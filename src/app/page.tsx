@@ -37,6 +37,7 @@ export default function Page() {
         )}
         {mode === 'assist' && (
           <GetAssistance
+            hospitalId={selectedHospitalId}
             hospitalName={selectedHospitalName}
             onBack={() => setMode('home')}
           />

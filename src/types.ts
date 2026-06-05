@@ -122,3 +122,82 @@ export type HospitalInfo = {
 }
 
 export type AppMode = 'home' | 'find' | 'assist'
+
+// ── Intake form types ─────────────────────────────────────────────────────────
+
+export type Ride = {
+  pickup: string
+  destination: string
+  date: string
+  time: string
+  transportationType: string[]
+  endDate: string
+  numberOfPassengers: string
+  notes: string
+}
+
+export type ContactHospitalData = {
+  fullName: string
+  phone: string
+  email: string
+  hospitalId: string
+  unitFloorRoom: string
+}
+
+export type MealsData = {
+  mealsFor: string
+  numberOfPeople: string
+  numberOfDays: string
+  mealTypes: string[]
+  dietaryRequirements: string[]
+  dietaryOther: string
+  hechsher: string
+  notes: string
+}
+
+export type TransportationData = {
+  rides: Ride[]
+}
+
+export type FamilyHousingData = {
+  housingFor: string
+  numberOfAdults: string
+  numberOfChildren: string
+  arrivalDate: string
+  departureDate: string
+  maxDistance: string
+  transportationAvailable: string
+  accommodationRequirements: string[]
+  notes: string
+}
+
+export type VisitorsData = {
+  visitorType: string[]
+  patientAgeGroup: string
+  bestTimes: string
+  notes: string
+}
+
+export type IntakeFormData = {
+  // Shared contact + hospital
+  contact: ContactHospitalData
+  // Big-form-only general fields
+  preferredContact: string
+  // Patient
+  patientName: string
+  relationship: string
+  // Situation
+  situation: string
+  // Assistance
+  assistanceNeeded: string[]
+  // Timing
+  timing: string
+  specificDate: string
+  // Additional
+  additionalInfo: string
+  // Service sections
+  meals: MealsData
+  transportation: TransportationData
+  familyHousing: FamilyHousingData
+  visitors: VisitorsData
+}

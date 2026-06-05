@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import IntakeModal from '@/components/IntakeModal'
+import IntakeForm from '@/components/intake/IntakeForm'
+import MealsForm from '@/components/intake/MealsForm'
+import TransportationForm from '@/components/intake/TransportationForm'
 
 const SERVICES = [
   {
@@ -27,12 +30,24 @@ const SERVICES = [
 ]
 
 type Props = {
+  hospitalId: string
   hospitalName: string
   onBack: () => void
 }
 
-export default function GetAssistance({ hospitalName, onBack }: Props) {
+export default function GetAssistance({ hospitalId, hospitalName, onBack }: Props) {
   const [activeModal, setActiveModal] = useState<string | null>(null)
+  const [showIntakeForm, setShowIntakeForm] = useState(false)
+
+  if (showIntakeForm) {
+    return (
+      <IntakeForm
+        hospitalId={hospitalId}
+        hospitalName={hospitalName}
+        onBack={() => setShowIntakeForm(false)}
+      />
+    )
+  }
 
   return (
     <div>
@@ -53,12 +68,14 @@ export default function GetAssistance({ hospitalName, onBack }: Props) {
         <p className="text-sm text-muted mt-0.5">{hospitalName}</p>
       </div>
 
-      {/* Primary CTA */}
+      {/* Primary CTA → full-page IntakeForm */}
       <div className="bg-primary rounded-xl p-5 mb-6 text-white">
         <p className="font-semibold text-lg mb-1">Need multiple services or not sure where to start?</p>
-        <p className="text-blue-100 text-sm mb-4">A community representative will reach out to help with whatever you need.</p>
+        <p className="text-blue-100 text-sm mb-4">
+          A community representative will reach out to help with whatever you need.
+        </p>
         <button
-          onClick={() => setActiveModal('Request Direct Support')}
+          onClick={() => setShowIntakeForm(true)}
           className="bg-white text-primary font-semibold px-5 py-2.5 rounded-md shadow hover:bg-blue-50 transition-colors cursor-pointer"
         >
           Request Direct Support
@@ -85,7 +102,17 @@ export default function GetAssistance({ hospitalName, onBack }: Props) {
         ))}
       </div>
 
-      {activeModal && (
+      {activeModal === 'Meals' && (
+        <IntakeModal title="Request Meals" onClose={() => setActiveModal(null)}>
+          <MealsForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+        </IntakeModal>
+      )}
+      {activeModal === 'Transportation' && (
+        <IntakeModal title="Request Transportation" onClose={() => setActiveModal(null)}>
+          <TransportationForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+        </IntakeModal>
+      )}
+      {activeModal && activeModal !== 'Meals' && activeModal !== 'Transportation' && (
         <IntakeModal title={activeModal} onClose={() => setActiveModal(null)} />
       )}
     </div>
