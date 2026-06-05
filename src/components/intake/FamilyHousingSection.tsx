@@ -12,14 +12,6 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
 
   return (
     <ServiceSection title="Family Housing" icon="🏠">
-      <Field label="Housing needed for">
-        <TextInput
-          value={data.housingFor}
-          onChange={(e) => set('housingFor', e.target.value)}
-          placeholder='e.g. "2 adults Thursday night, 5 adults for Shabbos"'
-        />
-      </Field>
-
       <div className="grid grid-cols-2 gap-3">
         <Field label="Number of adults">
           <TextInput
@@ -58,48 +50,70 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
         </Field>
       </div>
 
-      <Field label="Maximum distance from hospital">
-        <SelectInput
-          value={data.maxDistance}
-          onChange={(e) => set('maxDistance', e.target.value)}
-          options={[
-            { value: 'walking', label: 'Walking distance (< 0.5 mi)' },
-            { value: '1mile', label: 'Within 1 mile' },
-            { value: '2miles', label: 'Within 2 miles' },
-            { value: '5miles', label: 'Within 5 miles' },
-            { value: 'any', label: 'No preference' },
-          ]}
+      <Field label="Who will be staying?">
+        <Textarea
+          value={data.housingFor}
+          onChange={(e) => set('housingFor', e.target.value)}
+          placeholder='e.g. "2 adults Thursday night, 5 adults for Shabbos"'
+          rows={2}
         />
       </Field>
 
-      <Field label="Transportation available">
-        <RadioGroup
-          name="transportationAvailable"
-          columns={2}
-          options={[
-            { value: 'yes', label: 'Yes' },
-            { value: 'no', label: 'No' },
-          ]}
-          value={data.transportationAvailable}
-          onChange={(v) => set('transportationAvailable', v)}
-        />
-      </Field>
-
-      <Field label="Accommodation requirements">
+      <Field label="Housing preference (select all that apply)">
         <CheckboxGroup
           options={[
-            { value: 'family', label: 'Family accommodations' },
-            { value: 'accessible', label: 'Accessible accommodations' },
-            { value: 'maleOnly', label: 'Male only' },
-            { value: 'femaleOnly', label: 'Female only' },
-            { value: 'other', label: 'Other' },
+            { value: 'familyHome', label: 'Family home' },
+            { value: 'womenOnly', label: "Women's accommodations only" },
+            { value: 'menOnly', label: "Men's accommodations only" },
+            { value: 'mixedOkay', label: 'Mixed accommodations are okay' },
+            { value: 'noPreference', label: 'No preference' },
           ]}
           selected={data.accommodationRequirements}
           onChange={(v) => set('accommodationRequirements', v)}
         />
       </Field>
 
-      <Field label="Additional housing notes">
+      <Field label="Distance preference">
+        <RadioGroup
+          name="maxDistance"
+          options={[
+            { value: 'walking', label: 'Walking distance preferred' },
+            { value: '5min', label: 'Within 5 minutes' },
+            { value: '10min', label: 'Within 10 minutes' },
+            { value: '15min', label: 'Within 15 minutes' },
+            { value: 'flexible', label: 'Flexible' },
+          ]}
+          value={data.maxDistance}
+          onChange={(v) => set('maxDistance', v)}
+        />
+      </Field>
+
+      <Field label="Transportation availability">
+        <RadioGroup
+          name="transportationAvailable"
+          options={[
+            { value: 'nearTransit', label: 'Must be near public transportation' },
+            { value: 'noPreference', label: 'No transit preference' },
+          ]}
+          value={data.transportationAvailable}
+          onChange={(v) => set('transportationAvailable', v)}
+        />
+      </Field>
+
+      <Field label="Accessibility requirements">
+        <CheckboxGroup
+          options={[
+            { value: 'none', label: 'No accessibility requirements' },
+            { value: 'wheelchair', label: 'Wheelchair accessible' },
+            { value: 'elevator', label: 'Elevator required' },
+            { value: 'other', label: 'Other' },
+          ]}
+          selected={data.accessibilityRequirements}
+          onChange={(v) => set('accessibilityRequirements', v)}
+        />
+      </Field>
+
+      <Field label="Additional housing details">
         <Textarea
           value={data.notes}
           onChange={(e) => set('notes', e.target.value)}

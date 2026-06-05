@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import type { ContactHospitalData, MealsData } from '@/types'
+import type { ContactHospitalData, VisitorsData } from '@/types'
 import { submitRequest } from '@/lib/submitRequest'
 import ContactHospitalSection from './ContactHospitalSection'
-import MealsSection from './MealsSection'
+import VisitorsSection from './VisitorsSection'
 
 type Props = {
   hospitalId: string
@@ -15,22 +15,23 @@ function makeContact(hospitalId: string): ContactHospitalData {
   return { fullName: '', phone: '', email: '', hospitalId, unitFloorRoom: '' }
 }
 
-function makeMeals(): MealsData {
+function makeVisitors(): VisitorsData {
   return {
-    mealsFor: '',
-    numberOfPeople: '',
-    numberOfDays: '',
-    mealTypes: [],
-    dietaryRequirements: [],
-    dietaryOther: '',
-    hechsher: '',
-    notes: '',
+    patientName: '',
+    patientAgeGroup: '',
+    visitorType: [],
+    visitFrequency: '',
+    bestTimes: [],
+    bestTimesOther: '',
+    genderPreference: '',
+    startDate: '',
+    additionalInfo: '',
   }
 }
 
-export default function MealsForm({ hospitalId, onClose }: Props) {
+export default function VisitorsForm({ hospitalId, onClose }: Props) {
   const [contact, setContact] = useState<ContactHospitalData>(() => makeContact(hospitalId))
-  const [meals, setMeals] = useState<MealsData>(makeMeals)
+  const [visitors, setVisitors] = useState<VisitorsData>(makeVisitors)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -45,7 +46,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
     setErrors([])
     setSubmitting(true)
     try {
-      await submitRequest('Meals', contact, { ...meals })
+      await submitRequest('Visitors', contact, { ...visitors })
       setSubmitted(true)
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Something went wrong. Please try again.'])
@@ -60,7 +61,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
         <div className="text-4xl mb-3">✅</div>
         <h3 className="text-lg font-semibold text-slate-800 mb-2">Request Submitted</h3>
         <p className="text-sm text-muted mb-4">
-          We'll be in touch shortly to coordinate your meals.
+          We'll be in touch shortly to coordinate your visitors.
         </p>
         <button
           onClick={onClose}
@@ -76,7 +77,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <ContactHospitalSection data={contact} onChange={setContact} />
 
-      <MealsSection data={meals} onChange={setMeals} />
+      <VisitorsSection data={visitors} onChange={setVisitors} />
 
       {errors.length > 0 && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-0.5">

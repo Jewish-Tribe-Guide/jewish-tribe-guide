@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { ContactHospitalData, TransportationData } from '@/types'
+import { submitRequest } from '@/lib/submitRequest'
 import ContactHospitalSection from './ContactHospitalSection'
 import TransportationSection from './TransportationSection'
 
@@ -35,9 +36,10 @@ export default function TransportationForm({ hospitalId, onClose }: Props) {
   const [contact, setContact] = useState<ContactHospitalData>(() => makeContact(hospitalId))
   const [transportation, setTransportation] = useState<TransportationData>(makeTransportation)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const errs: string[] = []
     if (!contact.fullName.trim()) errs.push('Name is required.')
@@ -45,8 +47,15 @@ export default function TransportationForm({ hospitalId, onClose }: Props) {
       errs.push('Phone or email is required.')
     if (errs.length > 0) { setErrors(errs); return }
     setErrors([])
-    console.log('Transportation request:', JSON.stringify({ contact, transportation }, null, 2))
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      await submitRequest('Transportation', contact, { ...transportation })
+      setSubmitted(true)
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Something went wrong. Please try again.'])
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (submitted) {
@@ -90,9 +99,10 @@ export default function TransportationForm({ hospitalId, onClose }: Props) {
 
       <button
         type="submit"
-        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer"
+        disabled={submitting}
+        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Submit Request
+        {submitting ? 'Submitting…' : 'Submit Request'}
       </button>
     </form>
   )

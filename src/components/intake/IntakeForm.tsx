@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { IntakeFormData } from '@/types'
+import { submitRequest } from '@/lib/submitRequest'
 import {
   Field, Textarea, CheckboxGroup, RadioGroup, SectionDivider, ServiceSection,
 } from './FormControls'
@@ -55,13 +56,19 @@ function makeInitialData(hospitalId: string): IntakeFormData {
       maxDistance: '',
       transportationAvailable: '',
       accommodationRequirements: [],
+      accessibilityRequirements: [],
       notes: '',
     },
     visitors: {
-      visitorType: [],
+      patientName: '',
       patientAgeGroup: '',
-      bestTimes: '',
-      notes: '',
+      visitorType: [],
+      visitFrequency: '',
+      bestTimes: [],
+      bestTimesOther: '',
+      genderPreference: '',
+      startDate: '',
+      additionalInfo: '',
     },
   }
 }
@@ -79,6 +86,7 @@ type Props = {
 export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) {
   const [form, setForm] = useState<IntakeFormData>(() => makeInitialData(hospitalId))
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
   const update = <K extends keyof IntakeFormData>(key: K, value: IntakeFormData[K]) =>
@@ -88,7 +96,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const errs: string[] = []
     if (!form.contact.fullName.trim()) errs.push('Full name is required.')
@@ -99,8 +107,17 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
     if (!form.timing) errs.push('Please select a timing preference.')
     if (errs.length > 0) { setErrors(errs); return }
     setErrors([])
-    console.log('Intake form payload:', JSON.stringify(form, null, 2))
-    setSubmitted(true)
+    setSubmitting(true)
+    try {
+      // The whole form (minus the shared contact block) is the request detail.
+      const { contact, ...formData } = form
+      await submitRequest('Direct Support', contact, formData)
+      setSubmitted(true)
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Something went wrong. Please try again.'])
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // ── Success view ────────────────────────────────────────────────────────────
@@ -316,9 +333,10 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
           <div className="pt-4 pb-8">
             <button
               type="submit"
-              className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer text-base"
+              disabled={submitting}
+              className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer text-base disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Submit Request
+              {submitting ? 'Submitting…' : 'Submit Request'}
             </button>
             <p className="text-xs text-muted text-center mt-3">
               A community representative will review your request and reach out within 24 hours.

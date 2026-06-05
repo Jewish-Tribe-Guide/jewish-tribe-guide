@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { ContactHospitalData, MealsData } from '@/types'
+import type { ContactHospitalData, FamilyHousingData } from '@/types'
 import { submitRequest } from '@/lib/submitRequest'
 import ContactHospitalSection from './ContactHospitalSection'
-import MealsSection from './MealsSection'
+import FamilyHousingSection from './FamilyHousingSection'
+import { Field, SelectInput } from './FormControls'
 
 type Props = {
   hospitalId: string
@@ -15,22 +16,25 @@ function makeContact(hospitalId: string): ContactHospitalData {
   return { fullName: '', phone: '', email: '', hospitalId, unitFloorRoom: '' }
 }
 
-function makeMeals(): MealsData {
+function makeHousing(): FamilyHousingData {
   return {
-    mealsFor: '',
-    numberOfPeople: '',
-    numberOfDays: '',
-    mealTypes: [],
-    dietaryRequirements: [],
-    dietaryOther: '',
-    hechsher: '',
+    housingFor: '',
+    numberOfAdults: '',
+    numberOfChildren: '',
+    arrivalDate: '',
+    departureDate: '',
+    maxDistance: '',
+    transportationAvailable: '',
+    accommodationRequirements: [],
+    accessibilityRequirements: [],
     notes: '',
   }
 }
 
-export default function MealsForm({ hospitalId, onClose }: Props) {
+export default function FamilyHousingForm({ hospitalId, onClose }: Props) {
   const [contact, setContact] = useState<ContactHospitalData>(() => makeContact(hospitalId))
-  const [meals, setMeals] = useState<MealsData>(makeMeals)
+  const [relationship, setRelationship] = useState('')
+  const [housing, setHousing] = useState<FamilyHousingData>(makeHousing)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -45,7 +49,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
     setErrors([])
     setSubmitting(true)
     try {
-      await submitRequest('Meals', contact, { ...meals })
+      await submitRequest('Family Housing', contact, { relationship, ...housing })
       setSubmitted(true)
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Something went wrong. Please try again.'])
@@ -60,7 +64,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
         <div className="text-4xl mb-3">✅</div>
         <h3 className="text-lg font-semibold text-slate-800 mb-2">Request Submitted</h3>
         <p className="text-sm text-muted mb-4">
-          We'll be in touch shortly to coordinate your meals.
+          We'll be in touch shortly to coordinate family housing.
         </p>
         <button
           onClick={onClose}
@@ -76,7 +80,23 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <ContactHospitalSection data={contact} onChange={setContact} />
 
-      <MealsSection data={meals} onChange={setMeals} />
+      <Field label="Relationship to patient">
+        <SelectInput
+          value={relationship}
+          onChange={(e) => setRelationship(e.target.value)}
+          options={[
+            { value: 'self', label: 'Self' },
+            { value: 'spouse', label: 'Spouse' },
+            { value: 'parent', label: 'Parent' },
+            { value: 'child', label: 'Child' },
+            { value: 'relative', label: 'Relative' },
+            { value: 'friend', label: 'Friend' },
+            { value: 'other', label: 'Other' },
+          ]}
+        />
+      </Field>
+
+      <FamilyHousingSection data={housing} onChange={setHousing} />
 
       {errors.length > 0 && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-0.5">

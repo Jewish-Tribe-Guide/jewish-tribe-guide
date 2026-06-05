@@ -168,14 +168,20 @@ export type FamilyHousingData = {
   maxDistance: string
   transportationAvailable: string
   accommodationRequirements: string[]
+  accessibilityRequirements: string[]
   notes: string
 }
 
 export type VisitorsData = {
-  visitorType: string[]
+  patientName: string
   patientAgeGroup: string
-  bestTimes: string
-  notes: string
+  visitorType: string[]
+  visitFrequency: string
+  bestTimes: string[]
+  bestTimesOther: string
+  genderPreference: string
+  startDate: string
+  additionalInfo: string
 }
 
 export type IntakeFormData = {

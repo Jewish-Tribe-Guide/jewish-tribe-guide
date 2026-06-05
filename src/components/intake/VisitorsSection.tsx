@@ -1,5 +1,5 @@
 import type { VisitorsData } from '@/types'
-import { Field, TextInput, Textarea, SelectInput, CheckboxGroup, ServiceSection } from './FormControls'
+import { Field, TextInput, Textarea, SelectInput, CheckboxGroup, RadioGroup, ServiceSection } from './FormControls'
 
 type Props = {
   data: VisitorsData
@@ -12,17 +12,11 @@ export default function VisitorsSection({ data, onChange }: Props) {
 
   return (
     <ServiceSection title="Visitors" icon="🤝">
-      <Field label="Visitor request type">
-        <CheckboxGroup
-          options={[
-            { value: 'friendlyVisit', label: 'Friendly Visit' },
-            { value: 'spiritualSupport', label: 'Spiritual Support' },
-            { value: 'chaplainVisit', label: 'Jewish Chaplain Visit' },
-            { value: 'minyanAssistance', label: 'Minyan Assistance' },
-            { value: 'other', label: 'Other' },
-          ]}
-          selected={data.visitorType}
-          onChange={(v) => set('visitorType', v)}
+      <Field label="Patient name">
+        <TextInput
+          value={data.patientName}
+          onChange={(e) => set('patientName', e.target.value)}
+          placeholder="Patient's full name"
         />
       </Field>
 
@@ -31,28 +25,89 @@ export default function VisitorsSection({ data, onChange }: Props) {
           value={data.patientAgeGroup}
           onChange={(e) => set('patientAgeGroup', e.target.value)}
           options={[
-            { value: 'child', label: 'Child (0–12)' },
-            { value: 'teen', label: 'Teen (13–17)' },
-            { value: 'youngAdult', label: 'Young Adult (18–30)' },
-            { value: 'adult', label: 'Adult (31–64)' },
-            { value: 'senior', label: 'Senior (65+)' },
+            { value: 'child', label: 'Child' },
+            { value: 'teen', label: 'Teen' },
+            { value: 'adult', label: 'Adult' },
+            { value: 'senior', label: 'Senior' },
           ]}
         />
       </Field>
 
-      <Field label="Best times for visits">
-        <TextInput
-          value={data.bestTimes}
-          onChange={(e) => set('bestTimes', e.target.value)}
-          placeholder="e.g. Weekday afternoons, Shabbat morning…"
+      <Field label="Visitor request type">
+        <CheckboxGroup
+          options={[
+            { value: 'friendlyVisit', label: 'Friendly Visit' },
+            { value: 'spiritualSupport', label: 'Spiritual Support' },
+            { value: 'chaplainVisit', label: 'Jewish Chaplain Visit' },
+            { value: 'learningPartner', label: 'Learning Partner' },
+            { value: 'minyanAssistance', label: 'Minyan Assistance' },
+            { value: 'other', label: 'Other' },
+          ]}
+          selected={data.visitorType}
+          onChange={(v) => set('visitorType', v)}
         />
       </Field>
 
-      <Field label="Additional visitor notes">
+      <Field label="Visit frequency">
+        <RadioGroup
+          name="visitFrequency"
+          options={[
+            { value: 'oneTime', label: 'One-time visit' },
+            { value: 'daily', label: 'Daily' },
+            { value: 'severalPerWeek', label: 'Several times per week' },
+            { value: 'flexible', label: 'Flexible' },
+          ]}
+          value={data.visitFrequency}
+          onChange={(v) => set('visitFrequency', v)}
+        />
+      </Field>
+
+      <Field label="Best times for visits">
+        <CheckboxGroup
+          options={[
+            { value: 'morning', label: 'Morning' },
+            { value: 'afternoon', label: 'Afternoon' },
+            { value: 'evening', label: 'Evening' },
+          ]}
+          selected={data.bestTimes}
+          onChange={(v) => set('bestTimes', v)}
+        />
+        <TextInput
+          className="mt-2"
+          value={data.bestTimesOther}
+          onChange={(e) => set('bestTimesOther', e.target.value)}
+          placeholder="Or describe preferred times…"
+        />
+      </Field>
+
+      <Field label="Visitor gender preference">
+        <RadioGroup
+          name="genderPreference"
+          options={[
+            { value: 'noPreference', label: 'No Preference' },
+            { value: 'malePreferred', label: 'Male Visitor Preferred' },
+            { value: 'maleRequired', label: 'Male Visitor Required' },
+            { value: 'femalePreferred', label: 'Female Visitor Preferred' },
+            { value: 'femaleRequired', label: 'Female Visitor Required' },
+          ]}
+          value={data.genderPreference}
+          onChange={(v) => set('genderPreference', v)}
+        />
+      </Field>
+
+      <Field label="Start date">
+        <TextInput
+          type="date"
+          value={data.startDate}
+          onChange={(e) => set('startDate', e.target.value)}
+        />
+      </Field>
+
+      <Field label="Additional information">
         <Textarea
-          value={data.notes}
-          onChange={(e) => set('notes', e.target.value)}
-          placeholder="Any preferences or details for visitors…"
+          value={data.additionalInfo}
+          onChange={(e) => set('additionalInfo', e.target.value)}
+          placeholder="Any other preferences or details for visitors…"
         />
       </Field>
     </ServiceSection>

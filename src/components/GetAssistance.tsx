@@ -5,6 +5,8 @@ import IntakeModal from '@/components/IntakeModal'
 import IntakeForm from '@/components/intake/IntakeForm'
 import MealsForm from '@/components/intake/MealsForm'
 import TransportationForm from '@/components/intake/TransportationForm'
+import VisitorsForm from '@/components/intake/VisitorsForm'
+import FamilyHousingForm from '@/components/intake/FamilyHousingForm'
 
 const SERVICES = [
   {
@@ -112,7 +114,17 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
           <TransportationForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
         </IntakeModal>
       )}
-      {activeModal && activeModal !== 'Meals' && activeModal !== 'Transportation' && (
+      {activeModal === 'Request Visitors' && (
+        <IntakeModal title="Request Visitors" onClose={() => setActiveModal(null)}>
+          <VisitorsForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+        </IntakeModal>
+      )}
+      {activeModal === 'Family Housing' && (
+        <IntakeModal title="Family Housing" onClose={() => setActiveModal(null)}>
+          <FamilyHousingForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+        </IntakeModal>
+      )}
+      {activeModal && activeModal !== 'Meals' && activeModal !== 'Transportation' && activeModal !== 'Request Visitors' && activeModal !== 'Family Housing' && (
         <IntakeModal title={activeModal} onClose={() => setActiveModal(null)} />
       )}
     </div>
