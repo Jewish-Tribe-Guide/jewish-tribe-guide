@@ -168,7 +168,9 @@ export function RadioGroup({ name, options, value, onChange, columns = 1 }: Radi
 
 export function SectionDivider({ title, icon, required }: { title: string; icon: string; required?: boolean }) {
   return (
-    <div className="flex items-center gap-2 pt-6 pb-3 border-t border-slate-200 mt-2">
+    // When this is the first element in a form/card, drop the top rule + spacing
+    // so there's no divider line floating at the very top.
+    <div className="flex items-center gap-2 pt-6 pb-3 border-t border-slate-200 mt-2 first:border-t-0 first:pt-0 first:mt-0">
       <span aria-hidden="true">{icon}</span>
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
         {title}

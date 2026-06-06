@@ -161,8 +161,9 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
         <p className="text-sm text-muted mt-0.5">{hospitalName}</p>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="space-y-4">
 
           {/* ── Contact + Hospital + Preferred Contact ──────────────────────── */}
           <ContactHospitalSection
@@ -289,8 +290,9 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
             <SubmitButton submitting={submitting} />
           </div>
 
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
