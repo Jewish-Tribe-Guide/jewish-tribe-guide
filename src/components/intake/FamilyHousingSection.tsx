@@ -1,5 +1,5 @@
 import type { FamilyHousingData } from '@/types'
-import { Field, TextInput, Textarea, SelectInput, CheckboxGroup, RadioGroup, ServiceSection } from './FormControls'
+import { Field, TextInput, Textarea, CheckboxGroup, RadioGroup } from './FormControls'
 
 type Props = {
   data: FamilyHousingData
@@ -11,7 +11,7 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
     onChange({ ...data, [key]: value })
 
   return (
-    <ServiceSection title="Family Housing" icon="🏠">
+    <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Number of adults">
           <TextInput
@@ -78,9 +78,9 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
           name="maxDistance"
           options={[
             { value: 'walking', label: 'Walking distance preferred' },
-            { value: '5min', label: 'Within 5 minutes' },
-            { value: '10min', label: 'Within 10 minutes' },
-            { value: '15min', label: 'Within 15 minutes' },
+            { value: '5min', label: 'Within a 5 minute drive' },
+            { value: '10min', label: 'Within a 10 minute drive' },
+            { value: '15min', label: 'Within a 15 minute drive' },
             { value: 'flexible', label: 'Flexible' },
           ]}
           value={data.maxDistance}
@@ -111,6 +111,14 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
           selected={data.accessibilityRequirements}
           onChange={(v) => set('accessibilityRequirements', v)}
         />
+        {data.accessibilityRequirements.includes('other') && (
+          <TextInput
+            className="mt-2"
+            value={data.accessibilityOther}
+            onChange={(e) => set('accessibilityOther', e.target.value)}
+            placeholder="Please describe your accessibility needs…"
+          />
+        )}
       </Field>
 
       <Field label="Additional housing details">
@@ -120,6 +128,6 @@ export default function FamilyHousingSection({ data, onChange }: Props) {
           placeholder="Any other details or special requests…"
         />
       </Field>
-    </ServiceSection>
+    </div>
   )
 }

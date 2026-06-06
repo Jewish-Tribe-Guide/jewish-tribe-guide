@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { ContactHospitalData, MealsData } from '@/types'
 import { submitRequest } from '@/lib/submitRequest'
+import { validateContact } from '@/lib/validation'
+import { SectionDivider, SubmitButton } from './FormControls'
 import ContactHospitalSection from './ContactHospitalSection'
 import MealsSection from './MealsSection'
 
@@ -12,14 +14,15 @@ type Props = {
 }
 
 function makeContact(hospitalId: string): ContactHospitalData {
-  return { fullName: '', phone: '', email: '', hospitalId, unitFloorRoom: '' }
+  return { fullName: '', phone: '', email: '', preferredContact: '', hospitalId, unitFloorRoom: '' }
 }
 
 function makeMeals(): MealsData {
   return {
     mealsFor: '',
     numberOfPeople: '',
-    numberOfDays: '',
+    startDate: '',
+    endDate: '',
     mealTypes: [],
     dietaryRequirements: [],
     dietaryOther: '',
@@ -37,10 +40,7 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const errs: string[] = []
-    if (!contact.fullName.trim()) errs.push('Name is required.')
-    if (!contact.phone.trim() && !contact.email.trim())
-      errs.push('Phone or email is required.')
+    const errs = validateContact(contact)
     if (errs.length > 0) { setErrors(errs); return }
     setErrors([])
     setSubmitting(true)
@@ -59,13 +59,8 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
       <div className="text-center py-6">
         <div className="text-4xl mb-3">✅</div>
         <h3 className="text-lg font-semibold text-slate-800 mb-2">Request Submitted</h3>
-        <p className="text-sm text-muted mb-4">
-          We'll be in touch shortly to coordinate your meals.
-        </p>
-        <button
-          onClick={onClose}
-          className="bg-primary text-white font-semibold px-5 py-2 rounded-md cursor-pointer hover:bg-primary-dark transition-colors"
-        >
+        <p className="text-sm text-muted mb-4">We'll be in touch shortly to coordinate your meals.</p>
+        <button onClick={onClose} className="bg-primary text-white font-semibold px-5 py-2 rounded-md cursor-pointer hover:bg-primary-dark transition-colors">
           Close
         </button>
       </div>
@@ -75,24 +70,14 @@ export default function MealsForm({ hospitalId, onClose }: Props) {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <ContactHospitalSection data={contact} onChange={setContact} />
-
+      <SectionDivider title="Meal Details" icon="🍽️" />
       <MealsSection data={meals} onChange={setMeals} />
-
       {errors.length > 0 && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 space-y-0.5">
-          {errors.map((err, i) => (
-            <p key={i} className="text-sm text-red-600">{err}</p>
-          ))}
+          {errors.map((err, i) => <p key={i} className="text-sm text-red-600">{err}</p>)}
         </div>
       )}
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {submitting ? 'Submitting…' : 'Submit Request'}
-      </button>
+      <SubmitButton submitting={submitting} />
     </form>
   )
 }

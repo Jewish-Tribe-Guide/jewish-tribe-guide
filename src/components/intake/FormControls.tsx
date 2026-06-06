@@ -1,4 +1,5 @@
 // Shared form primitives used across all intake sections
+import React from 'react'
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary'
@@ -25,17 +26,40 @@ export function Field({ label, required, children }: FieldProps) {
 
 // ── Text input ────────────────────────────────────────────────────────────────
 
-export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={inputClass} {...props} />
-}
+export const TextInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
+  function TextInput({ className, type, autoComplete, ...props }, ref) {
+    // Date fields should never be browser-autofilled (avoids surprise "prefilled" dates).
+    const resolvedAutoComplete = autoComplete ?? (type === 'date' ? 'off' : undefined)
+    // A native date input renders its "mm/dd/yyyy" format text in the full text
+    // color; gray it like a placeholder until a real date is entered (styled in
+    // globals.css).
+    const isEmptyDate = type === 'date' && !props.value
+    return (
+      <input
+        ref={ref}
+        type={type}
+        autoComplete={resolvedAutoComplete}
+        className={[inputClass, isEmptyDate && 'date-empty', className].filter(Boolean).join(' ')}
+        {...props}
+      />
+    )
+  }
+)
 
 // ── Textarea ──────────────────────────────────────────────────────────────────
 
 export function Textarea({
+  className,
   rows = 3,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={`${inputClass} resize-none`} rows={rows} {...props} />
+  return (
+    <textarea
+      className={[`${inputClass} resize-none`, className].filter(Boolean).join(' ')}
+      rows={rows}
+      {...props}
+    />
+  )
 }
 
 // ── Select ────────────────────────────────────────────────────────────────────
@@ -45,10 +69,10 @@ type SelectInputProps = React.SelectHTMLAttributes<HTMLSelectElement> & {
   placeholder?: string
 }
 
-export function SelectInput({ options, placeholder = 'Select…', ...props }: SelectInputProps) {
+export function SelectInput({ options, placeholder = 'Select…', className, ...props }: SelectInputProps) {
   return (
     <div className="relative">
-      <select className={`${inputClass} appearance-none pr-8`} {...props}>
+      <select className={[`${inputClass} appearance-none pr-8`, className].filter(Boolean).join(' ')} {...props}>
         <option value="">{placeholder}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -142,16 +166,19 @@ export function RadioGroup({ name, options, value, onChange, columns = 1 }: Radi
 
 // ── Section divider (base sections) ──────────────────────────────────────────
 
-export function SectionDivider({ title, icon }: { title: string; icon: string }) {
+export function SectionDivider({ title, icon, required }: { title: string; icon: string; required?: boolean }) {
   return (
     <div className="flex items-center gap-2 pt-6 pb-3 border-t border-slate-200 mt-2">
       <span aria-hidden="true">{icon}</span>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+        {title}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </h3>
     </div>
   )
 }
 
-// ── Service section wrapper (revealed sections) ───────────────────────────────
+// ── Service section wrapper (revealed sections in the big form) ───────────────
 
 export function ServiceSection({
   title,
@@ -169,6 +196,30 @@ export function ServiceSection({
         {title}
       </h4>
       {children}
+    </div>
+  )
+}
+
+// ── Submit button + 24h note (used by every mini form) ────────────────────────
+
+type SubmitButtonProps = {
+  submitting: boolean
+  label?: string
+}
+
+export function SubmitButton({ submitting, label = 'Submit Request' }: SubmitButtonProps) {
+  return (
+    <div className="pt-2">
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {submitting ? 'Submitting…' : label}
+      </button>
+      <p className="text-xs text-muted text-center mt-3">
+        A community representative will review your request and reach out within 24 hours.
+      </p>
     </div>
   )
 }

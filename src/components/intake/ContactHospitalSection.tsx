@@ -1,6 +1,6 @@
 import { hospitals } from '@/data/hospitals'
 import type { ContactHospitalData } from '@/types'
-import { Field, TextInput, SelectInput, SectionDivider } from './FormControls'
+import { Field, TextInput, SelectInput, RadioGroup, SectionDivider } from './FormControls'
 
 type Props = {
   data: ContactHospitalData
@@ -24,7 +24,7 @@ export default function ContactHospitalSection({ data, onChange }: Props) {
         />
       </Field>
 
-      <Field label="Phone">
+      <Field label="Phone" required>
         <TextInput
           type="tel"
           value={data.phone}
@@ -41,6 +41,20 @@ export default function ContactHospitalSection({ data, onChange }: Props) {
           onChange={(e) => set('email', e.target.value)}
           placeholder="you@example.com"
           autoComplete="email"
+        />
+      </Field>
+
+      <Field label="Preferred contact method">
+        <RadioGroup
+          name="preferredContact"
+          columns={2}
+          options={[
+            { value: 'phone', label: 'Phone call' },
+            { value: 'text', label: 'Text message' },
+            { value: 'email', label: 'Email' },
+          ]}
+          value={data.preferredContact}
+          onChange={(v) => set('preferredContact', v)}
         />
       </Field>
 

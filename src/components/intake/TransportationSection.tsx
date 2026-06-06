@@ -1,18 +1,13 @@
+'use client'
+
 import type { TransportationData, Ride } from '@/types'
-import { Field, TextInput, Textarea, CheckboxGroup } from './FormControls'
+import { Field, TextInput, Textarea } from './FormControls'
+import AddressInput from './AddressInput'
 
 type Props = {
   data: TransportationData
   onChange: (data: TransportationData) => void
 }
-
-const TRANSPORT_TYPES = [
-  { value: 'toHospital', label: 'To Hospital' },
-  { value: 'fromHospital', label: 'From Hospital' },
-  { value: 'recurring', label: 'Recurring Ride' },
-  { value: 'airport', label: 'Airport Transportation' },
-  { value: 'other', label: 'Other' },
-]
 
 function emptyRide(): Ride {
   return {
@@ -20,7 +15,7 @@ function emptyRide(): Ride {
     destination: '',
     date: '',
     time: '',
-    transportationType: [],
+    recurring: false,
     endDate: '',
     numberOfPassengers: '',
     notes: '',
@@ -47,11 +42,8 @@ export default function TransportationSection({ data, onChange }: Props) {
           key={i}
           className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4"
         >
-          {/* Ride header */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-700">
-              Ride {i + 1}
-            </span>
+            <span className="text-sm font-semibold text-slate-700">Ride {i + 1}</span>
             {data.rides.length > 1 && (
               <button
                 type="button"
@@ -63,25 +55,23 @@ export default function TransportationSection({ data, onChange }: Props) {
             )}
           </div>
 
-          {/* Pickup / Destination */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Pickup location">
-              <TextInput
+              <AddressInput
                 value={ride.pickup}
-                onChange={(e) => updateRide(i, 'pickup', e.target.value)}
+                onChange={(v) => updateRide(i, 'pickup', v)}
                 placeholder="Address or location"
               />
             </Field>
             <Field label="Destination">
-              <TextInput
+              <AddressInput
                 value={ride.destination}
-                onChange={(e) => updateRide(i, 'destination', e.target.value)}
+                onChange={(v) => updateRide(i, 'destination', v)}
                 placeholder="Address or location"
               />
             </Field>
           </div>
 
-          {/* Date / Time */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Date">
               <TextInput
@@ -99,19 +89,18 @@ export default function TransportationSection({ data, onChange }: Props) {
             </Field>
           </div>
 
-          {/* Transportation type */}
-          <Field label="Transportation type">
-            <CheckboxGroup
-              columns={2}
-              options={TRANSPORT_TYPES}
-              selected={ride.transportationType}
-              onChange={(v) => updateRide(i, 'transportationType', v)}
+          <label className="flex items-center gap-2 text-sm text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={ride.recurring}
+              onChange={(e) => updateRide(i, 'recurring', e.target.checked)}
+              className="rounded border-slate-300 text-primary focus:ring-primary"
             />
-          </Field>
+            Recurring ride
+          </label>
 
-          {/* End date — revealed when Recurring is selected */}
-          {ride.transportationType.includes('recurring') && (
-            <Field label="End date">
+          {ride.recurring && (
+            <Field label="End date (optional)">
               <TextInput
                 type="date"
                 value={ride.endDate}
@@ -120,7 +109,6 @@ export default function TransportationSection({ data, onChange }: Props) {
             </Field>
           )}
 
-          {/* Number of passengers */}
           <Field label="Number of passengers">
             <TextInput
               type="number"
@@ -131,7 +119,6 @@ export default function TransportationSection({ data, onChange }: Props) {
             />
           </Field>
 
-          {/* Additional notes */}
           <Field label="Additional notes">
             <Textarea
               value={ride.notes}

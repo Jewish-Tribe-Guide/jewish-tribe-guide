@@ -1,5 +1,5 @@
 import type { VisitorsData } from '@/types'
-import { Field, TextInput, Textarea, SelectInput, CheckboxGroup, RadioGroup, ServiceSection } from './FormControls'
+import { Field, TextInput, Textarea, SelectInput, CheckboxGroup, RadioGroup } from './FormControls'
 
 type Props = {
   data: VisitorsData
@@ -11,7 +11,7 @@ export default function VisitorsSection({ data, onChange }: Props) {
     onChange({ ...data, [key]: value })
 
   return (
-    <ServiceSection title="Visitors" icon="🤝">
+    <div className="space-y-4">
       <Field label="Patient name">
         <TextInput
           value={data.patientName}
@@ -46,6 +46,14 @@ export default function VisitorsSection({ data, onChange }: Props) {
           selected={data.visitorType}
           onChange={(v) => set('visitorType', v)}
         />
+        {data.visitorType.includes('other') && (
+          <TextInput
+            className="mt-2"
+            value={data.visitorTypeOther}
+            onChange={(e) => set('visitorTypeOther', e.target.value)}
+            placeholder="Please describe…"
+          />
+        )}
       </Field>
 
       <Field label="Visit frequency">
@@ -110,6 +118,6 @@ export default function VisitorsSection({ data, onChange }: Props) {
           placeholder="Any other preferences or details for visitors…"
         />
       </Field>
-    </ServiceSection>
+    </div>
   )
 }

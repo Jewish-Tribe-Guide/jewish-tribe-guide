@@ -1,5 +1,6 @@
 import { hospitals } from '@/data/hospitals'
 import type { ContactHospitalData } from '@/types'
+import { validateContact } from './validation'
 
 // ── Request types ──────────────────────────────────────────────────────────────
 
@@ -48,13 +49,8 @@ export function generateRequestId(): string {
 
 // Validates the payload. Returns a list of error strings (empty = valid).
 export function validateSubmission(payload: SubmissionPayload): string[] {
-  const errs: string[] = []
-  if (!payload.requestType) errs.push('Request type is required.')
-  const c = payload.contact
-  if (!c || !c.fullName?.trim()) errs.push('Name is required.')
-  if (!c?.phone?.trim() && !c?.email?.trim())
-    errs.push('Phone or email is required.')
-  return errs
+  if (!payload.requestType) return ['Request type is required.']
+  return validateContact(payload.contact)
 }
 
 // Builds the row (matching SHEET_COLUMNS order) for a validated submission.

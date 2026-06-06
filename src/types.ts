@@ -1,6 +1,45 @@
 export type Hospital = {
   id: string
   name: string
+  latitude: number
+  longitude: number
+  timezone: string
+}
+
+// ── Zmanim & Shabbos ──────────────────────────────────────────────────────────
+
+/** A single labeled time, e.g. { label: 'Sunrise', time: '5:32 AM' }. */
+export type ZmanEntry = {
+  label: string
+  time: string
+}
+
+/**
+ * Normalized zmanim payload for the Zmanim & Shabbos card.
+ *
+ * Structured so future sections can be added without changing the existing
+ * shape — `parsha`, `holidays`, and `fastDay` are optional slots that the UI
+ * can render once `lib/zmanim.ts` starts populating them.
+ */
+export type ZmanimData = {
+  /** Today's Hebrew date, e.g. "21 Sivan 5786". */
+  hebrewDate: string
+  /** Day of week in the hospital's timezone (0 = Sunday … 6 = Saturday). */
+  dayOfWeek: number
+  isFriday: boolean
+  isShabbos: boolean
+  /** Sunrise, Latest Shema, Latest Shacharis, Sunset, Nightfall (extendable). */
+  dailyZmanim: ZmanEntry[]
+  shabbos: {
+    /** label = weekday (e.g. "Friday"), time = candle lighting time. */
+    candleLighting: ZmanEntry | null
+    /** label = weekday (e.g. "Saturday"), time = havdalah time. */
+    havdalah: ZmanEntry | null
+  }
+  // ── Future-friendly slots (not yet populated) ──
+  parsha?: string
+  holidays?: string[]
+  fastDay?: { label: string; start: string; end: string } | null
 }
 
 export type SynagogueContact = {
@@ -130,7 +169,7 @@ export type Ride = {
   destination: string
   date: string
   time: string
-  transportationType: string[]
+  recurring: boolean
   endDate: string
   numberOfPassengers: string
   notes: string
@@ -140,6 +179,7 @@ export type ContactHospitalData = {
   fullName: string
   phone: string
   email: string
+  preferredContact: string
   hospitalId: string
   unitFloorRoom: string
 }
@@ -147,7 +187,8 @@ export type ContactHospitalData = {
 export type MealsData = {
   mealsFor: string
   numberOfPeople: string
-  numberOfDays: string
+  startDate: string
+  endDate: string
   mealTypes: string[]
   dietaryRequirements: string[]
   dietaryOther: string
@@ -169,6 +210,7 @@ export type FamilyHousingData = {
   transportationAvailable: string
   accommodationRequirements: string[]
   accessibilityRequirements: string[]
+  accessibilityOther: string
   notes: string
 }
 
@@ -176,6 +218,7 @@ export type VisitorsData = {
   patientName: string
   patientAgeGroup: string
   visitorType: string[]
+  visitorTypeOther: string
   visitFrequency: string
   bestTimes: string[]
   bestTimesOther: string
@@ -187,8 +230,6 @@ export type VisitorsData = {
 export type IntakeFormData = {
   // Shared contact + hospital
   contact: ContactHospitalData
-  // Big-form-only general fields
-  preferredContact: string
   // Patient
   patientName: string
   relationship: string

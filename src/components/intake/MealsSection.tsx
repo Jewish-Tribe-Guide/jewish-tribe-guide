@@ -24,23 +24,29 @@ export default function MealsSection({ data, onChange }: Props) {
         />
       </Field>
 
+      <Field label="Number of people">
+        <TextInput
+          type="number"
+          min="1"
+          value={data.numberOfPeople}
+          onChange={(e) => set('numberOfPeople', e.target.value)}
+          placeholder="e.g. 4"
+        />
+      </Field>
+
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Number of people">
+        <Field label="Start date">
           <TextInput
-            type="number"
-            min="1"
-            value={data.numberOfPeople}
-            onChange={(e) => set('numberOfPeople', e.target.value)}
-            placeholder="e.g. 4"
+            type="date"
+            value={data.startDate}
+            onChange={(e) => set('startDate', e.target.value)}
           />
         </Field>
-        <Field label="Number of days needed">
+        <Field label="End date (optional)">
           <TextInput
-            type="number"
-            min="1"
-            value={data.numberOfDays}
-            onChange={(e) => set('numberOfDays', e.target.value)}
-            placeholder="e.g. 3"
+            type="date"
+            value={data.endDate}
+            onChange={(e) => set('endDate', e.target.value)}
           />
         </Field>
       </div>
@@ -77,7 +83,7 @@ export default function MealsSection({ data, onChange }: Props) {
             className="mt-2"
             value={data.dietaryOther}
             onChange={(e) => set('dietaryOther', e.target.value)}
-            placeholder="Please describe…"
+            placeholder="Please describe your dietary requirements…"
           />
         )}
       </Field>

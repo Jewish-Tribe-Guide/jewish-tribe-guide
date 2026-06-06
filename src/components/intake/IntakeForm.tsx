@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import type { IntakeFormData } from '@/types'
 import { submitRequest } from '@/lib/submitRequest'
+import { validateContact } from '@/lib/validation'
 import {
-  Field, Textarea, CheckboxGroup, RadioGroup, SectionDivider, ServiceSection,
+  Field, TextInput, Textarea, SelectInput, CheckboxGroup, RadioGroup,
+  SectionDivider, ServiceSection, SubmitButton,
 } from './FormControls'
 import ContactHospitalSection from './ContactHospitalSection'
 import MealsSection from './MealsSection'
@@ -20,10 +22,10 @@ function makeInitialData(hospitalId: string): IntakeFormData {
       fullName: '',
       phone: '',
       email: '',
+      preferredContact: '',
       hospitalId,
       unitFloorRoom: '',
     },
-    preferredContact: '',
     patientName: '',
     relationship: '',
     situation: '',
@@ -34,7 +36,8 @@ function makeInitialData(hospitalId: string): IntakeFormData {
     meals: {
       mealsFor: '',
       numberOfPeople: '',
-      numberOfDays: '',
+      startDate: '',
+      endDate: '',
       mealTypes: [],
       dietaryRequirements: [],
       dietaryOther: '',
@@ -44,7 +47,7 @@ function makeInitialData(hospitalId: string): IntakeFormData {
     transportation: {
       rides: [{
         pickup: '', destination: '', date: '', time: '',
-        transportationType: [], endDate: '', numberOfPassengers: '', notes: '',
+        recurring: false, endDate: '', numberOfPassengers: '', notes: '',
       }],
     },
     familyHousing: {
@@ -57,12 +60,14 @@ function makeInitialData(hospitalId: string): IntakeFormData {
       transportationAvailable: '',
       accommodationRequirements: [],
       accessibilityRequirements: [],
+      accessibilityOther: '',
       notes: '',
     },
     visitors: {
       patientName: '',
       patientAgeGroup: '',
       visitorType: [],
+      visitorTypeOther: '',
       visitFrequency: '',
       bestTimes: [],
       bestTimesOther: '',
@@ -98,10 +103,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const errs: string[] = []
-    if (!form.contact.fullName.trim()) errs.push('Full name is required.')
-    if (!form.contact.phone.trim() && !form.contact.email.trim())
-      errs.push('At least one contact method (phone or email) is required.')
+    const errs = validateContact(form.contact)
     if (form.assistanceNeeded.length === 0)
       errs.push('Please select at least one type of assistance.')
     if (!form.timing) errs.push('Please select a timing preference.')
@@ -109,7 +111,6 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
     setErrors([])
     setSubmitting(true)
     try {
-      // The whole form (minus the shared contact block) is the request detail.
       const { contact, ...formData } = form
       await submitRequest('Direct Support', contact, formData)
       setSubmitted(true)
@@ -125,10 +126,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
   if (submitted) {
     return (
       <div>
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-        >
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
@@ -138,13 +136,8 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
           <div className="text-5xl mb-4">✅</div>
           <h2 className="text-2xl font-semibold text-slate-800 mb-2">Request Submitted</h2>
           <p className="text-muted mb-1">A community representative will reach out to you shortly.</p>
-          <p className="text-muted text-sm mb-8">
-            For urgent needs, please call the Bikur Cholim line directly.
-          </p>
-          <button
-            onClick={onBack}
-            className="bg-primary text-white font-semibold px-6 py-2.5 rounded-md shadow hover:bg-primary-dark transition-colors cursor-pointer"
-          >
+          <p className="text-muted text-sm mb-8">For urgent needs, please call the Bikur Cholim line directly.</p>
+          <button onClick={onBack} className="bg-primary text-white font-semibold px-6 py-2.5 rounded-md shadow hover:bg-primary-dark transition-colors cursor-pointer">
             Back to Get Assistance
           </button>
         </div>
@@ -156,10 +149,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
 
   return (
     <div>
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
@@ -174,60 +164,35 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
       <form onSubmit={handleSubmit} noValidate>
         <div className="space-y-4">
 
-          {/* ── Contact + Hospital (shared section) ──────────────────────────── */}
+          {/* ── Contact + Hospital + Preferred Contact ──────────────────────── */}
           <ContactHospitalSection
             data={form.contact}
             onChange={(d) => update('contact', d)}
           />
 
-          {/* ── Preferred contact method (big-form only) ─────────────────────── */}
-          <SectionDivider title="Preferred Contact Method" icon="📱" />
-          <RadioGroup
-            name="preferredContact"
-            columns={2}
-            options={[
-              { value: 'phone', label: 'Phone call' },
-              { value: 'text', label: 'Text message' },
-              { value: 'email', label: 'Email' },
-            ]}
-            value={form.preferredContact}
-            onChange={(v) => update('preferredContact', v)}
-          />
-
           {/* ── Patient Information ──────────────────────────────────────────── */}
           <SectionDivider title="Patient Information" icon="🏥" />
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Patient Name (optional)">
-              <input
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+              <TextInput
                 value={form.patientName}
                 onChange={(e) => update('patientName', e.target.value)}
                 placeholder="Patient's full name"
               />
             </Field>
             <Field label="Your relationship to the patient">
-              <div className="relative">
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary appearance-none pr-8"
-                  value={form.relationship}
-                  onChange={(e) => update('relationship', e.target.value)}
-                >
-                  <option value="">Select…</option>
-                  {['Self', 'Spouse', 'Parent', 'Child', 'Relative', 'Friend', 'Other'].map((r) => (
-                    <option key={r} value={r.toLowerCase()}>{r}</option>
-                  ))}
-                </select>
-                <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              <SelectInput
+                value={form.relationship}
+                onChange={(e) => update('relationship', e.target.value)}
+                options={['Self', 'Spouse', 'Parent', 'Child', 'Relative', 'Friend', 'Other'].map((r) => ({
+                  value: r.toLowerCase(), label: r,
+                }))}
+              />
             </Field>
           </div>
 
           {/* ── Situation ────────────────────────────────────────────────────── */}
           <SectionDivider title="Situation" icon="📝" />
-
           <Field label="Brief description of the situation">
             <Textarea
               rows={4}
@@ -238,8 +203,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
           </Field>
 
           {/* ── Assistance Needed ─────────────────────────────────────────────── */}
-          <SectionDivider title="Assistance Needed" icon="🤲" />
-
+          <SectionDivider title="Assistance Needed" icon="🤲" required />
           <CheckboxGroup
             columns={2}
             options={[
@@ -253,7 +217,6 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
             onChange={(v) => update('assistanceNeeded', v)}
           />
 
-          {/* Dynamic service sections */}
           {has('meals') && (
             <ServiceSection title="Meals" icon="🍽️">
               <MealsSection data={form.meals} onChange={(d) => update('meals', d)} />
@@ -261,25 +224,22 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
           )}
           {has('transportation') && (
             <ServiceSection title="Transportation" icon="🚗">
-              <TransportationSection
-                data={form.transportation}
-                onChange={(d) => update('transportation', d)}
-              />
+              <TransportationSection data={form.transportation} onChange={(d) => update('transportation', d)} />
             </ServiceSection>
           )}
           {has('familyHousing') && (
-            <FamilyHousingSection
-              data={form.familyHousing}
-              onChange={(d) => update('familyHousing', d)}
-            />
+            <ServiceSection title="Family Housing" icon="🏠">
+              <FamilyHousingSection data={form.familyHousing} onChange={(d) => update('familyHousing', d)} />
+            </ServiceSection>
           )}
           {has('visitors') && (
-            <VisitorsSection data={form.visitors} onChange={(d) => update('visitors', d)} />
+            <ServiceSection title="Visitors" icon="🤝">
+              <VisitorsSection data={form.visitors} onChange={(d) => update('visitors', d)} />
+            </ServiceSection>
           )}
 
           {/* ── Timing ───────────────────────────────────────────────────────── */}
-          <SectionDivider title="Timing" icon="🕐" />
-
+          <SectionDivider title="Timing" icon="🕐" required />
           <RadioGroup
             name="timing"
             columns={2}
@@ -293,12 +253,10 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
             value={form.timing}
             onChange={(v) => update('timing', v)}
           />
-
           {form.timing === 'specificDate' && (
             <Field label="Specific date">
-              <input
+              <TextInput
                 type="date"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
                 value={form.specificDate}
                 onChange={(e) => update('specificDate', e.target.value)}
               />
@@ -307,7 +265,6 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
 
           {/* ── Additional Information ────────────────────────────────────────── */}
           <SectionDivider title="Additional Information" icon="💬" />
-
           <Field label="Anything else you'd like us to know">
             <Textarea
               rows={4}
@@ -322,25 +279,14 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
             <div className="rounded-md border border-red-200 bg-red-50 p-4">
               <p className="text-sm font-medium text-red-700 mb-1">Please fix the following:</p>
               <ul className="list-disc list-inside space-y-0.5">
-                {errors.map((err, i) => (
-                  <li key={i} className="text-sm text-red-600">{err}</li>
-                ))}
+                {errors.map((err, i) => <li key={i} className="text-sm text-red-600">{err}</li>)}
               </ul>
             </div>
           )}
 
           {/* ── Submit ─────────────────────────────────────────────────────────── */}
-          <div className="pt-4 pb-8">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-primary hover:bg-primary-dark text-white font-semibold px-6 py-3 rounded-md shadow transition-colors cursor-pointer text-base disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Submitting…' : 'Submit Request'}
-            </button>
-            <p className="text-xs text-muted text-center mt-3">
-              A community representative will review your request and reach out within 24 hours.
-            </p>
+          <div className="pb-8">
+            <SubmitButton submitting={submitting} />
           </div>
 
         </div>
