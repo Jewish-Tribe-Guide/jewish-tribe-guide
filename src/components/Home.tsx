@@ -36,12 +36,10 @@ export default function Home({ onNavigate, onUp }: Props) {
             onClick={() => onNavigate(path.mode)}
             className="flex flex-col items-start gap-3 p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group"
           >
-            <span className="text-4xl" aria-hidden="true">{path.icon}</span>
             <div>
-              <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors mb-1">
+              <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors">
                 {path.title}
               </p>
-              <p className="text-sm text-muted leading-snug">{path.description}</p>
             </div>
           </button>
         ))}

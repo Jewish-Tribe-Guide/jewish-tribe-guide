@@ -129,13 +129,12 @@ export default function GetAssistance({ hospitalId, hospitalName, onUp }: Props)
           <button
             key={service.title}
             onClick={() => openView(service.title)}
-            className="flex flex-col items-start gap-2 p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group"
+            className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group"
           >
-            <span className="text-2xl" aria-hidden="true">{service.icon}</span>
-            <span className="font-semibold text-slate-900 text-sm group-hover:text-primary transition-colors">
+            <span className="text-xl shrink-0" aria-hidden="true">{service.icon}</span>
+            <span className="text-base font-semibold text-slate-900 group-hover:text-primary transition-colors">
               {service.title}
             </span>
-            <span className="text-xs text-muted leading-snug">{service.description}</span>
           </button>
         ))}
       </div>

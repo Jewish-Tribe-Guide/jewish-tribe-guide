@@ -271,15 +271,12 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
             <button
               key={item.id}
               onClick={() => navigateTo(item.id)}
-              className="flex flex-col items-start gap-3 p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group h-full"
+              className="flex items-center gap-3 p-5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group h-full"
             >
-              <span className="text-4xl" aria-hidden="true">{item.icon}</span>
-              <div>
-                <p className="text-base font-semibold text-slate-900 group-hover:text-primary transition-colors mb-1">
-                  {item.label}
-                </p>
-                <p className="text-sm text-muted leading-snug">{item.description}</p>
-              </div>
+              <span className="text-xl shrink-0" aria-hidden="true">{item.icon}</span>
+              <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                {item.label}
+              </p>
             </button>
           ))}
         </div>
