@@ -13,6 +13,7 @@ import MealsSection from './MealsSection'
 import TransportationSection from './TransportationSection'
 import FamilyHousingSection from './FamilyHousingSection'
 import VisitorsSection from './VisitorsSection'
+import UpButton from '@/components/UpButton'
 
 // ── Initial state ─────────────────────────────────────────────────────────────
 
@@ -83,12 +84,12 @@ function makeInitialData(hospitalId: string): IntakeFormData {
 type Props = {
   hospitalId: string
   hospitalName: string
-  onBack: () => void
+  onUp: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) {
+export default function IntakeForm({ hospitalId, hospitalName, onUp }: Props) {
   const [form, setForm] = useState<IntakeFormData>(() => makeInitialData(hospitalId))
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -126,18 +127,13 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
   if (submitted) {
     return (
       <div>
-        <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
+        <UpButton label="Get assistance" onClick={onUp} />
         <div className="text-center py-12">
           <div className="text-5xl mb-4">✅</div>
           <h2 className="text-2xl font-semibold text-slate-800 mb-2">Request Submitted</h2>
           <p className="text-muted mb-1">A community representative will reach out to you shortly.</p>
           <p className="text-muted text-sm mb-8">For urgent needs, please call the Bikur Cholim line directly.</p>
-          <button onClick={onBack} className="bg-primary text-white font-semibold px-6 py-2.5 rounded-md shadow hover:bg-primary-dark transition-colors cursor-pointer">
+          <button onClick={onUp} className="bg-primary text-white font-semibold px-6 py-2.5 rounded-md shadow hover:bg-primary-dark transition-colors cursor-pointer">
             Back to Get Assistance
           </button>
         </div>
@@ -149,12 +145,7 @@ export default function IntakeForm({ hospitalId, hospitalName, onBack }: Props) 
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="Get assistance" onClick={onUp} />
 
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-slate-800">Request Direct Support</h2>

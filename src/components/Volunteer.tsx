@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import VolunteerForm from '@/components/intake/VolunteerForm'
 import VolunteerRemovalForm from '@/components/intake/VolunteerRemovalForm'
+import UpButton from '@/components/UpButton'
 
 type SubMode = 'signup' | 'edit' | 'remove'
 
@@ -10,10 +11,11 @@ type SubMode = 'signup' | 'edit' | 'remove'
 type VolNavState = { mode?: string; volunteerView?: string }
 
 type Props = {
-  onBack: () => void
+  /** Hierarchical Up from the signup screen → the audience home. */
+  onUp: () => void
 }
 
-export default function Volunteer({ onBack }: Props) {
+export default function Volunteer({ onUp }: Props) {
   // The signup form is the page itself (a history entry pushed by page.tsx).
   // 'edit' and 'remove' are history-backed sub-views so browser-back returns to
   // signup rather than overshooting to the home screen.
@@ -38,35 +40,32 @@ export default function Volunteer({ onBack }: Props) {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  // Navigate forward into edit/remove — pushes a history entry so back returns
-  // to signup.
+  // Navigate forward into edit/remove — pushes a history entry so browser-back
+  // returns to signup.
   function goToSubMode(mode: SubMode) {
     setSubMode(mode)
     setSubmitted(false)
     history.pushState({ ...window.history.state, volunteerView: mode }, '')
   }
 
-  // Every back/close action is history.back(): from signup it pops to home, from
-  // edit/remove it pops to signup. onBack (from page.tsx) is also history.back().
-  const goBack = () => history.back()
+  // Hierarchical Up from an edit/remove sub-view → the signup screen (pushes the
+  // parent, decoupled from browser Back).
+  function goToSignup() {
+    setSubMode('signup')
+    setSubmitted(false)
+    history.pushState({ ...(window.history.state ?? {}), volunteerView: 'signup' }, '')
+  }
 
-  const backChevron = (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-    </svg>
-  )
+  // The top Up button leaves the sub-view (→ signup) when editing/removing, and
+  // otherwise leaves the Volunteer page entirely (→ home, via onUp from page.tsx).
+  const inSubView = subMode !== 'signup' && !submitted
 
   return (
     <div>
-      {/* Top-level back button — always history.back(); the label reflects where
-          that lands (signup from a sub-view, otherwise the previous page). */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        {backChevron}
-        {subMode !== 'signup' && !submitted ? 'Back to sign up' : 'Back'}
-      </button>
+      <UpButton
+        label={inSubView ? 'Volunteer' : 'Home'}
+        onClick={inSubView ? goToSignup : onUp}
+      />
 
       {/* Page heading */}
       <div className="mb-6">
@@ -99,7 +98,7 @@ export default function Volunteer({ onBack }: Props) {
 
           <VolunteerForm
             mode="signup"
-            onClose={goBack}
+            onClose={onUp}
             onSubmitted={() => setSubmitted(true)}
           />
 
@@ -142,7 +141,7 @@ export default function Volunteer({ onBack }: Props) {
 
           <VolunteerForm
             mode="edit"
-            onClose={goBack}
+            onClose={goToSignup}
             onSubmitted={() => setSubmitted(true)}
           />
         </>
@@ -162,7 +161,7 @@ export default function Volunteer({ onBack }: Props) {
           )}
 
           <VolunteerRemovalForm
-            onClose={goBack}
+            onClose={goToSignup}
             onSubmitted={() => setSubmitted(true)}
           />
         </>

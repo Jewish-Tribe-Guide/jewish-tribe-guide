@@ -145,3 +145,59 @@ export function formatHoursSummary(v: unknown): string {
 export function dayLabel(key: DayKey): string {
   return DAY_LABELS[key]
 }
+
+// ── New Places JS API hours mapper (client-safe) ─────────────────────────────
+// The PlaceAutocompleteElement uses the new Places JS API, which represents
+// opening hours as { day, hour, minute } numbers rather than "HHMM" strings.
+// This mapper is the client-side counterpart to googleHoursToStructured in
+// googlePlaces.ts (which handles the legacy REST API format used by scripts).
+
+type PlacesApiPoint = { day: number; hour: number; minute: number }
+type PlacesApiPeriod = { open: PlacesApiPoint; close?: PlacesApiPoint | null }
+
+function padTime(h: number, m: number): string {
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/**
+ * Maps a Google Places JS API `regularOpeningHours.periods` array into
+ * StructuredHours. Pass `place.regularOpeningHours.periods` directly.
+ * Returns null when periods is empty/null so callers leave existing hours
+ * untouched rather than blanking them.
+ */
+export function placesApiHoursToStructured(periods: PlacesApiPeriod[]): StructuredHours | null {
+  if (!periods || periods.length === 0) return null
+
+  // 24/7: single open-only period at midnight on day 0.
+  if (periods.length === 1 && !periods[0].close && periods[0].open.hour === 0 && periods[0].open.minute === 0) {
+    const allDay: StructuredHours = {}
+    for (const key of DAY_KEYS) allDay[key] = { open: '00:00', close: '23:59' }
+    return allDay
+  }
+
+  const result: StructuredHours = {}
+  for (const key of DAY_KEYS) result[key] = null
+
+  for (const p of periods) {
+    const dayIdx = p.open.day
+    if (dayIdx < 0 || dayIdx > 6) continue
+    const key: DayKey = DAY_KEYS[dayIdx]
+    const open = padTime(p.open.hour, p.open.minute)
+    const close =
+      !p.close || p.close.day !== dayIdx
+        ? '23:59'
+        : padTime(p.close.hour, p.close.minute)
+
+    const existing = result[key]
+    if (!existing) {
+      result[key] = { open, close }
+    } else {
+      result[key] = {
+        open: open < existing.open ? open : existing.open,
+        close: close > existing.close ? close : existing.close,
+      }
+    }
+  }
+
+  return result
+}

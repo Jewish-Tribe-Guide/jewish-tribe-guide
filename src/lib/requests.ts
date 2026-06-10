@@ -34,7 +34,7 @@ export const SHEET_COLUMNS = [
   'Email',
   'Status',
   'Assigned To',
-  'Form Data (JSON)',
+  'Details (JSON)',
 ] as const
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -150,14 +150,6 @@ export function buildVolunteerSheetRow(
       : WAYS_TO_HELP_LABELS[code] ?? code,
   )
 
-  const has = (service: string) => v.waysToHelp?.includes(service)
-  const details = {
-    ...(has('visiting') ? { visiting: v.visiting } : {}),
-    ...(has('meals') ? { meals: v.meals } : {}),
-    ...(has('transportation') ? { transportation: v.transportation } : {}),
-    ...(has('housing') ? { housing: v.housing } : {}),
-  }
-
   return [
     timestamp,
     requestId,
@@ -170,7 +162,7 @@ export function buildVolunteerSheetRow(
     (v.availability ?? []).map((code) => AVAILABILITY_LABELS[code] ?? code).join(', '),
     HAS_CAR_LABELS[v.hasCar] ?? v.hasCar ?? '',
     v.notes ?? '',
-    Object.keys(details).length > 0 ? JSON.stringify(details) : '',
+    JSON.stringify(payload.formData),
   ]
 }
 
@@ -222,7 +214,7 @@ export function buildVolunteerChangeSheetRow(
       '', // Availability
       '', // Has Car
       d.reason ?? '',
-      '',
+      JSON.stringify(payload.formData),
     ]
   }
 
@@ -234,14 +226,6 @@ export function buildVolunteerChangeSheetRow(
       ? `Other: ${v.waysToHelpOther.trim()}`
       : WAYS_TO_HELP_LABELS[code] ?? code,
   )
-
-  const has = (service: string) => v.waysToHelp?.includes(service)
-  const details = {
-    ...(has('visiting') ? { visiting: v.visiting } : {}),
-    ...(has('meals') ? { meals: v.meals } : {}),
-    ...(has('transportation') ? { transportation: v.transportation } : {}),
-    ...(has('housing') ? { housing: v.housing } : {}),
-  }
 
   return [
     timestamp,
@@ -256,6 +240,6 @@ export function buildVolunteerChangeSheetRow(
     (v.availability ?? []).map((code) => AVAILABILITY_LABELS[code] ?? code).join(', '),
     HAS_CAR_LABELS[v.hasCar] ?? v.hasCar ?? '',
     v.notes ?? '',
-    Object.keys(details).length > 0 ? JSON.stringify(details) : '',
+    JSON.stringify(payload.formData),
   ]
 }

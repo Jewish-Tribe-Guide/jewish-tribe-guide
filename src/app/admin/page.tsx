@@ -142,8 +142,9 @@ function flatListing(src: ResourceRow | ResourceSubmission | undefined): Record<
     Address: fmt(src.address),
     Phone: fmt(src.phone),
   }
+  const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus'])
   for (const [k, v] of Object.entries(details)) {
-    if (k === 'legacyId' || k === 'geo') continue
+    if (SKIP.has(k)) continue
     out[k] = fmt(v)
   }
   return out

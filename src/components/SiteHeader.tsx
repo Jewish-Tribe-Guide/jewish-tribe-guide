@@ -1,8 +1,6 @@
 'use client'
 
-import type { Audience, Hospital } from '@/types'
-import HospitalPicker from '@/components/HospitalPicker'
-import AddressAnchor from '@/components/AddressAnchor'
+import type { Audience } from '@/types'
 
 type Props = {
   audience: Audience
@@ -10,14 +8,6 @@ type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
    *  Landing fork so they can re-choose their audience. */
   onGoHome: () => void
-  // Patient anchor
-  hospitals: Hospital[]
-  selectedHospitalId: string
-  onHospitalChange: (id: string) => void
-  // Community anchor
-  address: string
-  onAddressChange: (address: string) => void
-  onCoords: (coords: { lat: number; lng: number } | null) => void
 }
 
 const TABS: { audience: Audience; label: string }[] = [
@@ -25,17 +15,7 @@ const TABS: { audience: Audience; label: string }[] = [
   { audience: 'community', label: 'Community' },
 ]
 
-export default function SiteHeader({
-  audience,
-  onSwitchAudience,
-  onGoHome,
-  hospitals,
-  selectedHospitalId,
-  onHospitalChange,
-  address,
-  onAddressChange,
-  onCoords,
-}: Props) {
+export default function SiteHeader({ audience, onSwitchAudience, onGoHome }: Props) {
   return (
     <>
       {/* Blue brand zone — title + subtitle only */}
@@ -79,22 +59,6 @@ export default function SiteHeader({
         </div>
       </div>
 
-      {/* Anchor field — its own section below the toggle */}
-      <div className="bg-surface border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 py-5 flex justify-center">
-          <div className="w-full sm:w-[28rem]">
-            {audience === 'patient' ? (
-              <HospitalPicker
-                hospitals={hospitals}
-                selectedId={selectedHospitalId}
-                onChange={onHospitalChange}
-              />
-            ) : (
-              <AddressAnchor value={address} onChange={onAddressChange} onCoords={onCoords} />
-            )}
-          </div>
-        </div>
-      </div>
     </>
   )
 }

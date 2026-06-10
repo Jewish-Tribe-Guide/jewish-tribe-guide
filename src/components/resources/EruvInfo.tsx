@@ -1,22 +1,15 @@
 import type { EruvRecord } from '@/types'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   eruv: EruvRecord
-  onBack: () => void
+  onUp: () => void
 }
 
-export default function EruvInfo({ eruv, onBack }: Props) {
+export default function EruvInfo({ eruv, onUp }: Props) {
   return (
     <div>
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="All resources" onClick={onUp} />
       <h2 className="text-xl font-semibold text-slate-800 mb-4">Eruv Information</h2>
 
       <div className="space-y-3">

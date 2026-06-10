@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import type { CategorySubmissionPayload } from '@/types'
 import AddressInput from '@/components/intake/AddressInput'
+import UpButton from '@/components/UpButton'
 
 type Props = {
-  onBack: () => void
+  onUp: () => void
   onSubmitted: () => void
 }
 
@@ -15,7 +16,7 @@ const inputClass =
 // Lets anyone propose a brand-new category (e.g. "Dentists"). Because a category
 // is usually requested with a specific place in mind, the form also captures its
 // first listing. On approval, the category and its first listing are created.
-export default function CategoryForm({ onBack, onSubmitted }: Props) {
+export default function CategoryForm({ onUp, onSubmitted }: Props) {
   const [label, setLabel] = useState('')
   const [icon, setIcon] = useState('')
   const [description, setDescription] = useState('')
@@ -79,7 +80,7 @@ export default function CategoryForm({ onBack, onSubmitted }: Props) {
   if (done) {
     return (
       <div>
-        <BackButton onClick={onSubmitted} />
+        <UpButton label="All resources" onClick={onSubmitted} />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
@@ -93,7 +94,7 @@ export default function CategoryForm({ onBack, onSubmitted }: Props) {
 
   return (
     <div>
-      <BackButton onClick={onBack} />
+      <UpButton label="All resources" onClick={onUp} />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-1">Suggest a new category</h2>
       <p className="text-sm text-muted mb-5">
@@ -179,16 +180,3 @@ export default function CategoryForm({ onBack, onSubmitted }: Props) {
   )
 }
 
-function BackButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back
-    </button>
-  )
-}

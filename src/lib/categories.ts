@@ -62,6 +62,26 @@ export const DEFAULT_CATEGORY_ICON = '📋'
 // groups). Kept in code since these are rare and owner-defined.
 export const COMMUNITY_CATEGORY_IDS = new Set<string>(['whatsapp'])
 
+// Category ids whose listings must NOT auto-sync from Google Places. Two kinds:
+//   • community categories (not real map places, e.g. whatsapp), and
+//   • categories whose value is hand-curated community info Google doesn't have
+//     (synagogue davening times, mikvah schedules, bikur cholim rooms).
+// The place-id backfill skips these, so no placeId is ever assigned and the
+// sync can never overwrite their curated fields. Ids that don't exist are
+// harmless. (Mirrors COMMUNITY_CATEGORY_IDS for 'whatsapp'.)
+export const SYNC_EXCLUDED_CATEGORY_IDS = new Set<string>([
+  'whatsapp',
+  'synagogue',
+  'mikvah',
+  'bikur-cholim',
+])
+
+/** Whether listings in this category are eligible for Google Places auto-sync
+ *  (commercial places with real hours: grocery, restaurant, hotel, dentist, …). */
+export function isCategorySyncEligible(categoryId: string): boolean {
+  return !SYNC_EXCLUDED_CATEGORY_IDS.has(categoryId)
+}
+
 // Evaluates a field's `showIf` against the current detail values.
 export function fieldIsVisible(field: CategoryField, details: Record<string, unknown>): boolean {
   if (!field.showIf) return true

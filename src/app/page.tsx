@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { hospitals } from '@/data/hospitals'
 import type { AppMode, Audience, DirectoryAnchor } from '@/types'
+import type { AnchorControls } from '@/components/AnchorBar'
 import Landing from '@/components/Landing'
 import SiteHeader from '@/components/SiteHeader'
 import Home from '@/components/Home'
@@ -83,38 +84,43 @@ export default function Page() {
         audience={audience}
         onSwitchAudience={goToAudience}
         onGoHome={goToLanding}
-        hospitals={hospitals}
-        selectedHospitalId={selectedHospitalId}
-        onHospitalChange={setSelectedHospitalId}
-        address={address}
-        onAddressChange={setAddress}
-        onCoords={setCoords}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {audience === 'patient' ? (
-          <>
-            {mode === 'home' && <Home hospitalName={selectedHospitalName} onNavigate={goToMode} onBack={() => history.back()} />}
-            {mode === 'find' && <FindResources anchor={anchor} onBack={() => history.back()} />}
-            {mode === 'assist' && (
-              <GetAssistance
-                hospitalId={selectedHospitalId}
-                hospitalName={selectedHospitalName}
-                onBack={() => history.back()}
-              />
-            )}
-            {mode === 'volunteer' && <Volunteer onBack={() => history.back()} />}
-          </>
-        ) : (
-          <>
-            {mode === 'community-home' && (
-              <CommunityHome addressLabel={address} onNavigate={goToMode} onBack={() => history.back()} />
-            )}
-            {mode === 'find' && (
-              <FindResources anchor={anchor} onBack={() => history.back()} />
-            )}
-            {mode === 'give' && <Volunteer onBack={() => history.back()} />}
-          </>
-        )}
+        {(() => {
+          const anchorControls: AnchorControls = {
+            audience,
+            hospitals,
+            selectedHospitalId,
+            onHospitalChange: setSelectedHospitalId,
+            address,
+            onAddressChange: setAddress,
+            onCoords: setCoords,
+          }
+          return audience === 'patient' ? (
+            <>
+              {mode === 'home' && <Home onNavigate={goToMode} onUp={goToLanding} />}
+              {mode === 'find' && <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('home')} />}
+              {mode === 'assist' && (
+                <GetAssistance
+                  hospitalId={selectedHospitalId}
+                  hospitalName={selectedHospitalName}
+                  onUp={() => goToMode('home')}
+                />
+              )}
+              {mode === 'volunteer' && <Volunteer onUp={() => goToMode('home')} />}
+            </>
+          ) : (
+            <>
+              {mode === 'community-home' && (
+                <CommunityHome onNavigate={goToMode} onUp={goToLanding} />
+              )}
+              {mode === 'find' && (
+                <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('community-home')} />
+              )}
+              {mode === 'give' && <Volunteer onUp={() => goToMode('community-home')} />}
+            </>
+          )
+        })()}
       </main>
     </>
   )

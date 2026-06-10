@@ -6,13 +6,14 @@ import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
 import SynagogueDirectory from './SynagogueDirectory'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   category: CategoryConfig
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
-  onBack: () => void
+  onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -21,23 +22,9 @@ type Props = {
 // Per-listing real travel times fetched from /api/travel for address-mode anchors.
 type RealTimes = Record<string, { drive?: number; walk?: number }>
 
-function BackButton({ onBack }: { onBack: () => void }) {
-  return (
-    <button
-      onClick={onBack}
-      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back
-    </button>
-  )
-}
-
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, anchor, reopenItemId, onBack, onAdd, onEdit, onReport }: Props) {
+export default function ResourceLoader({ category, anchor, reopenItemId, onUp, onAdd, onEdit, onReport }: Props) {
   const [items, setItems] = useState<DirectoryResource[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Real driving/walking times for address-mode anchors, populated asynchronously
@@ -141,7 +128,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onBack,
   if (error) {
     return (
       <div>
-        <BackButton onBack={onBack} />
+        <UpButton label="All resources" onClick={onUp} />
         <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
         <p className="text-sm text-red-600">{error}</p>
       </div>
@@ -151,7 +138,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onBack,
   if (withDistance === null || withDistance === undefined) {
     return (
       <div>
-        <BackButton onBack={onBack} />
+        <UpButton label="All resources" onClick={onUp} />
         <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
         <p className="text-sm text-muted">Loading…</p>
       </div>
@@ -171,7 +158,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onBack,
         items={withDistance}
         anchorLabel={anchorLabel}
         reopenItemId={reopenItemId}
-        onBack={onBack}
+        onUp={onUp}
         onAdd={onAdd}
         onEdit={onEdit}
         onReport={onReport}
@@ -180,6 +167,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onBack,
   }
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} onBack={onBack} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
   )
 }

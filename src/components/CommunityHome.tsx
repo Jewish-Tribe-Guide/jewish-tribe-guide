@@ -1,10 +1,9 @@
 import type { AppMode } from '@/types'
+import UpButton from '@/components/UpButton'
 
 type Props = {
-  /** The visitor's chosen address, shown as context (empty until they pick one). */
-  addressLabel: string
   onNavigate: (mode: AppMode) => void
-  onBack: () => void
+  onUp: () => void
 }
 
 const PATHS: {
@@ -31,23 +30,12 @@ const PATHS: {
 
 // The community-side hub. Its verbs are all "give" — the patient assistance/intake
 // form is never surfaced here, so neighbors are guided to help rather than ask.
-export default function CommunityHome({ addressLabel, onNavigate, onBack }: Props) {
+export default function CommunityHome({ onNavigate, onUp }: Props) {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-6 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+    <>
+      <UpButton label="Start over" onClick={onUp} className="mb-6" />
       <div className="text-center mb-8">
         <h2 className="text-2xl font-semibold text-slate-800 mb-1">Welcome to the community</h2>
-        <p className="text-muted text-sm">
-          {addressLabel ? addressLabel : 'Enter your address above to sort resources by distance'}
-        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -67,6 +55,6 @@ export default function CommunityHome({ addressLabel, onNavigate, onBack }: Prop
           </button>
         ))}
       </div>
-    </div>
+    </>
   )
 }

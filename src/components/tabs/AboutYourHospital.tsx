@@ -1,27 +1,19 @@
 import { hospitalInfo } from '@/data/hospitalInfo'
 import Collapsible from '@/components/Collapsible'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   hospitalId: string
   hospitalName: string
-  onBack: () => void
+  onUp: () => void
 }
 
-export default function AboutYourHospital({ hospitalId, hospitalName, onBack }: Props) {
+export default function AboutYourHospital({ hospitalId, hospitalName, onUp }: Props) {
   const info = hospitalInfo[hospitalId]
 
   return (
     <div>
-      {/* Back button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="All resources" onClick={onUp} />
 
       {/* Option-3 heading */}
       <div className="mb-6">

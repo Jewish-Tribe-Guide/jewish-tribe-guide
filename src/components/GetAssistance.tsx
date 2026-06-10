@@ -7,6 +7,7 @@ import MealsForm from '@/components/intake/MealsForm'
 import TransportationForm from '@/components/intake/TransportationForm'
 import VisitorsForm from '@/components/intake/VisitorsForm'
 import FamilyHousingForm from '@/components/intake/FamilyHousingForm'
+import UpButton from '@/components/UpButton'
 
 const SERVICES = [
   {
@@ -41,10 +42,11 @@ type AssistNavState = { mode?: string; assistView?: string }
 type Props = {
   hospitalId: string
   hospitalName: string
-  onBack: () => void
+  /** Hierarchical Up from the service-selection screen → the audience home. */
+  onUp: () => void
 }
 
-export default function GetAssistance({ hospitalId, hospitalName, onBack }: Props) {
+export default function GetAssistance({ hospitalId, hospitalName, onUp }: Props) {
   // A single history-backed sub-view:
   //   null      → the service-selection screen
   //   'intake'  → Request Direct Support (full-page IntakeForm)
@@ -68,15 +70,22 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
   }, [])
 
   // Open a sub-view (the intake form or a service overlay). Pushes a history
-  // entry so browser-back — and the in-app close/back, which also calls
-  // history.back() — returns to the selection screen.
+  // entry so browser-back returns to the selection screen.
   function openView(next: string) {
     setView(next)
     history.pushState({ ...window.history.state, assistView: next }, '')
   }
 
-  // In-app close/back mirrors browser-back so the two are identical in effect.
-  const closeView = () => history.back()
+  // Hierarchical Up from the full-page intake form → the service-selection
+  // screen (pushes the parent, decoupled from browser Back).
+  function goToSelection() {
+    setView(null)
+    history.pushState({ ...(window.history.state ?? {}), assistView: null }, '')
+  }
+
+  // Service overlays are modals — closing one is a symmetric dismiss, so it pops
+  // the history entry that opened it rather than pushing a new screen.
+  const closeModal = () => history.back()
 
   // ── Request Direct Support (full-page form) ─────────────────────────────────
   if (view === 'intake') {
@@ -84,28 +93,17 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
       <IntakeForm
         hospitalId={hospitalId}
         hospitalName={hospitalName}
-        onBack={closeView}
+        onUp={goToSelection}
       />
     )
   }
 
   return (
     <div>
-      {/* Back to Home */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="Home" onClick={onUp} />
 
-      {/* Option-3 heading */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-slate-800">Get Assistance</h2>
-        <p className="text-sm text-muted mt-0.5">{hospitalName}</p>
       </div>
 
       {/* Primary CTA → full-page IntakeForm */}
@@ -143,27 +141,27 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
       </div>
 
       {view === 'Meals' && (
-        <IntakeModal title="Request Meals" onClose={closeView}>
-          <MealsForm hospitalId={hospitalId} onClose={closeView} />
+        <IntakeModal title="Request Meals" onClose={closeModal}>
+          <MealsForm hospitalId={hospitalId} onClose={closeModal} />
         </IntakeModal>
       )}
       {view === 'Transportation' && (
-        <IntakeModal title="Request Transportation" onClose={closeView}>
-          <TransportationForm hospitalId={hospitalId} onClose={closeView} />
+        <IntakeModal title="Request Transportation" onClose={closeModal}>
+          <TransportationForm hospitalId={hospitalId} onClose={closeModal} />
         </IntakeModal>
       )}
       {view === 'Request Visitors' && (
-        <IntakeModal title="Request Visitors" onClose={closeView}>
-          <VisitorsForm hospitalId={hospitalId} onClose={closeView} />
+        <IntakeModal title="Request Visitors" onClose={closeModal}>
+          <VisitorsForm hospitalId={hospitalId} onClose={closeModal} />
         </IntakeModal>
       )}
       {view === 'Family Housing' && (
-        <IntakeModal title="Family Housing" onClose={closeView}>
-          <FamilyHousingForm hospitalId={hospitalId} onClose={closeView} />
+        <IntakeModal title="Family Housing" onClose={closeModal}>
+          <FamilyHousingForm hospitalId={hospitalId} onClose={closeModal} />
         </IntakeModal>
       )}
       {view !== null && view !== 'intake' && !MODAL_TITLES.includes(view) && (
-        <IntakeModal title={view} onClose={closeView} />
+        <IntakeModal title={view} onClose={closeModal} />
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   category: CategoryConfig
@@ -13,7 +14,7 @@ type Props = {
   /** Shown under the category title — hospital name for patients, typed address
    *  for community. Mirrors the subtitle pattern in About Your Hospital. */
   anchorLabel?: string
-  onBack: () => void
+  onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -56,7 +57,7 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, onBack, onAdd, onEdit, onReport }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, onUp, onAdd, onEdit, onReport }: Props) {
   const [search, setSearch] = useState('')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   const [openNow, setOpenNow] = useState(false)
@@ -114,15 +115,7 @@ export default function GenericDirectory({ category, items, anchorLabel, onBack,
 
   return (
     <div>
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="All resources" onClick={onUp} />
 
       <div className="flex items-start justify-between gap-2 mb-4">
         <div>
@@ -255,8 +248,15 @@ export default function GenericDirectory({ category, items, anchorLabel, onBack,
                       )
                     })}
                     {/* Hours — today's line by default, expandable to the full week.
-                        Legacy text strings render as-is. */}
-                    {hoursVal !== undefined && <HoursDisplay value={hoursVal} />}
+                        Legacy text strings render as-is. Also shows a Google
+                        "closed" badge + sync-freshness note for synced listings. */}
+                    {(hoursVal !== undefined || item.businessStatus) && (
+                      <HoursDisplay
+                        value={hoursVal}
+                        businessStatus={item.businessStatus}
+                        syncedAt={item.googleSyncedAt}
+                      />
+                    )}
                     {/* Tag badges (clickable → search that item) */}
                     {tagFields.flatMap((f) => asTags(item[f.key])).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">

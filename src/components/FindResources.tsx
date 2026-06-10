@@ -9,6 +9,9 @@ import ReportListing from '@/components/resources/ReportListing'
 import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
+import UpButton from '@/components/UpButton'
+import AnchorBar from '@/components/AnchorBar'
+import type { AnchorControls } from '@/components/AnchorBar'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { hospitals } from '@/data/hospitals'
@@ -41,10 +44,12 @@ type ListingAction =
 
 type Props = {
   anchor: DirectoryAnchor
-  onBack: () => void
+  anchorControls: AnchorControls
+  /** Hierarchical Up from the Find index → the audience home screen. */
+  onUp: () => void
 }
 
-export default function FindResources({ anchor, onBack }: Props) {
+export default function FindResources({ anchor, anchorControls, onUp }: Props) {
   const isHospital = anchor.kind === 'hospital'
   // Eruv, Zmanim, and Synagogues are city-wide resources — relevant to community
   // members too. They're data-keyed to a hospital, so in address mode we fall back
@@ -55,7 +60,6 @@ export default function FindResources({ anchor, onBack }: Props) {
   //   patient mode → hospital name (data is keyed to this hospital)
   //   community mode → the typed address (so the user isn't confused by a hospital name)
   const locationLabel = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
-  const subtitle = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
 
   // ── History-backed internal navigation ──────────────────────────────────────
   // Initialize from the current history state so that browser-forward navigation
@@ -107,9 +111,8 @@ export default function FindResources({ anchor, onBack }: Props) {
   const audienceKey = anchor.kind === 'hospital' ? 'patient' : 'community'
 
   // Navigate forward to a sub-view. Always pushes a new history entry so that
-  // browser-back (and the in-app Back button, which also calls history.back())
-  // returns exactly one screen. Never called when going backwards — that's always
-  // history.back().
+  // browser-back returns exactly one screen. (In-app Up navigation is handled
+  // separately by goToIndex/goToCategoryList, which push the parent screen.)
   function navigateTo(next: string) {
     setAction(null)
     setView(next)
@@ -129,26 +132,38 @@ export default function FindResources({ anchor, onBack }: Props) {
     history.pushState({ audience: audienceKey, mode: 'find', findView: view, findAction: 'open' }, '')
   }
 
-  // Both the in-app Back button and form close/submit use history.back() so
-  // that in-app back and browser back are identical in effect, and forward
-  // history is preserved after pressing back.
-  const goBack = () => history.back()
-  const closeAction = () => history.back()
+  // Hierarchical "Up" navigation (not history.back()). Each Up pushes the parent
+  // screen as a new history entry, so the on-screen Up button is decoupled from
+  // the browser/trackpad Back button, which stays temporal.
+
+  // Up from a category / special view / add-category form → the Find index.
+  const goToIndex = () => {
+    setAction(null)
+    setView(null)
+    history.pushState({ audience: audienceKey, mode: 'find', findView: null }, '')
+  }
+
+  // Up from a listing form / report form → the category list it was opened from
+  // (view is still the category id; reopenItemId re-expands the relevant card).
+  const goToCategoryList = () => {
+    setAction(null)
+    history.pushState({ audience: audienceKey, mode: 'find', findView: view }, '')
+  }
 
   // ── Special (non-category) detail views ─────────────────────────────────────────
   if (view === 'about-hospital') {
-    return <AboutYourHospital hospitalId={hospitalId} hospitalName={locationLabel} onBack={goBack} />
+    return <AboutYourHospital hospitalId={hospitalId} hospitalName={locationLabel} onUp={goToIndex} />
   }
   if (view === 'eruv') {
     const eruv = eruvInfo[hospitalId as keyof typeof eruvInfo]
     if (!eruv)
       return (
         <div>
-          <BackButton onBack={goBack} />
+          <UpButton label="All resources" onClick={goToIndex} />
           <p className="text-muted text-sm">No eruv information available for this hospital.</p>
         </div>
       )
-    return <EruvInfo eruv={eruv} onBack={goBack} />
+    return <EruvInfo eruv={eruv} onUp={goToIndex} />
   }
   if (view === 'zmanim') {
     // Address mode: pass raw coords so the API skips the hospital lookup entirely.
@@ -159,7 +174,7 @@ export default function FindResources({ anchor, onBack }: Props) {
           key={anchor.label}
           coords={anchor.coords}
           locationLabel={locationLabel}
-          onBack={goBack}
+          onUp={goToIndex}
         />
       )
     }
@@ -168,32 +183,32 @@ export default function FindResources({ anchor, onBack }: Props) {
         key={hospitalId}
         hospitalId={hospitalId}
         locationLabel={locationLabel}
-        onBack={goBack}
+        onUp={goToIndex}
       />
     )
   }
   if (view === ADD_CATEGORY) {
-    return <CategoryForm onBack={goBack} onSubmitted={goBack} />
+    return <CategoryForm onUp={goToIndex} onSubmitted={goToIndex} />
   }
 
   // ── Database-backed categories (with add / edit / report) ───────────────────────
   const category = view ? categories?.find((c) => c.id === view) : undefined
   if (category) {
     if (action?.mode === 'create') {
-      return <ListingForm category={category} mode="create" onBack={closeAction} onSubmitted={closeAction} />
+      return <ListingForm category={category} mode="create" onUp={goToCategoryList} onSubmitted={goToCategoryList} />
     }
     if (action?.mode === 'edit') {
-      return <ListingForm category={category} mode="edit" existing={action.listing} onBack={closeAction} onSubmitted={closeAction} />
+      return <ListingForm category={category} mode="edit" existing={action.listing} onUp={goToCategoryList} onSubmitted={goToCategoryList} />
     }
     if (action?.mode === 'report') {
-      return <ReportListing listing={action.listing} onBack={closeAction} onSubmitted={closeAction} />
+      return <ReportListing listing={action.listing} upLabel={category.pluralLabel} onUp={goToCategoryList} onSubmitted={goToCategoryList} />
     }
     return (
       <ResourceLoader
         category={category}
         anchor={anchor}
         reopenItemId={reopenItemId}
-        onBack={goBack}
+        onUp={goToIndex}
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
         onReport={(listing) => openAction({ mode: 'report', listing })}
@@ -224,19 +239,11 @@ export default function FindResources({ anchor, onBack }: Props) {
 
   return (
     <div>
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="Home" onClick={onUp} />
 
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-slate-800">Find Resources</h2>
-        {subtitle && <p className="text-sm text-muted mt-0.5">{subtitle}</p>}
+        <AnchorBar {...anchorControls} label="Calculating distances from" />
       </div>
 
       {/* Search */}
@@ -253,15 +260,6 @@ export default function FindResources({ anchor, onBack }: Props) {
           className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder:text-muted shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
-
-      {/* Suggest a new category */}
-      <button
-        onClick={() => navigateTo(ADD_CATEGORY)}
-        className="w-full flex items-center justify-center gap-2 mb-5 px-4 py-3 rounded-lg border border-dashed border-primary/50 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-      >
-        <span aria-hidden="true">➕</span>
-        Don&apos;t see the right category? Suggest a new one
-      </button>
 
       {categories === null ? (
         <p className="text-muted text-sm">Loading…</p>
@@ -286,20 +284,15 @@ export default function FindResources({ anchor, onBack }: Props) {
           ))}
         </div>
       )}
-    </div>
-  )
-}
 
-function BackButton({ onBack }: { onBack: () => void }) {
-  return (
-    <button
-      onClick={onBack}
-      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back
-    </button>
+      {/* Suggest a new category */}
+      <button
+        onClick={() => navigateTo(ADD_CATEGORY)}
+        className="w-full flex items-center justify-center gap-2 mt-5 px-4 py-3 rounded-lg border border-dashed border-primary/50 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+      >
+        <span aria-hidden="true">➕</span>
+        Don&apos;t see the right category? Suggest a new one
+      </button>
+    </div>
   )
 }

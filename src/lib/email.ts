@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { hospitalName } from './requests'
 import { getCategoryById } from './categoryStore'
+import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
@@ -19,6 +20,13 @@ function row(label: string, value: string): string {
     <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
     <td style="padding:6px 12px;color:#0f172a;">${escapeHtml(value) || '—'}</td>
   </tr>`
+}
+
+function formatDetailValue(v: unknown): string {
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) return (v as unknown[]).map(String).join(', ')
+  if (v && typeof v === 'object') return formatHoursSummary(v)
+  return v != null ? String(v) : ''
 }
 
 // Low-level send. Reads RESEND_FROM from env (falls back to the sandbox sender).
@@ -51,6 +59,24 @@ export async function sendEmail({
 
 // ── Admin notification (intake forms) ────────────────────────────────────────
 
+function sheetsTabUrl(requestType: string): string {
+  const id = process.env.GOOGLE_SHEETS_ID
+  if (!id) return ''
+  const base = `https://docs.google.com/spreadsheets/d/${id}/edit`
+  // Volunteer Edit / Volunteer Removal → "Volunteer Changes" tab
+  if (requestType === 'Volunteer Edit' || requestType === 'Volunteer Removal') {
+    const gid = process.env.GOOGLE_SHEETS_VOLUNTEER_CHANGES_GID
+    return gid ? `${base}#gid=${gid}` : base
+  }
+  // New Volunteer signup → "Volunteer" tab
+  if (requestType === 'Volunteer') {
+    const gid = process.env.GOOGLE_SHEETS_VOLUNTEER_GID
+    return gid ? `${base}#gid=${gid}` : base
+  }
+  // All other requests (meals, transportation, etc.) → base sheet
+  return base
+}
+
 function buildHtml(
   payload: SubmissionPayload,
   requestId: string,
@@ -58,6 +84,16 @@ function buildHtml(
 ): string {
   const { contact, requestType, formData } = payload
   const formJson = JSON.stringify(formData, null, 2)
+  const sheetsUrl = sheetsTabUrl(requestType)
+  const sheetsLink = sheetsUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(sheetsUrl)}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open Google Sheets →</a></p>`
+    : ''
+  // Only non-volunteer request types have "Request" in their subject line.
+  const isVolunteer = requestType === 'Volunteer' || requestType === 'Volunteer Edit' || requestType === 'Volunteer Removal'
+  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const adminLink = !isVolunteer && appUrl
+    ? `<p style="margin-top:8px;"><a href="${escapeHtml(appUrl)}/admin" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Go to admin →</a></p>`
+    : ''
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">New ${escapeHtml(requestType)} Request</h2>
     <p style="color:#64748b;margin-top:0;font-size:14px;">Request ID: <strong>${escapeHtml(requestId)}</strong></p>
@@ -73,6 +109,8 @@ function buildHtml(
     </table>
     <h3 style="color:#334155;margin-bottom:6px;">Request Details</h3>
     <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(formJson)}</pre>
+    ${sheetsLink}
+    ${adminLink}
   </div>`
 }
 
@@ -147,6 +185,8 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus'])
+
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
     verb = 'New category'
@@ -156,7 +196,6 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     proposedRows = `${row('Category name', payload.label)}
       ${payload.description ? row('Description', payload.description) : ''}
       ${row('First listing', f?.name ?? '')}
-      ${f?.hospitalId ? row('Hospital', hospitalName(f.hospitalId)) : ''}
       ${row('Address', f?.address ?? '')}
       ${row('Phone', f?.phone ?? '')}`
   } else {
@@ -179,16 +218,14 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           ? `Edit Listing Suggestion — ${title}${catSuffix}`
           : `Removal Listing Suggestion — ${title}${catSuffix}`
     const detailRows = Object.entries(payload.details ?? {})
-      .filter(([k]) => k !== 'geo' && k !== 'legacyId')
-      .map(([k, v]) => row(k, typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)))
+      .filter(([k]) => !DETAIL_SKIP.has(k))
+      .map(([k, v]) => row(k, formatDetailValue(v)))
       .join('')
     proposedRows =
       submission.operation === 'delete'
         ? ''
         : `${row('Category', categoryLabel)}
            ${row('Name', payload.name ?? '')}
-           ${payload.hospitalId ? row('Hospital', hospitalName(payload.hospitalId)) : ''}
-           ${row('Distance', payload.distance != null ? `${payload.distance} mi` : '')}
            ${row('Address', payload.address ?? '')}
            ${row('Phone', payload.phone ?? '')}
            ${detailRows}`
@@ -196,7 +233,6 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
 
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(verb)} — awaiting review</h2>
-    <p style="color:#64748b;margin-top:0;font-size:14px;">Review it in the admin queue.</p>
     <table style="border-collapse:collapse;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
       ${row('Type', verb)}
       ${proposedRows}

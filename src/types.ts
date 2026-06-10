@@ -155,6 +155,13 @@ export type DirectoryResource = {
   milesFromAddress?: number
   /** Coordinates carried over from `details.geo` (spread onto the row). */
   geo?: { lat: number; lng: number } | null
+  // ── Google Places sync (carried over from `details`, set by the sync job) ──
+  /** Stable Google place id; its presence marks a listing as auto-syncing. */
+  placeId?: string
+  /** ISO timestamp of the last successful Google Places sync. */
+  googleSyncedAt?: string
+  /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
+  businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   [detailKey: string]: unknown
 }
 

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { fieldIsVisible, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, isCategorySyncEligible, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
-import AddressInput from '@/components/intake/AddressInput'
+import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   /** The category this listing belongs to (fixed by where the form was opened). */
@@ -14,34 +15,24 @@ type Props = {
   mode: 'create' | 'edit'
   /** Existing listing to pre-fill, when editing. */
   existing?: DirectoryResource
-  onBack: () => void
+  onUp: () => void
   onSubmitted: () => void
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-function BackButton({ onBack }: { onBack: () => void }) {
-  return (
-    <button
-      onClick={onBack}
-      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back
-    </button>
-  )
-}
-
-export default function ListingForm({ category, mode, existing, onBack, onSubmitted }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted }: Props) {
   const config = category
   const community = !!category.community
+  const syncEligible = isCategorySyncEligible(category.id)
 
   const [name, setName] = useState(existing?.name ?? '')
   const [address, setAddress] = useState(existing?.address ?? '')
   const [phone, setPhone] = useState(existing?.phone ?? '')
+  const [placeId, setPlaceId] = useState<string | null>(
+    typeof existing?.placeId === 'string' ? existing.placeId : null,
+  )
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
   )
@@ -61,6 +52,18 @@ export default function ListingForm({ category, mode, existing, onBack, onSubmit
 
   function setDetail(key: string, value: unknown) {
     setDetails((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function handlePlaceSelect(result: PlaceSelectResult) {
+    if (syncEligible) setPlaceId(result.placeId)
+    // Always overwrite — if you switch from "Trader Joe's" to "Giant", all
+    // auto-filled fields should update to match the new selection.
+    if (result.name) setName(result.name)
+    if (result.phone) setPhone(result.phone)
+    if (result.hours) {
+      const hoursField = config.detailFields.find((f) => f.type === 'hours')
+      if (hoursField) setDetail(hoursField.key, result.hours)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -83,7 +86,12 @@ export default function ListingForm({ category, mode, existing, onBack, onSubmit
       distance: null,
       address: community ? '' : address,
       phone: community ? '' : phone,
-      details: visibleDetails,
+      details: {
+        ...visibleDetails,
+        // Carry the Google place id through so the sync job can pick it up as
+        // soon as the listing is approved. Only set for sync-eligible categories.
+        ...(syncEligible && placeId ? { placeId } : {}),
+      },
       geo: community ? null : coords,
     }
     const submittedBy =
@@ -120,7 +128,7 @@ export default function ListingForm({ category, mode, existing, onBack, onSubmit
   if (done) {
     return (
       <div>
-        <BackButton onBack={onSubmitted} />
+        <UpButton label={config.pluralLabel} onClick={onSubmitted} />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
@@ -138,7 +146,7 @@ export default function ListingForm({ category, mode, existing, onBack, onSubmit
 
   return (
     <div>
-      <BackButton onBack={onBack} />
+      <UpButton label={config.pluralLabel} onClick={onUp} />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-1">{heading}</h2>
       <p className="text-sm text-muted mb-5">
@@ -149,23 +157,33 @@ export default function ListingForm({ category, mode, existing, onBack, onSubmit
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {!community && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+              <AddressInput
+                value={address}
+                onChange={setAddress}
+                onCoords={setCoords}
+                onPlaceSelect={handlePlaceSelect}
+                includedPrimaryTypes={syncEligible ? ['establishment'] : undefined}
+                placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
+              />
+            </div>
+
+          </>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
         </div>
 
         {!community && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
-              <AddressInput value={address} onChange={setAddress} onCoords={setCoords} placeholder="Start typing an address…" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="(215) 555-0100" />
-            </div>
-          </>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="(215) 555-0100" />
+          </div>
         )}
 
         {config.detailFields.some((f) => fieldIsVisible(f, details)) && (

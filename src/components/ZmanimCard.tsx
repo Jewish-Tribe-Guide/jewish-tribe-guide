@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import type { ZmanimData, ZmanEntry } from '@/types'
+import UpButton from '@/components/UpButton'
 
-type Status = 'loading' | 'error' | 'ready'
+type Status = 'loading' | 'no-location' | 'error' | 'ready'
 
 type Props = {
   /** Patient mode: fetch by hospital id. */
@@ -14,10 +15,10 @@ type Props = {
   /** Subtitle shown under the heading. Patient mode → hospital name.
    *  Community mode → the visitor's typed address. */
   locationLabel: string
-  onBack: () => void
+  onUp: () => void
 }
 
-export default function ZmanimCard({ hospitalId, coords, locationLabel, onBack }: Props) {
+export default function ZmanimCard({ hospitalId, coords, locationLabel, onUp }: Props) {
   const [data, setData] = useState<ZmanimData | null>(null)
   const [status, setStatus] = useState<Status>('loading')
 
@@ -31,8 +32,8 @@ export default function ZmanimCard({ hospitalId, coords, locationLabel, onBack }
     } else if (hospitalId) {
       url = `/api/zmanim?hospitalId=${encodeURIComponent(hospitalId)}`
     } else {
-      // Nothing to fetch — show error
-      setStatus('error')
+      // No location provided — show a clear explanation rather than a generic error
+      setStatus('no-location')
       return
     }
 
@@ -58,16 +59,7 @@ export default function ZmanimCard({ hospitalId, coords, locationLabel, onBack }
 
   return (
     <div>
-      {/* Back to index */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="All resources" onClick={onUp} />
 
       {/* Heading */}
       <div className="mb-6">
@@ -77,6 +69,7 @@ export default function ZmanimCard({ hospitalId, coords, locationLabel, onBack }
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
         {status === 'loading' && <LoadingState />}
+        {status === 'no-location' && <NoLocationState />}
         {status === 'error' && <ErrorState />}
         {status === 'ready' && data && <ReadyState data={data} />}
       </section>
@@ -99,6 +92,14 @@ function LoadingState() {
       <div className="h-4 w-48 rounded bg-slate-100" />
       <span className="sr-only">Loading zmanim…</span>
     </div>
+  )
+}
+
+function NoLocationState() {
+  return (
+    <p className="text-sm text-muted">
+      Enter your address to see zmanim for your location.
+    </p>
   )
 }
 

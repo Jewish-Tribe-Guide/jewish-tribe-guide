@@ -6,6 +6,7 @@ import SynagogueCard from '@/components/SynagogueCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   items: DirectoryResource[]
@@ -14,7 +15,7 @@ type Props = {
   /** When set, the card with this id will mount expanded and scroll into view.
    *  Used to restore the card the user had open before navigating to a form. */
   reopenItemId?: string | null
-  onBack: () => void
+  onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -38,7 +39,7 @@ export default function SynagogueDirectory({
   items,
   anchorLabel,
   reopenItemId,
-  onBack,
+  onUp,
   onAdd,
   onEdit,
   onReport,
@@ -79,15 +80,7 @@ export default function SynagogueDirectory({
 
   return (
     <div>
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label="All resources" onClick={onUp} />
 
       <div className="flex items-start justify-between gap-2 mb-4">
         <div>

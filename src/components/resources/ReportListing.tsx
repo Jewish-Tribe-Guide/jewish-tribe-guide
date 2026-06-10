@@ -2,14 +2,17 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
+import UpButton from '@/components/UpButton'
 
 type Props = {
   listing: DirectoryResource
-  onBack: () => void
+  /** The category this listing belongs to — the Up destination, e.g. "Synagogues". */
+  upLabel: string
+  onUp: () => void
   onSubmitted: () => void
 }
 
-export default function ReportListing({ listing, onBack, onSubmitted }: Props) {
+export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: Props) {
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -51,12 +54,7 @@ export default function ReportListing({ listing, onBack, onSubmitted }: Props) {
   if (done) {
     return (
       <div>
-        <button onClick={onSubmitted} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
+        <UpButton label={upLabel} onClick={onSubmitted} />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thanks for the heads-up</h2>
@@ -68,12 +66,7 @@ export default function ReportListing({ listing, onBack, onSubmitted }: Props) {
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      <UpButton label={upLabel} onClick={onUp} />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-1">Report a problem</h2>
       <p className="text-sm text-muted mb-2">

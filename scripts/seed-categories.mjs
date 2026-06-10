@@ -26,10 +26,8 @@ const categories = [
     description: 'Kosher and local grocery stores near the hospital',
     sort_order: 10,
     fields: [
+      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
       { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: 'Kosher' },
-      // kosherItems only shows when isKosher is checked (showIf evaluated by
-      // fieldIsVisible in lib/categories.ts). Placed before hours so the form
-      // reads: Kosher ✓ → Kosher items → Hours.
       {
         key: 'kosherItems',
         label: 'Kosher items available',
@@ -39,7 +37,6 @@ const categories = [
         help: 'Which kosher products can people find here?',
         showIf: { field: 'isKosher', equals: true },
       },
-      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
     ],
   },
   {
@@ -50,10 +47,8 @@ const categories = [
     description: 'Kosher and nearby dining options',
     sort_order: 20,
     fields: [
+      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
       { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: 'Kosher' },
-      // certification only shows when isKosher is checked (showIf evaluated by
-      // fieldIsVisible). Kept here so re-running this seed never clobbers it
-      // (it was previously added separately by migrate-changes.mjs #4).
       {
         key: 'certification',
         label: 'Kosher certification (Hechsher)',
@@ -62,7 +57,7 @@ const categories = [
         placeholder: 'e.g. OU, Star-K, local Vaad',
         showIf: { field: 'isKosher', equals: true },
       },
-      { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row', filterable: true },
+      { key: 'menu', label: 'Menu', type: 'url', linkLabel: 'View menu', renderAs: 'row', placeholder: 'https://…' },
     ],
   },
   {

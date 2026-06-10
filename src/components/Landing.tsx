@@ -37,7 +37,25 @@ export default function Landing({ onChoose }: Props) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-10">
+      {/* Invisible spacer — matches SiteHeader's toggle bar so "Who are you?" aligns
+          with "How can we help?" on the next screen. visibility:hidden preserves height. */}
+      <div className="bg-white border-b border-slate-200 invisible" aria-hidden="true">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-center">
+          <div className="inline-flex rounded-full bg-slate-100 p-1">
+            <div className="px-5 py-1.5 text-sm font-medium rounded-full">Patients</div>
+          </div>
+        </div>
+      </div>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Invisible spacer — matches UpButton + mb-6 on Home/CommunityHome. */}
+        <div className="flex items-center gap-1 text-sm mb-6 invisible" aria-hidden="true">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Start over
+        </div>
+
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold text-slate-800 mb-1">Who are you?</h2>
         </div>
