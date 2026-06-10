@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import IntakeModal from '@/components/IntakeModal'
 import IntakeForm from '@/components/intake/IntakeForm'
 import MealsForm from '@/components/intake/MealsForm'
@@ -31,6 +31,13 @@ const SERVICES = [
   },
 ]
 
+// The four service overlays that have a real form (anything else falls back to a
+// "coming soon" modal).
+const MODAL_TITLES = ['Meals', 'Transportation', 'Request Visitors', 'Family Housing']
+
+// History state page.tsx stamps, plus the sub-view this component adds.
+type AssistNavState = { mode?: string; assistView?: string }
+
 type Props = {
   hospitalId: string
   hospitalName: string
@@ -38,15 +45,46 @@ type Props = {
 }
 
 export default function GetAssistance({ hospitalId, hospitalName, onBack }: Props) {
-  const [activeModal, setActiveModal] = useState<string | null>(null)
-  const [showIntakeForm, setShowIntakeForm] = useState(false)
+  // A single history-backed sub-view:
+  //   null      → the service-selection screen
+  //   'intake'  → Request Direct Support (full-page IntakeForm)
+  //   <service> → that service's overlay modal (Meals, Transportation, …)
+  const [view, setView] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as AssistNavState | null)?.assistView ?? null
+  })
 
-  if (showIntakeForm) {
+  // Sync the sub-view when the browser back/forward buttons are used. page.tsx
+  // keeps GetAssistance mounted as long as mode stays 'assist'; this listener
+  // only adjusts which sub-view is showing, so the two never conflict.
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const s = e.state as AssistNavState | null
+      if (s?.mode !== 'assist') return
+      setView(s?.assistView ?? null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  // Open a sub-view (the intake form or a service overlay). Pushes a history
+  // entry so browser-back — and the in-app close/back, which also calls
+  // history.back() — returns to the selection screen.
+  function openView(next: string) {
+    setView(next)
+    history.pushState({ ...window.history.state, assistView: next }, '')
+  }
+
+  // In-app close/back mirrors browser-back so the two are identical in effect.
+  const closeView = () => history.back()
+
+  // ── Request Direct Support (full-page form) ─────────────────────────────────
+  if (view === 'intake') {
     return (
       <IntakeForm
         hospitalId={hospitalId}
         hospitalName={hospitalName}
-        onBack={() => setShowIntakeForm(false)}
+        onBack={closeView}
       />
     )
   }
@@ -77,7 +115,7 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
           A community representative will reach out to help with whatever you need.
         </p>
         <button
-          onClick={() => setShowIntakeForm(true)}
+          onClick={() => openView('intake')}
           className="bg-white text-primary font-semibold px-5 py-2.5 rounded-md shadow hover:bg-blue-50 transition-colors cursor-pointer"
         >
           Request Direct Support
@@ -92,7 +130,7 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
         {SERVICES.map((service) => (
           <button
             key={service.title}
-            onClick={() => setActiveModal(service.title)}
+            onClick={() => openView(service.title)}
             className="flex flex-col items-start gap-2 p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group"
           >
             <span className="text-2xl" aria-hidden="true">{service.icon}</span>
@@ -104,28 +142,28 @@ export default function GetAssistance({ hospitalId, hospitalName, onBack }: Prop
         ))}
       </div>
 
-      {activeModal === 'Meals' && (
-        <IntakeModal title="Request Meals" onClose={() => setActiveModal(null)}>
-          <MealsForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+      {view === 'Meals' && (
+        <IntakeModal title="Request Meals" onClose={closeView}>
+          <MealsForm hospitalId={hospitalId} onClose={closeView} />
         </IntakeModal>
       )}
-      {activeModal === 'Transportation' && (
-        <IntakeModal title="Request Transportation" onClose={() => setActiveModal(null)}>
-          <TransportationForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+      {view === 'Transportation' && (
+        <IntakeModal title="Request Transportation" onClose={closeView}>
+          <TransportationForm hospitalId={hospitalId} onClose={closeView} />
         </IntakeModal>
       )}
-      {activeModal === 'Request Visitors' && (
-        <IntakeModal title="Request Visitors" onClose={() => setActiveModal(null)}>
-          <VisitorsForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+      {view === 'Request Visitors' && (
+        <IntakeModal title="Request Visitors" onClose={closeView}>
+          <VisitorsForm hospitalId={hospitalId} onClose={closeView} />
         </IntakeModal>
       )}
-      {activeModal === 'Family Housing' && (
-        <IntakeModal title="Family Housing" onClose={() => setActiveModal(null)}>
-          <FamilyHousingForm hospitalId={hospitalId} onClose={() => setActiveModal(null)} />
+      {view === 'Family Housing' && (
+        <IntakeModal title="Family Housing" onClose={closeView}>
+          <FamilyHousingForm hospitalId={hospitalId} onClose={closeView} />
         </IntakeModal>
       )}
-      {activeModal && activeModal !== 'Meals' && activeModal !== 'Transportation' && activeModal !== 'Request Visitors' && activeModal !== 'Family Housing' && (
-        <IntakeModal title={activeModal} onClose={() => setActiveModal(null)} />
+      {view !== null && view !== 'intake' && !MODAL_TITLES.includes(view) && (
+        <IntakeModal title={view} onClose={closeView} />
       )}
     </div>
   )

@@ -1,172 +1,229 @@
 'use client'
 
-import { useState } from 'react'
-import Synagogues from '@/components/tabs/Synagogues'
+import { useEffect, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
-import { groceries, restaurants, hotels, mikvahs, eruvInfo, whatsappGroups } from '@/data/resources'
-import ResourceDirectory from '@/components/resources/ResourceDirectory'
-import Hotels from '@/components/resources/Hotels'
-import MikvahInfo from '@/components/resources/MikvahInfo'
+import { eruvInfo } from '@/data/resources'
+import ResourceLoader from '@/components/resources/ResourceLoader'
+import ListingForm from '@/components/resources/ListingForm'
+import ReportListing from '@/components/resources/ReportListing'
+import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
-import WhatsAppGroups from '@/components/resources/WhatsAppGroups'
 import ZmanimCard from '@/components/ZmanimCard'
+import type { DirectoryResource, DirectoryAnchor } from '@/types'
+import type { CategoryConfig } from '@/lib/categories'
+import { hospitals } from '@/data/hospitals'
 
-type FindView =
-  | 'about-hospital'
-  | 'synagogues'
-  | 'groceries'
-  | 'restaurants'
-  | 'hotels'
-  | 'mikvah'
-  | 'eruv'
-  | 'whatsapp'
-  | 'zmanim'
-  | null
+const ADD_CATEGORY = '__add_category__'
 
-type ResourceItem = {
-  id: Exclude<FindView, null>
-  label: string
-  icon: string
-  description: string
-}
-
-const ITEMS: ResourceItem[] = [
-  {
-    id: 'about-hospital',
-    label: 'About Your Hospital',
-    icon: '🏥',
-    description: 'Chaplain, kosher meals, Jewish medical staff, prayer space, and Shabbat accommodations',
-  },
-  {
-    id: 'synagogues',
-    label: 'Synagogues',
-    icon: '✡️',
-    description: 'Nearby shuls with davening times, contacts, and WhatsApp groups',
-  },
-  {
-    id: 'groceries',
-    label: 'Grocery Stores',
-    icon: '🛒',
-    description: 'Kosher and local grocery stores near the hospital',
-  },
-  {
-    id: 'restaurants',
-    label: 'Restaurants',
-    icon: '🍽️',
-    description: 'Kosher and nearby dining options',
-  },
-  {
-    id: 'hotels',
-    label: 'Hotels',
-    icon: '🏨',
-    description: 'Lodging with shuttle and Shabbat-friendly options',
-  },
-  {
-    id: 'mikvah',
-    label: 'Mikvah',
-    icon: '💧',
-    description: 'Mikvah locations, hours, and contact information',
-  },
-  {
-    id: 'eruv',
-    label: 'Eruv Information',
-    icon: '🗺️',
-    description: 'Eruv status, maps, and contacts for Shabbat',
-  },
-  {
-    id: 'whatsapp',
-    label: 'Community WhatsApp Groups',
-    icon: '💬',
-    description: 'Join local support and coordination groups',
-  },
-  {
-    id: 'zmanim',
-    label: 'Zmanim & Shabbos',
-    icon: '🕯️',
-    description: 'Hebrew date, daily zmanim, candle lighting, and havdalah',
-  },
+// Non-category items in the directory (hand-curated, not part of the DB pipeline).
+// Synagogues are now a DB category (see scripts/seed-synagogues.mjs) and no longer
+// appear here — they route through ResourceLoader automatically.
+type SpecialItem = { id: string; label: string; icon: string; description: string }
+const SPECIAL_ITEMS: SpecialItem[] = [
+  { id: 'about-hospital', label: 'About Your Hospital', icon: '🏥', description: 'Chaplain, kosher meals, Jewish medical staff, prayer space, and Shabbat accommodations' },
+  { id: 'eruv', label: 'Eruv Information', icon: '🗺️', description: 'Eruv status, maps, and contacts for Shabbat' },
+  { id: 'zmanim', label: 'Zmanim & Shabbos', icon: '🕯️', description: 'Hebrew date, daily zmanim, candle lighting, and havdalah' },
 ]
 
+// The history shape page.tsx stamps on every pushState/replaceState call, plus
+// the two extra fields FindResources adds when navigating inside Find mode.
+type FindNavState = {
+  mode?: string
+  findView?: string
+  findAction?: string
+}
+
+// A pending add/edit/report action on a listing within the current category.
+type ListingAction =
+  | { mode: 'create' }
+  | { mode: 'edit'; listing: DirectoryResource }
+  | { mode: 'report'; listing: DirectoryResource }
+
 type Props = {
-  hospitalId: string
-  hospitalName: string
+  anchor: DirectoryAnchor
   onBack: () => void
 }
 
-export default function FindResources({ hospitalId, hospitalName, onBack }: Props) {
-  const [view, setView] = useState<FindView>(null)
+export default function FindResources({ anchor, onBack }: Props) {
+  const isHospital = anchor.kind === 'hospital'
+  // Eruv, Zmanim, and Synagogues are city-wide resources — relevant to community
+  // members too. They're data-keyed to a hospital, so in address mode we fall back
+  // to the first hospital as a Philadelphia-area representative.
+  const fallbackHospital = hospitals[0]
+  const hospitalId = anchor.kind === 'hospital' ? anchor.hospitalId : fallbackHospital.id
+  // The label shown as page subtitle in Synagogues / Zmanim / Eruv:
+  //   patient mode → hospital name (data is keyed to this hospital)
+  //   community mode → the typed address (so the user isn't confused by a hospital name)
+  const locationLabel = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
+  const subtitle = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
+
+  // ── History-backed internal navigation ──────────────────────────────────────
+  // Initialize from the current history state so that browser-forward navigation
+  // (or a page.tsx audience-switch) re-opens the right sub-view automatically.
+  const [view, setView] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    const s = window.history.state as FindNavState | null
+    return s?.findView ?? null
+  })
   const [query, setQuery] = useState('')
+  const [action, setAction] = useState<ListingAction | null>(null)
+  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
+  // The listing id most recently opened for edit/report — restored as expanded
+  // when the user presses Back from the form to the category list.
+  const [reopenItemId, setReopenItemId] = useState<string | null>(null)
 
-  const goBack = () => setView(null)
+  // Keep internal view/action in sync when the browser's back/forward buttons
+  // are used. page.tsx has its own popstate listener for audience/mode; this one
+  // only fires when mode is still 'find', so the two listeners never conflict.
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const s = e.state as FindNavState | null
+      if (s?.mode !== 'find') return
+      setView(s.findView ?? null)
+      setAction(null) // edit/report listings can't be serialized into history
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
-  // ── Detail views ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/categories')
+      .then((res) => res.json())
+      .then((body) => {
+        if (!cancelled && body.ok) setCategories(body.categories as CategoryConfig[])
+        else if (!cancelled) setCategories([])
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Audience derived from the anchor — needed to stamp complete history states
+  // without reading window.history.state (which can carry stale values).
+  const audienceKey = anchor.kind === 'hospital' ? 'patient' : 'community'
+
+  // Navigate forward to a sub-view. Always pushes a new history entry so that
+  // browser-back (and the in-app Back button, which also calls history.back())
+  // returns exactly one screen. Never called when going backwards — that's always
+  // history.back().
+  function navigateTo(next: string) {
+    setAction(null)
+    setView(next)
+    history.pushState({ audience: audienceKey, mode: 'find', findView: next }, '')
+  }
+
+  // Open a listing action (create/edit/report form). Pushes its own history
+  // entry so browser-back from the form lands on the category list, not the index.
+  function openAction(act: ListingAction) {
+    setAction(act)
+    // Remember which listing was opened so we can re-expand its card on Back.
+    if (act.mode === 'edit' || act.mode === 'report') {
+      setReopenItemId(act.listing.id)
+    }
+    // Include the current view so popstate can restore it when going back to
+    // the category list (edit/report listing objects can't be serialized).
+    history.pushState({ audience: audienceKey, mode: 'find', findView: view, findAction: 'open' }, '')
+  }
+
+  // Both the in-app Back button and form close/submit use history.back() so
+  // that in-app back and browser back are identical in effect, and forward
+  // history is preserved after pressing back.
+  const goBack = () => history.back()
+  const closeAction = () => history.back()
+
+  // ── Special (non-category) detail views ─────────────────────────────────────────
   if (view === 'about-hospital') {
-    return <AboutYourHospital hospitalId={hospitalId} hospitalName={hospitalName} onBack={goBack} />
-  }
-  if (view === 'synagogues') {
-    return <Synagogues hospitalId={hospitalId} hospitalName={hospitalName} onBack={goBack} />
-  }
-  if (view === 'groceries') {
-    const items = groceries.filter((g) => g.hospitalId === hospitalId)
-    return <ResourceDirectory title="Grocery Stores" items={items} onBack={goBack} />
-  }
-  if (view === 'restaurants') {
-    const items = restaurants.filter((r) => r.hospitalId === hospitalId)
-    return <ResourceDirectory title="Restaurants" items={items} onBack={goBack} />
-  }
-  if (view === 'hotels') {
-    const items = hotels.filter((h) => h.hospitalId === hospitalId)
-    return <Hotels items={items} onBack={goBack} />
-  }
-  if (view === 'mikvah') {
-    const items = mikvahs.filter((m) => m.hospitalId === hospitalId)
-    return <MikvahInfo items={items} onBack={goBack} />
+    return <AboutYourHospital hospitalId={hospitalId} hospitalName={locationLabel} onBack={goBack} />
   }
   if (view === 'eruv') {
     const eruv = eruvInfo[hospitalId as keyof typeof eruvInfo]
     if (!eruv)
       return (
         <div>
-          <button
-            onClick={goBack}
-            className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
+          <BackButton onBack={goBack} />
           <p className="text-muted text-sm">No eruv information available for this hospital.</p>
         </div>
       )
     return <EruvInfo eruv={eruv} onBack={goBack} />
   }
-  if (view === 'whatsapp') {
-    return <WhatsAppGroups groups={whatsappGroups} onBack={goBack} />
-  }
   if (view === 'zmanim') {
+    // Address mode: pass raw coords so the API skips the hospital lookup entirely.
+    // Patient mode: pass hospitalId as before.
+    if (anchor.kind === 'address') {
+      return (
+        <ZmanimCard
+          key={anchor.label}
+          coords={anchor.coords}
+          locationLabel={locationLabel}
+          onBack={goBack}
+        />
+      )
+    }
     return (
       <ZmanimCard
         key={hospitalId}
         hospitalId={hospitalId}
-        hospitalName={hospitalName}
+        locationLabel={locationLabel}
         onBack={goBack}
+      />
+    )
+  }
+  if (view === ADD_CATEGORY) {
+    return <CategoryForm onBack={goBack} onSubmitted={goBack} />
+  }
+
+  // ── Database-backed categories (with add / edit / report) ───────────────────────
+  const category = view ? categories?.find((c) => c.id === view) : undefined
+  if (category) {
+    if (action?.mode === 'create') {
+      return <ListingForm category={category} mode="create" onBack={closeAction} onSubmitted={closeAction} />
+    }
+    if (action?.mode === 'edit') {
+      return <ListingForm category={category} mode="edit" existing={action.listing} onBack={closeAction} onSubmitted={closeAction} />
+    }
+    if (action?.mode === 'report') {
+      return <ReportListing listing={action.listing} onBack={closeAction} onSubmitted={closeAction} />
+    }
+    return (
+      <ResourceLoader
+        category={category}
+        anchor={anchor}
+        reopenItemId={reopenItemId}
+        onBack={goBack}
+        onAdd={() => openAction({ mode: 'create' })}
+        onEdit={(listing) => openAction({ mode: 'edit', listing })}
+        onReport={(listing) => openAction({ mode: 'report', listing })}
       />
     )
   }
 
   // ── Index ─────────────────────────────────────────────────────────────────────
+  const categoryItems = (categories ?? []).map((c) => ({
+    id: c.id,
+    label: c.pluralLabel,
+    icon: c.icon,
+    description: c.description,
+  }))
+  // 'About Your Hospital' is patient-only. The other specials (Synagogues, Eruv,
+  // Zmanim) are Philadelphia community resources and show in both modes.
+  const specialItems = isHospital
+    ? SPECIAL_ITEMS
+    : SPECIAL_ITEMS.filter((item) => item.id !== 'about-hospital')
+  const allItems = [...specialItems, ...categoryItems]
+
   const q = query.trim().toLowerCase()
-  const visibleItems = [...ITEMS]
+  const visibleItems = allItems
     .sort((a, b) => a.label.localeCompare(b.label))
     .filter(
-      (item) =>
-        !q || item.label.toLowerCase().includes(q) || item.description.toLowerCase().includes(q)
+      (item) => !q || item.label.toLowerCase().includes(q) || item.description.toLowerCase().includes(q),
     )
 
   return (
     <div>
-      {/* Back to Home */}
       <button
         onClick={onBack}
         className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
@@ -177,10 +234,9 @@ export default function FindResources({ hospitalId, hospitalName, onBack }: Prop
         Back
       </button>
 
-      {/* Option-3 heading */}
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-slate-800">Find Resources</h2>
-        <p className="text-sm text-muted mt-0.5">{hospitalName}</p>
+        {subtitle && <p className="text-sm text-muted mt-0.5">{subtitle}</p>}
       </div>
 
       {/* Search */}
@@ -198,14 +254,25 @@ export default function FindResources({ hospitalId, hospitalName, onBack }: Prop
         />
       </div>
 
-      {visibleItems.length === 0 ? (
-        <p className="text-muted text-sm">No resources match “{query}”.</p>
+      {/* Suggest a new category */}
+      <button
+        onClick={() => navigateTo(ADD_CATEGORY)}
+        className="w-full flex items-center justify-center gap-2 mb-5 px-4 py-3 rounded-lg border border-dashed border-primary/50 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+      >
+        <span aria-hidden="true">➕</span>
+        Don&apos;t see the right category? Suggest a new one
+      </button>
+
+      {categories === null ? (
+        <p className="text-muted text-sm">Loading…</p>
+      ) : visibleItems.length === 0 ? (
+        <p className="text-muted text-sm">No resources match "{query}".</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibleItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setView(item.id)}
+              onClick={() => navigateTo(item.id)}
               className="flex flex-col items-start gap-3 p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group h-full"
             >
               <span className="text-4xl" aria-hidden="true">{item.icon}</span>
@@ -220,5 +287,19 @@ export default function FindResources({ hospitalId, hospitalName, onBack }: Prop
         </div>
       )}
     </div>
+  )
+}
+
+function BackButton({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      onClick={onBack}
+      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back
+    </button>
   )
 }

@@ -32,6 +32,23 @@ gmp-place-autocomplete::part(input):focus {
   box-shadow: 0 0 0 2px var(--color-primary); /* focus:ring-2 focus:ring-primary */
 }
 
+/* Header address field: replicate the hospital <select> exactly (minus the
+   dropdown arrow) so the two anchor controls read as one matched set. Scoped to
+   .address-anchor-lg so intake-form instances keep their smaller styling. */
+.address-anchor-lg gmp-place-autocomplete {
+  border-radius: 6px; /* clip the inner input to the same rounded-md corners */
+}
+.address-anchor-lg gmp-place-autocomplete::part(input) {
+  box-sizing: border-box;
+  min-height: 3.25rem !important; /* 52px — fills the host, matches the select's min-h */
+  font-size: 1.125rem !important; /* text-lg */
+  padding: 0.75rem 1rem !important; /* px-4 py-3 */
+  border: 1px solid #cbd5e1 !important; /* slate-300 */
+  border-radius: 6px !important; /* rounded-md */
+  /* Tailwind v4 shadow-sm — the exact shadow the select carries. */
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+}
+
 /* Empty date inputs render their "mm/dd/yyyy" format text in the full text
    color; show it in the exact same muted color as other inputs' placeholders
    (Tailwind's ::placeholder = a 50%-transparent text color) until a real date

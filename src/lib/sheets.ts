@@ -61,16 +61,18 @@ async function getAccessToken(email: string, privateKeyPem: string): Promise<str
   return data.access_token
 }
 
-// Appends a single row to the configured sheet via the Sheets v4 REST API.
-export async function appendRow(row: string[]): Promise<void> {
+// Appends a single row to a tab of the configured sheet via the Sheets v4 REST
+// API. Defaults to the GOOGLE_SHEETS_TAB tab; pass opts.tab to target another
+// (e.g. 'Volunteers'). The tab must already exist in the spreadsheet.
+export async function appendRow(row: string[], opts: { tab?: string } = {}): Promise<void> {
   const spreadsheetId = getEnv('GOOGLE_SHEETS_ID')
-  const tab = process.env.GOOGLE_SHEETS_TAB || 'Requests'
+  const tab = opts.tab || process.env.GOOGLE_SHEETS_TAB || 'Requests'
   const email = getEnv('GOOGLE_SERVICE_ACCOUNT_EMAIL')
   const privateKey = parsePrivateKey(getEnv('GOOGLE_PRIVATE_KEY'))
 
   const token = await getAccessToken(email, privateKey)
 
-  const range = encodeURIComponent(`${tab}!A:J`)
+  const range = encodeURIComponent(`${tab}!A:Z`)
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}` +
     `:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`

@@ -42,41 +42,6 @@ export type ZmanimData = {
   fastDay?: { label: string; start: string; end: string } | null
 }
 
-export type SynagogueContact = {
-  name: string
-  role: string
-  phone: string
-}
-
-export type SynagogueWhatsApp = {
-  name: string
-  link: string
-}
-
-export type SynagogueRepresentative = {
-  name: string
-  phone: string
-}
-
-export type DaveningTime = {
-  label: string
-  time: string
-}
-
-export type Synagogue = {
-  id: string
-  name: string
-  denomination: string
-  hospitalId: string
-  distance: number
-  address: string
-  davening: DaveningTime[]
-  location: string
-  contacts: SynagogueContact[]
-  whatsappGroups: SynagogueWhatsApp[]
-  representative: SynagogueRepresentative
-}
-
 export type Resource = {
   name: string
   hospitalId: string
@@ -134,6 +99,124 @@ export type CommunityWhatsAppGroup = {
   link: string
 }
 
+// ── Supabase resource directory (submission + moderation pipeline) ─────────────
+
+export type ResourceStatus = 'pending' | 'approved' | 'rejected' | 'archived'
+
+/** Driving / walking travel time to one hospital, in whole minutes. Either may
+ *  be absent if Google couldn't route that mode (e.g. walking across a bridge). */
+export type TravelTimes = {
+  drive?: number
+  walk?: number
+}
+
+/** Precomputed travel times from a listing to every hospital, keyed by hospital id. */
+export type TravelMap = Record<string, TravelTimes>
+
+/** A row from the `resource` table, exactly as Supabase returns it (snake_case). */
+export type ResourceRow = {
+  id: string
+  category: string
+  name: string
+  hospital_id: string
+  distance: number | null
+  travel: TravelMap | null
+  address: string | null
+  phone: string | null
+  details: Record<string, unknown>
+  status: ResourceStatus
+  submitted_by: { name?: string; email?: string } | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+/**
+ * A resource normalized for the display components: shared fields at the top
+ * level and the category-specific `details` flattened onto it, so existing
+ * cards (KosherPlace/Hotel/MikvahEntry shapes) keep working unchanged.
+ */
+export type DirectoryResource = {
+  id: string
+  category: string
+  name: string
+  hospitalId: string
+  distance: number
+  /** Precomputed travel times to every hospital, keyed by hospital id. */
+  travel?: TravelMap | null
+  /** Driving/walking minutes to the SELECTED hospital (set client-side from `travel`). */
+  driveMinutes?: number
+  walkMinutes?: number
+  address: string
+  phone?: string
+  /** Upvote count (for upvote-enabled categories). */
+  upvotes?: number
+  /** Straight-line miles from the visitor's typed address (address-anchor mode).
+   *  Computed client-side from `details.geo` — see ResourceLoader. */
+  milesFromAddress?: number
+  /** Coordinates carried over from `details.geo` (spread onto the row). */
+  geo?: { lat: number; lng: number } | null
+  [detailKey: string]: unknown
+}
+
+/** The listing fields a create/edit submission proposes (stored in payload). */
+export type ResourceSubmission = {
+  category: string
+  name: string
+  hospitalId: string
+  distance: number | null
+  address: string
+  phone: string
+  details: Record<string, unknown>
+  submittedBy?: { name?: string; email?: string }
+  /** Coordinates captured client-side from the address autocomplete, if any.
+   *  When present, the server skips geocoding and uses these directly. */
+  geo?: { lat: number; lng: number } | null
+}
+
+// ── Moderation queue (the `submission` table) ──────────────────────────────────
+
+export type SubmissionOperation = 'create' | 'update' | 'delete'
+export type SubmissionTargetType = 'listing' | 'tag' | 'category'
+export type SubmissionStatus = 'pending' | 'approved' | 'rejected'
+
+/** A row from the `submission` table — one proposed change awaiting review. */
+export type SubmissionRow = {
+  id: string
+  operation: SubmissionOperation
+  target_type: SubmissionTargetType
+  target_id: string | null
+  payload: Record<string, unknown>
+  note: string | null
+  status: SubmissionStatus
+  submitted_by: { name?: string; email?: string } | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+/** A submission plus the current target row (for update/delete diffs in /admin)
+ *  and a resolved category label for display. */
+export type EnrichedSubmission = SubmissionRow & {
+  current?: ResourceRow | null
+  categoryLabel?: string
+}
+
+/** Payload for a `category` create submission: the proposed category + its first
+ *  listing (people usually request a category because they have one place in mind). */
+export type CategorySubmissionPayload = {
+  label: string
+  icon?: string
+  description?: string
+  upvotesEnabled?: boolean
+  firstListing: {
+    name: string
+    hospitalId: string
+    distance: number | null
+    address: string
+    phone: string
+    geo?: { lat: number; lng: number } | null
+  }
+}
+
 export type JewishMedicalProfessional = {
   name: string
   specialty: string
@@ -160,7 +243,21 @@ export type HospitalInfo = {
   shabbatAccommodations: string
 }
 
-export type AppMode = 'home' | 'find' | 'assist'
+// ── Audience + directory anchor ────────────────────────────────────────────────
+
+/** Which side of the site a visitor is on. Chosen at the Landing fork. */
+export type Audience = 'patient' | 'community'
+
+/**
+ * What the resource directory measures distance against.
+ *  - patients anchor on a hospital (precomputed drive/walk minutes)
+ *  - residents anchor on a typed address (haversine miles from `details.geo`)
+ */
+export type DirectoryAnchor =
+  | { kind: 'hospital'; hospitalId: string; hospitalName: string }
+  | { kind: 'address'; coords: { lat: number; lng: number } | null; label: string }
+
+export type AppMode = 'home' | 'find' | 'assist' | 'volunteer' | 'community-home' | 'give'
 
 // ── Intake form types ─────────────────────────────────────────────────────────
 
@@ -212,6 +309,49 @@ export type FamilyHousingData = {
   accessibilityRequirements: string[]
   accessibilityOther: string
   notes: string
+}
+
+// Extra questions shown when the matching "How can you help?" box is checked —
+// not about the volunteer's general info, but what they can offer for that
+// specific service (so we can match them to a patient/family's preferences).
+export type VolunteerVisitingDetails = {
+  gender: string
+  ageGroup: string
+}
+
+export type VolunteerMealsDetails = {
+  kosherStandard: string
+}
+
+export type VolunteerTransportationDetails = {
+  maxPassengers: string
+}
+
+export type VolunteerHousingDetails = {
+  apartmentType: string
+  numberOfRooms: string
+  numberOfBeds: string
+  address: string
+  wheelchairAccessible: boolean
+  elevatorInBuilding: boolean
+  maxDays: string
+}
+
+export type VolunteerData = {
+  waysToHelp: string[]
+  waysToHelpOther: string
+  hospitals: string[]
+  availability: string[]
+  hasCar: string
+  notes: string
+  visiting: VolunteerVisitingDetails
+  meals: VolunteerMealsDetails
+  transportation: VolunteerTransportationDetails
+  housing: VolunteerHousingDetails
+}
+
+export type VolunteerRemovalData = {
+  reason: string
 }
 
 export type VisitorsData = {

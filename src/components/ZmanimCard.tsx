@@ -6,19 +6,37 @@ import type { ZmanimData, ZmanEntry } from '@/types'
 type Status = 'loading' | 'error' | 'ready'
 
 type Props = {
-  hospitalId: string
-  hospitalName: string
+  /** Patient mode: fetch by hospital id. */
+  hospitalId?: string
+  /** Community/address mode: fetch by raw coordinates. When provided, hospitalId
+   *  is ignored. The timezone defaults to America/New_York (Philadelphia). */
+  coords?: { lat: number; lng: number } | null
+  /** Subtitle shown under the heading. Patient mode → hospital name.
+   *  Community mode → the visitor's typed address. */
+  locationLabel: string
   onBack: () => void
 }
 
-export default function ZmanimCard({ hospitalId, hospitalName, onBack }: Props) {
+export default function ZmanimCard({ hospitalId, coords, locationLabel, onBack }: Props) {
   const [data, setData] = useState<ZmanimData | null>(null)
   const [status, setStatus] = useState<Status>('loading')
 
   useEffect(() => {
     let cancelled = false
 
-    fetch(`/api/zmanim?hospitalId=${encodeURIComponent(hospitalId)}`)
+    // Build the query string: prefer raw coords (address mode) over hospitalId.
+    let url: string
+    if (coords?.lat != null && coords?.lng != null) {
+      url = `/api/zmanim?lat=${coords.lat}&lng=${coords.lng}&tzid=America%2FNew_York`
+    } else if (hospitalId) {
+      url = `/api/zmanim?hospitalId=${encodeURIComponent(hospitalId)}`
+    } else {
+      // Nothing to fetch — show error
+      setStatus('error')
+      return
+    }
+
+    fetch(url)
       .then((res) => res.json())
       .then((json: { ok: boolean; data?: ZmanimData }) => {
         if (cancelled) return
@@ -36,7 +54,7 @@ export default function ZmanimCard({ hospitalId, hospitalName, onBack }: Props) 
     return () => {
       cancelled = true
     }
-  }, [hospitalId])
+  }, [hospitalId, coords?.lat, coords?.lng])
 
   return (
     <div>
@@ -54,7 +72,7 @@ export default function ZmanimCard({ hospitalId, hospitalName, onBack }: Props) 
       {/* Heading */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-slate-800">Zmanim &amp; Shabbos</h2>
-        <p className="text-sm text-muted mt-0.5">{hospitalName}</p>
+        <p className="text-sm text-muted mt-0.5">{locationLabel}</p>
       </div>
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">

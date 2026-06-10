@@ -3,9 +3,14 @@ import {
   validateSubmission,
   generateRequestId,
   buildSheetRow,
+  buildVolunteerSheetRow,
+  VOLUNTEER_SHEET_TAB,
+  buildVolunteerChangeSheetRow,
+  VOLUNTEER_CHANGES_SHEET_TAB,
 } from '@/lib/requests'
 import { appendRow } from '@/lib/sheets'
 import { sendNotification } from '@/lib/email'
+import { sendRequestConfirmation } from '@/lib/confirmationEmail'
 
 export async function POST(request: Request) {
   let payload: SubmissionPayload
@@ -24,9 +29,17 @@ export async function POST(request: Request) {
   const requestId = generateRequestId()
   const timestamp = new Date().toISOString()
 
-  // 2. Append to Google Sheets (system of record — hard failure if this fails)
+  // 2. Append to Google Sheets (system of record — hard failure if this fails).
+  //    Volunteer signups → Volunteers tab; edit/removal change-requests →
+  //    Volunteer Changes tab; all other requests → default Requests tab.
   try {
-    await appendRow(buildSheetRow(payload, requestId, timestamp))
+    if (payload.requestType === 'Volunteer') {
+      await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_SHEET_TAB })
+    } else if (payload.requestType === 'Volunteer Edit' || payload.requestType === 'Volunteer Removal') {
+      await appendRow(buildVolunteerChangeSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_CHANGES_SHEET_TAB })
+    } else {
+      await appendRow(buildSheetRow(payload, requestId, timestamp))
+    }
   } catch (err) {
     console.error('[requests] Sheets append failed:', err)
     return Response.json(
@@ -35,11 +48,16 @@ export async function POST(request: Request) {
     )
   }
 
-  // 3. Send email notification (best-effort — never fails the request)
+  // 3. Send emails (best-effort — never fail the request)
   try {
     await sendNotification(payload, requestId, timestamp)
   } catch (err) {
-    console.error('[requests] Email notification failed:', err)
+    console.error('[requests] Admin notification failed:', err)
+  }
+  try {
+    await sendRequestConfirmation(payload, requestId)
+  } catch (err) {
+    console.error('[requests] Confirmation email failed:', err)
   }
 
   // 4. Success

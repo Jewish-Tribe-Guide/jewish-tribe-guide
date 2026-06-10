@@ -7,6 +7,10 @@ type Props = {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** Called with the chosen place's coordinates (or null when the text is typed
+   *  manually, so coordinates can't be trusted). Lets callers capture lat/lng
+   *  client-side without a server geocode. */
+  onCoords?: (coords: { lat: number; lng: number } | null) => void
 }
 
 declare global {
@@ -57,7 +61,7 @@ function loadMapsScript(): Promise<void> {
   return mapsScriptPromise
 }
 
-export default function AddressInput({ value, onChange, placeholder = 'Address or location' }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed)
@@ -65,10 +69,12 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   // Keep the latest props reachable from the long-lived effect without
   // re-running it (which would tear down and rebuild the Google element).
   const onChangeRef = useRef(onChange)
+  const onCoordsRef = useRef(onCoords)
   const valueRef = useRef(value)
   const placeholderRef = useRef(placeholder)
   useEffect(() => {
     onChangeRef.current = onChange
+    onCoordsRef.current = onCoords
     valueRef.current = value
     placeholderRef.current = placeholder
   })
@@ -104,16 +110,20 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         element.noClearButton = true
         if (valueRef.current) element.value = valueRef.current
 
-        // Capture a chosen suggestion's full formatted address.
+        // Capture a chosen suggestion's full formatted address + coordinates.
         element.addEventListener('gmp-select', async (event) => {
           const place = event.placePrediction.toPlace()
-          await place.fetchFields({ fields: ['formattedAddress'] })
+          await place.fetchFields({ fields: ['formattedAddress', 'location'] })
           if (place.formattedAddress) onChangeRef.current(place.formattedAddress)
+          const loc = place.location
+          if (loc) onCoordsRef.current?.({ lat: loc.lat(), lng: loc.lng() })
         })
 
-        // Preserve free-typed text (no selection) so the field still submits.
+        // Preserve free-typed text (no selection). Coordinates from any earlier
+        // selection no longer match, so clear them (server will geocode instead).
         element.addEventListener('input', () => {
           onChangeRef.current(element.value)
+          onCoordsRef.current?.(null)
         })
 
         // If Google reports a runtime error, fall back to a plain text field.

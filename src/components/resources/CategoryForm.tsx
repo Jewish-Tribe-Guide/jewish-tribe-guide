@@ -1,0 +1,194 @@
+'use client'
+
+import { useState } from 'react'
+import type { CategorySubmissionPayload } from '@/types'
+import AddressInput from '@/components/intake/AddressInput'
+
+type Props = {
+  onBack: () => void
+  onSubmitted: () => void
+}
+
+const inputClass =
+  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
+
+// Lets anyone propose a brand-new category (e.g. "Dentists"). Because a category
+// is usually requested with a specific place in mind, the form also captures its
+// first listing. On approval, the category and its first listing are created.
+export default function CategoryForm({ onBack, onSubmitted }: Props) {
+  const [label, setLabel] = useState('')
+  const [icon, setIcon] = useState('')
+  const [description, setDescription] = useState('')
+  const [upvotesEnabled, setUpvotesEnabled] = useState(false)
+
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
+  const [phone, setPhone] = useState('')
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  const [submitterName, setSubmitterName] = useState('')
+  const [submitterEmail, setSubmitterEmail] = useState('')
+
+  const [submitting, setSubmitting] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+  const [done, setDone] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setErrors([])
+
+    const payload: CategorySubmissionPayload = {
+      label,
+      icon: icon.trim() || undefined,
+      description: description.trim() || undefined,
+      upvotesEnabled,
+      firstListing: {
+        name,
+        hospitalId: 'all',
+        distance: null,
+        address,
+        phone,
+        geo: coords,
+      },
+    }
+    const submittedBy =
+      submitterName.trim() || submitterEmail.trim()
+        ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
+        : undefined
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'create', targetType: 'category', payload, submittedBy }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) {
+        setErrors(body.errors ?? ['Something went wrong. Please try again.'])
+        return
+      }
+      setDone(true)
+    } catch {
+      setErrors(['Network error. Please check your connection and try again.'])
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div>
+        <BackButton onClick={onSubmitted} />
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+          <p className="text-2xl mb-2">🙏</p>
+          <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
+          <p className="text-sm text-green-700">
+            Your category suggestion was received and will appear once it&apos;s reviewed and approved.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <BackButton onClick={onBack} />
+
+      <h2 className="text-xl font-semibold text-slate-800 mb-1">Suggest a new category</h2>
+      <p className="text-sm text-muted mb-5">
+        Don&apos;t see the right category? Suggest one and add the first place. New categories are
+        reviewed before they appear.
+      </p>
+
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Category name *</label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputClass} placeholder="e.g. Dentists, Car Repair" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-[6rem_1fr] gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Icon</label>
+            <input value={icon} onChange={(e) => setIcon(e.target.value)} className={inputClass} placeholder="🦷" maxLength={4} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} placeholder="Short description of this category" />
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={upvotesEnabled}
+            onChange={(e) => setUpvotesEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+          />
+          <span className="text-sm font-medium text-slate-700">Let people upvote listings in this category</span>
+        </label>
+
+        <div className="border-t border-slate-200 pt-4">
+          <p className="text-sm font-semibold text-slate-700 mb-3">First listing in this category</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Dr. Cohen, DDS" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+              <AddressInput value={address} onChange={setAddress} onCoords={setCoords} placeholder="Start typing an address…" />
+              <p className="text-xs text-muted mt-1">Distance from each hospital is calculated from the address.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="(215) 555-0100" />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
+            <input value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
+            <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+
+        {errors.length > 0 && (
+          <ul className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 list-disc list-inside space-y-0.5">
+            {errors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {submitting ? 'Submitting…' : 'Submit for review'}
+        </button>
+      </form>
+      </div>
+    </div>
+  )
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-sm text-muted hover:text-slate-700 mb-4 cursor-pointer transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back
+    </button>
+  )
+}
