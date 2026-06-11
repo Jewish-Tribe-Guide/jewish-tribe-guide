@@ -11,6 +11,9 @@ export type Destination = {
   audience: Audience
   mode: AppMode
   extra?: Record<string, unknown>
+  /** When set, open this service's request form as a modal over the current
+   *  page instead of navigating (see ServiceModal). */
+  service?: string
   keywords: string[]
 }
 
@@ -22,7 +25,7 @@ const STATIC_DESTINATIONS: Destination[] = [
     description: 'Home-cooked kosher meals delivered to you or your family.',
     audience: 'patient',
     mode: 'assist',
-    extra: { assistView: 'Meals' },
+    service: 'Meals',
     keywords: [
       'meal', 'meals', 'food', 'kosher', 'kosher food', 'dinner', 'lunch', 'breakfast',
       'eat', 'hungry', 'meal train', 'food delivery', 'cholent', 'shabbos food',
@@ -36,7 +39,7 @@ const STATIC_DESTINATIONS: Destination[] = [
     description: 'Rides to and from the hospital, arranged by neighbors.',
     audience: 'patient',
     mode: 'assist',
-    extra: { assistView: 'Transportation' },
+    service: 'Transportation',
     keywords: [
       'ride', 'rides', 'car', 'drive', 'driver', 'lift', 'transport', 'transportation',
       'taxi', 'uber', 'pickup', 'drop off', 'appointment', 'travel', 'carpool',
@@ -50,7 +53,7 @@ const STATIC_DESTINATIONS: Destination[] = [
     description: 'A nearby place to stay while your loved one is in care.',
     audience: 'patient',
     mode: 'assist',
-    extra: { assistView: 'Family Housing' },
+    service: 'Family Housing',
     keywords: [
       'housing', 'house', 'stay', 'sleep', 'room', 'spare room', 'apartment', 'lodging',
       'accommodation', 'accommodations', 'overnight', 'out of town', 'place to stay',
@@ -64,7 +67,7 @@ const STATIC_DESTINATIONS: Destination[] = [
     description: 'A friendly face at the bedside for you or your loved one.',
     audience: 'patient',
     mode: 'assist',
-    extra: { assistView: 'Request Visitors' },
+    service: 'Request Visitors',
     keywords: [
       'visit', 'visitor', 'visitors', 'company', 'lonely', 'bikur cholim',
       'someone to talk to', 'friendly face', 'sit with', 'patient visit', 'cheer up',
@@ -78,7 +81,6 @@ const STATIC_DESTINATIONS: Destination[] = [
     description: 'Not sure where to start? A community representative will reach out.',
     audience: 'patient',
     mode: 'assist',
-    extra: { assistView: 'intake' },
     keywords: [
       'help', 'support', 'assistance', 'direct support', 'not sure', 'representative',
       'case manager', 'social worker', 'multiple services', 'talk to someone',

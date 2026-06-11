@@ -8,11 +8,12 @@ import Landing from '@/components/Landing'
 import AudienceHome from '@/components/AudienceHome'
 import SiteHeader from '@/components/SiteHeader'
 import FindResources from '@/components/FindResources'
-import GetAssistance from '@/components/GetAssistance'
+import IntakeForm from '@/components/intake/IntakeForm'
+import ServiceModal from '@/components/home/ServiceModal'
 import Volunteer from '@/components/Volunteer'
 
 // What we persist in the browser history stack so back/forward can restore state.
-type NavState = { audience: Audience | null; mode: AppMode }
+type NavState = { audience: Audience | null; mode: AppMode; serviceModal?: string }
 
 export default function Page() {
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>(hospitals[0].id)
@@ -20,6 +21,9 @@ export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
   const [address, setAddress] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  // A service request form shown as an overlay on the CURRENT page (set by the
+  // Direct Support cards and search suggestions — opening one never navigates).
+  const [serviceModal, setServiceModal] = useState<string | null>(null)
 
   const selectedHospitalName = hospitals.find((h) => h.id === selectedHospitalId)?.name ?? ''
 
@@ -35,6 +39,7 @@ export default function Page() {
       const s = e.state as NavState | null
       setAudience(s?.audience ?? null)
       setMode(s?.mode ?? 'home')
+      setServiceModal(s?.serviceModal ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -52,7 +57,16 @@ export default function Page() {
   ) {
     setAudience(nextAudience)
     setMode(nextMode)
+    setServiceModal(null)
     history.pushState({ audience: nextAudience, mode: nextMode, ...extra } as NavState, '')
+  }
+
+  // Open a service form over the current page. Pushes a history entry so the
+  // browser Back button (and the modal's ✕, which calls history.back()) closes
+  // it and lands exactly where the visitor was.
+  function openService(service: string) {
+    setServiceModal(service)
+    history.pushState({ ...(window.history.state ?? {}), serviceModal: service }, '')
   }
 
   // Audience switch (the header tabs). 'find' works on both sides, so stay
@@ -62,17 +76,26 @@ export default function Page() {
     navigate(next, mode === 'find' && audience !== null ? 'find' : defaultMode)
   }
 
-  // Title click / Up buttons — always a way back to the landing page.
+  // Title click — always a way back to the landing page.
   function goToLanding() {
     navigate(null, 'home')
   }
+
+  const modal = serviceModal && (
+    <ServiceModal
+      service={serviceModal}
+      hospitalId={selectedHospitalId}
+      onClose={() => history.back()}
+    />
+  )
 
   // ── Landing + audience home pages (wide, card-based) ───────────────────────
   if (audience === null) {
     return (
       <>
         <SiteHeader audience={null} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
-        <Landing onNavigate={navigate} />
+        <Landing onNavigate={navigate} onOpenService={openService} />
+        {modal}
       </>
     )
   }
@@ -81,7 +104,8 @@ export default function Page() {
     return (
       <>
         <SiteHeader audience={audience} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
-        <AudienceHome audience={audience} onNavigate={navigate} />
+        <AudienceHome audience={audience} onNavigate={navigate} onOpenService={openService} />
+        {modal}
       </>
     )
   }
@@ -118,8 +142,10 @@ export default function Page() {
         {mode === 'find' && (
           <FindResources anchor={anchor} anchorControls={anchorControls} onUp={goToAudienceHome} />
         )}
+        {/* The four specific services open as modals over the current page, so
+            'assist' goes straight to the full direct-support intake form. */}
         {mode === 'assist' && audience === 'patient' && (
-          <GetAssistance
+          <IntakeForm
             hospitalId={selectedHospitalId}
             hospitalName={selectedHospitalName}
             onUp={goToAudienceHome}
@@ -127,6 +153,7 @@ export default function Page() {
         )}
         {(mode === 'volunteer' || mode === 'give') && <Volunteer onUp={goToAudienceHome} />}
       </main>
+      {modal}
     </>
   )
 }

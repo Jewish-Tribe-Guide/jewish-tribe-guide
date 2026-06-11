@@ -13,7 +13,7 @@ import UpButton from '@/components/UpButton'
 import AnchorBar from '@/components/AnchorBar'
 import type { AnchorControls } from '@/components/AnchorBar'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { useCategories } from '@/lib/useCategories'
 import { hospitals } from '@/data/hospitals'
 
 const ADD_CATEGORY = '__add_category__'
@@ -76,7 +76,7 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
     return (window.history.state as FindNavState | null)?.findQuery ?? ''
   })
   const [action, setAction] = useState<ListingAction | null>(null)
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
+  const categories = useCategories()
   // The listing id most recently opened for edit/report — restored as expanded
   // when the user presses Back from the form to the category list.
   const [reopenItemId, setReopenItemId] = useState<string | null>(null)
@@ -93,22 +93,6 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/categories')
-      .then((res) => res.json())
-      .then((body) => {
-        if (!cancelled && body.ok) setCategories(body.categories as CategoryConfig[])
-        else if (!cancelled) setCategories([])
-      })
-      .catch(() => {
-        if (!cancelled) setCategories([])
-      })
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   // Audience derived from the anchor — needed to stamp complete history states

@@ -85,73 +85,53 @@ export function CardRow({ cards, tintOffset = 0 }: { cards: CardDef[] | null; ti
 
 // ── Card definitions, shared by the landing page and the audience pages ───────
 
-export function directSupportCards(nav: NavigateFn): CardDef[] {
+/** The four service cards open their request form as a modal over the current
+ *  page (no intermediate "pick a service" screen — these cards ARE the picker).
+ *  The fifth card is the full direct-support intake form. */
+export function directSupportCards(openService: (service: string) => void, nav: NavigateFn): CardDef[] {
   return [
     {
       icon: '🍽️',
       title: 'Kosher Meals',
       description: 'Home-cooked kosher meals delivered to you or your family.',
-      go: () => nav('patient', 'assist', { assistView: 'Meals' }),
+      go: () => openService('Meals'),
     },
     {
       icon: '🚗',
       title: 'Transportation',
       description: 'Rides to and from the hospital, arranged by neighbors.',
-      go: () => nav('patient', 'assist', { assistView: 'Transportation' }),
+      go: () => openService('Transportation'),
     },
     {
       icon: '🏠',
       title: 'Family Housing',
       description: 'A nearby place to stay while your loved one is in care.',
-      go: () => nav('patient', 'assist', { assistView: 'Family Housing' }),
+      go: () => openService('Family Housing'),
     },
     {
       icon: '🤝',
       title: 'Visitors',
       description: 'A friendly face at the bedside for you or your loved one.',
-      go: () => nav('patient', 'assist', { assistView: 'Request Visitors' }),
+      go: () => openService('Request Visitors'),
     },
     {
       icon: '✨',
-      title: 'More Options',
-      description: 'Not sure where to start? Request direct support.',
+      title: 'Direct Support',
+      description: 'Anything else — a community representative will reach out.',
       go: () => nav('patient', 'assist'),
     },
   ]
 }
 
-/** Resource cards. Returns null while categories are loading (show skeletons).
- *  The middle cards come from the live category list, with Zmanim/Eruv as
- *  stand-ins if the fetch failed. */
+/** Resource cards: every live category (restaurants, groceries, hotels, …)
+ *  plus the hand-curated pages. Returns null while categories are loading
+ *  (show skeletons). */
 export function resourceCards(
   nav: NavigateFn,
   categories: CategoryConfig[] | null,
   { includeHospital }: { includeHospital: boolean },
 ): CardDef[] | null {
   if (categories === null) return null
-
-  const zmanim: CardDef = {
-    icon: '🕯️',
-    title: 'Zmanim & Shabbos',
-    description: 'Hebrew date, candle lighting, and havdalah times.',
-    go: () => nav('patient', 'find', { findView: 'zmanim' }),
-  }
-  const eruv: CardDef = {
-    icon: '🗺️',
-    title: 'Eruv Information',
-    description: 'Eruv status, maps, and contacts for Shabbat.',
-    go: () => nav('patient', 'find', { findView: 'eruv' }),
-  }
-  const middleCount = includeHospital ? 3 : 4
-  const middle: CardDef[] =
-    categories.length > 0
-      ? categories.slice(0, middleCount).map((c) => ({
-          icon: c.icon,
-          title: c.pluralLabel,
-          description: c.description,
-          go: () => nav('patient', 'find', { findView: c.id }),
-        }))
-      : [zmanim, eruv]
 
   return [
     ...(includeHospital
@@ -164,11 +144,28 @@ export function resourceCards(
           },
         ]
       : []),
-    ...middle,
+    ...categories.map((c) => ({
+      icon: c.icon,
+      title: c.pluralLabel,
+      description: c.description,
+      go: () => nav('patient', 'find', { findView: c.id }),
+    })),
+    {
+      icon: '🕯️',
+      title: 'Zmanim & Shabbos',
+      description: 'Hebrew date, candle lighting, and havdalah times.',
+      go: () => nav('patient', 'find', { findView: 'zmanim' }),
+    },
+    {
+      icon: '🗺️',
+      title: 'Eruv Information',
+      description: 'Eruv status, maps, and contacts for Shabbat.',
+      go: () => nav('patient', 'find', { findView: 'eruv' }),
+    },
     {
       icon: '📚',
       title: 'All Resources',
-      description: 'Synagogues, mikvahs, hotels, and everything else nearby.',
+      description: 'The full directory — search it or suggest a new category.',
       go: () => nav('patient', 'find'),
     },
   ]

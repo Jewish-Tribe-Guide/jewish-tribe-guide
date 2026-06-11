@@ -7,6 +7,8 @@ import type { NavigateFn } from '@/types'
 
 type Props = {
   onNavigate: NavigateFn
+  /** Opens a service request form as a modal over the current page. */
+  onOpenService: (service: string) => void
   /** Smaller pill for the audience pages (the landing uses the large one). */
   compact?: boolean
 }
@@ -14,7 +16,7 @@ type Props = {
 // Search-with-autosuggest. Matches against every page's keyword tags and jumps
 // straight there; Enter takes the top suggestion, or falls back to a plain
 // text search of the resource directory.
-export default function SearchBar({ onNavigate, compact = false }: Props) {
+export default function SearchBar({ onNavigate, onOpenService, compact = false }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const categories = useCategories()
@@ -27,7 +29,8 @@ export default function SearchBar({ onNavigate, compact = false }: Props) {
 
   function go(d: Destination) {
     setOpen(false)
-    onNavigate(d.audience, d.mode, d.extra)
+    if (d.service) onOpenService(d.service)
+    else onNavigate(d.audience, d.mode, d.extra)
   }
 
   function submit(e: React.FormEvent) {

@@ -14,11 +14,13 @@ import type { Audience, NavigateFn } from '@/types'
 type Props = {
   audience: Audience
   onNavigate: NavigateFn
+  /** Opens a service request form as a modal over this page. */
+  onOpenService: (service: string) => void
 }
 
 // The per-audience home pages (the header tabs switch between them, Airbnb
 // Homes/Experiences style). Each shows only what's relevant to that visitor.
-export default function AudienceHome({ audience, onNavigate }: Props) {
+export default function AudienceHome({ audience, onNavigate, onOpenService }: Props) {
   const categories = useCategories()
   const isPatient = audience === 'patient'
 
@@ -34,7 +36,7 @@ export default function AudienceHome({ audience, onNavigate }: Props) {
             : 'Lend a hand to a family in need, and find Jewish resources near you.'}
         </p>
         <div className="mt-6 max-w-xl">
-          <SearchBar onNavigate={onNavigate} compact />
+          <SearchBar onNavigate={onNavigate} onOpenService={onOpenService} compact />
         </div>
       </div>
 
@@ -43,10 +45,10 @@ export default function AudienceHome({ audience, onNavigate }: Props) {
           <Section
             title="Direct Support"
             subtitle="Request help from the community — a neighbor will take it from there."
-            seeAllLabel="All services"
+            seeAllLabel="Request direct support"
             onSeeAll={() => onNavigate('patient', 'assist')}
           >
-            <CardRow cards={directSupportCards(onNavigate)} />
+            <CardRow cards={directSupportCards(onOpenService, onNavigate)} />
           </Section>
           <Section
             title="Resources & Information"
