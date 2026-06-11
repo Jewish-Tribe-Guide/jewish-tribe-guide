@@ -6,12 +6,15 @@ import SynagogueCard from '@/components/SynagogueCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
+import AddressPrompt from './AddressPrompt'
 import UpButton from '@/components/UpButton'
 
 type Props = {
   items: DirectoryResource[]
   /** Shown under the heading — hospital name (patient) or typed address (community). */
   anchorLabel?: string
+  /** When true and no anchorLabel, prompt the visitor to set their location. */
+  addressPrompt?: boolean
   /** When set, the card with this id will mount expanded and scroll into view.
    *  Used to restore the card the user had open before navigating to a form. */
   reopenItemId?: string | null
@@ -38,6 +41,7 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 export default function SynagogueDirectory({
   items,
   anchorLabel,
+  addressPrompt,
   reopenItemId,
   onUp,
   onAdd,
@@ -85,7 +89,11 @@ export default function SynagogueDirectory({
       <div className="flex items-start justify-between gap-2 mb-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-800">Synagogues</h2>
-          {anchorLabel && <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>}
+          {anchorLabel ? (
+            <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>
+          ) : addressPrompt ? (
+            <AddressPrompt />
+          ) : null}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {hasMinyanim && (

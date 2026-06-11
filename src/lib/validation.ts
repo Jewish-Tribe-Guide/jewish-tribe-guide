@@ -12,9 +12,12 @@ export function isValidPhone(value: string): boolean {
 export function validateContact(contact: ContactHospitalData): string[] {
   const errs: string[] = []
   if (!contact.fullName.trim()) errs.push('Name is required.')
-  if (!contact.phone.trim()) {
-    errs.push('Phone number is required.')
-  } else if (!isValidPhone(contact.phone)) {
+  // A request needs at least one way to reach back — phone or email.
+  const hasPhone = !!contact.phone.trim()
+  const hasEmail = !!contact.email.trim()
+  if (!hasPhone && !hasEmail) {
+    errs.push('A phone number or email is required.')
+  } else if (hasPhone && !isValidPhone(contact.phone)) {
     errs.push('Please enter a valid phone number.')
   }
   return errs

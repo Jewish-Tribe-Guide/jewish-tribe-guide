@@ -56,3 +56,9 @@ gmp-place-autocomplete::part(input):focus {
 input[type='date'].date-empty {
   color: color-mix(in oklab, var(--color-slate-900) 50%, transparent);
 }
+
+/* Subtle screen-to-screen fade for the step wizard. */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

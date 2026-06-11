@@ -2,19 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import AddressInput from '@/components/intake/AddressInput'
-import type { Audience, Hospital } from '@/types'
 
 export type LocationControls = {
-  hospitals: Hospital[]
-  selectedHospitalId: string
-  onHospitalChange: (id: string) => void
   address: string
   onAddressChange: (address: string) => void
   onCoords: (coords: { lat: number; lng: number } | null) => void
 }
 
 type Props = {
-  audience: Audience | null
   controls: LocationControls
 }
 
@@ -27,10 +22,12 @@ function PinIcon({ className }: { className?: string }) {
   )
 }
 
-// Header pill that anchors all distance sorting: patients pick their hospital,
-// community members type an address (powers the directory's proximity filtering).
-export default function LocationControl({ audience, controls }: Props) {
+// Header pill that anchors all distance sorting: the visitor types an address or
+// taps "use my current location", which powers the directory's proximity sorting.
+export default function LocationControl({ controls }: Props) {
   const [open, setOpen] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [geoError, setGeoError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Close when clicking anywhere outside the popover.
@@ -43,16 +40,36 @@ export default function LocationControl({ audience, controls }: Props) {
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const hospital = controls.hospitals.find((h) => h.id === controls.selectedHospitalId)
-  const label =
-    audience === 'community'
-      ? controls.address || 'Enter address'
-      : audience === 'patient'
-        ? hospital?.name ?? 'Choose hospital'
-        : 'Set location'
+  const label = controls.address || 'Set location'
 
-  const showHospital = audience === 'patient' || audience === null
-  const showAddress = audience === 'community' || audience === null
+  // Picking a real address yields coordinates — apply them and close (no Done
+  // button needed). Free typing passes null coords, so the popover stays open.
+  const handleCoords = (coords: { lat: number; lng: number } | null) => {
+    controls.onCoords(coords)
+    if (coords) setOpen(false)
+  }
+
+  const useCurrentLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoError('Location isn’t available on this device.')
+      return
+    }
+    setLocating(true)
+    setGeoError(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        controls.onCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        controls.onAddressChange('Current location')
+        setLocating(false)
+        setOpen(false)
+      },
+      () => {
+        setLocating(false)
+        setGeoError('Couldn’t get your location. Please type an address instead.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
 
   return (
     <div className="relative" ref={ref}>
@@ -71,52 +88,29 @@ export default function LocationControl({ audience, controls }: Props) {
             Where should distances be measured from?
           </p>
 
-          {showHospital && (
-            <div className="mt-3">
-              <label htmlFor="location-hospital" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                {audience === null ? 'Patients — your hospital' : 'Your hospital'}
-              </label>
-              <div className="relative">
-                <select
-                  id="location-hospital"
-                  value={controls.selectedHospitalId}
-                  onChange={(e) => controls.onHospitalChange(e.target.value)}
-                  className="w-full cursor-pointer appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {controls.hospitals.map((h) => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
-                  ))}
-                </select>
-                <svg
-                  className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400"
-                  fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {showAddress && (
-            <div className="mt-3">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
-                {audience === null ? 'Community — your address' : 'Your address'}
-              </label>
-              <AddressInput
-                value={controls.address}
-                onChange={controls.onAddressChange}
-                onCoords={controls.onCoords}
-                placeholder="Enter your address"
-              />
-            </div>
-          )}
-
           <button
-            onClick={() => setOpen(false)}
-            className="mt-4 w-full cursor-pointer rounded-lg bg-primary py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+            onClick={useCurrentLocation}
+            disabled={locating}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
           >
-            Done
+            <PinIcon className="h-4 w-4 shrink-0" />
+            {locating ? 'Locating…' : 'Use my current location'}
           </button>
+
+          <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-100" />
+            or enter an address
+            <span className="h-px flex-1 bg-slate-100" />
+          </div>
+
+          <AddressInput
+            value={controls.address}
+            onChange={controls.onAddressChange}
+            onCoords={handleCoords}
+            placeholder="Enter your address"
+          />
+
+          {geoError && <p className="mt-2 text-xs text-red-600">{geoError}</p>}
         </div>
       )}
     </div>

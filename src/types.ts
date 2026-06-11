@@ -268,9 +268,11 @@ export type AppMode = 'home' | 'find' | 'assist' | 'volunteer' | 'community-home
 
 /** page.tsx's central navigation function, passed down to every screen that
  *  deep-links. `extra` is merged into the history state so the target screen
- *  can restore a sub-view on mount (assistView / findView / findQuery / …). */
+ *  can restore a sub-view on mount (findView / findQuery / volunteerPreselect).
+ *  The first arg is the legacy audience key — retired now that there's a single
+ *  path, but kept (nullable) so search-index destinations keep compiling. */
 export type NavigateFn = (
-  audience: Audience,
+  audience: Audience | null,
   mode: AppMode,
   extra?: Record<string, unknown>,
 ) => void

@@ -1,38 +1,30 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { hospitals } from '@/data/hospitals'
-import type { AppMode, Audience, DirectoryAnchor } from '@/types'
-import type { AnchorControls } from '@/components/AnchorBar'
+import type { AppMode, DirectoryAnchor, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
-import AudienceHome from '@/components/AudienceHome'
 import SiteHeader from '@/components/SiteHeader'
 import FindResources from '@/components/FindResources'
-import IntakeForm from '@/components/intake/IntakeForm'
-import ServiceModal from '@/components/home/ServiceModal'
-import Volunteer from '@/components/Volunteer'
+import SupportWizard from '@/components/wizard/SupportWizard'
+import VolunteerWizard from '@/components/wizard/VolunteerWizard'
+
+// Which guided form is open as a full-screen overlay (Support / Volunteer), and
+// any need pre-checked from the card or a search result.
+export type Flow = { kind: 'support' | 'volunteer'; preselect?: string[] }
 
 // What we persist in the browser history stack so back/forward can restore state.
-type NavState = { audience: Audience | null; mode: AppMode; serviceModal?: string }
+type NavState = { mode: AppMode; flow?: Flow }
 
 export default function Page() {
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(hospitals[0].id)
-  const [audience, setAudience] = useState<Audience | null>(null)
   const [mode, setMode] = useState<AppMode>('home')
   const [address, setAddress] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  // A service request form shown as an overlay on the CURRENT page (set by the
-  // Direct Support cards and search suggestions — opening one never navigates).
-  const [serviceModal, setServiceModal] = useState<string | null>(null)
+  // The guided Support/Volunteer form, shown as an overlay over the CURRENT page.
+  const [flow, setFlow] = useState<Flow | null>(null)
 
-  const selectedHospitalName = hospitals.find((h) => h.id === selectedHospitalId)?.name ?? ''
-
-  // The hospital/address anchor, editable from the header's location pill on
-  // every screen — it drives all proximity sorting in the directory.
+  // The address anchor, editable from the header's location pill on every screen
+  // — it drives all proximity sorting in the directory.
   const locationControls = {
-    hospitals,
-    selectedHospitalId,
-    onHospitalChange: setSelectedHospitalId,
     address,
     onAddressChange: setAddress,
     onCoords: setCoords,
@@ -43,48 +35,33 @@ export default function Page() {
     // Do NOT call replaceState here. Next.js App Router stamps the initial entry
     // with __NA:true; overwriting it before that stamp lands strips __NA and causes
     // its popstate handler to call window.location.reload() on every history.back().
-    // Our popstate handler already defaults audience/mode to null/'home' for entries
-    // that lack those keys, so back-pressing past the first navigate() still shows
-    // Landing correctly.
     function onPopState(e: PopStateEvent) {
       const s = e.state as NavState | null
-      setAudience(s?.audience ?? null)
       setMode(s?.mode ?? 'home')
-      setServiceModal(s?.serviceModal ?? null)
+      setFlow(s?.flow ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  // Central navigation function — always call this instead of setMode/setAudience
-  // directly so every transition is recorded in the browser history stack.
-  // `extra` rides along in the history state so the target screen can restore a
-  // sub-view on mount (assistView / findView / findQuery / volunteerView).
-  function navigate(
-    nextAudience: Audience | null,
-    nextMode: AppMode,
-    extra?: Record<string, unknown>,
-  ) {
-    setAudience(nextAudience)
+  // Central navigation function — always call this instead of setMode directly so
+  // every transition is recorded in the browser history stack. The first arg is
+  // the legacy audience key (unused now that there's a single path) — kept so the
+  // shared NavigateFn signature and search-index destinations keep compiling.
+  const navigate: NavigateFn = (_audience, nextMode, extra) => {
     setMode(nextMode)
-    setServiceModal(null)
-    history.pushState({ audience: nextAudience, mode: nextMode, ...extra } as NavState, '')
+    setFlow(null)
+    history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
-  // Open a service form over the current page. Pushes a history entry so the
-  // browser Back button (and the modal's ✕, which calls history.back()) closes
+  // Open a guided form over the current page. Pushes a history entry so the
+  // browser Back button (and the wizard's ✕, which calls history.back()) closes
   // it and lands exactly where the visitor was.
-  function openService(service: string) {
-    setServiceModal(service)
-    history.pushState({ ...(window.history.state ?? {}), serviceModal: service }, '')
-  }
-
-  // Audience switch (the header tabs). 'find' works on both sides, so stay
-  // there; anything else lands on that audience's home page.
-  function goToAudience(next: Audience) {
-    const defaultMode: AppMode = next === 'patient' ? 'home' : 'community-home'
-    navigate(next, mode === 'find' && audience !== null ? 'find' : defaultMode)
+  function openFlow(kind: Flow['kind'], preselect?: string[]) {
+    const f: Flow = { kind, preselect }
+    setFlow(f)
+    history.pushState({ ...(window.history.state ?? {}), flow: f }, '')
   }
 
   // Title click — always a way back to the landing page.
@@ -92,72 +69,40 @@ export default function Page() {
     navigate(null, 'home')
   }
 
-  const modal = serviceModal && (
-    <ServiceModal
-      service={serviceModal}
-      hospitalId={selectedHospitalId}
-      onClose={() => history.back()}
-    />
+  const overlay = flow && (
+    flow.kind === 'support' ? (
+      <SupportWizard preselect={flow.preselect} onClose={() => history.back()} />
+    ) : (
+      <VolunteerWizard preselect={flow.preselect} onClose={() => history.back()} />
+    )
   )
 
-  // ── Landing + audience home pages (wide, card-based) ───────────────────────
-  if (audience === null) {
-    return (
-      <>
-        <SiteHeader audience={null} onSwitchAudience={goToAudience} onGoHome={goToLanding} location={locationControls} />
-        <Landing onNavigate={navigate} onOpenService={openService} />
-        {modal}
-      </>
-    )
-  }
-
+  // ── Landing — the single home screen (search + one card grid) ──────────────
   if (mode === 'home' || mode === 'community-home') {
     return (
       <>
-        <SiteHeader audience={audience} onSwitchAudience={goToAudience} onGoHome={goToLanding} location={locationControls} />
-        <AudienceHome audience={audience} onNavigate={navigate} onOpenService={openService} />
-        {modal}
+        <SiteHeader onGoHome={goToLanding} location={locationControls} />
+        <Landing onNavigate={navigate} onOpenFlow={openFlow} />
+        {overlay}
       </>
     )
   }
 
-  // ── Inner screens (directory, forms) ────────────────────────────────────────
-  const anchor: DirectoryAnchor =
-    audience === 'patient'
-      ? { kind: 'hospital', hospitalId: selectedHospitalId, hospitalName: selectedHospitalName }
-      : { kind: 'address', coords, label: address }
+  // ── Inner screens (directory) ───────────────────────────────────────────────
+  // Everything anchors on the visitor's typed address now (the hospital picker
+  // was retired from the location pill).
+  const anchor: DirectoryAnchor = { kind: 'address', coords, label: address }
 
-  const anchorControls: AnchorControls = { audience, ...locationControls }
-
-  // Up buttons lead to the visitor's audience home page, not all the way out
-  // to the landing fork.
-  const goToAudienceHome = () =>
-    navigate(audience, audience === 'patient' ? 'home' : 'community-home')
+  // Up buttons lead back to the single home screen.
+  const goToHome = () => navigate(null, 'home')
 
   return (
     <>
-      <SiteHeader
-        audience={audience}
-        onSwitchAudience={goToAudience}
-        onGoHome={goToLanding}
-        location={locationControls}
-      />
+      <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {mode === 'find' && (
-          <FindResources anchor={anchor} anchorControls={anchorControls} onUp={goToAudienceHome} />
-        )}
-        {/* The four specific services open as modals over the current page, so
-            'assist' goes straight to the full direct-support intake form. */}
-        {mode === 'assist' && audience === 'patient' && (
-          <IntakeForm
-            hospitalId={selectedHospitalId}
-            hospitalName={selectedHospitalName}
-            onUp={goToAudienceHome}
-          />
-        )}
-        {(mode === 'volunteer' || mode === 'give') && <Volunteer onUp={goToAudienceHome} />}
+        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} />}
       </main>
-      {modal}
+      {overlay}
     </>
   )
 }

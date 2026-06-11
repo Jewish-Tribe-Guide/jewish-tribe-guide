@@ -151,12 +151,17 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onUp, o
       ? anchor.hospitalName
       : anchor.label || undefined
 
+  // Distance-sorted categories prompt for a location when none is set yet.
+  // Community categories (e.g. WhatsApp groups) aren't distance-based, so skip it.
+  const addressPrompt = anchor.kind === 'address' && !anchor.label && !category.community
+
   // Synagogues get the rich collapsible card instead of the generic flat-row renderer.
   if (category.id === 'synagogue') {
     return (
       <SynagogueDirectory
         items={withDistance}
         anchorLabel={anchorLabel}
+        addressPrompt={addressPrompt}
         reopenItemId={reopenItemId}
         onUp={onUp}
         onAdd={onAdd}
@@ -167,6 +172,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onUp, o
   }
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
   )
 }

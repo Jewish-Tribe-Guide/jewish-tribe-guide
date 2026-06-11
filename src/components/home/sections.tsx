@@ -39,97 +39,29 @@ export function CardSkeleton() {
   )
 }
 
-export function Section({
-  title,
-  subtitle,
-  seeAllLabel,
-  onSeeAll,
-  children,
+/** The single-screen card grid. Renders every card, then `loadingCount`
+ *  skeletons (for sections still loading, e.g. resource categories). Tints
+ *  cycle across the whole grid so colors stay varied. */
+export function CardGrid({
+  cards,
+  loadingCount = 0,
 }: {
-  title: string
-  subtitle: string
-  seeAllLabel: string
-  onSeeAll: () => void
-  children: React.ReactNode
+  cards: CardDef[]
+  loadingCount?: number
 }) {
   return (
-    <section className="mt-14">
-      <div className="flex items-end justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-slate-900">{title}</h2>
-          <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
-        </div>
-        <button
-          onClick={onSeeAll}
-          className="shrink-0 text-sm font-medium text-primary hover:underline cursor-pointer"
-        >
-          {seeAllLabel} →
-        </button>
-      </div>
-      {/* One card tall — extra cards scroll horizontally, Airbnb-row style. */}
-      <div className="flex gap-4 overflow-x-auto pb-2 snap-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {children}
-      </div>
-    </section>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-7">
+      {cards.map((card, i) => (
+        <Card key={card.title} card={card} tint={TINTS[i % TINTS.length]} />
+      ))}
+      {Array.from({ length: loadingCount }, (_, i) => (
+        <CardSkeleton key={`skeleton-${i}`} />
+      ))}
+    </div>
   )
 }
 
-/** Renders a card row with skeletons while `cards` is null (categories loading).
- *  Each card gets a fixed width so the row stays one card tall and scrolls. */
-export function CardRow({ cards, tintOffset = 0 }: { cards: CardDef[] | null; tintOffset?: number }) {
-  if (cards === null) {
-    return Array.from({ length: 5 }, (_, i) => (
-      <div key={i} className="w-[180px] sm:w-[210px] shrink-0 snap-start">
-        <CardSkeleton />
-      </div>
-    ))
-  }
-  return cards.map((card, i) => (
-    <div key={card.title} className="w-[180px] sm:w-[210px] shrink-0 snap-start">
-      <Card card={card} tint={TINTS[(i + tintOffset) % TINTS.length]} />
-    </div>
-  ))
-}
-
-// ── Card definitions, shared by the landing page and the audience pages ───────
-
-/** The four service cards open their request form as a modal over the current
- *  page (no intermediate "pick a service" screen — these cards ARE the picker).
- *  The fifth card is the full direct-support intake form. */
-export function directSupportCards(openService: (service: string) => void, nav: NavigateFn): CardDef[] {
-  return [
-    {
-      icon: '🍽️',
-      title: 'Kosher Meals',
-      description: 'Home-cooked kosher meals delivered to you or your family.',
-      go: () => openService('Meals'),
-    },
-    {
-      icon: '🚗',
-      title: 'Transportation',
-      description: 'Rides to and from the hospital, arranged by neighbors.',
-      go: () => openService('Transportation'),
-    },
-    {
-      icon: '🏠',
-      title: 'Family Housing',
-      description: 'A nearby place to stay while your loved one is in care.',
-      go: () => openService('Family Housing'),
-    },
-    {
-      icon: '🤝',
-      title: 'Visitors',
-      description: 'A friendly face at the bedside for you or your loved one.',
-      go: () => openService('Request Visitors'),
-    },
-    {
-      icon: '✨',
-      title: 'Direct Support',
-      description: 'Anything else — a community representative will reach out.',
-      go: () => nav('patient', 'assist'),
-    },
-  ]
-}
+// ── Card definitions ──────────────────────────────────────────────────────────
 
 /** Resource cards: every live category (restaurants, groceries, hotels, …)
  *  plus the hand-curated pages. Returns null while categories are loading
@@ -169,47 +101,6 @@ export function resourceCards(
       title: 'Eruv Information',
       description: 'Eruv status, maps, and contacts for Shabbat.',
       go: () => nav('patient', 'find', { findView: 'eruv' }),
-    },
-    {
-      icon: '📚',
-      title: 'All Resources',
-      description: 'The full directory — search it or suggest a new category.',
-      go: () => nav('patient', 'find'),
-    },
-  ]
-}
-
-export function volunteerCards(nav: NavigateFn): CardDef[] {
-  return [
-    {
-      icon: '🫂',
-      title: 'Visit Patients',
-      description: 'Bring warmth and company to someone in the hospital.',
-      go: () => nav('community', 'give', { volunteerPreselect: 'visiting' }),
-    },
-    {
-      icon: '🍲',
-      title: 'Cook a Meal',
-      description: 'Prepare a kosher meal for a family in need.',
-      go: () => nav('community', 'give', { volunteerPreselect: 'meals' }),
-    },
-    {
-      icon: '🚙',
-      title: 'Give Rides',
-      description: 'Drive a patient or family member where they need to go.',
-      go: () => nav('community', 'give', { volunteerPreselect: 'transportation' }),
-    },
-    {
-      icon: '🛏️',
-      title: 'Host a Family',
-      description: 'Offer a spare room to out-of-town family members.',
-      go: () => nav('community', 'give', { volunteerPreselect: 'housing' }),
-    },
-    {
-      icon: '❤️',
-      title: 'Sign Up',
-      description: 'Tell us how you’d like to help. We’ll match you up.',
-      go: () => nav('community', 'give'),
     },
   ]
 }

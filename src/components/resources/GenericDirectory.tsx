@@ -6,6 +6,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
+import AddressPrompt from './AddressPrompt'
 import UpButton from '@/components/UpButton'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   /** Shown under the category title — hospital name for patients, typed address
    *  for community. Mirrors the subtitle pattern in About Your Hospital. */
   anchorLabel?: string
+  /** When true and no anchorLabel, prompt the visitor to set their location. */
+  addressPrompt?: boolean
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -57,7 +60,7 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, onUp, onAdd, onEdit, onReport }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, onUp, onAdd, onEdit, onReport }: Props) {
   const [search, setSearch] = useState('')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   const [openNow, setOpenNow] = useState(false)
@@ -120,7 +123,11 @@ export default function GenericDirectory({ category, items, anchorLabel, onUp, o
       <div className="flex items-start justify-between gap-2 mb-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-800">{category.pluralLabel}</h2>
-          {anchorLabel && <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>}
+          {anchorLabel ? (
+            <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>
+          ) : addressPrompt ? (
+            <AddressPrompt />
+          ) : null}
         </div>
         <button
           onClick={onAdd}

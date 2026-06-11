@@ -130,19 +130,6 @@ const STATIC_DESTINATIONS: Destination[] = [
     ],
   },
   {
-    id: 'directory',
-    icon: '📚',
-    title: 'All Resources',
-    description: 'Synagogues, mikvahs, hotels, and everything else nearby.',
-    audience: 'patient',
-    mode: 'find',
-    keywords: [
-      'resources', 'directory', 'browse', 'synagogue', 'shul', 'minyan', 'davening',
-      'mikvah', 'mikveh', 'kosher restaurant', 'restaurant', 'grocery', 'hotel',
-      'whatsapp', 'community groups', 'pharmacy', 'near me', 'map', 'tehillim',
-    ],
-  },
-  {
     id: 'volunteer',
     icon: '❤️',
     title: 'Volunteer Sign-Up',
@@ -170,8 +157,21 @@ const STATIC_DESTINATIONS: Destination[] = [
   },
 ]
 
-// Keywords for DB-backed categories are derived from their label + description,
-// so newly added categories are searchable without touching this file.
+// Hand-curated synonyms for the well-known categories — the words people type
+// that won't appear in a category's label or description (alternate spellings,
+// related terms). Keyed by category id; unknown categories just skip this.
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  synagogue: ['shul', 'shuls', 'minyan', 'minyanim', 'davening', 'shtiebel', 'beis medrash'],
+  mikvah: ['mikveh', 'mikvaos', 'immersion'],
+  grocery: ['groceries', 'supermarket', 'food shopping'],
+  restaurant: ['restaurants', 'dining', 'eat out', 'takeout'],
+  hotel: ['hotels', 'motel', 'lodging', 'place to stay'],
+  whatsapp: ['whatsapp', 'group chat', 'community group'],
+}
+
+// Keywords for DB-backed categories are derived from their label + description
+// (plus any curated aliases), so newly added categories are searchable without
+// touching this file.
 function categoryDestination(c: CategoryConfig): Destination {
   const words = `${c.pluralLabel} ${c.description}`
     .toLowerCase()
@@ -185,7 +185,7 @@ function categoryDestination(c: CategoryConfig): Destination {
     audience: 'patient',
     mode: 'find',
     extra: { findView: c.id },
-    keywords: [...new Set([c.id.replaceAll('-', ' '), ...words])],
+    keywords: [...new Set([c.id.replaceAll('-', ' '), ...words, ...(CATEGORY_ALIASES[c.id] ?? [])])],
   }
 }
 
