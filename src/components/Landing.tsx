@@ -1,81 +1,90 @@
-import type { Audience } from '@/types'
+'use client'
+
+import SearchBar from '@/components/home/SearchBar'
+import {
+  CardRow,
+  Section,
+  directSupportCards,
+  resourceCards,
+  volunteerCards,
+} from '@/components/home/sections'
+import { useCategories } from '@/lib/useCategories'
+import type { NavigateFn } from '@/types'
 
 type Props = {
-  onChoose: (audience: Audience) => void
+  onNavigate: NavigateFn
 }
 
-const CHOICES: {
-  audience: Audience
-  icon: string
-  title: string
-  description: string
-}[] = [
-  {
-    audience: 'patient',
-    icon: '🤝',
-    title: 'I\'m a patient or family member',
-    description: 'Find resources near your hospital, or request meals, housing, rides, and visitors from the community.',
-  },
-  {
-    audience: 'community',
-    icon: '✡️',
-    title: 'I\'m a Philadelphia community member',
-    description: 'Browse Jewish community resources near you, or offer your time to help a family in need.',
-  },
-]
+// The landing page. The hero fork ("I'm a patient…" / "I live in the
+// community") is the primary path — it leads to the per-audience pages. The
+// search bar and card sections below are for visitors who'd rather just scroll
+// and browse without working through the flow.
+export default function Landing({ onNavigate }: Props) {
+  const categories = useCategories()
 
-// The "who are you?" fork. Header matches SiteHeader; main body matches Home.tsx.
-export default function Landing({ onChoose }: Props) {
   return (
-    <>
-      <header className="bg-primary text-white">
-        <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold mb-3">Philadelphia Jewish Community</h1>
-          <p className="text-blue-100/75 text-sm">
-            Connecting patients, families, and neighbors with Philadelphia&apos;s Jewish community
-          </p>
-        </div>
-      </header>
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
+      {/* ── Hero: welcome + audience fork ────────────────────────────────────── */}
+      <section className="pt-14 sm:pt-20 text-center">
+        <h1 className="text-3xl sm:text-[42px] font-bold tracking-tight text-slate-900 leading-tight">
+          Welcome to Philadelphia&apos;s Jewish community.
+        </h1>
+        <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
+          Kosher meals, rides, housing, visitors, and community resources for patients
+          and families at Philadelphia hospitals.
+        </p>
 
-      {/* Invisible spacer — matches SiteHeader's toggle bar so "Who are you?" aligns
-          with "How can we help?" on the next screen. visibility:hidden preserves height. */}
-      <div className="bg-white border-b border-slate-200 invisible" aria-hidden="true">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-center">
-          <div className="inline-flex rounded-full bg-slate-100 p-1">
-            <div className="px-5 py-1.5 text-sm font-medium rounded-full">Patients</div>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Invisible spacer — matches UpButton + mb-6 on Home/CommunityHome. */}
-        <div className="flex items-center gap-1 text-sm mb-6 invisible" aria-hidden="true">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Start over
-        </div>
-
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-slate-800 mb-1">Who are you?</h2>
+        <p className="mt-9 text-sm font-medium uppercase tracking-widest text-slate-400">
+          I am…
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={() => onNavigate('patient', 'home')}
+            className="w-full sm:w-auto rounded-full border border-slate-300 bg-white px-8 py-3.5 text-[15px] font-semibold text-slate-900 transition-all hover:border-slate-900 hover:shadow-md cursor-pointer"
+          >
+            a patient or family member
+          </button>
+          <button
+            onClick={() => onNavigate('community', 'community-home')}
+            className="w-full sm:w-auto rounded-full border border-slate-300 bg-white px-8 py-3.5 text-[15px] font-semibold text-slate-900 transition-all hover:border-slate-900 hover:shadow-md cursor-pointer"
+          >
+            a Philadelphia community member
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {CHOICES.map((choice) => (
-            <button
-              key={choice.audience}
-              onClick={() => onChoose(choice.audience)}
-              className="flex flex-col items-start gap-3 p-6 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group"
-            >
-              <div>
-                <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors">
-                  {choice.title}
-                </p>
-              </div>
-            </button>
-          ))}
+        {/* ── Search ───────────────────────────────────────────────────────── */}
+        <div className="mt-12 max-w-xl mx-auto">
+          <SearchBar onNavigate={onNavigate} />
         </div>
-      </main>
-    </>
+      </section>
+
+      {/* ── Browse-everything sections (secondary, for scrollers) ────────────── */}
+      <Section
+        title="Direct Support"
+        subtitle="Request help from the community — a neighbor will take it from there."
+        seeAllLabel="All services"
+        onSeeAll={() => onNavigate('patient', 'assist')}
+      >
+        <CardRow cards={directSupportCards(onNavigate)} />
+      </Section>
+
+      <Section
+        title="Resources & Information"
+        subtitle="Everything nearby, sorted by distance from your hospital or address."
+        seeAllLabel="All resources"
+        onSeeAll={() => onNavigate('patient', 'find')}
+      >
+        <CardRow cards={resourceCards(onNavigate, categories, { includeHospital: true })} tintOffset={2} />
+      </Section>
+
+      <Section
+        title="Volunteer Opportunities"
+        subtitle="The community runs on neighbors like you."
+        seeAllLabel="Sign up"
+        onSeeAll={() => onNavigate('community', 'give')}
+      >
+        <CardRow cards={volunteerCards(onNavigate)} tintOffset={4} />
+      </Section>
+    </main>
   )
 }

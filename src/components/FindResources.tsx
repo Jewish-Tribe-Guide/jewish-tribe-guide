@@ -34,6 +34,8 @@ type FindNavState = {
   mode?: string
   findView?: string
   findAction?: string
+  /** Search text carried in from the landing page's search bar. */
+  findQuery?: string
 }
 
 // A pending add/edit/report action on a listing within the current category.
@@ -69,7 +71,10 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
     const s = window.history.state as FindNavState | null
     return s?.findView ?? null
   })
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return (window.history.state as FindNavState | null)?.findQuery ?? ''
+  })
   const [action, setAction] = useState<ListingAction | null>(null)
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
   // The listing id most recently opened for edit/report — restored as expanded

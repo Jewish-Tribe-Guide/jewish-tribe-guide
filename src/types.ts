@@ -266,6 +266,15 @@ export type DirectoryAnchor =
 
 export type AppMode = 'home' | 'find' | 'assist' | 'volunteer' | 'community-home' | 'give'
 
+/** page.tsx's central navigation function, passed down to every screen that
+ *  deep-links. `extra` is merged into the history state so the target screen
+ *  can restore a sub-view on mount (assistView / findView / findQuery / …). */
+export type NavigateFn = (
+  audience: Audience,
+  mode: AppMode,
+  extra?: Record<string, unknown>,
+) => void
+
 // ── Intake form types ─────────────────────────────────────────────────────────
 
 export type Ride = {

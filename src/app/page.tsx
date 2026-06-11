@@ -5,9 +5,8 @@ import { hospitals } from '@/data/hospitals'
 import type { AppMode, Audience, DirectoryAnchor } from '@/types'
 import type { AnchorControls } from '@/components/AnchorBar'
 import Landing from '@/components/Landing'
+import AudienceHome from '@/components/AudienceHome'
 import SiteHeader from '@/components/SiteHeader'
-import Home from '@/components/Home'
-import CommunityHome from '@/components/CommunityHome'
 import FindResources from '@/components/FindResources'
 import GetAssistance from '@/components/GetAssistance'
 import Volunteer from '@/components/Volunteer'
@@ -44,39 +43,69 @@ export default function Page() {
 
   // Central navigation function — always call this instead of setMode/setAudience
   // directly so every transition is recorded in the browser history stack.
-  function navigate(nextAudience: Audience | null, nextMode: AppMode) {
+  // `extra` rides along in the history state so the target screen can restore a
+  // sub-view on mount (assistView / findView / findQuery / volunteerView).
+  function navigate(
+    nextAudience: Audience | null,
+    nextMode: AppMode,
+    extra?: Record<string, unknown>,
+  ) {
     setAudience(nextAudience)
     setMode(nextMode)
-    history.pushState({ audience: nextAudience, mode: nextMode } as NavState, '')
+    history.pushState({ audience: nextAudience, mode: nextMode, ...extra } as NavState, '')
   }
 
-  // Audience fork (Landing cards or header switch).
-  // Preserve the current mode when switching if that mode exists on the other
-  // side (e.g. 'find' is shared). Otherwise, reset to the side's home screen.
+  // Audience switch (the header tabs). 'find' works on both sides, so stay
+  // there; anything else lands on that audience's home page.
   function goToAudience(next: Audience) {
-    const sharedModes: AppMode[] = ['find']
     const defaultMode: AppMode = next === 'patient' ? 'home' : 'community-home'
-    navigate(next, sharedModes.includes(mode) ? mode : defaultMode)
+    navigate(next, mode === 'find' && audience !== null ? 'find' : defaultMode)
   }
 
-  // Title click — always a way back to the "who are you?" landing screen.
+  // Title click / Up buttons — always a way back to the landing page.
   function goToLanding() {
     navigate(null, 'home')
   }
 
-  // Mode change within the current audience.
-  function goToMode(newMode: AppMode) {
-    navigate(audience, newMode)
-  }
-
+  // ── Landing + audience home pages (wide, card-based) ───────────────────────
   if (audience === null) {
-    return <Landing onChoose={goToAudience} />
+    return (
+      <>
+        <SiteHeader audience={null} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
+        <Landing onNavigate={navigate} />
+      </>
+    )
   }
 
+  if (mode === 'home' || mode === 'community-home') {
+    return (
+      <>
+        <SiteHeader audience={audience} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
+        <AudienceHome audience={audience} onNavigate={navigate} />
+      </>
+    )
+  }
+
+  // ── Inner screens (directory, forms) ────────────────────────────────────────
   const anchor: DirectoryAnchor =
     audience === 'patient'
       ? { kind: 'hospital', hospitalId: selectedHospitalId, hospitalName: selectedHospitalName }
       : { kind: 'address', coords, label: address }
+
+  const anchorControls: AnchorControls = {
+    audience,
+    hospitals,
+    selectedHospitalId,
+    onHospitalChange: setSelectedHospitalId,
+    address,
+    onAddressChange: setAddress,
+    onCoords: setCoords,
+  }
+
+  // Up buttons lead to the visitor's audience home page, not all the way out
+  // to the landing fork.
+  const goToAudienceHome = () =>
+    navigate(audience, audience === 'patient' ? 'home' : 'community-home')
 
   return (
     <>
@@ -86,41 +115,17 @@ export default function Page() {
         onGoHome={goToLanding}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {(() => {
-          const anchorControls: AnchorControls = {
-            audience,
-            hospitals,
-            selectedHospitalId,
-            onHospitalChange: setSelectedHospitalId,
-            address,
-            onAddressChange: setAddress,
-            onCoords: setCoords,
-          }
-          return audience === 'patient' ? (
-            <>
-              {mode === 'home' && <Home onNavigate={goToMode} onUp={goToLanding} />}
-              {mode === 'find' && <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('home')} />}
-              {mode === 'assist' && (
-                <GetAssistance
-                  hospitalId={selectedHospitalId}
-                  hospitalName={selectedHospitalName}
-                  onUp={() => goToMode('home')}
-                />
-              )}
-              {mode === 'volunteer' && <Volunteer onUp={() => goToMode('home')} />}
-            </>
-          ) : (
-            <>
-              {mode === 'community-home' && (
-                <CommunityHome onNavigate={goToMode} onUp={goToLanding} />
-              )}
-              {mode === 'find' && (
-                <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('community-home')} />
-              )}
-              {mode === 'give' && <Volunteer onUp={() => goToMode('community-home')} />}
-            </>
-          )
-        })()}
+        {mode === 'find' && (
+          <FindResources anchor={anchor} anchorControls={anchorControls} onUp={goToAudienceHome} />
+        )}
+        {mode === 'assist' && audience === 'patient' && (
+          <GetAssistance
+            hospitalId={selectedHospitalId}
+            hospitalName={selectedHospitalName}
+            onUp={goToAudienceHome}
+          />
+        )}
+        {(mode === 'volunteer' || mode === 'give') && <Volunteer onUp={goToAudienceHome} />}
       </main>
     </>
   )
