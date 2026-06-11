@@ -14,6 +14,7 @@ import AnchorBar from '@/components/AnchorBar'
 import type { AnchorControls } from '@/components/AnchorBar'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import { useCategories } from '@/lib/useCategories'
+import { Card, TINTS } from '@/components/home/sections'
 import { hospitals } from '@/data/hospitals'
 
 const ADD_CATEGORY = '__add_category__'
@@ -255,18 +256,18 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
       ) : visibleItems.length === 0 ? (
         <p className="text-muted text-sm">No resources match "{query}".</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleItems.map((item) => (
-            <button
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-7">
+          {visibleItems.map((item, i) => (
+            <Card
               key={item.id}
-              onClick={() => navigateTo(item.id)}
-              className="flex items-center gap-3 p-5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group h-full"
-            >
-              <span className="text-xl shrink-0" aria-hidden="true">{item.icon}</span>
-              <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors">
-                {item.label}
-              </p>
-            </button>
+              card={{
+                icon: item.icon,
+                title: item.label,
+                description: item.description,
+                go: () => navigateTo(item.id),
+              }}
+              tint={TINTS[i % TINTS.length]}
+            />
           ))}
         </div>
       )}

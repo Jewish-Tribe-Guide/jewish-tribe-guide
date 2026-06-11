@@ -11,11 +11,11 @@ export type CardDef = {
 }
 
 // Soft tile tints, cycled per card within each section.
-const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
+export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
 export function Card({ card, tint }: { card: CardDef; tint: string }) {
   return (
-    <button onClick={card.go} className="group text-left cursor-pointer">
+    <button onClick={card.go} className="group w-full text-left cursor-pointer">
       <div
         className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex items-center justify-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5`}
       >
@@ -66,20 +66,28 @@ export function Section({
           {seeAllLabel} →
         </button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-7">
+      {/* One card tall — extra cards scroll horizontally, Airbnb-row style. */}
+      <div className="flex gap-4 overflow-x-auto pb-2 snap-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </div>
     </section>
   )
 }
 
-/** Renders a card row with skeletons while `cards` is null (categories loading). */
+/** Renders a card row with skeletons while `cards` is null (categories loading).
+ *  Each card gets a fixed width so the row stays one card tall and scrolls. */
 export function CardRow({ cards, tintOffset = 0 }: { cards: CardDef[] | null; tintOffset?: number }) {
   if (cards === null) {
-    return Array.from({ length: 5 }, (_, i) => <CardSkeleton key={i} />)
+    return Array.from({ length: 5 }, (_, i) => (
+      <div key={i} className="w-[180px] sm:w-[210px] shrink-0 snap-start">
+        <CardSkeleton />
+      </div>
+    ))
   }
   return cards.map((card, i) => (
-    <Card key={card.title} card={card} tint={TINTS[(i + tintOffset) % TINTS.length]} />
+    <div key={card.title} className="w-[180px] sm:w-[210px] shrink-0 snap-start">
+      <Card card={card} tint={TINTS[(i + tintOffset) % TINTS.length]} />
+    </div>
   ))
 }
 

@@ -27,6 +27,17 @@ export default function Page() {
 
   const selectedHospitalName = hospitals.find((h) => h.id === selectedHospitalId)?.name ?? ''
 
+  // The hospital/address anchor, editable from the header's location pill on
+  // every screen — it drives all proximity sorting in the directory.
+  const locationControls = {
+    hospitals,
+    selectedHospitalId,
+    onHospitalChange: setSelectedHospitalId,
+    address,
+    onAddressChange: setAddress,
+    onCoords: setCoords,
+  }
+
   // ── History API — keeps browser back/forward in sync with React state ──────
   useEffect(() => {
     // Do NOT call replaceState here. Next.js App Router stamps the initial entry
@@ -93,7 +104,7 @@ export default function Page() {
   if (audience === null) {
     return (
       <>
-        <SiteHeader audience={null} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
+        <SiteHeader audience={null} onSwitchAudience={goToAudience} onGoHome={goToLanding} location={locationControls} />
         <Landing onNavigate={navigate} onOpenService={openService} />
         {modal}
       </>
@@ -103,7 +114,7 @@ export default function Page() {
   if (mode === 'home' || mode === 'community-home') {
     return (
       <>
-        <SiteHeader audience={audience} onSwitchAudience={goToAudience} onGoHome={goToLanding} />
+        <SiteHeader audience={audience} onSwitchAudience={goToAudience} onGoHome={goToLanding} location={locationControls} />
         <AudienceHome audience={audience} onNavigate={navigate} onOpenService={openService} />
         {modal}
       </>
@@ -116,15 +127,7 @@ export default function Page() {
       ? { kind: 'hospital', hospitalId: selectedHospitalId, hospitalName: selectedHospitalName }
       : { kind: 'address', coords, label: address }
 
-  const anchorControls: AnchorControls = {
-    audience,
-    hospitals,
-    selectedHospitalId,
-    onHospitalChange: setSelectedHospitalId,
-    address,
-    onAddressChange: setAddress,
-    onCoords: setCoords,
-  }
+  const anchorControls: AnchorControls = { audience, ...locationControls }
 
   // Up buttons lead to the visitor's audience home page, not all the way out
   // to the landing fork.
@@ -137,6 +140,7 @@ export default function Page() {
         audience={audience}
         onSwitchAudience={goToAudience}
         onGoHome={goToLanding}
+        location={locationControls}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
         {mode === 'find' && (

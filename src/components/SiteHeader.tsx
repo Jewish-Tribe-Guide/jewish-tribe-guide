@@ -1,5 +1,6 @@
 'use client'
 
+import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import type { Audience } from '@/types'
 
 type Props = {
@@ -9,6 +10,8 @@ type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
    *  Landing page. */
   onGoHome: () => void
+  /** Hospital/address anchor for proximity sorting (top-right pill). */
+  location: LocationControls
 }
 
 const TABS: { audience: Audience; icon: string; label: string; shortLabel: string }[] = [
@@ -27,7 +30,7 @@ function StarOfDavid({ className }: { className?: string }) {
   )
 }
 
-export default function SiteHeader({ audience, onSwitchAudience, onGoHome }: Props) {
+export default function SiteHeader({ audience, onSwitchAudience, onGoHome, location }: Props) {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80">
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
@@ -38,7 +41,7 @@ export default function SiteHeader({ audience, onSwitchAudience, onGoHome }: Pro
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
             <StarOfDavid className="h-5 w-5" />
           </span>
-          <span className="hidden lg:block leading-tight">
+          <span className="hidden xl:block leading-tight">
             <span className="block text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               Philadelphia Jewish Community
             </span>
@@ -74,6 +77,10 @@ export default function SiteHeader({ audience, onSwitchAudience, onGoHome }: Pro
             )
           })}
         </nav>
+
+        <div className="ml-auto">
+          <LocationControl audience={audience} controls={location} />
+        </div>
       </div>
     </header>
   )
