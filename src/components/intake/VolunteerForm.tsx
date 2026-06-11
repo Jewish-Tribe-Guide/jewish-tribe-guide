@@ -16,15 +16,18 @@ type Props = {
    *  'edit' — update an existing commitment; shows a restate-everything warning
    *  and submits as 'Volunteer Edit'. */
   mode?: 'signup' | 'edit'
+  /** Ways-to-help boxes to pre-check (e.g. ['meals'] when arriving via the
+   *  "Cook a Meal" card) — opens the form with that service's section showing. */
+  preselect?: string[]
 }
 
 function makeContact(): ContactHospitalData {
   return { fullName: '', phone: '', email: '', preferredContact: '', hospitalId: '', unitFloorRoom: '' }
 }
 
-function makeVolunteer(): VolunteerData {
+function makeVolunteer(preselect: string[] = []): VolunteerData {
   return {
-    waysToHelp: [],
+    waysToHelp: preselect,
     waysToHelpOther: '',
     hospitals: [],
     availability: [],
@@ -45,9 +48,9 @@ function makeVolunteer(): VolunteerData {
   }
 }
 
-export default function VolunteerForm({ onClose, onSubmitted, mode = 'signup' }: Props) {
+export default function VolunteerForm({ onClose, onSubmitted, mode = 'signup', preselect }: Props) {
   const [contact, setContact] = useState<ContactHospitalData>(makeContact)
-  const [volunteer, setVolunteer] = useState<VolunteerData>(makeVolunteer)
+  const [volunteer, setVolunteer] = useState<VolunteerData>(() => makeVolunteer(preselect))
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])

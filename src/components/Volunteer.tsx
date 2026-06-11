@@ -8,7 +8,7 @@ import UpButton from '@/components/UpButton'
 type SubMode = 'signup' | 'edit' | 'remove'
 
 // History state page.tsx stamps, plus the sub-view this component adds.
-type VolNavState = { mode?: string; volunteerView?: string }
+type VolNavState = { mode?: string; volunteerView?: string; volunteerPreselect?: string }
 
 type Props = {
   /** Hierarchical Up from the signup screen → the audience home. */
@@ -25,6 +25,13 @@ export default function Volunteer({ onUp }: Props) {
     return v === 'edit' || v === 'remove' ? v : 'signup'
   })
   const [submitted, setSubmitted] = useState(false)
+  // Service pre-checked on the signup form when a specific volunteer card
+  // ("Cook a Meal", "Give Rides", …) brought the visitor here.
+  const [preselect] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    const p = (window.history.state as VolNavState | null)?.volunteerPreselect
+    return p ? [p] : []
+  })
 
   // Sync the sub-view on browser back/forward. Volunteer renders in both the
   // patient ('volunteer') and community ('give') branches, so accept either mode.
@@ -98,6 +105,7 @@ export default function Volunteer({ onUp }: Props) {
 
           <VolunteerForm
             mode="signup"
+            preselect={preselect}
             onClose={onUp}
             onSubmitted={() => setSubmitted(true)}
           />
