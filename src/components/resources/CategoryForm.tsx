@@ -18,9 +18,7 @@ const inputClass =
 // first listing. On approval, the category and its first listing are created.
 export default function CategoryForm({ onUp, onSubmitted }: Props) {
   const [label, setLabel] = useState('')
-  const [icon, setIcon] = useState('')
-  const [description, setDescription] = useState('')
-  const [upvotesEnabled, setUpvotesEnabled] = useState(false)
+  const [keywords, setKeywords] = useState('')
 
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -40,9 +38,9 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
 
     const payload: CategorySubmissionPayload = {
       label,
-      icon: icon.trim() || undefined,
-      description: description.trim() || undefined,
-      upvotesEnabled,
+      // Stored as the category's description, but its real job is search: these
+      // words feed the keyword index so the card surfaces for related searches.
+      description: keywords.trim() || undefined,
       firstListing: {
         name,
         hospitalId: 'all',
@@ -108,26 +106,13 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
           <label className="block text-sm font-medium text-slate-700 mb-1">Category name *</label>
           <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputClass} placeholder="e.g. Dentists, Car Repair" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-[6rem_1fr] gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Icon</label>
-            <input value={icon} onChange={(e) => setIcon(e.target.value)} className={inputClass} placeholder="🦷" maxLength={4} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} placeholder="Short description of this category" />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Search keywords</label>
+          <input value={keywords} onChange={(e) => setKeywords(e.target.value)} className={inputClass} placeholder="e.g. shul, minyan, davening" />
+          <p className="text-xs text-muted mt-1">
+            Words people might search to find this — the category will come up for these, not just its exact name. Separate them with commas.
+          </p>
         </div>
-
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={upvotesEnabled}
-            onChange={(e) => setUpvotesEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-          />
-          <span className="text-sm font-medium text-slate-700">Let people upvote listings in this category</span>
-        </label>
 
         <div className="border-t border-slate-200 pt-4">
           <p className="text-sm font-semibold text-slate-700 mb-3">First listing in this category</p>
@@ -148,14 +133,17 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
-            <input value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
-            <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+        <div className="border-t border-slate-200 pt-4">
+          <p className="text-sm font-semibold text-slate-700 mb-3">Your information</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Name (optional)</label>
+              <input value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email (optional)</label>
+              <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+            </div>
           </div>
         </div>
 

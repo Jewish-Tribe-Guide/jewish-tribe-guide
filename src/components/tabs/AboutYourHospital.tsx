@@ -6,14 +6,16 @@ type Props = {
   hospitalId: string
   hospitalName: string
   onUp: () => void
+  /** Label on the Up button — the screen this page was opened from. */
+  upLabel?: string
 }
 
-export default function AboutYourHospital({ hospitalId, hospitalName, onUp }: Props) {
+export default function AboutYourHospital({ hospitalId, hospitalName, onUp, upLabel = 'Hospitals' }: Props) {
   const info = hospitalInfo[hospitalId]
 
   return (
     <div>
-      <UpButton label="All resources" onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} />
 
       {/* Option-3 heading */}
       <div className="mb-6">

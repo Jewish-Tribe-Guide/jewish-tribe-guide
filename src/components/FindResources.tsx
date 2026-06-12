@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvInfo } from '@/data/resources'
+import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
@@ -22,6 +23,8 @@ type FindNavState = {
   mode?: string
   findView?: string
   findAction?: string
+  /** Which hospital's About page to show (set when tapping one in the list). */
+  findHospitalId?: string
 }
 
 // A pending add/edit/report action on a listing within the current category.
@@ -59,6 +62,11 @@ export default function FindResources({ anchor, onUp }: Props) {
   // The listing id most recently opened for edit/report — restored as expanded
   // when the user presses Back from the form to the category list.
   const [reopenItemId, setReopenItemId] = useState<string | null>(null)
+  // Which hospital's About page is showing (chosen from the Hospitals list).
+  const [hospitalDetailId, setHospitalDetailId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findHospitalId ?? null
+  })
 
   // Keep internal view/action in sync with browser back/forward. page.tsx has its
   // own popstate listener for mode; this one only acts while mode is still 'find'.
@@ -67,11 +75,25 @@ export default function FindResources({ anchor, onUp }: Props) {
       const s = e.state as FindNavState | null
       if (s?.mode !== 'find') return
       setView(s.findView ?? null)
+      setHospitalDetailId(s.findHospitalId ?? null)
       setAction(null) // edit/report listings can't be serialized into history
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+
+  // Open one hospital's About page (from the Hospitals list).
+  function openHospital(id: string) {
+    setHospitalDetailId(id)
+    setView('about-hospital')
+    history.pushState({ mode: 'find', findView: 'about-hospital', findHospitalId: id }, '')
+  }
+
+  // Up from a hospital's About page → back to the Hospitals list.
+  const goToHospitals = () => {
+    setView('hospitals')
+    history.pushState({ mode: 'find', findView: 'hospitals' }, '')
+  }
 
   // Open a listing action (create/edit/report form). Pushes its own history entry
   // so browser-back from the form lands on the category list, not all the way home.
@@ -89,8 +111,14 @@ export default function FindResources({ anchor, onUp }: Props) {
   }
 
   // ── Special (non-category) detail views ─────────────────────────────────────
+  if (view === 'hospitals') {
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} />
+  }
   if (view === 'about-hospital') {
-    return <AboutYourHospital hospitalId={hospitalId} hospitalName={locationLabel} onUp={onUp} />
+    // The hospital chosen from the list; its name (not the address) is the subtitle.
+    const id = hospitalDetailId ?? hospitalId
+    const name = hospitals.find((h) => h.id === id)?.name ?? ''
+    return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
   }
   if (view === 'eruv') {
     const eruv = eruvInfo[hospitalId as keyof typeof eruvInfo]

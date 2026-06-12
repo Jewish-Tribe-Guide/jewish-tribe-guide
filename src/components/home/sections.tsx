@@ -111,13 +111,15 @@ export function resourceCards(
     ...(includeHospital
       ? [
           {
-            title: 'About Your Hospital',
+            title: 'Hospitals',
             keywords: [
-              'hospital', 'chaplain', 'rabbi', 'prayer room', 'prayer space', 'shabbat elevator',
-              'shabbos elevator', 'kosher cafeteria', 'jewish doctor', 'medical staff',
-              'bikur cholim room', 'shabbos accommodations', 'hup', 'penn', 'jefferson', 'chop',
+              'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
+              'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
+              'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
+              'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
+              'temple', 'einstein',
             ],
-            go: () => nav('patient', 'find', { findView: 'about-hospital' }),
+            go: () => nav('patient', 'find', { findView: 'hospitals' }),
           },
         ]
       : []),
