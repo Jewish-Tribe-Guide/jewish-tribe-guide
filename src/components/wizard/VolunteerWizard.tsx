@@ -1,16 +1,22 @@
 'use client'
 
 import Wizard, { type Answers, type Step } from './Wizard'
+import { contactSteps, buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
 import { hospitals } from '@/data/hospitals'
-import type { VolunteerData } from '@/types'
 
 const ANYWHERE = 'anywhere'
+
+const MEALS = '🍲 Cooking meals'
+const VISITING = '🫂 Visiting patients'
+const RIDES = '🚙 Giving rides'
+const HOSTING = '🛏️ Hosting a family'
 
 const helps = (way: string) => (a: Answers) =>
   Array.isArray(a.waysToHelp) && a.waysToHelp.includes(way)
 
 const steps: Step[] = [
+  // ── Always asked (start) ────────────────────────────────────────────────────
   {
     id: 'waysToHelp',
     kind: 'multi',
@@ -24,110 +30,133 @@ const steps: Step[] = [
       { value: 'other', label: 'Something else', icon: '❤️' },
     ],
   },
-  {
-    id: 'waysToHelpOther',
-    kind: 'textarea',
-    when: helps('other'),
-    question: 'How else would you like to help?',
-    placeholder: 'Tell us…',
-  },
+
+  // ── Name + contact + preference (shared with the support form) ──────────────
+  ...contactSteps,
 
   // ── Meals ─────────────────────────────────────────────────────────────────
   {
     id: 'meals_kosher',
     kind: 'text',
+    section: MEALS,
     when: helps('meals'),
-    optional: true,
     question: 'What kosher standard do you keep?',
     placeholder: 'e.g. Glatt, Chalav Yisrael, OU…',
   },
 
   // ── Visiting ────────────────────────────────────────────────────────────────
   {
-    id: 'visiting_gender',
-    kind: 'single',
+    id: 'visit_days',
+    kind: 'multi',
+    section: VISITING,
     when: helps('visiting'),
-    optional: true,
-    question: 'Your gender?',
-    hint: 'Optional — helps us match patients who have a preference.',
+    question: 'Which days can you visit?',
+    options: [
+      { value: 'sunday', label: 'Sunday' },
+      { value: 'monday', label: 'Monday' },
+      { value: 'tuesday', label: 'Tuesday' },
+      { value: 'wednesday', label: 'Wednesday' },
+      { value: 'thursday', label: 'Thursday' },
+      { value: 'friday', label: 'Friday' },
+      { value: 'saturday', label: 'Saturday (Shabbat)' },
+    ],
+  },
+  {
+    id: 'visit_time',
+    kind: 'multi',
+    section: VISITING,
+    when: helps('visiting'),
+    question: 'What time of day?',
+    options: [
+      { value: 'morning', label: 'Morning' },
+      { value: 'afternoon', label: 'Afternoon' },
+      { value: 'evening', label: 'Evening' },
+    ],
+  },
+  {
+    id: 'visit_gender',
+    kind: 'single',
+    section: VISITING,
+    when: helps('visiting'),
+    question: 'What’s your gender?',
+    hint: 'We ask so we can pair you with patients appropriately.',
     options: [
       { value: 'male', label: 'Male' },
       { value: 'female', label: 'Female' },
       { value: 'preferNotToSay', label: 'Prefer not to say' },
     ],
   },
-
-  // ── Transportation ────────────────────────────────────────────────────────
   {
-    id: 'transport_passengers',
+    id: 'visit_age',
+    kind: 'single',
+    section: VISITING,
+    when: helps('visiting'),
+    question: 'What’s your age group?',
+    hint: 'Also helps us pair you appropriately.',
+    options: [
+      { value: 'under18', label: 'Under 18' },
+      { value: '18to30', label: '18–30' },
+      { value: '31to50', label: '31–50' },
+      { value: '51to65', label: '51–65' },
+      { value: '65plus', label: '65+' },
+    ],
+  },
+
+  // ── Rides ─────────────────────────────────────────────────────────────────
+  {
+    id: 'ride_passengers',
     kind: 'number',
+    section: RIDES,
     when: helps('transportation'),
-    optional: true,
     question: 'How many passengers can you take?',
     placeholder: 'e.g. 3',
   },
 
   // ── Hosting ───────────────────────────────────────────────────────────────
   {
-    id: 'housing_type',
-    kind: 'single',
+    id: 'host_rooms',
+    kind: 'number',
+    section: HOSTING,
     when: helps('housing'),
-    optional: true,
-    question: 'What best describes your home?',
-    options: [
-      { value: 'family', label: 'Family' },
-      { value: 'fullyMale', label: 'All male' },
-      { value: 'fullyFemale', label: 'All female' },
-      { value: 'mixedGender', label: 'Mixed' },
-    ],
+    question: 'How many rooms do you have for guests?',
+    placeholder: 'e.g. 2',
   },
   {
-    id: 'housing_beds',
+    id: 'host_beds',
     kind: 'number',
+    section: HOSTING,
     when: helps('housing'),
-    optional: true,
-    question: 'How many guests can you sleep?',
+    question: 'How many total beds do you have?',
     placeholder: 'e.g. 3',
   },
   {
-    id: 'housing_address',
+    id: 'host_address',
     kind: 'text',
+    section: HOSTING,
     when: helps('housing'),
-    optional: true,
     question: 'What’s your address?',
     placeholder: 'Street, city, zip',
   },
 
-  // ── Common ────────────────────────────────────────────────────────────────
+  // ── Something else (last branch, just before the always-asked end) ──────────
+  {
+    id: 'waysToHelpOther',
+    kind: 'textarea',
+    section: '❤️ Something else',
+    when: helps('other'),
+    question: 'How else would you like to help?',
+    placeholder: 'Tell us…',
+  },
+
+  // ── Always asked (end) ──────────────────────────────────────────────────────
   {
     id: 'areas',
     kind: 'multi',
     question: 'Where can you help?',
+    hint: 'Tap all that apply.',
     options: [
       ...hospitals.map((h) => ({ value: h.id, label: h.name })),
       { value: ANYWHERE, label: 'Anywhere in the Philadelphia area' },
-    ],
-  },
-  {
-    id: 'availability',
-    kind: 'multi',
-    question: 'When are you usually free?',
-    options: [
-      { value: 'weekdayMornings', label: 'Weekday mornings' },
-      { value: 'weekdayAfternoons', label: 'Weekday afternoons' },
-      { value: 'weekdayEvenings', label: 'Weekday evenings' },
-      { value: 'weekends', label: 'Weekends' },
-      { value: 'flexible', label: 'Flexible / varies' },
-    ],
-  },
-  {
-    id: 'hasCar',
-    kind: 'single',
-    question: 'Do you have a car you could use to help?',
-    options: [
-      { value: 'yes', label: 'Yes' },
-      { value: 'sometimes', label: 'Sometimes' },
-      { value: 'no', label: 'No' },
     ],
   },
   {
@@ -137,18 +166,6 @@ const steps: Step[] = [
     question: 'Anything else you’d like us to know?',
     hint: 'Languages you speak, experience, anything else.',
     placeholder: 'Optional',
-  },
-  {
-    id: 'name',
-    kind: 'text',
-    question: 'What’s your name?',
-    placeholder: 'Your full name',
-  },
-  {
-    id: 'phone',
-    kind: 'tel',
-    question: 'Best number to reach you?',
-    placeholder: '(215) 555-0100',
   },
 ]
 
@@ -163,35 +180,30 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
   const handleSubmit = async (a: Answers) => {
     const str = (id: string) => (typeof a[id] === 'string' ? (a[id] as string) : '')
     const arr = (id: string) => (Array.isArray(a[id]) ? (a[id] as string[]) : [])
-    const accessibility = arr('housing_accessibility')
 
-    const contact = {
-      fullName: str('name'),
-      phone: str('phone'),
-      email: '',
-      preferredContact: '',
-      hospitalId: '',
-      unitFloorRoom: '',
-    }
+    const contact = { ...buildContact(a), hospitalId: '', unitFloorRoom: '' }
 
-    const volunteer: VolunteerData = {
+    // Volunteer signups land in the "Volunteers" sheet tab, which reads these
+    // top-level fields (the rest is kept verbatim in the trailing JSON column).
+    const volunteer = {
       waysToHelp: arr('waysToHelp'),
       waysToHelpOther: str('waysToHelpOther'),
       hospitals: arr('areas'),
-      availability: arr('availability'),
-      hasCar: str('hasCar'),
+      availability: [],
+      hasCar: '',
       notes: str('notes'),
-      visiting: { gender: str('visiting_gender'), ageGroup: '' },
       meals: { kosherStandard: str('meals_kosher') },
-      transportation: { maxPassengers: str('transport_passengers') },
+      visiting: {
+        days: arr('visit_days'),
+        timeOfDay: arr('visit_time'),
+        gender: str('visit_gender'),
+        ageGroup: str('visit_age'),
+      },
+      transportation: { maxPassengers: str('ride_passengers') },
       housing: {
-        apartmentType: str('housing_type'),
-        numberOfRooms: '',
-        numberOfBeds: str('housing_beds'),
-        address: str('housing_address'),
-        wheelchairAccessible: accessibility.includes('wheelchair'),
-        elevatorInBuilding: accessibility.includes('elevator'),
-        maxDays: '',
+        numberOfRooms: str('host_rooms'),
+        numberOfBeds: str('host_beds'),
+        address: str('host_address'),
       },
     }
 

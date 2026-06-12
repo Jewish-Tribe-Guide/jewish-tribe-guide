@@ -7,21 +7,26 @@ import type { Answers, Step } from './Wizard'
 //  - phone only        → ask call vs text
 //  - phone AND email   → ask call vs text vs email
 //  - email only        → no preference question (it's obviously email)
+const SECTION = '👋 Your details'
+
 export const contactSteps: Step[] = [
   {
     id: 'name',
     kind: 'text',
+    section: SECTION,
     question: 'What’s your name?',
     placeholder: 'Your full name',
   },
   {
     id: 'contact',
     kind: 'contact',
+    section: SECTION,
     question: 'How can we reach you?',
   },
   {
     id: 'preferredContact',
     kind: 'single',
+    section: SECTION,
     when: (a) => !!(a.phone as string)?.trim() && !(a.email as string)?.trim(),
     question: 'How should we reach you?',
     options: [
@@ -32,6 +37,7 @@ export const contactSteps: Step[] = [
   {
     id: 'preferredContact',
     kind: 'single',
+    section: SECTION,
     when: (a) => !!(a.phone as string)?.trim() && !!(a.email as string)?.trim(),
     question: 'How should we reach you?',
     options: [

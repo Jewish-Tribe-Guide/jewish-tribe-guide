@@ -1,21 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { CardGrid, type CardDef, resourceCards } from '@/components/home/sections'
-import { buildDestinations, searchDestinations, type Destination } from '@/lib/searchIndex'
+import { useState } from 'react'
+import { CardGrid, cardMatches, type CardDef, resourceCards } from '@/components/home/sections'
 import { useCategories } from '@/lib/useCategories'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 
 const ADD_CATEGORY = '__add_category__'
-
-// Search "service" → the Support wizard need it should pre-check.
-const SERVICE_TO_NEED: Record<string, string> = {
-  Meals: 'meals',
-  Transportation: 'transportation',
-  'Family Housing': 'familyHousing',
-  'Request Visitors': 'visitors',
-}
 
 type Props = {
   onNavigate: NavigateFn
@@ -23,48 +14,53 @@ type Props = {
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
 }
 
-// The whole site is one screen: a filter box, then a grid of cards. Empty box →
-// browse everything (Support + Volunteer + the resource directory, A–Z). Typing
-// filters the grid live against each destination's keywords and shows matches
-// directly, so there's no dropdown to click through.
+// The whole site is one screen: a filter box, then a grid of cards. Typing
+// filters the grid live against each card's hidden keywords (so "shul" surfaces
+// Synagogues), with no dropdown to click through.
 export default function Landing({ onNavigate, onOpenFlow }: Props) {
   const categories = useCategories()
   const [query, setQuery] = useState('')
 
-  // Turn a search destination into a grid card that jumps straight to it —
-  // support services and "direct support" open the Support wizard (pre-checking
-  // the matching need); volunteer destinations open the Volunteer wizard.
-  const destToCard = (d: Destination): CardDef => {
-    const go = d.service || d.id === 'direct-support'
-      ? () => onOpenFlow('support', SERVICE_TO_NEED[d.service ?? ''] ? [SERVICE_TO_NEED[d.service!]] : [])
-      : d.mode === 'give'
-        ? () => onOpenFlow('volunteer')
-        : () => onNavigate(d.audience, d.mode, d.extra)
-    return { icon: d.icon, title: d.title, description: d.description, go }
-  }
-
-  const destinations = useMemo(() => buildDestinations(categories ?? []), [categories])
-  const q = query.trim()
-  const results = q ? searchDestinations(destinations, q).map(destToCard) : null
-
-  // ── Browse grid: Support + Volunteer pinned, then resources A–Z ─────────────
+  // Support + Volunteer lead the grid; both carry the keywords that route here.
   const entryCards: CardDef[] = [
     {
-      icon: '🤝',
       title: 'Support',
-      description: 'Request meals, rides, housing, visitors, or other help.',
+      keywords: [
+        'support', 'help', 'assistance', 'meal', 'meals', 'food', 'kosher food', 'dinner', 'lunch',
+        'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
+        'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay', 'room',
+        'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
+        'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
+      ],
       go: () => onOpenFlow('support'),
     },
     {
-      icon: '🙌',
       title: 'Volunteer Opportunities',
-      description: 'Sign up to cook, drive, visit, or host a family in need.',
+      keywords: [
+        'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
+        'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
+        'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
+      ],
       go: () => onOpenFlow('volunteer'),
     },
   ]
+
   const resources = resourceCards(onNavigate, categories, { includeHospital: true })
   const sortedResources = resources && [...resources].sort((a, b) => a.title.localeCompare(b.title))
-  const browseCards = [...entryCards, ...(sortedResources ?? [])]
+  const allCards = [...entryCards, ...(sortedResources ?? [])]
+
+  const q = query.trim()
+  const loading = !q && sortedResources === null
+  const filtered = q ? allCards.filter((c) => cardMatches(c, q)) : allCards
+
+  const suggestCard: CardDef = {
+    title: 'Suggest a new category',
+    dashed: true,
+    go: () => onNavigate('patient', 'find', { findView: ADD_CATEGORY }),
+  }
+  // While categories load, show the entry cards + skeletons (suggest card waits
+  // until the real cards are in). Otherwise show the filtered grid + suggest card.
+  const gridCards = loading ? entryCards : [...filtered, suggestCard]
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
@@ -105,26 +101,12 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
 
       {/* ── The grid ─────────────────────────────────────────────────────────── */}
       <section className="mt-12 sm:mt-14">
-        {results ? (
-          results.length > 0 ? (
-            <CardGrid cards={results} />
-          ) : (
-            <p className="text-center text-sm text-slate-500">
-              Nothing matches “{q}”. Try a different word, or browse everything by clearing the filter.
-            </p>
-          )
-        ) : (
-          <>
-            <CardGrid cards={browseCards} loadingCount={sortedResources === null ? 6 : 0} />
-            <button
-              onClick={() => onNavigate('patient', 'find', { findView: ADD_CATEGORY })}
-              className="mx-auto mt-10 flex items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-            >
-              <span aria-hidden="true">➕</span>
-              Don&apos;t see the right category? Suggest a new one
-            </button>
-          </>
+        {q && filtered.length === 0 && (
+          <p className="mb-5 text-center text-sm text-slate-500">
+            Nothing matches “{q}”. Try a different word, clear the filter, or suggest it below.
+          </p>
         )}
+        <CardGrid cards={gridCards} loadingCount={loading ? 6 : 0} />
       </section>
     </main>
   )

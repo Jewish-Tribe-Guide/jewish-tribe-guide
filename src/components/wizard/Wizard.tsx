@@ -16,6 +16,9 @@ type StepBase = {
   id: string
   question: string
   hint?: string
+  /** Small eyebrow above the question naming the section, e.g. "🍽️ Meals", so
+   *  the visitor always knows which part of the form they're in. */
+  section?: string
   /** Show this step only when the predicate passes (branching). */
   when?: (a: Answers) => boolean
   /** Optional steps can be skipped; required ones block until answered. */
@@ -162,6 +165,11 @@ export default function Wizard({
       stepText={`${clampedIdx + 1} of ${visible.length}`}
     >
       <div key={step.id} className="animate-[fadeIn_180ms_ease-out]">
+        {step.section && (
+          <p className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-primary">
+            {step.section}
+          </p>
+        )}
         <h2 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-slate-900 leading-tight">
           {step.question}
         </h2>

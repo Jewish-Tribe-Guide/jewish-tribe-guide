@@ -1,6 +1,7 @@
 'use client'
 
 import Wizard, { type Answers, type Step } from './Wizard'
+import { contactSteps, buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
 
 // One branching form for every kind of direct support. The visitor taps what
@@ -9,9 +10,15 @@ import { submitRequest } from '@/lib/submitRequest'
 const has = (need: string) => (a: Answers) =>
   Array.isArray(a.needs) && a.needs.includes(need)
 
-const hospitalRoomStep = (when: (a: Answers) => boolean): Step => ({
+const MEALS = '🍽️ Meals'
+const RIDE = '🚗 Ride'
+const STAY = '🏠 Place to stay'
+const VISIT = '🤝 Visit'
+
+const hospitalRoomStep = (when: (a: Answers) => boolean, section: string): Step => ({
   id: 'hospital_room',
   kind: 'text',
+  section,
   when,
   question: 'Which hospital and room?',
   placeholder: 'e.g. Jefferson, room 412',
@@ -32,45 +39,16 @@ const steps: Step[] = [
       { value: 'other', label: 'Something else', icon: '✨' },
     ],
   },
-  {
-    id: 'name',
-    kind: 'text',
-    question: 'What’s your name?',
-    placeholder: 'Your full name',
-  },
-  {
-    id: 'contact',
-    kind: 'contact',
-    question: 'How can we reach you?',
-  },
-  // Contact preference — only when a phone was given. Email-only needs no ask.
-  {
-    id: 'preferredContact',
-    kind: 'single',
-    when: (a) => !!(a.phone as string)?.trim() && !(a.email as string)?.trim(),
-    question: 'How should we reach you?',
-    options: [
-      { value: 'phone', label: 'Call me' },
-      { value: 'text', label: 'Text me' },
-    ],
-  },
-  {
-    id: 'preferredContact',
-    kind: 'single',
-    when: (a) => !!(a.phone as string)?.trim() && !!(a.email as string)?.trim(),
-    question: 'How should we reach you?',
-    options: [
-      { value: 'phone', label: 'Call me' },
-      { value: 'text', label: 'Text me' },
-      { value: 'email', label: 'Email me' },
-    ],
-  },
+
+  // ── Name + contact + preference (shared with the volunteer form) ────────────
+  ...contactSteps,
 
   // ── Meals ─────────────────────────────────────────────────────────────────
-  hospitalRoomStep(has('meals')),
+  hospitalRoomStep(has('meals'), MEALS),
   {
     id: 'meals_which',
     kind: 'multi',
+    section: MEALS,
     when: has('meals'),
     question: 'Which meals?',
     options: [
@@ -83,6 +61,7 @@ const steps: Step[] = [
   {
     id: 'meals_dietary',
     kind: 'multi',
+    section: MEALS,
     when: has('meals'),
     optional: true,
     question: 'Any dietary needs?',
@@ -98,6 +77,7 @@ const steps: Step[] = [
   {
     id: 'meals_count',
     kind: 'number',
+    section: MEALS,
     when: has('meals'),
     question: 'How many people are we feeding?',
     placeholder: 'e.g. 4',
@@ -105,6 +85,7 @@ const steps: Step[] = [
   {
     id: 'meals_notes',
     kind: 'textarea',
+    section: MEALS,
     when: has('meals'),
     optional: true,
     question: 'Anything else about the meals?',
@@ -115,6 +96,7 @@ const steps: Step[] = [
   {
     id: 'ride_pickup',
     kind: 'text',
+    section: RIDE,
     when: has('transportation'),
     question: 'Where is the pickup location?',
     placeholder: 'Pickup address',
@@ -122,6 +104,7 @@ const steps: Step[] = [
   {
     id: 'ride_dropoff',
     kind: 'text',
+    section: RIDE,
     when: has('transportation'),
     question: 'Where’s the dropoff location?',
     placeholder: 'Destination',
@@ -129,6 +112,7 @@ const steps: Step[] = [
   {
     id: 'ride_when',
     kind: 'text',
+    section: RIDE,
     when: has('transportation'),
     question: 'When do you need the ride?',
     placeholder: 'Day and time — e.g. Tuesday at 9am',
@@ -136,6 +120,7 @@ const steps: Step[] = [
   {
     id: 'ride_passengers',
     kind: 'number',
+    section: RIDE,
     when: has('transportation'),
     optional: true,
     question: 'How many passengers?',
@@ -144,6 +129,7 @@ const steps: Step[] = [
   {
     id: 'ride_notes',
     kind: 'textarea',
+    section: RIDE,
     when: has('transportation'),
     optional: true,
     question: 'Anything else about the ride?',
@@ -154,6 +140,7 @@ const steps: Step[] = [
   {
     id: 'stay_dates',
     kind: 'text',
+    section: STAY,
     when: has('familyHousing'),
     question: 'When would you arrive and leave?',
     placeholder: 'e.g. Thursday night through Sunday',
@@ -161,6 +148,7 @@ const steps: Step[] = [
   {
     id: 'stay_distance',
     kind: 'text',
+    section: STAY,
     when: has('familyHousing'),
     optional: true,
     question: 'How close to the hospital do you need to be?',
@@ -169,6 +157,7 @@ const steps: Step[] = [
   {
     id: 'stay_accessibility',
     kind: 'text',
+    section: STAY,
     when: has('familyHousing'),
     optional: true,
     question: 'Any accessibility needs?',
@@ -177,6 +166,7 @@ const steps: Step[] = [
   {
     id: 'stay_location_pref',
     kind: 'text',
+    section: STAY,
     when: has('familyHousing'),
     optional: true,
     question: 'Any preference on where you stay?',
@@ -185,6 +175,7 @@ const steps: Step[] = [
   {
     id: 'stay_notes',
     kind: 'textarea',
+    section: STAY,
     when: has('familyHousing'),
     optional: true,
     question: 'Anything else about the place to stay?',
@@ -193,10 +184,11 @@ const steps: Step[] = [
 
   // ── Visit ─────────────────────────────────────────────────────────────────
   // Hospital + room, but only if the meals branch didn't already ask it.
-  hospitalRoomStep((a) => has('visitors')(a) && !has('meals')(a)),
+  hospitalRoomStep((a) => has('visitors')(a) && !has('meals')(a), VISIT),
   {
     id: 'visit_type',
     kind: 'multi',
+    section: VISIT,
     when: has('visitors'),
     question: 'What kind of visit?',
     options: [
@@ -210,6 +202,7 @@ const steps: Step[] = [
   {
     id: 'visit_time',
     kind: 'multi',
+    section: VISIT,
     when: has('visitors'),
     optional: true,
     question: 'What time of day?',
@@ -222,6 +215,7 @@ const steps: Step[] = [
   {
     id: 'visit_frequency',
     kind: 'single',
+    section: VISIT,
     when: has('visitors'),
     optional: true,
     question: 'How often?',
@@ -237,6 +231,7 @@ const steps: Step[] = [
   {
     id: 'otherNeed',
     kind: 'textarea',
+    section: '✨ Something else',
     when: has('other'),
     question: 'What else can we help with?',
     placeholder: 'Tell us what you need…',
@@ -264,17 +259,9 @@ export default function SupportWizard({ preselect, onClose }: Props) {
     const str = (id: string) => (typeof a[id] === 'string' ? (a[id] as string) : '')
     const arr = (id: string) => (Array.isArray(a[id]) ? (a[id] as string[]) : [])
 
-    const phone = str('phone')
-    const email = str('email')
     const hospitalRoom = str('hospital_room')
-    // Email-only contacts skip the preference question — default it to email.
-    const preferredContact = str('preferredContact') || (email && !phone ? 'email' : '')
-
     const contact = {
-      fullName: str('name'),
-      phone,
-      email,
-      preferredContact,
+      ...buildContact(a),
       // No structured hospital id anymore — store the free-typed "hospital + room"
       // here so it still shows in the admin sheet's Hospital column.
       hospitalId: hospitalRoom,
