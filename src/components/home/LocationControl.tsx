@@ -40,6 +40,13 @@ export default function LocationControl({ controls }: Props) {
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
+  // Allow any component (e.g. AddressPrompt) to open the picker without prop drilling.
+  useEffect(() => {
+    function onOpen() { setOpen(true) }
+    document.addEventListener('jpc:open-location', onOpen)
+    return () => document.removeEventListener('jpc:open-location', onOpen)
+  }, [])
+
   const label = controls.address || 'Set location'
 
   // Picking a real address yields coordinates — apply them and close (no Done

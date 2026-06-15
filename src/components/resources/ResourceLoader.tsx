@@ -13,6 +13,8 @@ type Props = {
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
+  /** Pre-fill the directory's search box (from a landing "Places" result). */
+  initialSearch?: string
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -24,7 +26,7 @@ type RealTimes = Record<string, { drive?: number; walk?: number }>
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, anchor, reopenItemId, onUp, onAdd, onEdit, onReport }: Props) {
+export default function ResourceLoader({ category, anchor, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport }: Props) {
   const [items, setItems] = useState<DirectoryResource[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Real driving/walking times for address-mode anchors, populated asynchronously
@@ -172,6 +174,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onUp, o
   }
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
   )
 }

@@ -25,6 +25,11 @@ type FindNavState = {
   findAction?: string
   /** Which hospital's About page to show (set when tapping one in the list). */
   findHospitalId?: string
+  /** Pre-fill the category's search box (set when arriving from a landing "Places"
+   *  result, e.g. "cheese"). */
+  findQuery?: string
+  /** Expand this listing on arrival (the place tapped on the landing page). */
+  findItemId?: string
 }
 
 // A pending add/edit/report action on a listing within the current category.
@@ -59,9 +64,18 @@ export default function FindResources({ anchor, onUp }: Props) {
   })
   const [action, setAction] = useState<ListingAction | null>(null)
   const categories = useCategories()
-  // The listing id most recently opened for edit/report — restored as expanded
-  // when the user presses Back from the form to the category list.
-  const [reopenItemId, setReopenItemId] = useState<string | null>(null)
+  // The listing id most recently opened for edit/report, OR the place tapped on
+  // the landing page — restored as expanded when the category list shows.
+  const [reopenItemId, setReopenItemId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findItemId ?? null
+  })
+  // Pre-filled search for the category list, set when arriving from a landing
+  // "Places" result so the tapped place is already filtered in.
+  const [initialSearch, setInitialSearch] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findQuery ?? null
+  })
   // Which hospital's About page is showing (chosen from the Hospitals list).
   const [hospitalDetailId, setHospitalDetailId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
@@ -76,6 +90,8 @@ export default function FindResources({ anchor, onUp }: Props) {
       if (s?.mode !== 'find') return
       setView(s.findView ?? null)
       setHospitalDetailId(s.findHospitalId ?? null)
+      setReopenItemId(s.findItemId ?? null)
+      setInitialSearch(s.findQuery ?? null)
       setAction(null) // edit/report listings can't be serialized into history
     }
     window.addEventListener('popstate', onPop)
@@ -158,9 +174,11 @@ export default function FindResources({ anchor, onUp }: Props) {
     }
     return (
       <ResourceLoader
+        key={category.id + (initialSearch ?? '')}
         category={category}
         anchor={anchor}
         reopenItemId={reopenItemId}
+        initialSearch={initialSearch ?? undefined}
         onUp={onUp}
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}

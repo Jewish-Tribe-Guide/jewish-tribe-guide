@@ -14,7 +14,7 @@ const ICON_OVERRIDES: Record<string, string> = {
 // categories, so deep links keep working once the API is back.
 export const FALLBACK_CATEGORIES: CategoryConfig[] = [
   { id: 'synagogue', label: 'Synagogue', pluralLabel: 'Synagogues', icon: '🕍', description: 'Shuls and minyanim near the hospital, with davening times', detailFields: [] },
-  { id: 'restaurant', label: 'Restaurant', pluralLabel: 'Restaurants', icon: '🍽️', description: 'Kosher and nearby dining options', detailFields: [] },
+  { id: 'restaurant', label: 'Food Establishment', pluralLabel: 'Food Establishments', icon: '🍽️', description: 'Restaurants, bakeries, cafes, and ice cream near the hospital', detailFields: [] },
   { id: 'grocery', label: 'Grocery Store', pluralLabel: 'Grocery Stores', icon: '🛒', description: 'Kosher and local grocery stores near the hospital', detailFields: [] },
   { id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', icon: '🏨', description: 'Lodging with shuttle and Shabbat-friendly options', detailFields: [] },
   { id: 'mikvah', label: 'Mikvah', pluralLabel: 'Mikvah', icon: '💧', description: 'Mikvah locations, hours, and contact information', detailFields: [] },

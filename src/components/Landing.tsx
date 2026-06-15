@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { CardGrid, cardMatches, type CardDef, resourceCards } from '@/components/home/sections'
+import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, resourceCards } from '@/components/home/sections'
 import { useCategories } from '@/lib/useCategories'
+import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 
@@ -19,6 +20,7 @@ type Props = {
 // Synagogues), with no dropdown to click through.
 export default function Landing({ onNavigate, onOpenFlow }: Props) {
   const categories = useCategories()
+  const listings = useAllListings()
   const [query, setQuery] = useState('')
 
   // Support + Volunteer lead the grid; both carry the keywords that route here.
@@ -52,6 +54,19 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
   const q = query.trim()
   const loading = !q && sortedResources === null
   const filtered = q ? allCards.filter((c) => cardMatches(c, q)) : allCards
+
+  // Individual places that match the query by name + tags (e.g. a grocery store
+  // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
+  const placeHits = q && listings ? searchListings(listings, categories ?? [], q) : []
+
+  // Tapping a place opens its category directory, pre-filtered to the matched term
+  // (so it survives that page's own search) with the place itself expanded.
+  const openPlace = (hit: (typeof placeHits)[number]) =>
+    onNavigate('patient', 'find', {
+      findView: hit.item.category,
+      findQuery: hit.term,
+      findItemId: hit.item.id,
+    })
 
   const suggestCard: CardDef = {
     title: 'Suggest a new category',
@@ -101,13 +116,18 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
 
       {/* ── The grid ─────────────────────────────────────────────────────────── */}
       <section className="mt-12 sm:mt-14">
-        {q && filtered.length === 0 && (
+        {q && filtered.length === 0 && placeHits.length === 0 && (
           <p className="mb-5 text-center text-sm text-slate-500">
             Nothing matches “{q}”. Try a different word, clear the filter, or suggest it below.
           </p>
         )}
         <CardGrid cards={gridCards} loadingCount={loading ? 6 : 0} />
       </section>
+
+      {/* ── Matching places (individual listings within the cards) ───────────── */}
+      {placeHits.length > 0 && (
+        <PlacesResults hits={placeHits} onOpen={openPlace} />
+      )}
     </main>
   )
 }

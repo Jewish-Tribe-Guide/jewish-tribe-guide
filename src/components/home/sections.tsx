@@ -1,7 +1,7 @@
 'use client'
 
 import type { CategoryConfig } from '@/lib/categories'
-import type { NavigateFn } from '@/types'
+import type { DirectoryResource, NavigateFn } from '@/types'
 
 export type CardDef = {
   title: string
@@ -75,6 +75,122 @@ export function cardMatches(card: CardDef, query: string): boolean {
   return tokens.every((t) => hay.includes(t))
 }
 
+// ── Listing (within-card) search ───────────────────────────────────────────────
+
+/** A single place that matched the landing search — e.g. a grocery store whose
+ *  "cheese" tag matched "kosher cheese". */
+export type ListingHit = {
+  item: DirectoryResource
+  /** The category's plural label, e.g. "Grocery Stores". */
+  categoryLabel: string
+  /** Tags that matched the query — shown as chips so the visitor sees *why*. */
+  matchedTags: string[]
+  /** The term to pre-fill the category's own search with on tap: the matched tag
+   *  when there is one (so the place survives that page's filter), else the query. */
+  term: string
+}
+
+// A listing's tags live spread onto the row as arrays of strings (kosher items,
+// amenities, …). Collect every string-array value generically so this stays
+// decoupled from per-category field config.
+function listingTags(item: DirectoryResource): string[] {
+  const out: string[] = []
+  for (const value of Object.values(item)) {
+    if (Array.isArray(value) && value.every((x) => typeof x === 'string')) {
+      out.push(...(value as string[]))
+    }
+  }
+  return out
+}
+
+/** Find individual listings matching the query by name + tags (every query word
+ *  must appear, mirroring `cardMatches`). Returns at most `limit` hits so a broad
+ *  word like "kosher" can't flood the landing page. */
+export function searchListings(
+  listings: DirectoryResource[],
+  categories: CategoryConfig[],
+  query: string,
+  limit = 8,
+): ListingHit[] {
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return []
+  const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
+
+  // How many query words a tag contains — used to rank "Kosher Wine" (2) above
+  // "Glatt Kosher Meat" (1) for the query "kosher wine".
+  const score = (tag: string) => {
+    const t = tag.toLowerCase()
+    return tokens.reduce((n, tok) => n + (t.includes(tok) ? 1 : 0), 0)
+  }
+
+  const hits: ListingHit[] = []
+  for (const item of listings) {
+    const tags = listingTags(item)
+    const hay = [item.name, ...tags].join(' ').toLowerCase()
+    if (!tokens.every((t) => hay.includes(t))) continue
+    // Most-specific matched tags first; show a few as chips, lead with the best.
+    const matchedTags = tags
+      .filter((tag) => score(tag) > 0)
+      .sort((a, b) => score(b) - score(a) || a.length - b.length)
+      .slice(0, 3)
+    hits.push({
+      item,
+      categoryLabel: labelById.get(item.category) ?? item.category,
+      matchedTags,
+      term: matchedTags[0] ?? query.trim(),
+    })
+    if (hits.length >= limit) break
+  }
+  return hits
+}
+
+/** The "Places" results list shown beneath the card grid: individual listings
+ *  that matched the query, each tagged with its category and the matched term. */
+export function PlacesResults({
+  hits,
+  onOpen,
+}: {
+  hits: ListingHit[]
+  onOpen: (hit: ListingHit) => void
+}) {
+  return (
+    <section className="mt-10 sm:mt-12">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Places
+      </h2>
+      <div className="space-y-2">
+        {hits.map((hit) => (
+          <button
+            key={hit.item.id}
+            onClick={() => onOpen(hit)}
+            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary cursor-pointer"
+          >
+            <span className="min-w-0">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-semibold text-slate-900 text-sm group-hover:text-primary transition-colors">
+                  {hit.item.name}
+                </span>
+                <span className="text-xs text-slate-500">{hit.categoryLabel}</span>
+                {hit.matchedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </span>
+            </span>
+            <svg className="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ── Card definitions ──────────────────────────────────────────────────────────
 
 // Hidden synonyms for the well-known categories — the words people type that
@@ -83,7 +199,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   synagogue: ['shul', 'shuls', 'minyan', 'minyanim', 'davening', 'shtiebel', 'beis medrash'],
   mikvah: ['mikveh', 'mikvaos', 'immersion'],
   grocery: ['groceries', 'supermarket', 'market', 'food shopping'],
-  restaurant: ['restaurants', 'dining', 'eat out', 'takeout'],
+  restaurant: ['restaurants', 'dining', 'eat out', 'takeout', 'bakery', 'bakeries', 'cafe', 'cafes', 'coffee', 'ice cream', 'dessert', 'sweets', 'donuts', 'pastry', 'bagel'],
   hotel: ['hotels', 'motel', 'lodging', 'place to stay'],
   whatsapp: ['whatsapp', 'group chat', 'community group', 'chat'],
 }
@@ -111,7 +227,7 @@ export function resourceCards(
     ...(includeHospital
       ? [
           {
-            title: 'Hospitals',
+            title: 'Jewish Medical Resources',
             keywords: [
               'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
               'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
@@ -19,6 +19,8 @@ type Props = {
   addressPrompt?: boolean
   /** A listing to mount already expanded (restored after returning from a form). */
   reopenItemId?: string | null
+  /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
+  initialSearch?: string
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -43,6 +45,13 @@ function asTags(value: unknown): string[] {
   return Array.isArray(value) ? (value as string[]) : []
 }
 
+// Trim a full mailing address down to "street, city" for the quiet card subtitle
+// (drops state, zip, and country). The full address still shows when expanded.
+function shortAddress(addr: string): string {
+  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
+  return parts.length <= 2 ? parts.join(', ') : `${parts[0]}, ${parts[1]}`
+}
+
 function travelLabel(item: DirectoryResource): string | null {
   if (item.milesFromAddress != null) return `📍 ${item.milesFromAddress} mi`
   const parts: string[] = []
@@ -62,10 +71,12 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, onUp, onAdd, onEdit, onReport }: Props) {
-  const [search, setSearch] = useState('')
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport }: Props) {
+  const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
-  const [selectFilters, setSelectFilters] = useState<Record<string, string>>({})
+  // Multi-select: each key maps to the set of chosen values (empty = no filter).
+  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(false)
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
@@ -85,13 +96,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
   const q = search.trim().toLowerCase()
+  const tokens = q.split(/\s+/).filter(Boolean)
+  // Every word must appear in the name or a tag (AND across words) — mirrors the
+  // landing search, so a place tapped there ("kosher cheese") survives this filter.
   const matchesSearch = (item: DirectoryResource) => {
-    if (!q) return true
-    if (item.name.toLowerCase().includes(q)) return true
-    for (const f of tagFields) {
-      if (asTags(item[f.key]).some((t) => t.toLowerCase().includes(q))) return true
-    }
-    return false
+    if (tokens.length === 0) return true
+    const hay = [
+      item.name,
+      ...tagFields.flatMap((f) => asTags(item[f.key])),
+    ].join(' ').toLowerCase()
+    return tokens.every((t) => hay.includes(t))
   }
 
   const filtered = items
@@ -102,7 +116,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       }
       for (const f of filterableSelects) {
         const chosen = selectFilters[f.key]
-        if (chosen && item[f.key] !== chosen) return false
+        if (chosen?.length && !chosen.includes(item[f.key] as string)) return false
       }
       if (openNow && hasFilterableHours) {
         // Item must be open right now according to at least one filterable hours field.
@@ -170,14 +184,43 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           )
         })}
         {filterableSelects.map((f) => {
-          // Collect only the values that actually appear in the current item set.
           const presentValues = Array.from(new Set(items.map((item) => item[f.key] as string).filter(Boolean))).sort()
           if (presentValues.length < 2) return null
+          const chosen = selectFilters[f.key] ?? []
+          const toggle = (v: string) =>
+            setSelectFilters((prev) => {
+              const cur = prev[f.key] ?? []
+              return { ...prev, [f.key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }
+            })
+          if (f.multiSelect) {
+            const isOpen = openDropdown === f.key
+            const label = chosen.length === 0
+              ? `All ${f.filterLabel ?? f.label}s`
+              : chosen.length === 1
+              ? chosen[0]
+              : `${chosen.length} selected`
+            return (
+              <CheckboxDropdown
+                key={f.key}
+                label={label}
+                active={chosen.length > 0}
+                isOpen={isOpen}
+                onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
+                onClose={() => setOpenDropdown(null)}
+                values={presentValues}
+                chosen={chosen}
+                onToggle={toggle}
+              />
+            )
+          }
+          // Default: single-select dropdown.
           return (
             <select
               key={f.key}
-              value={selectFilters[f.key] ?? ''}
-              onChange={(e) => setSelectFilters((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              value={chosen[0] ?? ''}
+              onChange={(e) =>
+                setSelectFilters((prev) => ({ ...prev, [f.key]: e.target.value ? [e.target.value] : [] }))
+              }
               className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
             >
               <option value="">All {f.filterLabel ?? f.label}s</option>
@@ -245,9 +288,81 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               defaultExpanded={item.id === reopenItemId}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
+              onFilterOpen={() => setOpenNow((v) => !v)}
+              onFilterBool={(key) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
+              onFilterSelect={(key, value, multi) =>
+                setSelectFilters((prev) => {
+                  const cur = prev[key] ?? []
+                  // Single-select: toggle between [value] and cleared. Multi-select:
+                  // add/remove this value from the set. Clicking the badge again undoes it.
+                  if (!multi) return { ...prev, [key]: cur.includes(value) ? [] : [value] }
+                  return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
+                })
+              }
               onEdit={() => onEdit(item)}
               onReport={() => onReport(item)}
             />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Checkbox dropdown filter ───────────────────────────────────────────────────
+
+function CheckboxDropdown({
+  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle,
+}: {
+  label: string
+  active: boolean
+  isOpen: boolean
+  onToggleOpen: () => void
+  onClose: () => void
+  values: string[]
+  chosen: string[]
+  onToggle: (v: string) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [isOpen, onClose])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={onToggleOpen}
+        className={[
+          'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm cursor-pointer whitespace-nowrap transition-colors',
+          active
+            ? 'border-primary bg-primary/5 text-primary font-medium'
+            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+        ].join(' ')}
+      >
+        {label}
+        <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 z-20 min-w-[160px] rounded-md border border-slate-200 bg-white shadow-lg py-1">
+          {values.map((v) => (
+            <label key={v} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={chosen.includes(v)}
+                onChange={() => onToggle(v)}
+                className="accent-primary h-3.5 w-3.5 cursor-pointer"
+              />
+              {v}
+            </label>
           ))}
         </div>
       )}
@@ -266,6 +381,9 @@ function GenericListingCard({
   defaultExpanded,
   onVote,
   onTagClick,
+  onFilterOpen,
+  onFilterBool,
+  onFilterSelect,
   onEdit,
   onReport,
 }: {
@@ -276,6 +394,13 @@ function GenericListingCard({
   defaultExpanded?: boolean
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
+  /** Click the "Open" badge → turn on the "Open now" filter. */
+  onFilterOpen: () => void
+  /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
+  onFilterBool: (key: string) => void
+  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → select it in
+   *  that field's filter. `multi` adds to the set; otherwise it replaces. */
+  onFilterSelect: (key: string, value: string, multi: boolean) => void
   onEdit: () => void
   onReport: () => void
 }) {
@@ -283,7 +408,8 @@ function GenericListingCard({
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
-  const urlFields = fields.filter((f) => f.type === 'url')
+  const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
+  const headerUrlFields = fields.filter((f) => f.type === 'url' && f.showInHeader)
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours'
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
@@ -301,6 +427,13 @@ function GenericListingCard({
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
 
+  // A quiet second line under the name — mirrors the synagogue card's denomination
+  // subtitle. The address gives "where is this" context without expanding; items
+  // with no address (e.g. community groups) fall back to a short Google blurb.
+  const subtitle = item.address
+    ? shortAddress(item.address)
+    : (item.googleDescription as string | undefined) || null
+
   return (
     <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
       <div
@@ -309,38 +442,75 @@ function GenericListingCard({
         aria-expanded={expanded}
         onClick={() => setExpanded((p) => !p)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+        className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches). */}
-        <div className="min-w-0 flex flex-col gap-0.5">
+        <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
+          <span className="font-semibold text-slate-900">{item.name}</span>
           {isOpen && (
-            <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">Open</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
+              title="Filter to places open now"
+              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
+            >
+              Open
+            </button>
           )}
-          {signalBadges.map((f) => (
-            <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">
-              {f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)}
-            </span>
-          ))}
+          {signalBadges.map((f) => {
+            const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
+            return (
+              <button
+                key={f.key}
+                // A badge "has a designated filter" when its field is filterable; then
+                // clicking it drives that control. Otherwise it falls back to search.
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
+                  else if (f.filterable && f.type === 'select') onFilterSelect(f.key, String(item[f.key]), !!f.multiSelect)
+                  else onTagClick(text)
+                }}
+                title={`Filter by ${text}`}
+                className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                {text}
+              </button>
+            )
+          })}
           {tags.map((t) => (
             <button
               key={t}
               onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
               title={`Find places with ${t}`}
-              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
+              className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 transition-colors cursor-pointer"
             >
               {t}
             </button>
           ))}
           </div>
-          {item.googleDescription && (
-            <p className="text-xs text-slate-500 leading-snug">{item.googleDescription as string}</p>
+          {subtitle && (
+            <p className="text-sm text-muted truncate">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
           {travel && <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{travel}</span>}
+          {headerUrlFields.map((f) => {
+            const href = display(item[f.key])
+            if (!href) return null
+            return (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            )
+          })}
           <svg
             className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
