@@ -162,6 +162,8 @@ export type DirectoryResource = {
   googleSyncedAt?: string
   /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+  /** Short editorial description from Google Places (fetched on first sync). */
+  googleDescription?: string
   [detailKey: string]: unknown
 }
 

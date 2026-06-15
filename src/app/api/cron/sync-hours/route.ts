@@ -69,6 +69,7 @@ async function runSync(): Promise<NextResponse> {
     }
     if (sync.hours) details.hours = sync.hours
     if (sync.businessStatus) details.businessStatus = sync.businessStatus
+    if (sync.description && !details.googleDescription) details.googleDescription = sync.description
 
     const update: { details: Record<string, unknown>; phone?: string; address?: string } = { details }
     if (sync.phone) update.phone = sync.phone

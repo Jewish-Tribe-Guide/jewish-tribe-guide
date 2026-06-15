@@ -45,6 +45,17 @@ export default function Page() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
+  // On a full page reload the browser keeps the current entry's history.state, so
+  // restore whatever screen the visitor was on (a category, the hospitals list,
+  // an open form) instead of snapping back to the landing page. Runs once after
+  // mount — initializing state from history.state directly would mismatch the
+  // server-rendered (always-home) markup during hydration.
+  useEffect(() => {
+    const s = window.history.state as NavState | null
+    if (s?.mode && s.mode !== 'home') setMode(s.mode)
+    if (s?.flow) setFlow(s.flow)
+  }, [])
+
   // Central navigation function — always call this instead of setMode directly so
   // every transition is recorded in the browser history stack. The first arg is
   // the legacy audience key (unused now that there's a single path) — kept so the

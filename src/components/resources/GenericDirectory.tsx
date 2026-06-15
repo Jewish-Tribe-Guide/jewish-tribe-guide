@@ -17,6 +17,8 @@ type Props = {
   anchorLabel?: string
   /** When true and no anchorLabel, prompt the visitor to set their location. */
   addressPrompt?: boolean
+  /** A listing to mount already expanded (restored after returning from a form). */
+  reopenItemId?: string | null
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -60,9 +62,10 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, onUp, onAdd, onEdit, onReport }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, onUp, onAdd, onEdit, onReport }: Props) {
   const [search, setSearch] = useState('')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
+  const [selectFilters, setSelectFilters] = useState<Record<string, string>>({})
   const [openNow, setOpenNow] = useState(false)
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
@@ -76,6 +79,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
+  const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 
   const upvotes = !!category.upvotesEnabled
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
@@ -95,6 +99,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       if (!matchesSearch(item)) return false
       for (const f of filterableBooleans) {
         if (boolFilters[f.key] && !item[f.key]) return false
+      }
+      for (const f of filterableSelects) {
+        const chosen = selectFilters[f.key]
+        if (chosen && item[f.key] !== chosen) return false
       }
       if (openNow && hasFilterableHours) {
         // Item must be open right now according to at least one filterable hours field.
@@ -161,6 +169,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </button>
           )
         })}
+        {filterableSelects.map((f) => {
+          // Collect only the values that actually appear in the current item set.
+          const presentValues = Array.from(new Set(items.map((item) => item[f.key] as string).filter(Boolean))).sort()
+          if (presentValues.length < 2) return null
+          return (
+            <select
+              key={f.key}
+              value={selectFilters[f.key] ?? ''}
+              onChange={(e) => setSelectFilters((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+            >
+              <option value="">All {f.filterLabel ?? f.label}s</option>
+              {presentValues.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          )
+        })}
         {/* Open Now toggle — only shown for categories that have a filterable hours field */}
         {hasFilterableHours && (
           <button
@@ -209,126 +235,189 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         <p className="text-muted text-sm">No results found.</p>
       ) : (
         <div className="space-y-2">
-          {filtered.map((item) => {
-            // Compute hours status once per card — drives both the Open badge and
-            // the today-hours line. Only show badge when structured hours are present.
-            const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
-            const openStatus = hoursVal !== undefined ? hoursOpenNow(hoursVal) : null
+          {filtered.map((item) => (
+            <GenericListingCard
+              key={item.id}
+              item={item}
+              category={category}
+              upvotes={upvotes}
+              count={liveCount(item)}
+              defaultExpanded={item.id === reopenItemId}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
+              onTagClick={setSearch}
+              onEdit={() => onEdit(item)}
+              onReport={() => onReport(item)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
+// ── Collapsible listing card ────────────────────────────────────────────────────
+// Mirrors the synagogue card: collapsed shows only what people decide by (name,
+// the key yes/no badges, "Open", distance); the rest waits behind a tap.
+function GenericListingCard({
+  item,
+  category,
+  upvotes,
+  count,
+  defaultExpanded,
+  onVote,
+  onTagClick,
+  onEdit,
+  onReport,
+}: {
+  item: DirectoryResource
+  category: CategoryConfig
+  upvotes: boolean
+  count: number
+  defaultExpanded?: boolean
+  onVote: (count: number) => void
+  onTagClick: (tag: string) => void
+  onEdit: () => void
+  onReport: () => void
+}) {
+  const [expanded, setExpanded] = useState(!!defaultExpanded)
+
+  const fields = category.detailFields
+  const tagFields = fields.filter((f) => f.type === 'tags')
+  const urlFields = fields.filter((f) => f.type === 'url')
+  const hoursFields = fields.filter((f) => f.type === 'hours')
+  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours'
+  const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
+  const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
+
+  const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
+  const isOpen = hoursVal !== undefined && hoursOpenNow(hoursVal) === true && isStructuredHours(hoursVal)
+  const travel = travelLabel(item)
+  const tags = tagFields.flatMap((f) => asTags(item[f.key]))
+
+  // Collapsed signals: boolean true-badges + select badges (e.g. kosher cert).
+  // Unset booleans and unset selects go in the detail panel.
+  const signalBadges = badgeFields.filter((f) =>
+    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? !!item[f.key] : false,
+  )
+  const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
+
+  return (
+    <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+      >
+        {/* Name + the badges/tags people scan by (tags are clickable searches). */}
+        <div className="min-w-0 flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
+          {isOpen && (
+            <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">Open</span>
+          )}
+          {signalBadges.map((f) => (
+            <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">
+              {f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)}
+            </span>
+          ))}
+          {tags.map((t) => (
+            <button
+              key={t}
+              onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+              title={`Find places with ${t}`}
+              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
+            >
+              {t}
+            </button>
+          ))}
+          </div>
+          {item.googleDescription && (
+            <p className="text-xs text-slate-500 leading-snug">{item.googleDescription as string}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
+          {travel && <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{travel}</span>}
+          <svg
+            className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50">
+          {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
+            <div className="flex flex-wrap gap-1.5">
+              {detailBadges.map((f) => {
+                const v = item[f.key]
+                if (f.type === 'boolean' ? !v : !display(v)) return null
+                const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
+                return (
+                  <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">{text}</span>
+                )
+              })}
+            </div>
+          )}
+
+          {item.address && (
+            <div>
+              <p className="text-sm text-slate-800">{item.address}</p>
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(item.address)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
+              >
+                Get directions →
+              </a>
+            </div>
+          )}
+
+          {item.phone && (
+            <a href={`tel:${item.phone.replace(/\D/g, '')}`} className="block text-sm text-primary hover:underline">
+              {item.phone}
+            </a>
+          )}
+
+          {rowFields.map((f) => {
+            const v = display(item[f.key])
+            if (!v) return null
             return (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-lg shadow-sm px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-slate-900 text-sm">{item.name}</p>
-                      {badgeFields.map((f) => {
-                        const v = item[f.key]
-                        if (f.type === 'boolean' ? !v : !display(v)) return null
-                        const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
-                        return (
-                          <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">
-                            {text}
-                          </span>
-                        )
-                      })}
-                      {/* Green Open badge — only when the place is currently open */}
-                      {openStatus === true && isStructuredHours(hoursVal) && (
-                        <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
-                          Open
-                        </span>
-                      )}
-                    </div>
-                    {item.address && <p className="text-xs text-muted mt-0.5">{item.address}</p>}
-                    {item.phone && (
-                      <a href={`tel:${item.phone.replace(/\D/g, '')}`} className="text-xs text-primary hover:underline">
-                        {item.phone}
-                      </a>
-                    )}
-                    {rowFields.map((f) => {
-                      const v = display(item[f.key])
-                      if (!v) return null
-                      return (
-                        <p key={f.key} className="text-xs text-slate-600 mt-1">
-                          {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
-                          {v}
-                        </p>
-                      )
-                    })}
-                    {/* Hours — today's line by default, expandable to the full week.
-                        Legacy text strings render as-is. Also shows a Google
-                        "closed" badge + sync-freshness note for synced listings. */}
-                    {(hoursVal !== undefined || item.businessStatus) && (
-                      <HoursDisplay
-                        value={hoursVal}
-                        businessStatus={item.businessStatus}
-                        syncedAt={item.googleSyncedAt}
-                      />
-                    )}
-                    {/* Tag badges (clickable → search that item) */}
-                    {tagFields.flatMap((f) => asTags(item[f.key])).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {tagFields.flatMap((f) => asTags(item[f.key])).map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setSearch(t)}
-                            title={`Find places with ${t}`}
-                            className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {upvotes && (
-                      <UpvoteButton
-                        resourceId={item.id}
-                        count={item.upvotes ?? 0}
-                        onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-                      />
-                    )}
-                    {travelLabel(item) && (
-                      <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{travelLabel(item)}</span>
-                    )}
-                    {item.address && (
-                      <a
-                        href={`https://maps.google.com/?q=${encodeURIComponent(item.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                      >
-                        Directions
-                      </a>
-                    )}
-                    {urlFields.map((f) => {
-                      const href = display(item[f.key])
-                      if (!href) return null
-                      return (
-                        <a
-                          key={f.key}
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                        >
-                          {f.linkLabel ?? f.label}
-                        </a>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-2 pt-2 border-t border-slate-100">
-                  <button onClick={() => onEdit(item)} className="text-xs text-muted hover:text-primary transition-colors cursor-pointer">
-                    ✏️ Edit
-                  </button>
-                  <button onClick={() => onReport(item)} className="text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
-                    🗑️ Report
-                  </button>
-                </div>
-              </div>
+              <p key={f.key} className="text-sm text-slate-700">
+                {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
+                {v}
+              </p>
             )
           })}
+
+          {(hoursVal !== undefined || item.businessStatus) && (
+            <HoursDisplay value={hoursVal} businessStatus={item.businessStatus} syncedAt={item.googleSyncedAt} />
+          )}
+
+          {urlFields.map((f) => {
+            const href = display(item[f.key])
+            if (!href) return null
+            return (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            )
+          })}
+
+          <div className="flex gap-3 pt-2 border-t border-slate-200">
+            <button onClick={onEdit} className="text-xs text-muted hover:text-primary transition-colors cursor-pointer">✏️ Edit</button>
+            <button onClick={onReport} className="text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">🗑️ Report</button>
+          </div>
         </div>
       )}
     </div>

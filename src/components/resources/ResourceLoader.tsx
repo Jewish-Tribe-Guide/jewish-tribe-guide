@@ -172,6 +172,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, onUp, o
   }
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
   )
 }

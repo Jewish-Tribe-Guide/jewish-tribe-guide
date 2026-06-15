@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { CategorySubmissionPayload } from '@/types'
-import AddressInput from '@/components/intake/AddressInput'
+import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import UpButton from '@/components/UpButton'
 
 type Props = {
@@ -31,6 +31,13 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
+
+  // Picking a business from the address autocomplete fills in its name + phone,
+  // the same way the regular "add a listing" form does.
+  function handlePlaceSelect(result: PlaceSelectResult) {
+    if (result.name) setName(result.name)
+    if (result.phone) setPhone(result.phone)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -118,13 +125,20 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
           <p className="text-sm font-semibold text-slate-700 mb-3">First listing in this category</p>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Dr. Cohen, DDS" />
+              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+              <AddressInput
+                value={address}
+                onChange={setAddress}
+                onCoords={setCoords}
+                onPlaceSelect={handlePlaceSelect}
+                includedPrimaryTypes={['establishment']}
+                placeholder="Search by business name or address…"
+              />
+              <p className="text-xs text-muted mt-1">Find the place to auto-fill its name and phone. Distance is calculated from the address.</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
-              <AddressInput value={address} onChange={setAddress} onCoords={setCoords} placeholder="Start typing an address…" />
-              <p className="text-xs text-muted mt-1">Distance from each hospital is calculated from the address.</p>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Dr. Cohen, DDS" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
