@@ -108,7 +108,10 @@ export default function UpvoteButton({
         aria-pressed={voted}
         title={title}
         className={[
-          'inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
+          // Negative margin + padding grows the tap area to ~32px for touch
+          // without shifting the surrounding header layout. Mobile only — desktop
+          // keeps the original compact hit area (sm:m-0 sm:p-0).
+          'inline-flex items-center gap-1 -m-2 p-2 sm:m-0 sm:p-0 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
           voted ? 'text-primary' : 'text-slate-500 hover:text-primary',
         ].join(' ')}
       >

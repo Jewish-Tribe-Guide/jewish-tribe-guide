@@ -83,14 +83,17 @@ export default function LocationControl({ controls }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex max-w-[220px] items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2.5 pr-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md cursor-pointer"
+        className="flex max-w-[220px] items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2.5 pr-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
       >
         <PinIcon className="h-4 w-4 shrink-0 text-primary" />
-        <span className="hidden truncate md:block">{label}</span>
+        {/* Show the "Set location" prompt on every size so first-time mobile
+            visitors discover it; once an address is set, collapse to just the
+            pin on mobile to save header space. */}
+        <span className={`truncate ${controls.address ? 'hidden md:block' : 'block'}`}>{label}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10">
           <p className="text-sm font-semibold text-slate-900">
             Where should distances be measured from?
           </p>
@@ -98,7 +101,7 @@ export default function LocationControl({ controls }: Props) {
           <button
             onClick={useCurrentLocation}
             disabled={locating}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
           >
             <PinIcon className="h-4 w-4 shrink-0" />
             {locating ? 'Locating…' : 'Use my current location'}

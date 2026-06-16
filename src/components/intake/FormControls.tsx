@@ -112,7 +112,7 @@ export function CheckboxGroup({ options, selected, onChange, columns = 1 }: Chec
     }
   }
   return (
-    <div className={columns === 2 ? 'grid grid-cols-2 gap-x-4 gap-y-2' : 'space-y-2'}>
+    <div className={columns === 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2' : 'space-y-2'}>
       {options.map((o) => (
         <label
           key={o.value}
@@ -143,7 +143,7 @@ type RadioGroupProps = {
 
 export function RadioGroup({ name, options, value, onChange, columns = 1 }: RadioGroupProps) {
   return (
-    <div className={columns === 2 ? 'grid grid-cols-2 gap-x-4 gap-y-2' : 'space-y-2'}>
+    <div className={columns === 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2' : 'space-y-2'}>
       {options.map((o) => (
         <label
           key={o.value}

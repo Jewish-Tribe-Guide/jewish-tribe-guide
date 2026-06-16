@@ -23,7 +23,7 @@ function StarOfDavid({ className }: { className?: string }) {
 
 export default function SiteHeader({ onGoHome, location }: Props) {
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80">
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)]">
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
         <button
           onClick={onGoHome}

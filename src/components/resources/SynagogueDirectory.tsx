@@ -8,6 +8,7 @@ import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import AddressPrompt from './AddressPrompt'
 import UpButton from '@/components/UpButton'
+import { ClockIcon, PlusIcon } from '@/components/icons'
 
 type Props = {
   items: DirectoryResource[]
@@ -86,7 +87,7 @@ export default function SynagogueDirectory({
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="flex items-start justify-between gap-2 mb-4">
+      <div className="flex items-end justify-between gap-2 mb-2">
         <div>
           <h2 className="text-xl font-semibold text-slate-800">Synagogues</h2>
           {anchorLabel ? (
@@ -95,49 +96,75 @@ export default function SynagogueDirectory({
             <AddressPrompt />
           ) : null}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {hasMinyanim && (
-            <button
-              onClick={() => setModalOpen(true)}
-              className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              🕐 All davening times
-            </button>
-          )}
-          <button
-            onClick={onAdd}
-            className="text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-          >
-            ➕ Add
-          </button>
-        </div>
+        <button
+          onClick={onAdd}
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <PlusIcon className="h-4 w-4" /> Add
+        </button>
       </div>
 
       {/* Controls: search + denomination filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+      <div className="mb-4 space-y-2">
         <input
           type="text"
           placeholder="Search synagogues…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        {denominations.length > 1 && (
-          <select
-            value={denomination}
-            onChange={(e) => setDenomination(e.target.value)}
-            className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-          >
-            <option value="">All Denominations</option>
-            {denominations.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+        {(denominations.length > 1 || hasMinyanim) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {denominations.length > 1 && (
+              <select
+                value={denomination}
+                onChange={(e) => setDenomination(e.target.value)}
+                className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+              >
+                <option value="">All Denominations</option>
+                {denominations.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
+            {hasMinyanim && (
+              // Sits at the right end of the toolbar (mirrors the sort control on
+              // other directories) — it's an action, not a filter.
+              <button
+                onClick={() => setModalOpen(true)}
+                className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <ClockIcon className="h-4 w-4" /> All davening times
+              </button>
+            )}
+          </div>
         )}
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-muted text-sm">No synagogues found.</p>
+        <div className="text-center py-12">
+          <p className="text-sm text-muted">
+            {search.trim() !== '' || denomination !== ''
+              ? 'No synagogues match your search.'
+              : 'No synagogues listed yet.'}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {(search.trim() !== '' || denomination !== '') && (
+              <button
+                onClick={() => { setSearch(''); setDenomination('') }}
+                className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Clear search &amp; filters
+              </button>
+            )}
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+            >
+              <PlusIcon className="h-4 w-4" /> Add synagogue
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((item) => {

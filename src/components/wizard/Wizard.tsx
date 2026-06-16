@@ -318,9 +318,12 @@ function OptionButton({
       {option.icon && <span className="text-2xl shrink-0" aria-hidden="true">{option.icon}</span>}
       <span className="text-[15px] font-medium text-slate-900">{option.label}</span>
       {showCheck && (
+        // Square (not circular) so it reads as a checkbox — these steps are
+        // multi-select ("tap all that apply"), and a round indicator looks like
+        // a single-choice radio.
         <span
           className={[
-            'ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] text-white',
+            'ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] text-white',
             active ? 'border-primary bg-primary' : 'border-slate-300',
           ].join(' ')}
           aria-hidden="true"
@@ -347,7 +350,7 @@ function Shell({
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
-      <div className="sticky top-0 bg-white/95 backdrop-blur">
+      <div className="sticky top-0 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-xl items-center gap-3 px-4 sm:px-6 py-3">
           <button
             onClick={onBack ?? undefined}
@@ -378,7 +381,7 @@ function Shell({
         </div>
       </div>
 
-      <div className="mx-auto max-w-xl px-4 sm:px-6 pb-20 pt-10 sm:pt-16">{children}</div>
+      <div className="mx-auto max-w-xl px-4 sm:px-6 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-10 sm:pt-16">{children}</div>
     </div>
   )
 }

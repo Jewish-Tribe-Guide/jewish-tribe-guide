@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import { isMinyanim, groupByTefillah } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
+import { PencilIcon, FlagIcon } from '@/components/icons'
 
 type Props = {
   item: DirectoryResource
@@ -211,11 +212,11 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
 
           {/* Footer: edit / report */}
           <div className="flex gap-3 pt-2 border-t border-slate-200">
-            <button onClick={onEdit} className="text-xs text-muted hover:text-primary transition-colors cursor-pointer">
-              ✏️ Edit
+            <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
+              <PencilIcon className="h-3.5 w-3.5" /> Edit
             </button>
-            <button onClick={onReport} className="text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
-              🗑️ Report
+            <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
+              <FlagIcon className="h-3.5 w-3.5" /> Report
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, resourceCards } from '@/components/home/sections'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
@@ -22,6 +23,7 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
   const categories = useCategories()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
+  const isMobile = useIsMobile()
 
   // Support + Volunteer lead the grid; both carry the keywords that route here.
   const entryCards: CardDef[] = [
@@ -97,7 +99,7 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter — kosher food, rides, housing, synagogues…"
+              placeholder={isMobile ? 'Filter — food, rides, housing…' : 'Filter — kosher food, rides, housing, synagogues…'}
               aria-label="Filter resources"
               className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />

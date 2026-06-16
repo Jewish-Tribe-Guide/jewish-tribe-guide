@@ -8,6 +8,8 @@ import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
 import AddressPrompt from './AddressPrompt'
 import UpButton from '@/components/UpButton'
+import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 type Props = {
   category: CategoryConfig
@@ -80,6 +82,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [openNow, setOpenNow] = useState(false)
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+  const isMobile = useIsMobile()
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
@@ -135,14 +138,36 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   const searchPlaceholder =
     tagFields.length > 0
-      ? `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
+      ? isMobile
+        ? `Search ${category.pluralLabel.toLowerCase()} or items…`
+        : `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
       : 'Search…'
+
+  // The toolbar row (filters + sort) only renders when there's something in it;
+  // a select needs ≥2 distinct values before it's worth showing.
+  const hasRenderedSelects = filterableSelects.some(
+    (f) => new Set(items.map((item) => item[f.key] as string).filter(Boolean)).size >= 2,
+  )
+  const hasFilterRow =
+    filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes
+
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    Object.values(boolFilters).some(Boolean) ||
+    Object.values(selectFilters).some((v) => v.length > 0) ||
+    openNow
+  const clearAll = () => {
+    setSearch('')
+    setBoolFilters({})
+    setSelectFilters({})
+    setOpenNow(false)
+  }
 
   return (
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="flex items-start justify-between gap-2 mb-4">
+      <div className="flex items-end justify-between gap-2 mb-2">
         <div>
           <h2 className="text-xl font-semibold text-slate-800">{category.pluralLabel}</h2>
           {anchorLabel ? (
@@ -153,21 +178,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         </div>
         <button
           onClick={onAdd}
-          className="text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
         >
-          ➕ Add
+          <PlusIcon className="h-4 w-4" /> Add
         </button>
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+      <div className="mb-4 space-y-2">
         <input
           type="text"
           placeholder={searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
+        {q && tagFields.length > 0 && (
+          <p className="text-xs text-muted">
+            Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
+            <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
+              clear
+            </button>
+          </p>
+        )}
+        {hasFilterRow && (
+        <div className="flex flex-wrap items-center gap-2">
         {filterableBooleans.map((f) => {
           const active = !!boolFilters[f.key]
           return (
@@ -235,17 +270,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <button
             onClick={() => setOpenNow((v) => !v)}
             className={[
-              'px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+              'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
               openNow
                 ? 'bg-green-600 text-white border-green-600'
                 : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
             ].join(' ')}
           >
-            🟢 Open now
+            <span className={['inline-block h-2 w-2 rounded-full', openNow ? 'bg-white' : 'bg-green-500'].join(' ')} aria-hidden="true" />
+            Open now
           </button>
         )}
         {upvotes && (
-          <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
+          // Sort control — not a filter, so push it to the right end of the row.
+          <div className="ml-auto flex rounded-md border border-slate-300 overflow-hidden shrink-0">
             {[
               { v: false, label: 'Closest' },
               { v: true, label: '▲ Popular' },
@@ -263,19 +300,34 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             ))}
           </div>
         )}
+        </div>
+        )}
       </div>
 
-      {q && tagFields.length > 0 && (
-        <p className="text-xs text-muted mb-2">
-          Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
-          <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
-            clear
-          </button>
-        </p>
-      )}
-
       {filtered.length === 0 ? (
-        <p className="text-muted text-sm">No results found.</p>
+        <div className="text-center py-12">
+          <p className="text-sm text-muted">
+            {hasActiveFilters
+              ? `No ${category.pluralLabel.toLowerCase()} match your search.`
+              : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={clearAll}
+                className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Clear search &amp; filters
+              </button>
+            )}
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+            >
+              <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((item) => (
@@ -442,17 +494,17 @@ function GenericListingCard({
         aria-expanded={expanded}
         onClick={() => setExpanded((p) => !p)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
-        className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
+        className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches). */}
         <div className="min-w-0 flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           <span className="font-semibold text-slate-900">{item.name}</span>
           {isOpen && (
             <button
               onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
               title="Filter to places open now"
-              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
+              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-100 active:bg-green-200 transition-colors cursor-pointer"
             >
               Open
             </button>
@@ -471,7 +523,7 @@ function GenericListingCard({
                   else onTagClick(text)
                 }}
                 title={`Filter by ${text}`}
-                className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
               >
                 {text}
               </button>
@@ -482,7 +534,7 @@ function GenericListingCard({
               key={t}
               onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
               title={`Find places with ${t}`}
-              className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 transition-colors cursor-pointer"
+              className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
             >
               {t}
             </button>
@@ -505,7 +557,7 @@ function GenericListingCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                className="text-xs font-medium text-primary border border-primary rounded px-2 py-1.5 sm:py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
               >
                 {f.linkLabel ?? f.label}
               </a>
@@ -585,8 +637,8 @@ function GenericListingCard({
           })}
 
           <div className="flex gap-3 pt-2 border-t border-slate-200">
-            <button onClick={onEdit} className="text-xs text-muted hover:text-primary transition-colors cursor-pointer">✏️ Edit</button>
-            <button onClick={onReport} className="text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">🗑️ Report</button>
+            <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
+            <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
           </div>
         </div>
       )}

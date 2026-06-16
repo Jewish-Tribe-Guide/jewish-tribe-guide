@@ -1,6 +1,5 @@
 import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
-import { hospitalName } from './requests'
 import { getCategoryById } from './categoryStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -100,11 +99,10 @@ function buildHtml(
     <table style="border-collapse:collapse;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
       ${row('Submitted', timestamp)}
       ${row('Request Type', requestType)}
-      ${row('Hospital', hospitalName(contact.hospitalId))}
+      ${row('Hospital / room', contact.hospitalId)}
       ${row('Name', contact.fullName)}
       ${row('Phone', contact.phone)}
       ${row('Email', contact.email)}
-      ${row('Unit / Room', contact.unitFloorRoom)}
       ${row('Status', 'New')}
     </table>
     <h3 style="color:#334155;margin-bottom:6px;">Request Details</h3>
@@ -185,7 +183,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus'])
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload

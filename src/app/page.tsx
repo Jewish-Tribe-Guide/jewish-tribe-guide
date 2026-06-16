@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { AppMode, DirectoryAnchor, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
 import SiteHeader from '@/components/SiteHeader'
+import SiteFooter from '@/components/SiteFooter'
 import FindResources from '@/components/FindResources'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
@@ -93,7 +94,10 @@ export default function Page() {
     return (
       <>
         <SiteHeader onGoHome={goToLanding} location={locationControls} />
-        <Landing onNavigate={navigate} onOpenFlow={openFlow} />
+        <div className="flex-1">
+          <Landing onNavigate={navigate} onOpenFlow={openFlow} />
+        </div>
+        <SiteFooter />
         {overlay}
       </>
     )
@@ -110,9 +114,10 @@ export default function Page() {
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} />}
       </main>
+      <SiteFooter />
       {overlay}
     </>
   )

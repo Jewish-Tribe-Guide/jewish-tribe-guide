@@ -20,7 +20,7 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
   if (card.dashed) {
     return (
       <button onClick={card.go} className="group w-full cursor-pointer">
-        <div className="aspect-[4/3] rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 flex flex-col items-center justify-center gap-1.5 p-4 text-center transition-all duration-200 group-hover:border-primary group-hover:bg-primary/10">
+        <div className="aspect-[4/3] rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 flex flex-col items-center justify-center gap-1.5 p-4 text-center transition-all duration-200 group-hover:border-primary group-hover:bg-primary/10 group-active:border-primary group-active:bg-primary/10">
           <span className="text-2xl leading-none text-primary" aria-hidden="true">＋</span>
           <span className="text-[15px] font-semibold leading-snug text-primary">{card.title}</span>
         </div>
@@ -30,9 +30,9 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
   return (
     <button onClick={card.go} className="group w-full cursor-pointer">
       <div
-        className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex items-center justify-center p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5`}
+        className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex items-center justify-center p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
-        <span className="text-[17px] font-semibold leading-snug text-slate-900 group-hover:text-primary transition-colors">
+        <span className="text-[17px] font-semibold leading-snug text-slate-900 group-hover:text-primary group-active:text-primary transition-colors">
           {card.title}
         </span>
       </div>
@@ -163,7 +163,7 @@ export function PlacesResults({
           <button
             key={hit.item.id}
             onClick={() => onOpen(hit)}
-            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary cursor-pointer"
+            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary active:border-primary active:bg-slate-50 cursor-pointer"
           >
             <span className="min-w-0">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
