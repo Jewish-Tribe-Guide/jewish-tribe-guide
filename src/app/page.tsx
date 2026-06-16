@@ -14,7 +14,11 @@ import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 export type Flow = { kind: 'support' | 'volunteer'; preselect?: string[] }
 
 // What we persist in the browser history stack so back/forward can restore state.
-type NavState = { mode: AppMode; flow?: Flow }
+// `flowStep` is the wizard's current step index — each step is its own history
+// entry, so browser Back/forward (and the swipe gesture) move between steps
+// instead of discarding the whole form. The Wizard maintains it; page.tsx only
+// reads it (to know how far to unwind on a full close).
+type NavState = { mode: AppMode; flow?: Flow; flowStep?: number }
 
 export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
@@ -67,13 +71,23 @@ export default function Page() {
     history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
-  // Open a guided form over the current page. Pushes a history entry so the
-  // browser Back button (and the wizard's ✕, which calls history.back()) closes
-  // it and lands exactly where the visitor was.
+  // Open a guided form over the current page. Pushes the base flow entry
+  // (flowStep 0); the Wizard pushes one more entry per step it advances, so the
+  // browser Back button walks back through the steps and only closes the form
+  // once the visitor backs out of step 0.
   function openFlow(kind: Flow['kind'], preselect?: string[]) {
     const f: Flow = { kind, preselect }
     setFlow(f)
-    history.pushState({ ...(window.history.state ?? {}), flow: f }, '')
+    history.pushState({ ...(window.history.state ?? {}), flow: f, flowStep: 0 }, '')
+  }
+
+  // Fully close the wizard from any step (its ✕ / Esc / success "Done"). Each
+  // step is a history entry, so we pop the current step plus every entry down to
+  // and including the base flow entry — landing exactly on the page the visitor
+  // opened the form from, where popstate sees no `flow` and unmounts the overlay.
+  function closeFlow() {
+    const step = (window.history.state as NavState | null)?.flowStep ?? 0
+    history.go(-(step + 1))
   }
 
   // Title click — always a way back to the landing page.
@@ -83,9 +97,9 @@ export default function Page() {
 
   const overlay = flow && (
     flow.kind === 'support' ? (
-      <SupportWizard preselect={flow.preselect} onClose={() => history.back()} />
+      <SupportWizard preselect={flow.preselect} onClose={closeFlow} />
     ) : (
-      <VolunteerWizard preselect={flow.preselect} onClose={() => history.back()} />
+      <VolunteerWizard preselect={flow.preselect} onClose={closeFlow} />
     )
   )
 

@@ -18,7 +18,10 @@ export const FALLBACK_CATEGORIES: CategoryConfig[] = [
   { id: 'grocery', label: 'Grocery Store', pluralLabel: 'Grocery Stores', icon: '🛒', description: 'Kosher and local grocery stores near the hospital', detailFields: [] },
   { id: 'hotel', label: 'Hotel', pluralLabel: 'Hotels', icon: '🏨', description: 'Lodging with shuttle and Shabbat-friendly options', detailFields: [] },
   { id: 'mikvah', label: 'Mikvah', pluralLabel: 'Mikvah', icon: '💧', description: 'Mikvah locations, hours, and contact information', detailFields: [] },
-  { id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups', icon: '💬', description: 'Community WhatsApp groups to join', detailFields: [] },
+  { id: 'whatsapp', label: 'WhatsApp Group', pluralLabel: 'WhatsApp Groups', icon: '💬', description: 'Community WhatsApp groups to join', detailFields: [
+    { key: 'description', label: 'Description', type: 'textarea', renderAs: 'row', hideLabel: true },
+    { key: 'link', label: 'Join group', type: 'url', linkLabel: 'Join group', renderAs: 'row', showInHeader: true },
+  ] },
 ]
 
 // Module-level cache — the landing page, audience pages, search bar, and the

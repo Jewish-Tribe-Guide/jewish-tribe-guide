@@ -69,7 +69,7 @@ const categories = [
     sort_order: 30,
     fields: [
       { key: 'shabbatFriendly', label: 'Shabbat friendly', type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: 'Shabbat friendly' },
-      { key: 'shuttleAvailable', label: 'Shuttle available', type: 'boolean', renderAs: 'badge' },
+      { key: 'shuttleAvailable', label: 'Shuttle available', type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: 'Shuttle available' },
       { key: 'notes', label: 'Notes', type: 'textarea', renderAs: 'row', placeholder: 'Anything else worth knowing' },
     ],
   },
@@ -88,6 +88,18 @@ const categories = [
       { key: 'womenTevillah', label: "Women's Tevillah", type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: "Women's" },
       { key: 'menTevillah', label: "Men's Tevillah", type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: "Men's" },
       { key: 'keilim', label: 'Keilim', type: 'boolean', renderAs: 'badge', filterable: true, filterLabel: 'Keilim' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp Group',
+    plural_label: 'WhatsApp Groups',
+    icon: '💬',
+    description: 'Community WhatsApp groups to join',
+    sort_order: 50,
+    fields: [
+      { key: 'description', label: 'Description', type: 'textarea', renderAs: 'row', hideLabel: true, placeholder: 'What is this group about?' },
+      { key: 'link', label: 'Join group', type: 'url', linkLabel: 'Join group', renderAs: 'row', showInHeader: true },
     ],
   },
 ]

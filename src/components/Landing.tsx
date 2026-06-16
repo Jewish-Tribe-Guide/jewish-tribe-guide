@@ -25,12 +25,12 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
   const [query, setQuery] = useState('')
   const isMobile = useIsMobile()
 
-  // Support + Volunteer lead the grid; both carry the keywords that route here.
   const entryCards: CardDef[] = [
     {
-      title: 'Support',
+      title: 'Request Support',
       keywords: [
-        'support', 'help', 'assistance', 'meal', 'meals', 'food', 'kosher food', 'dinner', 'lunch',
+        'support', 'help', 'assistance', 'request', 'patient', 'need help',
+        'meal', 'meals', 'food', 'kosher food', 'dinner', 'lunch',
         'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
         'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay', 'room',
         'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
@@ -50,12 +50,13 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
   ]
 
   const resources = resourceCards(onNavigate, categories, { includeHospital: true })
-  const sortedResources = resources && [...resources].sort((a, b) => a.title.localeCompare(b.title))
-  const allCards = [...entryCards, ...(sortedResources ?? [])]
+  const allCards = resources
+    ? [...entryCards, ...resources].sort((a, b) => a.title.localeCompare(b.title))
+    : null
 
   const q = query.trim()
-  const loading = !q && sortedResources === null
-  const filtered = q ? allCards.filter((c) => cardMatches(c, q)) : allCards
+  const loading = !q && allCards === null
+  const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q)) : allCards
 
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
@@ -75,9 +76,9 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
     dashed: true,
     go: () => onNavigate('patient', 'find', { findView: ADD_CATEGORY }),
   }
-  // While categories load, show the entry cards + skeletons (suggest card waits
-  // until the real cards are in). Otherwise show the filtered grid + suggest card.
-  const gridCards = loading ? entryCards : [...filtered, suggestCard]
+  // While categories load, show entry cards + skeletons (suggest card waits until
+  // the real cards are in). Otherwise show the filtered grid + suggest card.
+  const gridCards = loading ? entryCards : [...(filtered ?? []), suggestCard]
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
@@ -118,7 +119,7 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
 
       {/* ── The grid ─────────────────────────────────────────────────────────── */}
       <section className="mt-12 sm:mt-14">
-        {q && filtered.length === 0 && placeHits.length === 0 && (
+        {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
           <p className="mb-5 text-center text-sm text-slate-500">
             Nothing matches “{q}”. Try a different word, clear the filter, or suggest it below.
           </p>

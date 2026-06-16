@@ -48,6 +48,38 @@ type Props = {
 const asArray = (v: string | string[] | undefined): string[] =>
   Array.isArray(v) ? v : v ? [v] : []
 
+// Returns an error message if the step isn't satisfied by the given answers, or
+// null if it is. Pure (no component state) so it can gate both Continue and the
+// reachability clamp below.
+function validateStep(s: Step, a: Answers): string | null {
+  if (s.kind === 'contact') {
+    const phone = ((a.phone as string) ?? '').trim()
+    const email = ((a.email as string) ?? '').trim()
+    if (!phone && !email) return 'Enter a phone number or email so we can reach you.'
+    if (phone && !isValidPhone(phone)) return 'Please enter a valid phone number.'
+    return null
+  }
+  if (s.optional) return null
+  const value = a[s.id]
+  const empty = Array.isArray(value) ? value.length === 0 : !value?.toString().trim()
+  if (empty) return 'Please answer to continue.'
+  if (s.kind === 'tel' && typeof value === 'string' && !isValidPhone(value))
+    return 'Please enter a valid phone number.'
+  return null
+}
+
+// The furthest step the answers justify being on: you may sit on the first step
+// whose requirements aren't met yet, but never past it. Clamping the rendered
+// step to this closes the history loophole — backing out of the form and then
+// hitting browser Forward (or reloading mid-form) remounts an empty wizard, and
+// without this you'd land on a deep step you never filled in.
+function maxReachableIdx(steps: Step[], a: Answers): number {
+  for (let i = 0; i < steps.length; i++) {
+    if (validateStep(steps[i], a) !== null) return i
+  }
+  return steps.length - 1
+}
+
 export default function Wizard({
   steps,
   initial = {},
@@ -66,7 +98,8 @@ export default function Wizard({
 
   // Steps visible given the current answers — branching recomputes this live.
   const visible = useMemo(() => steps.filter((s) => !s.when || s.when(answers)), [steps, answers])
-  const clampedIdx = Math.min(idx, visible.length - 1)
+  // Render the step from history, but never further than the answers justify.
+  const clampedIdx = Math.min(idx, maxReachableIdx(visible, answers))
   const step = visible[clampedIdx]
   const isLast = clampedIdx === visible.length - 1
 
@@ -79,28 +112,37 @@ export default function Wizard({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Each step is its own history entry (pushed in goToStep), so browser/trackpad
+  // Back and forward move between steps. Drive `idx` from the entry we land on;
+  // backing out past step 0 lands on an entry with no flowStep, where the parent
+  // unmounts us — so we only act when a step index is present.
+  useEffect(() => {
+    function onPop(e: PopStateEvent) {
+      const s = e.state as { flowStep?: number } | null
+      if (s && typeof s.flowStep === 'number') {
+        setIdx(s.flowStep)
+        setError(null)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
   const setAnswer = (id: string, value: string | string[]) =>
     setAnswers((prev) => ({ ...prev, [id]: value }))
 
-  const validate = (s: Step): string | null => {
-    if (s.kind === 'contact') {
-      const phone = ((answers.phone as string) ?? '').trim()
-      const email = ((answers.email as string) ?? '').trim()
-      if (!phone && !email) return 'Enter a phone number or email so we can reach you.'
-      if (phone && !isValidPhone(phone)) return 'Please enter a valid phone number.'
-      return null
-    }
-    if (s.optional) return null
-    const value = answers[s.id]
-    const empty = Array.isArray(value) ? value.length === 0 : !value?.toString().trim()
-    if (empty) return 'Please answer to continue.'
-    if (s.kind === 'tel' && typeof value === 'string' && !isValidPhone(value))
-      return 'Please enter a valid phone number.'
-    return null
+  // Advance/jump to a step, recording it as a history entry so Back returns here.
+  // No-ops when already on the target step (avoids duplicate entries, e.g. a
+  // single-select on the final step that has nowhere further to go).
+  const goToStep = (next: number) => {
+    if (next === clampedIdx) return
+    setError(null)
+    setIdx(next)
+    history.pushState({ ...(window.history.state ?? {}), flowStep: next }, '')
   }
 
   const goNext = async () => {
-    const err = validate(step)
+    const err = validateStep(step, answers)
     if (err) { setError(err); return }
     setError(null)
     if (isLast) {
@@ -115,19 +157,20 @@ export default function Wizard({
       }
       return
     }
-    setIdx(clampedIdx + 1)
+    goToStep(clampedIdx + 1)
   }
 
-  const goBack = () => { setError(null); setIdx(Math.max(0, clampedIdx - 1)) }
+  // Back a step via the history stack so the in-form Back button and the
+  // browser/trackpad Back gesture behave identically (both fire popstate).
+  const goBack = () => { setError(null); history.back() }
 
   // Single-select: record the choice, briefly show it highlighted, then advance.
   const pickSingle = (value: string) => {
     setAnswer(step.id, value)
     setError(null)
     if (advanceTimer.current) clearTimeout(advanceTimer.current)
-    advanceTimer.current = setTimeout(() => {
-      setIdx((i) => Math.min(i + 1, visible.length - 1))
-    }, 180)
+    const next = Math.min(clampedIdx + 1, visible.length - 1)
+    advanceTimer.current = setTimeout(() => goToStep(next), 180)
   }
 
   const toggleMulti = (value: string) => {
@@ -281,7 +324,7 @@ export default function Wizard({
         )}
         {step.kind === 'single' && step.optional && (
           <button
-            onClick={() => setIdx(Math.min(clampedIdx + 1, visible.length - 1))}
+            onClick={() => goToStep(Math.min(clampedIdx + 1, visible.length - 1))}
             className="mt-7 text-[15px] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
           >
             Skip

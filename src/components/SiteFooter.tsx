@@ -25,6 +25,7 @@ export default function SiteFooter() {
             </p>
             <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-muted sm:ml-auto">
               Use the <span className="font-medium text-slate-600">Suggest</span>,{' '}
+              <span className="font-medium text-slate-600">Add</span>,{' '}
               <span className="font-medium text-slate-600">Edit</span>, or{' '}
               <span className="font-medium text-slate-600">Report</span> links on
               any listing — updates go straight to our reviewers.
