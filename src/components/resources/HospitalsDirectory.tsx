@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { hospitals } from '@/data/hospitals'
+import { hospitalInfo } from '@/data/hospitalInfo'
 import type { DirectoryAnchor } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import UpButton from '@/components/UpButton'
@@ -14,8 +15,22 @@ type Props = {
   onUp: () => void
 }
 
+// A short list of what a hospital offers, derived from its data — so each card
+// previews what's inside instead of being a bare name + chevron.
+function features(id: string): string[] {
+  const info = hospitalInfo[id]
+  if (!info) return []
+  const f: string[] = []
+  if (info.jewishChaplain) f.push('Chaplain')
+  if (info.bikurCholim) f.push('Bikkur Cholim')
+  if (info.prayerSpace) f.push('Prayer space')
+  if (info.shabbatAccommodations) f.push('Kosher & Shabbos')
+  return f
+}
+
 // Lists every hospital, sorted by distance from the visitor's address (when set),
-// with a search box. Tapping one opens its About Your Hospital page.
+// with a search box. Tapping one opens its Jewish-resources page. Framed as a
+// question so it reads as a clear first step, not a database listing.
 export default function HospitalsDirectory({ anchor, onSelect, onUp }: Props) {
   const [search, setSearch] = useState('')
   const coords = anchor.kind === 'address' ? anchor.coords : null
@@ -31,21 +46,23 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp }: Props) {
   const q = search.trim().toLowerCase()
   const filtered = withDistance
     .filter((h) => !q || h.name.toLowerCase().includes(q))
-    .sort((a, b) =>
-      a.miles != null && b.miles != null ? a.miles - b.miles : 0,
-    )
+    .sort((a, b) => (a.miles != null && b.miles != null ? a.miles - b.miles : 0))
 
   return (
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-slate-800">Jewish Medical Resources</h2>
+      <div className="mb-5">
+        <h2 className="text-xl font-semibold text-slate-800">Which hospital?</h2>
         <p className="text-sm text-muted mt-1">
-          Pick a hospital to see its Jewish chaplain, bikkur cholim, kosher and Shabbos
-          accommodations, and prayer spaces.
+          Pick where you are (or will be) to find its Jewish chaplain, bikkur cholim, prayer
+          spaces, and kosher &amp; Shabbos support.
         </p>
-        {!coords && <AddressPrompt />}
+        {!coords && (
+          <div className="mt-3">
+            <AddressPrompt />
+          </div>
+        )}
       </div>
 
       {/* Search — only when the list is long enough to need it. */}
@@ -68,26 +85,60 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp }: Props) {
       {filtered.length === 0 ? (
         <p className="text-muted text-sm">No hospitals match &ldquo;{search.trim()}&rdquo;.</p>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((h) => (
-            <button
-              key={h.id}
-              onClick={() => onSelect(h.id)}
-              className="w-full text-left bg-white border border-slate-200 rounded-lg shadow-sm px-4 py-3 flex items-center justify-between gap-3 hover:border-primary transition-colors cursor-pointer"
-            >
-              <span className="font-semibold text-slate-900 text-sm min-w-0">{h.name}</span>
-              <span className="flex items-center gap-2 shrink-0">
-                {h.miles != null && (
-                  <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {h.miles} mi</span>
-                )}
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-            </button>
-          ))}
+        <div className="space-y-3">
+          {filtered.map((h, i) => {
+            // The closest hospital, only when distances are known and it's a real winner.
+            const isNearest = i === 0 && h.miles != null && (filtered[1]?.miles == null || filtered[1].miles > h.miles)
+            return (
+              <button
+                key={h.id}
+                onClick={() => onSelect(h.id)}
+                className="group w-full text-left bg-white border border-slate-200 rounded-2xl shadow-sm px-4 py-4 flex items-start gap-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+              >
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <BuildingIcon className="h-6 w-6" />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-semibold text-slate-900 text-[15px] leading-tight">{h.name}</span>
+                    {isNearest && (
+                      <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold">
+                        Nearest you
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {features(h.id).map((f) => (
+                      <span key={f} className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px] font-medium">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
+                  {h.miles != null && (
+                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {h.miles} mi</span>
+                  )}
+                  <svg className="w-5 h-5 text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+function BuildingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V5a1 1 0 011-1h12a1 1 0 011 1v16" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 8h1m-1 4h1m4-4h1m-1 4h1M10 21v-3a1 1 0 011-1h2a1 1 0 011 1v3" />
+    </svg>
   )
 }
