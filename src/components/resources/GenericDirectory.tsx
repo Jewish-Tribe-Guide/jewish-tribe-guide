@@ -193,12 +193,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <h2 className="text-xl font-semibold text-slate-800">{category.pluralLabel}</h2>
           {anchorLabel ? (
             <p className="text-sm text-muted mt-0.5">
-              {anchorLabel}
-              <span className="before:content-['·'] before:mx-1.5">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
+              {anchorLabel}<span aria-hidden="true" className="hidden sm:inline mx-1.5">·</span><span className="hidden sm:inline">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
             </p>
           ) : addressPrompt ? (
-            <AddressPrompt />
-          ) : null}
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <AddressPrompt />
+              <span className="hidden sm:inline text-sm text-muted"><span aria-hidden="true" className="mr-1">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</span>
+            </div>
+          ) : (
+            <p className="hidden sm:block text-sm text-muted mt-0.5"><span aria-hidden="true" className="mr-1.5">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {onViewMap && !category.community && (
@@ -672,13 +676,17 @@ export function GenericListingCard({
             </button>
           ))}
           {headerTagsSometimes.map((t) => (
-            <button
-              key={`sometimes:${t}`}
-              onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-              className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
-            >
-              ~{t}
-            </button>
+            <span key={`sometimes:${t}`} className="relative group/tip">
+              <button
+                onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+                className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
+              >
+                ~{t}
+              </button>
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                not always in stock
+              </span>
+            </span>
           ))}
           {hiddenTagCount > 0 && (
             <button
@@ -750,18 +758,22 @@ export function GenericListingCard({
                 </button>
               ))}
               {tagsSometimes.map((t) => (
-                <button
-                  key={`sometimes:${t}`}
-                  onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-                  className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
-                >
-                  ~{t}
-                </button>
+                <span key={`sometimes:${t}`} className="relative group/tip">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+                    className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
+                  >
+                    ~{t}
+                  </button>
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                    not always in stock
+                  </span>
+                </span>
               ))}
             </div>
           )}
           {tagsSometimes.length > 0 && (
-            <p className="text-[11px] text-muted">~ = not always in stock — call ahead</p>
+            <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
           )}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">

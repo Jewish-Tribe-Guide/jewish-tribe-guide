@@ -130,7 +130,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals') {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'about-hospital') {
     // The hospital chosen from the list; its name (not the address) is the subtitle.

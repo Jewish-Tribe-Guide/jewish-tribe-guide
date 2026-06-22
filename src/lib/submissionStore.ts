@@ -170,6 +170,39 @@ async function insertSubmission(row: {
   return data as SubmissionRow
 }
 
+// Creates a pending deletion submission triggered by the Google sync job when
+// it detects businessStatus=CLOSED_PERMANENTLY. Returns the new submission, or
+// null if a pending deletion already exists for this listing (idempotent across
+// repeated weekly syncs).
+export async function submitGoogleClosure(targetId: string): Promise<SubmissionRow | null> {
+  const supabase = getAdminClient()
+
+  // Idempotency guard — skip if there is already a pending delete for this row.
+  const { data: existing } = await supabase
+    .from('submission')
+    .select('id')
+    .eq('target_id', targetId)
+    .eq('operation', 'delete')
+    .eq('status', 'pending')
+    .maybeSingle()
+  if (existing) return null
+
+  const { data: resource } = await supabase
+    .from('resource')
+    .select('name, category')
+    .eq('id', targetId)
+    .single()
+
+  return insertSubmission({
+    operation: 'delete',
+    target_type: 'listing',
+    target_id: targetId,
+    payload: resource ? { name: resource.name, category: resource.category } : {},
+    note: 'Google Places reports this business as permanently closed.',
+    submitted_by: { name: 'Google Places (automated)' },
+  })
+}
+
 // ── Moderation (admin) ───────────────────────────────────────────────────────
 
 // Approves a submission and APPLIES its change to the live tables, then marks it

@@ -13,6 +13,8 @@ type Props = {
   /** Open the About Your Hospital page for the chosen hospital. */
   onSelect: (hospitalId: string) => void
   onUp: () => void
+  /** Open the map view (all resources, no category filter). */
+  onViewMap?: () => void
 }
 
 // A short list of what a hospital offers, derived from its data — so each card
@@ -31,9 +33,10 @@ function features(id: string): string[] {
 // Lists every hospital, sorted by distance from the visitor's address (when set),
 // with a search box. Tapping one opens its Jewish-resources page. Framed as a
 // question so it reads as a clear first step, not a database listing.
-export default function HospitalsDirectory({ anchor, onSelect, onUp }: Props) {
+export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }: Props) {
   const [search, setSearch] = useState('')
   const coords = anchor.kind === 'address' ? anchor.coords : null
+  const label = anchor.kind === 'address' ? anchor.label : null
 
   const withDistance = hospitals.map((h) => ({
     ...h,
@@ -54,15 +57,27 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp }: Props) {
 
       <div className="mb-5">
         <h2 className="text-xl font-semibold text-slate-800">Which hospital?</h2>
-        <p className="text-sm text-muted mt-1">
-          Pick where you are (or will be) to find its Jewish chaplain, bikkur cholim, prayer
-          spaces, and kosher &amp; Shabbos support.
-        </p>
-        {!coords && (
-          <div className="mt-3">
+        {coords && label ? (
+          <p className="text-sm text-muted mt-1">{label}</p>
+        ) : (
+          <div className="mt-1.5">
             <AddressPrompt />
           </div>
         )}
+        <div className="flex items-center justify-between gap-4 mt-3">
+          <p className="text-sm text-muted">
+            Pick where you are (or will be) to find its Jewish chaplain, bikkur cholim, prayer
+            spaces, and kosher &amp; Shabbos support.
+          </p>
+          {onViewMap && (
+            <button
+              onClick={onViewMap}
+              className="shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              🗺️ Map
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search — only when the list is long enough to need it. */}

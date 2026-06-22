@@ -98,12 +98,16 @@ export default function SynagogueDirectory({
           <h2 className="text-xl font-semibold text-slate-800">Synagogues</h2>
           {anchorLabel ? (
             <p className="text-sm text-muted mt-0.5">
-              {anchorLabel}
-              <span className="before:content-['·'] before:mx-1.5">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
+              {anchorLabel}<span aria-hidden="true" className="hidden sm:inline mx-1.5">·</span><span className="hidden sm:inline">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
             </p>
           ) : addressPrompt ? (
-            <AddressPrompt />
-          ) : null}
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <AddressPrompt />
+              <span className="hidden sm:inline text-sm text-muted"><span aria-hidden="true" className="mr-1">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</span>
+            </div>
+          ) : (
+            <p className="hidden sm:block text-sm text-muted mt-0.5"><span aria-hidden="true" className="mr-1.5">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {onViewMap && (

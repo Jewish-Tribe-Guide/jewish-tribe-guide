@@ -21,6 +21,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync } from '@/lib/googlePlaces'
+import { submitGoogleClosure } from '@/lib/submissionStore'
+import { sendSubmissionNotification } from '@/lib/email'
 
 // Does network + DB work; never prerender or cache it.
 export const dynamic = 'force-dynamic'
@@ -54,6 +56,7 @@ async function runSync(): Promise<NextResponse> {
   const rows = (data ?? []) as SyncedRow[]
   let synced = 0
   let failed = 0
+  let flaggedClosed = 0
 
   for (const row of rows) {
     const placeId = String(row.details.placeId)
@@ -78,9 +81,23 @@ async function runSync(): Promise<NextResponse> {
 
     await supabase.from('resource').update(update).eq('id', row.id)
     synced++
+
+    // Route permanent closures through the moderation queue so an admin can
+    // review and approve before the listing is removed from the public directory.
+    if (sync.businessStatus === 'CLOSED_PERMANENTLY') {
+      try {
+        const submission = await submitGoogleClosure(row.id)
+        if (submission) {
+          flaggedClosed++
+          await sendSubmissionNotification(submission).catch(() => {})
+        }
+      } catch (err) {
+        console.error(`[sync-hours] submitGoogleClosure failed for ${row.id}:`, err)
+      }
+    }
   }
 
-  return NextResponse.json({ ok: true, total: rows.length, synced, failed })
+  return NextResponse.json({ ok: true, total: rows.length, synced, failed, flaggedClosed })
 }
 
 export async function GET(req: NextRequest) {

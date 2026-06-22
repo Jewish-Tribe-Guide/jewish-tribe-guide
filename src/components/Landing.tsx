@@ -100,7 +100,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
           A guide to Jewish Philadelphia — kosher food, synagogues, rides, housing,
-          and community support for patients, visitors, and neighbors.
+          and community support for residents, visitors, and patients.
         </p>
         <div className="mt-8 max-w-xl mx-auto">
           <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
