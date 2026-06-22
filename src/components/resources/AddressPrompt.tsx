@@ -14,7 +14,7 @@ export default function AddressPrompt() {
       className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 hover:border-amber-300 active:bg-amber-200 transition-colors cursor-pointer"
     >
       <span aria-hidden="true">📍</span>
-      Set your location to see how far each one is from you.
+      Set location to see distances
     </button>
   )
 }

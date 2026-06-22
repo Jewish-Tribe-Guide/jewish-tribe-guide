@@ -6,6 +6,7 @@ import Landing from '@/components/Landing'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import FindResources from '@/components/FindResources'
+import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 
@@ -18,14 +19,15 @@ export type Flow = { kind: 'support' | 'volunteer'; preselect?: string[] }
 // entry, so browser Back/forward (and the swipe gesture) move between steps
 // instead of discarding the whole form. The Wizard maintains it; page.tsx only
 // reads it (to know how far to unwind on a full close).
-type NavState = { mode: AppMode; flow?: Flow; flowStep?: number }
+type NavState = { mode: AppMode; flow?: Flow; flowStep?: number; mapCategory?: string }
 
 export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
   const [address, setAddress] = useState('')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  // The guided Support/Volunteer form, shown as an overlay over the CURRENT page.
   const [flow, setFlow] = useState<Flow | null>(null)
+  // Which category to pre-select when opening the map from a category directory.
+  const [mapCategory, setMapCategory] = useState<string | null>(null)
 
   // The address anchor, editable from the header's location pill on every screen
   // — it drives all proximity sorting in the directory.
@@ -44,6 +46,7 @@ export default function Page() {
       const s = e.state as NavState | null
       setMode(s?.mode ?? 'home')
       setFlow(s?.flow ?? null)
+      setMapCategory(s?.mapCategory ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -59,6 +62,7 @@ export default function Page() {
     const s = window.history.state as NavState | null
     if (s?.mode && s.mode !== 'home') setMode(s.mode)
     if (s?.flow) setFlow(s.flow)
+    if (s?.mapCategory) setMapCategory(s.mapCategory)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -109,7 +113,7 @@ export default function Page() {
       <>
         <SiteHeader onGoHome={goToLanding} location={locationControls} />
         <div className="flex-1">
-          <Landing onNavigate={navigate} onOpenFlow={openFlow} />
+          <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
         </div>
         <SiteFooter />
         {overlay}
@@ -125,11 +129,30 @@ export default function Page() {
   // Up buttons lead back to the single home screen.
   const goToHome = () => navigate(null, 'home')
 
+  // Called from the Nearby list — switches to the Find screen with the chosen
+  // listing's category open and that card expanded/scrolled into view.
+  const viewListing = (categoryId: string, listingId: string) => {
+    setMode('find')
+    setMapCategory(null)
+    setFlow(null)
+    history.pushState({ mode: 'find', findView: categoryId, findItemId: listingId }, '')
+  }
+
+  // Called from a category directory's "View map" button — navigates to the map
+  // screen with that category pre-selected in the filter.
+  const viewMapForCategory = (categoryId: string) => {
+    setMode('map')
+    setMapCategory(categoryId)
+    setFlow(null)
+    history.pushState({ mode: 'map', mapCategory: categoryId } as NavState, '')
+  }
+
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
-        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} />}
+        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+        {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory ?? undefined} onViewListing={viewListing} />}
       </main>
       <SiteFooter />
       {overlay}

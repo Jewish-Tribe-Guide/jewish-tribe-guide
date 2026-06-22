@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import SynagogueCard from '@/components/SynagogueCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
+import DenominationFilter from '@/components/synagogues/DenominationFilter'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import AddressPrompt from './AddressPrompt'
@@ -23,6 +24,8 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
+  /** Navigate to the map screen pre-filtered to synagogues. */
+  onViewMap?: () => void
 }
 
 // Sort by closest first. Drive time takes priority in hospital mode; address
@@ -48,6 +51,7 @@ export default function SynagogueDirectory({
   onAdd,
   onEdit,
   onReport,
+  onViewMap,
 }: Props) {
   const [search, setSearch] = useState('')
   const [denomination, setDenomination] = useState('')
@@ -57,7 +61,9 @@ export default function SynagogueDirectory({
   const reopenRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (reopenItemId && reopenRef.current) {
-      reopenRef.current.scrollIntoView({ block: 'nearest' })
+      const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+      const top = reopenRef.current.getBoundingClientRect().top + window.scrollY - headerH
+      window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally empty — only fire on mount
@@ -91,17 +97,31 @@ export default function SynagogueDirectory({
         <div>
           <h2 className="text-xl font-semibold text-slate-800">Synagogues</h2>
           {anchorLabel ? (
-            <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>
+            <p className="text-sm text-muted mt-0.5">
+              {anchorLabel}
+              <span className="before:content-['·'] before:mx-1.5">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
+            </p>
           ) : addressPrompt ? (
             <AddressPrompt />
           ) : null}
         </div>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
-        >
-          <PlusIcon className="h-4 w-4" /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          {onViewMap && (
+            <button
+              onClick={onViewMap}
+              /* Desktop only — on mobile Map moves into the filter row below. */
+              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              🗺️ Map
+            </button>
+          )}
+          <button
+            onClick={onAdd}
+            className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <PlusIcon className="h-4 w-4" /> Add
+          </button>
+        </div>
       </div>
 
       {/* Controls: search + denomination filter */}
@@ -113,28 +133,35 @@ export default function SynagogueDirectory({
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        {(denominations.length > 1 || hasMinyanim) && (
-          <div className="flex flex-wrap items-center gap-2">
+        {(denominations.length > 1 || hasMinyanim || onViewMap) && (
+          <div className="relative z-20 flex items-center gap-1.5 sm:gap-2 flex-nowrap sm:flex-wrap pb-1 sm:pb-0">
             {denominations.length > 1 && (
-              <select
+              <DenominationFilter
                 value={denomination}
-                onChange={(e) => setDenomination(e.target.value)}
-                className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                options={denominations}
+                onChange={setDenomination}
+              />
+            )}
+            {/* Map — mobile only here (after denomination); on desktop it lives in the header. */}
+            {onViewMap && (
+              <button
+                onClick={onViewMap}
+                className="sm:hidden shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
-                <option value="">All Denominations</option>
-                {denominations.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+                🗺️ Map
+              </button>
             )}
             {hasMinyanim && (
               // Sits at the right end of the toolbar (mirrors the sort control on
-              // other directories) — it's an action, not a filter.
+              // other directories) — it's an action, not a filter. Label drops to
+              // "Davening" on mobile so Map + denomination + this all fit one line.
               <button
                 onClick={() => setModalOpen(true)}
-                className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-2.5 sm:px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
-                <ClockIcon className="h-4 w-4" /> All davening times
+                <ClockIcon className="h-4 w-4" />
+                <span className="sm:hidden">Davening</span>
+                <span className="hidden sm:inline">All davening times</span>
               </button>
             )}
           </div>
@@ -188,6 +215,7 @@ export default function SynagogueDirectory({
         items={items}
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
+        initialDenomination={denomination}
       />
     </div>
   )

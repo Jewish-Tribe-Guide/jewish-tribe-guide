@@ -14,12 +14,15 @@ type Props = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
+  /** The visitor's location (from the header pill) — lets "Places" results show
+   *  distance, exactly like the category directory does. */
+  coords: { lat: number; lng: number } | null
 }
 
 // The whole site is one screen: a filter box, then a grid of cards. Typing
 // filters the grid live against each card's hidden keywords (so "shul" surfaces
 // Synagogues), with no dropdown to click through.
-export default function Landing({ onNavigate, onOpenFlow }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const categories = useCategories()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
@@ -47,6 +50,14 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
       ],
       go: () => onOpenFlow('volunteer'),
     },
+    {
+      title: 'View Map',
+      keywords: [
+        'map', 'maps', 'view map', 'locations', 'where', 'nearby', 'directions', 'address',
+        'addresses', 'google map', 'pin', 'pins', 'navigate', 'around me',
+      ],
+      go: () => onNavigate('patient', 'map'),
+    },
   ]
 
   const resources = resourceCards(onNavigate, categories, { includeHospital: true })
@@ -60,7 +71,7 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
 
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
-  const placeHits = q && listings ? searchListings(listings, categories ?? [], q) : []
+  const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
 
   // Tapping a place opens its category directory, pre-filtered to the matched term
   // (so it survives that page's own search) with the place itself expanded.
@@ -88,8 +99,8 @@ export default function Landing({ onNavigate, onOpenFlow }: Props) {
           What are you looking for?
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
-          Kosher meals, rides, housing, visitors, and community resources for patients
-          and families at Philadelphia hospitals.
+          A guide to Jewish Philadelphia — kosher food, synagogues, rides, housing,
+          and community support for patients, visitors, and neighbors.
         </p>
         <div className="mt-8 max-w-xl mx-auto">
           <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">

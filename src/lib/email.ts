@@ -22,9 +22,26 @@ function row(label: string, value: string): string {
   </tr>`
 }
 
+function formatMinyan(m: Record<string, unknown>): string {
+  const days = Array.isArray(m.days) && m.days.length > 0 ? ` (${(m.days as string[]).join('/')})` : ''
+  const note = m.notes ? ` — ${m.notes}` : ''
+  const tefillah = typeof m.tefillah === 'string'
+    ? m.tefillah.charAt(0).toUpperCase() + m.tefillah.slice(1).replace(/_/g, ' ')
+    : ''
+  return `${tefillah}${days}: ${m.time}${note}`
+}
+
 function formatDetailValue(v: unknown): string {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  if (Array.isArray(v)) return (v as unknown[]).map(String).join(', ')
+  if (Array.isArray(v)) {
+    if (v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
+      // Object arrays (e.g. minyanim) — format each item instead of calling String().
+      return (v as Record<string, unknown>[]).map((item) =>
+        'tefillah' in item ? formatMinyan(item) : JSON.stringify(item)
+      ).join(' | ')
+    }
+    return (v as unknown[]).map(String).join(', ')
+  }
   if (v && typeof v === 'object') return formatHoursSummary(v)
   return v != null ? String(v) : ''
 }

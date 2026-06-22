@@ -97,9 +97,12 @@ function LoadingState() {
 
 function NoLocationState() {
   return (
-    <p className="text-sm text-muted">
+    <button
+      onClick={() => document.dispatchEvent(new CustomEvent('jpc:open-location'))}
+      className="text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
+    >
       Enter your address to see zmanim for your location.
-    </p>
+    </button>
   )
 }
 

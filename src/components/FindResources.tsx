@@ -42,13 +42,15 @@ type Props = {
   anchor: DirectoryAnchor
   /** Up from any resource view → back to the home grid (the directory itself). */
   onUp: () => void
+  /** Navigate to the map screen pre-filtered to this category. */
+  onViewMap?: (categoryId: string) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form. The home grid IS
 // the index now, so every Up here goes straight home.
-export default function FindResources({ anchor, onUp }: Props) {
+export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   // Eruv, Zmanim, and Synagogues are city-wide resources keyed to a hospital in
   // the data; in address mode we fall back to the first hospital as a
   // Philadelphia-area representative.
@@ -183,6 +185,7 @@ export default function FindResources({ anchor, onUp }: Props) {
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
         onReport={(listing) => openAction({ mode: 'report', listing })}
+        onViewMap={onViewMap ? () => onViewMap(category.id) : undefined}
       />
     )
   }

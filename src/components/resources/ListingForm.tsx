@@ -40,6 +40,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     const init: Record<string, unknown> = {}
     for (const field of config?.detailFields ?? []) {
       if (existing && field.key in existing) init[field.key] = existing[field.key]
+      // Load companion "sometimes" array for tag fields.
+      if (field.type === 'tags' && existing) {
+        const sk = field.key + '_sometimes'
+        if (sk in existing) init[sk] = existing[sk]
+      }
     }
     return init
   })
@@ -74,7 +79,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // community categories that hide hospital/address/distance/phone).
     const visibleDetails: Record<string, unknown> = {}
     for (const field of config.detailFields) {
-      if (fieldIsVisible(field, details)) visibleDetails[field.key] = details[field.key]
+      if (fieldIsVisible(field, details)) {
+        visibleDetails[field.key] = details[field.key]
+        // Carry the companion "sometimes" array for tag fields.
+        if (field.type === 'tags') {
+          visibleDetails[field.key + '_sometimes'] = details[field.key + '_sometimes'] ?? []
+        }
+      }
     }
 
     const payload: ResourceSubmission = {
@@ -191,7 +202,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             {config.detailFields
               .filter((field) => fieldIsVisible(field, details))
               .map((field) => (
-                <DetailFieldInput key={field.key} field={field} value={details[field.key]} onChange={(v) => setDetail(field.key, v)} />
+                <DetailFieldInput
+                  key={field.key}
+                  field={field}
+                  value={details[field.key]}
+                  onChange={(v) => setDetail(field.key, v)}
+                  sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+                  onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                />
               ))}
           </div>
         )}
@@ -232,15 +250,27 @@ function DetailFieldInput({
   field,
   value,
   onChange,
+  sometimes,
+  onChangeSometimes,
 }: {
   field: CategoryField
   value: unknown
   onChange: (value: unknown) => void
+  sometimes?: string[]
+  onChangeSometimes?: (v: string[]) => void
 }) {
   const label = `${field.label}${field.required ? ' *' : ''}`
 
   if (field.type === 'tags') {
-    return <TagsInput field={field} value={(value as string[]) ?? []} onChange={onChange} />
+    return (
+      <TagsInput
+        field={field}
+        value={(value as string[]) ?? []}
+        onChange={onChange}
+        sometimes={sometimes}
+        onChangeSometimes={onChangeSometimes}
+      />
+    )
   }
 
   if (field.type === 'url') {

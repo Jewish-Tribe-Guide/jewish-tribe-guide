@@ -1,7 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, NavigateFn } from '@/types'
+import { listingSearchText } from '@/lib/searchListing'
+import { distanceMiles } from '@/lib/geo'
+import { GenericListingCard } from '@/components/resources/GenericDirectory'
+import SynagogueCard from '@/components/SynagogueCard'
 
 export type CardDef = {
   title: string
@@ -81,18 +86,19 @@ export function cardMatches(card: CardDef, query: string): boolean {
  *  "cheese" tag matched "kosher cheese". */
 export type ListingHit = {
   item: DirectoryResource
+  /** Full category config — needed to render the real listing card. */
+  category: CategoryConfig
   /** The category's plural label, e.g. "Grocery Stores". */
   categoryLabel: string
-  /** Tags that matched the query — shown as chips so the visitor sees *why*. */
+  /** Tags that matched the query — used to seed the category search on tap. */
   matchedTags: string[]
   /** The term to pre-fill the category's own search with on tap: the matched tag
    *  when there is one (so the place survives that page's filter), else the query. */
   term: string
 }
 
-// A listing's tags live spread onto the row as arrays of strings (kosher items,
-// amenities, …). Collect every string-array value generically so this stays
-// decoupled from per-category field config.
+// Collect every string-array value from a listing (tags, _sometimes, etc.) for
+// matching and ranking. Stays decoupled from per-category field config.
 function listingTags(item: DirectoryResource): string[] {
   const out: string[] = []
   for (const value of Object.values(item)) {
@@ -103,18 +109,21 @@ function listingTags(item: DirectoryResource): string[] {
   return out
 }
 
-/** Find individual listings matching the query by name + tags (every query word
- *  must appear, mirroring `cardMatches`). Returns at most `limit` hits so a broad
- *  word like "kosher" can't flood the landing page. */
+/** Find individual listings matching the query against their full search text —
+ *  name, address, tags, and scalar detail fields (every query word must appear).
+ *  Returns at most `limit` hits so a broad word like "kosher" can't flood the
+ *  landing page. */
 export function searchListings(
   listings: DirectoryResource[],
   categories: CategoryConfig[],
   query: string,
+  coords: { lat: number; lng: number } | null = null,
   limit = 8,
 ): ListingHit[] {
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return []
   const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
+  const configById = new Map(categories.map((c) => [c.id, c]))
 
   // How many query words a tag contains — used to rank "Kosher Wine" (2) above
   // "Glatt Kosher Meat" (1) for the query "kosher wine".
@@ -125,16 +134,24 @@ export function searchListings(
 
   const hits: ListingHit[] = []
   for (const item of listings) {
+    const category = configById.get(item.category)
+    if (!category) continue
     const tags = listingTags(item)
-    const hay = [item.name, ...tags].join(' ').toLowerCase()
+    const hay = listingSearchText(item, category)
     if (!tokens.every((t) => hay.includes(t))) continue
-    // Most-specific matched tags first; show a few as chips, lead with the best.
     const matchedTags = tags
       .filter((tag) => score(tag) > 0)
       .sort((a, b) => score(b) - score(a) || a.length - b.length)
       .slice(0, 3)
+    // Stamp straight-line distance the same way the directory does (ResourceLoader):
+    // address-anchored, non-community categories, when the listing has coordinates.
+    const withDistance =
+      coords && !category.community && item.geo
+        ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
+        : item
     hits.push({
-      item,
+      item: withDistance,
+      category,
       categoryLabel: labelById.get(item.category) ?? item.category,
       matchedTags,
       term: matchedTags[0] ?? query.trim(),
@@ -144,8 +161,9 @@ export function searchListings(
   return hits
 }
 
-/** The "Places" results list shown beneath the card grid: individual listings
- *  that matched the query, each tagged with its category and the matched term. */
+/** The "Places" results list: each hit rendered as the SAME card its category
+ *  directory uses — SynagogueCard for shuls (so davening times show), the generic
+ *  collapsible card for everything else — so a searched place is the full listing. */
 export function PlacesResults({
   hits,
   onOpen,
@@ -153,39 +171,39 @@ export function PlacesResults({
   hits: ListingHit[]
   onOpen: (hit: ListingHit) => void
 }) {
+  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+
   return (
     <section className="mt-10 sm:mt-12">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Places
       </h2>
       <div className="space-y-2">
-        {hits.map((hit) => (
-          <button
-            key={hit.item.id}
-            onClick={() => onOpen(hit)}
-            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary active:border-primary active:bg-slate-50 cursor-pointer"
-          >
-            <span className="min-w-0">
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="font-semibold text-slate-900 text-sm group-hover:text-primary transition-colors">
-                  {hit.item.name}
-                </span>
-                <span className="text-xs text-slate-500">{hit.categoryLabel}</span>
-                {hit.matchedTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </span>
-            </span>
-            <svg className="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        ))}
+        {hits.map((hit) =>
+          hit.item.category === 'synagogue' ? (
+            <SynagogueCard
+              key={hit.item.id}
+              item={hit.item}
+              onEdit={() => onOpen(hit)}
+              onReport={() => onOpen(hit)}
+            />
+          ) : (
+            <GenericListingCard
+              key={hit.item.id}
+              item={hit.item}
+              category={hit.category}
+              upvotes={!!hit.category.upvotesEnabled}
+              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
+              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
+              onFilterOpen={() => onOpen(hit)}
+              onFilterBool={() => onOpen(hit)}
+              onFilterSelect={() => onOpen(hit)}
+              onEdit={() => onOpen(hit)}
+              onReport={() => onOpen(hit)}
+            />
+          ),
+        )}
       </div>
     </section>
   )

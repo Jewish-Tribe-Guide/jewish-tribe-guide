@@ -37,7 +37,7 @@ export default function SiteHeader({ onGoHome, location }: Props) {
               Philadelphia Jewish Community
             </span>
             <span className="hidden sm:block text-[11px] text-slate-500">
-              Support for patients, families, and neighbors
+              Guide for patients, visitors, and neighbors
             </span>
           </span>
         </button>

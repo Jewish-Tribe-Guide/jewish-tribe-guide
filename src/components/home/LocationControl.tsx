@@ -70,9 +70,20 @@ export default function LocationControl({ controls }: Props) {
         setLocating(false)
         setOpen(false)
       },
-      () => {
+      (err) => {
         setLocating(false)
-        setGeoError('Couldn’t get your location. Please type an address instead.')
+        // Surface the actual failure: a denied permission and a hardware/timeout
+        // failure need different fixes, so a single generic message hides the cause.
+        console.warn('[geolocation] error', err.code, err.message)
+        if (err.code === err.PERMISSION_DENIED) {
+          setGeoError('Location permission is blocked. Allow location for this site in your browser settings (and check iOS Settings → Privacy → Location Services → Safari), then try again — or type an address below.')
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setGeoError('Your location is currently unavailable. Please type an address below.')
+        } else if (err.code === err.TIMEOUT) {
+          setGeoError('Locating timed out. Try again, or type an address below.')
+        } else {
+          setGeoError('Couldn’t get your location. Please type an address below.')
+        }
       },
       { enableHighAccuracy: true, timeout: 10000 },
     )

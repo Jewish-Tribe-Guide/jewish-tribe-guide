@@ -5,6 +5,8 @@ import type { DirectoryResource } from '@/types'
 import { isMinyanim, groupByTefillah } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import { PencilIcon, FlagIcon } from '@/components/icons'
+import { businessUrl } from '@/lib/googleMapsLinks'
+import FreshnessFooter from '@/components/resources/FreshnessFooter'
 
 type Props = {
   item: DirectoryResource
@@ -15,16 +17,14 @@ type Props = {
   onReport: () => void
 }
 
-// Distance label matching the grocery/hotel format.
-// Prefers real drive/walk times; falls back to straight-line miles while the
-// Distance Matrix call is in flight (address mode only).
-function travelLabel(item: DirectoryResource): string | null {
+// Returns travel chips as separate parts so the card can stack drive/walk
+// vertically on mobile (matching the GenericDirectory pattern).
+function travelParts(item: DirectoryResource): string[] {
+  if (item.milesFromAddress != null) return [`📍 ${item.milesFromAddress} mi`]
   const parts: string[] = []
   if (item.driveMinutes != null) parts.push(`🚗 ${item.driveMinutes} min`)
   if (item.walkMinutes != null) parts.push(`🚶 ${item.walkMinutes} min`)
-  if (parts.length > 0) return parts.join(' · ')
-  if (item.milesFromAddress != null) return `📍 ${item.milesFromAddress} mi`
-  return null
+  return parts
 }
 
 // ── Davening sub-components ───────────────────────────────────────────────────
@@ -106,7 +106,7 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
   const davening = item.davening as string | undefined
   const minyanim = item.minyanim
   const whatsapp = item.whatsapp as string | undefined
-  const travel = travelLabel(item)
+  const travel = travelParts(item)
 
   // Use structured minyanim when available; fall back to legacy text.
   const hasStructuredMinyanim =
@@ -127,8 +127,10 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-4">
-          {travel && (
-            <span className="text-sm font-medium text-slate-600 whitespace-nowrap">{travel}</span>
+          {travel.length > 0 && (
+            <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+              {travel.map((t) => <span key={t}>{t}</span>)}
+            </div>
           )}
           {/* Chevron */}
           <svg
@@ -154,7 +156,7 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Location</h3>
               <p className="text-sm text-slate-800">{item.address}</p>
               <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(item.address)}`}
+                href={businessUrl(item.name, item.address, item.placeId as string | undefined)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
@@ -167,7 +169,12 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
           {/* 2. Contact */}
           {item.phone && (
             <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Contact</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contact</h3>
+                {item.placeId && (
+                  <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">via Google</span>
+                )}
+              </div>
               <a
                 href={`tel:${String(item.phone).replace(/\D/g, '')}`}
                 className="text-sm text-primary hover:underline"
@@ -210,14 +217,17 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
             </section>
           )}
 
-          {/* Footer: edit / report */}
-          <div className="flex gap-3 pt-2 border-t border-slate-200">
-            <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
-              <PencilIcon className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
-              <FlagIcon className="h-3.5 w-3.5" /> Report
-            </button>
+          {/* Footer: freshness + edit / report */}
+          <div className="pt-2 border-t border-slate-200 space-y-2">
+            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+            <div className="flex gap-3">
+              <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
+                <PencilIcon className="h-3.5 w-3.5" /> Edit
+              </button>
+              <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
+                <FlagIcon className="h-3.5 w-3.5" /> Report
+              </button>
+            </div>
           </div>
         </div>
       )}

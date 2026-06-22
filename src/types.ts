@@ -160,6 +160,8 @@ export type DirectoryResource = {
   placeId?: string
   /** ISO timestamp of the last successful Google Places sync. */
   googleSyncedAt?: string
+  /** ISO timestamp of the last time a user confirmed the community-curated info is still accurate. */
+  confirmedAt?: string
   /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** Short editorial description from Google Places (fetched on first sync). */
@@ -266,7 +268,7 @@ export type DirectoryAnchor =
   | { kind: 'hospital'; hospitalId: string; hospitalName: string }
   | { kind: 'address'; coords: { lat: number; lng: number } | null; label: string }
 
-export type AppMode = 'home' | 'find' | 'assist' | 'volunteer' | 'community-home' | 'give'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give'
 
 /** page.tsx's central navigation function, passed down to every screen that
  *  deep-links. `extra` is merged into the history state so the target screen
