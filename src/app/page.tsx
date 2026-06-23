@@ -1,127 +1,162 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { hospitals } from '@/data/hospitals'
-import type { AppMode, Audience, DirectoryAnchor } from '@/types'
-import type { AnchorControls } from '@/components/AnchorBar'
+import type { AppMode, DirectoryAnchor, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
 import SiteHeader from '@/components/SiteHeader'
-import Home from '@/components/Home'
-import CommunityHome from '@/components/CommunityHome'
+import SiteFooter from '@/components/SiteFooter'
 import FindResources from '@/components/FindResources'
-import GetAssistance from '@/components/GetAssistance'
-import Volunteer from '@/components/Volunteer'
+import ResourceMapView from '@/components/map/ResourceMapView'
+import SupportWizard from '@/components/wizard/SupportWizard'
+import VolunteerWizard from '@/components/wizard/VolunteerWizard'
+import { useStoredLocation } from '@/lib/useStoredLocation'
+
+// Which guided form is open as a full-screen overlay (Support / Volunteer), and
+// any need pre-checked from the card or a search result.
+export type Flow = { kind: 'support' | 'volunteer'; preselect?: string[] }
 
 // What we persist in the browser history stack so back/forward can restore state.
-type NavState = { audience: Audience | null; mode: AppMode }
+// `flowStep` is the wizard's current step index — each step is its own history
+// entry, so browser Back/forward (and the swipe gesture) move between steps
+// instead of discarding the whole form. The Wizard maintains it; page.tsx only
+// reads it (to know how far to unwind on a full close).
+type NavState = { mode: AppMode; flow?: Flow; flowStep?: number; mapCategory?: string }
 
 export default function Page() {
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(hospitals[0].id)
-  const [audience, setAudience] = useState<Audience | null>(null)
   const [mode, setMode] = useState<AppMode>('home')
-  const [address, setAddress] = useState('')
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  // Location persists across reloads/return visits — it drives all distance sorting.
+  const { address, coords, setAddress, setCoords } = useStoredLocation()
+  const [flow, setFlow] = useState<Flow | null>(null)
+  // Which category to pre-select when opening the map from a category directory.
+  const [mapCategory, setMapCategory] = useState<string | null>(null)
 
-  const selectedHospitalName = hospitals.find((h) => h.id === selectedHospitalId)?.name ?? ''
+  // The address anchor, editable from the header's location pill on every screen
+  // — it drives all proximity sorting in the directory.
+  const locationControls = {
+    address,
+    onAddressChange: setAddress,
+    onCoords: setCoords,
+  }
 
   // ── History API — keeps browser back/forward in sync with React state ──────
   useEffect(() => {
     // Do NOT call replaceState here. Next.js App Router stamps the initial entry
     // with __NA:true; overwriting it before that stamp lands strips __NA and causes
     // its popstate handler to call window.location.reload() on every history.back().
-    // Our popstate handler already defaults audience/mode to null/'home' for entries
-    // that lack those keys, so back-pressing past the first navigate() still shows
-    // Landing correctly.
     function onPopState(e: PopStateEvent) {
       const s = e.state as NavState | null
-      setAudience(s?.audience ?? null)
       setMode(s?.mode ?? 'home')
+      setFlow(s?.flow ?? null)
+      setMapCategory(s?.mapCategory ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  // Central navigation function — always call this instead of setMode/setAudience
-  // directly so every transition is recorded in the browser history stack.
-  function navigate(nextAudience: Audience | null, nextMode: AppMode) {
-    setAudience(nextAudience)
+  // On a full page reload the browser keeps the current entry's history.state, so
+  // restore whatever screen the visitor was on (a category, the hospitals list,
+  // an open form) instead of snapping back to the landing page. Runs once after
+  // mount — initializing state from history.state directly would mismatch the
+  // server-rendered (always-home) markup during hydration.
+  useEffect(() => {
+    const s = window.history.state as NavState | null
+    if (s?.mode && s.mode !== 'home') setMode(s.mode)
+    if (s?.flow) setFlow(s.flow)
+    if (s?.mapCategory) setMapCategory(s.mapCategory)
+  }, [])
+
+  // Central navigation function — always call this instead of setMode directly so
+  // every transition is recorded in the browser history stack. The first arg is
+  // the legacy audience key (unused now that there's a single path) — kept so the
+  // shared NavigateFn signature and search-index destinations keep compiling.
+  const navigate: NavigateFn = (_audience, nextMode, extra) => {
     setMode(nextMode)
-    history.pushState({ audience: nextAudience, mode: nextMode } as NavState, '')
+    setFlow(null)
+    history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
-  // Audience fork (Landing cards or header switch).
-  // Preserve the current mode when switching if that mode exists on the other
-  // side (e.g. 'find' is shared). Otherwise, reset to the side's home screen.
-  function goToAudience(next: Audience) {
-    const sharedModes: AppMode[] = ['find']
-    const defaultMode: AppMode = next === 'patient' ? 'home' : 'community-home'
-    navigate(next, sharedModes.includes(mode) ? mode : defaultMode)
+  // Open a guided form over the current page. Pushes the base flow entry
+  // (flowStep 0); the Wizard pushes one more entry per step it advances, so the
+  // browser Back button walks back through the steps and only closes the form
+  // once the visitor backs out of step 0.
+  function openFlow(kind: Flow['kind'], preselect?: string[]) {
+    const f: Flow = { kind, preselect }
+    setFlow(f)
+    history.pushState({ ...(window.history.state ?? {}), flow: f, flowStep: 0 }, '')
   }
 
-  // Title click — always a way back to the "who are you?" landing screen.
+  // Fully close the wizard from any step (its ✕ / Esc / success "Done"). Each
+  // step is a history entry, so we pop the current step plus every entry down to
+  // and including the base flow entry — landing exactly on the page the visitor
+  // opened the form from, where popstate sees no `flow` and unmounts the overlay.
+  function closeFlow() {
+    const step = (window.history.state as NavState | null)?.flowStep ?? 0
+    history.go(-(step + 1))
+  }
+
+  // Title click — always a way back to the landing page.
   function goToLanding() {
     navigate(null, 'home')
   }
 
-  // Mode change within the current audience.
-  function goToMode(newMode: AppMode) {
-    navigate(audience, newMode)
+  const overlay = flow && (
+    flow.kind === 'support' ? (
+      <SupportWizard preselect={flow.preselect} onClose={closeFlow} />
+    ) : (
+      <VolunteerWizard preselect={flow.preselect} onClose={closeFlow} />
+    )
+  )
+
+  // ── Landing — the single home screen (search + one card grid) ──────────────
+  if (mode === 'home' || mode === 'community-home') {
+    return (
+      <>
+        <SiteHeader onGoHome={goToLanding} location={locationControls} />
+        <div className="flex-1">
+          <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
+        </div>
+        <SiteFooter />
+        {overlay}
+      </>
+    )
   }
 
-  if (audience === null) {
-    return <Landing onChoose={goToAudience} />
+  // ── Inner screens (directory) ───────────────────────────────────────────────
+  // Everything anchors on the visitor's typed address now (the hospital picker
+  // was retired from the location pill).
+  const anchor: DirectoryAnchor = { kind: 'address', coords, label: address }
+
+  // Up buttons lead back to the single home screen.
+  const goToHome = () => navigate(null, 'home')
+
+  // Called from the Nearby list — switches to the Find screen with the chosen
+  // listing's category open and that card expanded/scrolled into view.
+  const viewListing = (categoryId: string, listingId: string) => {
+    setMode('find')
+    setMapCategory(null)
+    setFlow(null)
+    history.pushState({ mode: 'find', findView: categoryId, findItemId: listingId }, '')
   }
 
-  const anchor: DirectoryAnchor =
-    audience === 'patient'
-      ? { kind: 'hospital', hospitalId: selectedHospitalId, hospitalName: selectedHospitalName }
-      : { kind: 'address', coords, label: address }
+  // Called from a category directory's "View map" button — navigates to the map
+  // screen with that category pre-selected in the filter.
+  const viewMapForCategory = (categoryId: string) => {
+    setMode('map')
+    setMapCategory(categoryId)
+    setFlow(null)
+    history.pushState({ mode: 'map', mapCategory: categoryId } as NavState, '')
+  }
 
   return (
     <>
-      <SiteHeader
-        audience={audience}
-        onSwitchAudience={goToAudience}
-        onGoHome={goToLanding}
-      />
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {(() => {
-          const anchorControls: AnchorControls = {
-            audience,
-            hospitals,
-            selectedHospitalId,
-            onHospitalChange: setSelectedHospitalId,
-            address,
-            onAddressChange: setAddress,
-            onCoords: setCoords,
-          }
-          return audience === 'patient' ? (
-            <>
-              {mode === 'home' && <Home onNavigate={goToMode} onUp={goToLanding} />}
-              {mode === 'find' && <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('home')} />}
-              {mode === 'assist' && (
-                <GetAssistance
-                  hospitalId={selectedHospitalId}
-                  hospitalName={selectedHospitalName}
-                  onUp={() => goToMode('home')}
-                />
-              )}
-              {mode === 'volunteer' && <Volunteer onUp={() => goToMode('home')} />}
-            </>
-          ) : (
-            <>
-              {mode === 'community-home' && (
-                <CommunityHome onNavigate={goToMode} onUp={goToLanding} />
-              )}
-              {mode === 'find' && (
-                <FindResources anchor={anchor} anchorControls={anchorControls} onUp={() => goToMode('community-home')} />
-              )}
-              {mode === 'give' && <Volunteer onUp={() => goToMode('community-home')} />}
-            </>
-          )
-        })()}
+      <SiteHeader onGoHome={goToLanding} location={locationControls} />
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
+        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+        {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} onViewListing={viewListing} />}
       </main>
+      <SiteFooter />
+      {overlay}
     </>
   )
 }

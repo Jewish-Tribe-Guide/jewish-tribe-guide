@@ -26,6 +26,8 @@ export type PlaceSync = {
    *  has none — it never overwrites a curated address (that would desync `geo`). */
   address: string | null
   businessStatus: BusinessStatus | null
+  /** Google's editorial summary (short human-readable description). */
+  description: string | null
 }
 
 function serverKey(): string | null {
@@ -69,6 +71,7 @@ type GooglePlaceResult = {
   formatted_phone_number?: string
   formatted_address?: string
   opening_hours?: GoogleOpeningHours
+  editorial_summary?: { overview?: string }
 }
 
 /**
@@ -80,7 +83,7 @@ export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null>
   const key = serverKey()
   if (!key) return null
   try {
-    const fields = 'business_status,formatted_phone_number,formatted_address,opening_hours'
+    const fields = 'business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary'
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`
@@ -94,6 +97,7 @@ export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null>
       phone: r.formatted_phone_number ?? null,
       address: r.formatted_address ?? null,
       businessStatus: normalizeBusinessStatus(r.business_status),
+      description: r.editorial_summary?.overview ?? null,
     }
   } catch {
     return null

@@ -1,64 +1,51 @@
 'use client'
 
-import type { Audience } from '@/types'
+import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 
 type Props = {
-  audience: Audience
-  onSwitchAudience: (audience: Audience) => void
   /** Called when the visitor clicks the site title — takes them back to the
-   *  Landing fork so they can re-choose their audience. */
+   *  Landing page. */
   onGoHome: () => void
+  /** Address anchor for proximity sorting (top-right pill). */
+  location: LocationControls
 }
 
-const TABS: { audience: Audience; label: string }[] = [
-  { audience: 'patient', label: 'Patients' },
-  { audience: 'community', label: 'Community' },
-]
-
-export default function SiteHeader({ audience, onSwitchAudience, onGoHome }: Props) {
+/** Magen David mark — inline SVG so it renders identically everywhere
+ *  (the ✡ character falls back to emoji presentation on some platforms). */
+function StarOfDavid({ className }: { className?: string }) {
   return (
-    <>
-      {/* Blue brand zone — title + subtitle only */}
-      <header className="bg-primary text-white">
-        <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-          <button
-            onClick={onGoHome}
-            className="text-4xl sm:text-5xl font-bold mb-3 hover:opacity-80 transition-opacity cursor-pointer"
-          >
-            Philadelphia Jewish Community
-          </button>
-          <p className="text-blue-100/75 text-sm">
-            Connecting patients, families, and neighbors with Philadelphia&apos;s Jewish community
-          </p>
-        </div>
-      </header>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 3 L19.8 16.5 L4.2 16.5 Z" />
+      <path d="M12 21 L4.2 7.5 L19.8 7.5 Z" />
+    </svg>
+  )
+}
 
-      {/* Audience toggle — its own row, sitting on the seam below the blue banner */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-center">
-          <div className="inline-flex rounded-full bg-slate-100 p-1">
-            {TABS.map((tab) => {
-              const active = audience === tab.audience
-              return (
-                <button
-                  key={tab.audience}
-                  onClick={() => onSwitchAudience(tab.audience)}
-                  aria-pressed={active}
-                  className={[
-                    'px-5 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer',
-                    active
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                  ].join(' ')}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
+export default function SiteHeader({ onGoHome, location }: Props) {
+  return (
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)]">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
+        <button
+          onClick={onGoHome}
+          className="flex items-center gap-2.5 cursor-pointer group text-left"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
+            <StarOfDavid className="h-5 w-5" />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+              Philadelphia Jewish Community
+            </span>
+            <span className="hidden sm:block text-[11px] text-slate-500">
+              Guide for residents, visitors, and patients
+            </span>
+          </span>
+        </button>
+
+        <div className="ml-auto">
+          <LocationControl controls={location} />
         </div>
       </div>
-
-    </>
+    </header>
   )
 }

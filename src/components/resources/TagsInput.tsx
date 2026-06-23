@@ -5,16 +5,23 @@ import type { CategoryField } from '@/lib/categories'
 
 type Props = {
   field: CategoryField
+  /** Tags that are always available. */
   value: string[]
   onChange: (value: string[]) => void
+  /** Tags that are only sometimes available. */
+  sometimes?: string[]
+  onChangeSometimes?: (value: string[]) => void
 }
 
 // Multi-select for a `type: 'tags'` field: pick from the vocabulary or type a new
 // item. Values are stored as labels (e.g. "Kosher Cheese") on the listing.
-export default function TagsInput({ field, value, onChange }: Props) {
+// Each selected tag can be toggled between "always" (green) and "sometimes" (amber)
+// by clicking the chip itself; × removes it entirely.
+export default function TagsInput({ field, value, onChange, sometimes = [], onChangeSometimes }: Props) {
   const [vocab, setVocab] = useState<string[]>([])
   const [input, setInput] = useState('')
-  const selected = value ?? []
+  const always = value ?? []
+  const showConsistency = !!onChangeSometimes
 
   useEffect(() => {
     if (!field.tagGroup) return
@@ -33,39 +40,87 @@ export default function TagsInput({ field, value, onChange }: Props) {
   const add = (label: string) => {
     const v = label.trim()
     if (!v) return
-    if (!selected.some((s) => s.toLowerCase() === v.toLowerCase())) onChange([...selected, v])
+    if (!always.some((s) => s.toLowerCase() === v.toLowerCase()) &&
+        !sometimes.some((s) => s.toLowerCase() === v.toLowerCase())) {
+      onChange([...always, v])
+    }
     setInput('')
   }
-  const remove = (label: string) => onChange(selected.filter((s) => s !== label))
+
+  const removeAlways = (label: string) => onChange(always.filter((s) => s !== label))
+  const removeSometimes = (label: string) => onChangeSometimes?.(sometimes.filter((s) => s !== label))
+
+  const moveToSometimes = (label: string) => {
+    onChange(always.filter((s) => s !== label))
+    onChangeSometimes?.([...sometimes, label])
+  }
+  const moveToAlways = (label: string) => {
+    onChangeSometimes?.(sometimes.filter((s) => s !== label))
+    onChange([...always, label])
+  }
 
   const q = input.trim().toLowerCase()
+  const allSelected = [...always, ...sometimes]
   const suggestions = useMemo(
     () =>
       vocab
-        .filter((t) => !selected.some((s) => s.toLowerCase() === t.toLowerCase()))
+        .filter((t) => !allSelected.some((s) => s.toLowerCase() === t.toLowerCase()))
         .filter((t) => !q || t.toLowerCase().includes(q))
         .slice(0, 8),
-    [vocab, selected, q],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vocab, always, sometimes, q],
   )
 
-  const canAddNew = q && !vocab.some((t) => t.toLowerCase() === q) && !selected.some((s) => s.toLowerCase() === q)
+  const canAddNew = q &&
+    !vocab.some((t) => t.toLowerCase() === q) &&
+    !allSelected.some((s) => s.toLowerCase() === q)
 
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-1">{field.label}</label>
       {field.help && <p className="text-xs text-muted mb-1.5">{field.help}</p>}
 
-      {selected.length > 0 && (
+      {(always.length > 0 || sometimes.length > 0) && (
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {selected.map((label) => (
+          {always.map((label) => (
             <span key={label} className="inline-flex items-center gap-1 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full pl-2 pr-1 py-0.5">
-              {label}
-              <button type="button" onClick={() => remove(label)} aria-label={`Remove ${label}`} className="hover:bg-green-100 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
+              {showConsistency ? (
+                <button
+                  type="button"
+                  onClick={() => moveToSometimes(label)}
+                  title="Always available — click to mark as sometimes"
+                  className="hover:opacity-70 transition-opacity cursor-pointer"
+                >
+                  {label}
+                </button>
+              ) : label}
+              <button type="button" onClick={() => removeAlways(label)} aria-label={`Remove ${label}`} className="hover:bg-green-100 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
+                ×
+              </button>
+            </span>
+          ))}
+          {sometimes.map((label) => (
+            <span key={label} className="inline-flex items-center gap-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full pl-2 pr-1 py-0.5">
+              <button
+                type="button"
+                onClick={() => moveToAlways(label)}
+                title="Sometimes available — click to mark as always"
+                className="hover:opacity-70 transition-opacity cursor-pointer"
+              >
+                ~{label}
+              </button>
+              <button type="button" onClick={() => removeSometimes(label)} aria-label={`Remove ${label}`} className="hover:bg-amber-100 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
                 ×
               </button>
             </span>
           ))}
         </div>
+      )}
+
+      {showConsistency && (always.length > 0 || sometimes.length > 0) && (
+        <p className="text-xs text-muted mb-2">
+          <span className="text-green-700 font-medium">Green</span> = always in stock · Click a tag to toggle to <span className="text-amber-600 font-medium">~sometimes</span>
+        </p>
       )}
 
       <input
@@ -91,7 +146,7 @@ export default function TagsInput({ field, value, onChange }: Props) {
           ))}
           {canAddNew && (
             <button type="button" onClick={() => add(input)} className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 hover:bg-primary/20 transition-colors cursor-pointer">
-              + Add “{input.trim()}”
+              + Add "{input.trim()}"
             </button>
           )}
         </div>

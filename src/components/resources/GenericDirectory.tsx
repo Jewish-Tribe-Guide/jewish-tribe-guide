@@ -1,12 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
+import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
+import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
+import { useIsMobile } from '@/lib/useIsMobile'
+import { businessUrl } from '@/lib/googleMapsLinks'
+import { listingSearchText } from '@/lib/searchListing'
+import FreshnessFooter from './FreshnessFooter'
 
 type Props = {
   category: CategoryConfig
@@ -14,10 +20,18 @@ type Props = {
   /** Shown under the category title — hospital name for patients, typed address
    *  for community. Mirrors the subtitle pattern in About Your Hospital. */
   anchorLabel?: string
+  /** When true and no anchorLabel, prompt the visitor to set their location. */
+  addressPrompt?: boolean
+  /** A listing to mount already expanded (restored after returning from a form). */
+  reopenItemId?: string | null
+  /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
+  initialSearch?: string
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
+  /** Navigate to the map screen pre-filtered to this category. */
+  onViewMap?: () => void
 }
 
 // ── Generic card helpers ───────────────────────────────────────────────────────
@@ -38,12 +52,21 @@ function asTags(value: unknown): string[] {
   return Array.isArray(value) ? (value as string[]) : []
 }
 
-function travelLabel(item: DirectoryResource): string | null {
-  if (item.milesFromAddress != null) return `📍 ${item.milesFromAddress} mi`
+// Trim a full mailing address down to "street, city" for the quiet card subtitle
+// (drops state, zip, and country). The full address still shows when expanded.
+function shortAddress(addr: string): string {
+  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
+  return parts.length <= 2 ? parts.join(', ') : `${parts[0]}, ${parts[1]}`
+}
+
+// Returns the travel chips as separate parts so the card can stack drive/walk
+// vertically (they were previously joined with " · " on one wide line).
+function travelParts(item: DirectoryResource): string[] {
+  if (item.milesFromAddress != null) return [`📍 ${item.milesFromAddress} mi`]
   const parts: string[] = []
   if (item.driveMinutes != null) parts.push(`🚗 ${item.driveMinutes} min`)
   if (item.walkMinutes != null) parts.push(`🚶 ${item.walkMinutes} min`)
-  return parts.length > 0 ? parts.join(' · ') : null
+  return parts
 }
 
 function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
@@ -57,12 +80,17 @@ function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, onUp, onAdd, onEdit, onReport }: Props) {
-  const [search, setSearch] = useState('')
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
+  const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
+  // Multi-select: each key maps to the set of chosen values (empty = no filter).
+  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(false)
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
@@ -73,18 +101,30 @@ export default function GenericDirectory({ category, items, anchorLabel, onUp, o
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
+  const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 
   const upvotes = !!category.upvotesEnabled
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
-  const q = search.trim().toLowerCase()
-  const matchesSearch = (item: DirectoryResource) => {
-    if (!q) return true
-    if (item.name.toLowerCase().includes(q)) return true
-    for (const f of tagFields) {
-      if (asTags(item[f.key]).some((t) => t.toLowerCase().includes(q))) return true
+  const reopenRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (reopenItemId && reopenRef.current) {
+      const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+      const top = reopenRef.current.getBoundingClientRect().top + window.scrollY - headerH
+      window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
     }
-    return false
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — only fire on mount
+
+  const q = search.trim().toLowerCase()
+  const tokens = q.split(/\s+/).filter(Boolean)
+  // Every word must appear somewhere in the listing's search text — name, address,
+  // tags, or scalar detail fields (AND across words). Shares listingSearchText with
+  // the landing search, so a place tapped there ("kosher cheese") survives this filter.
+  const matchesSearch = (item: DirectoryResource) => {
+    if (tokens.length === 0) return true
+    const hay = listingSearchText(item, category)
+    return tokens.every((t) => hay.includes(t))
   }
 
   const filtered = items
@@ -92,6 +132,10 @@ export default function GenericDirectory({ category, items, anchorLabel, onUp, o
       if (!matchesSearch(item)) return false
       for (const f of filterableBooleans) {
         if (boolFilters[f.key] && !item[f.key]) return false
+      }
+      for (const f of filterableSelects) {
+        const chosen = selectFilters[f.key]
+        if (chosen?.length && !chosen.includes(item[f.key] as string)) return false
       }
       if (openNow && hasFilterableHours) {
         // Item must be open right now according to at least one filterable hours field.
@@ -110,218 +154,692 @@ export default function GenericDirectory({ category, items, anchorLabel, onUp, o
 
   const searchPlaceholder =
     tagFields.length > 0
-      ? `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
+      ? isMobile
+        ? `Search ${category.pluralLabel.toLowerCase()} or items…`
+        : `Search ${category.pluralLabel.toLowerCase()} or kosher items (e.g. cheese)…`
       : 'Search…'
+
+  // The toolbar row (filters + sort) only renders when there's something in it;
+  // a select needs ≥2 distinct values before it's worth showing.
+  const hasRenderedSelects = filterableSelects.some(
+    (f) => new Set(items.map((item) => item[f.key] as string).filter(Boolean)).size >= 2,
+  )
+  const hasFilterRow =
+    filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes
+
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    Object.values(boolFilters).some(Boolean) ||
+    Object.values(selectFilters).some((v) => v.length > 0) ||
+    openNow
+
+  const activeFilterCount =
+    Object.values(boolFilters).filter(Boolean).length +
+    Object.values(selectFilters).filter((v) => v.length > 0).length +
+    (openNow ? 1 : 0)
+  const clearAll = () => {
+    setSearch('')
+    setBoolFilters({})
+    setSelectFilters({})
+    setOpenNow(false)
+  }
 
   return (
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="flex items-start justify-between gap-2 mb-4">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">{category.pluralLabel}</h2>
-          {anchorLabel && <p className="text-sm text-muted mt-0.5">{anchorLabel}</p>}
-        </div>
-        <button
-          onClick={onAdd}
-          className="text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
-        >
-          ➕ Add
-        </button>
-      </div>
+      <DirectoryHeader
+        title={category.pluralLabel}
+        count={items.length}
+        anchorLabel={anchorLabel}
+        addressPrompt={addressPrompt}
+        actions={
+          <>
+            {onViewMap && !category.community && (
+              <button
+                onClick={onViewMap}
+                /* Desktop only — on mobile the Map button moves into the filter/sort
+                   row (next to Filters) to keep the header uncluttered. */
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                🗺️ Map
+              </button>
+            )}
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <PlusIcon className="h-4 w-4" /> Add
+            </button>
+          </>
+        }
+      />
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+      <div className="mb-4 space-y-2">
         <input
           type="text"
           placeholder={searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        {filterableBooleans.map((f) => {
-          const active = !!boolFilters[f.key]
-          return (
-            <button
-              key={f.key}
-              onClick={() => setBoolFilters((prev) => ({ ...prev, [f.key]: !prev[f.key] }))}
-              className={[
-                'px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-              ].join(' ')}
-            >
-              {f.filterLabel ?? f.label}
+        {q && tagFields.length > 0 && (
+          <p className="text-xs text-muted">
+            Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
+            <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
+              clear
             </button>
-          )
-        })}
-        {/* Open Now toggle — only shown for categories that have a filterable hours field */}
-        {hasFilterableHours && (
-          <button
-            onClick={() => setOpenNow((v) => !v)}
-            className={[
-              'px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-              openNow
-                ? 'bg-green-600 text-white border-green-600'
-                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-            ].join(' ')}
-          >
-            🟢 Open now
-          </button>
+          </p>
         )}
-        {upvotes && (
-          <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
-            {[
-              { v: false, label: 'Closest' },
-              { v: true, label: '▲ Popular' },
-            ].map((opt) => (
+        {hasFilterRow && (
+          <>
+            {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
+            <div className="flex items-center gap-1.5 sm:hidden">
               <button
-                key={opt.label}
-                onClick={() => setSortByPopular(opt.v)}
+                onClick={() => setFiltersOpen((v) => !v)}
                 className={[
-                  'px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                  sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                  'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                  activeFilterCount > 0
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
                 ].join(' ')}
               >
-                {opt.label}
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
+                </svg>
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
-            ))}
-          </div>
+              {onViewMap && !category.community && (
+                <button
+                  onClick={onViewMap}
+                  className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  🗺️ Map
+                </button>
+              )}
+              {upvotes && (
+                <div className="flex rounded-md border border-slate-300 overflow-hidden ml-auto">
+                  {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
+                    <button
+                      key={opt.label}
+                      onClick={() => setSortByPopular(opt.v)}
+                      className={[
+                        'px-2.5 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
+                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                      ].join(' ')}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Filter controls: collapsible on mobile, always visible on desktop ── */}
+            <div
+              className={[
+                'gap-2',
+                // Mobile: vertical wrap inside collapsed panel
+                filtersOpen ? 'flex flex-wrap' : 'hidden',
+                // Desktop: always show as horizontal scroll row
+                'sm:flex sm:flex-nowrap sm:overflow-x-auto sm:pb-1',
+              ].join(' ')}
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {hasFilterableHours && (
+                <button
+                  onClick={() => setOpenNow((v) => !v)}
+                  className={[
+                    'inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                    openNow
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <span className={['inline-block h-2 w-2 rounded-full', openNow ? 'bg-white' : 'bg-green-500'].join(' ')} aria-hidden="true" />
+                  Open now
+                </button>
+              )}
+              {filterableBooleans.map((f) => {
+                const active = !!boolFilters[f.key]
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setBoolFilters((prev) => ({ ...prev, [f.key]: !prev[f.key] }))}
+                    className={[
+                      'shrink-0 px-3 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                      active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {f.filterLabel ?? f.label}
+                  </button>
+                )
+              })}
+              {filterableSelects.map((f) => {
+                const presentValues = Array.from(new Set(items.map((item) => item[f.key] as string).filter(Boolean))).sort()
+                if (presentValues.length < 2) return null
+                const chosen = selectFilters[f.key] ?? []
+                const toggle = (v: string) =>
+                  setSelectFilters((prev) => {
+                    const cur = prev[f.key] ?? []
+                    return { ...prev, [f.key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }
+                  })
+                if (f.multiSelect) {
+                  const isOpen = openDropdown === f.key
+                  const label = chosen.length === 0
+                    ? `All ${f.filterLabel ?? f.label}s`
+                    : chosen.length === 1
+                    ? chosen[0]
+                    : `${chosen.length} selected`
+                  return (
+                    <CheckboxDropdown
+                      key={f.key}
+                      label={label}
+                      active={chosen.length > 0}
+                      isOpen={isOpen}
+                      onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
+                      onClose={() => setOpenDropdown(null)}
+                      values={presentValues}
+                      chosen={chosen}
+                      onToggle={toggle}
+                    />
+                  )
+                }
+                return (
+                  <select
+                    key={f.key}
+                    value={chosen[0] ?? ''}
+                    onChange={(e) =>
+                      setSelectFilters((prev) => ({ ...prev, [f.key]: e.target.value ? [e.target.value] : [] }))
+                    }
+                    className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="">All {f.filterLabel ?? f.label}s</option>
+                    {presentValues.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                )
+              })}
+              {upvotes && (
+                <div className="hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0 sm:ml-auto">
+                  {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
+                    <button
+                      key={opt.label}
+                      onClick={() => setSortByPopular(opt.v)}
+                      className={[
+                        'px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
+                        sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                      ].join(' ')}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {q && tagFields.length > 0 && (
-        <p className="text-xs text-muted mb-2">
-          Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
-          <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
-            clear
-          </button>
-        </p>
-      )}
-
       {filtered.length === 0 ? (
-        <p className="text-muted text-sm">No results found.</p>
+        <div className="text-center py-12">
+          <p className="text-sm text-muted">
+            {hasActiveFilters
+              ? `No ${category.pluralLabel.toLowerCase()} match your search.`
+              : `No ${category.pluralLabel.toLowerCase()} listed yet.`}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={clearAll}
+                className="text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Clear search &amp; filters
+              </button>
+            )}
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+            >
+              <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((item) => {
-            // Compute hours status once per card — drives both the Open badge and
-            // the today-hours line. Only show badge when structured hours are present.
-            const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
-            const openStatus = hoursVal !== undefined ? hoursOpenNow(hoursVal) : null
+          {filtered.map((item) => (
+            <div key={item.id} ref={item.id === reopenItemId ? reopenRef : undefined}>
+            <GenericListingCard
+              item={item}
+              category={category}
+              upvotes={upvotes}
+              count={liveCount(item)}
+              defaultExpanded={item.id === reopenItemId}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
+              onTagClick={setSearch}
+              onFilterOpen={() => setOpenNow((v) => !v)}
+              onFilterBool={(key) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
+              onFilterSelect={(key, value, multi) =>
+                setSelectFilters((prev) => {
+                  const cur = prev[key] ?? []
+                  // Single-select: toggle between [value] and cleared. Multi-select:
+                  // add/remove this value from the set. Clicking the badge again undoes it.
+                  if (!multi) return { ...prev, [key]: cur.includes(value) ? [] : [value] }
+                  return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
+                })
+              }
+              onEdit={() => onEdit(item)}
+              onReport={() => onReport(item)}
+            />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
+// ── Checkbox dropdown filter ───────────────────────────────────────────────────
+
+function CheckboxDropdown({
+  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle,
+}: {
+  label: string
+  active: boolean
+  isOpen: boolean
+  onToggleOpen: () => void
+  onClose: () => void
+  values: string[]
+  chosen: string[]
+  onToggle: (v: string) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    // Close if the user scrolls so the popup doesn't float in the wrong spot.
+    function handleScroll() { onClose() }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [isOpen, onClose])
+
+  function handleToggleOpen() {
+    if (!isOpen && ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      setPopupPos({ top: rect.bottom + 4, left: rect.left })
+    }
+    onToggleOpen()
+  }
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={handleToggleOpen}
+        className={[
+          'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm cursor-pointer whitespace-nowrap transition-colors',
+          active
+            ? 'border-primary bg-primary/5 text-primary font-medium'
+            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+        ].join(' ')}
+      >
+        {label}
+        <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && popupPos && (
+        <div
+          style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+          className="z-50 min-w-[160px] rounded-md border border-slate-200 bg-white shadow-lg py-1"
+        >
+          {values.map((v) => (
+            <label key={v} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={chosen.includes(v)}
+                onChange={() => onToggle(v)}
+                className="accent-primary h-3.5 w-3.5 cursor-pointer"
+              />
+              {v}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Collapsible listing card ────────────────────────────────────────────────────
+// Mirrors the synagogue card: collapsed shows only what people decide by (name,
+// the key yes/no badges, "Open", distance); the rest waits behind a tap.
+export function GenericListingCard({
+  item,
+  category,
+  upvotes,
+  count,
+  defaultExpanded,
+  onVote,
+  onTagClick,
+  onFilterOpen,
+  onFilterBool,
+  onFilterSelect,
+  onEdit,
+  onReport,
+}: {
+  item: DirectoryResource
+  category: CategoryConfig
+  upvotes: boolean
+  count: number
+  defaultExpanded?: boolean
+  onVote: (count: number) => void
+  onTagClick: (tag: string) => void
+  /** Click the "Open" badge → turn on the "Open now" filter. */
+  onFilterOpen: () => void
+  /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
+  onFilterBool: (key: string) => void
+  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → select it in
+   *  that field's filter. `multi` adds to the set; otherwise it replaces. */
+  onFilterSelect: (key: string, value: string, multi: boolean) => void
+  onEdit: () => void
+  onReport: () => void
+}) {
+  const [expanded, setExpanded] = useState(!!defaultExpanded)
+  const isMobile = useIsMobile()
+
+  const fields = category.detailFields
+  const tagFields = fields.filter((f) => f.type === 'tags')
+  const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
+  const headerUrlFields = fields.filter((f) => f.type === 'url' && f.showInHeader)
+  const hoursFields = fields.filter((f) => f.type === 'hours')
+  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours'
+  const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
+  const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
+
+  const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
+  const isOpen = hoursVal !== undefined && hoursOpenNow(hoursVal) === true && isStructuredHours(hoursVal)
+  const travel = travelParts(item)
+  const tags = tagFields.flatMap((f) => asTags(item[f.key]))
+  const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
+  // On mobile the name line gets crowded, so cap the tag chips shown collapsed
+  // and surface the rest behind a "+N" chip that expands the card (the full list
+  // renders in the detail panel below). Desktop shows them all inline.
+  const MOBILE_TAG_LIMIT = 3
+  const allTags = [...tags, ...tagsSometimes]
+  const capTags = isMobile && allTags.length > MOBILE_TAG_LIMIT + 1
+  const headerTags = capTags ? tags.slice(0, MOBILE_TAG_LIMIT) : tags
+  const headerTagsSometimes = capTags ? tagsSometimes.slice(0, Math.max(0, MOBILE_TAG_LIMIT - headerTags.length)) : tagsSometimes
+  const hiddenTagCount = allTags.length - headerTags.length - headerTagsSometimes.length
+
+  // Collapsed signals: boolean true-badges + select badges (e.g. kosher cert).
+  // Unset booleans and unset selects go in the detail panel.
+  const signalBadges = badgeFields.filter((f) =>
+    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? !!item[f.key] : false,
+  )
+  const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
+
+  // A quiet second line under the name — mirrors the synagogue card's denomination
+  // subtitle. The address gives "where is this" context without expanding; items
+  // with no address (e.g. community groups) fall back to a short Google blurb.
+  const subtitle = item.address
+    ? shortAddress(item.address)
+    : (item.googleDescription as string | undefined) || null
+
+  return (
+    <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
+        className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+      >
+        {/* Name + the badges/tags people scan by (tags are clickable searches).
+            On mobile the name sits on its own line with the chips on a row below
+            so it never gets crowded; on desktop they share a line. */}
+        <div className="min-w-0 flex flex-col gap-1">
+          <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
+          {/* On mobile the upvote flows inline right after the name text, so it
+              follows the last word even when the name wraps to two lines. On desktop
+              it's hidden here and appears in the right-side cluster instead. */}
+          <span className="min-w-0 font-semibold text-slate-900">
+            {item.name}
+            {upvotes && (
+              <span className="sm:hidden inline-flex align-middle relative -top-0.5 ml-2">
+                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+              </span>
+            )}
+          </span>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
+          {isOpen && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
+              title="Filter to places open now"
+              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-100 active:bg-green-200 transition-colors cursor-pointer"
+            >
+              Open
+            </button>
+          )}
+          {signalBadges.map((f) => {
+            const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
             return (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-lg shadow-sm px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-slate-900 text-sm">{item.name}</p>
-                      {badgeFields.map((f) => {
-                        const v = item[f.key]
-                        if (f.type === 'boolean' ? !v : !display(v)) return null
-                        const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
-                        return (
-                          <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">
-                            {text}
-                          </span>
-                        )
-                      })}
-                      {/* Green Open badge — only when the place is currently open */}
-                      {openStatus === true && isStructuredHours(hoursVal) && (
-                        <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
-                          Open
-                        </span>
-                      )}
-                    </div>
-                    {item.address && <p className="text-xs text-muted mt-0.5">{item.address}</p>}
-                    {item.phone && (
-                      <a href={`tel:${item.phone.replace(/\D/g, '')}`} className="text-xs text-primary hover:underline">
-                        {item.phone}
-                      </a>
-                    )}
-                    {rowFields.map((f) => {
-                      const v = display(item[f.key])
-                      if (!v) return null
-                      return (
-                        <p key={f.key} className="text-xs text-slate-600 mt-1">
-                          {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
-                          {v}
-                        </p>
-                      )
-                    })}
-                    {/* Hours — today's line by default, expandable to the full week.
-                        Legacy text strings render as-is. Also shows a Google
-                        "closed" badge + sync-freshness note for synced listings. */}
-                    {(hoursVal !== undefined || item.businessStatus) && (
-                      <HoursDisplay
-                        value={hoursVal}
-                        businessStatus={item.businessStatus}
-                        syncedAt={item.googleSyncedAt}
-                      />
-                    )}
-                    {/* Tag badges (clickable → search that item) */}
-                    {tagFields.flatMap((f) => asTags(item[f.key])).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {tagFields.flatMap((f) => asTags(item[f.key])).map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setSearch(t)}
-                            title={`Find places with ${t}`}
-                            className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5 hover:bg-green-100 transition-colors cursor-pointer"
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {upvotes && (
-                      <UpvoteButton
-                        resourceId={item.id}
-                        count={item.upvotes ?? 0}
-                        onCountChange={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
-                      />
-                    )}
-                    {travelLabel(item) && (
-                      <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{travelLabel(item)}</span>
-                    )}
-                    {item.address && (
-                      <a
-                        href={`https://maps.google.com/?q=${encodeURIComponent(item.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                      >
-                        Directions
-                      </a>
-                    )}
-                    {urlFields.map((f) => {
-                      const href = display(item[f.key])
-                      if (!href) return null
-                      return (
-                        <a
-                          key={f.key}
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                        >
-                          {f.linkLabel ?? f.label}
-                        </a>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-2 pt-2 border-t border-slate-100">
-                  <button onClick={() => onEdit(item)} className="text-xs text-muted hover:text-primary transition-colors cursor-pointer">
-                    ✏️ Edit
-                  </button>
-                  <button onClick={() => onReport(item)} className="text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
-                    🗑️ Report
-                  </button>
-                </div>
-              </div>
+              <button
+                key={f.key}
+                // A badge "has a designated filter" when its field is filterable; then
+                // clicking it drives that control. Otherwise it falls back to search.
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
+                  else if (f.filterable && f.type === 'select') onFilterSelect(f.key, String(item[f.key]), !!f.multiSelect)
+                  else onTagClick(text)
+                }}
+                title={`Filter by ${text}`}
+                className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
+              >
+                {text}
+              </button>
             )
           })}
+          {headerTags.map((t) => (
+            <button
+              key={t}
+              onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+              title={`Find places with ${t}`}
+              className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
+            >
+              {t}
+            </button>
+          ))}
+          {headerTagsSometimes.map((t) => (
+            <span key={`sometimes:${t}`} className="relative group/tip">
+              <button
+                onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+                className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
+              >
+                ~{t}
+              </button>
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                not always in stock
+              </span>
+            </span>
+          ))}
+          {hiddenTagCount > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+              title="Show all tags"
+              className="text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
+            >
+              +{hiddenTagCount}
+            </button>
+          )}
+          </div>
+          </div>
+          {subtitle && (
+            // Hidden on mobile to keep collapsed cards uncluttered — distance shows
+            // on the right once a location is set, and the full address is one tap
+            // away in the expanded panel. Still shown on desktop where there's room.
+            <p className="hidden sm:block text-sm text-muted truncate">{subtitle}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {upvotes && (
+            <span className="hidden sm:block">
+              <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+            </span>
+          )}
+          {travel.length > 0 && (
+            <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+              {travel.map((t) => <span key={t}>{t}</span>)}
+            </div>
+          )}
+          {headerUrlFields.map((f) => {
+            const href = display(item[f.key])
+            if (!href) return null
+            return (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs font-medium text-primary border border-primary rounded px-2 py-1.5 sm:py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            )
+          })}
+          <svg
+            className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50">
+          {/* Full tag list — only when the collapsed header capped it (mobile). */}
+          {capTags && allTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((t) => (
+                <button
+                  key={t}
+                  onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+                  title={`Find places with ${t}`}
+                  className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
+                >
+                  {t}
+                </button>
+              ))}
+              {tagsSometimes.map((t) => (
+                <span key={`sometimes:${t}`} className="relative group/tip">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
+                    className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
+                  >
+                    ~{t}
+                  </button>
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                    not always in stock
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+          {tagsSometimes.length > 0 && (
+            <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
+          )}
+          {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
+            <div className="flex flex-wrap gap-1.5">
+              {detailBadges.map((f) => {
+                const v = item[f.key]
+                if (f.type === 'boolean' ? !v : !display(v)) return null
+                const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
+                return (
+                  <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">{text}</span>
+                )
+              })}
+            </div>
+          )}
+
+          {item.address && (
+            <div>
+              <p className="text-sm text-slate-800">{item.address}</p>
+              <a
+                href={businessUrl(item.name, item.address, item.placeId as string | undefined)}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
+              >
+                Get directions →
+              </a>
+            </div>
+          )}
+
+          {item.phone && (
+            <div>
+              <a href={`tel:${item.phone.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
+                {item.phone}
+              </a>
+              {item.placeId && !hoursVal && (
+                <span className="ml-2 text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none align-middle">via Google</span>
+              )}
+            </div>
+          )}
+
+          {rowFields.map((f) => {
+            const v = display(item[f.key])
+            if (!v) return null
+            return (
+              <p key={f.key} className="text-sm text-slate-700">
+                {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
+                {v}
+              </p>
+            )
+          })}
+
+          {(hoursVal !== undefined || item.businessStatus) && (
+            <HoursDisplay value={hoursVal} businessStatus={item.businessStatus} syncedAt={item.googleSyncedAt} />
+          )}
+
+          {urlFields.map((f) => {
+            const href = display(item[f.key])
+            if (!href) return null
+            return (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            )
+          })}
+
+          <div className="pt-2 border-t border-slate-200 space-y-2">
+            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+            <div className="flex gap-3">
+              <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
+              <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

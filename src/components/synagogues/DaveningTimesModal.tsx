@@ -10,6 +10,7 @@ import {
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
 } from '@/lib/davening'
+import DenominationFilter from './DenominationFilter'
 
 type GroupMode = 'tefillah' | 'day'
 
@@ -17,6 +18,8 @@ type Props = {
   items: DirectoryResource[]
   isOpen: boolean
   onClose: () => void
+  /** Pre-select a denomination when the modal opens (mirrors the parent's filter). */
+  initialDenomination?: string
 }
 
 function shulsFromItems(items: DirectoryResource[]) {
@@ -58,9 +61,14 @@ function TravelLine({
  * by tefillah with a banner, so shacharis / mincha / maariv never appear inline).
  * Drive + walk time sit under the shul name.
  */
-export default function DaveningTimesModal({ items, isOpen, onClose }: Props) {
+export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [groupMode, setGroupMode] = useState<GroupMode>('tefillah')
-  const [denomination, setDenomination] = useState('')
+  const [denomination, setDenomination] = useState(initialDenomination)
+
+  // Sync denomination each time the modal opens so it mirrors the parent's filter.
+  useEffect(() => {
+    if (isOpen) setDenomination(initialDenomination)
+  }, [isOpen, initialDenomination])
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
@@ -113,32 +121,35 @@ export default function DaveningTimesModal({ items, isOpen, onClose }: Props) {
         </div>
 
         {/* ── Controls ────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 shrink-0 flex-wrap">
-          <div className="flex rounded-md border border-slate-300 overflow-hidden">
-            {([['tefillah', 'By Tefillah'], ['day', 'By Day']] as [GroupMode, string][]).map(([mode, lbl]) => (
-              <button
-                key={mode}
-                onClick={() => setGroupMode(mode)}
-                className={[
-                  'px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer',
-                  groupMode === mode ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                {lbl}
-              </button>
-            ))}
-          </div>
+        {/* relative + z so the denomination dropdown overlays the scrolling list. */}
+        <div className="relative z-20 flex items-center gap-2 px-5 py-3 border-b border-slate-100 shrink-0 flex-wrap">
+          {/* Toggle + denomination filter stay on one line together; on mobile the
+              toggle labels drop "By " so the denomination control fits beside them. */}
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-md border border-slate-300 overflow-hidden">
+              {([['tefillah', 'By Tefillah', 'Tefillah'], ['day', 'By Day', 'Day']] as [GroupMode, string, string][]).map(([mode, lbl, shortLbl]) => (
+                <button
+                  key={mode}
+                  onClick={() => setGroupMode(mode)}
+                  className={[
+                    'px-2.5 sm:px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
+                    groupMode === mode ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <span className="sm:hidden">{shortLbl}</span>
+                  <span className="hidden sm:inline">{lbl}</span>
+                </button>
+              ))}
+            </div>
 
-          {denominations.length > 1 && (
-            <select
-              value={denomination}
-              onChange={(e) => setDenomination(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-            >
-              <option value="">All Denominations</option>
-              {denominations.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          )}
+            {denominations.length > 1 && (
+              <DenominationFilter
+                value={denomination}
+                options={denominations}
+                onChange={setDenomination}
+              />
+            )}
+          </div>
 
           {filtered.length > 0 && (
             <span className="text-xs text-muted ml-auto">

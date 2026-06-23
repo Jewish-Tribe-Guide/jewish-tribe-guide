@@ -36,6 +36,12 @@ export type CategoryField = {
   filterable?: boolean
   /** Label for the filter toggle/chip (e.g. "Kosher"). Defaults to `label`. */
   filterLabel?: string
+  /** For filterable select fields: render chips instead of a single-select dropdown,
+   *  allowing multiple values to be selected simultaneously. */
+  multiSelect?: boolean
+  /** For `type: 'url'`: show the link button in the collapsed card header so it's
+   *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
+  showInHeader?: boolean
 }
 
 export type CategoryConfig = {

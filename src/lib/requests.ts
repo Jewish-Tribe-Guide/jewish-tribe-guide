@@ -5,10 +5,6 @@ import { validateContact } from './validation'
 // ── Request types ──────────────────────────────────────────────────────────────
 
 export type RequestType =
-  | 'Meals'
-  | 'Transportation'
-  | 'Visitors'
-  | 'Family Housing'
   | 'Direct Support'
   | 'Volunteer'
   | 'Volunteer Edit'
@@ -28,7 +24,7 @@ export const SHEET_COLUMNS = [
   'Timestamp',
   'Request ID',
   'Request Type',
-  'Hospital',
+  'Hospital / room',
   'Name',
   'Phone',
   'Email',
@@ -115,7 +111,7 @@ const AVAILABILITY_LABELS: Record<string, string> = {
   flexible: 'Flexible / varies',
 }
 
-const PREFERRED_CONTACT_LABELS: Record<string, string> = {
+export const PREFERRED_CONTACT_LABELS: Record<string, string> = {
   phone: 'Phone call',
   text: 'Text message',
   email: 'Email',

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvInfo } from '@/data/resources'
+import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
@@ -10,30 +11,25 @@ import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
-import AnchorBar from '@/components/AnchorBar'
-import type { AnchorControls } from '@/components/AnchorBar'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { useCategories } from '@/lib/useCategories'
 import { hospitals } from '@/data/hospitals'
 
 const ADD_CATEGORY = '__add_category__'
 
-// Non-category items in the directory (hand-curated, not part of the DB pipeline).
-// Synagogues are now a DB category (see scripts/seed-synagogues.mjs) and no longer
-// appear here — they route through ResourceLoader automatically.
-type SpecialItem = { id: string; label: string; icon: string; description: string }
-const SPECIAL_ITEMS: SpecialItem[] = [
-  { id: 'about-hospital', label: 'About Your Hospital', icon: '🏥', description: 'Chaplain, kosher meals, Jewish medical staff, prayer space, and Shabbat accommodations' },
-  { id: 'eruv', label: 'Eruv Information', icon: '🗺️', description: 'Eruv status, maps, and contacts for Shabbat' },
-  { id: 'zmanim', label: 'Zmanim & Shabbos', icon: '🕯️', description: 'Hebrew date, daily zmanim, candle lighting, and havdalah' },
-]
-
 // The history shape page.tsx stamps on every pushState/replaceState call, plus
-// the two extra fields FindResources adds when navigating inside Find mode.
+// the two extra fields this view adds when opening a listing form.
 type FindNavState = {
   mode?: string
   findView?: string
   findAction?: string
+  /** Which hospital's About page to show (set when tapping one in the list). */
+  findHospitalId?: string
+  /** Pre-fill the category's search box (set when arriving from a landing "Places"
+   *  result, e.g. "cheese"). */
+  findQuery?: string
+  /** Expand this listing on arrival (the place tapped on the landing page). */
+  findItemId?: string
 }
 
 // A pending add/edit/report action on a listing within the current category.
@@ -44,154 +40,129 @@ type ListingAction =
 
 type Props = {
   anchor: DirectoryAnchor
-  anchorControls: AnchorControls
-  /** Hierarchical Up from the Find index → the audience home screen. */
+  /** Up from any resource view → back to the home grid (the directory itself). */
   onUp: () => void
+  /** Navigate to the map screen pre-filtered to this category. */
+  onViewMap?: (categoryId: string) => void
 }
 
-export default function FindResources({ anchor, anchorControls, onUp }: Props) {
-  const isHospital = anchor.kind === 'hospital'
-  // Eruv, Zmanim, and Synagogues are city-wide resources — relevant to community
-  // members too. They're data-keyed to a hospital, so in address mode we fall back
-  // to the first hospital as a Philadelphia-area representative.
+// A single resource detail view, opened by tapping a card on the home grid:
+// a category's listings (with add/edit/report), or a curated page (About Your
+// Hospital, Eruv, Zmanim), or the "suggest a category" form. The home grid IS
+// the index now, so every Up here goes straight home.
+export default function FindResources({ anchor, onUp, onViewMap }: Props) {
+  // Eruv, Zmanim, and Synagogues are city-wide resources keyed to a hospital in
+  // the data; in address mode we fall back to the first hospital as a
+  // Philadelphia-area representative.
   const fallbackHospital = hospitals[0]
   const hospitalId = anchor.kind === 'hospital' ? anchor.hospitalId : fallbackHospital.id
-  // The label shown as page subtitle in Synagogues / Zmanim / Eruv:
-  //   patient mode → hospital name (data is keyed to this hospital)
-  //   community mode → the typed address (so the user isn't confused by a hospital name)
   const locationLabel = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
 
-  // ── History-backed internal navigation ──────────────────────────────────────
-  // Initialize from the current history state so that browser-forward navigation
-  // (or a page.tsx audience-switch) re-opens the right sub-view automatically.
+  // Initialize from history so browser forward/back re-opens the right sub-view.
   const [view, setView] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     const s = window.history.state as FindNavState | null
     return s?.findView ?? null
   })
-  const [query, setQuery] = useState('')
   const [action, setAction] = useState<ListingAction | null>(null)
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
-  // The listing id most recently opened for edit/report — restored as expanded
-  // when the user presses Back from the form to the category list.
-  const [reopenItemId, setReopenItemId] = useState<string | null>(null)
+  const categories = useCategories()
+  // The listing id most recently opened for edit/report, OR the place tapped on
+  // the landing page — restored as expanded when the category list shows.
+  const [reopenItemId, setReopenItemId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findItemId ?? null
+  })
+  // Pre-filled search for the category list, set when arriving from a landing
+  // "Places" result so the tapped place is already filtered in.
+  const [initialSearch, setInitialSearch] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findQuery ?? null
+  })
+  // Which hospital's About page is showing (chosen from the Hospitals list).
+  const [hospitalDetailId, setHospitalDetailId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return (window.history.state as FindNavState | null)?.findHospitalId ?? null
+  })
 
-  // Keep internal view/action in sync when the browser's back/forward buttons
-  // are used. page.tsx has its own popstate listener for audience/mode; this one
-  // only fires when mode is still 'find', so the two listeners never conflict.
+  // Keep internal view/action in sync with browser back/forward. page.tsx has its
+  // own popstate listener for mode; this one only acts while mode is still 'find'.
   useEffect(() => {
     function onPop(e: PopStateEvent) {
       const s = e.state as FindNavState | null
       if (s?.mode !== 'find') return
       setView(s.findView ?? null)
+      setHospitalDetailId(s.findHospitalId ?? null)
+      setReopenItemId(s.findItemId ?? null)
+      setInitialSearch(s.findQuery ?? null)
       setAction(null) // edit/report listings can't be serialized into history
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/categories')
-      .then((res) => res.json())
-      .then((body) => {
-        if (!cancelled && body.ok) setCategories(body.categories as CategoryConfig[])
-        else if (!cancelled) setCategories([])
-      })
-      .catch(() => {
-        if (!cancelled) setCategories([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Audience derived from the anchor — needed to stamp complete history states
-  // without reading window.history.state (which can carry stale values).
-  const audienceKey = anchor.kind === 'hospital' ? 'patient' : 'community'
-
-  // Navigate forward to a sub-view. Always pushes a new history entry so that
-  // browser-back returns exactly one screen. (In-app Up navigation is handled
-  // separately by goToIndex/goToCategoryList, which push the parent screen.)
-  function navigateTo(next: string) {
-    setAction(null)
-    setView(next)
-    history.pushState({ audience: audienceKey, mode: 'find', findView: next }, '')
+  // Open one hospital's About page (from the Hospitals list).
+  function openHospital(id: string) {
+    setHospitalDetailId(id)
+    setView('about-hospital')
+    history.pushState({ mode: 'find', findView: 'about-hospital', findHospitalId: id }, '')
   }
 
-  // Open a listing action (create/edit/report form). Pushes its own history
-  // entry so browser-back from the form lands on the category list, not the index.
+  // Up from a hospital's About page → back to the Hospitals list.
+  const goToHospitals = () => {
+    setView('hospitals')
+    history.pushState({ mode: 'find', findView: 'hospitals' }, '')
+  }
+
+  // Open a listing action (create/edit/report form). Pushes its own history entry
+  // so browser-back from the form lands on the category list, not all the way home.
   function openAction(act: ListingAction) {
     setAction(act)
-    // Remember which listing was opened so we can re-expand its card on Back.
-    if (act.mode === 'edit' || act.mode === 'report') {
-      setReopenItemId(act.listing.id)
-    }
-    // Include the current view so popstate can restore it when going back to
-    // the category list (edit/report listing objects can't be serialized).
-    history.pushState({ audience: audienceKey, mode: 'find', findView: view, findAction: 'open' }, '')
-  }
-
-  // Hierarchical "Up" navigation (not history.back()). Each Up pushes the parent
-  // screen as a new history entry, so the on-screen Up button is decoupled from
-  // the browser/trackpad Back button, which stays temporal.
-
-  // Up from a category / special view / add-category form → the Find index.
-  const goToIndex = () => {
-    setAction(null)
-    setView(null)
-    history.pushState({ audience: audienceKey, mode: 'find', findView: null }, '')
+    if (act.mode === 'edit' || act.mode === 'report') setReopenItemId(act.listing.id)
+    history.pushState({ mode: 'find', findView: view, findAction: 'open' }, '')
   }
 
   // Up from a listing form / report form → the category list it was opened from
   // (view is still the category id; reopenItemId re-expands the relevant card).
   const goToCategoryList = () => {
     setAction(null)
-    history.pushState({ audience: audienceKey, mode: 'find', findView: view }, '')
+    history.pushState({ mode: 'find', findView: view }, '')
   }
 
-  // ── Special (non-category) detail views ─────────────────────────────────────────
+  // ── Special (non-category) detail views ─────────────────────────────────────
+  if (view === 'hospitals') {
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+  }
   if (view === 'about-hospital') {
-    return <AboutYourHospital hospitalId={hospitalId} hospitalName={locationLabel} onUp={goToIndex} />
+    // The hospital chosen from the list; its name (not the address) is the subtitle.
+    const id = hospitalDetailId ?? hospitalId
+    const name = hospitals.find((h) => h.id === id)?.name ?? ''
+    return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
   }
   if (view === 'eruv') {
     const eruv = eruvInfo[hospitalId as keyof typeof eruvInfo]
     if (!eruv)
       return (
         <div>
-          <UpButton label="All resources" onClick={goToIndex} />
-          <p className="text-muted text-sm">No eruv information available for this hospital.</p>
+          <UpButton label="Home" onClick={onUp} />
+          <p className="text-muted text-sm">No eruv information available.</p>
         </div>
       )
-    return <EruvInfo eruv={eruv} onUp={goToIndex} />
+    return <EruvInfo eruv={eruv} onUp={onUp} />
   }
   if (view === 'zmanim') {
     // Address mode: pass raw coords so the API skips the hospital lookup entirely.
-    // Patient mode: pass hospitalId as before.
     if (anchor.kind === 'address') {
       return (
-        <ZmanimCard
-          key={anchor.label}
-          coords={anchor.coords}
-          locationLabel={locationLabel}
-          onUp={goToIndex}
-        />
+        <ZmanimCard key={anchor.label} coords={anchor.coords} locationLabel={locationLabel} onUp={onUp} />
       )
     }
-    return (
-      <ZmanimCard
-        key={hospitalId}
-        hospitalId={hospitalId}
-        locationLabel={locationLabel}
-        onUp={goToIndex}
-      />
-    )
+    return <ZmanimCard key={hospitalId} hospitalId={hospitalId} locationLabel={locationLabel} onUp={onUp} />
   }
   if (view === ADD_CATEGORY) {
-    return <CategoryForm onUp={goToIndex} onSubmitted={goToIndex} />
+    return <CategoryForm onUp={onUp} onSubmitted={onUp} />
   }
 
-  // ── Database-backed categories (with add / edit / report) ───────────────────────
+  // ── Database-backed categories (with add / edit / report) ───────────────────
   const category = view ? categories?.find((c) => c.id === view) : undefined
   if (category) {
     if (action?.mode === 'create') {
@@ -205,91 +176,35 @@ export default function FindResources({ anchor, anchorControls, onUp }: Props) {
     }
     return (
       <ResourceLoader
+        key={category.id + (initialSearch ?? '')}
         category={category}
         anchor={anchor}
         reopenItemId={reopenItemId}
-        onUp={goToIndex}
+        initialSearch={initialSearch ?? undefined}
+        onUp={onUp}
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
         onReport={(listing) => openAction({ mode: 'report', listing })}
+        onViewMap={onViewMap ? () => onViewMap(category.id) : undefined}
       />
     )
   }
 
-  // ── Index ─────────────────────────────────────────────────────────────────────
-  const categoryItems = (categories ?? []).map((c) => ({
-    id: c.id,
-    label: c.pluralLabel,
-    icon: c.icon,
-    description: c.description,
-  }))
-  // 'About Your Hospital' is patient-only. The other specials (Synagogues, Eruv,
-  // Zmanim) are Philadelphia community resources and show in both modes.
-  const specialItems = isHospital
-    ? SPECIAL_ITEMS
-    : SPECIAL_ITEMS.filter((item) => item.id !== 'about-hospital')
-  const allItems = [...specialItems, ...categoryItems]
-
-  const q = query.trim().toLowerCase()
-  const visibleItems = allItems
-    .sort((a, b) => a.label.localeCompare(b.label))
-    .filter(
-      (item) => !q || item.label.toLowerCase().includes(q) || item.description.toLowerCase().includes(q),
+  // A category-id view whose data hasn't loaded yet.
+  if (view && categories === null) {
+    return (
+      <div>
+        <UpButton label="Home" onClick={onUp} />
+        <p className="text-muted text-sm">Loading…</p>
+      </div>
     )
+  }
 
+  // Unknown / empty view — nothing to show; offer a way back to the grid.
   return (
     <div>
       <UpButton label="Home" onClick={onUp} />
-
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-slate-800">Find Resources</h2>
-        <AnchorBar {...anchorControls} label="Calculating distances from" />
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-5">
-        <svg className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-        </svg>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search resources…"
-          aria-label="Search resources"
-          className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-900 placeholder:text-muted shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
-
-      {categories === null ? (
-        <p className="text-muted text-sm">Loading…</p>
-      ) : visibleItems.length === 0 ? (
-        <p className="text-muted text-sm">No resources match "{query}".</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visibleItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => navigateTo(item.id)}
-              className="flex items-center gap-3 p-5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-primary hover:shadow-md transition-all text-left cursor-pointer group h-full"
-            >
-              <span className="text-xl shrink-0" aria-hidden="true">{item.icon}</span>
-              <p className="text-lg font-semibold text-slate-900 group-hover:text-primary transition-colors">
-                {item.label}
-              </p>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Suggest a new category */}
-      <button
-        onClick={() => navigateTo(ADD_CATEGORY)}
-        className="w-full flex items-center justify-center gap-2 mt-5 px-4 py-3 rounded-lg border border-dashed border-primary/50 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-      >
-        <span aria-hidden="true">➕</span>
-        Don&apos;t see the right category? Suggest a new one
-      </button>
+      <p className="text-muted text-sm">This resource isn’t available. Head back to browse everything.</p>
     </div>
   )
 }

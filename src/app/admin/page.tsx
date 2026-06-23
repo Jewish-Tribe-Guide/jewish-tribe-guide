@@ -142,7 +142,7 @@ function flatListing(src: ResourceRow | ResourceSubmission | undefined): Record<
     Address: fmt(src.address),
     Phone: fmt(src.phone),
   }
-  const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus'])
+  const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
   for (const [k, v] of Object.entries(details)) {
     if (SKIP.has(k)) continue
     out[k] = fmt(v)
@@ -348,10 +348,10 @@ function SubmissionCard({
 
 function CategoryDetails({ payload }: { payload: CategorySubmissionPayload }) {
   const f = payload.firstListing
+  // Icon / upvotes aren't collected on the suggestion form (a moderator sets
+  // those on approval), so they'd always render empty here — omit them.
   const rows: [string, string][] = [
-    ['Icon', payload.icon || '—'],
     ['Description', payload.description || '—'],
-    ['Upvotes', payload.upvotesEnabled ? 'Enabled' : 'Off'],
     ['First listing', f?.name || '—'],
     ['Address', f?.address || '—'],
     ['Phone', f?.phone || '—'],

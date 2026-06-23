@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TextInput } from './FormControls'
 import { placesApiHoursToStructured, type StructuredHours } from '@/lib/hours'
+import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure, reportMapsAuthFailure } from '@/lib/loadGoogleMaps'
 
 /** Structured data returned when the user picks a suggestion from the autocomplete. */
 export type PlaceSelectResult = {
@@ -30,58 +31,10 @@ type Props = {
   includedPrimaryTypes?: string[]
 }
 
-declare global {
-  interface Window {
-    gm_authFailure?: () => void
-  }
-}
-
-const MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-
-// Set to true if Google rejects the key (invalid key, Places API/billing not
-// enabled, referrer not allowed). When that happens we degrade to plain text
-// instead of leaving a broken Google widget on the field.
-let mapsAuthFailed = false
-
-// Load the Maps JS API once for the whole app, then resolve only when
-// `google.maps.importLibrary` is actually available. With `loading=async`,
-// that function is attached shortly *after* the script's load event fires, so
-// resolving on `onload` alone would call importLibrary too early.
-let mapsScriptPromise: Promise<void> | null = null
-function loadMapsScript(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve()
-  if (mapsScriptPromise) return mapsScriptPromise
-
-  mapsScriptPromise = new Promise<void>((resolve, reject) => {
-    if (!document.getElementById('google-maps-script') && !window.google?.maps) {
-      const script = document.createElement('script')
-      script.id = 'google-maps-script'
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&loading=async`
-      script.async = true
-      script.onerror = () => reject(new Error('Failed to load Google Maps script'))
-      document.head.appendChild(script)
-    }
-
-    // Poll for the modern loader to become ready (up to ~10s).
-    let tries = 0
-    const check = () => {
-      if (typeof window.google?.maps?.importLibrary === 'function') {
-        resolve()
-      } else if (++tries > 200) {
-        reject(new Error('Google Maps importLibrary did not become available'))
-      } else {
-        setTimeout(check, 50)
-      }
-    }
-    check()
-  })
-  return mapsScriptPromise
-}
-
 export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null)
-  const [authFailed, setAuthFailed] = useState(mapsAuthFailed)
+  const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
 
   // Keep the latest props reachable from the long-lived effect without
   // re-running it (which would tear down and rebuild the Google element).
@@ -102,22 +55,20 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   })
 
   useEffect(() => {
-    if (!MAPS_API_KEY || mapsAuthFailed) return
+    if (!MAPS_API_KEY || mapsAuthFailed()) return
     const container = containerRef.current
     if (!container || elementRef.current) return
 
     let cancelled = false
 
-    // Google calls this global on auth failure (bad key, no billing, etc.).
-    window.gm_authFailure = () => {
-      mapsAuthFailed = true
-      setAuthFailed(true)
-    }
+    // Re-render to the plain-text fallback if Google rejects the key (the
+    // shared loader's gm_authFailure hook fires this for every subscriber).
+    const unsubscribe = onMapsAuthFailure(() => setAuthFailed(true))
 
-    loadMapsScript()
+    loadGoogleMaps()
       .then(() => google.maps.importLibrary('places'))
       .then(() => {
-        if (cancelled || !containerRef.current || mapsAuthFailed) return
+        if (cancelled || !containerRef.current || mapsAuthFailed()) return
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const opts: any = { placeholder: placeholderRef.current }
@@ -169,10 +120,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         })
 
         // If Google reports a runtime error, fall back to a plain text field.
-        element.addEventListener('gmp-error', () => {
-          mapsAuthFailed = true
-          setAuthFailed(true)
-        })
+        element.addEventListener('gmp-error', reportMapsAuthFailure)
 
         containerRef.current.appendChild(element)
         elementRef.current = element
@@ -183,6 +131,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
 
     return () => {
       cancelled = true
+      unsubscribe()
       elementRef.current?.remove()
       elementRef.current = null
     }

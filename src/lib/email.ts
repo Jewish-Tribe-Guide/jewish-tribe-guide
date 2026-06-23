@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
-import { hospitalName } from './requests'
+import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -22,9 +22,26 @@ function row(label: string, value: string): string {
   </tr>`
 }
 
+function formatMinyan(m: Record<string, unknown>): string {
+  const days = Array.isArray(m.days) && m.days.length > 0 ? ` (${(m.days as string[]).join('/')})` : ''
+  const note = m.notes ? ` — ${m.notes}` : ''
+  const tefillah = typeof m.tefillah === 'string'
+    ? m.tefillah.charAt(0).toUpperCase() + m.tefillah.slice(1).replace(/_/g, ' ')
+    : ''
+  return `${tefillah}${days}: ${m.time}${note}`
+}
+
 function formatDetailValue(v: unknown): string {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  if (Array.isArray(v)) return (v as unknown[]).map(String).join(', ')
+  if (Array.isArray(v)) {
+    if (v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
+      // Object arrays (e.g. minyanim) — format each item instead of calling String().
+      return (v as Record<string, unknown>[]).map((item) =>
+        'tefillah' in item ? formatMinyan(item) : JSON.stringify(item)
+      ).join(' | ')
+    }
+    return (v as unknown[]).map(String).join(', ')
+  }
   if (v && typeof v === 'object') return formatHoursSummary(v)
   return v != null ? String(v) : ''
 }
@@ -88,29 +105,22 @@ function buildHtml(
   const sheetsLink = sheetsUrl
     ? `<p style="margin-top:16px;"><a href="${escapeHtml(sheetsUrl)}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open Google Sheets →</a></p>`
     : ''
-  // Only non-volunteer request types have "Request" in their subject line.
-  const isVolunteer = requestType === 'Volunteer' || requestType === 'Volunteer Edit' || requestType === 'Volunteer Removal'
-  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
-  const adminLink = !isVolunteer && appUrl
-    ? `<p style="margin-top:8px;"><a href="${escapeHtml(appUrl)}/admin" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Go to admin →</a></p>`
-    : ''
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">New ${escapeHtml(requestType)} Request</h2>
     <p style="color:#64748b;margin-top:0;font-size:14px;">Request ID: <strong>${escapeHtml(requestId)}</strong></p>
     <table style="border-collapse:collapse;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
       ${row('Submitted', timestamp)}
       ${row('Request Type', requestType)}
-      ${row('Hospital', hospitalName(contact.hospitalId))}
+      ${row('Hospital / room', contact.hospitalId)}
       ${row('Name', contact.fullName)}
       ${row('Phone', contact.phone)}
       ${row('Email', contact.email)}
-      ${row('Unit / Room', contact.unitFloorRoom)}
+      ${row('Preferred contact', PREFERRED_CONTACT_LABELS[contact.preferredContact] ?? contact.preferredContact)}
       ${row('Status', 'New')}
     </table>
     <h3 style="color:#334155;margin-bottom:6px;">Request Details</h3>
     <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(formJson)}</pre>
     ${sheetsLink}
-    ${adminLink}
   </div>`
 }
 
@@ -185,7 +195,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus'])
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
@@ -231,6 +241,11 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
            ${detailRows}`
   }
 
+  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const adminLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Review in admin →</a></p>`
+    : ''
+
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(verb)} — awaiting review</h2>
     <table style="border-collapse:collapse;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
@@ -239,6 +254,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
       ${submission.note ? row('Note', submission.note) : ''}
       ${row('Submitted by', submission.submitted_by?.name || submission.submitted_by?.email || 'Anonymous')}
     </table>
+    ${adminLink}
   </div>`
 
   await sendEmail({ to, subject, html })

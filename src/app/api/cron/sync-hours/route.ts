@@ -21,6 +21,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync } from '@/lib/googlePlaces'
+import { submitGoogleClosure } from '@/lib/submissionStore'
+import { sendSubmissionNotification } from '@/lib/email'
 
 // Does network + DB work; never prerender or cache it.
 export const dynamic = 'force-dynamic'
@@ -34,9 +36,25 @@ type SyncedRow = {
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true // unset → open (dev only; set it in production)
+  if (!secret) {
+    // No secret configured. Open in dev for convenience, but FAIL CLOSED in
+    // production: an unauthenticated endpoint that fans out to paid Google
+    // Places calls per listing is a billing-runaway risk if anyone finds the
+    // URL. Set CRON_SECRET in the production environment (e.g. Vercel env vars)
+    // so the route — and Vercel's own cron — can authenticate.
+    return process.env.NODE_ENV !== 'production'
+  }
   const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   return bearer === secret || req.headers.get('x-cron-secret') === secret
+}
+
+// Safety ceiling: the largest number of listings one sync run will touch, i.e.
+// the max paid Google Place Details calls per invocation. Bounds the cost of any
+// single run regardless of directory size or how often the route is triggered.
+// Override with SYNC_MAX_RECORDS; defaults to 500.
+function maxRecords(): number {
+  const n = Number(process.env.SYNC_MAX_RECORDS)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500
 }
 
 async function runSync(): Promise<NextResponse> {
@@ -46,6 +64,8 @@ async function runSync(): Promise<NextResponse> {
     .select('id,phone,address,details')
     .eq('status', 'approved')
     .not('details->>placeId', 'is', null)
+    // Cap the number of paid Google Place Details calls a single run can make.
+    .limit(maxRecords())
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
@@ -54,6 +74,7 @@ async function runSync(): Promise<NextResponse> {
   const rows = (data ?? []) as SyncedRow[]
   let synced = 0
   let failed = 0
+  let flaggedClosed = 0
 
   for (const row of rows) {
     const placeId = String(row.details.placeId)
@@ -69,6 +90,7 @@ async function runSync(): Promise<NextResponse> {
     }
     if (sync.hours) details.hours = sync.hours
     if (sync.businessStatus) details.businessStatus = sync.businessStatus
+    if (sync.description && !details.googleDescription) details.googleDescription = sync.description
 
     const update: { details: Record<string, unknown>; phone?: string; address?: string } = { details }
     if (sync.phone) update.phone = sync.phone
@@ -77,9 +99,23 @@ async function runSync(): Promise<NextResponse> {
 
     await supabase.from('resource').update(update).eq('id', row.id)
     synced++
+
+    // Route permanent closures through the moderation queue so an admin can
+    // review and approve before the listing is removed from the public directory.
+    if (sync.businessStatus === 'CLOSED_PERMANENTLY') {
+      try {
+        const submission = await submitGoogleClosure(row.id)
+        if (submission) {
+          flaggedClosed++
+          await sendSubmissionNotification(submission).catch(() => {})
+        }
+      } catch (err) {
+        console.error(`[sync-hours] submitGoogleClosure failed for ${row.id}:`, err)
+      }
+    }
   }
 
-  return NextResponse.json({ ok: true, total: rows.length, synced, failed })
+  return NextResponse.json({ ok: true, total: rows.length, synced, failed, flaggedClosed })
 }
 
 export async function GET(req: NextRequest) {

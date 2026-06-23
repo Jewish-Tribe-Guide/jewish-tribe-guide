@@ -188,9 +188,11 @@ export function groupByTefillah(shuls: ShulInfo[]): ByTefillahGroup[] {
   return TEFILLAH_ORDER.filter((t) => (map.get(t)?.length ?? 0) > 0).map((t) => ({
     tefillah: t,
     label: TEFILLAH_LABELS[t],
-    rows: (map.get(t) ?? []).sort(
-      (a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time),
-    ),
+    rows: (map.get(t) ?? []).sort((a, b) => {
+      const aDay = a.days.length > 0 ? Math.min(...a.days.map((d) => DAY_KEYS.indexOf(d))) : Infinity
+      const bDay = b.days.length > 0 ? Math.min(...b.days.map((d) => DAY_KEYS.indexOf(d))) : Infinity
+      return aDay - bDay || parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time)
+    }),
   }))
 }
 

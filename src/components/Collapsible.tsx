@@ -5,10 +5,12 @@ import { useState } from 'react'
 type Props = {
   title: string
   children: React.ReactNode
+  /** Render expanded on first paint (the visitor can still collapse it). */
+  defaultOpen?: boolean
 }
 
-export default function Collapsible({ title, children }: Props) {
-  const [isExpanded, setIsExpanded] = useState(false)
+export default function Collapsible({ title, children, defaultOpen = false }: Props) {
+  const [isExpanded, setIsExpanded] = useState(defaultOpen)
 
   return (
     <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">

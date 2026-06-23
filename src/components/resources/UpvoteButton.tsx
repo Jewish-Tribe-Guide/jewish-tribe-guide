@@ -35,11 +35,15 @@ export default function UpvoteButton({
   resourceId,
   count: initialCount,
   onCountChange,
+  variant = 'box',
 }: {
   resourceId: string
   count: number
   /** Notifies the parent of the latest count so it can re-sort by popularity. */
   onCountChange?: (count: number) => void
+  /** 'box' — the bordered ▲/count tile. 'inline' — a minimal "▲ count" that sits
+   *  in a row (used in the collapsed listing header). */
+  variant?: 'box' | 'inline'
 }) {
   const [count, setCount] = useState(initialCount)
   const [voted, setVoted] = useState(false) // set from localStorage after mount (hydration-safe)
@@ -87,12 +91,42 @@ export default function UpvoteButton({
     }
   }
 
+  // Stop propagation so upvoting inside a tappable card header doesn't also
+  // toggle the card open/closed.
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    toggle()
+  }
+
+  const title = voted ? 'Remove your upvote' : 'Upvote this place'
+
+  if (variant === 'inline') {
+    return (
+      <button
+        onClick={handleClick}
+        disabled={busy}
+        aria-pressed={voted}
+        title={title}
+        className={[
+          // Negative margin + padding grows the tap area to ~32px for touch
+          // without shifting the surrounding header layout. Mobile only — desktop
+          // keeps the original compact hit area (sm:m-0 sm:p-0).
+          'inline-flex items-center gap-1 -m-2 p-2 sm:m-0 sm:p-0 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
+          voted ? 'text-primary' : 'text-slate-500 hover:text-primary',
+        ].join(' ')}
+      >
+        <span aria-hidden="true">▲</span>
+        {count}
+      </button>
+    )
+  }
+
   return (
     <button
-      onClick={toggle}
+      onClick={handleClick}
       disabled={busy}
       aria-pressed={voted}
-      title={voted ? 'Remove your upvote' : 'Upvote this place'}
+      title={title}
       className={[
         'flex flex-col items-center justify-center rounded-md border px-2.5 py-1 cursor-pointer transition-colors min-w-[2.75rem]',
         voted
