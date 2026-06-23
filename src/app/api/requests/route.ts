@@ -13,6 +13,7 @@ import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { isHoneypotTripped } from '@/lib/honeypot'
 
 export async function POST(request: Request) {
   // Writes to Sheets + sends two emails per call — throttle hard.
@@ -28,6 +29,11 @@ export async function POST(request: Request) {
 
   const tooBig = payloadTooLarge(payload)
   if (tooBig) return Response.json({ ok: false, errors: [tooBig] }, { status: 413 })
+
+  // Bot trap — silently accept (no Sheets/email) so the bot can't tell.
+  if (isHoneypotTripped(payload)) {
+    return Response.json({ ok: true, requestId: 'ok' })
+  }
 
   // 1. Validate
   const errors = validateSubmission(payload)

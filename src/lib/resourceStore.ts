@@ -1,6 +1,6 @@
 import { getAdminClient } from './supabase/admin'
 import type { CategoryConfig } from './categories'
-import { isValidPhone } from './validation'
+import { isValidPhone, isHttpUrl } from './validation'
 import { LIMITS, tooLong, oversizedField } from './limits'
 import { getVoteCounts } from './voteStore'
 import type { ResourceRow, DirectoryResource, ResourceSubmission } from '@/types'
@@ -82,6 +82,16 @@ export function validateSubmission(
     const value = submission.details?.[field.key]
     if (value === undefined || value === null || String(value).trim() === '') {
       errs.push(`${field.label} is required.`)
+    }
+  }
+
+  // URL fields render as clickable link buttons on approved cards — only allow
+  // http/https so a `javascript:`/`data:` URL can't be smuggled into an href.
+  for (const field of category?.detailFields ?? []) {
+    if (field.type !== 'url') continue
+    const value = submission.details?.[field.key]
+    if (typeof value === 'string' && value.trim() && !isHttpUrl(value)) {
+      errs.push(`${field.label} must be a valid http(s) link.`)
     }
   }
 

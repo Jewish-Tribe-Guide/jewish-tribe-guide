@@ -8,6 +8,7 @@ import AddressInput, { type PlaceSelectResult } from '@/components/intake/Addres
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
+import Honeypot from '@/components/Honeypot'
 
 type Props = {
   /** The category this listing belongs to (fixed by where the form was opened). */
@@ -50,6 +51,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   })
   const [submitterName, setSubmitterName] = useState('')
   const [submitterEmail, setSubmitterEmail] = useState('')
+  // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
+  const [honeypot, setHoneypot] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -121,6 +124,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           targetId: mode === 'edit' ? existing?.id : undefined,
           payload,
           submittedBy,
+          company: honeypot,
         }),
       })
       const body = await res.json()
@@ -168,6 +172,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <Honeypot value={honeypot} onChange={setHoneypot} />
         {!community && (
           <>
             <div>

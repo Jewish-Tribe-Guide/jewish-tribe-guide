@@ -11,6 +11,7 @@ import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { isValidPhone } from '@/lib/validation'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { isHoneypotTripped } from '@/lib/honeypot'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
 type Body = {
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
 
   const tooBig = payloadTooLarge(body)
   if (tooBig) return Response.json({ ok: false, errors: [tooBig] }, { status: 413 })
+
+  // Bot trap — silently accept (no DB/email/geocode) so the bot can't tell.
+  if (isHoneypotTripped(body)) return Response.json({ ok: true, id: 'ok' })
 
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null
