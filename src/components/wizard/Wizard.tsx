@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isValidPhone } from '@/lib/validation'
+import Honeypot from '@/components/Honeypot'
 
 // ── Step config ───────────────────────────────────────────────────────────────
 // A wizard is a flat list of steps. Each step shows ONE question. `when` gates a
@@ -207,6 +208,10 @@ export default function Wizard({
       onBack={clampedIdx > 0 ? goBack : null}
       stepText={`${clampedIdx + 1} of ${visible.length}`}
     >
+      <Honeypot
+        value={(answers.company as string) ?? ''}
+        onChange={(v) => setAnswers((a) => ({ ...a, company: v }))}
+      />
       <div key={step.id} className="animate-[fadeIn_180ms_ease-out]">
         {step.section && (
           <p className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-primary">

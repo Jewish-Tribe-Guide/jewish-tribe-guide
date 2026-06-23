@@ -207,7 +207,7 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
       },
     }
 
-    await submitRequest('Volunteer', contact, volunteer)
+    await submitRequest('Volunteer', contact, volunteer, str('company'))
   }
 
   return (

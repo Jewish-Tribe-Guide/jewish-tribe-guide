@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { CategorySubmissionPayload } from '@/types'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import UpButton from '@/components/UpButton'
+import Honeypot from '@/components/Honeypot'
 
 type Props = {
   onUp: () => void
@@ -27,6 +28,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
 
   const [submitterName, setSubmitterName] = useState('')
   const [submitterEmail, setSubmitterEmail] = useState('')
+  const [honeypot, setHoneypot] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -67,7 +69,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
       const res = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'create', targetType: 'category', payload, submittedBy }),
+        body: JSON.stringify({ operation: 'create', targetType: 'category', payload, submittedBy, company: honeypot }),
       })
       const body = await res.json()
       if (!res.ok || !body.ok) {
@@ -109,6 +111,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <Honeypot value={honeypot} onChange={setHoneypot} />
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Category name *</label>
           <input value={label} onChange={(e) => setLabel(e.target.value)} className={inputClass} placeholder="e.g. Dentists, Car Repair" />

@@ -1,0 +1,21 @@
+# Dependabot keeps dependencies patched — it opens PRs when a package has a new
+# version or a known security advisory. Security updates are what matter most
+# here; grouping the routine version bumps keeps PR noise low.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for all routine (non-major) updates instead of many.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
