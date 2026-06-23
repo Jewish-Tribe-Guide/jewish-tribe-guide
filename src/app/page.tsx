@@ -9,6 +9,7 @@ import FindResources from '@/components/FindResources'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
+import { useStoredLocation } from '@/lib/useStoredLocation'
 
 // Which guided form is open as a full-screen overlay (Support / Volunteer), and
 // any need pre-checked from the card or a search result.
@@ -23,8 +24,8 @@ type NavState = { mode: AppMode; flow?: Flow; flowStep?: number; mapCategory?: s
 
 export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
-  const [address, setAddress] = useState('')
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  // Location persists across reloads/return visits — it drives all distance sorting.
+  const { address, coords, setAddress, setCoords } = useStoredLocation()
   const [flow, setFlow] = useState<Flow | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)

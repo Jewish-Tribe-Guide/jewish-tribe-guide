@@ -6,7 +6,7 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
-import AddressPrompt from './AddressPrompt'
+import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
 import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -188,41 +188,32 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="flex items-end justify-between gap-2 mb-2">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">{category.pluralLabel}</h2>
-          {anchorLabel ? (
-            <p className="text-sm text-muted mt-0.5">
-              {anchorLabel}<span aria-hidden="true" className="hidden sm:inline mx-1.5">·</span><span className="hidden sm:inline">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
-            </p>
-          ) : addressPrompt ? (
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <AddressPrompt />
-              <span className="hidden sm:inline text-sm text-muted"><span aria-hidden="true" className="mr-1">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</span>
-            </div>
-          ) : (
-            <p className="hidden sm:block text-sm text-muted mt-0.5"><span aria-hidden="true" className="mr-1.5">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {onViewMap && !category.community && (
+      <DirectoryHeader
+        title={category.pluralLabel}
+        count={items.length}
+        anchorLabel={anchorLabel}
+        addressPrompt={addressPrompt}
+        actions={
+          <>
+            {onViewMap && !category.community && (
+              <button
+                onClick={onViewMap}
+                /* Desktop only — on mobile the Map button moves into the filter/sort
+                   row (next to Filters) to keep the header uncluttered. */
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                🗺️ Map
+              </button>
+            )}
             <button
-              onClick={onViewMap}
-              /* Desktop only — on mobile the Map button moves into the filter/sort
-                 row (next to Filters) to keep the header uncluttered. */
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
             >
-              🗺️ Map
+              <PlusIcon className="h-4 w-4" /> Add
             </button>
-          )}
-          <button
-            onClick={onAdd}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <PlusIcon className="h-4 w-4" /> Add
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Controls */}
       <div className="mb-4 space-y-2">

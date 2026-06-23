@@ -36,9 +36,25 @@ type SyncedRow = {
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true // unset → open (dev only; set it in production)
+  if (!secret) {
+    // No secret configured. Open in dev for convenience, but FAIL CLOSED in
+    // production: an unauthenticated endpoint that fans out to paid Google
+    // Places calls per listing is a billing-runaway risk if anyone finds the
+    // URL. Set CRON_SECRET in the production environment (e.g. Vercel env vars)
+    // so the route — and Vercel's own cron — can authenticate.
+    return process.env.NODE_ENV !== 'production'
+  }
   const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
   return bearer === secret || req.headers.get('x-cron-secret') === secret
+}
+
+// Safety ceiling: the largest number of listings one sync run will touch, i.e.
+// the max paid Google Place Details calls per invocation. Bounds the cost of any
+// single run regardless of directory size or how often the route is triggered.
+// Override with SYNC_MAX_RECORDS; defaults to 500.
+function maxRecords(): number {
+  const n = Number(process.env.SYNC_MAX_RECORDS)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 500
 }
 
 async function runSync(): Promise<NextResponse> {
@@ -48,6 +64,8 @@ async function runSync(): Promise<NextResponse> {
     .select('id,phone,address,details')
     .eq('status', 'approved')
     .not('details->>placeId', 'is', null)
+    // Cap the number of paid Google Place Details calls a single run can make.
+    .limit(maxRecords())
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

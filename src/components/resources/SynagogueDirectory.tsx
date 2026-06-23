@@ -7,7 +7,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import DenominationFilter from '@/components/synagogues/DenominationFilter'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
-import AddressPrompt from './AddressPrompt'
+import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
 import { ClockIcon, PlusIcon } from '@/components/icons'
 
@@ -93,40 +93,31 @@ export default function SynagogueDirectory({
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="flex items-end justify-between gap-2 mb-2">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">Synagogues</h2>
-          {anchorLabel ? (
-            <p className="text-sm text-muted mt-0.5">
-              {anchorLabel}<span aria-hidden="true" className="hidden sm:inline mx-1.5">·</span><span className="hidden sm:inline">{items.length} listing{items.length !== 1 ? 's' : ''}</span>
-            </p>
-          ) : addressPrompt ? (
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <AddressPrompt />
-              <span className="hidden sm:inline text-sm text-muted"><span aria-hidden="true" className="mr-1">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</span>
-            </div>
-          ) : (
-            <p className="hidden sm:block text-sm text-muted mt-0.5"><span aria-hidden="true" className="mr-1.5">·</span>{items.length} listing{items.length !== 1 ? 's' : ''}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {onViewMap && (
+      <DirectoryHeader
+        title="Synagogues"
+        count={items.length}
+        anchorLabel={anchorLabel}
+        addressPrompt={addressPrompt}
+        actions={
+          <>
+            {onViewMap && (
+              <button
+                onClick={onViewMap}
+                /* Desktop only — on mobile Map moves into the filter row below. */
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                🗺️ Map
+              </button>
+            )}
             <button
-              onClick={onViewMap}
-              /* Desktop only — on mobile Map moves into the filter row below. */
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+              onClick={onAdd}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
             >
-              🗺️ Map
+              <PlusIcon className="h-4 w-4" /> Add
             </button>
-          )}
-          <button
-            onClick={onAdd}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <PlusIcon className="h-4 w-4" /> Add
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Controls: search + denomination filter */}
       <div className="mb-4 space-y-2">

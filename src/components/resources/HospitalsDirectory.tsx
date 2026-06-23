@@ -6,7 +6,7 @@ import { hospitalInfo } from '@/data/hospitalInfo'
 import type { DirectoryAnchor } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import UpButton from '@/components/UpButton'
-import AddressPrompt from './AddressPrompt'
+import DirectoryHeader from './DirectoryHeader'
 
 type Props = {
   anchor: DirectoryAnchor
@@ -55,29 +55,26 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
     <div>
       <UpButton label="All resources" onClick={onUp} />
 
-      <div className="mb-5">
-        <h2 className="text-xl font-semibold text-slate-800">Which hospital?</h2>
-        {coords && label ? (
-          <p className="text-sm text-muted mt-1">{label}</p>
-        ) : (
-          <div className="mt-1.5">
-            <AddressPrompt />
-          </div>
+      <DirectoryHeader
+        title="Which hospital?"
+        anchorLabel={coords && label ? label : undefined}
+        addressPrompt
+      />
+      {/* Description + Map sit on their own row here (not in the header's actions
+          slot) because the explanatory copy is unique to this screen. */}
+      <div className="flex items-center justify-between gap-4 mt-1 mb-5">
+        <p className="text-sm text-muted">
+          Pick where you are (or will be) to find its Jewish chaplain, bikkur cholim, prayer
+          spaces, and kosher &amp; Shabbos support.
+        </p>
+        {onViewMap && (
+          <button
+            onClick={onViewMap}
+            className="shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            🗺️ Map
+          </button>
         )}
-        <div className="flex items-center justify-between gap-4 mt-3">
-          <p className="text-sm text-muted">
-            Pick where you are (or will be) to find its Jewish chaplain, bikkur cholim, prayer
-            spaces, and kosher &amp; Shabbos support.
-          </p>
-          {onViewMap && (
-            <button
-              onClick={onViewMap}
-              className="shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-            >
-              🗺️ Map
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Search — only when the list is long enough to need it. */}
