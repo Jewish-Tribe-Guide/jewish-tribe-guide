@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 const figtree = Figtree({ subsets: ['latin'] })
@@ -26,7 +27,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={figtree.className}>
-      <body className="bg-surface text-slate-900 antialiased min-h-screen flex flex-col">{children}</body>
+      <body className="bg-surface text-slate-900 antialiased min-h-screen flex flex-col">
+        {children}
+        <Analytics />
+      </body>
     </html>
   )
 }
