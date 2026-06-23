@@ -9,6 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { computeTravelTimesFrom } from '@/lib/travelTime'
+import { enforceRateLimit } from '@/lib/rateLimit'
+import { LIMITS } from '@/lib/limits'
 import type { LatLng } from '@/lib/geo'
 
 type Destination = { id: string; lat: number; lng: number }
@@ -19,6 +21,10 @@ type RequestBody = {
 }
 
 export async function POST(req: NextRequest) {
+  // Each destination is a paid Google lookup — throttle and bound the array.
+  const limited = await enforceRateLimit(req, 'travel', { limit: 20, windowSec: 60 })
+  if (limited) return limited
+
   try {
     const body = (await req.json()) as RequestBody
     const { origin, destinations } = body
@@ -29,6 +35,13 @@ export async function POST(req: NextRequest) {
       !Array.isArray(destinations)
     ) {
       return NextResponse.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
+    }
+
+    if (destinations.length > LIMITS.travelDestinations) {
+      return NextResponse.json(
+        { ok: false, error: 'Too many destinations in one request.' },
+        { status: 413 },
+      )
     }
 
     const results = await computeTravelTimesFrom(origin, destinations)

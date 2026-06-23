@@ -1,10 +1,14 @@
 import { getAdminClient } from '@/lib/supabase/admin'
+import { enforceRateLimit } from '@/lib/rateLimit'
 
 // POST /api/resource/:id/confirm
 // Records that a visitor verified the community-curated info is still accurate.
 // Writes confirmedAt into details (same pattern as googleSyncedAt) — no separate
 // column needed, surfaces automatically via the normalizeRow spread.
-export async function POST(_request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
+export async function POST(request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
+  const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
+  if (limited) return limited
+
   const { id } = await ctx.params
 
   const db = getAdminClient()

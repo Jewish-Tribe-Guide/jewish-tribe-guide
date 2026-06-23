@@ -1,6 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import type { CategoryConfig } from './categories'
 import { isValidPhone } from './validation'
+import { LIMITS, tooLong, oversizedField } from './limits'
 import { getVoteCounts } from './voteStore'
 import type { ResourceRow, DirectoryResource, ResourceSubmission } from '@/types'
 
@@ -83,6 +84,12 @@ export function validateSubmission(
       errs.push(`${field.label} is required.`)
     }
   }
+
+  // Size caps — keep junk out of the queue and bound geocode/email cost.
+  if (tooLong(submission.name, LIMITS.name)) errs.push('Name is too long.')
+  if (tooLong(submission.address, LIMITS.address)) errs.push('Address is too long.')
+  if (tooLong(submission.phone, LIMITS.phone)) errs.push('Phone number is too long.')
+  if (oversizedField(submission.details)) errs.push('One of the fields is too long.')
 
   return errs
 }

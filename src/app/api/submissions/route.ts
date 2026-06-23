@@ -9,6 +9,8 @@ import {
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { isValidPhone } from '@/lib/validation'
+import { enforceRateLimit } from '@/lib/rateLimit'
+import { payloadTooLarge } from '@/lib/limits'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
 type Body = {
@@ -24,12 +26,20 @@ type Body = {
 // a listing, or request a new category (with its first listing). Everything lands
 // in the moderation queue as `pending`; nothing goes live until an admin approves.
 export async function POST(request: Request) {
+  // Each submission geocodes + emails, and floods the moderation queue if
+  // abused — throttle per IP.
+  const limited = await enforceRateLimit(request, 'submissions', { limit: 10, windowSec: 60 })
+  if (limited) return limited
+
   let body: Body
   try {
     body = (await request.json()) as Body
   } catch {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
+
+  const tooBig = payloadTooLarge(body)
+  if (tooBig) return Response.json({ ok: false, errors: [tooBig] }, { status: 413 })
 
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null

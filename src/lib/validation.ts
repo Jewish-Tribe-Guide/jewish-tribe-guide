@@ -1,4 +1,5 @@
 import type { ContactHospitalData } from '@/types'
+import { LIMITS, tooLong } from './limits'
 
 // Strips all non-digit characters and checks for a plausible phone number length.
 // Accepts US formats like (215) 555-0100, 215-555-0100, +12155550100, etc.
@@ -20,5 +21,9 @@ export function validateContact(contact: ContactHospitalData): string[] {
   } else if (hasPhone && !isValidPhone(contact.phone)) {
     errs.push('Please enter a valid phone number.')
   }
+  // Size caps.
+  if (tooLong(contact.fullName, LIMITS.name)) errs.push('Name is too long.')
+  if (tooLong(contact.phone, LIMITS.phone)) errs.push('Phone number is too long.')
+  if (tooLong(contact.email, LIMITS.email)) errs.push('Email is too long.')
   return errs
 }

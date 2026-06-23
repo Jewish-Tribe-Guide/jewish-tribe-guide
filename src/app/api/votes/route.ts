@@ -1,8 +1,12 @@
 import { toggleVote } from '@/lib/voteStore'
+import { enforceRateLimit } from '@/lib/rateLimit'
 
 // POST /api/votes  body: { resourceId, token }
 // Toggles the browser token's upvote on a listing. Instant (not moderated).
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, 'votes', { limit: 30, windowSec: 60 })
+  if (limited) return limited
+
   let body: { resourceId?: string; token?: string }
   try {
     body = (await request.json()) as { resourceId?: string; token?: string }

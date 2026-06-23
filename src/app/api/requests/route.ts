@@ -11,14 +11,23 @@ import {
 import { appendRow } from '@/lib/sheets'
 import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
+import { enforceRateLimit } from '@/lib/rateLimit'
+import { payloadTooLarge } from '@/lib/limits'
 
 export async function POST(request: Request) {
+  // Writes to Sheets + sends two emails per call — throttle hard.
+  const limited = await enforceRateLimit(request, 'requests', { limit: 5, windowSec: 60 })
+  if (limited) return limited
+
   let payload: SubmissionPayload
   try {
     payload = (await request.json()) as SubmissionPayload
   } catch {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
+
+  const tooBig = payloadTooLarge(payload)
+  if (tooBig) return Response.json({ ok: false, errors: [tooBig] }, { status: 413 })
 
   // 1. Validate
   const errors = validateSubmission(payload)
