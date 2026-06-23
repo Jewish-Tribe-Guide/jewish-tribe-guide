@@ -1,6 +1,7 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { isAllowedAdminEmail } from '@/lib/adminAuth'
 import { sendAdminMagicLink } from '@/lib/email'
+import { enforceRateLimit } from '@/lib/rateLimit'
 
 // POST /api/admin/request-link  body: { email }
 // Sends a magic sign-in link ONLY if the email is an allowlisted admin. Because
@@ -8,6 +9,10 @@ import { sendAdminMagicLink } from '@/lib/email'
 // the only path that can create/sign in an admin — so no one else can obtain a
 // link by entering an arbitrary email.
 export async function POST(request: Request) {
+  // Sends email when the address is an admin — throttle to prevent inbox spam.
+  const limited = await enforceRateLimit(request, 'request-link', { limit: 5, windowSec: 300 })
+  if (limited) return limited
+
   let email: string
   try {
     const body = (await request.json()) as { email?: string }
