@@ -33,6 +33,16 @@ function buildRequestConfirmation(
   const name = escapeHtml(payload.contact.fullName)
 
   switch (payload.requestType) {
+    case 'Feedback':
+      return {
+        subject: 'Thanks for your feedback',
+        html: wrap(`
+          <h2 style="${HEADING_STYLE}">Thanks for your note!</h2>
+          <p style="${TEXT_STYLE}">We&apos;ve received your feedback and appreciate you taking the time to share it.</p>
+          <p style="${TEXT_STYLE}">Have questions? Just reply to this email.</p>
+        `),
+      }
+
     case 'Volunteer':
       return {
         subject: "You're on our volunteer list",

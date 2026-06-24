@@ -7,6 +7,8 @@ import {
   VOLUNTEER_SHEET_TAB,
   buildVolunteerChangeSheetRow,
   VOLUNTEER_CHANGES_SHEET_TAB,
+  buildFeedbackSheetRow,
+  FEEDBACK_SHEET_TAB,
 } from '@/lib/requests'
 import { appendRow } from '@/lib/sheets'
 import { sendNotification } from '@/lib/email'
@@ -62,6 +64,8 @@ export async function POST(request: Request) {
       await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_SHEET_TAB })
     } else if (payload.requestType === 'Volunteer Edit' || payload.requestType === 'Volunteer Removal') {
       await appendRow(buildVolunteerChangeSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_CHANGES_SHEET_TAB })
+    } else if (payload.requestType === 'Feedback') {
+      await appendRow(buildFeedbackSheetRow(payload, requestId, timestamp), { tab: FEEDBACK_SHEET_TAB })
     } else {
       await appendRow(buildSheetRow(payload, requestId, timestamp))
     }

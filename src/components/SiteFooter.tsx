@@ -1,7 +1,5 @@
-// Site-wide footer. Adds credibility/context and points people to the in-app
-// feedback flows (Suggest a category, Edit, Report) rather than an email, so
-// corrections land in the right place. No contact email for now — see the
-// header pattern if/when a public address is added.
+import FeedbackButton from './FeedbackButton'
+
 export default function SiteFooter() {
   const year = new Date().getFullYear()
 
@@ -33,11 +31,12 @@ export default function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-slate-100 pt-5">
+        <div className="mt-8 border-t border-slate-100 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
             on them. © {year} Philadelphia Jewish Community.
           </p>
+          <FeedbackButton />
         </div>
       </div>
     </footer>
