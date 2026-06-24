@@ -11,8 +11,10 @@ import {
 import { appendRow } from '@/lib/sheets'
 import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
-import { enforceRateLimit } from '@/lib/rateLimit'
+import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { isHoneypotTripped } from '@/lib/honeypot'
+import { verifyTurnstile } from '@/lib/turnstile'
 
 export async function POST(request: Request) {
   // Writes to Sheets + sends two emails per call — throttle hard.
@@ -28,6 +30,20 @@ export async function POST(request: Request) {
 
   const tooBig = payloadTooLarge(payload)
   if (tooBig) return Response.json({ ok: false, errors: [tooBig] }, { status: 413 })
+
+  // Bot trap — silently accept (no Sheets/email) so the bot can't tell.
+  if (isHoneypotTripped(payload)) {
+    return Response.json({ ok: true, requestId: 'ok' })
+  }
+
+  // CAPTCHA — no-op until TURNSTILE_SECRET_KEY is configured.
+  const turnstileToken = (payload as { turnstileToken?: string }).turnstileToken
+  if (!(await verifyTurnstile(turnstileToken, clientIp(request)))) {
+    return Response.json(
+      { ok: false, errors: ['Verification failed. Please refresh and try again.'] },
+      { status: 403 },
+    )
+  }
 
   // 1. Validate
   const errors = validateSubmission(payload)

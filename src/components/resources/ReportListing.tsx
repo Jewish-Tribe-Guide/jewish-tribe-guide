@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import UpButton from '@/components/UpButton'
+import Honeypot from '@/components/Honeypot'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 type Props = {
   listing: DirectoryResource
@@ -15,6 +17,8 @@ type Props = {
 export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: Props) {
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
+  const [honeypot, setHoneypot] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -33,6 +37,8 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
           targetId: listing.id,
           note: note.trim() || undefined,
           submittedBy: submitterName.trim() ? { name: submitterName.trim() } : undefined,
+          company: honeypot,
+          turnstileToken,
         }),
       })
       const body = await res.json()
@@ -81,6 +87,7 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <Honeypot value={honeypot} onChange={setHoneypot} />
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">What&apos;s the issue?</label>
           <textarea
@@ -97,6 +104,8 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
         </div>
 
         {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
+
+        <TurnstileWidget onVerify={setTurnstileToken} />
 
         <button
           type="submit"

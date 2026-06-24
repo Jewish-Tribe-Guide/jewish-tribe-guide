@@ -10,13 +10,15 @@ export async function submitRequest(
   requestType: RequestType,
   contact: ContactHospitalData,
   formData: Record<string, unknown>,
+  honeypot = '',
+  turnstileToken = '',
 ): Promise<SubmitResult> {
   let res: Response
   try {
     res = await fetch('/api/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestType, contact, formData }),
+      body: JSON.stringify({ requestType, contact, formData, company: honeypot, turnstileToken }),
     })
   } catch {
     throw new Error('Network error. Please check your connection and try again.')
