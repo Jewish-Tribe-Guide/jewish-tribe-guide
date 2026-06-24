@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, resourceCards } from '@/components/home/sections'
+import { logSearchMiss } from '@/lib/logSearchMiss'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
@@ -81,6 +82,26 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       findQuery: hit.term,
       findItemId: hit.item.id,
     })
+
+  // Capture searches that come up empty — the most actionable signal for what
+  // content to add next. Debounced (so we log settled intent, not every
+  // keystroke) and deduped per session. Only fires once data has loaded, so a
+  // slow load never looks like a "miss".
+  const dataReady = allCards !== null && listings !== null
+  const filteredCount = filtered?.length ?? 0
+  const placeHitCount = placeHits.length
+  const loggedMisses = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const term = q.toLowerCase()
+    if (!dataReady || term.length < 3) return
+    if (filteredCount > 0 || placeHitCount > 0) return
+    if (loggedMisses.current.has(term)) return
+    const timer = setTimeout(() => {
+      loggedMisses.current.add(term)
+      logSearchMiss(q)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [q, dataReady, filteredCount, placeHitCount])
 
   const suggestCard: CardDef = {
     title: 'Suggest a new category',
