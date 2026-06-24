@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 type Props = {
   listing: DirectoryResource
@@ -17,6 +18,7 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
   const [honeypot, setHoneypot] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -36,6 +38,7 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
           note: note.trim() || undefined,
           submittedBy: submitterName.trim() ? { name: submitterName.trim() } : undefined,
           company: honeypot,
+          turnstileToken,
         }),
       })
       const body = await res.json()
@@ -101,6 +104,8 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
         </div>
 
         {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}
+
+        <TurnstileWidget onVerify={setTurnstileToken} />
 
         <button
           type="submit"

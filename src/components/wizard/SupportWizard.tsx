@@ -304,7 +304,13 @@ export default function SupportWizard({ preselect, onClose }: Props) {
       }),
     }
 
-    await submitRequest('Direct Support', contact, formData, typeof a.company === 'string' ? a.company : '')
+    await submitRequest(
+      'Direct Support',
+      contact,
+      formData,
+      typeof a.company === 'string' ? a.company : '',
+      typeof a.turnstileToken === 'string' ? a.turnstileToken : '',
+    )
   }
 
   return (

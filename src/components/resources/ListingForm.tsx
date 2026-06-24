@@ -9,6 +9,7 @@ import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 type Props = {
   /** The category this listing belongs to (fixed by where the form was opened). */
@@ -53,6 +54,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [submitterEmail, setSubmitterEmail] = useState('')
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
   const [honeypot, setHoneypot] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -125,6 +127,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           payload,
           submittedBy,
           company: honeypot,
+          turnstileToken,
         }),
       })
       const body = await res.json()
@@ -237,6 +240,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
             ))}
           </ul>
         )}
+
+        <TurnstileWidget onVerify={setTurnstileToken} />
 
         <button
           type="submit"

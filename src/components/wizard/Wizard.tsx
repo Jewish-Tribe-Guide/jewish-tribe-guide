@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isValidPhone } from '@/lib/validation'
 import Honeypot from '@/components/Honeypot'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 // ── Step config ───────────────────────────────────────────────────────────────
 // A wizard is a flat list of steps. Each step shows ONE question. `when` gates a
@@ -305,6 +306,15 @@ export default function Wizard({
         </div>
 
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+        {/* CAPTCHA on the final step only, so its token is fresh at submit. */}
+        {isLast && (
+          <div className="mt-6">
+            <TurnstileWidget
+              onVerify={(t) => setAnswers((a) => ({ ...a, turnstileToken: t }))}
+            />
+          </div>
+        )}
 
         {/* Single-select auto-advances, so it needs no Continue button. */}
         {step.kind !== 'single' && (

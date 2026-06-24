@@ -9,9 +9,10 @@ import {
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { isValidPhone } from '@/lib/validation'
-import { enforceRateLimit } from '@/lib/rateLimit'
+import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
+import { verifyTurnstile } from '@/lib/turnstile'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
 type Body = {
@@ -21,6 +22,7 @@ type Body = {
   payload?: ResourceSubmission | CategorySubmissionPayload
   note?: string
   submittedBy?: { name?: string; email?: string }
+  turnstileToken?: string
 }
 
 // POST /api/submissions — public endpoint for proposing a change: add/edit/report
@@ -44,6 +46,14 @@ export async function POST(request: Request) {
 
   // Bot trap — silently accept (no DB/email/geocode) so the bot can't tell.
   if (isHoneypotTripped(body)) return Response.json({ ok: true, id: 'ok' })
+
+  // CAPTCHA — no-op until TURNSTILE_SECRET_KEY is configured.
+  if (!(await verifyTurnstile(body.turnstileToken, clientIp(request)))) {
+    return Response.json(
+      { ok: false, errors: ['Verification failed. Please refresh and try again.'] },
+      { status: 403 },
+    )
+  }
 
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null

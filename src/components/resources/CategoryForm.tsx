@@ -5,6 +5,7 @@ import type { CategorySubmissionPayload } from '@/types'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 type Props = {
   onUp: () => void
@@ -29,6 +30,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
   const [submitterName, setSubmitterName] = useState('')
   const [submitterEmail, setSubmitterEmail] = useState('')
   const [honeypot, setHoneypot] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -69,7 +71,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
       const res = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'create', targetType: 'category', payload, submittedBy, company: honeypot }),
+        body: JSON.stringify({ operation: 'create', targetType: 'category', payload, submittedBy, company: honeypot, turnstileToken }),
       })
       const body = await res.json()
       if (!res.ok || !body.ok) {
@@ -171,6 +173,8 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
             ))}
           </ul>
         )}
+
+        <TurnstileWidget onVerify={setTurnstileToken} />
 
         <button
           type="submit"
