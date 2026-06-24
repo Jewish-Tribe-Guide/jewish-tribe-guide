@@ -90,6 +90,10 @@ function sheetsTabUrl(requestType: string): string {
     const gid = process.env.GOOGLE_SHEETS_VOLUNTEER_GID
     return gid ? `${base}#gid=${gid}` : base
   }
+  if (requestType === 'Feedback') {
+    const gid = process.env.GOOGLE_SHEETS_FEEDBACK_GID
+    return gid ? `${base}#gid=${gid}` : base
+  }
   // All other requests (meals, transportation, etc.) → base sheet
   return base
 }
@@ -150,22 +154,51 @@ function buildRequestSubject(payload: SubmissionPayload): string {
   if (payload.requestType === 'Volunteer Removal') {
     return `Remove Volunteer Commitment — ${payload.contact.fullName || 'Unknown'}`
   }
+  if (payload.requestType === 'Feedback') return 'New Site Feedback'
   return `New Assistance Request — ${payload.requestType}`
 }
 
 // Sends the admin notification email via Resend. Best-effort: callers should
 // catch and log errors without failing the request (Sheets is the system of
 // record).
+function buildFeedbackHtml(
+  payload: SubmissionPayload,
+  requestId: string,
+  timestamp: string,
+): string {
+  const message = escapeHtml(String(payload.formData.message ?? ''))
+  const email = payload.contact.email?.trim()
+  const sheetsUrl = sheetsTabUrl('Feedback')
+  const sheetsLink = sheetsUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(sheetsUrl)}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open Feedback in Sheets →</a></p>`
+    : ''
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
+    <h2 style="color:#1d4ed8;margin-bottom:4px;">New Site Feedback</h2>
+    <p style="color:#64748b;margin-top:0;font-size:14px;">ID: <strong>${escapeHtml(requestId)}</strong> · ${escapeHtml(timestamp)}</p>
+    <table style="border-collapse:collapse;width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+      ${row('Message', message)}
+      ${email ? row('Email', email) : ''}
+    </table>
+    ${sheetsLink}
+  </div>`
+}
+
 export async function sendNotification(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
 ): Promise<void> {
   const to = process.env.NOTIFICATION_TO || 'jewishpatientconnect@gmail.com'
+  const html = payload.requestType === 'Feedback'
+    ? buildFeedbackHtml(payload, requestId, timestamp)
+    : buildHtml(payload, requestId, timestamp)
   await sendEmail({
     to,
     subject: buildRequestSubject(payload),
-    html: buildHtml(payload, requestId, timestamp),
+    html,
+    ...(payload.requestType === 'Feedback' && payload.contact.email?.trim()
+      ? { replyTo: payload.contact.email.trim() }
+      : {}),
   })
 }
 

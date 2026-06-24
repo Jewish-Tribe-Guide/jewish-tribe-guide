@@ -1,6 +1,7 @@
 import { hospitals } from '@/data/hospitals'
 import type { ContactHospitalData, VolunteerData, VolunteerRemovalData } from '@/types'
 import { validateContact } from './validation'
+import { LIMITS, tooLong } from './limits'
 
 // ── Request types ──────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ export type RequestType =
   | 'Volunteer'
   | 'Volunteer Edit'
   | 'Volunteer Removal'
+  | 'Feedback'
 
 // The payload every form POSTs to /api/requests. `contact` carries the shared
 // name/phone/email/hospital fields; `formData` is the request-type-specific blob
@@ -49,6 +51,14 @@ export function generateRequestId(): string {
 // Validates the payload. Returns a list of error strings (empty = valid).
 export function validateSubmission(payload: SubmissionPayload): string[] {
   if (!payload.requestType) return ['Request type is required.']
+  if (payload.requestType === 'Feedback') {
+    const msg = typeof payload.formData?.message === 'string' ? payload.formData.message.trim() : ''
+    const errs: string[] = []
+    if (!msg) errs.push('Please enter your feedback.')
+    if (tooLong(msg, LIMITS.longText)) errs.push('Feedback is too long.')
+    if (payload.contact?.email && tooLong(payload.contact.email, LIMITS.email)) errs.push('Email is too long.')
+    return errs
+  }
   return validateContact(payload.contact)
 }
 
@@ -167,6 +177,24 @@ export function buildVolunteerSheetRow(
 // column — so the admin has a single queue to work through. Edits carry the
 // full restated commitment; removals carry only contact info + an optional
 // reason. Nothing is mutated automatically: a human acts on each row.
+
+// ── Feedback (separate "Feedback" tab) ───────────────────────────────────────
+
+export const FEEDBACK_SHEET_TAB = 'Feedback'
+
+export function buildFeedbackSheetRow(
+  payload: SubmissionPayload,
+  requestId: string,
+  timestamp: string,
+): string[] {
+  return [
+    timestamp,
+    requestId,
+    String(payload.formData.message ?? ''),
+    payload.contact.email ?? '',
+    'New',
+  ]
+}
 
 export const VOLUNTEER_CHANGES_SHEET_TAB = 'Volunteer Changes'
 

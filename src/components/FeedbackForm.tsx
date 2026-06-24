@@ -1,0 +1,129 @@
+'use client'
+
+import { useState } from 'react'
+import Honeypot from './Honeypot'
+import TurnstileWidget from './TurnstileWidget'
+import { submitRequest } from '@/lib/submitRequest'
+import type { ContactHospitalData } from '@/types'
+
+type Props = { onClose: () => void }
+
+export default function FeedbackForm({ onClose }: Props) {
+  const [message, setMessage] = useState('')
+  const [email, setEmail] = useState('')
+  const [honeypot, setHoneypot] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) return
+    setStatus('submitting')
+    setError('')
+    try {
+      const contact: ContactHospitalData = {
+        fullName: '',
+        phone: '',
+        email: email.trim(),
+        preferredContact: 'email',
+        hospitalId: '',
+        unitFloorRoom: '',
+      }
+      await submitRequest('Feedback', contact, { message: message.trim() }, honeypot, turnstileToken)
+      setStatus('success')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setStatus('error')
+    }
+  }
+
+  if (status === 'success') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <h3 className="text-lg font-semibold text-slate-900">Thanks for your note!</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            We appreciate your feedback and will take it into account.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <div className="flex items-start justify-between">
+          <h3 className="text-lg font-semibold text-slate-900">Send feedback</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            &times;
+          </button>
+        </div>
+
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          For adding, fixing, or removing a specific listing, use the{' '}
+          <span className="font-medium text-slate-600">Add</span>,{' '}
+          <span className="font-medium text-slate-600">Edit</span>, or{' '}
+          <span className="font-medium text-slate-600">Report</span> buttons
+          on that listing — those get handled fastest.
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <Honeypot value={honeypot} onChange={setHoneypot} />
+
+          <div>
+            <label htmlFor="feedback-message" className="block text-sm font-medium text-slate-700">
+              Your feedback
+            </label>
+            <textarea
+              id="feedback-message"
+              required
+              rows={4}
+              maxLength={2000}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="What's on your mind?"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="feedback-email" className="block text-sm font-medium text-slate-700">
+              Email <span className="font-normal text-slate-400">(optional, if you'd like a reply)</span>
+            </label>
+            <input
+              id="feedback-email"
+              type="email"
+              maxLength={200}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <TurnstileWidget onVerify={setTurnstileToken} />
+
+          {status === 'error' && (
+            <p className="text-sm text-red-600">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={status === 'submitting' || !message.trim()}
+            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {status === 'submitting' ? 'Sending...' : 'Send feedback'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
