@@ -8,6 +8,16 @@ import { payloadTooLarge } from '@/lib/limits'
 const SEARCHES_SHEET_TAB = 'Missed Searches'
 const MAX_QUERY_LEN = 200
 
+// Eastern (Philadelphia) local time, sortable: "2026-06-24 14:30:45". Written as
+// a string so it reads correctly in the sheet without UTC offset confusion.
+function easternTimestamp(): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/New_York',
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(new Date())
+}
+
 export async function POST(request: Request) {
   // Public + fires automatically from the client, so cap it hard to keep it from
   // being used to spam the sheet.
@@ -31,7 +41,7 @@ export async function POST(request: Request) {
 
   // Best-effort: a logging failure must never surface to the visitor.
   try {
-    await appendRow([new Date().toISOString(), query], { tab: SEARCHES_SHEET_TAB })
+    await appendRow([easternTimestamp(), query], { tab: SEARCHES_SHEET_TAB })
   } catch (err) {
     console.error('[search-miss] Sheets append failed:', err)
   }
