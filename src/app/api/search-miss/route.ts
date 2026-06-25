@@ -1,22 +1,13 @@
 import { appendRow } from '@/lib/sheets'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { easternTimestamp } from '@/lib/time'
 
 // Logs searches that returned nothing, so we can see what the community looks
 // for but can't find — a ranked content to-do list written by real users.
 // Append-only to a "Missed Searches" tab; no email, no geocode, no PII.
 const SEARCHES_SHEET_TAB = 'Missed Searches'
 const MAX_QUERY_LEN = 200
-
-// Eastern (Philadelphia) local time, sortable: "2026-06-24 14:30:45". Written as
-// a string so it reads correctly in the sheet without UTC offset confusion.
-function easternTimestamp(): string {
-  return new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'America/New_York',
-    dateStyle: 'short',
-    timeStyle: 'medium',
-  }).format(new Date())
-}
 
 export async function POST(request: Request) {
   // Public + fires automatically from the client, so cap it hard to keep it from
