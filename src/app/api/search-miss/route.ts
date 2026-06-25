@@ -1,6 +1,7 @@
 import { appendRow } from '@/lib/sheets'
 import { enforceRateLimit } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
+import { easternTimestamp } from '@/lib/time'
 
 // Logs searches that returned nothing, so we can see what the community looks
 // for but can't find — a ranked content to-do list written by real users.
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
   // Best-effort: a logging failure must never surface to the visitor.
   try {
-    await appendRow([new Date().toISOString(), query], { tab: SEARCHES_SHEET_TAB })
+    await appendRow([easternTimestamp(), query], { tab: SEARCHES_SHEET_TAB })
   } catch (err) {
     console.error('[search-miss] Sheets append failed:', err)
   }

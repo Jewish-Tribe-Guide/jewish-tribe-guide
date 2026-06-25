@@ -14,6 +14,7 @@ import { appendRow } from '@/lib/sheets'
 import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
+import { easternTimestamp } from '@/lib/time'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   const requestId = generateRequestId()
-  const timestamp = new Date().toISOString()
+  const timestamp = easternTimestamp()
 
   // 2. Append to Google Sheets (system of record — hard failure if this fails).
   //    Volunteer signups → Volunteers tab; edit/removal change-requests →
