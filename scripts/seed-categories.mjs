@@ -81,6 +81,25 @@ const categories = [
         filterable: true,
         filterLabel: 'Kosher Cert',
         multiSelect: true,
+        // When the place carries a hechsher but isn't entirely kosher, the cert
+        // badge renders amber and shows the note explaining what isn't.
+        caveat: { flagField: 'kosherPartial', noteField: 'kosherNote' },
+      },
+      {
+        key: 'kosherPartial',
+        label: 'Not everything here is kosher',
+        type: 'boolean',
+        renderAs: 'hidden',
+        help: 'Check this if the establishment has a hechsher but some items/areas are not kosher.',
+      },
+      {
+        key: 'kosherNote',
+        label: 'What isn’t kosher?',
+        type: 'textarea',
+        renderAs: 'hidden',
+        showIf: { field: 'kosherPartial', equals: true },
+        placeholder: 'e.g. The dairy menu is certified; the meat counter is not under supervision.',
+        help: 'Explain what isn’t kosher so observant visitors know what to verify.',
       },
       {
         key: 'dietary',
