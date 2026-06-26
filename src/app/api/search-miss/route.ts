@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   // Best-effort: a logging failure must never surface to the visitor.
   try {
-    await appendRow([easternTimestamp(), query, source], { tab: SEARCHES_SHEET_TAB })
+    await appendRow([easternTimestamp(), source, query], { tab: SEARCHES_SHEET_TAB })
   } catch (err) {
     console.error('[search-miss] Sheets append failed:', err)
   }
