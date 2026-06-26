@@ -593,6 +593,14 @@ export function GenericListingCard({
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
 
+  // The per-listing caveat note for a badge field flagged not-fully-kosher
+  // (e.g. a hechsher that doesn't cover the whole menu). Returns the authored
+  // note ('' if flagged but none typed), or null when the caveat doesn't apply.
+  const caveatNote = (f: CategoryField): string | null => {
+    if (!f.caveat || !item[f.caveat.flagField]) return null
+    return String(item[f.caveat.noteField] ?? '').trim()
+  }
+
   // A quiet second line under the name — mirrors the synagogue card's denomination
   // subtitle. The address gives "where is this" context without expanding; items
   // with no address (e.g. community groups) fall back to a short Google blurb.
@@ -638,22 +646,38 @@ export function GenericListingCard({
           )}
           {signalBadges.map((f) => {
             const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
-            return (
+            const note = caveatNote(f)
+            const amber = note !== null
+            // A badge "has a designated filter" when its field is filterable; then
+            // clicking it drives that control. Otherwise it falls back to search.
+            const btn = (
               <button
-                key={f.key}
-                // A badge "has a designated filter" when its field is filterable; then
-                // clicking it drives that control. Otherwise it falls back to search.
                 onClick={(e) => {
                   e.stopPropagation()
                   if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
                   else if (f.filterable && f.type === 'select') onFilterSelect(f.key, String(item[f.key]), !!f.multiSelect)
                   else onTagClick(text)
                 }}
-                title={`Filter by ${text}`}
-                className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
+                title={amber ? undefined : `Filter by ${text}`}
+                className={[
+                  'text-xs font-medium border rounded-full px-2 py-1 sm:py-0.5 transition-colors cursor-pointer',
+                  amber
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:bg-amber-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 active:bg-slate-300',
+                ].join(' ')}
               >
-                {text}
+                {text}{amber ? ' ⚠' : ''}
               </button>
+            )
+            // Not-fully-kosher cert → amber badge with the per-listing note on hover.
+            if (!amber) return <span key={f.key}>{btn}</span>
+            return (
+              <span key={f.key} className="relative group/tip">
+                {btn}
+                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                  {note || 'Not everything here is kosher — please verify.'}
+                </span>
+              </span>
             )
           })}
           {headerTags.map((t) => (
@@ -766,6 +790,18 @@ export function GenericListingCard({
           {tagsSometimes.length > 0 && (
             <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
           )}
+          {/* Not-fully-kosher caveat note — the explanation for the amber cert
+              badge, surfaced here so it's readable on mobile (no hover). */}
+          {signalBadges.map((f) => {
+            const note = caveatNote(f)
+            if (note === null) return null
+            return (
+              <p key={`caveat:${f.key}`} className="flex gap-1.5 text-[12px] leading-snug text-amber-700">
+                <span aria-hidden="true">⚠</span>
+                <span>{note || 'Not everything here is kosher — please verify.'}</span>
+              </p>
+            )
+          })}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">
               {detailBadges.map((f) => {

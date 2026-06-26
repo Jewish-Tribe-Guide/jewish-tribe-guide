@@ -42,6 +42,12 @@ export type CategoryField = {
   /** For `type: 'url'`: show the link button in the collapsed card header so it's
    *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
   showInHeader?: boolean
+  /** For a badge field: when `flagField` is truthy on the listing, render this
+   *  badge in amber (caution) and surface `noteField`'s free text as the
+   *  explanation — on hover (desktop) and in the expanded card (mobile). Used
+   *  for food establishments that carry a hechsher but aren't entirely kosher
+   *  (the note says what isn't). The note is authored per listing, not generic. */
+  caveat?: { flagField: string; noteField: string }
 }
 
 export type CategoryConfig = {
