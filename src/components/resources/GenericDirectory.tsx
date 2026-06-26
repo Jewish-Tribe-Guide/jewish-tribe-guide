@@ -12,6 +12,7 @@ import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
+import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import FreshnessFooter from './FreshnessFooter'
 
 type Props = {
@@ -151,6 +152,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b),
     )
+
+  // Log searches that match no listing in this category — by the search text
+  // alone, so an active filter (open-now, cert, etc.) doesn't look like a miss.
+  useLogSearchMiss({
+    query: search,
+    hasResults: items.some(matchesSearch),
+    ready: true,
+    source: category.pluralLabel,
+  })
 
   const searchPlaceholder =
     tagFields.length > 0
