@@ -7,6 +7,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import DenominationFilter from '@/components/synagogues/DenominationFilter'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
+import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
 import { ClockIcon, PlusIcon } from '@/components/icons'
@@ -88,6 +89,18 @@ export default function SynagogueDirectory({
       return true
     })
     .sort(travelCompare)
+
+  // Log searches matching no synagogue — by the search text alone, so the
+  // denomination filter doesn't register as a content gap.
+  useLogSearchMiss({
+    query: search,
+    hasResults: items.some(
+      (item) =>
+        item.name.toLowerCase().includes(q) || (item.address ?? '').toLowerCase().includes(q),
+    ),
+    ready: true,
+    source: 'Synagogues',
+  })
 
   return (
     <div>

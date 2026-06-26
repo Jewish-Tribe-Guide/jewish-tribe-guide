@@ -7,6 +7,7 @@ import type { DirectoryAnchor } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import UpButton from '@/components/UpButton'
 import DirectoryHeader from './DirectoryHeader'
+import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 
 type Props = {
   anchor: DirectoryAnchor
@@ -50,6 +51,13 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
   const filtered = withDistance
     .filter((h) => !q || h.name.toLowerCase().includes(q))
     .sort((a, b) => (a.miles != null && b.miles != null ? a.miles - b.miles : 0))
+
+  useLogSearchMiss({
+    query: search,
+    hasResults: withDistance.some((h) => h.name.toLowerCase().includes(q)),
+    ready: showSearch,
+    source: 'Hospitals',
+  })
 
   return (
     <div>
