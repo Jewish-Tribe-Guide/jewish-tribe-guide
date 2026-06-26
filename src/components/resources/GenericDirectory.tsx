@@ -793,17 +793,6 @@ export function GenericListingCard({
           {tagsSometimes.length > 0 && (
             <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
           )}
-          {/* Not-fully-kosher caveat note — the explanation for the amber cert
-              badge, surfaced here so it's readable on mobile (no hover). */}
-          {signalBadges.map((f) => {
-            const note = caveatNote(f)
-            if (note === null) return null
-            return (
-              <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
-                {note || 'Not everything here is kosher — please verify.'}
-              </p>
-            )
-          })}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">
               {detailBadges.map((f) => {
@@ -868,6 +857,18 @@ export function GenericListingCard({
               >
                 {f.linkLabel ?? f.label}
               </a>
+            )
+          })}
+
+          {/* Not-fully-kosher caveat note — placed under the menu/details so it
+              reads in context; the amber cert badge above is the at-a-glance flag. */}
+          {signalBadges.map((f) => {
+            const note = caveatNote(f)
+            if (note === null) return null
+            return (
+              <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
+                {note || 'Not everything here is kosher — please verify.'}
+              </p>
             )
           })}
 
