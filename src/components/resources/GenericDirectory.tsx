@@ -652,9 +652,9 @@ export function GenericListingCard({
             <span className="relative group/tip">
               <button
                 onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
-                className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-100 active:bg-green-200 transition-colors cursor-pointer"
+                className="text-xs font-medium bg-green-600 text-white border border-green-600 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-700 active:bg-green-800 transition-colors cursor-pointer"
               >
-                Closes soon
+                Closes Soon
               </button>
               <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
                 Closes at {closing.closeLabel}
