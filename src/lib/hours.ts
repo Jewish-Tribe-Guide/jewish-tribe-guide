@@ -63,6 +63,37 @@ export function hoursOpenNow(v: unknown): boolean | null {
 }
 
 /**
+ * For a place that's open right now, describes how close it is to closing.
+ *   { closesSoon, closeLabel }
+ *     - closesSoon: true when today's close time is within `withinMins` of now
+ *     - closeLabel: today's formatted close time, e.g. "6:00 PM"
+ * Returns null when the value isn't structured hours, or the place isn't open
+ * right now (so callers can keep using `hoursOpenNow` to decide open vs. closed).
+ *
+ * A 23:59 close is our "open through end of day" sentinel (24/7 or a period
+ * that rolls past midnight), so it never counts as closing soon.
+ */
+export function hoursClosing(
+  v: unknown,
+  withinMins = 60,
+): { closesSoon: boolean; closeLabel: string } | null {
+  if (!isStructuredHours(v)) return null
+  const hours = v as Record<string, DayHours>
+  const now = new Date()
+  const day = hours[DAY_KEYS[now.getDay()]]
+  if (!day || !day.open || !day.close) return null
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const [oh, om] = day.open.split(':').map(Number)
+  const [ch, cm] = day.close.split(':').map(Number)
+  const closeMins = ch * 60 + cm
+  if (nowMins < oh * 60 + om || nowMins > closeMins) return null // not open now
+  return {
+    closesSoon: day.close !== '23:59' && closeMins - nowMins <= withinMins,
+    closeLabel: fmt12(day.close),
+  }
+}
+
+/**
  * One-line label for today's hours shown on a directory card.
  *  - Structured hours → "Today: 9:00 AM – 5:00 PM" or "Closed today"
  *  - Legacy text string → the raw string (unchanged)
