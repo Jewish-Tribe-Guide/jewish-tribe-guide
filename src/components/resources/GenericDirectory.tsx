@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
-import { isStructuredHours, hoursOpenNow } from '@/lib/hours'
+import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
 import DirectoryHeader from './DirectoryHeader'
@@ -583,6 +583,9 @@ export function GenericListingCard({
 
   const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
   const isOpen = hoursVal !== undefined && hoursOpenNow(hoursVal) === true && isStructuredHours(hoursVal)
+  // Within the last hour before closing, the "Open" chip reads "Closes soon"
+  // (still green — the place is usable now) with the exact close time on hover.
+  const closing = isOpen ? hoursClosing(hoursVal) : null
   const travel = travelParts(item)
   const tags = tagFields.flatMap((f) => asTags(item[f.key]))
   const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
@@ -648,7 +651,19 @@ export function GenericListingCard({
             )}
           </span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
-          {isOpen && (
+          {isOpen && (closing?.closesSoon ? (
+            <span className="relative group/tip">
+              <button
+                onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
+                className="text-xs font-medium bg-green-600 text-white border border-green-600 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-700 active:bg-green-800 transition-colors cursor-pointer"
+              >
+                Closes Soon
+              </button>
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                Closes at {closing.closeLabel}
+              </span>
+            </span>
+          ) : (
             <button
               onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
               title="Filter to places open now"
@@ -656,7 +671,7 @@ export function GenericListingCard({
             >
               Open
             </button>
-          )}
+          ))}
           {signalBadges.map((f) => {
             const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
             const note = caveatNote(f)
