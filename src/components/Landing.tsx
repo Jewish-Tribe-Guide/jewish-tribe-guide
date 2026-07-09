@@ -31,23 +31,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   const entryCards: CardDef[] = [
     {
-      title: 'Patients & Families',
+      title: 'Patient & Family Support',
       keywords: [
-        // Request Support (meals / rides / housing for patients & families)
         'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
         'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
         'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
         'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
         'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
         'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
-        // Jewish Medical Resources (in-hospital Jewish life)
-        'jewish medical resources', 'hospital', 'hospitals', 'about your hospital', 'chaplain',
-        'rabbi', 'prayer room', 'prayer space', 'shabbat elevator', 'shabbos elevator',
-        'kosher cafeteria', 'jewish doctor', 'medical staff', 'bikur cholim room',
-        'shabbos accommodations', 'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop',
-        'childrens hospital', 'temple', 'einstein',
       ],
-      go: () => onNavigate('patient', 'find', { findView: 'patients' }),
+      go: () => onOpenFlow('support'),
     },
     {
       title: 'Volunteer Opportunities',

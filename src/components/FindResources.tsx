@@ -9,11 +9,9 @@ import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
-import PatientsHub from '@/components/resources/PatientsHub'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
-import type { Flow } from '@/app/page'
 import { useCategories } from '@/lib/useCategories'
 import { hospitals } from '@/data/hospitals'
 
@@ -46,15 +44,13 @@ type Props = {
   onUp: () => void
   /** Navigate to the map screen pre-filtered to this category. */
   onViewMap?: (categoryId: string) => void
-  /** Open a guided form overlay (Support / Volunteer) — used by the Patients hub. */
-  onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form. The home grid IS
 // the index now, so every Up here goes straight home.
-export default function FindResources({ anchor, onUp, onViewMap, onOpenFlow }: Props) {
+export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   // Eruv, Zmanim, and Synagogues are city-wide resources keyed to a hospital in
   // the data; in address mode we fall back to the first hospital as a
   // Philadelphia-area representative.
@@ -141,16 +137,6 @@ export default function FindResources({ anchor, onUp, onViewMap, onOpenFlow }: P
     const id = hospitalDetailId ?? hospitalId
     const name = hospitals.find((h) => h.id === id)?.name ?? ''
     return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
-  }
-  if (view === 'patients') {
-    return (
-      <PatientsHub
-        onOpenMedical={goToHospitals}
-        onRequestSupport={() => onOpenFlow('support')}
-        onVolunteer={() => onOpenFlow('volunteer')}
-        onUp={onUp}
-      />
-    )
   }
   if (view === 'eruv') {
     return <EruvInfo eruvim={eruvim} onUp={onUp} />
