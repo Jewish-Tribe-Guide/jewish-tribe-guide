@@ -237,26 +237,21 @@ function labelWords(c: CategoryConfig): string[] {
 export function resourceCards(
   nav: NavigateFn,
   categories: CategoryConfig[] | null,
-  { includeHospital }: { includeHospital: boolean },
 ): CardDef[] | null {
   if (categories === null) return null
 
   return [
-    ...(includeHospital
-      ? [
-          {
-            title: 'Jewish Medical Resources',
-            keywords: [
-              'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
-              'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
-              'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
-              'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
-              'temple', 'einstein',
-            ],
-            go: () => nav('patient', 'find', { findView: 'hospitals' }),
-          },
-        ]
-      : []),
+    {
+      title: 'Jewish Medical Resources',
+      keywords: [
+        'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
+        'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
+        'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
+        'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
+        'temple', 'einstein',
+      ],
+      go: () => nav('patient', 'find', { findView: 'hospitals' }),
+    },
     ...categories.map((c) => ({
       title: c.pluralLabel,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],

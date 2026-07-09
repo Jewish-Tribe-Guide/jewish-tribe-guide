@@ -31,19 +31,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   const entryCards: CardDef[] = [
     {
-      title: 'Request Support',
+      title: 'Patient & Family Support',
       keywords: [
-        'support', 'help', 'assistance', 'request', 'patient', 'need help',
-        'meal', 'meals', 'food', 'kosher food', 'dinner', 'lunch',
-        'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
-        'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay', 'room',
-        'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
+        'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
+        'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
+        'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
+        'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
+        'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
         'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
       ],
       go: () => onOpenFlow('support'),
     },
     {
-      title: 'Volunteer Opportunities',
+      title: 'Volunteer for Patients',
       keywords: [
         'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
         'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
@@ -61,7 +61,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     },
   ]
 
-  const resources = resourceCards(onNavigate, categories, { includeHospital: true })
+  const resources = resourceCards(onNavigate, categories)
   const allCards = resources
     ? [...entryCards, ...resources].sort((a, b) => a.title.localeCompare(b.title))
     : null
@@ -110,8 +110,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           What are you looking for?
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
-          A guide to Jewish Philadelphia — kosher food, synagogues, rides, housing,
-          and community support for residents, visitors, and patients.
+          A guide to Jewish Philadelphia — community resources for
+          residents, visitors, and hospital patients.
         </p>
         <div className="mt-8 max-w-xl mx-auto">
           <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">

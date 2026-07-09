@@ -7,7 +7,7 @@ const figtree = Figtree({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Philadelphia Jewish Community',
-  description: 'A guide to Jewish Philadelphia — kosher food, synagogues, rides, housing, and community support for residents, visitors, and patients.',
+  description: 'A guide to Jewish Philadelphia — community resources for residents, visitors, and hospital patients.',
   manifest: '/manifest.webmanifest',
   // Standalone "Add to Home Screen" experience on iOS.
   appleWebApp: {
