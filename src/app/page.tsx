@@ -152,7 +152,7 @@ export default function Page() {
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
-        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} onOpenFlow={openFlow} />}
         {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} onViewListing={viewListing} />}
       </main>
       <SiteFooter />

@@ -12,8 +12,8 @@ export default function SiteFooter() {
               Philadelphia Jewish Community
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              A guide to Jewish Philadelphia — kosher food, synagogues, rides,
-              housing, and community support for residents, visitors, and patients.
+              A guide to Jewish Philadelphia — kosher food, synagogues, and more
+              for residents, visitors, and hospital patients.
             </p>
           </div>
 
