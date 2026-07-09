@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
-import { eruvInfo } from '@/data/resources'
+import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
@@ -139,15 +139,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
   }
   if (view === 'eruv') {
-    const eruv = eruvInfo[hospitalId as keyof typeof eruvInfo]
-    if (!eruv)
-      return (
-        <div>
-          <UpButton label="Home" onClick={onUp} />
-          <p className="text-muted text-sm">No eruv information available.</p>
-        </div>
-      )
-    return <EruvInfo eruv={eruv} onUp={onUp} />
+    return <EruvInfo eruvim={eruvim} onUp={onUp} />
   }
   if (view === 'zmanim') {
     // Address mode: pass raw coords so the API skips the hospital lookup entirely.
