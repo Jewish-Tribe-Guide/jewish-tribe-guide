@@ -97,7 +97,6 @@ export const eruvim = [
     name: "University City Eruv",
     area: "Penn, Drexel & West Philadelphia",
     statusLink: "https://www.pennocp.org/eruv",
-    mapLink: "https://www.pennocp.org/eruv",
     notes: "Covers University City — Penn, Drexel, and the surrounding West Philadelphia neighborhood — including HUP and CHOP, and connects to the Center City Eruv over the South Street Bridge. The published map is approximate — any street on the border should be treated as outside. Always verify the status right before Shabbos.",
   },
   {
@@ -105,10 +104,7 @@ export const eruvim = [
     name: "Center City Eruv",
     area: "Center City Philadelphia",
     statusLink: "https://www.centercityeruv.com/",
-    mapLink: "https://www.centercityeruv.com/",
-    checkerLink: "https://www.centercityeruv.com/#checker",
-    subscribeLink: "https://www.centercityeruv.com/",
-    notes: "Covers Center City, including Jefferson, and connects to the University City Eruv over the South Street Bridge. Use the address checker to confirm a specific location, and always verify the status right before Shabbos.",
+    notes: "Covers Center City, including Jefferson, and connects to the University City Eruv over the South Street Bridge. Always verify the status right before Shabbos.",
   },
 ]
 

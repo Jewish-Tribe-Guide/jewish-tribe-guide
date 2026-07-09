@@ -87,16 +87,8 @@ export type EruvRecord = {
   name: string
   /** Short coverage description, e.g. "Penn, Drexel & West Philadelphia". */
   area: string
-  /** The eruv's homepage / where current status is posted. */
+  /** The eruv's site, where current status and the boundary map are both posted. */
   statusLink: string
-  /** Boundary map link (may be the same page as the status). */
-  mapLink?: string
-  /** Address-checker deep link, when the eruv offers one. */
-  checkerLink?: string
-  /** Email-updates signup, when the eruv offers one. */
-  subscribeLink?: string
-  /** True only when we surface a real, timestamped status value. */
-  statusIsLive?: boolean
   notes: string
 }
 
