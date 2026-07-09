@@ -43,7 +43,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       go: () => onOpenFlow('support'),
     },
     {
-      title: 'Volunteer Opportunities',
+      title: 'Volunteer for Patients',
       keywords: [
         'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
         'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
