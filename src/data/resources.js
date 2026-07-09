@@ -90,36 +90,27 @@ export const mikvahs = [
 ]
 
 // ── Eruv Information ──────────────────────────────────────────────────────────
-export const eruvInfo = {
-  penn: {
-    hospitalId: "penn",
-    statusLink: "https://www.phillyeruv.org/status",
-    mapLink: "https://www.phillyeruv.org/map",
-    contact: { name: "Rabbi Moshe Klein", phone: "(215) 555-9001" },
-    notes: "The Main Line Eruv covers the area surrounding HUP including Bala Cynwyd, Wynnewood, and parts of West Philadelphia. Check status every Friday before Shabbat.",
+// Eruvim are places, not hospital attributes — every user sees the full list.
+export const eruvim = [
+  {
+    id: "university-city",
+    name: "University City Eruv",
+    area: "Penn, Drexel & West Philadelphia",
+    statusLink: "https://www.pennocp.org/eruv",
+    mapLink: "https://www.pennocp.org/eruv",
+    notes: "Covers University City — Penn, Drexel, and the surrounding West Philadelphia neighborhood — including HUP and CHOP, and connects to the Center City Eruv over the South Street Bridge. The published map is approximate — any street on the border should be treated as outside. Always verify the status right before Shabbos.",
   },
-  chop: {
-    hospitalId: "chop",
-    statusLink: "https://www.phillyeruv.org/status",
-    mapLink: "https://www.phillyeruv.org/map",
-    contact: { name: "Rabbi Avi Hirsch", phone: "(215) 555-9012" },
-    notes: "The Center City Eruv covers Society Hill, Queen Village, and Old City. CHOP is within the eruv boundary. Verify status weekly before Shabbat.",
+  {
+    id: "center-city",
+    name: "Center City Eruv",
+    area: "Center City Philadelphia",
+    statusLink: "https://www.centercityeruv.com/",
+    mapLink: "https://www.centercityeruv.com/",
+    checkerLink: "https://www.centercityeruv.com/#checker",
+    subscribeLink: "https://www.centercityeruv.com/",
+    notes: "Covers Center City, including Jefferson, and connects to the University City Eruv over the South Street Bridge. Use the address checker to confirm a specific location, and always verify the status right before Shabbos.",
   },
-  jefferson: {
-    hospitalId: "jefferson",
-    statusLink: "https://www.phillyeruv.org/status",
-    mapLink: "https://www.phillyeruv.org/map",
-    contact: { name: "Rabbi Yosef Mandel", phone: "(215) 555-9023" },
-    notes: "Jefferson Hospital is within the Center City Eruv. Cherry Hill has its own separate eruv — consult the Cherry Hill Eruv Association for NJ status.",
-  },
-  temple: {
-    hospitalId: "temple",
-    statusLink: "https://www.cheltenhameruv.org/status",
-    mapLink: "https://www.cheltenhameruv.org/map",
-    contact: { name: "Rabbi Nachman Goldstein", phone: "(215) 555-9034" },
-    notes: "Temple University Hospital is not currently within an established eruv boundary. The Cheltenham eruv is 2 miles north. Consult your rabbi for specific guidance.",
-  },
-}
+]
 
 // ── Community WhatsApp Groups ─────────────────────────────────────────────────
 export const whatsappGroups = [

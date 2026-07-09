@@ -82,13 +82,21 @@ export type MikvahEntry = {
 }
 
 export type EruvRecord = {
-  hospitalId: string
+  id: string
+  /** Name of the eruv, e.g. "University City Eruv". */
+  name: string
+  /** Short coverage description, e.g. "Penn, Drexel & West Philadelphia". */
+  area: string
+  /** The eruv's homepage / where current status is posted. */
   statusLink: string
-  mapLink: string
-  contact: {
-    name: string
-    phone: string
-  }
+  /** Boundary map link (may be the same page as the status). */
+  mapLink?: string
+  /** Address-checker deep link, when the eruv offers one. */
+  checkerLink?: string
+  /** Email-updates signup, when the eruv offers one. */
+  subscribeLink?: string
+  /** True only when we surface a real, timestamped status value. */
+  statusIsLive?: boolean
   notes: string
 }
 
