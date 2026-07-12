@@ -108,7 +108,7 @@ export default function SynagogueDirectory({
 
       <DirectoryHeader
         title="Synagogues"
-        count={items.length}
+        count={filtered.length}
         anchorLabel={anchorLabel}
         addressPrompt={addressPrompt}
         actions={
