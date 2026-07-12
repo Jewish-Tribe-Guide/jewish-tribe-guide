@@ -38,11 +38,15 @@ export default function SiteHeader({ onGoHome, location }: Props) {
           onClick={onGoHome}
           className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer group text-left"
         >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
+          {/* Logo is hidden on mobile: at phone width the full title + tagline
+              and the "Set location" pill can't share a row with it, and dropping
+              the mark frees the ~46px needed to keep all the text full (no
+              truncation). Shown from sm up, where there's ample room. */}
+          <span className="hidden sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
             <StarOfDavid className="h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+            <span className="block truncate text-[14px] sm:text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               Philadelphia Jewish Community
             </span>
             <span className="block truncate text-[11px] text-slate-500">
