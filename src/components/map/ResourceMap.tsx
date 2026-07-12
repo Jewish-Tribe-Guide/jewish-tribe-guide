@@ -151,6 +151,9 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
           clickableIcons: false,
         })
         infoWindowRef.current = new google.maps.InfoWindow()
+        // Click-away to dismiss: tapping empty map closes the open info window
+        // (marker taps fire 'gmp-click' and don't bubble here, so they still open).
+        mapRef.current.addListener('click', () => infoWindowRef.current?.close())
         setReady(true)
       })
       .catch(() => {

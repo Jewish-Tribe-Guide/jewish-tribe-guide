@@ -200,7 +200,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       <DirectoryHeader
         title={category.pluralLabel}
-        count={items.length}
+        count={filtered.length}
         anchorLabel={anchorLabel}
         addressPrompt={addressPrompt}
         actions={
