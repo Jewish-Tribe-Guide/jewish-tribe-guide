@@ -94,9 +94,9 @@ export default function LocationControl({ controls }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex max-w-[220px] items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2.5 pr-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
+        className="flex max-w-[220px] items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2.5 text-xs sm:pl-2.5 sm:pr-3 sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
       >
-        <PinIcon className="h-4 w-4 shrink-0 text-primary" />
+        <PinIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
         {/* Show the "Set location" prompt on every size so first-time mobile
             visitors discover it; once an address is set, collapse to just the
             pin on mobile to save header space. */}
