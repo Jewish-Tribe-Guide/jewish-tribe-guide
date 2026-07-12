@@ -36,16 +36,16 @@ export default function SiteHeader({ onGoHome, location }: Props) {
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
         <button
           onClick={onGoHome}
-          className="flex items-center gap-2.5 cursor-pointer group text-left"
+          className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer group text-left"
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
             <StarOfDavid className="h-5 w-5" />
           </span>
-          <span className="leading-tight">
-            <span className="block text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               Philadelphia Jewish Community
             </span>
-            <span className="hidden sm:block text-[11px] text-slate-500">
+            <span className="block truncate text-[11px] text-slate-500">
               Guide for residents, visitors, and patients
             </span>
           </span>
