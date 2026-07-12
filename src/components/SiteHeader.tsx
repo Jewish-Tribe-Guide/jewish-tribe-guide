@@ -47,7 +47,7 @@ export default function SiteHeader({ onGoHome, location }: Props) {
             <StarOfDavid className="h-5 w-5" />
           </span>
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-[14px] sm:text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+            <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               Philadelphia Jewish Community
             </span>
             <span className="block truncate text-[11px] text-slate-500">
