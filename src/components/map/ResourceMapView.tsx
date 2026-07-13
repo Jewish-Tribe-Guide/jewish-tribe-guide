@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
@@ -11,6 +11,7 @@ import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { hospitals } from '@/data/hospitals'
 import type { LatLng } from '@/lib/googleMapsLinks'
+import { listingSearchText } from '@/lib/searchListing'
 
 const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
@@ -35,13 +36,21 @@ type Props = {
   userLocation?: LatLng | null
   /** Pre-select a single category filter on arrival (from a category's "Map" button). */
   initialCategory?: string
+  /** Pre-fill the map's own search box on arrival — set when the directory the
+   *  visitor came from had an active search (e.g. "insomnia cookies" within
+   *  Food Establishments). */
+  initialQuery?: string
+  /** The exact category selection restored from history (browser back after
+   *  the visitor toggled chips on the map itself). Takes precedence over
+   *  initialCategory, which only covers the single-category arrival case. */
+  initialSelectedCategories?: string[]
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, onViewListing }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
@@ -69,7 +78,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
   }, [categories])
 
   const allPoints = useMemo(() => {
-    const out: (MapPoint & { filterId: string })[] = []
+    const out: (MapPoint & { filterId: string; searchText: string })[] = []
 
     for (const h of hospitals) {
       out.push({
@@ -81,6 +90,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
         color: HOSPITAL_COLOR,
         glyph: HOSPITAL_ICON,
         categoryLabel: 'Hospital',
+        searchText: h.name.toLowerCase(),
       })
     }
 
@@ -101,6 +111,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
         color: colorById.get(r.category) ?? '#64748b',
         glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
         categoryLabel: cat?.label ?? r.category,
+        // Same haystack the category directory searches against (name, address,
+        // tags, detail fields) — so a query that matches in the directory
+        // matches here too.
+        searchText: listingSearchText(r, cat),
       })
     }
     return out
@@ -122,18 +136,44 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
     return opts
   }, [allPoints, categories, colorById])
 
+  // initialSelectedCategories (a full toggle set restored from history after
+  // browser back) takes precedence over initialCategory (the single-category
+  // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    initialCategory ? new Set([initialCategory]) : null,
+    initialSelectedCategories !== undefined
+      ? new Set(initialSelectedCategories)
+      : initialCategory
+        ? new Set([initialCategory])
+        : null,
   )
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
     [selected, options],
   )
 
-  const visiblePoints = useMemo(
-    () => allPoints.filter((p) => effectiveSelected.has(p.filterId)),
-    [allPoints, effectiveSelected],
-  )
+  // General text filter — pre-filled on arrival from a directory's active
+  // search, but a normal editable box the visitor can change or clear here too.
+  const [query, setQuery] = useState(initialQuery ?? '')
+  const q = query.trim().toLowerCase()
+
+  // Keep the current history entry in sync with the live query/selection, so
+  // returning via browser Back restores what was actually on screen — not just
+  // the snapshot from when the map was first opened (or last touched a chip).
+  useEffect(() => {
+    const current = window.history.state as { mode?: string } | null
+    if (current?.mode !== 'map') return
+    history.replaceState(
+      { ...current, mapQuery: query || undefined, mapSelected: selected ? Array.from(selected) : undefined },
+      '',
+    )
+  }, [query, selected])
+
+  const visiblePoints = useMemo(() => {
+    const tokens = q.split(/\s+/).filter(Boolean)
+    return allPoints
+      .filter((p) => effectiveSelected.has(p.filterId))
+      .filter((p) => tokens.length === 0 || tokens.every((t) => p.searchText.includes(t)))
+  }, [allPoints, effectiveSelected, q])
 
   const toggle = (id: string) => {
     const next = new Set(effectiveSelected)
@@ -182,7 +222,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
         )}
       </div>
 
-      {/* ── Live tracking bar ────────────────────────────────────────────────── */}
+      {/* ── Live tracking bar ─────────────────────────────────────────────────── */}
       {!loading && (
         <div className="mb-4">
           {tracking ? (
@@ -222,7 +262,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
         </div>
       )}
 
-      {/* ── Category filter chips ────────────────────────────────────────────── */}
+      {/* ── Category filter chips (broad filter, above search's narrower text
+              filter — a single scroll row so they stay compact) ─────────────── */}
       {!loading && options.length > 0 && (
         <div className="mb-4">
           <CategoryFilter
@@ -232,6 +273,30 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
             onAll={showAll}
             onNone={hideAll}
           />
+        </div>
+      )}
+
+      {/* ── Search ──────────────────────────────────────────────────────────── */}
+      {!loading && (
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search by name or address…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="mt-1.5 text-xs text-muted">
+            {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
+            {q && (
+              <>
+                {' '}for &ldquo;{query.trim()}&rdquo; &middot;{' '}
+                <button onClick={() => setQuery('')} className="text-primary hover:underline cursor-pointer">
+                  clear
+                </button>
+              </>
+            )}
+          </p>
         </div>
       )}
 
@@ -273,7 +338,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
 
       {!loading && visiblePoints.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
-          No places shown. Turn on a category above to see locations.
+          {q
+            ? `No places match “${query.trim()}”. Try a different search or clear it.`
+            : 'No places shown. Turn on a category above to see locations.'}
         </p>
       )}
     </div>

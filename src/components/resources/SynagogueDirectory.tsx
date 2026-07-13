@@ -25,8 +25,9 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to synagogues. */
-  onViewMap?: () => void
+  /** Navigate to the map screen pre-filtered to synagogues. When a search is
+   *  active, pass the query so the map opens pre-filtered to it too. */
+  onViewMap?: (query?: string) => void
 }
 
 // Sort by closest first. Drive time takes priority in hospital mode; address
@@ -115,7 +116,7 @@ export default function SynagogueDirectory({
           <>
             {onViewMap && (
               <button
-                onClick={onViewMap}
+                onClick={() => onViewMap(search.trim() || undefined)}
                 /* Desktop only — on mobile Map moves into the filter row below. */
                 className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
@@ -153,7 +154,7 @@ export default function SynagogueDirectory({
             {/* Map — mobile only here (after denomination); on desktop it lives in the header. */}
             {onViewMap && (
               <button
-                onClick={onViewMap}
+                onClick={() => onViewMap(search.trim() || undefined)}
                 className="sm:hidden shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
                 🗺️ Map

@@ -19,8 +19,9 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to this category. */
-  onViewMap?: () => void
+  /** Navigate to the map screen pre-filtered to this category (and, when a
+   *  search is active in the directory, pre-filtered to that query too). */
+  onViewMap?: (query?: string) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,
