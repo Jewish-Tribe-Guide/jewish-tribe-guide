@@ -5,7 +5,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
-import { GenericListingCard } from '@/components/resources/GenericDirectory'
+import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import SynagogueCard from '@/components/SynagogueCard'
 
 export type CardDef = {
