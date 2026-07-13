@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
@@ -40,13 +40,17 @@ type Props = {
    *  visitor came from had an active search (e.g. "insomnia cookies" within
    *  Food Establishments). */
   initialQuery?: string
+  /** The exact category selection restored from history (browser back after
+   *  the visitor toggled chips on the map itself). Takes precedence over
+   *  initialCategory, which only covers the single-category arrival case. */
+  initialSelectedCategories?: string[]
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, onViewListing }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
@@ -132,8 +136,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     return opts
   }, [allPoints, categories, colorById])
 
+  // initialSelectedCategories (a full toggle set restored from history after
+  // browser back) takes precedence over initialCategory (the single-category
+  // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    initialCategory ? new Set([initialCategory]) : null,
+    initialSelectedCategories !== undefined
+      ? new Set(initialSelectedCategories)
+      : initialCategory
+        ? new Set([initialCategory])
+        : null,
   )
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
@@ -144,6 +155,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // search, but a normal editable box the visitor can change or clear here too.
   const [query, setQuery] = useState(initialQuery ?? '')
   const q = query.trim().toLowerCase()
+
+  // Keep the current history entry in sync with the live query/selection, so
+  // returning via browser Back restores what was actually on screen — not just
+  // the snapshot from when the map was first opened (or last touched a chip).
+  useEffect(() => {
+    const current = window.history.state as { mode?: string } | null
+    if (current?.mode !== 'map') return
+    history.replaceState(
+      { ...current, mapQuery: query || undefined, mapSelected: selected ? Array.from(selected) : undefined },
+      '',
+    )
+  }, [query, selected])
 
   const visiblePoints = useMemo(() => {
     const tokens = q.split(/\s+/).filter(Boolean)
