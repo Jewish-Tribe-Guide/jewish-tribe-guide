@@ -12,6 +12,7 @@ import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
+import { travelCompare, travelParts } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import FreshnessFooter from './FreshnessFooter'
 
@@ -61,25 +62,6 @@ function shortAddress(addr: string): string {
   return parts.length <= 2 ? parts.join(', ') : `${parts[0]}, ${parts[1]}`
 }
 
-// Returns the travel chips as separate parts so the card can stack drive/walk
-// vertically (they were previously joined with " · " on one wide line).
-function travelParts(item: DirectoryResource): string[] {
-  if (item.milesFromAddress != null) return [`📍 ${item.milesFromAddress} mi`]
-  const parts: string[] = []
-  if (item.driveMinutes != null) parts.push(`🚗 ${item.driveMinutes} min`)
-  if (item.walkMinutes != null) parts.push(`🚶 ${item.walkMinutes} min`)
-  return parts
-}
-
-function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
-  if (a.milesFromAddress != null || b.milesFromAddress != null) {
-    return (a.milesFromAddress ?? Infinity) - (b.milesFromAddress ?? Infinity)
-  }
-  const drive = (a.driveMinutes ?? Infinity) - (b.driveMinutes ?? Infinity)
-  if (drive !== 0) return drive
-  return (a.walkMinutes ?? Infinity) - (b.walkMinutes ?? Infinity)
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
@@ -96,12 +78,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
-  const urlFields = fields.filter((f) => f.type === 'url')
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const hasFilterableHours = hoursFields.some((f) => f.filterable)
-  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours'
-  const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
-  const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 

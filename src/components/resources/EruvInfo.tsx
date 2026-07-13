@@ -1,26 +1,10 @@
 import type { EruvRecord } from '@/types'
 import UpButton from '@/components/UpButton'
+import { ExternalIcon } from '@/components/icons'
 
 type Props = {
   eruvim: EruvRecord[]
   onUp: () => void
-}
-
-function ExternalIcon() {
-  return (
-    <svg
-      className="h-3.5 w-3.5"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M8 5H5v10h10v-3M12 4h4v4M16 4l-7 7" />
-    </svg>
-  )
 }
 
 function EruvCard({ eruv }: { eruv: EruvRecord }) {

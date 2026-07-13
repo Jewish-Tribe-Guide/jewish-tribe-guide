@@ -7,6 +7,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import DenominationFilter from '@/components/synagogues/DenominationFilter'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
+import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
@@ -28,17 +29,6 @@ type Props = {
   /** Navigate to the map screen pre-filtered to synagogues. When a search is
    *  active, pass the query so the map opens pre-filtered to it too. */
   onViewMap?: (query?: string) => void
-}
-
-// Sort by closest first. Drive time takes priority in hospital mode; address
-// mode uses the same field once ResourceLoader populates driveMinutes via /api/travel.
-function travelCompare(a: DirectoryResource, b: DirectoryResource): number {
-  if (a.milesFromAddress != null || b.milesFromAddress != null) {
-    return (a.milesFromAddress ?? Number.POSITIVE_INFINITY) - (b.milesFromAddress ?? Number.POSITIVE_INFINITY)
-  }
-  const drive = (a.driveMinutes ?? Number.POSITIVE_INFINITY) - (b.driveMinutes ?? Number.POSITIVE_INFINITY)
-  if (drive !== 0) return drive
-  return (a.walkMinutes ?? Number.POSITIVE_INFINITY) - (b.walkMinutes ?? Number.POSITIVE_INFINITY)
 }
 
 // Collapsible-card list for the synagogue category — preserves the original
