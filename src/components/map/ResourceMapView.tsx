@@ -35,13 +35,17 @@ type Props = {
   userLocation?: LatLng | null
   /** Pre-select a single category filter on arrival (from a category's "Map" button). */
   initialCategory?: string
+  /** When arriving from a directory with an active search/filter, restrict the
+   *  map to just these listing ids instead of the whole category. Cleared as
+   *  soon as the visitor touches the category filter chips. */
+  initialListingIds?: string[]
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialListingIds, onViewListing }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
@@ -130,9 +134,20 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
     [selected, options],
   )
 
+  // Restricts the map to a specific set of listing ids (arrived from a directory
+  // with an active search/filter — e.g. "insomnia cookies" within Food
+  // Establishments). Cleared the moment the visitor touches the category chips,
+  // so filtering back in returns to normal full-category browsing.
+  const [listingIdFilter, setListingIdFilter] = useState<Set<string> | null>(
+    initialListingIds && initialListingIds.length > 0 ? new Set(initialListingIds) : null,
+  )
+
   const visiblePoints = useMemo(
-    () => allPoints.filter((p) => effectiveSelected.has(p.filterId)),
-    [allPoints, effectiveSelected],
+    () =>
+      allPoints
+        .filter((p) => effectiveSelected.has(p.filterId))
+        .filter((p) => !listingIdFilter || listingIdFilter.has(p.id)),
+    [allPoints, effectiveSelected, listingIdFilter],
   )
 
   const toggle = (id: string) => {
@@ -140,9 +155,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, o
     if (next.has(id)) next.delete(id)
     else next.add(id)
     setSelected(next)
+    setListingIdFilter(null)
   }
-  const showAll = () => setSelected(new Set(options.map((o) => o.id)))
-  const hideAll = () => setSelected(new Set())
+  const showAll = () => {
+    setSelected(new Set(options.map((o) => o.id)))
+    setListingIdFilter(null)
+  }
+  const hideAll = () => {
+    setSelected(new Set())
+    setListingIdFilter(null)
+  }
 
   const loading = listings === null || categories === null
 

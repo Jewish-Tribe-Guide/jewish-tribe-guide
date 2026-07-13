@@ -42,8 +42,9 @@ type Props = {
   anchor: DirectoryAnchor
   /** Up from any resource view → back to the home grid (the directory itself). */
   onUp: () => void
-  /** Navigate to the map screen pre-filtered to this category. */
-  onViewMap?: (categoryId: string) => void
+  /** Navigate to the map screen pre-filtered to this category, and (when a
+   *  search/filter is active in the directory) to just those listing ids. */
+  onViewMap?: (categoryId: string, listingIds?: string[]) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
@@ -177,7 +178,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
         onReport={(listing) => openAction({ mode: 'report', listing })}
-        onViewMap={onViewMap ? () => onViewMap(category.id) : undefined}
+        onViewMap={onViewMap ? (listingIds) => onViewMap(category.id, listingIds) : undefined}
       />
     )
   }

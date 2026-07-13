@@ -25,8 +25,10 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to synagogues. */
-  onViewMap?: () => void
+  /** Navigate to the map screen pre-filtered to synagogues. When a search or
+   *  denomination filter is active, pass the filtered listing ids so the map
+   *  opens showing only those synagogues instead of the whole category. */
+  onViewMap?: (listingIds?: string[]) => void
 }
 
 // Sort by closest first. Drive time takes priority in hospital mode; address
@@ -79,6 +81,8 @@ export default function SynagogueDirectory({
     (item) => isMinyanim(item.minyanim) && (item.minyanim as Minyan[]).length > 0,
   )
 
+  const hasActiveFilters = search.trim() !== '' || denomination !== ''
+
   const q = search.trim().toLowerCase()
   const filtered = items
     .filter((item) => {
@@ -115,7 +119,7 @@ export default function SynagogueDirectory({
           <>
             {onViewMap && (
               <button
-                onClick={onViewMap}
+                onClick={() => onViewMap(hasActiveFilters ? filtered.map((i) => i.id) : undefined)}
                 /* Desktop only — on mobile Map moves into the filter row below. */
                 className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
@@ -153,7 +157,7 @@ export default function SynagogueDirectory({
             {/* Map — mobile only here (after denomination); on desktop it lives in the header. */}
             {onViewMap && (
               <button
-                onClick={onViewMap}
+                onClick={() => onViewMap(hasActiveFilters ? filtered.map((i) => i.id) : undefined)}
                 className="sm:hidden shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
                 🗺️ Map
