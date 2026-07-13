@@ -223,7 +223,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Live tracking bar ────────────────────────────────────────────────── */}
+      {/* ── Category filter chips (broad filter, above the narrower search's
+              results — and a single scroll row so they stay compact) ─────────── */}
+      {!loading && options.length > 0 && (
+        <div className="mb-4">
+          <CategoryFilter
+            options={options}
+            selected={effectiveSelected}
+            onToggle={toggle}
+            onAll={showAll}
+            onNone={hideAll}
+          />
+        </div>
+      )}
+
+      {/* ── Live tracking bar — a slim strip right above the map it controls,
+              kept out of the search → categories finding flow above. ─────────── */}
       {!loading && (
         <div className="mb-4">
           {tracking ? (
@@ -260,19 +275,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           {geoError && (
             <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{geoError}</p>
           )}
-        </div>
-      )}
-
-      {/* ── Category filter chips ────────────────────────────────────────────── */}
-      {!loading && options.length > 0 && (
-        <div className="mb-4">
-          <CategoryFilter
-            options={options}
-            selected={effectiveSelected}
-            onToggle={toggle}
-            onAll={showAll}
-            onNone={hideAll}
-          />
         </div>
       )}
 
