@@ -239,6 +239,20 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
+      {/* ── Category filter chips (broad filter, above search's narrower text
+              filter — a single scroll row so they stay compact) ─────────────── */}
+      {!loading && options.length > 0 && (
+        <div className="mb-4">
+          <CategoryFilter
+            options={options}
+            selected={effectiveSelected}
+            onToggle={toggle}
+            onAll={showAll}
+            onNone={hideAll}
+          />
+        </div>
+      )}
+
       {/* ── Search ──────────────────────────────────────────────────────────── */}
       {!loading && (
         <div className="mb-4">
@@ -260,20 +274,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               </>
             )}
           </p>
-        </div>
-      )}
-
-      {/* ── Category filter chips (broad filter, below search's narrower text
-              filter — and a single scroll row so they stay compact) ─────────── */}
-      {!loading && options.length > 0 && (
-        <div className="mb-4">
-          <CategoryFilter
-            options={options}
-            selected={effectiveSelected}
-            onToggle={toggle}
-            onAll={showAll}
-            onNone={hideAll}
-          />
         </div>
       )}
 
