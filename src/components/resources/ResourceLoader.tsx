@@ -20,8 +20,8 @@ type Props = {
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
   /** Navigate to the map screen pre-filtered to this category (and, when a
-   *  search/filter is active in the directory, to just those listing ids). */
-  onViewMap?: (listingIds?: string[]) => void
+   *  search is active in the directory, pre-filtered to that query too). */
+  onViewMap?: (query?: string) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,
