@@ -199,46 +199,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         )}
       </div>
 
-      {/* ── Search ──────────────────────────────────────────────────────────── */}
-      {!loading && (
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search by name or address…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <p className="mt-1.5 text-xs text-muted">
-            {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
-            {q && (
-              <>
-                {' '}for &ldquo;{query.trim()}&rdquo; &middot;{' '}
-                <button onClick={() => setQuery('')} className="text-primary hover:underline cursor-pointer">
-                  clear
-                </button>
-              </>
-            )}
-          </p>
-        </div>
-      )}
-
-      {/* ── Category filter chips (broad filter, above the narrower search's
-              results — and a single scroll row so they stay compact) ─────────── */}
-      {!loading && options.length > 0 && (
-        <div className="mb-4">
-          <CategoryFilter
-            options={options}
-            selected={effectiveSelected}
-            onToggle={toggle}
-            onAll={showAll}
-            onNone={hideAll}
-          />
-        </div>
-      )}
-
-      {/* ── Live tracking bar — a slim strip right above the map it controls,
-              kept out of the search → categories finding flow above. ─────────── */}
+      {/* ── Live tracking bar ─────────────────────────────────────────────────── */}
       {!loading && (
         <div className="mb-4">
           {tracking ? (
@@ -275,6 +236,44 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           {geoError && (
             <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{geoError}</p>
           )}
+        </div>
+      )}
+
+      {/* ── Search ──────────────────────────────────────────────────────────── */}
+      {!loading && (
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search by name or address…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="mt-1.5 text-xs text-muted">
+            {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
+            {q && (
+              <>
+                {' '}for &ldquo;{query.trim()}&rdquo; &middot;{' '}
+                <button onClick={() => setQuery('')} className="text-primary hover:underline cursor-pointer">
+                  clear
+                </button>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* ── Category filter chips (broad filter, below search's narrower text
+              filter — and a single scroll row so they stay compact) ─────────── */}
+      {!loading && options.length > 0 && (
+        <div className="mb-4">
+          <CategoryFilter
+            options={options}
+            selected={effectiveSelected}
+            onToggle={toggle}
+            onAll={showAll}
+            onNone={hideAll}
+          />
         </div>
       )}
 
