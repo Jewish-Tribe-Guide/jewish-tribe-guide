@@ -2,6 +2,7 @@
 
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { StarOfDavid, PinIcon } from '@/components/icons'
+import { community } from '@/community.config'
 
 type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
@@ -29,10 +30,10 @@ export default function SiteHeader({ onGoHome, location }: Props) {
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
-              Philadelphia Jewish Community
+              {community.name}
             </span>
             <span className="block truncate text-[11px] text-slate-500">
-              Guide for residents, visitors, and patients
+              {community.tagline}
             </span>
           </span>
         </button>

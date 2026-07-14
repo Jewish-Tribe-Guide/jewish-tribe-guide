@@ -1,18 +1,18 @@
 import type { MetadataRoute } from 'next'
+import { community } from '@/community.config'
 
 // Web app manifest — enables "Add to Home Screen" with an app-like standalone
 // window. Icons currently point at the favicon; swap in dedicated 192/512 PNGs
 // when available for a sharper home-screen icon.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Philadelphia Jewish Community',
-    short_name: 'PJC',
-    description:
-      "Connecting patients, families, and neighbors with Philadelphia's Jewish community resources",
+    name: community.name,
+    short_name: community.shortName,
+    description: community.manifestDescription,
     start_url: '/',
     display: 'standalone',
-    background_color: '#f8fafc',
-    theme_color: '#1d4ed8',
+    background_color: community.backgroundColor,
+    theme_color: community.themeColor,
     icons: [
       {
         src: '/favicon.ico',
