@@ -7,6 +7,7 @@ import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
+import Chip from './Chip'
 import { PencilIcon, FlagIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { businessUrl } from '@/lib/googleMapsLinks'
@@ -152,24 +153,17 @@ export function GenericListingCard({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           {isOpen && (closing?.closesSoon ? (
             <span className="relative group/tip">
-              <button
-                onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
-                className="text-xs font-medium bg-green-600 text-white border border-green-600 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-700 active:bg-green-800 transition-colors cursor-pointer"
-              >
+              <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
                 Closes Soon
-              </button>
+              </Chip>
               <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
                 Closes at {closing.closeLabel}
               </span>
             </span>
           ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); onFilterOpen() }}
-              title="Filter to places open now"
-              className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-green-100 active:bg-green-200 transition-colors cursor-pointer"
-            >
+            <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
               Open
-            </button>
+            </Chip>
           ))}
           {signalBadges.map((f) => {
             const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
@@ -178,7 +172,8 @@ export function GenericListingCard({
             // A badge "has a designated filter" when its field is filterable; then
             // clicking it drives that control. Otherwise it falls back to search.
             const btn = (
-              <button
+              <Chip
+                tone={amber ? 'amber' : 'slate'}
                 onClick={(e) => {
                   e.stopPropagation()
                   if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
@@ -186,15 +181,9 @@ export function GenericListingCard({
                   else onTagClick(text)
                 }}
                 title={amber ? undefined : `Filter by ${text}`}
-                className={[
-                  'text-xs font-medium border rounded-full px-2 py-1 sm:py-0.5 transition-colors cursor-pointer',
-                  amber
-                    ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:bg-amber-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 active:bg-slate-300',
-                ].join(' ')}
               >
                 {text}{amber ? ' ⚠' : ''}
-              </button>
+              </Chip>
             )
             // Not-fully-kosher cert → amber badge with the per-listing note on hover.
             if (!amber) return <span key={f.key}>{btn}</span>
@@ -208,36 +197,24 @@ export function GenericListingCard({
             )
           })}
           {headerTags.map((t) => (
-            <button
-              key={t}
-              onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-              title={`Find places with ${t}`}
-              className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
-            >
+            <Chip key={t} tone="slate" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
               {t}
-            </button>
+            </Chip>
           ))}
           {headerTagsSometimes.map((t) => (
             <span key={`sometimes:${t}`} className="relative group/tip">
-              <button
-                onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-                className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
-              >
+              <Chip tone="amber" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
                 ~{t}
-              </button>
+              </Chip>
               <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
                 not always in stock
               </span>
             </span>
           ))}
           {hiddenTagCount > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
-              title="Show all tags"
-              className="text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200 rounded-full px-2 py-1 sm:py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
-            >
+            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); setExpanded(true) }} title="Show all tags">
               +{hiddenTagCount}
-            </button>
+            </Chip>
           )}
           </div>
           </div>
@@ -290,23 +267,15 @@ export function GenericListingCard({
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {tags.map((t) => (
-                <button
-                  key={t}
-                  onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-                  title={`Find places with ${t}`}
-                  className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5 hover:bg-slate-200 active:bg-slate-300 transition-colors cursor-pointer"
-                >
+                <Chip key={t} tone="slate" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
                   {t}
-                </button>
+                </Chip>
               ))}
               {tagsSometimes.map((t) => (
                 <span key={`sometimes:${t}`} className="relative group/tip">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
-                    className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100 active:bg-amber-200 transition-colors cursor-pointer"
-                  >
+                  <Chip tone="amber" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
                     ~{t}
-                  </button>
+                  </Chip>
                   <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
                     not always in stock
                   </span>
@@ -336,7 +305,7 @@ export function GenericListingCard({
                 if (f.type === 'boolean' ? !v : !display(v)) return null
                 const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
                 return (
-                  <span key={f.key} className="text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full px-2 py-0.5">{text}</span>
+                  <Chip key={f.key} tone="slate" size="expanded">{text}</Chip>
                 )
               })}
             </div>
