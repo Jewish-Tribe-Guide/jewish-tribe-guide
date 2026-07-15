@@ -1,4 +1,6 @@
-export type Hospital = {
+/** A named geographic point with a timezone. Hospitals are one kind of landmark
+ *  (the patient module keeps a list of them); the type itself is generic. */
+export type Landmark = {
   id: string
   name: string
   latitude: number
@@ -103,24 +105,15 @@ export type CommunityWhatsAppGroup = {
 
 export type ResourceStatus = 'pending' | 'approved' | 'rejected' | 'archived'
 
-/** Driving / walking travel time to one hospital, in whole minutes. Either may
- *  be absent if Google couldn't route that mode (e.g. walking across a bridge). */
-export type TravelTimes = {
-  drive?: number
-  walk?: number
-}
-
-/** Precomputed travel times from a listing to every hospital, keyed by hospital id. */
-export type TravelMap = Record<string, TravelTimes>
-
 /** A row from the `resource` table, exactly as Supabase returns it (snake_case). */
 export type ResourceRow = {
   id: string
   category: string
   name: string
-  hospital_id: string
+  /** Generic grouping key (defaults to 'community'); the directory anchors on the
+   *  visitor's address, so this is no longer a real distance anchor. */
+  anchor_id: string
   distance: number | null
-  travel: TravelMap | null
   address: string | null
   phone: string | null
   details: Record<string, unknown>
@@ -139,11 +132,13 @@ export type DirectoryResource = {
   id: string
   category: string
   name: string
-  hospitalId: string
+  /** Generic grouping key (defaults to 'community'). */
+  anchorId: string
   distance: number
-  /** Precomputed travel times to every hospital, keyed by hospital id. */
-  travel?: TravelMap | null
-  /** Driving/walking minutes to the SELECTED hospital (set client-side from `travel`). */
+  /** Dormant drive/walk-minute display fields — no longer populated now that the
+   *  directory anchors on the visitor's address (kept so the synagogue/davening
+   *  card renderers, which reference them, keep compiling and simply show
+   *  nothing). Straight-line miles (below) is the live proximity signal. */
   driveMinutes?: number
   walkMinutes?: number
   address: string
@@ -173,7 +168,7 @@ export type DirectoryResource = {
 export type ResourceSubmission = {
   category: string
   name: string
-  hospitalId: string
+  anchorId: string
   distance: number | null
   address: string
   phone: string
@@ -220,7 +215,7 @@ export type CategorySubmissionPayload = {
   upvotesEnabled?: boolean
   firstListing: {
     name: string
-    hospitalId: string
+    anchorId: string
     distance: number | null
     address: string
     phone: string
@@ -260,13 +255,14 @@ export type HospitalInfo = {
 export type Audience = 'patient' | 'community'
 
 /**
- * What the resource directory measures distance against.
- *  - patients anchor on a hospital (precomputed drive/walk minutes)
- *  - residents anchor on a typed address (haversine miles from `details.geo`)
+ * What the resource directory measures distance against: the visitor's typed
+ *  address. Distance is straight-line miles from each listing's `details.geo`.
+ *  (`coords` is null until the visitor sets a location.)
  */
-export type DirectoryAnchor =
-  | { kind: 'hospital'; hospitalId: string; hospitalName: string }
-  | { kind: 'address'; coords: { lat: number; lng: number } | null; label: string }
+export type DirectoryAnchor = {
+  coords: { lat: number; lng: number } | null
+  label: string
+}
 
 export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give'
 

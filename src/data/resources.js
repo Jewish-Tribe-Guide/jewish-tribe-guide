@@ -1,6 +1,6 @@
 // Initial seed content for a fresh deployment. `scripts/seed.mjs` loads the
-// grocery/restaurant/hotel/mikvah arrays into Supabase, and
-// `scripts/migrate-changes.mjs` loads `whatsappGroups`; after that, live
+// grocery/restaurant/hotel/mikvah/whatsappGroups arrays into Supabase (and
+// `scripts/seed-synagogues.mjs` loads the synagogues); after that, live
 // listings are served from the database, not this file. A new community
 // replaces (or clears) this starter content, then runs the seed script. The
 // `eruvim` export is the exception — it's read directly at runtime (see

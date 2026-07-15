@@ -1,4 +1,5 @@
 import { hospitals } from '@/data/hospitals'
+import { community } from '@/community.config'
 import type { ContactHospitalData, VolunteerData, VolunteerRemovalData } from '@/types'
 import { validateContact } from './validation'
 import { LIMITS, tooLong } from './limits'
@@ -136,7 +137,7 @@ const HAS_CAR_LABELS: Record<string, string> = {
 const ANYWHERE = 'anywhere'
 
 function areaLabel(id: string): string {
-  return id === ANYWHERE ? 'Anywhere in the Philadelphia area' : hospitalName(id)
+  return id === ANYWHERE ? `Anywhere in the ${community.region} area` : hospitalName(id)
 }
 
 // Builds the Volunteers-tab row (matching VOLUNTEER_SHEET_COLUMNS order). The

@@ -10,6 +10,7 @@ import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { hospitals } from '@/data/hospitals'
+import { community } from '@/community.config'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 
@@ -80,18 +81,21 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const allPoints = useMemo(() => {
     const out: (MapPoint & { filterId: string; searchText: string })[] = []
 
-    for (const h of hospitals) {
-      out.push({
-        filterId: HOSPITALS_ID,
-        id: `hospital:${h.id}`,
-        lat: h.latitude,
-        lng: h.longitude,
-        name: h.name,
-        color: HOSPITAL_COLOR,
-        glyph: HOSPITAL_ICON,
-        categoryLabel: 'Hospital',
-        searchText: h.name.toLowerCase(),
-      })
+    // Hospital pins are a patient-oriented overlay — only when that module is on.
+    if (community.features.medicalResources) {
+      for (const h of hospitals) {
+        out.push({
+          filterId: HOSPITALS_ID,
+          id: `hospital:${h.id}`,
+          lat: h.latitude,
+          lng: h.longitude,
+          name: h.name,
+          color: HOSPITAL_COLOR,
+          glyph: HOSPITAL_ICON,
+          categoryLabel: 'Hospital',
+          searchText: h.name.toLowerCase(),
+        })
+      }
     }
 
     const catById = new Map((categories ?? []).map((c) => [c.id, c]))

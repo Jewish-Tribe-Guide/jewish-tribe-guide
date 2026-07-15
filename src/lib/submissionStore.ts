@@ -2,7 +2,6 @@ import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
-import { computeTravelTimes } from './travelTime'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -74,7 +73,7 @@ function listingColumns(payload: ResourceSubmission) {
   return {
     category: payload.category,
     name: payload.name.trim(),
-    hospital_id: payload.hospitalId,
+    anchor_id: payload.anchorId,
     distance: payload.distance,
     address: payload.address.trim(),
     phone: payload.phone?.trim() || null,
@@ -82,8 +81,9 @@ function listingColumns(payload: ResourceSubmission) {
   }
 }
 
-// Like listingColumns, but ensures details.geo (coordinates) and `travel` (drive/
-// walk minutes to each hospital) are populated. Uses coordinates captured
+// Like listingColumns, but ensures details.geo (coordinates) is populated —
+// the directory sorts listings by straight-line miles from the visitor's typed
+// address, computed client-side from this geo. Uses coordinates captured
 // client-side from the address autocomplete when available; otherwise geocodes
 // the address server-side.
 async function listingColumnsWithGeo(payload: ResourceSubmission) {
@@ -95,7 +95,6 @@ async function listingColumnsWithGeo(payload: ResourceSubmission) {
   return {
     ...cols,
     details: geo ? { ...cols.details, geo } : cols.details,
-    travel: geo ? await computeTravelTimes(geo) : null,
   }
 }
 
@@ -327,9 +326,8 @@ async function applyCategory(submission: SubmissionRow): Promise<void> {
   const { error } = await getAdminClient().from('resource').insert({
     category: category.id,
     name: first.name.trim(),
-    hospital_id: first.hospitalId || 'all',
+    anchor_id: first.anchorId || 'community',
     distance: null,
-    travel: geo ? await computeTravelTimes(geo) : null,
     address: first.address.trim(),
     phone: first.phone?.trim() || null,
     details: geo ? { geo } : {},

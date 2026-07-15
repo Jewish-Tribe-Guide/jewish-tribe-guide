@@ -144,7 +144,7 @@ export default function Page() {
   // ── Inner screens (directory) ───────────────────────────────────────────────
   // Everything anchors on the visitor's typed address now (the hospital picker
   // was retired from the location pill).
-  const anchor: DirectoryAnchor = { kind: 'address', coords, label: address }
+  const anchor: DirectoryAnchor = { coords, label: address }
 
   // Up buttons lead back to the single home screen.
   const goToHome = () => navigate(null, 'home')

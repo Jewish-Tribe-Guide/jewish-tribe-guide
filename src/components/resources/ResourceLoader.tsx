@@ -33,8 +33,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
 
   // Extract stable deps from the anchor object (anchor itself is re-created each
   // parent render, so referencing it directly in effect deps would over-fire).
-  const anchorKind = anchor.kind
-  const anchorCoords = anchor.kind === 'address' ? anchor.coords : null
+  const anchorCoords = anchor.coords
 
   useEffect(() => {
     let cancelled = false
@@ -56,29 +55,19 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
     }
   }, [category.id])
 
-  // Distance to the visitor's anchor:
-  //  - hospital → precomputed driving/walking minutes (computed at approval)
-  //  - address  → straight-line miles (haversine)
+  // Distance to the visitor's anchor: straight-line miles (haversine) from their
+  // typed address to each listing's geocoded coordinates.
   const withDistance = useMemo(() => {
     if (!items) return items
     if (category.community) return items
 
-    if (anchor.kind === 'hospital') {
-      const hid = anchor.hospitalId
-      return items.map((item) => {
-        const times = item.travel?.[hid]
-        return times ? { ...item, driveMinutes: times.drive, walkMinutes: times.walk } : item
-      })
-    }
-
-    // Address mode — always show straight-line miles
     const coords = anchorCoords
     if (!coords) return items
     return items.map((item) => {
       if (!item.geo) return item
       return { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
     })
-  }, [items, anchor, anchorCoords, category.community])
+  }, [items, anchorCoords, category.community])
 
   if (error) {
     return (
@@ -100,15 +89,12 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
     )
   }
 
-  // Subtitle shown under the category title — mirrors "About Your Hospital" pattern.
-  const anchorLabel =
-    anchor.kind === 'hospital'
-      ? anchor.hospitalName
-      : anchor.label || undefined
+  // Subtitle shown under the category title — the visitor's typed location.
+  const anchorLabel = anchor.label || undefined
 
   // Distance-sorted categories prompt for a location when none is set yet.
   // Community categories (e.g. WhatsApp groups) aren't distance-based, so skip it.
-  const addressPrompt = anchor.kind === 'address' && !anchor.label && !category.community
+  const addressPrompt = !anchor.label && !category.community
 
   // Synagogues get the rich collapsible card instead of the generic flat-row renderer.
   if (category.id === 'synagogue') {

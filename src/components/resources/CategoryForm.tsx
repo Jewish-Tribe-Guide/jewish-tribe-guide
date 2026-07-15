@@ -54,7 +54,7 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
       description: keywords.trim() || undefined,
       firstListing: {
         name,
-        hospitalId: 'all',
+        anchorId: 'all',
         distance: null,
         address,
         phone,

@@ -36,8 +36,8 @@ function features(id: string): string[] {
 // question so it reads as a clear first step, not a database listing.
 export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }: Props) {
   const [search, setSearch] = useState('')
-  const coords = anchor.kind === 'address' ? anchor.coords : null
-  const label = anchor.kind === 'address' ? anchor.label : null
+  const coords = anchor.coords
+  const label = anchor.label || null
 
   const withDistance = hospitals.map((h) => ({
     ...h,

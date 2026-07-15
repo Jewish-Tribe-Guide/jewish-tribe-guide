@@ -4,8 +4,10 @@
 // and PWA manifest all read from this object rather than hardcoding strings.
 //
 // Not covered here (edit alongside this file):
-//  • Palette — the `primary` color lives in src/app/globals.css (@theme
-//    --color-primary). Keep `themeColor` below in sync with it.
+//  • Palette — `themeColor` below is the single source for the brand color: it
+//    drives the browser chrome, the PWA manifest, and the Tailwind `primary`
+//    utilities (injected as --color-primary in src/app/layout.tsx). The value
+//    in globals.css is only a build-time fallback.
 //  • Location data — hospitals in src/data/hospitals; eruvim (read at
 //    runtime) in src/data/resources.
 //  • Initial listings — the seed arrays in src/data/resources, loaded into
@@ -30,6 +32,10 @@ export const community = {
     "Connecting patients, families, and neighbors with Philadelphia's Jewish community resources",
   /** Region/area name, used in copy such as "the {region}-area eruvim". */
   region: 'Philadelphia',
+  /** IANA timezone for the community — drives zmanim/candle-lighting when the
+   *  visitor is located by address rather than a hospital (which carries its
+   *  own tz). Must be a valid tz database name, e.g. 'America/Chicago'. */
+  timezone: 'America/New_York',
   /** Default map center — used when the visitor has no location set and there
    *  are no pins to frame. Roughly the middle of the community's area. */
   mapCenter: { lat: 39.9526, lng: -75.1652 },
@@ -56,3 +62,39 @@ export const community = {
     volunteer: true,
   },
 } as const
+
+// ── Validation ───────────────────────────────────────────────────────────────
+// Runs once on import (so any code path that touches the config triggers it) and
+// throws loudly if a rebrand left a required field blank or malformed — better a
+// clear build/boot failure than "undefined" rendered in the header.
+function validateCommunityConfig(c: typeof community): void {
+  const errs: string[] = []
+
+  const required = ['name', 'shortName', 'tagline', 'mission', 'region', 'timezone'] as const
+  for (const key of required) {
+    if (!c[key] || !String(c[key]).trim()) errs.push(`\`${key}\` must be a non-empty string`)
+  }
+
+  const hex = /^#[0-9a-fA-F]{6}$/
+  if (!hex.test(c.themeColor)) errs.push('`themeColor` must be a 6-digit hex color like #1d4ed8')
+  if (!hex.test(c.backgroundColor)) errs.push('`backgroundColor` must be a 6-digit hex color like #f8fafc')
+
+  const { lat, lng } = c.mapCenter ?? {}
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) errs.push('`mapCenter.lat` must be between -90 and 90')
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) errs.push('`mapCenter.lng` must be between -180 and 180')
+
+  // A valid IANA zone can be constructed into a DateTimeFormat without throwing.
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: c.timezone })
+  } catch {
+    errs.push(`\`timezone\` (${c.timezone}) is not a valid IANA timezone, e.g. 'America/Chicago'`)
+  }
+
+  if (errs.length) {
+    throw new Error(
+      `Invalid community.config.ts — fix before deploying:\n  • ${errs.join('\n  • ')}`,
+    )
+  }
+}
+
+validateCommunityConfig(community)

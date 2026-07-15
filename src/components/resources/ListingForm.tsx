@@ -96,9 +96,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     const payload: ResourceSubmission = {
       category: category.id,
       name,
-      // Listings aren't hospital-scoped anymore; distance is computed from the
-      // geocoded address. Community categories have no address at all.
-      hospitalId: community ? 'community' : 'all',
+      // Listings aren't hospital-scoped; distance is computed from the geocoded
+      // address. `anchorId` is just a grouping key ('community' for community
+      // categories, which have no address at all; 'all' otherwise).
+      anchorId: community ? 'community' : 'all',
       distance: null,
       address: community ? '' : address,
       phone: community ? '' : phone,

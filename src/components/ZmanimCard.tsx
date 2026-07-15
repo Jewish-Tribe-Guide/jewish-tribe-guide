@@ -2,40 +2,33 @@
 
 import { useEffect, useState } from 'react'
 import type { ZmanimData, ZmanEntry } from '@/types'
+import { community } from '@/community.config'
 import UpButton from '@/components/UpButton'
 
 type Status = 'loading' | 'no-location' | 'error' | 'ready'
 
 type Props = {
-  /** Patient mode: fetch by hospital id. */
-  hospitalId?: string
-  /** Community/address mode: fetch by raw coordinates. When provided, hospitalId
-   *  is ignored. The timezone defaults to America/New_York (Philadelphia). */
+  /** Coordinates to compute zmanim for — the visitor's typed address, or the
+   *  community's configured center. Timezone comes from community.config. */
   coords?: { lat: number; lng: number } | null
-  /** Subtitle shown under the heading. Patient mode → hospital name.
-   *  Community mode → the visitor's typed address. */
+  /** Subtitle shown under the heading — the visitor's location or community name. */
   locationLabel: string
   onUp: () => void
 }
 
-export default function ZmanimCard({ hospitalId, coords, locationLabel, onUp }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp }: Props) {
   const [data, setData] = useState<ZmanimData | null>(null)
   const [status, setStatus] = useState<Status>('loading')
 
   useEffect(() => {
     let cancelled = false
 
-    // Build the query string: prefer raw coords (address mode) over hospitalId.
-    let url: string
-    if (coords?.lat != null && coords?.lng != null) {
-      url = `/api/zmanim?lat=${coords.lat}&lng=${coords.lng}&tzid=America%2FNew_York`
-    } else if (hospitalId) {
-      url = `/api/zmanim?hospitalId=${encodeURIComponent(hospitalId)}`
-    } else {
-      // No location provided — show a clear explanation rather than a generic error
+    if (coords?.lat == null || coords?.lng == null) {
+      // No location provided — show a clear explanation rather than a generic error.
       setStatus('no-location')
       return
     }
+    const url = `/api/zmanim?lat=${coords.lat}&lng=${coords.lng}&tzid=${encodeURIComponent(community.timezone)}`
 
     fetch(url)
       .then((res) => res.json())
@@ -55,7 +48,7 @@ export default function ZmanimCard({ hospitalId, coords, locationLabel, onUp }: 
     return () => {
       cancelled = true
     }
-  }, [hospitalId, coords?.lat, coords?.lng])
+  }, [coords?.lat, coords?.lng])
 
   return (
     <div>
