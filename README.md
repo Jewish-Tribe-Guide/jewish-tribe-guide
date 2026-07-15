@@ -6,6 +6,11 @@ support for hospital patients and their families. It's built as a **reusable
 template**: standing up a new community is mostly editing one config file plus a
 few assets, not touching component code.
 
+> **Bringing this to your community?** Start with
+> **[NEW-COMMUNITY.md](NEW-COMMUNITY.md)** — a plain-language intake of exactly
+> what to provide (branding, content, accounts). This README below is the
+> developer guide for wiring it up.
+
 ## Stack
 
 - **Next.js** (App Router) · **React** · **Tailwind**
