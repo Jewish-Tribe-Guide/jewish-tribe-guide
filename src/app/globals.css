@@ -1,8 +1,11 @@
 @import 'tailwindcss';
 
 @theme {
+  /* Fallback only — the real brand color is injected on <html> from
+     community.config (themeColor) in layout.tsx, so `primary` always tracks it.
+     --color-primary-dark derives from whatever primary ends up being. */
   --color-primary: #1d4ed8;
-  --color-primary-dark: #1e40af;
+  --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
   --color-accent: #d97706;
   --color-accent-dark: #b45309;
   --color-surface: #f8fafc;

@@ -27,7 +27,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={figtree.className}>
+    <html
+      lang="en"
+      className={figtree.className}
+      // Brand color is single-sourced from community.config: override the
+      // Tailwind `primary` utilities' variable at runtime so it always matches
+      // `themeColor` (browser chrome / manifest). globals.css holds only a
+      // build-time fallback. `--color-primary-dark` derives from this in CSS.
+      style={{ '--color-primary': community.themeColor } as React.CSSProperties}
+    >
       <body className="bg-surface text-slate-900 antialiased min-h-screen flex flex-col">
         {children}
         <Analytics />
