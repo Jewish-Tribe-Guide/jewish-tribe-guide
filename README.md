@@ -82,8 +82,9 @@ anchor on `community.mapCenter` + `community.timezone` instead.
    Apply just the newest migration, `…_decouple_hospital_to_anchor.sql`, once.)
 3. Enable the Google **Places API** and **Maps JavaScript API**, then set
    `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
-4. Replace the starter content in `src/data/` (`resources.js`, `synagogues.js`)
-   with your own.
+4. Choose your **directory categories** in `src/data/categories.js` (keep/drop/
+   reorder/add — every seed follows it), and replace the starter content in
+   `src/data/` (`resources.js`, `synagogues.js`) with your own.
 5. **Seed the database** with one command — it preflights your env, verifies the
    schema, and runs every seed script in the right order (safe to re-run):
 

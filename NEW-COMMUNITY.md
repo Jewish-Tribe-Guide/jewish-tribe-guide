@@ -66,13 +66,18 @@ pre-built:**
 | **WhatsApp Groups** | name · description · invite link | ☐ |
 | **Synagogues** | name · address · denomination · minyan/davening times | ☐ |
 
-- **Keep all, some, or none.** Your builder deletes the categories you don't want
-  from `scripts/seed-categories.mjs` (Synagogues live in
-  `scripts/seed-synagogues.mjs`) before seeding. Any subset works with
-  `npm run setup` — nothing else breaks. So "restaurants but not groceries" is
-  totally fine.
-- **Add your own.** Want _Schools_, _Gemachs_, or _Shiurim_? Give it a name, an
-  emoji icon, and the fields each listing should have. Communities can also add
+All six live in **one file — `src/data/categories.js`** — and that's the single
+place to choose:
+
+- **Keep all, some, or none.** Delete any category block you don't want from
+  `src/data/categories.js`. Everything follows it: the card, its starter
+  listings, tags, and upvotes are all skipped automatically, and Synagogues drop
+  cleanly too (no leftover empty card). Any subset works with `npm run setup` —
+  so "restaurants but not groceries" is totally fine.
+- **Reorder or tweak.** `sort_order` sets the card order; edit a category's
+  label, emoji icon, or its fields right there.
+- **Add your own.** Want _Schools_, _Gemachs_, or _Shiurim_? Copy a block, give
+  it a unique id, a name, an icon, and its fields. Communities can also add
   categories **after launch** through the in-app "Suggest a new category" flow
   (an admin approves it at `/admin`).
 

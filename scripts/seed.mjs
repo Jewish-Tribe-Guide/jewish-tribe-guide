@@ -10,6 +10,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { groceries, restaurants, hotels, mikvahs, whatsappGroups } from '../src/data/resources.js'
+import { categoryIds } from '../src/data/categories.js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -63,7 +64,9 @@ const rows = [
     status: 'approved',
     reviewed_at: new Date().toISOString(),
   })),
-]
+  // Only seed listings for categories you kept in src/data/categories.js, so
+  // removing a category cleanly drops its starter listings too.
+].filter((r) => categoryIds.has(r.category))
 
 async function main() {
   const { count, error: countErr } = await supabase

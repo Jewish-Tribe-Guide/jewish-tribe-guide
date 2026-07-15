@@ -1,6 +1,8 @@
-// One-time migration: seed the `synagogue` category and insert the 12 hardcoded
-// synagogues (from src/data/synagogues.js) as approved `resource` rows with
-// flat details fields. Geocodes each address via OSM Nominatim at ~1 req/sec.
+// Seeds the synagogue starter data (from src/data/synagogues.js) as approved
+// `resource` rows, geocoding each address via OSM Nominatim at ~1 req/sec. The
+// synagogue CATEGORY itself is defined in src/data/categories.js (seeded by
+// seed-categories.mjs) — remove it there to leave shuls out entirely, and this
+// script skips itself.
 //
 //   node --env-file=.env.local scripts/seed-synagogues.mjs
 //
@@ -9,6 +11,15 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { synagogues } from '../src/data/synagogues.js'
+import { categories } from '../src/data/categories.js'
+
+// Respect the category catalog: if a community removed the synagogue category,
+// don't seed shul data (there'd be no card to show it under).
+const SYNAGOGUE_CATEGORY = categories.find((c) => c.id === 'synagogue')
+if (!SYNAGOGUE_CATEGORY) {
+  console.log('• synagogue category not in src/data/categories.js — skipping shul seed.')
+  process.exit(0)
+}
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -35,48 +46,9 @@ async function geocode(address) {
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
 }
 
-// ── 1. Upsert the synagogue category ──────────────────────────────────────────
-
-const SYNAGOGUE_CATEGORY = {
-  id: 'synagogue',
-  label: 'Synagogue',
-  plural_label: 'Synagogues',
-  icon: '✡️',
-  description: 'Nearby shuls with davening times, contacts, and WhatsApp groups',
-  sort_order: 5,
-  fields: [
-    {
-      key: 'denomination',
-      label: 'Denomination',
-      type: 'select',
-      renderAs: 'badge',
-      filterable: true,
-      filterLabel: 'Denomination',
-      options: [
-        { value: 'Orthodox', label: 'Orthodox' },
-        { value: 'Orthodox (Sephardic)', label: 'Orthodox (Sephardic)' },
-        { value: 'Conservative', label: 'Conservative' },
-        { value: 'Reform', label: 'Reform' },
-        { value: 'Other', label: 'Other' },
-      ],
-    },
-    {
-      // Structured minyanim field — rendered by SynagogueCard, not GenericDirectory.
-      // Legacy `davening` text field removed from the form; existing rows keep
-      // `details.davening` as a fallback until migrate-davening.mjs is run.
-      key: 'minyanim',
-      label: 'Davening Times (Minyanim)',
-      type: 'minyanim',
-      renderAs: 'hidden',
-    },
-    {
-      key: 'whatsapp',
-      label: 'WhatsApp Group',
-      type: 'url',
-      linkLabel: 'Join WhatsApp',
-    },
-  ],
-}
+// ── 1. Upsert the synagogue category (from the catalog) ───────────────────────
+// seed-categories.mjs already seeds it; upserting here too keeps this script
+// correct when run on its own.
 
 console.log('Upserting synagogue category…')
 const { error: catErr } = await supabase
