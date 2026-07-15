@@ -59,8 +59,9 @@ export function PinIcon({ className }: IconProps) {
   )
 }
 
-// Magen David — the brand mark (thinner 1.7 stroke, no linecap, so it renders
-// identically everywhere rather than falling back to the ✡ emoji glyph).
+// Magen David — the app's brand mark (thinner 1.7 stroke, no linecap, so it
+// renders identically everywhere rather than falling back to the ✡ emoji glyph).
+// To rebrand for another community, replace this SVG (and src/app/favicon.ico).
 export function StarOfDavid({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" className={className} aria-hidden="true">

@@ -10,7 +10,10 @@
 //    runtime) in src/data/resources.
 //  • Initial listings — the seed arrays in src/data/resources, loaded into
 //    the database once by scripts/seed.mjs. Replace with your own content.
-//  • Logo — the StarOfDavid mark in src/components/icons.tsx.
+//  • Logo — the StarOfDavid mark in src/components/icons.tsx, and the browser
+//    icon at src/app/favicon.ico.
+//
+// See README.md ("Rebrand for a new community") for the full checklist.
 
 export const community = {
   /** Full name — page title, header, footer, and PWA manifest. */
