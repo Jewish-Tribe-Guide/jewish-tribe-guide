@@ -1,3 +1,11 @@
+// Initial seed content for a fresh deployment. `scripts/seed.mjs` loads the
+// grocery/restaurant/hotel/mikvah arrays into Supabase, and
+// `scripts/migrate-changes.mjs` loads `whatsappGroups`; after that, live
+// listings are served from the database, not this file. A new community
+// replaces (or clears) this starter content, then runs the seed script. The
+// `eruvim` export is the exception — it's read directly at runtime (see
+// FindResources), so edit it for any deployment.
+
 // ── Grocery Stores ────────────────────────────────────────────────────────────
 export const groceries = [
   // Penn / HUP

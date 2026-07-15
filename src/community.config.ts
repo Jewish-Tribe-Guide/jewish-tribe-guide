@@ -6,8 +6,10 @@
 // Not covered here (edit alongside this file):
 //  • Palette — the `primary` color lives in src/app/globals.css (@theme
 //    --color-primary). Keep `themeColor` below in sync with it.
-//  • Location data — hospitals in src/data/hospitals, eruvim in
-//    src/data/resources.
+//  • Location data — hospitals in src/data/hospitals; eruvim (read at
+//    runtime) in src/data/resources.
+//  • Initial listings — the seed arrays in src/data/resources, loaded into
+//    the database once by scripts/seed.mjs. Replace with your own content.
 //  • Logo — the StarOfDavid mark in src/components/icons.tsx.
 
 export const community = {
