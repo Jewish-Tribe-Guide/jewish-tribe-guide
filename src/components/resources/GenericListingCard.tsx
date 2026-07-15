@@ -125,14 +125,17 @@ export function GenericListingCard({
     : (item.googleDescription as string | undefined) || null
 
   return (
-    <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+    // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
+    // collapsed card. Corners stay clean because the header and expanded panel
+    // round their own edges below.
+    <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
         onClick={() => setExpanded((p) => !p)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
-        className="w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+        className={`w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches).
             On mobile the name sits on its own line with the chips on a row below
@@ -182,7 +185,7 @@ export function GenericListingCard({
                 }}
                 title={amber ? undefined : `Filter by ${text}`}
               >
-                {text}{amber ? ' ⚠' : ''}
+                {text}
               </Chip>
             )
             // Not-fully-kosher cert → amber badge with the per-listing note on hover.
@@ -262,7 +265,7 @@ export function GenericListingCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50">
+        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
           {/* Full tag list — only when the collapsed header capped it (mobile). */}
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -286,18 +289,6 @@ export function GenericListingCard({
           {tagsSometimes.length > 0 && (
             <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
           )}
-          {/* Not-fully-kosher caveat note — the explanation for the amber cert
-              badge, surfaced here so it's readable on mobile (no hover). */}
-          {signalBadges.map((f) => {
-            const note = caveatNote(f)
-            if (note === null) return null
-            return (
-              <p key={`caveat:${f.key}`} className="flex gap-1.5 text-[12px] leading-snug text-amber-700">
-                <span aria-hidden="true">⚠</span>
-                <span>{note || 'Not everything here is kosher — please verify.'}</span>
-              </p>
-            )
-          })}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">
               {detailBadges.map((f) => {
@@ -362,6 +353,18 @@ export function GenericListingCard({
               >
                 {f.linkLabel ?? f.label}
               </a>
+            )
+          })}
+
+          {/* Not-fully-kosher caveat note — placed under the menu/details so it
+              reads in context; the amber cert badge above is the at-a-glance flag. */}
+          {signalBadges.map((f) => {
+            const note = caveatNote(f)
+            if (note === null) return null
+            return (
+              <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
+                {note || 'Not everything here is kosher — please verify.'}
+              </p>
             )
           })}
 
