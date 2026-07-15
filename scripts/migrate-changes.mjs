@@ -88,7 +88,7 @@ const slugify = (x) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replac
     const rows = whatsappGroups.map((g) => ({
       category: 'whatsapp',
       name: g.name,
-      hospital_id: 'community',
+      anchor_id: 'community',
       details: { description: g.description ?? '', link: g.link },
       status: 'approved',
       reviewed_at: new Date().toISOString(),

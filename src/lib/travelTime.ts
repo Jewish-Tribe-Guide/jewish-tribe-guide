@@ -3,34 +3,9 @@
 // should treat null / missing results as "unknown", not as errors — travel
 // times are a nice-to-have sort/display enhancement.
 
-import { hospitals } from '@/data/hospitals'
 import type { LatLng } from './geo'
-import type { TravelMap, TravelTimes } from '@/types'
 
 type Mode = 'driving' | 'walking'
-
-export async function computeTravelTimes(origin: LatLng): Promise<TravelMap | null> {
-  const key = process.env.GOOGLE_MAPS_SERVER_KEY
-  if (!key) return null
-
-  const originParam = `${origin.lat},${origin.lng}`
-  const destinationsParam = hospitals.map((h) => `${h.latitude},${h.longitude}`).join('|')
-
-  const [driving, walking] = await Promise.all([
-    fetchDurationsMinutes(originParam, destinationsParam, 'driving', key),
-    fetchDurationsMinutes(originParam, destinationsParam, 'walking', key),
-  ])
-  if (!driving && !walking) return null
-
-  const map: TravelMap = {}
-  hospitals.forEach((h, i) => {
-    const times: TravelTimes = {}
-    if (driving?.[i] != null) times.drive = driving[i] as number
-    if (walking?.[i] != null) times.walk = walking[i] as number
-    if (times.drive != null || times.walk != null) map[h.id] = times
-  })
-  return Object.keys(map).length > 0 ? map : null
-}
 
 // ── Arbitrary origin → multiple destinations ─────────────────────────────────
 // Used for the community tab: compute drive/walk minutes from the user's typed

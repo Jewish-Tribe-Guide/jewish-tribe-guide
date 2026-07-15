@@ -137,7 +137,7 @@ for (const s of synagogues) {
   const row = {
     category: 'synagogue',
     name: s.name,
-    hospital_id: s.hospitalId,
+    anchor_id: s.hospitalId ?? 'community',
     distance: s.distance ?? null,
     address: s.location ?? s.address ?? null,
     phone,

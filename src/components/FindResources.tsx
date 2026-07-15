@@ -14,6 +14,7 @@ import UpButton from '@/components/UpButton'
 import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { hospitals } from '@/data/hospitals'
+import { community } from '@/community.config'
 
 const ADD_CATEGORY = '__add_category__'
 
@@ -52,12 +53,11 @@ type Props = {
 // Hospital, Eruv, Zmanim), or the "suggest a category" form. The home grid IS
 // the index now, so every Up here goes straight home.
 export default function FindResources({ anchor, onUp, onViewMap }: Props) {
-  // Eruv, Zmanim, and Synagogues are city-wide resources keyed to a hospital in
-  // the data; in address mode we fall back to the first hospital as a
-  // Philadelphia-area representative.
-  const fallbackHospital = hospitals[0]
-  const hospitalId = anchor.kind === 'hospital' ? anchor.hospitalId : fallbackHospital.id
-  const locationLabel = anchor.kind === 'hospital' ? anchor.hospitalName : anchor.label
+  // Zmanim is a city-wide resource. It anchors on the visitor's typed address
+  // when set, otherwise on the community's configured center + label — so it
+  // works for any community, with or without hospitals.
+  const zmanimCoords = anchor.coords ?? community.mapCenter
+  const locationLabel = anchor.label || community.region
 
   // Initialize from history so browser forward/back re-opens the right sub-view.
   const [view, setView] = useState<string | null>(() => {
@@ -135,7 +135,8 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   }
   if (view === 'about-hospital') {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
-    const id = hospitalDetailId ?? hospitalId
+    // (Patient feature — hospitals is non-empty whenever this view is reachable.)
+    const id = hospitalDetailId ?? hospitals[0]?.id ?? ''
     const name = hospitals.find((h) => h.id === id)?.name ?? ''
     return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
   }
@@ -143,13 +144,11 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     return <EruvInfo eruvim={eruvim} onUp={onUp} />
   }
   if (view === 'zmanim') {
-    // Address mode: pass raw coords so the API skips the hospital lookup entirely.
-    if (anchor.kind === 'address') {
-      return (
-        <ZmanimCard key={anchor.label} coords={anchor.coords} locationLabel={locationLabel} onUp={onUp} />
-      )
-    }
-    return <ZmanimCard key={hospitalId} hospitalId={hospitalId} locationLabel={locationLabel} onUp={onUp} />
+    // Pass raw coords (the visitor's address, or the community's center) so the
+    // API computes zmanim directly — no hospital lookup.
+    return (
+      <ZmanimCard key={locationLabel} coords={zmanimCoords} locationLabel={locationLabel} onUp={onUp} />
+    )
   }
   if (view === ADD_CATEGORY) {
     return <CategoryForm onUp={onUp} onSubmitted={onUp} />
