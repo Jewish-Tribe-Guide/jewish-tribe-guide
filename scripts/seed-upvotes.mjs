@@ -14,12 +14,20 @@ if (!url || !key) {
 }
 const s = createClient(url, key, { auth: { persistSession: false } })
 
-const { error } = await s
+// Only whichever of these a community actually seeded get updated — the rest
+// are silently absent, so any subset of categories works.
+const { data, error } = await s
   .from('category')
   .update({ upvotes_enabled: true })
   .in('id', ['grocery', 'restaurant', 'hotel'])
+  .select('id')
 if (error) {
   console.error('❌ failed:', error.message)
   process.exit(1)
 }
-console.log('✅ Enabled upvotes on grocery, restaurant, hotel.')
+const enabled = (data ?? []).map((c) => c.id)
+console.log(
+  enabled.length
+    ? `✅ Enabled upvotes on ${enabled.join(', ')}.`
+    : '• None of grocery/restaurant/hotel are seeded — nothing to enable.',
+)

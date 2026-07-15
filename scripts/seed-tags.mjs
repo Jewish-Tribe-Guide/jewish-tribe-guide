@@ -1,5 +1,6 @@
-// Seeds the kosher-item tag vocabulary and enables a `kosherItems` tags field on
-// the grocery category. Idempotent. No new DDL — uses the existing `tag` table.
+// Seeds the kosher-item tag vocabulary and, if the grocery category is present,
+// enables a `kosherItems` tags field on it. Idempotent, and safe when grocery
+// wasn't seeded. No new DDL — uses the existing `tag` table.
 //
 //   node --env-file=.env.local scripts/seed-tags.mjs
 
@@ -37,33 +38,39 @@ if (tagErr) {
 }
 console.log(`✅ Seeded ${tagRows.length} kosher-item tags.`)
 
-// Add the kosherItems tags field to the grocery category (if not already there).
+// Add the kosherItems tags field to the grocery category (if present). A
+// community that didn't seed `grocery` just gets the tag vocabulary and no
+// field — no error, so any subset of categories works with `npm run setup`.
 const { data: grocery, error: gErr } = await supabase
   .from('category')
   .select('fields')
   .eq('id', 'grocery')
-  .single()
+  .maybeSingle()
 if (gErr) {
   console.error('❌ could not load grocery category:', gErr.message)
   process.exit(1)
 }
 
-const fields = grocery.fields ?? []
-if (!fields.some((f) => f.key === 'kosherItems')) {
-  fields.push({
-    key: 'kosherItems',
-    label: 'Kosher items available',
-    type: 'tags',
-    tagGroup: GROUP,
-    renderAs: 'badge',
-    help: 'Which kosher products can people find here?',
-  })
-  const { error: upErr } = await supabase.from('category').update({ fields }).eq('id', 'grocery')
-  if (upErr) {
-    console.error('❌ could not update grocery fields:', upErr.message)
-    process.exit(1)
-  }
-  console.log('✅ Added kosherItems tags field to grocery.')
+if (!grocery) {
+  console.log('• grocery category not seeded — skipping its kosherItems field.')
 } else {
-  console.log('• grocery already has a kosherItems field — left as is.')
+  const fields = grocery.fields ?? []
+  if (!fields.some((f) => f.key === 'kosherItems')) {
+    fields.push({
+      key: 'kosherItems',
+      label: 'Kosher items available',
+      type: 'tags',
+      tagGroup: GROUP,
+      renderAs: 'badge',
+      help: 'Which kosher products can people find here?',
+    })
+    const { error: upErr } = await supabase.from('category').update({ fields }).eq('id', 'grocery')
+    if (upErr) {
+      console.error('❌ could not update grocery fields:', upErr.message)
+      process.exit(1)
+    }
+    console.log('✅ Added kosherItems tags field to grocery.')
+  } else {
+    console.log('• grocery already has a kosherItems field — left as is.')
+  }
 }

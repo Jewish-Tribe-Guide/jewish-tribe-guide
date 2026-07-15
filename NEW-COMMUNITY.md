@@ -33,7 +33,9 @@ Logo:                             an SVG mark (or send us a PNG/idea to trace)
 Favicon:                          a .ico / square image for the browser tab
 ```
 
-**Which modules do you want?** Turn any of these off if they don't fit:
+**Which feature modules do you want?** These are hand-built cards/flows —
+_separate_ from the directory categories you choose in Part 2. Turn any off if
+they don't fit:
 
 ```
 Eruv information ........ yes / no
@@ -49,29 +51,48 @@ Hospital patient support . yes / no   ← turn OFF for a general community
 
 ---
 
-## Part 2 — Your content (optional — you can start empty)
+## Part 2 — Choose your directory categories
 
-You have two ways to launch:
+The directory is built from **categories** — the tabs of listings on the home
+screen. Keep the ones you want, drop the rest, or add your own. **Six come
+pre-built:**
+
+| Category | What each listing holds | Keep it? |
+|---|---|---|
+| **Grocery Stores** | name · address · phone · kosher? · kosher items | ☐ |
+| **Food Establishments** | name · address · phone · type (restaurant / bakery-café / ice cream) · kosher cert | ☐ |
+| **Hotels** | name · address · phone · Shabbos-friendly? · shuttle? | ☐ |
+| **Mikvah** | name · address · hours · tevillah / keilim | ☐ |
+| **WhatsApp Groups** | name · description · invite link | ☐ |
+| **Synagogues** | name · address · denomination · minyan/davening times | ☐ |
+
+- **Keep all, some, or none.** Your builder deletes the categories you don't want
+  from `scripts/seed-categories.mjs` (Synagogues live in
+  `scripts/seed-synagogues.mjs`) before seeding. Any subset works with
+  `npm run setup` — nothing else breaks. So "restaurants but not groceries" is
+  totally fine.
+- **Add your own.** Want _Schools_, _Gemachs_, or _Shiurim_? Give it a name, an
+  emoji icon, and the fields each listing should have. Communities can also add
+  categories **after launch** through the in-app "Suggest a new category" flow
+  (an admin approves it at `/admin`).
+
+### Starting content (optional — you can launch empty)
+
+For each category you keep, either provide a starting list or launch empty:
 
 - **Start empty and crowdsource (fastest).** Ship with an empty directory; your
-  community adds listings through the built-in **submit → review → approve**
-  flow, and an admin approves each one. Nothing to gather up front.
-- **Seed it with a starting set.** Provide lists for any of these categories and
-  they'll be loaded on day one:
+  community fills it in through the built-in **submit → review → approve** flow.
+  Nothing to gather up front.
+- **Seed a starting set.** Hand over a simple spreadsheet — one tab per category,
+  columns matching the fields above. You don't need coordinates; addresses are
+  geocoded automatically.
+
+Two feature modules (Part 1) have their own small data, only if you turn them on:
 
 ```
-Synagogues:      name · address · denomination · minyan/davening times
-Kosher grocery:  name · address · phone · kosher (y/n) · kosher items
-Kosher food:     name · address · phone · kosher cert (hechsher) · type
-Mikvaos:         name · address · hours · contact
-Hotels:          name · address · phone · Shabbos-friendly? · shuttle?
-Eruv(im):        name · area covered · status-page URL
-WhatsApp groups: name · description · invite link
-Hospitals:       ONLY if patient support is on — name · coordinates · timezone
+Eruv(im):  name · area covered · status-page URL      (if Eruv is on)
+Hospitals: name · coordinates · timezone              (if patient support is on)
 ```
-
-A simple spreadsheet (one tab per category) is a perfect way to hand this over.
-You don't need coordinates — addresses get geocoded automatically.
 
 ---
 
