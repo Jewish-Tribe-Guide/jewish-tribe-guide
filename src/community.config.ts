@@ -23,6 +23,11 @@ export const community = {
   /** Longer phrasing used only in the PWA manifest description. */
   manifestDescription:
     "Connecting patients, families, and neighbors with Philadelphia's Jewish community resources",
+  /** Region/area name, used in copy such as "the {region}-area eruvim". */
+  region: 'Philadelphia',
+  /** Default map center — used when the visitor has no location set and there
+   *  are no pins to frame. Roughly the middle of the community's area. */
+  mapCenter: { lat: 39.9526, lng: -75.1652 },
   /** Brand color for browser chrome / PWA. Keep in sync with --color-primary
    *  in globals.css (that CSS var drives the Tailwind `primary` utilities). */
   themeColor: '#1d4ed8',

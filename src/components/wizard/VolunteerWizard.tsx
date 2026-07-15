@@ -4,6 +4,7 @@ import Wizard, { type Answers, type Step } from './Wizard'
 import { contactSteps, buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
 import { hospitals } from '@/data/hospitals'
+import { community } from '@/community.config'
 
 const ANYWHERE = 'anywhere'
 
@@ -156,7 +157,7 @@ const steps: Step[] = [
     hint: 'Tap all that apply.',
     options: [
       ...hospitals.map((h) => ({ value: h.id, label: h.name })),
-      { value: ANYWHERE, label: 'Anywhere in the Philadelphia area' },
+      { value: ANYWHERE, label: `Anywhere in the ${community.region} area` },
     ],
   },
   {

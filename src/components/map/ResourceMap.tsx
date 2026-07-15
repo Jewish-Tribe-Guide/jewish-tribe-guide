@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
+import { community } from '@/community.config'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -40,7 +41,7 @@ type Props = {
   onViewListing?: (categoryId: string, listingId: string) => void
 }
 
-const DEFAULT_CENTER = { lat: 39.9526, lng: -75.1652 } // Philadelphia
+const DEFAULT_CENTER = community.mapCenter
 
 // Builds the info-window content as a real DOM node so we can attach event
 // listeners (e.g. "View listing") without putting callbacks on window.

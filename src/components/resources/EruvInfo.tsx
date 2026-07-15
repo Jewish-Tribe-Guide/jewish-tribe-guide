@@ -1,6 +1,7 @@
 import type { EruvRecord } from '@/types'
 import UpButton from '@/components/UpButton'
 import { ExternalIcon } from '@/components/icons'
+import { community } from '@/community.config'
 
 type Props = {
   eruvim: EruvRecord[]
@@ -33,7 +34,7 @@ export default function EruvInfo({ eruvim, onUp }: Props) {
       <UpButton label="All resources" onClick={onUp} />
       <h2 className="text-xl font-semibold text-slate-800 mb-1">Eruv Information</h2>
       <p className="mb-4 text-sm text-muted">
-        Check the current status of the Philadelphia-area eruvim before Shabbos.
+        Check the current status of the {community.region}-area eruvim before Shabbos.
       </p>
 
       <div className="space-y-3">
