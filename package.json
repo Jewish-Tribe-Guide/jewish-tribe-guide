@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup": "node --env-file=.env.local scripts/setup.mjs",
+    "seed": "node --env-file=.env.local scripts/seed.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

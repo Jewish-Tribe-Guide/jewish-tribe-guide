@@ -1,5 +1,6 @@
-// Seeds the four built-in categories into the `category` table (run once after
-// supabase/categories.sql). Idempotent: upserts by id.
+// Seeds the built-in categories into the `category` table (run once after the
+// schema migrations are applied). Idempotent: upserts by id. Normally invoked
+// via `npm run setup`; to run on its own:
 //
 //   node --env-file=.env.local scripts/seed-categories.mjs
 

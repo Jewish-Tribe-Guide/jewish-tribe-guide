@@ -9,7 +9,7 @@
 //   FORCE=1 node --env-file=.env.local scripts/seed.mjs
 
 import { createClient } from '@supabase/supabase-js'
-import { groceries, restaurants, hotels, mikvahs } from '../src/data/resources.js'
+import { groceries, restaurants, hotels, mikvahs, whatsappGroups } from '../src/data/resources.js'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -29,7 +29,8 @@ function toRow(category, item, details) {
   return {
     category,
     name: item.name,
-    hospital_id: item.hospitalId,
+    // Listings anchor on the visitor's address; anchor_id is just a grouping key.
+    anchor_id: item.hospitalId ?? 'community',
     distance: item.distance ?? null,
     address: item.address ?? null,
     phone: item.phone ?? null,
@@ -50,6 +51,18 @@ const rows = [
     }),
   ),
   ...mikvahs.map((m) => toRow('mikvah', m, { hours: m.hours })),
+  // WhatsApp groups belong to the whole community — no address/distance.
+  ...whatsappGroups.map((g) => ({
+    category: 'whatsapp',
+    name: g.name,
+    anchor_id: 'community',
+    distance: null,
+    address: null,
+    phone: null,
+    details: { legacyId: g.id, description: g.description ?? '', link: g.link },
+    status: 'approved',
+    reviewed_at: new Date().toISOString(),
+  })),
 ]
 
 async function main() {

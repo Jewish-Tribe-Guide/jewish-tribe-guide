@@ -1,5 +1,6 @@
 // Enables upvotes on the built-in categories that should have them
-// (grocery, restaurant, hotel). Run after supabase/votes.sql. Idempotent.
+// (grocery, restaurant, hotel). Run after the schema migrations are applied
+// (the `votes` migration adds category.upvotes_enabled). Idempotent.
 //
 //   node --env-file=.env.local scripts/seed-upvotes.mjs
 
