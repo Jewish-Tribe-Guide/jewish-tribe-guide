@@ -31,27 +31,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const isMobile = useIsMobile()
 
   const entryCards: CardDef[] = [
-    {
-      title: 'Patient & Family Support',
-      keywords: [
-        'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
-        'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
-        'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
-        'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
-        'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
-        'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
-      ],
-      go: () => onOpenFlow('support'),
-    },
-    {
-      title: 'Volunteer for Patients',
-      keywords: [
-        'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
-        'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
-        'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
-      ],
-      go: () => onOpenFlow('volunteer'),
-    },
+    ...(community.features.patientSupport
+      ? [{
+          title: 'Patient & Family Support',
+          keywords: [
+            'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
+            'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
+            'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
+            'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
+            'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
+            'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
+          ],
+          go: () => onOpenFlow('support'),
+        }]
+      : []),
+    ...(community.features.volunteer
+      ? [{
+          title: 'Volunteer for Patients',
+          keywords: [
+            'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
+            'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
+            'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
+          ],
+          go: () => onOpenFlow('volunteer'),
+        }]
+      : []),
     {
       title: 'View Map',
       keywords: [

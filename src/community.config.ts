@@ -35,4 +35,21 @@ export const community = {
   themeColor: '#1d4ed8',
   /** App background color for the PWA splash screen. */
   backgroundColor: '#f8fafc',
+
+  /** Optional modules — turn a hand-built card/flow off for a community that
+   *  doesn't need it. (Database categories like restaurants or mikvah are
+   *  managed in the DB, not here — these flags cover the community-specific
+   *  cards only.) Everything defaults on, matching this deployment. */
+  features: {
+    /** "Eruv Information" card + page. */
+    eruv: true,
+    /** "Zmanim & Shabbos" (candle-lighting / davening times) card + page. */
+    zmanim: true,
+    /** "Jewish Medical Resources" card — per-hospital Jewish life. */
+    medicalResources: true,
+    /** "Patient & Family Support" request flow. */
+    patientSupport: true,
+    /** "Volunteer for Patients" flow. */
+    volunteer: true,
+  },
 } as const

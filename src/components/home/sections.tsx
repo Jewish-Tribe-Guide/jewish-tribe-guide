@@ -7,6 +7,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import SynagogueCard from '@/components/SynagogueCard'
+import { community } from '@/community.config'
 
 export type CardDef = {
   title: string
@@ -240,39 +241,47 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
+  const { features } = community
+
   return [
-    {
-      title: 'Jewish Medical Resources',
-      keywords: [
-        'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
-        'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
-        'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
-        'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
-        'temple', 'einstein',
-      ],
-      go: () => nav('patient', 'find', { findView: 'hospitals' }),
-    },
+    ...(features.medicalResources
+      ? [{
+          title: 'Jewish Medical Resources',
+          keywords: [
+            'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
+            'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
+            'jewish doctor', 'medical staff', 'bikur cholim room', 'shabbos accommodations',
+            'hup', 'penn', 'university of pennsylvania', 'jefferson', 'chop', 'childrens hospital',
+            'temple', 'einstein',
+          ],
+          go: () => nav('patient', 'find', { findView: 'hospitals' }),
+        }]
+      : []),
     ...categories.map((c) => ({
       title: c.pluralLabel,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
     })),
-    {
-      title: 'Zmanim & Shabbos',
-      keywords: [
-        'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
-        'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
-        'mincha', 'maariv', 'shacharis', 'parsha', 'molad',
-      ],
-      go: () => nav('patient', 'find', { findView: 'zmanim' }),
-    },
-    {
-      title: 'Eruv Information',
-      keywords: [
-        'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
-        'techum', 'stroller on shabbos',
-      ],
-      go: () => nav('patient', 'find', { findView: 'eruv' }),
-    },
+    ...(features.zmanim
+      ? [{
+          title: 'Zmanim & Shabbos',
+          keywords: [
+            'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
+            'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
+            'mincha', 'maariv', 'shacharis', 'parsha', 'molad',
+          ],
+          go: () => nav('patient', 'find', { findView: 'zmanim' }),
+        }]
+      : []),
+    ...(features.eruv
+      ? [{
+          title: 'Eruv Information',
+          keywords: [
+            'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
+            'techum', 'stroller on shabbos',
+          ],
+          go: () => nav('patient', 'find', { findView: 'eruv' }),
+        }]
+      : []),
   ]
 }
