@@ -8,6 +8,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
+import { community } from '@/community.config'
 
 const ADD_CATEGORY = '__add_category__'
 
@@ -30,27 +31,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const isMobile = useIsMobile()
 
   const entryCards: CardDef[] = [
-    {
-      title: 'Patient & Family Support',
-      keywords: [
-        'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
-        'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
-        'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
-        'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
-        'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
-        'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
-      ],
-      go: () => onOpenFlow('support'),
-    },
-    {
-      title: 'Volunteer for Patients',
-      keywords: [
-        'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
-        'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
-        'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
-      ],
-      go: () => onOpenFlow('volunteer'),
-    },
+    ...(community.features.patientSupport
+      ? [{
+          title: 'Patient & Family Support',
+          keywords: [
+            'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
+            'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
+            'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
+            'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
+            'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
+            'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
+          ],
+          go: () => onOpenFlow('support'),
+        }]
+      : []),
+    ...(community.features.volunteer
+      ? [{
+          title: 'Volunteer for Patients',
+          keywords: [
+            'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
+            'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
+            'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
+          ],
+          go: () => onOpenFlow('volunteer'),
+        }]
+      : []),
     {
       title: 'View Map',
       keywords: [
@@ -110,8 +115,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           What are you looking for?
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
-          A guide to Jewish Philadelphia — community resources for
-          residents, visitors, and hospital patients.
+          {community.mission}
         </p>
         <div className="mt-8 max-w-xl mx-auto">
           <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">

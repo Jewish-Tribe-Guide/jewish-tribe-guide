@@ -1,6 +1,8 @@
 'use client'
 
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
+import { StarOfDavid, PinIcon } from '@/components/icons'
+import { community } from '@/community.config'
 
 type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
@@ -8,26 +10,6 @@ type Props = {
   onGoHome: () => void
   /** Address anchor for proximity sorting (top-right pill). */
   location: LocationControls
-}
-
-/** Magen David mark — inline SVG so it renders identically everywhere
- *  (the ✡ character falls back to emoji presentation on some platforms). */
-function StarOfDavid({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M12 3 L19.8 16.5 L4.2 16.5 Z" />
-      <path d="M12 21 L4.2 7.5 L19.8 7.5 Z" />
-    </svg>
-  )
-}
-
-function PinIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M12 21c-4.4-3.9-7-7.4-7-10.8A7 7 0 0 1 12 3a7 7 0 0 1 7 7.2c0 3.4-2.6 6.9-7 10.8z" />
-      <circle cx="12" cy="10" r="2.6" />
-    </svg>
-  )
 }
 
 export default function SiteHeader({ onGoHome, location }: Props) {
@@ -48,10 +30,10 @@ export default function SiteHeader({ onGoHome, location }: Props) {
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
-              Philadelphia Jewish Community
+              {community.name}
             </span>
             <span className="block truncate text-[11px] text-slate-500">
-              Guide for residents, visitors, and patients
+              {community.tagline}
             </span>
           </span>
         </button>

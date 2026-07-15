@@ -1,4 +1,5 @@
 import FeedbackButton from './FeedbackButton'
+import { community } from '@/community.config'
 
 export default function SiteFooter() {
   const year = new Date().getFullYear()
@@ -9,11 +10,10 @@ export default function SiteFooter() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-md">
             <p className="text-sm font-semibold text-slate-900">
-              Philadelphia Jewish Community
+              {community.name}
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              A guide to Jewish Philadelphia — community resources for
-              residents, visitors, and hospital patients.
+              {community.mission}
             </p>
           </div>
 
@@ -34,7 +34,7 @@ export default function SiteFooter() {
         <div className="mt-8 border-t border-slate-100 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
-            on them. © {year} Philadelphia Jewish Community.
+            on them. © {year} {community.name}.
           </p>
           <FeedbackButton />
         </div>

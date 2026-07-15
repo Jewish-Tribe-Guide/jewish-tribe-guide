@@ -48,3 +48,44 @@ export function ClockIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Location pin — the header's "Set location" mark and the mobile distance strip.
+export function PinIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 21c-4.4-3.9-7-7.4-7-10.8A7 7 0 0 1 12 3a7 7 0 0 1 7 7.2c0 3.4-2.6 6.9-7 10.8z" />
+      <circle cx="12" cy="10" r="2.6" />
+    </svg>
+  )
+}
+
+// Magen David — the app's brand mark (thinner 1.7 stroke, no linecap, so it
+// renders identically everywhere rather than falling back to the ✡ emoji glyph).
+// To rebrand for another community, replace this SVG (and src/app/favicon.ico).
+export function StarOfDavid({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 3 L19.8 16.5 L4.2 16.5 Z" />
+      <path d="M12 21 L4.2 7.5 L19.8 7.5 Z" />
+    </svg>
+  )
+}
+
+// Outbound-link arrow, shown next to links that open an external site in a new
+// tab (eruv status pages, etc.). Defaults to the small size used inline.
+export function ExternalIcon({ className = 'h-3.5 w-3.5' }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M8 5H5v10h10v-3M12 4h4v4M16 4l-7 7" />
+    </svg>
+  )
+}

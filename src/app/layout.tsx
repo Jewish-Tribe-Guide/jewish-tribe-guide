@@ -1,24 +1,25 @@
 import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { community } from '@/community.config'
 import './globals.css'
 
 const figtree = Figtree({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Philadelphia Jewish Community',
-  description: 'A guide to Jewish Philadelphia — community resources for residents, visitors, and hospital patients.',
+  title: community.name,
+  description: community.mission,
   manifest: '/manifest.webmanifest',
   // Standalone "Add to Home Screen" experience on iOS.
   appleWebApp: {
     capable: true,
-    title: 'PJC',
+    title: community.shortName,
     statusBarStyle: 'default',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1d4ed8',
+  themeColor: community.themeColor,
   // Let content extend into the notch / home-indicator areas so our own
   // safe-area padding (globals.css + sticky headers) can manage the insets.
   viewportFit: 'cover',
