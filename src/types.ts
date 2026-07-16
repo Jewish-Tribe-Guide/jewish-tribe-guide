@@ -264,6 +264,17 @@ export type DirectoryAnchor = {
   label: string
 }
 
+/** Directory filters carried onto the map — applied to pins as predicates and
+ *  shown as removable chips. Serializable so it survives in history state. */
+export type MapFilters = {
+  /** Show only listings open right now (by their filterable hours field). */
+  openNow?: boolean
+  /** Boolean field keys that must be true on the listing (e.g. `isKosher`). */
+  bool?: string[]
+  /** Select field key → allowed values; a listing matches if its value is one. */
+  select?: Record<string, string[]>
+}
+
 export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give'
 
 /** page.tsx's central navigation function, passed down to every screen that
