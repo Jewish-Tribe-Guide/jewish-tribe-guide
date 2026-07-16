@@ -20,6 +20,11 @@ const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
 const HOSPITAL_ICON = '🏥'
 
+// Typing one of these in the search pins the open-now filter (rather than a plain
+// text term), so it's entered from the search box like every other chip.
+const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
+const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
+
 const PALETTE = [
   '#2563eb', // blue
   '#16a34a', // green
@@ -175,16 +180,23 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const addTerm = (raw: string) => {
     const v = raw.trim()
     if (!v) return
+    // "open now" pins the open-now filter instead of a text term.
+    if (isOpenNowWord(v)) {
+      setOpenNowOn(true)
+      setInput('')
+      return
+    }
     setTerms((prev) => (prev.some((t) => t.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))
     setInput('')
   }
   const removeTerm = (term: string) => setTerms((prev) => prev.filter((t) => t !== term))
 
-  // The typed-but-not-yet-added text also filters, so results update live.
+  // The typed-but-not-yet-added text also filters, so results update live — except
+  // an "open now" keyword, which becomes the filter on Enter, not a text match.
   const activeTerms = useMemo(() => {
     const live = input.trim()
-    const all = live && !terms.some((t) => t.toLowerCase() === live.toLowerCase()) ? [...terms, live] : terms
-    return all.map((t) => t.toLowerCase())
+    const includeLive = live && !isOpenNowWord(live) && !terms.some((t) => t.toLowerCase() === live.toLowerCase())
+    return (includeLive ? [...terms, live] : terms).map((t) => t.toLowerCase())
   }, [terms, input])
 
   // ── Field filters (open-now / kosher / type / …) ─────────────────────────────
@@ -387,31 +399,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Search + filters — type a term (Enter to pin it), toggle Open now,
-              and any filters carried from a category show as removable chips.
-              Every chip narrows the results. ────────────────────────────────── */}
+      {/* ── Search + filters — type a term (Enter to pin it as a chip); typing
+              "open now" pins the open-now filter. Filters carried from a category
+              show as chips too. Every chip narrows the results. ──────────────── */}
       {!loading && (
         <div className="mb-4">
-          {/* Open now — a first-class map filter (only where hours exist). */}
-          {[...hoursKeysByCat.values()].some((v) => v.length > 0) && (
-            <div className="mb-2">
-              <button
-                onClick={() => setOpenNowOn((v) => !v)}
-                aria-pressed={openNowOn}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
-                  openNowOn
-                    ? 'bg-primary text-white'
-                    : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                <span aria-hidden="true">🕒</span> Open now
-              </button>
-            </div>
-          )}
-
           <input
             type="text"
-            placeholder={terms.length ? 'Add another term…' : 'Search name, address, kosher cert… (Enter to add)'}
+            placeholder={terms.length ? 'Add another term…' : "Search name, address, or 'open now'…"}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -431,7 +426,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               {filterChips.map((c) => (
                 <span
                   key={c.id}
-                  className="inline-flex items-center gap-1 text-xs font-semibold bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
                 >
                   {c.label}
                   <button
@@ -443,17 +438,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   </button>
                 </span>
               ))}
-              {/* Free-text search terms. */}
+              {/* Free-text search terms — same blue as the filter chips. */}
               {terms.map((t) => (
                 <span
                   key={t}
-                  className="inline-flex items-center gap-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full pl-2.5 pr-1 py-1"
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
                 >
                   {t}
                   <button
                     onClick={() => removeTerm(t)}
                     aria-label={`Remove ${t}`}
-                    className="hover:bg-slate-200 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
+                    className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
                   >
                     ×
                   </button>
