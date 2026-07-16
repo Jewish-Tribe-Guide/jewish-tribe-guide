@@ -11,7 +11,7 @@ import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
-import type { DirectoryResource, DirectoryAnchor } from '@/types'
+import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { hospitals } from '@/data/hospitals'
 import { community } from '@/community.config'
@@ -43,9 +43,9 @@ type Props = {
   anchor: DirectoryAnchor
   /** Up from any resource view → back to the home grid (the directory itself). */
   onUp: () => void
-  /** Navigate to the map screen pre-filtered to this category, and (when a
-   *  search is active in the directory) pre-filtered to that query too. */
-  onViewMap?: (categoryId: string, query?: string) => void
+  /** Navigate to the map screen pre-filtered to this category, carrying the
+   *  directory's active search query and field filters. */
+  onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
@@ -177,7 +177,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
         onReport={(listing) => openAction({ mode: 'report', listing })}
-        onViewMap={onViewMap ? (query) => onViewMap(category.id, query) : undefined}
+        onViewMap={onViewMap ? (query, filters) => onViewMap(category.id, query, filters) : undefined}
       />
     )
   }

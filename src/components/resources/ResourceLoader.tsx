@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { DirectoryResource, DirectoryAnchor } from '@/types'
+import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
@@ -19,9 +19,9 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to this category (and, when a
-   *  search is active in the directory, pre-filtered to that query too). */
-  onViewMap?: (query?: string) => void
+  /** Navigate to the map screen, carrying the directory's active search + field
+   *  filters so the map opens showing the same results. */
+  onViewMap?: (query?: string, filters?: MapFilters) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,

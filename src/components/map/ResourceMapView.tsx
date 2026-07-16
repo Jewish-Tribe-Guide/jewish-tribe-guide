@@ -13,10 +13,17 @@ import { hospitals } from '@/data/hospitals'
 import { community } from '@/community.config'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
+import { hoursOpenNow } from '@/lib/hours'
+import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
 const HOSPITAL_ICON = '🏥'
+
+// Typing one of these in the search pins the open-now filter (rather than a plain
+// text term), so it's entered from the search box like every other chip.
+const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
+const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
 const PALETTE = [
   '#2563eb', // blue
@@ -45,13 +52,16 @@ type Props = {
    *  the visitor toggled chips on the map itself). Takes precedence over
    *  initialCategory, which only covers the single-category arrival case. */
   initialSelectedCategories?: string[]
+  /** Field filters (open-now / kosher / type / …) carried from the directory the
+   *  visitor came from, applied to pins and shown as removable chips. */
+  initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
@@ -79,7 +89,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }, [categories])
 
   const allPoints = useMemo(() => {
-    const out: (MapPoint & { filterId: string; searchText: string })[] = []
+    // `raw` carries the underlying listing so field filters (open-now / kosher /
+    // type) can be applied; hospital pins have none.
+    const out: (MapPoint & { filterId: string; searchText: string; raw?: DirectoryResource })[] = []
 
     // Hospital pins are a patient-oriented overlay — only when that module is on.
     if (community.features.medicalResources) {
@@ -119,6 +131,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         // tags, detail fields) — so a query that matches in the directory
         // matches here too.
         searchText: listingSearchText(r, cat),
+        raw: r,
       })
     }
     return out
@@ -155,29 +168,135 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     [selected, options],
   )
 
-  // General text filter — pre-filled on arrival from a directory's active
-  // search, but a normal editable box the visitor can change or clear here too.
-  const [query, setQuery] = useState(initialQuery ?? '')
-  const q = query.trim().toLowerCase()
+  // Search terms shown as removable chips — each is an AND filter (a place shows
+  // only if it matches every term against its name / address / tags / detail
+  // fields). Pre-filled from a directory's active search on arrival; the term
+  // being typed filters live and becomes a chip on Enter.
+  const [terms, setTerms] = useState<string[]>(() =>
+    (initialQuery ?? '').split(/\s+/).map((t) => t.trim()).filter(Boolean),
+  )
+  const [input, setInput] = useState('')
 
-  // Keep the current history entry in sync with the live query/selection, so
-  // returning via browser Back restores what was actually on screen — not just
+  const addTerm = (raw: string) => {
+    const v = raw.trim()
+    if (!v) return
+    // "open now" pins the open-now filter instead of a text term.
+    if (isOpenNowWord(v)) {
+      setOpenNowOn(true)
+      setInput('')
+      return
+    }
+    setTerms((prev) => (prev.some((t) => t.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))
+    setInput('')
+  }
+  const removeTerm = (term: string) => setTerms((prev) => prev.filter((t) => t !== term))
+
+  // The typed-but-not-yet-added text also filters, so results update live — except
+  // an "open now" keyword, which becomes the filter on Enter, not a text match.
+  const activeTerms = useMemo(() => {
+    const live = input.trim()
+    const includeLive = live && !isOpenNowWord(live) && !terms.some((t) => t.toLowerCase() === live.toLowerCase())
+    return (includeLive ? [...terms, live] : terms).map((t) => t.toLowerCase())
+  }, [terms, input])
+
+  // ── Field filters (open-now / kosher / type / …) ─────────────────────────────
+  // Held as a serializable spec (also what's persisted to history); carried in
+  // from the directory. Predicates below are derived once categories load.
+  const [openNowOn, setOpenNowOn] = useState(!!initialFilters?.openNow)
+  const [boolFields, setBoolFields] = useState<string[]>(initialFilters?.bool ?? [])
+  const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>(initialFilters?.select ?? {})
+
+  // Filterable hours-field keys per category, for the open-now predicate.
+  const hoursKeysByCat = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const c of categories ?? []) {
+      m.set(c.id, c.detailFields.filter((f) => f.type === 'hours' && f.filterable).map((f) => f.key))
+    }
+    return m
+  }, [categories])
+
+  // A field's display label, resolved from the category the filters came from.
+  const labelForField = (key: string): string => {
+    const cat = (categories ?? []).find((c) => c.id === initialCategory)
+    const f = cat?.detailFields.find((x) => x.key === key)
+    return f?.filterLabel ?? f?.label ?? key
+  }
+
+  // Active filter chips: label + predicate + remover. Each is an AND filter; a
+  // listing that lacks the field passes (so "Kosher" ignores shuls, etc.).
+  const filterChips = useMemo(() => {
+    const chips: { id: string; label: string; test: (r: DirectoryResource) => boolean; remove: () => void }[] = []
+    if (openNowOn) {
+      chips.push({
+        id: '__open',
+        label: 'Open now',
+        test: (r) => {
+          const keys = hoursKeysByCat.get(r.category)
+          return !keys?.length || keys.some((k) => hoursOpenNow(r[k]) === true)
+        },
+        remove: () => setOpenNowOn(false),
+      })
+    }
+    for (const field of boolFields) {
+      chips.push({
+        id: `b:${field}`,
+        label: labelForField(field),
+        test: (r) => r[field] === undefined || r[field] === true,
+        remove: () => setBoolFields((prev) => prev.filter((f) => f !== field)),
+      })
+    }
+    for (const [field, values] of Object.entries(selectFilters)) {
+      if (!values.length) continue
+      chips.push({
+        id: `s:${field}`,
+        label: values.join(' / '),
+        test: (r) => r[field] === undefined || values.includes(r[field] as string),
+        remove: () => setSelectFilters((prev) => { const n = { ...prev }; delete n[field]; return n }),
+      })
+    }
+    return chips
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNowOn, boolFields, selectFilters, categories, initialCategory, hoursKeysByCat])
+
+  const hasAnyChip = terms.length > 0 || filterChips.length > 0
+  const clearAllFilters = () => {
+    setTerms([])
+    setInput('')
+    setOpenNowOn(false)
+    setBoolFields([])
+    setSelectFilters({})
+  }
+
+  // Keep the current history entry in sync with the live terms/filters/selection,
+  // so returning via browser Back restores what was actually on screen — not just
   // the snapshot from when the map was first opened (or last touched a chip).
   useEffect(() => {
     const current = window.history.state as { mode?: string } | null
     if (current?.mode !== 'map') return
+    const anyFilter = openNowOn || boolFields.length > 0 || Object.keys(selectFilters).length > 0
     history.replaceState(
-      { ...current, mapQuery: query || undefined, mapSelected: selected ? Array.from(selected) : undefined },
+      {
+        ...current,
+        mapQuery: terms.join(' ') || undefined,
+        mapSelected: selected ? Array.from(selected) : undefined,
+        mapFilters: anyFilter
+          ? {
+              openNow: openNowOn || undefined,
+              bool: boolFields.length ? boolFields : undefined,
+              select: Object.keys(selectFilters).length ? selectFilters : undefined,
+            }
+          : undefined,
+      },
       '',
     )
-  }, [query, selected])
+  }, [terms, selected, openNowOn, boolFields, selectFilters])
 
   const visiblePoints = useMemo(() => {
-    const tokens = q.split(/\s+/).filter(Boolean)
     return allPoints
       .filter((p) => effectiveSelected.has(p.filterId))
-      .filter((p) => tokens.length === 0 || tokens.every((t) => p.searchText.includes(t)))
-  }, [allPoints, effectiveSelected, q])
+      .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
+      .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
+  }, [allPoints, effectiveSelected, activeTerms, filterChips])
 
   const toggle = (id: string) => {
     const next = new Set(effectiveSelected)
@@ -280,26 +399,73 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Search ──────────────────────────────────────────────────────────── */}
+      {/* ── Search + filters — type a term (Enter to pin it as a chip); typing
+              "open now" pins the open-now filter. Filters carried from a category
+              show as chips too. Every chip narrows the results. ──────────────── */}
       {!loading && (
         <div className="mb-4">
           <input
             type="text"
-            placeholder="Search by name or address…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            placeholder={terms.length ? 'Add another term…' : "Search name, address, or 'open now'…"}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addTerm(input)
+              } else if (e.key === 'Backspace' && !input && terms.length) {
+                removeTerm(terms[terms.length - 1])
+              }
+            }}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
+
+          {hasAnyChip && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* Filters carried from the directory (open-now / kosher / type). */}
+              {filterChips.map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
+                >
+                  {c.label}
+                  <button
+                    onClick={c.remove}
+                    aria-label={`Remove ${c.label} filter`}
+                    className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {/* Free-text search terms — same blue as the filter chips. */}
+              {terms.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
+                >
+                  {t}
+                  <button
+                    onClick={() => removeTerm(t)}
+                    aria-label={`Remove ${t}`}
+                    className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={clearAllFilters}
+                className="ml-1 text-xs text-muted underline hover:text-slate-700 cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           <p className="mt-1.5 text-xs text-muted">
             {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
-            {q && (
-              <>
-                {' '}for &ldquo;{query.trim()}&rdquo; &middot;{' '}
-                <button onClick={() => setQuery('')} className="text-primary hover:underline cursor-pointer">
-                  clear
-                </button>
-              </>
-            )}
+            {(activeTerms.length > 0 || filterChips.length > 0) && ' · filtered'}
           </p>
         </div>
       )}
@@ -342,8 +508,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {!loading && visiblePoints.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
-          {q
-            ? `No places match “${query.trim()}”. Try a different search or clear it.`
+          {activeTerms.length > 0 || filterChips.length > 0
+            ? 'No places match every filter. Try removing one.'
             : 'No places shown. Turn on a category above to see locations.'}
         </p>
       )}

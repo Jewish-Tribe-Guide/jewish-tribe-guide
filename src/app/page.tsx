@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { AppMode, DirectoryAnchor, NavigateFn } from '@/types'
+import type { AppMode, DirectoryAnchor, MapFilters, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
@@ -30,6 +30,9 @@ type NavState = {
    *  live map state (see ResourceMapView) so browser back restores what was
    *  actually on screen instead of the snapshot from when the map first opened. */
   mapSelected?: string[]
+  /** Field filters (open-now / kosher / type) carried from the directory, kept
+   *  in sync with the live map state. */
+  mapFilters?: MapFilters
 }
 
 export default function Page() {
@@ -44,6 +47,8 @@ export default function Page() {
   const [mapQuery, setMapQuery] = useState<string | null>(null)
   // The exact set of category chips toggled on the map — see NavState.mapSelected.
   const [mapSelectedCategories, setMapSelectedCategories] = useState<string[] | null>(null)
+  // Field filters carried from a directory onto the map — see NavState.mapFilters.
+  const [mapFilters, setMapFilters] = useState<MapFilters | null>(null)
 
   // The address anchor, editable from the header's location pill on every screen
   // — it drives all proximity sorting in the directory.
@@ -65,6 +70,7 @@ export default function Page() {
       setMapCategory(s?.mapCategory ?? null)
       setMapQuery(s?.mapQuery ?? null)
       setMapSelectedCategories(s?.mapSelected ?? null)
+      setMapFilters(s?.mapFilters ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -83,6 +89,7 @@ export default function Page() {
     if (s?.mapCategory) setMapCategory(s.mapCategory)
     if (s?.mapQuery) setMapQuery(s.mapQuery)
     if (s?.mapSelected) setMapSelectedCategories(s.mapSelected)
+    if (s?.mapFilters) setMapFilters(s.mapFilters)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -156,22 +163,24 @@ export default function Page() {
     setMapCategory(null)
     setMapQuery(null)
     setMapSelectedCategories(null)
+    setMapFilters(null)
     setFlow(null)
     history.pushState({ mode: 'find', findView: categoryId, findItemId: listingId }, '')
   }
 
   // Called from a category directory's "View map" button — navigates to the map
-  // screen with that category pre-selected in the filter. When the directory had
-  // an active search, query pre-fills the map's own search box with it. Starts
-  // fresh (no persisted mapSelected) — the map's own effect will sync the live
-  // selection into this entry once it mounts.
-  const viewMapForCategory = (categoryId: string, query?: string) => {
+  // screen with that category pre-selected in the filter. Carries the directory's
+  // active search query and field filters so the map shows the same results.
+  // Starts fresh (no persisted mapSelected) — the map's own effect will sync the
+  // live selection into this entry once it mounts.
+  const viewMapForCategory = (categoryId: string, query?: string, filters?: MapFilters) => {
     setMode('map')
     setMapCategory(categoryId)
     setMapQuery(query ?? null)
     setMapSelectedCategories(null)
+    setMapFilters(filters ?? null)
     setFlow(null)
-    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query } as NavState, '')
+    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters } as NavState, '')
   }
 
   return (
@@ -179,7 +188,7 @@ export default function Page() {
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
-        {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} onViewListing={viewListing} />}
+        {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
       </main>
       <SiteFooter />
       {overlay}

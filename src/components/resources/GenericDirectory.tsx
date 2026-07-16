@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { DirectoryResource } from '@/types'
+import type { DirectoryResource, MapFilters } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow } from '@/lib/hours'
 import DirectoryHeader from './DirectoryHeader'
@@ -30,9 +30,9 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to this category. When a search
-   *  is active, pass the query so the map opens pre-filtered to it too. */
-  onViewMap?: (query?: string) => void
+  /** Navigate to the map screen pre-filtered to this category. Carries the active
+   *  search query and field filters so the map opens showing the same results. */
+  onViewMap?: (query?: string, filters?: MapFilters) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -146,6 +146,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setOpenNow(false)
   }
 
+  // The active field filters in the shape the map consumes (see MapFilters).
+  const mapFilters = (): MapFilters => ({
+    openNow: openNow || undefined,
+    bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
+    select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
+  })
+
   return (
     <div>
       <UpButton label="All resources" onClick={onUp} />
@@ -159,7 +166,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <>
             {onViewMap && !category.community && (
               <button
-                onClick={() => onViewMap(search.trim() || undefined)}
+                onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                 /* Desktop only — on mobile the Map button moves into the filter/sort
                    row (next to Filters) to keep the header uncluttered. */
                 className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
@@ -219,7 +226,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               </button>
               {onViewMap && !category.community && (
                 <button
-                  onClick={() => onViewMap(search.trim() || undefined)}
+                  onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   🗺️ Map

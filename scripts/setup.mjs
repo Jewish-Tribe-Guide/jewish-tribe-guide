@@ -22,6 +22,16 @@ import { createClient } from '@supabase/supabase-js'
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const checkOnly = process.argv.includes('--check')
 
+// ── 0. Node version ──────────────────────────────────────────────────────────
+// Next 16 (and `npm run dev/build`) needs Node >= 20.9. Fail clearly here rather
+// than let a mysterious error surface later. `.nvmrc` recommends a current LTS.
+const [major, minor] = process.versions.node.split('.').map(Number)
+if (major < 20 || (major === 20 && minor < 9)) {
+  console.error(`❌ Node ${process.versions.node} is too old — this project needs Node >= 20.9.`)
+  console.error('   Install a current Node (see .nvmrc): e.g. `nvm install 24 && nvm use 24`.')
+  process.exit(1)
+}
+
 // ── 1. Environment preflight ─────────────────────────────────────────────────
 // Required to do anything; recommended power the map / email / spam features.
 const REQUIRED = {
