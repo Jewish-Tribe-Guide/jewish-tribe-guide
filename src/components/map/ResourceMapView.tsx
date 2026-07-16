@@ -155,29 +155,47 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     [selected, options],
   )
 
-  // General text filter — pre-filled on arrival from a directory's active
-  // search, but a normal editable box the visitor can change or clear here too.
-  const [query, setQuery] = useState(initialQuery ?? '')
-  const q = query.trim().toLowerCase()
+  // Search terms shown as removable chips — each is an AND filter (a place shows
+  // only if it matches every term against its name / address / tags / detail
+  // fields). Pre-filled from a directory's active search on arrival; the term
+  // being typed filters live and becomes a chip on Enter.
+  const [terms, setTerms] = useState<string[]>(() =>
+    (initialQuery ?? '').split(/\s+/).map((t) => t.trim()).filter(Boolean),
+  )
+  const [input, setInput] = useState('')
 
-  // Keep the current history entry in sync with the live query/selection, so
+  const addTerm = (raw: string) => {
+    const v = raw.trim()
+    if (!v) return
+    setTerms((prev) => (prev.some((t) => t.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))
+    setInput('')
+  }
+  const removeTerm = (term: string) => setTerms((prev) => prev.filter((t) => t !== term))
+
+  // The typed-but-not-yet-added text also filters, so results update live.
+  const activeTerms = useMemo(() => {
+    const live = input.trim()
+    const all = live && !terms.some((t) => t.toLowerCase() === live.toLowerCase()) ? [...terms, live] : terms
+    return all.map((t) => t.toLowerCase())
+  }, [terms, input])
+
+  // Keep the current history entry in sync with the live terms/selection, so
   // returning via browser Back restores what was actually on screen — not just
   // the snapshot from when the map was first opened (or last touched a chip).
   useEffect(() => {
     const current = window.history.state as { mode?: string } | null
     if (current?.mode !== 'map') return
     history.replaceState(
-      { ...current, mapQuery: query || undefined, mapSelected: selected ? Array.from(selected) : undefined },
+      { ...current, mapQuery: terms.join(' ') || undefined, mapSelected: selected ? Array.from(selected) : undefined },
       '',
     )
-  }, [query, selected])
+  }, [terms, selected])
 
   const visiblePoints = useMemo(() => {
-    const tokens = q.split(/\s+/).filter(Boolean)
     return allPoints
       .filter((p) => effectiveSelected.has(p.filterId))
-      .filter((p) => tokens.length === 0 || tokens.every((t) => p.searchText.includes(t)))
-  }, [allPoints, effectiveSelected, q])
+      .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
+  }, [allPoints, effectiveSelected, activeTerms])
 
   const toggle = (id: string) => {
     const next = new Set(effectiveSelected)
@@ -280,26 +298,58 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Search ──────────────────────────────────────────────────────────── */}
+      {/* ── Search — type a term, press Enter to pin it as a chip. Multiple
+              chips narrow the results (every term must match). ─────────────── */}
       {!loading && (
         <div className="mb-4">
           <input
             type="text"
-            placeholder="Search by name or address…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            placeholder={terms.length ? 'Add another term…' : 'Search name, address, kosher cert… (Enter to add)'}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addTerm(input)
+              } else if (e.key === 'Backspace' && !input && terms.length) {
+                removeTerm(terms[terms.length - 1])
+              }
+            }}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
+
+          {terms.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {terms.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-primary/10 text-primary rounded-full pl-2.5 pr-1 py-1"
+                >
+                  {t}
+                  <button
+                    onClick={() => removeTerm(t)}
+                    aria-label={`Remove ${t}`}
+                    className="hover:bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={() => {
+                  setTerms([])
+                  setInput('')
+                }}
+                className="ml-1 text-xs text-muted underline hover:text-slate-700 cursor-pointer"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           <p className="mt-1.5 text-xs text-muted">
             {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
-            {q && (
-              <>
-                {' '}for &ldquo;{query.trim()}&rdquo; &middot;{' '}
-                <button onClick={() => setQuery('')} className="text-primary hover:underline cursor-pointer">
-                  clear
-                </button>
-              </>
-            )}
+            {activeTerms.length > 0 && ` · matching ${activeTerms.length === 1 ? 'this term' : 'all terms'}`}
           </p>
         </div>
       )}
@@ -342,8 +392,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {!loading && visiblePoints.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
-          {q
-            ? `No places match “${query.trim()}”. Try a different search or clear it.`
+          {activeTerms.length > 0
+            ? 'No places match every term. Try removing one.'
             : 'No places shown. Turn on a category above to see locations.'}
         </p>
       )}
