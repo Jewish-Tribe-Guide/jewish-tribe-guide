@@ -132,6 +132,15 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
+
+  // Read these inside the marker effect via refs so it does NOT rebuild markers
+  // when the live GPS position ticks or the callback identity changes — only
+  // when the actual points change. Rebuilding on every GPS tick was destroying
+  // the marker an open info window was anchored to, closing it mid-tap.
+  const onViewListingRef = useRef(onViewListing)
+  const userLocationRef = useRef(userLocation)
+  useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
+  useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -194,7 +203,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       marker.addListener('gmp-click', () => {
         const iw = infoWindowRef.current
         if (!iw) return
-        iw.setContent(buildInfoContent(p, onViewListing))
+        iw.setContent(buildInfoContent(p, onViewListingRef.current))
         iw.open({ map, anchor: marker })
       })
       markersRef.current.push(marker)
@@ -203,14 +212,17 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
     // Don't auto-reframe to the points if the visitor has a location set —
     // keeping "where am I" in view matters more than framing every pin.
-    if (userLocation) return
+    if (userLocationRef.current) return
     if (points.length === 1) {
       map.setCenter(bounds.getCenter())
       map.setZoom(15)
     } else if (points.length > 1) {
       map.fitBounds(bounds, 64)
     }
-  }, [points, ready, userLocation, onViewListing])
+    // Rebuild only when the points themselves change — GPS ticks and callback
+    // identity are read via refs so an open info window survives them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, ready])
 
   // ── The visitor's "you are here" marker, centered on when set ─────────────
   useEffect(() => {
