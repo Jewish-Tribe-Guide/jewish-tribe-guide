@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   CATEGORY_CAPABILITY_KEYS,
+  FIELD_TYPES,
   FIELD_TYPE_SHAPE,
-  FIELD_TYPES_BY_SHAPE,
+  TYPE_HAS_SHAPE_CHOICE,
+  TYPE_IS_FILTERABLE,
   resolveCapabilities,
   slugifyFieldKey,
   type CategoryCapabilities,
@@ -430,50 +432,38 @@ function FieldEditor({
     onChange(!f.key ? { label, key: slugifyFieldKey(label) } : { label })
   }
 
-  // "Show as" is the primary choice; the Type list is filtered to the types that
-  // fit the chosen shape. Each type maps to exactly one shape, so the current
-  // shape is derived from the type — which also guarantees the type is always
-  // present in its shape's filtered list.
-  const showAs: 'badge' | 'row' = FIELD_TYPE_SHAPE[f.type]
-
-  function onShowAsChange(next: 'badge' | 'row') {
-    const options = FIELD_TYPES_BY_SHAPE[next]
-    // Keep the current type if it still fits; otherwise fall back to the first.
-    const type = options.some((t) => t.value === f.type) ? f.type : options[0].value
-    onChange({ renderAs: next, type })
-  }
+  // Type is the primary choice. A few downstream options apply only to certain
+  // types — "Show as" (badge vs row) and "filter by this" — so compute those.
+  const canChooseShape = TYPE_HAS_SHAPE_CHOICE(f.type)
+  const canFilter = TYPE_IS_FILTERABLE(f.type)
+  const showAs: 'badge' | 'row' = f.renderAs === 'row' ? 'row' : 'badge'
 
   function onTypeChange(type: FieldType) {
-    onChange({ type, renderAs: FIELD_TYPE_SHAPE[type] })
+    const patch: Partial<CategoryField> = { type, renderAs: FIELD_TYPE_SHAPE[type] }
+    // Clear options that don't apply to the new type.
+    if (!TYPE_IS_FILTERABLE(type)) patch.filterable = false
+    if (type !== 'select') patch.multiSelect = false
+    onChange(patch)
   }
 
   const sectionLabel = 'text-[10px] font-semibold uppercase tracking-wide text-slate-400'
 
   return (
     <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-3">
-      {/* ── The information ──────────────────────────────────────────────── */}
+      {/* ── The field: what it is (used in both the form and the listing) ── */}
       <div className="space-y-2">
         <label className="block">
           <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Label</span>
           <input value={f.label} onChange={(e) => onLabelChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <label className="block">
-            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
-            <select value={showAs} onChange={(e) => onShowAsChange(e.target.value as 'badge' | 'row')} className={inputClass}>
-              <option value="badge">Badge — a chip by the name</option>
-              <option value="row">Row — a labeled line</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
-            <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
-              {FIELD_TYPES_BY_SHAPE[showAs].map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="block sm:w-1/2">
+          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
+          <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
+            {FIELD_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </label>
 
         {f.type === 'select' && (
           <label className="block">
@@ -496,25 +486,40 @@ function FieldEditor({
         )}
       </div>
 
-      {/* ── On the listings page ─────────────────────────────────────────── */}
-      <div className="border-t border-slate-200 pt-2.5 space-y-1.5">
-        <p className={sectionLabel}>On the listings page</p>
-        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-          <input type="checkbox" checked={!!f.filterable} onChange={(e) => onChange({ filterable: e.target.checked })} className="rounded border-slate-300" />
-          Let people filter listings by this
-        </label>
-        {f.filterable && f.type === 'select' && (
-          <label className="ml-5 flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
-            Allow picking several at once
-          </label>
-        )}
-      </div>
+      {/* ── On the listing: how visitors see and filter it ───────────────── */}
+      {(canChooseShape || canFilter) && (
+        <div className="border-t border-slate-200 pt-2.5 space-y-2">
+          <p className={sectionLabel}>On the listing</p>
+          {canChooseShape && (
+            <label className="block sm:w-1/2">
+              <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
+              <select value={showAs} onChange={(e) => onChange({ renderAs: e.target.value as 'badge' | 'row' })} className={inputClass}>
+                <option value="badge">Badge — a chip by the name</option>
+                <option value="row">Row — a labeled line</option>
+              </select>
+            </label>
+          )}
+          {canFilter && (
+            <div className="space-y-1.5">
+              <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={!!f.filterable} onChange={(e) => onChange({ filterable: e.target.checked })} className="rounded border-slate-300" />
+                Let people filter listings by this
+              </label>
+              {f.filterable && f.type === 'select' && (
+                <label className="ml-5 flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
+                  Allow picking several at once
+                </label>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* ── When adding a listing (only if people can add/edit) ──────────── */}
+      {/* ── When adding/editing: the contribution form (only if enabled) ─── */}
       {canRequire && (
         <div className="border-t border-slate-200 pt-2.5 space-y-1.5">
-          <p className={sectionLabel}>When someone adds a listing</p>
+          <p className={sectionLabel}>When adding or editing a listing</p>
           <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
             <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
             Required
