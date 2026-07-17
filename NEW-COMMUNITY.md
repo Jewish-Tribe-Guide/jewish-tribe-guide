@@ -112,9 +112,18 @@ For each category you keep, either provide a starting list or launch empty:
 - **Start empty and crowdsource (fastest).** Ship with an empty directory; your
   community fills it in through the built-in **submit → review → approve** flow.
   Nothing to gather up front.
-- **Seed a starting set.** Hand over a simple spreadsheet — one tab per category,
-  columns matching the fields above. You don't need coordinates; addresses are
-  geocoded automatically.
+- **Seed a starting set from a spreadsheet.** Hand over a **CSV per category** —
+  a header row with `name`, `address`, `phone`, and columns matching the fields
+  above (booleans accept yes/no; tag lists split on `;`). Your builder loads each
+  with one command — addresses are geocoded automatically:
+
+  ```bash
+  npm run import -- shuls.csv --category synagogue
+  npm run import -- food.csv  --category restaurant --dry-run   # preview first
+  ```
+
+  Add `--status pending` to route the rows through the moderation queue instead
+  of publishing them straight away.
 
 Two feature modules (Part 1) have their own small data, only if you turn them on:
 

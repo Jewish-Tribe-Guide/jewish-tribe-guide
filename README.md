@@ -104,7 +104,9 @@ anchor on `community.mapCenter` + `community.timezone` instead.
    ```
 
    The individual scripts in `scripts/` still exist if you need to run one on its
-   own; each documents what it loads at the top.
+   own; each documents what it loads at the top. To bulk-load a category from a
+   spreadsheet, use `npm run import -- <file.csv> --category <id>` (add
+   `--dry-run` to preview) — addresses are geocoded automatically.
 
    **Prefer to start empty and crowdsource?** Clear the arrays in
    `src/data/resources.js` and `src/data/synagogues.js` (or just don't run

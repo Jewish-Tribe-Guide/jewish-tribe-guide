@@ -12,7 +12,8 @@
     "lint": "eslint",
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
-    "doctor": "node --env-file=.env.local scripts/doctor.mjs"
+    "doctor": "node --env-file=.env.local scripts/doctor.mjs",
+    "import": "node --env-file=.env.local scripts/import.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
