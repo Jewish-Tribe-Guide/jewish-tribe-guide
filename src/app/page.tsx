@@ -10,6 +10,7 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import { useStoredLocation } from '@/lib/useStoredLocation'
+import { ui } from '@/lib/uiConfig'
 
 // Which guided form is open as a full-screen overlay (Support / Volunteer), and
 // any need pre-checked from the card or a search result.
@@ -188,7 +189,7 @@ export default function Page() {
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
-        {mode === 'map' && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
+        {mode === 'map' && ui.map.enabled && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
       </main>
       <SiteFooter />
       {overlay}

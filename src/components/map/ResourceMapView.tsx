@@ -14,6 +14,7 @@ import { community } from '@/community.config'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
+import { ui } from '@/lib/uiConfig'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
@@ -323,7 +324,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
 
         {/* Map / Nearby tab toggle */}
-        {!loading && (
+        {!loading && ui.map.nearbyList && (
           <div className="flex shrink-0 rounded-xl bg-slate-100 p-1">
             <button
               onClick={() => setTab('map')}
@@ -346,7 +347,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       </div>
 
       {/* ── Live tracking bar ─────────────────────────────────────────────────── */}
-      {!loading && (
+      {!loading && ui.map.liveTracking && (
         <div className="mb-4">
           {tracking ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -402,7 +403,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       {/* ── Search + filters — type a term (Enter to pin it as a chip); typing
               "open now" pins the open-now filter. Filters carried from a category
               show as chips too. Every chip narrows the results. ──────────────── */}
-      {!loading && (
+      {!loading && ui.search.map && (
         <div className="mb-4">
           <input
             type="text"
@@ -490,7 +491,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       )}
 
       {/* ── Nearby list view ─────────────────────────────────────────────────── */}
-      {tab === 'nearby' && !loading && (
+      {tab === 'nearby' && !loading && ui.map.nearbyList && (
         <>
           {activeLocation ? (
             <p className="mb-3 text-xs text-slate-400">

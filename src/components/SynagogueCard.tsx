@@ -7,6 +7,7 @@ import type { Minyan } from '@/lib/davening'
 import { PencilIcon, FlagIcon } from '@/components/icons'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
+import { ui } from '@/lib/uiConfig'
 
 type Props = {
   item: DirectoryResource
@@ -220,14 +221,20 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
           {/* Footer: freshness + edit / report */}
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            <div className="flex gap-3">
-              <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
-                <PencilIcon className="h-3.5 w-3.5" /> Edit
-              </button>
-              <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
-                <FlagIcon className="h-3.5 w-3.5" /> Report
-              </button>
-            </div>
+            {(ui.contributions.edit || ui.contributions.report) && (
+              <div className="flex gap-3">
+                {ui.contributions.edit && (
+                  <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
+                    <PencilIcon className="h-3.5 w-3.5" /> Edit
+                  </button>
+                )}
+                {ui.contributions.report && (
+                  <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
+                    <FlagIcon className="h-3.5 w-3.5" /> Report
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -13,6 +13,7 @@ import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
 type Body = {
@@ -57,6 +58,23 @@ export async function POST(request: Request) {
 
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null
+
+  // Curated-directory gate: refuse whichever contribution paths the community
+  // turned off in community.config (ui.contributions), so hiding a button can't
+  // be bypassed by posting directly.
+  const allowed =
+    targetType === 'category'
+      ? ui.contributions.suggestCategory
+      : operation === 'create'
+        ? ui.contributions.add
+        : operation === 'update'
+          ? ui.contributions.edit
+          : operation === 'delete'
+            ? ui.contributions.report
+            : true // unknown operations fall through to the 400 below
+  if (!allowed) {
+    return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+  }
 
   if (targetType === 'category') {
     return handleCategory(body, submittedBy)

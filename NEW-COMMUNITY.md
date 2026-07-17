@@ -49,6 +49,30 @@ Hospital patient support . yes / no   ← turn OFF for a general community
 > **Tip — map center:** search your neighborhood on Google Maps, right-click the
 > middle of it, and click the lat/lng at the top of the menu to copy it.
 
+**Which UI options do you want?** The base app is the same for everyone; a
+`ui` block in `src/community.config.ts` turns individual affordances on/off (all
+default on — flip to `false` to remove). Pick per row:
+
+```
+Public contributions (ui.contributions)
+  ├ Add buttons ............... yes / no
+  ├ Edit (per listing) ........ yes / no
+  ├ Report (per listing) ...... yes / no
+  └ Suggest a new category .... yes / no    ← all off = curated, admin-only
+Search bars (ui.search)
+  ├ Home / landing search ..... yes / no
+  ├ Category directory search . yes / no
+  └ Map search ................ yes / no
+Map & discovery (ui.map)
+  ├ Map at all (card + screen)  yes / no    ← off = no map anywhere
+  ├ Live GPS tracking ......... yes / no
+  └ "Nearby" list ............. yes / no
+Upvotes (ui.upvotes) .......... yes / no
+```
+
+Turning a contribution off removes its button **and** makes the server reject
+that action — so "curated" really is curated, not just hidden buttons.
+
 ---
 
 ## Part 2 — Choose your directory categories

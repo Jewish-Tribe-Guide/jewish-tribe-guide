@@ -50,6 +50,12 @@ The single source of truth for branding. Edit:
 - `features` — turn off any hand-built module a community doesn't need
   (`eruv`, `zmanim`, `medicalResources`, `patientSupport`, `volunteer`). The
   card and its page/flow disappear when a flag is `false`.
+- `ui` — capability toggles for the app's affordances (all default on): public
+  `contributions` (Add / Edit / Report / suggest-category — off = a curated,
+  admin-only directory, enforced on the server too), `search` bars per screen
+  (landing / directory / map), the `map` and its extras (live tracking, nearby
+  list), and `upvotes`. Read through `src/lib/uiConfig.ts`, which applies the
+  defaults so any key can be flipped or omitted.
 
 ### 2. Logo & favicon
 
