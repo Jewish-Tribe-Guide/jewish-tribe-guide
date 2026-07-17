@@ -61,6 +61,45 @@ export const community = {
     /** "Volunteer for Patients" flow. */
     volunteer: true,
   },
+
+  /** UI capabilities — which affordances the app shows. The base code is the
+   *  same for every community; these toggles turn pieces on/off. Everything
+   *  defaults on (matching this deployment); omit any key to keep it on. Read
+   *  through src/lib/uiConfig.ts, which fills in defaults. */
+  ui: {
+    /** Public contributions. Turn a group off for a curated, admin-only
+     *  directory — the buttons disappear AND the server rejects those writes. */
+    contributions: {
+      /** "Add" buttons on each category directory. */
+      add: true,
+      /** Per-listing "Edit" button. */
+      edit: true,
+      /** Per-listing "Report" button. */
+      report: true,
+      /** The "Suggest a new category" card on the home screen. */
+      suggestCategory: true,
+    },
+    /** Show/hide the search bar on each screen independently. */
+    search: {
+      /** The hero search on the home screen. */
+      landing: true,
+      /** The per-category directory search. */
+      directory: true,
+      /** The resource map's search. */
+      map: true,
+    },
+    /** The resource map and its extras. */
+    map: {
+      /** The "View Map" card + the whole map screen. Off = no map anywhere. */
+      enabled: true,
+      /** The "Start live tracking" (live GPS) bar on the map. */
+      liveTracking: true,
+      /** The "Nearby" list tab on the map. */
+      nearbyList: true,
+    },
+    /** Global on/off for upvotes, layered on top of each category's DB setting. */
+    upvotes: true,
+  },
 } as const
 
 // ── Validation ───────────────────────────────────────────────────────────────

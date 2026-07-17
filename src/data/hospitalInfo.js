@@ -1,3 +1,6 @@
+// Starter per-hospital "Jewish life" details, keyed by hospital id. Loaded into
+// the `hospital` table's `info` column by scripts/seed-hospitals.mjs; after
+// seeding the app reads it from the DB, not this file.
 /** @type {Record<string, import('@/types').HospitalInfo>} */
 export const hospitalInfo = {
   penn: {

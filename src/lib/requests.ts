@@ -1,4 +1,3 @@
-import { hospitals } from '@/data/hospitals'
 import { community } from '@/community.config'
 import type { ContactHospitalData, VolunteerData, VolunteerRemovalData } from '@/types'
 import { validateContact } from './validation'
@@ -38,8 +37,10 @@ export const SHEET_COLUMNS = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-export function hospitalName(hospitalId: string): string {
-  return hospitals.find((h) => h.id === hospitalId)?.name ?? hospitalId
+/** Resolve a hospital id to its name via a lookup map (built server-side from
+ *  the `hospital` table); falls back to the id if unknown. */
+export function hospitalName(hospitalId: string, names: Record<string, string>): string {
+  return names[hospitalId] ?? hospitalId
 }
 
 // Short, human-readable, reasonably unique request id, e.g. "REQ-LXYZ12-4F9A".
@@ -68,13 +69,14 @@ export function buildSheetRow(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  names: Record<string, string>,
 ): string[] {
   const { contact, requestType, formData } = payload
   return [
     timestamp,
     requestId,
     requestType,
-    hospitalName(contact.hospitalId),
+    hospitalName(contact.hospitalId, names),
     contact.fullName,
     contact.phone,
     contact.email,
@@ -136,8 +138,8 @@ const HAS_CAR_LABELS: Record<string, string> = {
 
 const ANYWHERE = 'anywhere'
 
-function areaLabel(id: string): string {
-  return id === ANYWHERE ? `Anywhere in the ${community.region} area` : hospitalName(id)
+function areaLabel(id: string, names: Record<string, string>): string {
+  return id === ANYWHERE ? `Anywhere in the ${community.region} area` : hospitalName(id, names)
 }
 
 // Builds the Volunteers-tab row (matching VOLUNTEER_SHEET_COLUMNS order). The
@@ -147,6 +149,7 @@ export function buildVolunteerSheetRow(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  names: Record<string, string>,
 ): string[] {
   const { contact } = payload
   const v = payload.formData as unknown as VolunteerData
@@ -165,7 +168,7 @@ export function buildVolunteerSheetRow(
     contact.email,
     PREFERRED_CONTACT_LABELS[contact.preferredContact] ?? contact.preferredContact ?? '',
     waysToHelp.join(', '),
-    (v.hospitals ?? []).map(areaLabel).join(', '),
+    (v.hospitals ?? []).map((id) => areaLabel(id, names)).join(', '),
     (v.availability ?? []).map((code) => AVAILABILITY_LABELS[code] ?? code).join(', '),
     HAS_CAR_LABELS[v.hasCar] ?? v.hasCar ?? '',
     v.notes ?? '',
@@ -221,6 +224,7 @@ export function buildVolunteerChangeSheetRow(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  names: Record<string, string>,
 ): string[] {
   const { contact } = payload
 
@@ -261,7 +265,7 @@ export function buildVolunteerChangeSheetRow(
     contact.email,
     PREFERRED_CONTACT_LABELS[contact.preferredContact] ?? contact.preferredContact ?? '',
     waysToHelp.join(', '),
-    (v.hospitals ?? []).map(areaLabel).join(', '),
+    (v.hospitals ?? []).map((id) => areaLabel(id, names)).join(', '),
     (v.availability ?? []).map((code) => AVAILABILITY_LABELS[code] ?? code).join(', '),
     HAS_CAR_LABELS[v.hasCar] ?? v.hasCar ?? '',
     v.notes ?? '',

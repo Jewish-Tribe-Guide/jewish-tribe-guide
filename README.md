@@ -50,6 +50,12 @@ The single source of truth for branding. Edit:
 - `features` — turn off any hand-built module a community doesn't need
   (`eruv`, `zmanim`, `medicalResources`, `patientSupport`, `volunteer`). The
   card and its page/flow disappear when a flag is `false`.
+- `ui` — capability toggles for the app's affordances (all default on): public
+  `contributions` (Add / Edit / Report / suggest-category — off = a curated,
+  admin-only directory, enforced on the server too), `search` bars per screen
+  (landing / directory / map), the `map` and its extras (live tracking, nearby
+  list), and `upvotes`. Read through `src/lib/uiConfig.ts`, which applies the
+  defaults so any key can be flipped or omitted.
 
 ### 2. Logo & favicon
 
@@ -65,13 +71,18 @@ optional**. For a general (non-patient) community, set `hospitals = []` in
 map pins, and the "About Your Hospital" pages all disappear, and zmanim/eruv
 anchor on `community.mapCenter` + `community.timezone` instead.
 
-- `hospitals` — coordinates + timezone per hospital; only used by the patient
-  module (map pins, volunteer form, "About Your Hospital"). Leave empty if your
-  community isn't hospital-oriented.
+- `hospitals` (+ `hospitalInfo`) — starter data for the patient module (map pins,
+  volunteer form, "About Your Hospital"). Seeded into the `hospital` DB table by
+  `npm run setup`; the app then reads it from the database, so edit these files
+  for your initial set (or leave `hospitals` empty for a non-hospital community).
 - `resources.js → eruvim` — read directly at runtime; edit for your community's
   eruvim.
 
 ### 4. Backend & initial content
+
+> New to the accounts/keys? **[SETUP.md](SETUP.md)** is a click-by-click
+> walkthrough, and **`npm run doctor`** checks your env + database at any time
+> and prints exactly what's missing and how to fix it.
 
 1. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
@@ -94,7 +105,9 @@ anchor on `community.mapCenter` + `community.timezone` instead.
    ```
 
    The individual scripts in `scripts/` still exist if you need to run one on its
-   own; each documents what it loads at the top.
+   own; each documents what it loads at the top. To bulk-load a category from a
+   spreadsheet, use `npm run import -- <file.csv> --category <id>` (add
+   `--dry-run` to preview) — addresses are geocoded automatically.
 
    **Prefer to start empty and crowdsource?** Clear the arrays in
    `src/data/resources.js` and `src/data/synagogues.js` (or just don't run

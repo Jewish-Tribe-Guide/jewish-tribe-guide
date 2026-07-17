@@ -49,6 +49,30 @@ Hospital patient support . yes / no   ← turn OFF for a general community
 > **Tip — map center:** search your neighborhood on Google Maps, right-click the
 > middle of it, and click the lat/lng at the top of the menu to copy it.
 
+**Which UI options do you want?** The base app is the same for everyone; a
+`ui` block in `src/community.config.ts` turns individual affordances on/off (all
+default on — flip to `false` to remove). Pick per row:
+
+```
+Public contributions (ui.contributions)
+  ├ Add buttons ............... yes / no
+  ├ Edit (per listing) ........ yes / no
+  ├ Report (per listing) ...... yes / no
+  └ Suggest a new category .... yes / no    ← all off = curated, admin-only
+Search bars (ui.search)
+  ├ Home / landing search ..... yes / no
+  ├ Category directory search . yes / no
+  └ Map search ................ yes / no
+Map & discovery (ui.map)
+  ├ Map at all (card + screen)  yes / no    ← off = no map anywhere
+  ├ Live GPS tracking ......... yes / no
+  └ "Nearby" list ............. yes / no
+Upvotes (ui.upvotes) .......... yes / no
+```
+
+Turning a contribution off removes its button **and** makes the server reject
+that action — so "curated" really is curated, not just hidden buttons.
+
 ---
 
 ## Part 2 — Choose your directory categories
@@ -88,9 +112,18 @@ For each category you keep, either provide a starting list or launch empty:
 - **Start empty and crowdsource (fastest).** Ship with an empty directory; your
   community fills it in through the built-in **submit → review → approve** flow.
   Nothing to gather up front.
-- **Seed a starting set.** Hand over a simple spreadsheet — one tab per category,
-  columns matching the fields above. You don't need coordinates; addresses are
-  geocoded automatically.
+- **Seed a starting set from a spreadsheet.** Hand over a **CSV per category** —
+  a header row with `name`, `address`, `phone`, and columns matching the fields
+  above (booleans accept yes/no; tag lists split on `;`). Your builder loads each
+  with one command — addresses are geocoded automatically:
+
+  ```bash
+  npm run import -- shuls.csv --category synagogue
+  npm run import -- food.csv  --category restaurant --dry-run   # preview first
+  ```
+
+  Add `--status pending` to route the rows through the moderation queue instead
+  of publishing them straight away.
 
 Two feature modules (Part 1) have their own small data, only if you turn them on:
 
@@ -107,6 +140,8 @@ These are external services. The **account owner must create them** (they can't
 be handed to you second-hand), but each is free to start. Give the resulting
 keys to whoever builds the site — they go in a `.env.local` file (see
 [`.env.example`](.env.example) for the exact names and where each is found).
+**[SETUP.md](SETUP.md)** walks through creating each account click-by-click, and
+**`npm run doctor`** checks that everything is wired up.
 
 ### Required — the site won't function without these
 | What | Why | Where |

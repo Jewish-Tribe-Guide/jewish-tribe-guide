@@ -12,6 +12,7 @@ import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import DirectoryHeader from './DirectoryHeader'
 import UpButton from '@/components/UpButton'
 import { ClockIcon, PlusIcon } from '@/components/icons'
+import { ui } from '@/lib/uiConfig'
 
 type Props = {
   items: DirectoryResource[]
@@ -104,7 +105,7 @@ export default function SynagogueDirectory({
         addressPrompt={addressPrompt}
         actions={
           <>
-            {onViewMap && (
+            {onViewMap && ui.map.enabled && (
               <button
                 onClick={() => onViewMap(search.trim() || undefined)}
                 /* Desktop only — on mobile Map moves into the filter row below. */
@@ -113,26 +114,30 @@ export default function SynagogueDirectory({
                 🗺️ Map
               </button>
             )}
-            <button
-              onClick={onAdd}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-            >
-              <PlusIcon className="h-4 w-4" /> Add
-            </button>
+            {ui.contributions.add && (
+              <button
+                onClick={onAdd}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <PlusIcon className="h-4 w-4" /> Add
+              </button>
+            )}
           </>
         }
       />
 
       {/* Controls: search + denomination filter */}
       <div className="mb-4 space-y-2">
-        <input
-          type="text"
-          placeholder="Search synagogues…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        {(denominations.length > 1 || hasMinyanim || onViewMap) && (
+        {ui.search.directory && (
+          <input
+            type="text"
+            placeholder="Search synagogues…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        )}
+        {(denominations.length > 1 || hasMinyanim || (onViewMap && ui.map.enabled)) && (
           <div className="relative z-20 flex items-center gap-1.5 sm:gap-2 flex-nowrap sm:flex-wrap pb-1 sm:pb-0">
             {denominations.length > 1 && (
               <DenominationFilter
@@ -142,7 +147,7 @@ export default function SynagogueDirectory({
               />
             )}
             {/* Map — mobile only here (after denomination); on desktop it lives in the header. */}
-            {onViewMap && (
+            {onViewMap && ui.map.enabled && (
               <button
                 onClick={() => onViewMap(search.trim() || undefined)}
                 className="sm:hidden shrink-0 inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
@@ -183,12 +188,14 @@ export default function SynagogueDirectory({
                 Clear search &amp; filters
               </button>
             )}
-            <button
-              onClick={onAdd}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
-            >
-              <PlusIcon className="h-4 w-4" /> Add synagogue
-            </button>
+            {ui.contributions.add && (
+              <button
+                onClick={onAdd}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              >
+                <PlusIcon className="h-4 w-4" /> Add synagogue
+              </button>
+            )}
           </div>
         </div>
       ) : (

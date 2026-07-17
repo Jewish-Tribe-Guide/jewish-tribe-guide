@@ -13,6 +13,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { listingSearchText } from '@/lib/searchListing'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { ui } from '@/lib/uiConfig'
 
 type Props = {
   category: CategoryConfig
@@ -56,7 +57,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 
-  const upvotes = !!category.upvotesEnabled
+  const upvotes = !!category.upvotesEnabled && ui.upvotes
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
   const reopenRef = useRef<HTMLDivElement>(null)
@@ -164,7 +165,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         addressPrompt={addressPrompt}
         actions={
           <>
-            {onViewMap && !category.community && (
+            {onViewMap && ui.map.enabled && !category.community && (
               <button
                 onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                 /* Desktop only — on mobile the Map button moves into the filter/sort
@@ -174,26 +175,30 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 🗺️ Map
               </button>
             )}
-            <button
-              onClick={onAdd}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-            >
-              <PlusIcon className="h-4 w-4" /> Add
-            </button>
+            {ui.contributions.add && (
+              <button
+                onClick={onAdd}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <PlusIcon className="h-4 w-4" /> Add
+              </button>
+            )}
           </>
         }
       />
 
       {/* Controls */}
       <div className="mb-4 space-y-2">
-        <input
-          type="text"
-          placeholder={searchPlaceholder}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        {q && tagFields.length > 0 && (
+        {ui.search.directory && (
+          <input
+            type="text"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        )}
+        {ui.search.directory && q && tagFields.length > 0 && (
           <p className="text-xs text-muted">
             Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
             <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
@@ -224,7 +229,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   </span>
                 )}
               </button>
-              {onViewMap && !category.community && (
+              {onViewMap && ui.map.enabled && !category.community && (
                 <button
                   onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
@@ -373,12 +378,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 Clear search &amp; filters
               </button>
             )}
-            <button
-              onClick={onAdd}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
-            >
-              <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
-            </button>
+            {ui.contributions.add && (
+              <button
+                onClick={onAdd}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              >
+                <PlusIcon className="h-4 w-4" /> Add {category.label.toLowerCase()}
+              </button>
+            )}
           </div>
         </div>
       ) : (

@@ -13,7 +13,7 @@ import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
-import { hospitals } from '@/data/hospitals'
+import { useHospitals } from '@/lib/useHospitals'
 import { community } from '@/community.config'
 
 const ADD_CATEGORY = '__add_category__'
@@ -67,6 +67,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   })
   const [action, setAction] = useState<ListingAction | null>(null)
   const categories = useCategories()
+  const hospitals = useHospitals() ?? []
   // The listing id most recently opened for edit/report, OR the place tapped on
   // the landing page — restored as expanded when the category list shows.
   const [reopenItemId, setReopenItemId] = useState<string | null>(() => {
@@ -137,8 +138,8 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
     // (Patient feature — hospitals is non-empty whenever this view is reachable.)
     const id = hospitalDetailId ?? hospitals[0]?.id ?? ''
-    const name = hospitals.find((h) => h.id === id)?.name ?? ''
-    return <AboutYourHospital hospitalId={id} hospitalName={name} onUp={goToHospitals} />
+    const hospital = hospitals.find((h) => h.id === id)
+    return <AboutYourHospital hospitalName={hospital?.name ?? ''} info={hospital?.info} onUp={goToHospitals} />
   }
   if (view === 'eruv') {
     return <EruvInfo eruvim={eruvim} onUp={onUp} />

@@ -11,6 +11,7 @@ import {
   FEEDBACK_SHEET_TAB,
 } from '@/lib/requests'
 import { appendRow } from '@/lib/sheets'
+import { hospitalNameMap } from '@/lib/hospitalStore'
 import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
@@ -60,15 +61,17 @@ export async function POST(request: Request) {
   // 2. Append to Google Sheets (system of record — hard failure if this fails).
   //    Volunteer signups → Volunteers tab; edit/removal change-requests →
   //    Volunteer Changes tab; all other requests → default Requests tab.
+  //    Resolve hospital ids → names once (from the DB) for the row builders.
+  const names = await hospitalNameMap()
   try {
     if (payload.requestType === 'Volunteer') {
-      await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_SHEET_TAB })
+      await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp, names), { tab: VOLUNTEER_SHEET_TAB })
     } else if (payload.requestType === 'Volunteer Edit' || payload.requestType === 'Volunteer Removal') {
-      await appendRow(buildVolunteerChangeSheetRow(payload, requestId, timestamp), { tab: VOLUNTEER_CHANGES_SHEET_TAB })
+      await appendRow(buildVolunteerChangeSheetRow(payload, requestId, timestamp, names), { tab: VOLUNTEER_CHANGES_SHEET_TAB })
     } else if (payload.requestType === 'Feedback') {
       await appendRow(buildFeedbackSheetRow(payload, requestId, timestamp), { tab: FEEDBACK_SHEET_TAB })
     } else {
-      await appendRow(buildSheetRow(payload, requestId, timestamp))
+      await appendRow(buildSheetRow(payload, requestId, timestamp, names))
     }
   } catch (err) {
     console.error('[requests] Sheets append failed:', err)

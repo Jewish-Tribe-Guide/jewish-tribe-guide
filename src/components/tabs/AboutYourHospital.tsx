@@ -1,9 +1,10 @@
-import { hospitalInfo } from '@/data/hospitalInfo'
+import type { HospitalInfo } from '@/types'
 import UpButton from '@/components/UpButton'
 
 type Props = {
-  hospitalId: string
   hospitalName: string
+  /** Per-hospital "Jewish life" details, from the DB (hospital.info). */
+  info?: HospitalInfo | null
   onUp: () => void
   /** Label on the Up button — the screen this page was opened from. */
   upLabel?: string
@@ -20,9 +21,7 @@ function alwaysOpen(text: string): boolean {
 // A page built around what a visitor needs in the moment: reach a person first
 // (chaplain, bikkur cholim), then find where to pray and how to arrange kosher
 // & Shabbos support — with the staff directory last.
-export default function AboutYourHospital({ hospitalId, hospitalName, onUp, upLabel = 'Jewish Medical Resources' }: Props) {
-  const info = hospitalInfo[hospitalId]
-
+export default function AboutYourHospital({ hospitalName, info, onUp, upLabel = 'Jewish Medical Resources' }: Props) {
   if (!info) {
     return (
       <div>
