@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig, CategoryField } from '@/lib/categories'
+import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import UpvoteButton from './UpvoteButton'
@@ -77,6 +77,10 @@ export function GenericListingCard({
   const isMobile = useIsMobile()
 
   const fields = category.detailFields
+  // Per-category capabilities layered under the global `ui.contributions` switches.
+  const caps = resolveCapabilities(category.capabilities)
+  const canEdit = ui.contributions.edit && caps.edit
+  const canReport = ui.contributions.report && caps.report
   const tagFields = fields.filter((f) => f.type === 'tags')
   const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
   const headerUrlFields = fields.filter((f) => f.type === 'url' && f.showInHeader)
@@ -371,12 +375,12 @@ export function GenericListingCard({
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {(ui.contributions.edit || ui.contributions.report) && (
+            {(canEdit || canReport) && (
               <div className="flex gap-3">
-                {ui.contributions.edit && (
+                {canEdit && (
                   <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
                 )}
-                {ui.contributions.report && (
+                {canReport && (
                   <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
                 )}
               </div>

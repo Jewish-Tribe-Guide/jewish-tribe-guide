@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow } from '@/lib/hours'
 import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
@@ -58,6 +58,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
 
   const upvotes = !!category.upvotesEnabled && ui.upvotes
+  // Per-category capabilities layered under the global `ui.*` master switches.
+  const caps = resolveCapabilities(category.capabilities)
+  const canAdd = ui.contributions.add && caps.add
+  const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
   const reopenRef = useRef<HTMLDivElement>(null)
@@ -175,7 +179,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 🗺️ Map
               </button>
             )}
-            {ui.contributions.add && (
+            {canAdd && (
               <button
                 onClick={onAdd}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
@@ -189,7 +193,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       {/* Controls */}
       <div className="mb-4 space-y-2">
-        {ui.search.directory && (
+        {showSearch && (
           <input
             type="text"
             placeholder={searchPlaceholder}
@@ -198,7 +202,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         )}
-        {ui.search.directory && q && tagFields.length > 0 && (
+        {showSearch && q && tagFields.length > 0 && (
           <p className="text-xs text-muted">
             Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
             <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
@@ -378,7 +382,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 Clear search &amp; filters
               </button>
             )}
-            {ui.contributions.add && (
+            {canAdd && (
               <button
                 onClick={onAdd}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"

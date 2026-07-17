@@ -11,6 +11,7 @@ import type {
 } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
+import CategoryManager from '@/components/admin/CategoryManager'
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -36,8 +37,38 @@ export default function AdminPage() {
 
   return (
     <Shell>
-      <ModerationQueue session={session} />
+      <AdminTabs session={session} />
     </Shell>
+  )
+}
+
+function AdminTabs({ session }: { session: Session }) {
+  const [tab, setTab] = useState<'queue' | 'categories'>('queue')
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-5 border-b border-slate-200">
+        {(['queue', 'categories'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`text-sm font-medium px-3 py-2 -mb-px border-b-2 transition-colors cursor-pointer ${
+              tab === t
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted hover:text-slate-700'
+            }`}
+          >
+            {t === 'queue' ? 'Moderation queue' : 'Categories'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'queue' ? (
+        <ModerationQueue session={session} />
+      ) : (
+        <CategoryManager token={session.access_token} />
+      )}
+    </div>
   )
 }
 

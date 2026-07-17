@@ -9,6 +9,21 @@
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim'
 
+/** All field types, with a human label — drives the type picker in the admin
+ *  category editor. Order is rough "most common first". */
+export const FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: 'text', label: 'Text' },
+  { value: 'textarea', label: 'Long text' },
+  { value: 'tel', label: 'Phone' },
+  { value: 'url', label: 'Link' },
+  { value: 'number', label: 'Number' },
+  { value: 'boolean', label: 'Yes / No' },
+  { value: 'select', label: 'Choice (dropdown)' },
+  { value: 'tags', label: 'Tags' },
+  { value: 'hours', label: 'Hours' },
+  { value: 'minyanim', label: 'Minyan times' },
+]
+
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
   key: string
@@ -50,6 +65,47 @@ export type CategoryField = {
   caveat?: { flagField: string; noteField: string }
 }
 
+/** Per-category UI affordances, layered UNDER the site-wide `ui.*` master
+ *  switches in community.config. Effective visibility = global flag AND the
+ *  matching capability here (see the `ui.*` consumers). Upvotes are tracked
+ *  separately via `upvotesEnabled` (its own DB column), not in this object. */
+export type CategoryCapabilities = {
+  /** "Add {category}" buttons on this category's directory. */
+  add: boolean
+  /** Per-listing "Edit" button. */
+  edit: boolean
+  /** Per-listing "Report" button. */
+  report: boolean
+  /** The search bar on this category's directory. */
+  directorySearch: boolean
+}
+
+/** The ordered capability keys, for building the admin toggles. */
+export const CATEGORY_CAPABILITY_KEYS: (keyof CategoryCapabilities)[] = [
+  'add',
+  'edit',
+  'report',
+  'directorySearch',
+]
+
+/** Every capability defaults ON — an unset category behaves exactly as before
+ *  this feature existed (the global `ui.*` flags alone decide). */
+export const CATEGORY_CAPABILITY_DEFAULTS: CategoryCapabilities = {
+  add: true,
+  edit: true,
+  report: true,
+  directorySearch: true,
+}
+
+/** Fills in defaults for any missing capability key. Use this everywhere a
+ *  capability is read, so partial/absent stored objects (and the fallback
+ *  categories) always resolve to a complete, valid shape. */
+export function resolveCapabilities(
+  raw?: Partial<CategoryCapabilities> | null,
+): CategoryCapabilities {
+  return { ...CATEGORY_CAPABILITY_DEFAULTS, ...(raw ?? {}) }
+}
+
 export type CategoryConfig = {
   /** Slug stored in `resource.category`, e.g. 'grocery'. */
   id: string
@@ -66,9 +122,23 @@ export type CategoryConfig = {
   community?: boolean
   /** Whether listings in this category can be upvoted. */
   upvotesEnabled?: boolean
+  /** Per-category UI affordances (resolved with defaults). Server code always
+   *  sets this via `resolveCapabilities`; client consumers should still guard
+   *  with `resolveCapabilities` in case of cached/fallback data. */
+  capabilities?: CategoryCapabilities
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'
+
+/** Turns a human field label into a safe `details` key, e.g. "Grades served" →
+ *  "grades_served". Used by the admin field editor to auto-fill the key. */
+export function slugifyFieldKey(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
 
 // Category ids that are community-wide rather than hospital-scoped (e.g. WhatsApp
 // groups). Kept in code since these are rare and owner-defined.
