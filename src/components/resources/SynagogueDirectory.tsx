@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import SynagogueCard from '@/components/SynagogueCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import DenominationFilter from '@/components/synagogues/DenominationFilter'
@@ -15,6 +16,7 @@ import { ClockIcon, PlusIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
 
 type Props = {
+  category: CategoryConfig
   items: DirectoryResource[]
   /** Shown under the heading — hospital name (patient) or typed address (community). */
   anchorLabel?: string
@@ -36,6 +38,7 @@ type Props = {
 // rich UI (denomination, davening times, contact, WhatsApp) while routing
 // through the standard DB add/edit/report pipeline.
 export default function SynagogueDirectory({
+  category,
   items,
   anchorLabel,
   addressPrompt,
@@ -49,6 +52,16 @@ export default function SynagogueDirectory({
   const [search, setSearch] = useState('')
   const [denomination, setDenomination] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
+
+  // Per-category capabilities layered under the global `ui.*` master switches
+  // (mirrors GenericDirectory) — so the admin category editor's toggles apply to
+  // synagogues too, not just the generic categories.
+  const caps = resolveCapabilities(category.capabilities)
+  const canAdd = ui.contributions.add && caps.add
+  const showSearch = ui.search.directory && caps.directorySearch
+  const upvotes = !!category.upvotesEnabled && ui.upvotes
+  const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
   // Scroll the target card into view on mount (runs once, after items are ready).
   const reopenRef = useRef<HTMLDivElement>(null)
@@ -114,7 +127,7 @@ export default function SynagogueDirectory({
                 🗺️ Map
               </button>
             )}
-            {ui.contributions.add && (
+            {canAdd && (
               <button
                 onClick={onAdd}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
@@ -128,7 +141,7 @@ export default function SynagogueDirectory({
 
       {/* Controls: search + denomination filter */}
       <div className="mb-4 space-y-2">
-        {ui.search.directory && (
+        {showSearch && (
           <input
             type="text"
             placeholder="Search synagogues…"
@@ -188,7 +201,7 @@ export default function SynagogueDirectory({
                 Clear search &amp; filters
               </button>
             )}
-            {ui.contributions.add && (
+            {canAdd && (
               <button
                 onClick={onAdd}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer"
@@ -206,7 +219,11 @@ export default function SynagogueDirectory({
               <div key={item.id} ref={isTarget ? reopenRef : undefined}>
                 <SynagogueCard
                   item={item}
+                  category={category}
                   defaultExpanded={isTarget}
+                  upvotes={upvotes}
+                  voteCount={liveCount(item)}
+                  onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
                   onEdit={() => onEdit(item)}
                   onReport={() => onReport(item)}
                 />

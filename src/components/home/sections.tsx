@@ -185,6 +185,10 @@ export function PlacesResults({
             <SynagogueCard
               key={hit.item.id}
               item={hit.item}
+              category={hit.category}
+              upvotes={!!hit.category.upvotesEnabled}
+              voteCount={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
               onEdit={() => onOpen(hit)}
               onReport={() => onOpen(hit)}
             />

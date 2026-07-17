@@ -100,6 +100,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   if (category.id === 'synagogue') {
     return (
       <SynagogueDirectory
+        category={category}
         items={withDistance}
         anchorLabel={anchorLabel}
         addressPrompt={addressPrompt}

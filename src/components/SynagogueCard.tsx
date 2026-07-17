@@ -2,18 +2,27 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
+import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { isMinyanim, groupByTefillah } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import { PencilIcon, FlagIcon } from '@/components/icons'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
+import UpvoteButton from '@/components/resources/UpvoteButton'
 import { ui } from '@/lib/uiConfig'
 
 type Props = {
   item: DirectoryResource
+  category: CategoryConfig
   /** Seed the expanded state on mount — used to restore the card the user had
    *  open when they navigated into a form and then pressed Back. */
   defaultExpanded?: boolean
+  /** Whether upvotes are shown for this category (global switch AND per-category). */
+  upvotes?: boolean
+  /** Live vote count from the parent directory (optimistic across the list). */
+  voteCount?: number
+  /** Report the new count back up when the visitor toggles their vote. */
+  onVote?: (count: number) => void
   onEdit: () => void
   onReport: () => void
 }
@@ -100,8 +109,23 @@ function LegacyDaveningTimes({ text }: { text: string }) {
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport }: Props) {
+export default function SynagogueCard({
+  item,
+  category,
+  defaultExpanded,
+  upvotes,
+  voteCount,
+  onVote,
+  onEdit,
+  onReport,
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? false)
+
+  // Per-category capabilities layered under the global `ui.contributions` switches.
+  const caps = resolveCapabilities(category.capabilities)
+  const canEdit = ui.contributions.edit && caps.edit
+  const canReport = ui.contributions.report && caps.report
+  const count = voteCount ?? (item.upvotes as number | undefined) ?? 0
 
   const denomination = item.denomination as string | undefined
   const davening = item.davening as string | undefined
@@ -116,14 +140,27 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
   return (
     <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
       {/* ── Collapsed header (always visible) ──────────────────────────── */}
-      <button
-        className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+      {/* role="button" (not <button>) so the interactive UpvoteButton can nest
+          inside it without invalid button-in-button markup — matches the
+          generic listing card. */}
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-slate-50 transition-colors cursor-pointer rounded-t-lg"
         onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsExpanded((p) => !p) } }}
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-900 truncate">{item.name}</p>
+            <p className="font-semibold text-slate-900 truncate">
+              {item.name}
+              {upvotes && (
+                <span className="inline-flex align-middle relative -top-0.5 ml-2">
+                  <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+                </span>
+              )}
+            </p>
             {denomination && <p className="text-sm text-muted">{denomination}</p>}
           </div>
         </div>
@@ -145,7 +182,7 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
-      </button>
+      </div>
 
       {/* ── Expanded detail panel ──────────────────────────────────────── */}
       {isExpanded && (
@@ -221,14 +258,14 @@ export default function SynagogueCard({ item, defaultExpanded, onEdit, onReport 
           {/* Footer: freshness + edit / report */}
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {(ui.contributions.edit || ui.contributions.report) && (
+            {(canEdit || canReport) && (
               <div className="flex gap-3">
-                {ui.contributions.edit && (
+                {canEdit && (
                   <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer">
                     <PencilIcon className="h-3.5 w-3.5" /> Edit
                   </button>
                 )}
-                {ui.contributions.report && (
+                {canReport && (
                   <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer">
                     <FlagIcon className="h-3.5 w-3.5" /> Report
                   </button>
