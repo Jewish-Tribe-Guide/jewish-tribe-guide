@@ -68,7 +68,7 @@ export default function CategoryManager({ token }: { token: string }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted">
-          Choose what each category shows — its buttons, search bar, upvotes, and the fields (and
+          Choose what each category shows — its buttons, search bar, upvotes, and the details (and
           filters) on its listings.
         </p>
         <button
@@ -107,9 +107,15 @@ export default function CategoryManager({ token }: { token: string }) {
                     <span className="ml-2 font-normal text-xs text-muted">{c.id}</span>
                   </p>
                   <p className="text-xs text-muted mt-1">
-                    {c.detailFields.length} field{c.detailFields.length !== 1 ? 's' : ''}
-                    {c.detailFields.some((f) => f.filterable) &&
-                      ` · ${c.detailFields.filter((f) => f.filterable).length} filter${c.detailFields.filter((f) => f.filterable).length !== 1 ? 's' : ''}`}
+                    {(() => {
+                      // Count only visible details (hidden ones aren't editable here).
+                      const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
+                      const filters = shown.filter((f) => f.filterable).length
+                      return (
+                        `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
+                        (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
+                      )
+                    })()}
                     {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
                   </p>
                 </div>
@@ -318,20 +324,19 @@ function CategoryEditor({
           </div>
         </section>
 
-        {/* Fields */}
+        {/* Details */}
         <section className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-semibold text-slate-800">Fields</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Details</h3>
             <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
-              + Add field
+              + Add detail
             </button>
           </div>
           <p className="text-xs text-muted mb-3">
-            The details each listing holds. Tick <span className="font-medium">Filter</span> to add a
-            filter control for that field on the category page.
+            What each listing shows, beyond its name, address, and phone.
           </p>
           {draft.fields.length === 0 ? (
-            <p className="text-xs text-muted">No fields yet — listings will show just name, address, and phone.</p>
+            <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
             <div className="space-y-3">
               {draft.fields.map((f, i) => (
@@ -340,6 +345,8 @@ function CategoryEditor({
                   field={f}
                   index={i}
                   total={draft.fields.length}
+                  // "Required" only matters if people can add or edit listings.
+                  canRequire={draft.capabilities.add || draft.capabilities.edit}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
@@ -403,6 +410,7 @@ function FieldEditor({
   field: f,
   index,
   total,
+  canRequire,
   onChange,
   onRemove,
   onMove,
@@ -410,14 +418,16 @@ function FieldEditor({
   field: CategoryField
   index: number
   total: number
+  canRequire: boolean
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
 }) {
-  // Auto-fill the key from the label until the user types a key by hand.
+  // The `key` is the internal id and is never shown. It's auto-derived from the
+  // label only while still blank — once set (new field filled in, or loaded from
+  // an existing field) it's frozen, so renaming a field never orphans its data.
   function onLabelChange(label: string) {
-    const autoKey = !f.key || f.key === slugifyFieldKey(f.label)
-    onChange(autoKey ? { label, key: slugifyFieldKey(label) } : { label })
+    onChange(!f.key ? { label, key: slugifyFieldKey(label) } : { label })
   }
 
   // "Show as" is the primary choice; the Type list is filtered to the types that
@@ -437,84 +447,86 @@ function FieldEditor({
     onChange({ type, renderAs: FIELD_TYPE_SHAPE[type] })
   }
 
+  const sectionLabel = 'text-[10px] font-semibold uppercase tracking-wide text-slate-400'
+
   return (
-    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-3">
+      {/* ── The information ──────────────────────────────────────────────── */}
+      <div className="space-y-2">
         <label className="block">
           <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Label</span>
           <input value={f.label} onChange={(e) => onLabelChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
         </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Key</span>
-          <input value={f.key} onChange={(e) => onChange({ key: slugifyFieldKey(e.target.value) })} className={inputClass} placeholder="grades" />
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
-          <select value={showAs} onChange={(e) => onShowAsChange(e.target.value as 'badge' | 'row')} className={inputClass}>
-            <option value="badge">Badge — a chip by the name</option>
-            <option value="row">Row — a labeled line</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
-          <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
-            {FIELD_TYPES_BY_SHAPE[showAs].map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
+            <select value={showAs} onChange={(e) => onShowAsChange(e.target.value as 'badge' | 'row')} className={inputClass}>
+              <option value="badge">Badge — a chip by the name</option>
+              <option value="row">Row — a labeled line</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
+            <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
+              {FIELD_TYPES_BY_SHAPE[showAs].map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {f.type === 'select' && (
+          <label className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Choices (one per line — “value | label”, or just value)</span>
+            <textarea
+              rows={3}
+              value={serializeOptions(f.options)}
+              onChange={(e) => onChange({ options: parseOptions(e.target.value) })}
+              className={inputClass}
+              placeholder={'Elementary\nMiddle\nHigh'}
+            />
+          </label>
+        )}
+
+        {f.type === 'tags' && (
+          <label className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Tag group (shared vocabulary id)</span>
+            <input value={f.tagGroup ?? ''} onChange={(e) => onChange({ tagGroup: e.target.value || undefined })} className={inputClass} placeholder="e.g. kosher_product" />
+          </label>
+        )}
       </div>
 
-      {f.type === 'select' && (
-        <label className="block mt-2">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Options (one per line — “value | label”, or just value)</span>
-          <textarea
-            rows={3}
-            value={serializeOptions(f.options)}
-            onChange={(e) => onChange({ options: parseOptions(e.target.value) })}
-            className={inputClass}
-            placeholder={'Elementary\nMiddle\nHigh'}
-          />
-        </label>
-      )}
-
-      {f.type === 'tags' && (
-        <label className="block mt-2">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Tag group (shared vocabulary id)</span>
-          <input value={f.tagGroup ?? ''} onChange={(e) => onChange({ tagGroup: e.target.value || undefined })} className={inputClass} placeholder="e.g. kosher_product" />
-        </label>
-      )}
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-          <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
-          Required
-        </label>
+      {/* ── On the listings page ─────────────────────────────────────────── */}
+      <div className="border-t border-slate-200 pt-2.5 space-y-1.5">
+        <p className={sectionLabel}>On the listings page</p>
         <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
           <input type="checkbox" checked={!!f.filterable} onChange={(e) => onChange({ filterable: e.target.checked })} className="rounded border-slate-300" />
-          Filter
+          Let people filter listings by this
         </label>
-        {f.filterable && (
-          <>
-            <input
-              value={f.filterLabel ?? ''}
-              onChange={(e) => onChange({ filterLabel: e.target.value || undefined })}
-              className="rounded-md border border-slate-300 px-2 py-1 text-xs w-40"
-              placeholder="Filter label (optional)"
-            />
-            {f.type === 'select' && (
-              <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-                <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
-                Multi-select
-              </label>
-            )}
-          </>
+        {f.filterable && f.type === 'select' && (
+          <label className="ml-5 flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
+            Allow picking several at once
+          </label>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field up">↑</button>
-          <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field down">↓</button>
-          <button onClick={onRemove} className="text-xs text-red-600 hover:underline cursor-pointer">Remove</button>
+      </div>
+
+      {/* ── When adding a listing (only if people can add/edit) ──────────── */}
+      {canRequire && (
+        <div className="border-t border-slate-200 pt-2.5 space-y-1.5">
+          <p className={sectionLabel}>When someone adds a listing</p>
+          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
+            Required
+          </label>
         </div>
+      )}
+
+      {/* ── Reorder / remove ─────────────────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-2">
+        <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field up">↑</button>
+        <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field down">↓</button>
+        <button onClick={onRemove} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Remove</button>
       </div>
     </div>
   )
