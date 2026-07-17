@@ -37,11 +37,13 @@ function toConfig(row: CategoryRow): CategoryConfig {
 
 // All categories, ordered for the directory index.
 export async function listCategories(): Promise<CategoryConfig[]> {
+  // Ordered alphabetically by the plural label shown on the cards. (The
+  // `sort_order` column is still stored so a community can switch to manual
+  // ordering later, but for now the directory is purely alphabetical.)
   const { data, error } = await getAdminClient()
     .from('category')
     .select('*')
-    .order('sort_order', { ascending: true })
-    .order('label', { ascending: true })
+    .order('plural_label', { ascending: true })
 
   if (error) throw new Error(`Failed to load categories: ${error.message}`)
   return (data as CategoryRow[]).map(toConfig)

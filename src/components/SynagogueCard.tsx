@@ -153,10 +153,11 @@ export default function SynagogueCard({
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-900 truncate">
+            <p className="font-semibold text-slate-900">
               {item.name}
+              {/* Mobile: inline right after the name (matches the generic card). */}
               {upvotes && (
-                <span className="inline-flex align-middle relative -top-0.5 ml-2">
+                <span className="sm:hidden inline-flex align-middle relative -top-0.5 ml-2">
                   <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
                 </span>
               )}
@@ -165,6 +166,12 @@ export default function SynagogueCard({
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0 ml-4">
+          {/* Desktop: in the right-side cluster before the travel chips. */}
+          {upvotes && (
+            <span className="hidden sm:block">
+              <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+            </span>
+          )}
           {travel.length > 0 && (
             <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
               {travel.map((t) => <span key={t}>{t}</span>)}

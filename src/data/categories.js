@@ -4,7 +4,8 @@
 // listings. To customize:
 //
 //   • Keep all, some, or none — delete any category block you don't want.
-//   • Reorder — `sort_order` controls the order of the cards (low to high).
+//   • Order — the cards show alphabetically by name. (`sort_order` is still
+//     stored for a future manual-ordering option, but is not used today.)
 //   • Tweak — change a category's label, icon (emoji), or its `fields`.
 //   • Add your own — copy a block, give it a unique `id`, a label, an icon, and
 //     the fields each listing should have (see the field types in use below).

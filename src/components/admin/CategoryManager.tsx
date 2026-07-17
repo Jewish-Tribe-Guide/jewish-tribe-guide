@@ -132,9 +132,7 @@ export default function CategoryManager({ token }: { token: string }) {
 type Draft = {
   label: string
   pluralLabel: string
-  icon: string
   description: string
-  sortOrder: number
   upvotesEnabled: boolean
   capabilities: CategoryCapabilities
   fields: CategoryField[]
@@ -144,9 +142,7 @@ function toDraft(c: CategoryConfig | null): Draft {
   return {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
-    icon: c?.icon ?? '📋',
     description: c?.description ?? '',
-    sortOrder: c?.sortOrder ?? 100,
     upvotesEnabled: !!c?.upvotesEnabled,
     capabilities: resolveCapabilities(c?.capabilities),
     fields: (c?.detailFields ?? []).map((f) => ({ ...f })),
@@ -233,9 +229,7 @@ function CategoryEditor({
       const payload = {
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
-        icon: draft.icon,
         description: draft.description,
-        sortOrder: draft.sortOrder,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
         fields: draft.fields,
@@ -283,14 +277,6 @@ function CategoryEditor({
             <label className="block">
               <span className="block text-xs font-medium text-slate-700 mb-1">Name (plural)</span>
               <input value={draft.pluralLabel} onChange={(e) => set('pluralLabel', e.target.value)} className={inputClass} placeholder="e.g. Schools" />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Icon (emoji)</span>
-              <input value={draft.icon} onChange={(e) => set('icon', e.target.value)} className={inputClass} placeholder="🏫" />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Sort order</span>
-              <input type="number" value={draft.sortOrder} onChange={(e) => set('sortOrder', Number(e.target.value) || 0)} className={inputClass} />
             </label>
           </div>
           <label className="block">
