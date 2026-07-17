@@ -131,6 +131,7 @@ async function main() {
   }
 
   run('seed-synagogues.mjs')
+  run('seed-hospitals.mjs')
 
   console.log('\n🎉 Setup complete. Start the app with `npm run dev`.')
 }

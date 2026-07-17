@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { hospitals } from '@/data/hospitals'
-import { hospitalInfo } from '@/data/hospitalInfo'
-import type { DirectoryAnchor } from '@/types'
+import { useHospitals } from '@/lib/useHospitals'
+import type { DirectoryAnchor, HospitalInfo } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import UpButton from '@/components/UpButton'
 import DirectoryHeader from './DirectoryHeader'
@@ -20,8 +19,7 @@ type Props = {
 
 // A short list of what a hospital offers, derived from its data — so each card
 // previews what's inside instead of being a bare name + chevron.
-function features(id: string): string[] {
-  const info = hospitalInfo[id]
+function features(info?: HospitalInfo | null): string[] {
   if (!info) return []
   const f: string[] = []
   if (info.jewishChaplain) f.push('Chaplain')
@@ -36,6 +34,7 @@ function features(id: string): string[] {
 // question so it reads as a clear first step, not a database listing.
 export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }: Props) {
   const [search, setSearch] = useState('')
+  const hospitals = useHospitals() ?? []
   const coords = anchor.coords
   const label = anchor.label || null
 
@@ -129,7 +128,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
                     )}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {features(h.id).map((f) => (
+                    {features(h.info).map((f) => (
                       <span key={f} className="rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px] font-medium">
                         {f}
                       </span>

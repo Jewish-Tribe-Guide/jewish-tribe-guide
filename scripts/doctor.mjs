@@ -55,7 +55,7 @@ if (!url || !service) {
     error && (error.code === '42P01' || /does not exist|find the table/i.test(error.message))
 
   // Schema — every table the app needs.
-  const tables = ['category', 'resource', 'submission', 'tag', 'resource_tag', 'vote']
+  const tables = ['category', 'resource', 'submission', 'tag', 'resource_tag', 'vote', 'hospital']
   let schemaOk = true
   for (const t of tables) {
     const { error, count } = await supabase.from(t).select('*', { head: true, count: 'exact' })

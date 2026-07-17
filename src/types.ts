@@ -249,6 +249,10 @@ export type HospitalInfo = {
   shabbatAccommodations: string
 }
 
+/** A hospital as stored in the DB (the `hospital` table) — a landmark plus its
+ *  optional per-hospital "Jewish life" details. */
+export type Hospital = Landmark & { info?: HospitalInfo | null }
+
 // ── Audience + directory anchor ────────────────────────────────────────────────
 
 /** Which side of the site a visitor is on. Chosen at the Landing fork. */

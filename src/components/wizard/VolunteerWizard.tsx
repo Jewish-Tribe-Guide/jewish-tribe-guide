@@ -1,9 +1,11 @@
 'use client'
 
+import { useMemo } from 'react'
 import Wizard, { type Answers, type Step } from './Wizard'
 import { contactSteps, buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
-import { hospitals } from '@/data/hospitals'
+import { useHospitals } from '@/lib/useHospitals'
+import type { Hospital } from '@/types'
 import { community } from '@/community.config'
 
 const ANYWHERE = 'anywhere'
@@ -16,7 +18,7 @@ const HOSTING = '🛏️ Hosting a family'
 const helps = (way: string) => (a: Answers) =>
   Array.isArray(a.waysToHelp) && a.waysToHelp.includes(way)
 
-const steps: Step[] = [
+const buildSteps = (hospitals: Hospital[]): Step[] => [
   // ── Always asked (start) ────────────────────────────────────────────────────
   {
     id: 'waysToHelp',
@@ -176,6 +178,8 @@ type Props = {
 }
 
 export default function VolunteerWizard({ preselect, onClose }: Props) {
+  const hospitals = useHospitals() ?? []
+  const steps = useMemo(() => buildSteps(hospitals), [hospitals])
   const initial: Answers = preselect && preselect.length ? { waysToHelp: preselect } : {}
 
   const handleSubmit = async (a: Answers) => {

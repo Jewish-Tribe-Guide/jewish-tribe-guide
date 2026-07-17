@@ -71,9 +71,10 @@ optional**. For a general (non-patient) community, set `hospitals = []` in
 map pins, and the "About Your Hospital" pages all disappear, and zmanim/eruv
 anchor on `community.mapCenter` + `community.timezone` instead.
 
-- `hospitals` — coordinates + timezone per hospital; only used by the patient
-  module (map pins, volunteer form, "About Your Hospital"). Leave empty if your
-  community isn't hospital-oriented.
+- `hospitals` (+ `hospitalInfo`) — starter data for the patient module (map pins,
+  volunteer form, "About Your Hospital"). Seeded into the `hospital` DB table by
+  `npm run setup`; the app then reads it from the database, so edit these files
+  for your initial set (or leave `hospitals` empty for a non-hospital community).
 - `resources.js → eruvim` — read directly at runtime; edit for your community's
   eruvim.
 

@@ -9,7 +9,7 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
-import { hospitals } from '@/data/hospitals'
+import { useHospitals } from '@/lib/useHospitals'
 import { community } from '@/community.config'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
@@ -65,6 +65,7 @@ type Tab = 'map' | 'nearby'
 export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
+  const hospitals = useHospitals() ?? []
   const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
 
   // Live GPS takes priority over the one-shot header location.
@@ -136,7 +137,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       })
     }
     return out
-  }, [listings, categories, colorById])
+  }, [listings, categories, colorById, hospitals])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()
