@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "setup": "node --env-file=.env.local scripts/setup.mjs",
-    "seed": "node --env-file=.env.local scripts/seed.mjs"
+    "seed": "node --env-file=.env.local scripts/seed.mjs",
+    "doctor": "node --env-file=.env.local scripts/doctor.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

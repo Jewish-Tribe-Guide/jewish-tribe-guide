@@ -79,6 +79,10 @@ anchor on `community.mapCenter` + `community.timezone` instead.
 
 ### 4. Backend & initial content
 
+> New to the accounts/keys? **[SETUP.md](SETUP.md)** is a click-by-click
+> walkthrough, and **`npm run doctor`** checks your env + database at any time
+> and prints exactly what's missing and how to fix it.
+
 1. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 2. **Apply the schema.** The ordered migrations live in `supabase/migrations/`.

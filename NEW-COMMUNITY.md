@@ -131,6 +131,8 @@ These are external services. The **account owner must create them** (they can't
 be handed to you second-hand), but each is free to start. Give the resulting
 keys to whoever builds the site — they go in a `.env.local` file (see
 [`.env.example`](.env.example) for the exact names and where each is found).
+**[SETUP.md](SETUP.md)** walks through creating each account click-by-click, and
+**`npm run doctor`** checks that everything is wired up.
 
 ### Required — the site won't function without these
 | What | Why | Where |
