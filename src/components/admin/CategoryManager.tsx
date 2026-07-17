@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   CATEGORY_CAPABILITY_KEYS,
-  FIELD_TYPES,
+  FIELD_TYPE_SHAPE,
+  FIELD_TYPES_BY_SHAPE,
   resolveCapabilities,
   slugifyFieldKey,
   type CategoryCapabilities,
@@ -135,17 +136,24 @@ type Draft = {
   description: string
   upvotesEnabled: boolean
   capabilities: CategoryCapabilities
+  /** The editable fields (everything shown on a card). */
   fields: CategoryField[]
+  /** Fields with renderAs 'hidden' (caveat notes, structured minyanim) — not
+   *  editable here, but preserved as-is and re-merged on save so editing a
+   *  category never drops or exposes them. */
+  hiddenFields: CategoryField[]
 }
 
 function toDraft(c: CategoryConfig | null): Draft {
+  const all = (c?.detailFields ?? []).map((f) => ({ ...f }))
   return {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
     description: c?.description ?? '',
     upvotesEnabled: !!c?.upvotesEnabled,
     capabilities: resolveCapabilities(c?.capabilities),
-    fields: (c?.detailFields ?? []).map((f) => ({ ...f })),
+    fields: all.filter((f) => f.renderAs !== 'hidden'),
+    hiddenFields: all.filter((f) => f.renderAs === 'hidden'),
   }
 }
 
@@ -183,7 +191,7 @@ function CategoryEditor({
   function addField() {
     setDraft((d) => ({
       ...d,
-      fields: [...d.fields, { key: '', label: '', type: 'text' as FieldType }],
+      fields: [...d.fields, { key: '', label: '', type: 'text' as FieldType, renderAs: 'row' }],
     }))
   }
 
@@ -204,7 +212,9 @@ function CategoryEditor({
   function validate(): string[] {
     const errs: string[] = []
     if (!draft.label.trim()) errs.push('Category name is required.')
-    const keys = new Set<string>()
+    // Seed the key set with the preserved hidden fields so a new visible field
+    // can't collide with a caveat note / minyanim key.
+    const keys = new Set<string>(draft.hiddenFields.map((f) => f.key))
     draft.fields.forEach((f, i) => {
       const n = i + 1
       if (!f.key.trim()) errs.push(`Field ${n}: needs a key.`)
@@ -232,7 +242,8 @@ function CategoryEditor({
         description: draft.description,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
-        fields: draft.fields,
+        // Re-merge the preserved hidden fields so editing never drops them.
+        fields: [...draft.fields, ...draft.hiddenFields],
       }
       const res = await fetch(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
@@ -409,6 +420,23 @@ function FieldEditor({
     onChange(autoKey ? { label, key: slugifyFieldKey(label) } : { label })
   }
 
+  // "Show as" is the primary choice; the Type list is filtered to the types that
+  // fit the chosen shape. Each type maps to exactly one shape, so the current
+  // shape is derived from the type — which also guarantees the type is always
+  // present in its shape's filtered list.
+  const showAs: 'badge' | 'row' = FIELD_TYPE_SHAPE[f.type]
+
+  function onShowAsChange(next: 'badge' | 'row') {
+    const options = FIELD_TYPES_BY_SHAPE[next]
+    // Keep the current type if it still fits; otherwise fall back to the first.
+    const type = options.some((t) => t.value === f.type) ? f.type : options[0].value
+    onChange({ renderAs: next, type })
+  }
+
+  function onTypeChange(type: FieldType) {
+    onChange({ type, renderAs: FIELD_TYPE_SHAPE[type] })
+  }
+
   return (
     <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -421,20 +449,18 @@ function FieldEditor({
           <input value={f.key} onChange={(e) => onChange({ key: slugifyFieldKey(e.target.value) })} className={inputClass} placeholder="grades" />
         </label>
         <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
-          <select value={f.type} onChange={(e) => onChange({ type: e.target.value as FieldType })} className={inputClass}>
-            {FIELD_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
+          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
+          <select value={showAs} onChange={(e) => onShowAsChange(e.target.value as 'badge' | 'row')} className={inputClass}>
+            <option value="badge">Badge — a chip by the name</option>
+            <option value="row">Row — a labeled line</option>
           </select>
         </label>
         <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
-          <select value={f.renderAs ?? ''} onChange={(e) => onChange({ renderAs: (e.target.value || undefined) as CategoryField['renderAs'] })} className={inputClass}>
-            <option value="">Default</option>
-            <option value="badge">Badge</option>
-            <option value="row">Row</option>
-            <option value="hidden">Hidden</option>
+          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
+          <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
+            {FIELD_TYPES_BY_SHAPE[showAs].map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
           </select>
         </label>
       </div>

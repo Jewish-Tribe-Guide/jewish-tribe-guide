@@ -9,20 +9,44 @@
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim'
 
-/** All field types, with a human label — drives the type picker in the admin
- *  category editor. Order is rough "most common first". */
-export const FIELD_TYPES: { value: FieldType; label: string }[] = [
-  { value: 'text', label: 'Text' },
-  { value: 'textarea', label: 'Long text' },
-  { value: 'tel', label: 'Phone' },
-  { value: 'url', label: 'Link' },
-  { value: 'number', label: 'Number' },
-  { value: 'boolean', label: 'Yes / No' },
-  { value: 'select', label: 'Choice (dropdown)' },
-  { value: 'tags', label: 'Tags' },
-  { value: 'hours', label: 'Hours' },
-  { value: 'minyanim', label: 'Minyan times' },
-]
+/** The display shape a field takes on a card: a `badge` (a chip beside the
+ *  name) or a `row` (a labeled line in the expanded card). This is derived from
+ *  the field's type — each type has exactly one natural shape — so the admin
+ *  editor picks the shape first, then only the types that fit it. `hidden`
+ *  fields (stored but not shown, e.g. caveat notes) sit outside this and are
+ *  preserved by the editor rather than offered as a choice. */
+export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
+  boolean: 'badge',
+  select: 'badge',
+  tags: 'badge',
+  text: 'row',
+  textarea: 'row',
+  tel: 'row',
+  url: 'row',
+  number: 'row',
+  hours: 'row',
+  minyanim: 'row',
+}
+
+/** The field types offered in the editor, grouped by display shape — drives the
+ *  two-step "Show as → Type" picker. `minyanim` is intentionally omitted: it's a
+ *  synagogue-only structured type rendered by the bespoke shul card, not
+ *  something to hand-add to an arbitrary category. */
+export const FIELD_TYPES_BY_SHAPE: Record<'badge' | 'row', { value: FieldType; label: string }[]> = {
+  badge: [
+    { value: 'boolean', label: 'Yes / No' },
+    { value: 'select', label: 'Choice (dropdown)' },
+    { value: 'tags', label: 'Tags' },
+  ],
+  row: [
+    { value: 'text', label: 'Text' },
+    { value: 'textarea', label: 'Long text' },
+    { value: 'tel', label: 'Phone' },
+    { value: 'url', label: 'Link' },
+    { value: 'number', label: 'Number' },
+    { value: 'hours', label: 'Hours' },
+  ],
+}
 
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
