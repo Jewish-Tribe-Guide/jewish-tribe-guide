@@ -1,5 +1,6 @@
-import { validateSubmission } from '@/lib/resourceStore'
+import { validateSubmission, getResourceById } from '@/lib/resourceStore'
 import { getCategoryById } from '@/lib/categoryStore'
+import { resolveCapabilities } from '@/lib/categories'
 import {
   submitListingCreate,
   submitListingUpdate,
@@ -90,6 +91,31 @@ export async function POST(request: Request) {
   const payload = body.payload as ResourceSubmission | undefined
   if ((operation === 'create' || operation === 'update') && !payload) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
+  }
+
+  // Per-category gate: on top of the global `ui.contributions` check above, the
+  // target category can independently turn add/edit/report off. Resolve the
+  // category from the payload (create) or the existing listing (update/delete),
+  // so a disabled per-category button can't be bypassed by posting directly.
+  const categoryId =
+    operation === 'create'
+      ? payload?.category
+      : targetId
+        ? (await getResourceById(targetId))?.category
+        : undefined
+  if (categoryId) {
+    const cat = await getCategoryById(categoryId)
+    if (cat) {
+      const caps = resolveCapabilities(cat.capabilities)
+      const capOk =
+        operation === 'create' ? caps.add : operation === 'update' ? caps.edit : caps.report
+      if (!capOk) {
+        return Response.json(
+          { ok: false, errors: ['This action is not available for this category.'] },
+          { status: 403 },
+        )
+      }
+    }
   }
 
   if (payload) {

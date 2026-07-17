@@ -2,6 +2,8 @@ import { getAdminClient } from './supabase/admin'
 import {
   DEFAULT_CATEGORY_ICON,
   COMMUNITY_CATEGORY_IDS,
+  resolveCapabilities,
+  type CategoryCapabilities,
   type CategoryConfig,
   type CategoryField,
 } from './categories'
@@ -15,6 +17,7 @@ type CategoryRow = {
   fields: CategoryField[]
   sort_order: number
   upvotes_enabled: boolean
+  capabilities: Partial<CategoryCapabilities> | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -28,6 +31,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     sortOrder: row.sort_order,
     community: COMMUNITY_CATEGORY_IDS.has(row.id),
     upvotesEnabled: !!row.upvotes_enabled,
+    capabilities: resolveCapabilities(row.capabilities),
   }
 }
 
@@ -72,7 +76,9 @@ export async function createCategory(input: {
   icon?: string
   description?: string
   fields?: CategoryField[]
+  sortOrder?: number
   upvotesEnabled?: boolean
+  capabilities?: Partial<CategoryCapabilities>
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
@@ -92,11 +98,53 @@ export async function createCategory(input: {
     icon: input.icon?.trim() || DEFAULT_CATEGORY_ICON,
     description: input.description?.trim() || '',
     fields: input.fields ?? [],
-    sort_order: 100,
+    sort_order: input.sortOrder ?? 100,
     upvotes_enabled: !!input.upvotesEnabled,
+    capabilities: input.capabilities ?? {},
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
   if (error) throw new Error(`Failed to create category: ${error.message}`)
   return toConfig(data as CategoryRow)
+}
+
+// Updates an existing category's presentation, fields, and capabilities. Only
+// the provided keys are changed. The slug (`id`) is immutable — it's referenced
+// by every listing's `resource.category`, so it's never rewritten here.
+export async function updateCategory(
+  id: string,
+  patch: {
+    label?: string
+    pluralLabel?: string
+    icon?: string
+    description?: string
+    fields?: CategoryField[]
+    sortOrder?: number
+    upvotesEnabled?: boolean
+    capabilities?: Partial<CategoryCapabilities>
+  },
+): Promise<CategoryConfig | null> {
+  const supabase = getAdminClient()
+
+  const row: Record<string, unknown> = {}
+  if (patch.label !== undefined) row.label = patch.label.trim()
+  if (patch.pluralLabel !== undefined) row.plural_label = patch.pluralLabel.trim()
+  if (patch.icon !== undefined) row.icon = patch.icon.trim() || DEFAULT_CATEGORY_ICON
+  if (patch.description !== undefined) row.description = patch.description.trim()
+  if (patch.fields !== undefined) row.fields = patch.fields
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
+  if (patch.upvotesEnabled !== undefined) row.upvotes_enabled = !!patch.upvotesEnabled
+  if (patch.capabilities !== undefined) row.capabilities = patch.capabilities
+
+  if (Object.keys(row).length === 0) return getCategoryById(id)
+
+  const { data, error } = await supabase
+    .from('category')
+    .update(row)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to update category: ${error.message}`)
+  return data ? toConfig(data as CategoryRow) : null
 }
