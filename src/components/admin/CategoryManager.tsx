@@ -138,6 +138,14 @@ export default function CategoryManager({ token }: { token: string }) {
 
 // ── Editor ──────────────────────────────────────────────────────────────────
 
+// Derive the singular from the plural name by dropping a trailing "s" (only when
+// preceded by a non-"s", so "Class"/"Mikvah" stay put). Good enough for the
+// "Add a …" phrasing across realistic category names.
+function singularize(plural: string): string {
+  const s = plural.trim()
+  return /[^s]s$/i.test(s) ? s.slice(0, -1) : s
+}
+
 type Draft = {
   label: string
   pluralLabel: string
@@ -180,9 +188,17 @@ function CategoryEditor({
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
+  }
+
+  // One "Name" field holds the plural (card title); the singular used in
+  // "Add a …" phrasing is derived by dropping a trailing "s".
+  function setName(name: string) {
+    setDraft((d) => ({ ...d, pluralLabel: name, label: singularize(name) }))
   }
 
   function setCap(key: keyof CategoryCapabilities, value: boolean) {
@@ -219,7 +235,7 @@ function CategoryEditor({
 
   function validate(): string[] {
     const errs: string[] = []
-    if (!draft.label.trim()) errs.push('Category name is required.')
+    if (!draft.pluralLabel.trim()) errs.push('Category name is required.')
     // Seed the key set with the preserved hidden fields so a new visible field
     // can't collide with a caveat note / minyanim key.
     const keys = new Set<string>(draft.hiddenFields.map((f) => f.key))
@@ -271,6 +287,26 @@ function CategoryEditor({
     }
   }
 
+  async function deleteCat() {
+    if (isNew) return
+    setErrors([])
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/categories/${initial!.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      onSaved()
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Delete failed.'])
+      setConfirmingDelete(false)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div>
       <button
@@ -288,16 +324,11 @@ function CategoryEditor({
       <div className="space-y-6">
         {/* Presentation */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Name (singular) *</span>
-              <input value={draft.label} onChange={(e) => set('label', e.target.value)} className={inputClass} placeholder="e.g. School" />
-            </label>
-            <label className="block">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Name (plural)</span>
-              <input value={draft.pluralLabel} onChange={(e) => set('pluralLabel', e.target.value)} className={inputClass} placeholder="e.g. Schools" />
-            </label>
-          </div>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
+            <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
+            <span className="block text-[11px] text-muted mt-1">Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.</span>
+          </label>
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
@@ -382,6 +413,43 @@ function CategoryEditor({
             Cancel
           </button>
         </div>
+
+        {/* Danger zone — existing categories only */}
+        {!isNew && (
+          <div className="border-t border-slate-200 pt-4">
+            {!confirmingDelete ? (
+              <button
+                onClick={() => { setErrors([]); setConfirmingDelete(true) }}
+                className="text-sm font-medium text-red-600 hover:underline cursor-pointer"
+              >
+                Delete this category
+              </button>
+            ) : (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                <p className="text-sm text-red-800">
+                  Permanently delete <span className="font-semibold">{initial!.pluralLabel}</span> and
+                  every listing in it? This can’t be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={deleteCat}
+                    disabled={deleting}
+                    className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    {deleting ? 'Deleting…' : 'Delete category & listings'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
