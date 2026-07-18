@@ -186,7 +186,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                 onChange={setAddress}
                 onCoords={setCoords}
                 onPlaceSelect={handlePlaceSelect}
-                includedPrimaryTypes={syncEligible ? ['establishment'] : undefined}
                 placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
               />
             </div>

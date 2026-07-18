@@ -136,7 +136,6 @@ export default function CategoryForm({ onUp, onSubmitted }: Props) {
                 onChange={setAddress}
                 onCoords={setCoords}
                 onPlaceSelect={handlePlaceSelect}
-                includedPrimaryTypes={['establishment']}
                 placeholder="Search by business name or address…"
               />
               <p className="text-xs text-muted mt-1">Find the place to auto-fill its name and phone. Distance is calculated from the address.</p>
