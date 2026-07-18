@@ -6,7 +6,6 @@ import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import SynagogueCard from '@/components/SynagogueCard'
 import { community } from '@/community.config'
 
 export type CardDef = {
@@ -162,9 +161,9 @@ export function searchListings(
   return hits
 }
 
-/** The "Places" results list: each hit rendered as the SAME card its category
- *  directory uses — SynagogueCard for shuls (so davening times show), the generic
- *  collapsible card for everything else — so a searched place is the full listing. */
+/** The "Places" results list: each hit rendered as the same card its category
+ *  directory uses, so a searched place is the full listing (davening times,
+ *  upvotes, filters, and all). */
 export function PlacesResults({
   hits,
   onOpen,
@@ -180,35 +179,22 @@ export function PlacesResults({
         Places
       </h2>
       <div className="space-y-2">
-        {hits.map((hit) =>
-          hit.item.category === 'synagogue' ? (
-            <SynagogueCard
-              key={hit.item.id}
-              item={hit.item}
-              category={hit.category}
-              upvotes={!!hit.category.upvotesEnabled}
-              voteCount={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-              onEdit={() => onOpen(hit)}
-              onReport={() => onOpen(hit)}
-            />
-          ) : (
-            <GenericListingCard
-              key={hit.item.id}
-              item={hit.item}
-              category={hit.category}
-              upvotes={!!hit.category.upvotesEnabled}
-              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
-              onFilterOpen={() => onOpen(hit)}
-              onFilterBool={() => onOpen(hit)}
-              onFilterSelect={() => onOpen(hit)}
-              onEdit={() => onOpen(hit)}
-              onReport={() => onOpen(hit)}
-            />
-          ),
-        )}
+        {hits.map((hit) => (
+          <GenericListingCard
+            key={hit.item.id}
+            item={hit.item}
+            category={hit.category}
+            upvotes={!!hit.category.upvotesEnabled}
+            count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
+            onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
+            onTagClick={(tag) => onOpen({ ...hit, term: tag })}
+            onFilterOpen={() => onOpen(hit)}
+            onFilterBool={() => onOpen(hit)}
+            onFilterSelect={() => onOpen(hit)}
+            onEdit={() => onOpen(hit)}
+            onReport={() => onOpen(hit)}
+          />
+        ))}
       </div>
     </section>
   )

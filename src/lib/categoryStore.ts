@@ -150,3 +150,24 @@ export async function updateCategory(
   if (error) throw new Error(`Failed to update category: ${error.message}`)
   return data ? toConfig(data as CategoryRow) : null
 }
+
+// Permanently deletes a category and every listing in it. Listings are removed
+// first (resource.category has no DB cascade), then the category row. Votes
+// cascade from the resource delete. Returns how many listings were removed so
+// the caller can confirm the scope of the deletion.
+export async function deleteCategory(id: string): Promise<{ listings: number }> {
+  const supabase = getAdminClient()
+
+  const { count } = await supabase
+    .from('resource')
+    .select('id', { count: 'exact', head: true })
+    .eq('category', id)
+
+  const { error: resErr } = await supabase.from('resource').delete().eq('category', id)
+  if (resErr) throw new Error(`Failed to delete the category's listings: ${resErr.message}`)
+
+  const { error: catErr } = await supabase.from('category').delete().eq('id', id)
+  if (catErr) throw new Error(`Failed to delete category: ${catErr.message}`)
+
+  return { listings: count ?? 0 }
+}

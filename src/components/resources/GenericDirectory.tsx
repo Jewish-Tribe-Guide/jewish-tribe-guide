@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow } from '@/lib/hours'
+import { isMinyanim } from '@/lib/davening'
+import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard } from './GenericListingCard'
+import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import UpButton from '@/components/UpButton'
-import { PlusIcon } from '@/components/icons'
+import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { listingSearchText } from '@/lib/searchListing'
 import { travelCompare } from '@/lib/listingTravel'
@@ -48,6 +51,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [daveningModalOpen, setDaveningModalOpen] = useState(false)
   const isMobile = useIsMobile()
 
   const fields = category.detailFields
@@ -56,6 +60,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const hasFilterableHours = hoursFields.some((f) => f.filterable)
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
+
+  // "All davening times" — only for categories with a `minyanim`-type field
+  // (today, just Synagogues) and at least one listing with structured data.
+  const minyanimField = fields.find((f) => f.type === 'minyanim')
+  const hasMinyanim =
+    !!minyanimField &&
+    items.some((item) => isMinyanim(item[minyanimField.key]) && (item[minyanimField.key] as Minyan[]).length > 0)
 
   const upvotes = !!category.upvotesEnabled && ui.upvotes
   // Per-category capabilities layered under the global `ui.*` master switches.
@@ -132,7 +143,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     (f) => new Set(items.map((item) => item[f.key] as string).filter(Boolean)).size >= 2,
   )
   const hasFilterRow =
-    filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes
+    filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes || hasMinyanim
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -241,6 +252,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   🗺️ Map
                 </button>
               )}
+              {hasMinyanim && (
+                <button
+                  onClick={() => setDaveningModalOpen(true)}
+                  aria-label="All davening times"
+                  title="All davening times"
+                  className={[
+                    'inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
+                    !upvotes ? 'ml-auto' : '',
+                  ].join(' ')}
+                >
+                  <ClockIcon className="h-4 w-4" />
+                </button>
+              )}
               {upvotes && (
                 <div className="flex rounded-md border border-slate-300 overflow-hidden ml-auto">
                   {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
@@ -345,6 +369,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   </select>
                 )
               })}
+              {hasMinyanim && (
+                <button
+                  onClick={() => setDaveningModalOpen(true)}
+                  className={[
+                    'hidden sm:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
+                    !upvotes ? 'sm:ml-auto' : '',
+                  ].join(' ')}
+                >
+                  <ClockIcon className="h-4 w-4" />
+                  All davening times
+                </button>
+              )}
               {upvotes && (
                 <div className="hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0 sm:ml-auto">
                   {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
@@ -421,6 +457,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             </div>
           ))}
         </div>
+      )}
+
+      {hasMinyanim && (
+        <DaveningTimesModal
+          items={items}
+          isOpen={daveningModalOpen}
+          onClose={() => setDaveningModalOpen(false)}
+          initialDenomination={selectFilters['denomination']?.[0] ?? ''}
+        />
       )}
     </div>
   )
