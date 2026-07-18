@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormConfig, FormContent, FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
@@ -45,6 +45,26 @@ export default function FormEditor({
   const [previewing, setPreviewing] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [savedNotice, setSavedNotice] = useState(false)
+
+  // Preview gets its own history entry so browser/trackpad Back (and the
+  // preview's own Close button, which calls closePreview) land back on this
+  // editor instead of skipping past it to the categories list.
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  function openPreview() {
+    setPreviewing(true)
+    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+  }
+
+  function closePreview() {
+    history.back()
+  }
 
   function set<K extends keyof FormContent>(key: K, value: FormContent[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -166,7 +186,7 @@ export default function FormEditor({
   }
 
   if (previewing) {
-    return <FormPreview content={draft} onClose={() => setPreviewing(false)} />
+    return <FormPreview content={draft} onClose={closePreview} />
   }
 
   const busy = saving || publishing || discarding
@@ -241,7 +261,7 @@ export default function FormEditor({
 
       <div className="flex flex-wrap items-center gap-2 mt-6">
         <button
-          onClick={() => setPreviewing(true)}
+          onClick={openPreview}
           className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           Preview

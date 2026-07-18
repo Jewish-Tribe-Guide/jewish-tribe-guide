@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
-import type { DirectoryResource } from '@/types'
+import type { DirectoryResource, MapFilters } from '@/types'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
+import ResourceMapView from '@/components/map/ResourceMapView'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingForm/ReportListing components a visitor sees, driven
@@ -14,11 +15,15 @@ import ReportListing from '@/components/resources/ReportListing'
 // straight into the preview list instead of posting to /api/submissions, so
 // the admin can see a new listing "appear" without persisting anything.
 // Report similarly shows its confirmation screen without actually filing one.
+// The Map button opens the real site-wide map, pre-filtered to this category —
+// it reads live, already-saved data (the map has no notion of an unpublished
+// draft), same as clicking Map from the live directory would.
 
 type Action =
   | { mode: 'create' }
   | { mode: 'edit'; listing: DirectoryResource }
   | { mode: 'report'; listing: DirectoryResource }
+  | { mode: 'map'; query?: string; filters?: MapFilters }
 
 export default function CategoryPreview({
   category,
@@ -95,6 +100,16 @@ export default function CategoryPreview({
       />
     )
   }
+  if (action?.mode === 'map') {
+    return (
+      <ResourceMapView
+        onUp={goToDirectory}
+        initialCategory={category.id}
+        initialQuery={action.query}
+        initialFilters={action.filters}
+      />
+    )
+  }
 
   if (realListings === null) {
     return <p className="text-sm text-muted">Loading…</p>
@@ -112,6 +127,7 @@ export default function CategoryPreview({
       onAdd={() => setAction({ mode: 'create' })}
       onEdit={(listing) => setAction({ mode: 'edit', listing })}
       onReport={(listing) => setAction({ mode: 'report', listing })}
+      onViewMap={(query, filters) => setAction({ mode: 'map', query, filters })}
     />
   )
 }
