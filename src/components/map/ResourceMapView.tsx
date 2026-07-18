@@ -7,7 +7,7 @@ import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import NearbyList from './NearbyList'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
 import { community } from '@/community.config'
@@ -118,6 +118,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       const lng = r.geo?.lng
       if (typeof lat !== 'number' || typeof lng !== 'number') continue
       const cat = catById.get(r.category)
+      // A category whose Map button capability is off (or that no longer
+      // resolves — e.g. a stale/deleted category) never gets pins here, same
+      // as it not showing up as a filter chip.
+      if (!cat || !resolveCapabilities(cat.capabilities).map) continue
       out.push({
         filterId: r.category,
         id: r.id,
