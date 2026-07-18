@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   CATEGORY_CAPABILITY_KEYS,
+  FIELD_TYPES,
   FIELD_TYPE_SHAPE,
-  FIELD_TYPES_BY_SHAPE,
+  TYPE_HAS_SHAPE_CHOICE,
+  TYPE_IS_FILTERABLE,
   resolveCapabilities,
   slugifyFieldKey,
   type CategoryCapabilities,
@@ -68,7 +70,7 @@ export default function CategoryManager({ token }: { token: string }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted">
-          Choose what each category shows — its buttons, search bar, upvotes, and the fields (and
+          Choose what each category shows — its buttons, search bar, upvotes, and the details (and
           filters) on its listings.
         </p>
         <button
@@ -107,9 +109,15 @@ export default function CategoryManager({ token }: { token: string }) {
                     <span className="ml-2 font-normal text-xs text-muted">{c.id}</span>
                   </p>
                   <p className="text-xs text-muted mt-1">
-                    {c.detailFields.length} field{c.detailFields.length !== 1 ? 's' : ''}
-                    {c.detailFields.some((f) => f.filterable) &&
-                      ` · ${c.detailFields.filter((f) => f.filterable).length} filter${c.detailFields.filter((f) => f.filterable).length !== 1 ? 's' : ''}`}
+                    {(() => {
+                      // Count only visible details (hidden ones aren't editable here).
+                      const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
+                      const filters = shown.filter((f) => f.filterable).length
+                      return (
+                        `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
+                        (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
+                      )
+                    })()}
                     {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
                   </p>
                 </div>
@@ -217,12 +225,11 @@ function CategoryEditor({
     const keys = new Set<string>(draft.hiddenFields.map((f) => f.key))
     draft.fields.forEach((f, i) => {
       const n = i + 1
-      if (!f.key.trim()) errs.push(`Field ${n}: needs a key.`)
-      else if (keys.has(f.key)) errs.push(`Field ${n}: duplicate key "${f.key}".`)
+      if (!f.label.trim()) errs.push(`Detail ${n}: needs a name.`)
+      else if (keys.has(f.key)) errs.push(`Detail ${n}: another detail is already named “${f.label}”.`)
       else keys.add(f.key)
-      if (!f.label.trim()) errs.push(`Field ${n}: needs a label.`)
       if (f.type === 'select' && !(f.options && f.options.length > 0))
-        errs.push(`Field ${n} ("${f.label || f.key}"): a choice field needs at least one option.`)
+        errs.push(`Detail ${n} (“${f.label || 'unnamed'}”): a Choice needs at least one option.`)
     })
     return errs
   }
@@ -242,8 +249,9 @@ function CategoryEditor({
         description: draft.description,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
-        // Re-merge the preserved hidden fields so editing never drops them.
-        fields: [...draft.fields, ...draft.hiddenFields],
+        // Apply the implied filter/tag rules, then re-merge the preserved hidden
+        // fields so editing never drops them.
+        fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
       }
       const res = await fetch(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
@@ -318,20 +326,19 @@ function CategoryEditor({
           </div>
         </section>
 
-        {/* Fields */}
+        {/* Details */}
         <section className="bg-white border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-semibold text-slate-800">Fields</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Details</h3>
             <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
-              + Add field
+              + Add detail
             </button>
           </div>
           <p className="text-xs text-muted mb-3">
-            The details each listing holds. Tick <span className="font-medium">Filter</span> to add a
-            filter control for that field on the category page.
+            What each listing shows, beyond its name, address, and phone.
           </p>
           {draft.fields.length === 0 ? (
-            <p className="text-xs text-muted">No fields yet — listings will show just name, address, and phone.</p>
+            <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
             <div className="space-y-3">
               {draft.fields.map((f, i) => (
@@ -340,6 +347,8 @@ function CategoryEditor({
                   field={f}
                   index={i}
                   total={draft.fields.length}
+                  // "Required" only matters if people can add or edit listings.
+                  canRequire={draft.capabilities.add || draft.capabilities.edit}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
@@ -380,6 +389,36 @@ function CategoryEditor({
 
 // ── One field row ─────────────────────────────────────────────────────────────
 
+// The editor only asks Name / Type / Show as / Required; the filter + tag rules
+// are implied and applied here on save:
+//   • Badge (Yes/No, Choice) → a filter. Row → display only, no filter.
+//   • Choice filter → always multi-select.
+//   • Hours → always the "Open now" filter.
+//   • Tags → always chips + click-to-search (never a filter); their tag group is
+//     derived from the name once, then frozen so a rename can't orphan tags.
+function normalizeField(f: CategoryField): CategoryField {
+  const out: CategoryField = { ...f }
+  const isBadge = out.renderAs !== 'row'
+
+  if (out.type === 'tags') {
+    out.renderAs = 'badge'
+    out.tagGroup = out.tagGroup || slugifyFieldKey(out.label)
+    out.filterable = false
+    out.multiSelect = undefined
+  } else if (out.type === 'hours') {
+    out.filterable = true
+    out.multiSelect = undefined
+  } else if (TYPE_IS_FILTERABLE(out.type)) {
+    // Yes/No or Choice: the badge is the filter; a row is display-only.
+    out.filterable = isBadge
+    out.multiSelect = out.type === 'select' && isBadge ? true : undefined
+  } else {
+    out.filterable = false
+    out.multiSelect = undefined
+  }
+  return out
+}
+
 function serializeOptions(options?: { value: string; label: string }[]): string {
   return (options ?? [])
     .map((o) => (o.label && o.label !== o.value ? `${o.value} | ${o.label}` : o.value))
@@ -403,6 +442,7 @@ function FieldEditor({
   field: f,
   index,
   total,
+  canRequire,
   onChange,
   onRemove,
   onMove,
@@ -410,64 +450,51 @@ function FieldEditor({
   field: CategoryField
   index: number
   total: number
+  canRequire: boolean
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
 }) {
-  // Auto-fill the key from the label until the user types a key by hand.
-  function onLabelChange(label: string) {
-    const autoKey = !f.key || f.key === slugifyFieldKey(f.label)
-    onChange(autoKey ? { label, key: slugifyFieldKey(label) } : { label })
+  // "Name" auto-fills the internal key only while it's still blank, then freezes,
+  // so renaming a detail later never orphans its stored data.
+  function onNameChange(name: string) {
+    onChange(!f.key ? { label: name, key: slugifyFieldKey(name) } : { label: name })
   }
 
-  // "Show as" is the primary choice; the Type list is filtered to the types that
-  // fit the chosen shape. Each type maps to exactly one shape, so the current
-  // shape is derived from the type — which also guarantees the type is always
-  // present in its shape's filtered list.
-  const showAs: 'badge' | 'row' = FIELD_TYPE_SHAPE[f.type]
-
-  function onShowAsChange(next: 'badge' | 'row') {
-    const options = FIELD_TYPES_BY_SHAPE[next]
-    // Keep the current type if it still fits; otherwise fall back to the first.
-    const type = options.some((t) => t.value === f.type) ? f.type : options[0].value
-    onChange({ renderAs: next, type })
-  }
+  // "Show as" is offered only for Yes/No and Choice — the types where badge-vs-row
+  // is a real choice. Badge also means "this is a filter" (applied in
+  // normalizeField); a row is display-only. Everything else has a fixed shape.
+  const canChooseShape = TYPE_HAS_SHAPE_CHOICE(f.type)
+  const showAs: 'badge' | 'row' = f.renderAs === 'row' ? 'row' : 'badge'
 
   function onTypeChange(type: FieldType) {
-    onChange({ type, renderAs: FIELD_TYPE_SHAPE[type] })
+    // Reset to the type's natural shape; drop choices when leaving Choice.
+    const patch: Partial<CategoryField> = { type, renderAs: FIELD_TYPE_SHAPE[type] }
+    if (type !== 'select') patch.options = undefined
+    onChange(patch)
   }
 
+  const fieldLabel = 'block text-[11px] font-medium text-slate-600 mb-0.5'
+
   return (
-    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Label</span>
-          <input value={f.label} onChange={(e) => onLabelChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Key</span>
-          <input value={f.key} onChange={(e) => onChange({ key: slugifyFieldKey(e.target.value) })} className={inputClass} placeholder="grades" />
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
-          <select value={showAs} onChange={(e) => onShowAsChange(e.target.value as 'badge' | 'row')} className={inputClass}>
-            <option value="badge">Badge — a chip by the name</option>
-            <option value="row">Row — a labeled line</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
-          <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
-            {FIELD_TYPES_BY_SHAPE[showAs].map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-2">
+      <label className="block">
+        <span className={fieldLabel}>Name</span>
+        <input value={f.label} onChange={(e) => onNameChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
+      </label>
+
+      <label className="block sm:w-1/2">
+        <span className={fieldLabel}>Type</span>
+        <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
+          {FIELD_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </label>
 
       {f.type === 'select' && (
-        <label className="block mt-2">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Options (one per line — “value | label”, or just value)</span>
+        <label className="block">
+          <span className={fieldLabel}>Choices (one per line — “value | label”, or just value)</span>
           <textarea
             rows={3}
             value={serializeOptions(f.options)}
@@ -478,43 +505,27 @@ function FieldEditor({
         </label>
       )}
 
-      {f.type === 'tags' && (
-        <label className="block mt-2">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Tag group (shared vocabulary id)</span>
-          <input value={f.tagGroup ?? ''} onChange={(e) => onChange({ tagGroup: e.target.value || undefined })} className={inputClass} placeholder="e.g. kosher_product" />
+      {canChooseShape && (
+        <label className="block sm:w-1/2">
+          <span className={fieldLabel}>Show as</span>
+          <select value={showAs} onChange={(e) => onChange({ renderAs: e.target.value as 'badge' | 'row' })} className={inputClass}>
+            <option value="badge">Badge — a chip, and a filter</option>
+            <option value="row">Row — a labeled line</option>
+          </select>
         </label>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+      {canRequire && (
+        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
           <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
-          Required
+          Required when adding a listing
         </label>
-        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-          <input type="checkbox" checked={!!f.filterable} onChange={(e) => onChange({ filterable: e.target.checked })} className="rounded border-slate-300" />
-          Filter
-        </label>
-        {f.filterable && (
-          <>
-            <input
-              value={f.filterLabel ?? ''}
-              onChange={(e) => onChange({ filterLabel: e.target.value || undefined })}
-              className="rounded-md border border-slate-300 px-2 py-1 text-xs w-40"
-              placeholder="Filter label (optional)"
-            />
-            {f.type === 'select' && (
-              <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-                <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
-                Multi-select
-              </label>
-            )}
-          </>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field up">↑</button>
-          <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field down">↓</button>
-          <button onClick={onRemove} className="text-xs text-red-600 hover:underline cursor-pointer">Remove</button>
-        </div>
+      )}
+
+      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-2 mt-1">
+        <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move detail up">↑</button>
+        <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move detail down">↓</button>
+        <button onClick={onRemove} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Remove</button>
       </div>
     </div>
   )

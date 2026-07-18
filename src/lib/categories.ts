@@ -9,12 +9,25 @@
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim'
 
-/** The display shape a field takes on a card: a `badge` (a chip beside the
- *  name) or a `row` (a labeled line in the expanded card). This is derived from
- *  the field's type — each type has exactly one natural shape — so the admin
- *  editor picks the shape first, then only the types that fit it. `hidden`
- *  fields (stored but not shown, e.g. caveat notes) sit outside this and are
- *  preserved by the editor rather than offered as a choice. */
+/** The field types offered in the editor's Type picker, most-common first.
+ *  `minyanim` is intentionally omitted: it's a synagogue-only structured type
+ *  rendered by the bespoke shul card, not something to hand-add elsewhere. */
+export const FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: 'text', label: 'Text' },
+  { value: 'textarea', label: 'Long text' },
+  { value: 'tel', label: 'Phone' },
+  { value: 'url', label: 'Link' },
+  { value: 'number', label: 'Number' },
+  { value: 'boolean', label: 'Yes / No' },
+  { value: 'select', label: 'Choice (dropdown)' },
+  { value: 'tags', label: 'Tags' },
+  { value: 'hours', label: 'Hours' },
+]
+
+/** Each type's natural display shape on a card — a `badge` (chip beside the
+ *  name) or a `row` (labeled line). Used to set a sensible default when the type
+ *  changes; the editor only offers a badge/row *choice* for the types where it's
+ *  a real, effective decision (see TYPE_HAS_SHAPE_CHOICE). */
 export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
   boolean: 'badge',
   select: 'badge',
@@ -28,25 +41,16 @@ export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
   minyanim: 'row',
 }
 
-/** The field types offered in the editor, grouped by display shape — drives the
- *  two-step "Show as → Type" picker. `minyanim` is intentionally omitted: it's a
- *  synagogue-only structured type rendered by the bespoke shul card, not
- *  something to hand-add to an arbitrary category. */
-export const FIELD_TYPES_BY_SHAPE: Record<'badge' | 'row', { value: FieldType; label: string }[]> = {
-  badge: [
-    { value: 'boolean', label: 'Yes / No' },
-    { value: 'select', label: 'Choice (dropdown)' },
-    { value: 'tags', label: 'Tags' },
-  ],
-  row: [
-    { value: 'text', label: 'Text' },
-    { value: 'textarea', label: 'Long text' },
-    { value: 'tel', label: 'Phone' },
-    { value: 'url', label: 'Link' },
-    { value: 'number', label: 'Number' },
-    { value: 'hours', label: 'Hours' },
-  ],
-}
+/** Types where badge-vs-row is a genuine, effective choice (a short categorical
+ *  value that reads fine either way). Others are fixed: tags always render as
+ *  chips, and text/phone/number/link/hours are always rows. */
+export const TYPE_HAS_SHAPE_CHOICE = (type: FieldType): boolean =>
+  type === 'boolean' || type === 'select'
+
+/** Types the directory can actually build a filter control for (see
+ *  GenericDirectory) — so the editor only offers "filter by this" where it works. */
+export const TYPE_IS_FILTERABLE = (type: FieldType): boolean =>
+  type === 'boolean' || type === 'select' || type === 'hours'
 
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
