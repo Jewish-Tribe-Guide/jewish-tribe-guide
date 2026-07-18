@@ -1,114 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { FormConfig, FormContent, FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
 
-// ── The forms manager: edit the Request Support and Volunteer wizards' title,
-// chrome text, and questions. Mounted on /admin. Unlike categories, forms are a
-// fixed pair (no create/delete) — the schema seeds exactly 'support' and
-// 'volunteer'. Edits save as a draft; nothing reaches a real visitor until the
-// admin explicitly publishes (see the draft/publish notes in formStore.ts). ──
+// ── Editor for one form (Request Support / Volunteer) — title, chrome text,
+// and questions. Mounted from CategoryManager's unified list alongside listing
+// categories. Unlike categories, forms are a fixed pair (no create/delete) —
+// the schema seeds exactly 'support' and 'volunteer'. Edits save as a draft;
+// nothing reaches a real visitor until the admin explicitly publishes (see the
+// draft/publish notes in formStore.ts). ─────────────────────────────────────
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
-
-export default function FormManager({
-  token,
-  editingId,
-  onOpenEditor,
-  onCloseEditor,
-}: {
-  token: string
-  /** Form id being edited ('support' | 'volunteer'), or null when showing the
-   *  list. Owned by the admin page so Back walks editor → list → moderation
-   *  tab in one stack, same as CategoryManager. */
-  editingId: string | null
-  onOpenEditor: (id: string) => void
-  onCloseEditor: () => void
-}) {
-  const [forms, setForms] = useState<FormConfig[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setError(null)
-    try {
-      const res = await fetch('/api/admin/forms', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setForms(body.forms as FormConfig[])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
-    }
-  }, [token])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  if (editingId) {
-    const form = forms?.find((f) => f.id === editingId) ?? null
-    if (!form) return <p className="text-sm text-muted">Loading…</p>
-    return (
-      <FormEditor
-        token={token}
-        form={form}
-        onDone={() => {
-          onCloseEditor()
-          load()
-        }}
-        onCancel={onCloseEditor}
-      />
-    )
-  }
-
-  return (
-    <div>
-      <p className="text-sm text-muted mb-4">
-        Edit the questions in the Request Support and Volunteer forms — add, reorder, or retitle
-        steps. Changes save as a draft; nothing reaches visitors until you publish.
-      </p>
-
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
-
-      {forms === null ? (
-        <p className="text-sm text-muted">Loading forms…</p>
-      ) : (
-        <div className="space-y-2">
-          {forms.map((f) => (
-            <div key={f.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-slate-900 text-sm">
-                  {f.title}
-                  <span className="ml-2 font-normal text-xs text-muted">{f.id}</span>
-                  {f.draft && (
-                    <span className="ml-2 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-                      Unpublished draft
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
-              </div>
-              <button
-                onClick={() => onOpenEditor(f.id)}
-                className="shrink-0 text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                Edit
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Editor ──────────────────────────────────────────────────────────────────
 
 function toContent(f: FormConfig): FormContent {
   // Continue an existing draft if there is one; otherwise start from what's
@@ -122,7 +27,7 @@ function toContent(f: FormConfig): FormContent {
   }
 }
 
-function FormEditor({
+export default function FormEditor({
   token,
   form,
   onDone,
@@ -272,7 +177,7 @@ function FormEditor({
         onClick={onCancel}
         className="text-sm text-muted hover:text-slate-700 underline mb-4 cursor-pointer"
       >
-        ← Back to forms
+        ← Back to categories
       </button>
 
       <h2 className="text-lg font-semibold text-slate-900 mb-1">Edit “{form.title}”</h2>

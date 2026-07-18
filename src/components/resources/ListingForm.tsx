@@ -19,12 +19,16 @@ type Props = {
   existing?: DirectoryResource
   onUp: () => void
   onSubmitted: () => void
+  /** Admin-preview only: renders the exact same form, but Submit shows the
+   *  confirmation screen without actually posting a submission. Used by the
+   *  category editor's Preview button. */
+  preview?: boolean
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, preview }: Props) {
   const config = category
   const community = !!category.community
   const syncEligible = isCategorySyncEligible(category.id)
@@ -79,6 +83,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrors([])
+
+    if (preview) {
+      setDone(true)
+      return
+    }
 
     // Only submit values for fields that are actually shown (respects showIf and
     // community categories that hide hospital/address/distance/phone).
