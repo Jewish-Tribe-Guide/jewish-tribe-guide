@@ -42,8 +42,53 @@ export default function AdminPage() {
   )
 }
 
+type AdminTab = 'queue' | 'categories'
+
+// The history.state shape this screen stamps on every pushState call, mirroring
+// the public page's NavState pattern so browser Back walks admin screens one at
+// a time (tab → category list → category editor) instead of leaving /admin.
+type AdminNavState = {
+  adminTab?: AdminTab
+  /** Category id being edited, or 'new' — only meaningful when adminTab is 'categories'. */
+  adminEditing?: string
+}
+
 function AdminTabs({ session }: { session: Session }) {
-  const [tab, setTab] = useState<'queue' | 'categories'>('queue')
+  const [tab, setTab] = useState<AdminTab>('queue')
+  const [editingId, setEditingId] = useState<string | 'new' | null>(null)
+
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const s = e.state as AdminNavState | null
+      setTab(s?.adminTab ?? 'queue')
+      setEditingId(s?.adminEditing ?? null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  // On a full reload the browser keeps the current entry's history.state —
+  // restore whichever tab/editor the admin was on instead of resetting to queue.
+  useEffect(() => {
+    const s = window.history.state as AdminNavState | null
+    if (s?.adminTab) setTab(s.adminTab)
+    if (s?.adminEditing) setEditingId(s.adminEditing)
+  }, [])
+
+  function goToTab(t: AdminTab) {
+    setTab(t)
+    setEditingId(null)
+    history.pushState({ adminTab: t } as AdminNavState, '')
+  }
+
+  function openEditor(id: string | 'new') {
+    setEditingId(id)
+    history.pushState({ adminTab: 'categories', adminEditing: id } as AdminNavState, '')
+  }
+
+  function closeEditor() {
+    history.back()
+  }
 
   return (
     <div>
@@ -51,7 +96,7 @@ function AdminTabs({ session }: { session: Session }) {
         {(['queue', 'categories'] as const).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => goToTab(t)}
             className={`text-sm font-medium px-3 py-2 -mb-px border-b-2 transition-colors cursor-pointer ${
               tab === t
                 ? 'border-primary text-primary'
@@ -66,7 +111,12 @@ function AdminTabs({ session }: { session: Session }) {
       {tab === 'queue' ? (
         <ModerationQueue session={session} />
       ) : (
-        <CategoryManager token={session.access_token} />
+        <CategoryManager
+          token={session.access_token}
+          editingId={editingId}
+          onOpenEditor={openEditor}
+          onCloseEditor={closeEditor}
+        />
       )}
     </div>
   )

@@ -29,10 +29,21 @@ const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
   directorySearch: 'Search bar',
 }
 
-export default function CategoryManager({ token }: { token: string }) {
+export default function CategoryManager({
+  token,
+  editingId,
+  onOpenEditor,
+  onCloseEditor,
+}: {
+  token: string
+  /** Category id being edited, 'new' for a fresh category, or null when showing the list.
+   *  Owned by the admin page so Back walks editor → list → moderation tab in one stack. */
+  editingId: string | 'new' | null
+  onOpenEditor: (id: string | 'new') => void
+  onCloseEditor: () => void
+}) {
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editing, setEditing] = useState<CategoryConfig | 'new' | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -73,16 +84,17 @@ export default function CategoryManager({ token }: { token: string }) {
     }
   }
 
-  if (editing) {
+  if (editingId) {
+    const initial = editingId === 'new' ? null : categories?.find((c) => c.id === editingId) ?? null
     return (
       <CategoryEditor
         token={token}
-        initial={editing === 'new' ? null : editing}
+        initial={initial}
         onSaved={() => {
-          setEditing(null)
+          onCloseEditor()
           load()
         }}
-        onCancel={() => setEditing(null)}
+        onCancel={onCloseEditor}
       />
     )
   }
@@ -95,7 +107,7 @@ export default function CategoryManager({ token }: { token: string }) {
           filters) on its listings.
         </p>
         <button
-          onClick={() => setEditing('new')}
+          onClick={() => onOpenEditor('new')}
           className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
         >
           + New category
@@ -142,7 +154,7 @@ export default function CategoryManager({ token }: { token: string }) {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <button
-                      onClick={() => setEditing(c)}
+                      onClick={() => onOpenEditor(c.id)}
                       className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       Edit
