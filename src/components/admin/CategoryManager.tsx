@@ -17,7 +17,7 @@ import {
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
 import FormEditor from './FormEditor'
-import ListingForm from '@/components/resources/ListingForm'
+import CategoryPreview from './CategoryPreview'
 
 // ── The categories manager: one list mixing the two kinds of thing a
 // community configures — Listing categories (Grocery Stores, Synagogues, …,
@@ -487,8 +487,8 @@ function CategoryEditor({
 
   if (previewing) {
     // A throwaway config built from the in-progress draft (never saved) — lets
-    // the admin see the real "Add a listing" form update live as they edit
-    // fields, same idea as the Forms editor's Preview.
+    // the admin see the real directory page (listings, buttons, Add/Edit/
+    // Report forms) update live as they edit fields.
     const previewCategory: CategoryConfig = {
       id: initial?.id ?? 'preview',
       label: draft.label || 'Listing',
@@ -500,15 +500,7 @@ function CategoryEditor({
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
     }
-    return (
-      <ListingForm
-        category={previewCategory}
-        mode="create"
-        preview
-        onUp={() => setPreviewing(false)}
-        onSubmitted={() => setPreviewing(false)}
-      />
-    )
+    return <CategoryPreview category={previewCategory} onClose={() => setPreviewing(false)} />
   }
 
   return (

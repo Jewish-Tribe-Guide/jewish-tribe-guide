@@ -12,9 +12,12 @@ type Props = {
   upLabel: string
   onUp: () => void
   onSubmitted: () => void
+  /** Admin-preview only: Submit shows the confirmation screen without actually
+   *  posting a report. Used by the category editor's Preview. */
+  preview?: boolean
 }
 
-export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: Props) {
+export default function ReportListing({ listing, upLabel, onUp, onSubmitted, preview }: Props) {
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
   const [honeypot, setHoneypot] = useState('')
@@ -26,6 +29,12 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted }: P
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (preview) {
+      setDone(true)
+      return
+    }
+
     setSubmitting(true)
     try {
       const res = await fetch('/api/submissions', {
