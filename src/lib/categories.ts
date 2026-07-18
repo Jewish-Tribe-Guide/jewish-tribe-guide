@@ -9,9 +9,7 @@
 
 export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim'
 
-/** The field types offered in the editor's Type picker, most-common first.
- *  `minyanim` is intentionally omitted: it's a synagogue-only structured type
- *  rendered by the bespoke shul card, not something to hand-add elsewhere. */
+/** The field types offered in the editor's Type picker, most-common first. */
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'text', label: 'Text' },
   { value: 'textarea', label: 'Long text' },
@@ -22,6 +20,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'select', label: 'Choice (dropdown)' },
   { value: 'tags', label: 'Tags' },
   { value: 'hours', label: 'Hours' },
+  { value: 'minyanim', label: 'Davening Times (Minyanim)' },
 ]
 
 /** Each type's natural display shape on a card — a `badge` (chip beside the

@@ -221,9 +221,9 @@ type Draft = {
   capabilities: CategoryCapabilities
   /** The editable fields (everything shown on a card). */
   fields: CategoryField[]
-  /** Fields with renderAs 'hidden' (caveat notes, structured minyanim) — not
-   *  editable here, but preserved as-is and re-merged on save so editing a
-   *  category never drops or exposes them. */
+  /** Fields with renderAs 'hidden' (caveat notes) — not editable here, but
+   *  preserved as-is and re-merged on save so editing a category never drops
+   *  or exposes them. */
   hiddenFields: CategoryField[]
 }
 

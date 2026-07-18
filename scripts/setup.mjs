@@ -117,6 +117,7 @@ async function main() {
   }
 
   run('seed-categories.mjs')
+  run('seed-forms.mjs')
   run('seed-tags.mjs')
   run('seed-upvotes.mjs')
 
