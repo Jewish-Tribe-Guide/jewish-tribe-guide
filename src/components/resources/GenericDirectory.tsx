@@ -180,7 +180,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         addressPrompt={addressPrompt}
         actions={
           <>
-            {onViewMap && ui.map.enabled && !category.community && (
+            {onViewMap && ui.map.enabled && !category.community && caps.map && (
               <button
                 onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                 /* Desktop only — on mobile the Map button moves into the filter/sort
@@ -244,7 +244,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   </span>
                 )}
               </button>
-              {onViewMap && ui.map.enabled && !category.community && (
+              {onViewMap && ui.map.enabled && !category.community && caps.map && (
                 <button
                   onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"

@@ -105,6 +105,10 @@ export type CategoryCapabilities = {
   report: boolean
   /** The search bar on this category's directory. */
   directorySearch: boolean
+  /** The "🗺️ Map" button on this category's directory (still subject to the
+   *  site-wide `ui.map.enabled` switch and never shown for community-wide
+   *  categories, which aren't tied to a physical location). */
+  map: boolean
 }
 
 /** The ordered capability keys, for building the admin toggles. */
@@ -113,6 +117,7 @@ export const CATEGORY_CAPABILITY_KEYS: (keyof CategoryCapabilities)[] = [
   'edit',
   'report',
   'directorySearch',
+  'map',
 ]
 
 /** Every capability defaults ON — an unset category behaves exactly as before
@@ -122,6 +127,7 @@ export const CATEGORY_CAPABILITY_DEFAULTS: CategoryCapabilities = {
   edit: true,
   report: true,
   directorySearch: true,
+  map: true,
 }
 
 /** Fills in defaults for any missing capability key. Use this everywhere a
