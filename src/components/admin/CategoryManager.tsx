@@ -27,6 +27,7 @@ const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
   edit: 'Edit button',
   report: 'Report button',
   directorySearch: 'Search bar',
+  map: 'Map button',
 }
 
 export default function CategoryManager({
