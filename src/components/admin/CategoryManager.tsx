@@ -225,12 +225,11 @@ function CategoryEditor({
     const keys = new Set<string>(draft.hiddenFields.map((f) => f.key))
     draft.fields.forEach((f, i) => {
       const n = i + 1
-      if (!f.key.trim()) errs.push(`Field ${n}: needs a key.`)
-      else if (keys.has(f.key)) errs.push(`Field ${n}: duplicate key "${f.key}".`)
+      if (!f.label.trim()) errs.push(`Detail ${n}: needs a name.`)
+      else if (keys.has(f.key)) errs.push(`Detail ${n}: another detail is already named “${f.label}”.`)
       else keys.add(f.key)
-      if (!f.label.trim()) errs.push(`Field ${n}: needs a label.`)
       if (f.type === 'select' && !(f.options && f.options.length > 0))
-        errs.push(`Field ${n} ("${f.label || f.key}"): a choice field needs at least one option.`)
+        errs.push(`Detail ${n} (“${f.label || 'unnamed'}”): a Choice needs at least one option.`)
     })
     return errs
   }
@@ -250,8 +249,9 @@ function CategoryEditor({
         description: draft.description,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
-        // Re-merge the preserved hidden fields so editing never drops them.
-        fields: [...draft.fields, ...draft.hiddenFields],
+        // Apply the implied filter/tag rules, then re-merge the preserved hidden
+        // fields so editing never drops them.
+        fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
       }
       const res = await fetch(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
@@ -389,6 +389,36 @@ function CategoryEditor({
 
 // ── One field row ─────────────────────────────────────────────────────────────
 
+// The editor only asks Name / Type / Show as / Required; the filter + tag rules
+// are implied and applied here on save:
+//   • Badge (Yes/No, Choice) → a filter. Row → display only, no filter.
+//   • Choice filter → always multi-select.
+//   • Hours → always the "Open now" filter.
+//   • Tags → always chips + click-to-search (never a filter); their tag group is
+//     derived from the name once, then frozen so a rename can't orphan tags.
+function normalizeField(f: CategoryField): CategoryField {
+  const out: CategoryField = { ...f }
+  const isBadge = out.renderAs !== 'row'
+
+  if (out.type === 'tags') {
+    out.renderAs = 'badge'
+    out.tagGroup = out.tagGroup || slugifyFieldKey(out.label)
+    out.filterable = false
+    out.multiSelect = undefined
+  } else if (out.type === 'hours') {
+    out.filterable = true
+    out.multiSelect = undefined
+  } else if (TYPE_IS_FILTERABLE(out.type)) {
+    // Yes/No or Choice: the badge is the filter; a row is display-only.
+    out.filterable = isBadge
+    out.multiSelect = out.type === 'select' && isBadge ? true : undefined
+  } else {
+    out.filterable = false
+    out.multiSelect = undefined
+  }
+  return out
+}
+
 function serializeOptions(options?: { value: string; label: string }[]): string {
   return (options ?? [])
     .map((o) => (o.label && o.label !== o.value ? `${o.value} | ${o.label}` : o.value))
@@ -425,112 +455,76 @@ function FieldEditor({
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
 }) {
-  // The `key` is the internal id and is never shown. It's auto-derived from the
-  // label only while still blank — once set (new field filled in, or loaded from
-  // an existing field) it's frozen, so renaming a field never orphans its data.
-  function onLabelChange(label: string) {
-    onChange(!f.key ? { label, key: slugifyFieldKey(label) } : { label })
+  // "Name" auto-fills the internal key only while it's still blank, then freezes,
+  // so renaming a detail later never orphans its stored data.
+  function onNameChange(name: string) {
+    onChange(!f.key ? { label: name, key: slugifyFieldKey(name) } : { label: name })
   }
 
-  // Type is the primary choice. A few downstream options apply only to certain
-  // types — "Show as" (badge vs row) and "filter by this" — so compute those.
+  // "Show as" is offered only for Yes/No and Choice — the types where badge-vs-row
+  // is a real choice. Badge also means "this is a filter" (applied in
+  // normalizeField); a row is display-only. Everything else has a fixed shape.
   const canChooseShape = TYPE_HAS_SHAPE_CHOICE(f.type)
-  const canFilter = TYPE_IS_FILTERABLE(f.type)
   const showAs: 'badge' | 'row' = f.renderAs === 'row' ? 'row' : 'badge'
 
   function onTypeChange(type: FieldType) {
+    // Reset to the type's natural shape; drop choices when leaving Choice.
     const patch: Partial<CategoryField> = { type, renderAs: FIELD_TYPE_SHAPE[type] }
-    // Clear options that don't apply to the new type.
-    if (!TYPE_IS_FILTERABLE(type)) patch.filterable = false
-    if (type !== 'select') patch.multiSelect = false
+    if (type !== 'select') patch.options = undefined
     onChange(patch)
   }
 
-  const sectionLabel = 'text-[10px] font-semibold uppercase tracking-wide text-slate-400'
+  const fieldLabel = 'block text-[11px] font-medium text-slate-600 mb-0.5'
 
   return (
-    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-3">
-      {/* ── The field: what it is (used in both the form and the listing) ── */}
-      <div className="space-y-2">
+    <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-2">
+      <label className="block">
+        <span className={fieldLabel}>Name</span>
+        <input value={f.label} onChange={(e) => onNameChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
+      </label>
+
+      <label className="block sm:w-1/2">
+        <span className={fieldLabel}>Type</span>
+        <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
+          {FIELD_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </label>
+
+      {f.type === 'select' && (
         <label className="block">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Label</span>
-          <input value={f.label} onChange={(e) => onLabelChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
+          <span className={fieldLabel}>Choices (one per line — “value | label”, or just value)</span>
+          <textarea
+            rows={3}
+            value={serializeOptions(f.options)}
+            onChange={(e) => onChange({ options: parseOptions(e.target.value) })}
+            className={inputClass}
+            placeholder={'Elementary\nMiddle\nHigh'}
+          />
         </label>
+      )}
+
+      {canChooseShape && (
         <label className="block sm:w-1/2">
-          <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Type</span>
-          <select value={f.type} onChange={(e) => onTypeChange(e.target.value as FieldType)} className={inputClass}>
-            {FIELD_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
+          <span className={fieldLabel}>Show as</span>
+          <select value={showAs} onChange={(e) => onChange({ renderAs: e.target.value as 'badge' | 'row' })} className={inputClass}>
+            <option value="badge">Badge — a chip, and a filter</option>
+            <option value="row">Row — a labeled line</option>
           </select>
         </label>
-
-        {f.type === 'select' && (
-          <label className="block">
-            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Choices (one per line — “value | label”, or just value)</span>
-            <textarea
-              rows={3}
-              value={serializeOptions(f.options)}
-              onChange={(e) => onChange({ options: parseOptions(e.target.value) })}
-              className={inputClass}
-              placeholder={'Elementary\nMiddle\nHigh'}
-            />
-          </label>
-        )}
-
-        {f.type === 'tags' && (
-          <label className="block">
-            <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Tag group (shared vocabulary id)</span>
-            <input value={f.tagGroup ?? ''} onChange={(e) => onChange({ tagGroup: e.target.value || undefined })} className={inputClass} placeholder="e.g. kosher_product" />
-          </label>
-        )}
-      </div>
-
-      {/* ── On the listing: how visitors see and filter it ───────────────── */}
-      {(canChooseShape || canFilter) && (
-        <div className="border-t border-slate-200 pt-2.5 space-y-2">
-          <p className={sectionLabel}>On the listing</p>
-          {canChooseShape && (
-            <label className="block sm:w-1/2">
-              <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Show as</span>
-              <select value={showAs} onChange={(e) => onChange({ renderAs: e.target.value as 'badge' | 'row' })} className={inputClass}>
-                <option value="badge">Badge — a chip by the name</option>
-                <option value="row">Row — a labeled line</option>
-              </select>
-            </label>
-          )}
-          {canFilter && (
-            <div className="space-y-1.5">
-              <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-                <input type="checkbox" checked={!!f.filterable} onChange={(e) => onChange({ filterable: e.target.checked })} className="rounded border-slate-300" />
-                Let people filter listings by this
-              </label>
-              {f.filterable && f.type === 'select' && (
-                <label className="ml-5 flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-                  <input type="checkbox" checked={!!f.multiSelect} onChange={(e) => onChange({ multiSelect: e.target.checked })} className="rounded border-slate-300" />
-                  Allow picking several at once
-                </label>
-              )}
-            </div>
-          )}
-        </div>
       )}
 
-      {/* ── When adding/editing: the contribution form (only if enabled) ─── */}
       {canRequire && (
-        <div className="border-t border-slate-200 pt-2.5 space-y-1.5">
-          <p className={sectionLabel}>When adding or editing a listing</p>
-          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
-            Required
-          </label>
-        </div>
+        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
+          <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
+          Required when adding a listing
+        </label>
       )}
 
-      {/* ── Reorder / remove ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-2">
-        <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field up">↑</button>
-        <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move field down">↓</button>
+      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-2 mt-1">
+        <button onClick={() => onMove(-1)} disabled={index === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move detail up">↑</button>
+        <button onClick={() => onMove(1)} disabled={index === total - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer" aria-label="Move detail down">↓</button>
         <button onClick={onRemove} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Remove</button>
       </div>
     </div>
