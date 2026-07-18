@@ -389,6 +389,26 @@ function CategoryEditor({
   const [errors, setErrors] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
 
+  // Preview gets its own history entry so browser/trackpad Back (and the
+  // preview's own Up button, which calls closePreview) land back on this
+  // editor instead of skipping past it to the category list.
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  function openPreview() {
+    setPreviewing(true)
+    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+  }
+
+  function closePreview() {
+    history.back()
+  }
+
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
   }
@@ -500,7 +520,7 @@ function CategoryEditor({
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
     }
-    return <CategoryPreview category={previewCategory} onClose={() => setPreviewing(false)} />
+    return <CategoryPreview category={previewCategory} onClose={closePreview} />
   }
 
   return (
@@ -595,7 +615,7 @@ function CategoryEditor({
 
         <div className="flex gap-2">
           <button
-            onClick={() => setPreviewing(true)}
+            onClick={openPreview}
             className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Preview
