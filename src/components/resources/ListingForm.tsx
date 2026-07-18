@@ -19,16 +19,17 @@ type Props = {
   existing?: DirectoryResource
   onUp: () => void
   onSubmitted: () => void
-  /** Admin-preview only: renders the exact same form, but Submit shows the
-   *  confirmation screen without actually posting a submission. Used by the
-   *  category editor's Preview button. */
-  preview?: boolean
+  /** Admin-preview only: when set, Submit builds the resource locally and
+   *  hands it to this callback instead of posting to /api/submissions — so
+   *  the category editor's Preview can show it appearing in the directory
+   *  without persisting anything. */
+  onPreviewSubmit?: (resource: DirectoryResource) => void
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, preview }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit }: Props) {
   const config = category
   const community = !!category.community
   const syncEligible = isCategorySyncEligible(category.id)
@@ -84,11 +85,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     e.preventDefault()
     setErrors([])
 
-    if (preview) {
-      setDone(true)
-      return
-    }
-
     // Only submit values for fields that are actually shown (respects showIf and
     // community categories that hide hospital/address/distance/phone).
     const visibleDetails: Record<string, unknown> = {}
@@ -100,6 +96,21 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           visibleDetails[field.key + '_sometimes'] = details[field.key + '_sometimes'] ?? []
         }
       }
+    }
+
+    if (onPreviewSubmit) {
+      onPreviewSubmit({
+        id: existing?.id ?? `preview-${Date.now()}`,
+        category: category.id,
+        name,
+        anchorId: community ? 'community' : 'all',
+        distance: 0,
+        address: community ? '' : address,
+        phone: community ? '' : phone,
+        geo: community ? null : coords,
+        ...visibleDetails,
+      })
+      return
     }
 
     const payload: ResourceSubmission = {
