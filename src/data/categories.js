@@ -186,7 +186,7 @@ export const categories = [
         key: 'minyanim',
         label: 'Davening Times (Minyanim)',
         type: 'minyanim',
-        renderAs: 'hidden',
+        renderAs: 'row',
       },
       {
         key: 'whatsapp',

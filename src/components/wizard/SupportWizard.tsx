@@ -1,251 +1,37 @@
 'use client'
 
-import Wizard, { type Answers, type Step } from './Wizard'
-import { contactSteps, buildContact } from './contactSteps'
+import Wizard, { WizardLoading, type Answers, type Step } from './Wizard'
+import { buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
+import { useForm } from '@/lib/useForms'
+import type { FormStep } from '@/lib/forms'
 
-// One branching form for every kind of direct support. The visitor taps what
-// they need; only the matching detail questions appear after that.
+// The question list itself is data-driven (see src/data/forms.js, seeded into
+// the `form` table, editable from /admin's Forms tab) — this component just
+// wires the collected answers into the submission payload the confirmation
+// email and Google Sheet expect.
 
-const has = (need: string) => (a: Answers) =>
-  Array.isArray(a.needs) && a.needs.includes(need)
+// Step ids read into named submission fields below. Anything answered under an
+// id NOT in this set (i.e. a question an admin added through /admin) falls
+// into `formData.extra` instead, so it still reaches the email and the sheet's
+// trailing JSON column even though nothing named it ahead of time.
+const KNOWN_IDS = new Set([
+  'needs', 'name', 'contact', 'preferredContact', 'hospital_room',
+  'meals_which', 'meals_dietary', 'meals_count', 'meals_notes',
+  'ride_pickup', 'ride_dropoff', 'ride_when', 'ride_passengers', 'ride_notes',
+  'stay_dates', 'stay_distance', 'stay_accessibility', 'stay_location_pref', 'stay_notes',
+  'visit_type', 'visit_time', 'visit_frequency',
+  'otherNeed', 'additionalInfo',
+  'phone', 'email', 'company', 'turnstileToken',
+])
 
-const MEALS = '🍽️ Meals'
-const RIDE = '🚗 Ride'
-const STAY = '🏠 Place to stay'
-const VISIT = '🤝 Visit'
-
-const hospitalRoomStep = (when: (a: Answers) => boolean, section: string): Step => ({
-  id: 'hospital_room',
-  kind: 'text',
-  section,
-  when,
-  question: 'Which hospital and room?',
-  placeholder: 'e.g. Jefferson, room 412',
-})
-
-const steps: Step[] = [
-  // ── Always asked (start) ────────────────────────────────────────────────────
-  {
-    id: 'needs',
-    kind: 'multi',
-    question: 'What do you need?',
-    hint: 'Tap all that apply.',
-    options: [
-      { value: 'meals', label: 'Meals', icon: '🍽️' },
-      { value: 'transportation', label: 'A ride', icon: '🚗' },
-      { value: 'familyHousing', label: 'A place to stay', icon: '🏠' },
-      { value: 'visitors', label: 'Someone to visit', icon: '🤝' },
-      { value: 'other', label: 'Something else', icon: '✨' },
-    ],
-  },
-
-  // ── Name + contact + preference (shared with the volunteer form) ────────────
-  ...contactSteps,
-
-  // ── Meals ─────────────────────────────────────────────────────────────────
-  hospitalRoomStep(has('meals'), MEALS),
-  {
-    id: 'meals_which',
-    kind: 'multi',
-    section: MEALS,
-    when: has('meals'),
-    question: 'Which meals?',
-    options: [
-      { value: 'breakfast', label: 'Breakfast' },
-      { value: 'lunch', label: 'Lunch' },
-      { value: 'dinner', label: 'Dinner' },
-      { value: 'shabbatYomTov', label: 'Shabbat / Yom Tov' },
-    ],
-  },
-  {
-    id: 'meals_dietary',
-    kind: 'multi',
-    section: MEALS,
-    when: has('meals'),
-    optional: true,
-    question: 'Any dietary needs?',
-    options: [
-      { value: 'standardKosher', label: 'Standard Kosher' },
-      { value: 'glattKosher', label: 'Glatt Kosher' },
-      { value: 'cholovYisroel', label: 'Cholov Yisroel' },
-      { value: 'vegetarian', label: 'Vegetarian' },
-      { value: 'vegan', label: 'Vegan' },
-      { value: 'allergies', label: 'Allergies (note below)' },
-    ],
-  },
-  {
-    id: 'meals_count',
-    kind: 'number',
-    section: MEALS,
-    when: has('meals'),
-    question: 'How many people are we feeding?',
-    placeholder: 'e.g. 4',
-  },
-  {
-    id: 'meals_notes',
-    kind: 'textarea',
-    section: MEALS,
-    when: has('meals'),
-    optional: true,
-    question: 'Anything else about the meals?',
-    placeholder: 'Allergies, hechsher preferences, special requests…',
-  },
-
-  // ── Ride ────────────────────────────────────────────────────────────────────
-  {
-    id: 'ride_pickup',
-    kind: 'text',
-    section: RIDE,
-    when: has('transportation'),
-    question: 'Where is the pickup location?',
-    placeholder: 'Pickup address',
-  },
-  {
-    id: 'ride_dropoff',
-    kind: 'text',
-    section: RIDE,
-    when: has('transportation'),
-    question: 'Where’s the dropoff location?',
-    placeholder: 'Destination',
-  },
-  {
-    id: 'ride_when',
-    kind: 'text',
-    section: RIDE,
-    when: has('transportation'),
-    question: 'When do you need the ride?',
-    placeholder: 'Day and time — e.g. Tuesday at 9am',
-  },
-  {
-    id: 'ride_passengers',
-    kind: 'number',
-    section: RIDE,
-    when: has('transportation'),
-    optional: true,
-    question: 'How many passengers?',
-    placeholder: 'e.g. 2',
-  },
-  {
-    id: 'ride_notes',
-    kind: 'textarea',
-    section: RIDE,
-    when: has('transportation'),
-    optional: true,
-    question: 'Anything else about the ride?',
-    placeholder: 'Optional',
-  },
-
-  // ── Place to stay ───────────────────────────────────────────────────────────
-  {
-    id: 'stay_dates',
-    kind: 'text',
-    section: STAY,
-    when: has('familyHousing'),
-    question: 'When would you arrive and leave?',
-    placeholder: 'e.g. Thursday night through Sunday',
-  },
-  {
-    id: 'stay_distance',
-    kind: 'text',
-    section: STAY,
-    when: has('familyHousing'),
-    optional: true,
-    question: 'How close to the hospital do you need to be?',
-    placeholder: 'e.g. walking distance, or within 10 minutes',
-  },
-  {
-    id: 'stay_accessibility',
-    kind: 'text',
-    section: STAY,
-    when: has('familyHousing'),
-    optional: true,
-    question: 'Any accessibility needs?',
-    placeholder: 'e.g. no stairs, wheelchair accessible',
-  },
-  {
-    id: 'stay_location_pref',
-    kind: 'text',
-    section: STAY,
-    when: has('familyHousing'),
-    optional: true,
-    question: 'Any preference on where you stay?',
-    placeholder: 'e.g. a family home, women’s only, near a shul',
-  },
-  {
-    id: 'stay_notes',
-    kind: 'textarea',
-    section: STAY,
-    when: has('familyHousing'),
-    optional: true,
-    question: 'Anything else about the place to stay?',
-    placeholder: 'Optional',
-  },
-
-  // ── Visit ─────────────────────────────────────────────────────────────────
-  // Hospital + room, but only if the meals branch didn't already ask it.
-  hospitalRoomStep((a) => has('visitors')(a) && !has('meals')(a), VISIT),
-  {
-    id: 'visit_type',
-    kind: 'multi',
-    section: VISIT,
-    when: has('visitors'),
-    question: 'What kind of visit?',
-    options: [
-      { value: 'friendlyVisit', label: 'A friendly visit' },
-      { value: 'spiritualSupport', label: 'Spiritual support' },
-      { value: 'chaplainVisit', label: 'Jewish chaplain' },
-      { value: 'learningPartner', label: 'Learning partner' },
-      { value: 'minyanAssistance', label: 'Minyan help' },
-    ],
-  },
-  {
-    id: 'visit_time',
-    kind: 'multi',
-    section: VISIT,
-    when: has('visitors'),
-    optional: true,
-    question: 'What time of day?',
-    options: [
-      { value: 'morning', label: 'Morning' },
-      { value: 'afternoon', label: 'Afternoon' },
-      { value: 'evening', label: 'Evening' },
-    ],
-  },
-  {
-    id: 'visit_frequency',
-    kind: 'single',
-    section: VISIT,
-    when: has('visitors'),
-    optional: true,
-    question: 'How often?',
-    options: [
-      { value: 'oneTime', label: 'One time' },
-      { value: 'daily', label: 'Daily' },
-      { value: 'severalPerWeek', label: 'A few times a week' },
-      { value: 'flexible', label: 'Flexible' },
-    ],
-  },
-
-  // ── Something else (last branch, just before the always-asked end) ──────────
-  {
-    id: 'otherNeed',
-    kind: 'textarea',
-    section: '✨ Something else',
-    when: has('other'),
-    question: 'What else can we help with?',
-    placeholder: 'Tell us what you need…',
-  },
-
-  // ── Always asked (end) ──────────────────────────────────────────────────────
-  {
-    id: 'additionalInfo',
-    kind: 'textarea',
-    optional: true,
-    question: 'Anything else we should know?',
-    placeholder: 'Optional',
-  },
-]
+// FormStep (loaded from the DB/fallback data as plain JSON) is structurally a
+// Step, but TS can't see through the JSON boundary to know every 'single'/
+// 'multi' step actually carries `options` — the admin editor and seed data
+// both guarantee that invariant, so the cast is safe.
+function toWizardSteps(steps: FormStep[]): Step[] {
+  return steps as unknown as Step[]
+}
 
 type Props = {
   preselect?: string[]
@@ -253,6 +39,7 @@ type Props = {
 }
 
 export default function SupportWizard({ preselect, onClose }: Props) {
+  const form = useForm('support')
   const initial: Answers = preselect && preselect.length ? { needs: preselect } : {}
 
   const handleSubmit = async (a: Answers) => {
@@ -272,7 +59,12 @@ export default function SupportWizard({ preselect, onClose }: Props) {
     const include = (need: string, blob: Record<string, unknown>) =>
       needs.includes(need) ? blob : undefined
 
-    const formData = {
+    const extra: Record<string, unknown> = {}
+    for (const [id, value] of Object.entries(a)) {
+      if (!KNOWN_IDS.has(id) && value !== undefined && value !== '') extra[id] = value
+    }
+
+    const formData: Record<string, unknown> = {
       needs,
       hospitalRoom,
       otherNeed: str('otherNeed'),
@@ -303,6 +95,7 @@ export default function SupportWizard({ preselect, onClose }: Props) {
         frequency: str('visit_frequency'),
       }),
     }
+    if (Object.keys(extra).length > 0) formData.extra = extra
 
     await submitRequest(
       'Direct Support',
@@ -313,15 +106,17 @@ export default function SupportWizard({ preselect, onClose }: Props) {
     )
   }
 
+  if (!form) return <WizardLoading onClose={onClose} />
+
   return (
     <Wizard
-      steps={steps}
+      steps={toWizardSteps(form.steps)}
       initial={initial}
       onSubmit={handleSubmit}
       onClose={onClose}
-      submitLabel="Send request"
-      successTitle="Request sent"
-      successMessage="A community representative will reach out to you shortly to coordinate."
+      submitLabel={form.submitLabel}
+      successTitle={form.successTitle}
+      successMessage={form.successMessage}
     />
   )
 }

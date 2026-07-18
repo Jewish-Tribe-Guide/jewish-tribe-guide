@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isValidPhone } from '@/lib/validation'
+import { stepIsVisible, type StepCondition } from '@/lib/forms'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 
@@ -9,6 +10,10 @@ import TurnstileWidget from '@/components/TurnstileWidget'
 // A wizard is a flat list of steps. Each step shows ONE question. `when` gates a
 // step on earlier answers, which is how branching works: a meal step only shows
 // once "meals" is chosen. Answers are stored by step id.
+//
+// Both wizards (SupportWizard, VolunteerWizard) build this list from a
+// data-driven FormConfig (see lib/forms.ts, useForms.ts) rather than hardcoding
+// it, so an admin can edit the questions from /admin without a deploy.
 
 export type Answers = Record<string, string | string[]>
 
@@ -21,8 +26,8 @@ type StepBase = {
   /** Small eyebrow above the question naming the section, e.g. "🍽️ Meals", so
    *  the visitor always knows which part of the form they're in. */
   section?: string
-  /** Show this step only when the predicate passes (branching). */
-  when?: (a: Answers) => boolean
+  /** Show this step only when every condition holds (branching). */
+  when?: StepCondition[]
   /** Optional steps can be skipped; required ones block until answered. */
   optional?: boolean
 }
@@ -99,7 +104,7 @@ export default function Wizard({
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Steps visible given the current answers — branching recomputes this live.
-  const visible = useMemo(() => steps.filter((s) => !s.when || s.when(answers)), [steps, answers])
+  const visible = useMemo(() => steps.filter((s) => stepIsVisible(s, answers)), [steps, answers])
   // Render the step from history, but never further than the answers justify.
   const clampedIdx = Math.min(idx, maxReachableIdx(visible, answers))
   const step = visible[clampedIdx]
@@ -347,6 +352,30 @@ export default function Wizard({
         )}
       </div>
     </Shell>
+  )
+}
+
+// Brief full-screen placeholder shown while a data-driven wizard's form config
+// is still loading (see useForms.ts) — same chrome as Shell, minus the
+// progress bar and Back button, since there's no step to show yet.
+export function WizardLoading({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-white overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="sticky top-0 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex max-w-xl items-center justify-end px-4 sm:px-6 py-3">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div className="mx-auto max-w-xl px-4 sm:px-6 py-16 text-center text-sm text-slate-400">Loading…</div>
+    </div>
   )
 }
 

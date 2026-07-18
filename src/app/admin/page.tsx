@@ -12,6 +12,7 @@ import type {
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
 import CategoryManager from '@/components/admin/CategoryManager'
+import FormManager from '@/components/admin/FormManager'
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -42,14 +43,21 @@ export default function AdminPage() {
   )
 }
 
-type AdminTab = 'queue' | 'categories'
+type AdminTab = 'queue' | 'categories' | 'forms'
+
+const TAB_LABELS: Record<AdminTab, string> = {
+  queue: 'Moderation queue',
+  categories: 'Categories',
+  forms: 'Forms',
+}
 
 // The history.state shape this screen stamps on every pushState call, mirroring
 // the public page's NavState pattern so browser Back walks admin screens one at
-// a time (tab → category list → category editor) instead of leaving /admin.
+// a time (tab → list → editor) instead of leaving /admin.
 type AdminNavState = {
   adminTab?: AdminTab
-  /** Category id being edited, or 'new' — only meaningful when adminTab is 'categories'. */
+  /** Category id being edited (or 'new'), or form id being edited — only
+   *  meaningful when adminTab is 'categories' or 'forms'. */
   adminEditing?: string
 }
 
@@ -81,9 +89,11 @@ function AdminTabs({ session }: { session: Session }) {
     history.pushState({ adminTab: t } as AdminNavState, '')
   }
 
+  // `tab` is the currently active tab in the closure at call time — this is
+  // only ever invoked from the manager belonging to that tab.
   function openEditor(id: string | 'new') {
     setEditingId(id)
-    history.pushState({ adminTab: 'categories', adminEditing: id } as AdminNavState, '')
+    history.pushState({ adminTab: tab, adminEditing: id } as AdminNavState, '')
   }
 
   function closeEditor() {
@@ -93,7 +103,7 @@ function AdminTabs({ session }: { session: Session }) {
   return (
     <div>
       <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {(['queue', 'categories'] as const).map((t) => (
+        {(['queue', 'categories', 'forms'] as const).map((t) => (
           <button
             key={t}
             onClick={() => goToTab(t)}
@@ -103,17 +113,24 @@ function AdminTabs({ session }: { session: Session }) {
                 : 'border-transparent text-muted hover:text-slate-700'
             }`}
           >
-            {t === 'queue' ? 'Moderation queue' : 'Categories'}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
 
       {tab === 'queue' ? (
         <ModerationQueue session={session} />
-      ) : (
+      ) : tab === 'categories' ? (
         <CategoryManager
           token={session.access_token}
           editingId={editingId}
+          onOpenEditor={openEditor}
+          onCloseEditor={closeEditor}
+        />
+      ) : (
+        <FormManager
+          token={session.access_token}
+          editingId={editingId === 'new' ? null : editingId}
           onOpenEditor={openEditor}
           onCloseEditor={closeEditor}
         />

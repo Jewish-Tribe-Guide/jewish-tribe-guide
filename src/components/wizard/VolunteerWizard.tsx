@@ -1,176 +1,55 @@
 'use client'
 
 import { useMemo } from 'react'
-import Wizard, { type Answers, type Step } from './Wizard'
-import { contactSteps, buildContact } from './contactSteps'
+import Wizard, { WizardLoading, type Answers, type Step } from './Wizard'
+import { buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
+import { useForm } from '@/lib/useForms'
 import { useHospitals } from '@/lib/useHospitals'
+import type { FormStep } from '@/lib/forms'
 import type { Hospital } from '@/types'
 import { community } from '@/community.config'
 
 const ANYWHERE = 'anywhere'
 
-const MEALS = '🍲 Cooking meals'
-const VISITING = '🫂 Visiting patients'
-const RIDES = '🚙 Giving rides'
-const HOSTING = '🛏️ Hosting a family'
+// The question list itself is data-driven (see src/data/forms.js, seeded into
+// the `form` table, editable from /admin's Forms tab) — this component just
+// resolves the one step whose options come from live data (not something to
+// store/edit as text) and wires the collected answers into the submission
+// payload the Volunteers sheet tab expects.
 
-const helps = (way: string) => (a: Answers) =>
-  Array.isArray(a.waysToHelp) && a.waysToHelp.includes(way)
+// Step ids read into named submission fields below. Anything answered under an
+// id NOT in this set (i.e. a question an admin added through /admin) falls
+// into `formData.extra` instead, so it still reaches the sheet's trailing JSON
+// column even though nothing named it ahead of time.
+const KNOWN_IDS = new Set([
+  'waysToHelp', 'name', 'contact', 'preferredContact',
+  'meals_kosher',
+  'visit_days', 'visit_time', 'visit_gender', 'visit_age',
+  'ride_passengers',
+  'host_rooms', 'host_beds', 'host_address',
+  'waysToHelpOther', 'areas', 'notes',
+  'phone', 'email', 'company', 'turnstileToken',
+])
 
-const buildSteps = (hospitals: Hospital[]): Step[] => [
-  // ── Always asked (start) ────────────────────────────────────────────────────
-  {
-    id: 'waysToHelp',
-    kind: 'multi',
-    question: 'How would you like to help?',
-    hint: 'Tap all that apply.',
-    options: [
-      { value: 'meals', label: 'Cook or deliver meals', icon: '🍲' },
-      { value: 'visiting', label: 'Visit patients', icon: '🫂' },
-      { value: 'transportation', label: 'Give rides', icon: '🚙' },
-      { value: 'housing', label: 'Host a family', icon: '🛏️' },
-      { value: 'other', label: 'Something else', icon: '❤️' },
-    ],
-  },
-
-  // ── Name + contact + preference (shared with the support form) ──────────────
-  ...contactSteps,
-
-  // ── Meals ─────────────────────────────────────────────────────────────────
-  {
-    id: 'meals_kosher',
-    kind: 'text',
-    section: MEALS,
-    when: helps('meals'),
-    question: 'What kosher standard do you keep?',
-    placeholder: 'e.g. Glatt, Chalav Yisrael, OU…',
-  },
-
-  // ── Visiting ────────────────────────────────────────────────────────────────
-  {
-    id: 'visit_days',
-    kind: 'multi',
-    section: VISITING,
-    when: helps('visiting'),
-    question: 'Which days can you visit?',
-    options: [
-      { value: 'sunday', label: 'Sunday' },
-      { value: 'monday', label: 'Monday' },
-      { value: 'tuesday', label: 'Tuesday' },
-      { value: 'wednesday', label: 'Wednesday' },
-      { value: 'thursday', label: 'Thursday' },
-      { value: 'friday', label: 'Friday' },
-      { value: 'saturday', label: 'Saturday (Shabbat)' },
-    ],
-  },
-  {
-    id: 'visit_time',
-    kind: 'multi',
-    section: VISITING,
-    when: helps('visiting'),
-    question: 'What time of day?',
-    options: [
-      { value: 'morning', label: 'Morning' },
-      { value: 'afternoon', label: 'Afternoon' },
-      { value: 'evening', label: 'Evening' },
-    ],
-  },
-  {
-    id: 'visit_gender',
-    kind: 'single',
-    section: VISITING,
-    when: helps('visiting'),
-    question: 'What’s your gender?',
-    hint: 'We ask so we can pair you with patients appropriately.',
-    options: [
-      { value: 'male', label: 'Male' },
-      { value: 'female', label: 'Female' },
-      { value: 'preferNotToSay', label: 'Prefer not to say' },
-    ],
-  },
-  {
-    id: 'visit_age',
-    kind: 'single',
-    section: VISITING,
-    when: helps('visiting'),
-    question: 'What’s your age group?',
-    hint: 'Also helps us pair you appropriately.',
-    options: [
-      { value: 'under18', label: 'Under 18' },
-      { value: '18to30', label: '18–30' },
-      { value: '31to50', label: '31–50' },
-      { value: '51to65', label: '51–65' },
-      { value: '65plus', label: '65+' },
-    ],
-  },
-
-  // ── Rides ─────────────────────────────────────────────────────────────────
-  {
-    id: 'ride_passengers',
-    kind: 'number',
-    section: RIDES,
-    when: helps('transportation'),
-    question: 'How many passengers can you take?',
-    placeholder: 'e.g. 3',
-  },
-
-  // ── Hosting ───────────────────────────────────────────────────────────────
-  {
-    id: 'host_rooms',
-    kind: 'number',
-    section: HOSTING,
-    when: helps('housing'),
-    question: 'How many rooms do you have for guests?',
-    placeholder: 'e.g. 2',
-  },
-  {
-    id: 'host_beds',
-    kind: 'number',
-    section: HOSTING,
-    when: helps('housing'),
-    question: 'How many total beds do you have?',
-    placeholder: 'e.g. 3',
-  },
-  {
-    id: 'host_address',
-    kind: 'text',
-    section: HOSTING,
-    when: helps('housing'),
-    question: 'What’s your address?',
-    placeholder: 'Street, city, zip',
-  },
-
-  // ── Something else (last branch, just before the always-asked end) ──────────
-  {
-    id: 'waysToHelpOther',
-    kind: 'textarea',
-    section: '❤️ Something else',
-    when: helps('other'),
-    question: 'How else would you like to help?',
-    placeholder: 'Tell us…',
-  },
-
-  // ── Always asked (end) ──────────────────────────────────────────────────────
-  {
-    id: 'areas',
-    kind: 'multi',
-    question: 'Where can you help?',
-    hint: 'Tap all that apply.',
-    options: [
-      ...hospitals.map((h) => ({ value: h.id, label: h.name })),
-      { value: ANYWHERE, label: `Anywhere in the ${community.region} area` },
-    ],
-  },
-  {
-    id: 'notes',
-    kind: 'textarea',
-    optional: true,
-    question: 'Anything else you’d like us to know?',
-    hint: 'Languages you speak, experience, anything else.',
-    placeholder: 'Optional',
-  },
-]
+// FormStep (loaded from the DB/fallback data as plain JSON) is structurally a
+// Step, but TS can't see through the JSON boundary to know every 'single'/
+// 'multi' step actually carries `options` — the admin editor and seed data
+// both guarantee that invariant, so the cast is safe.
+function toWizardSteps(steps: FormStep[], hospitals: Hospital[]): Step[] {
+  const resolved = steps.map((s) =>
+    s.optionsSource === 'hospitals'
+      ? {
+          ...s,
+          options: [
+            ...hospitals.map((h) => ({ value: h.id, label: h.name })),
+            { value: ANYWHERE, label: `Anywhere in the ${community.region} area` },
+          ],
+        }
+      : s,
+  )
+  return resolved as unknown as Step[]
+}
 
 type Props = {
   preselect?: string[]
@@ -178,8 +57,9 @@ type Props = {
 }
 
 export default function VolunteerWizard({ preselect, onClose }: Props) {
+  const form = useForm('volunteer')
   const hospitals = useHospitals() ?? []
-  const steps = useMemo(() => buildSteps(hospitals), [hospitals])
+  const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitals) : []), [form, hospitals])
   const initial: Answers = preselect && preselect.length ? { waysToHelp: preselect } : {}
 
   const handleSubmit = async (a: Answers) => {
@@ -188,9 +68,14 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
 
     const contact = { ...buildContact(a), hospitalId: '', unitFloorRoom: '' }
 
+    const extra: Record<string, unknown> = {}
+    for (const [id, value] of Object.entries(a)) {
+      if (!KNOWN_IDS.has(id) && value !== undefined && value !== '') extra[id] = value
+    }
+
     // Volunteer signups land in the "Volunteers" sheet tab, which reads these
     // top-level fields (the rest is kept verbatim in the trailing JSON column).
-    const volunteer = {
+    const volunteer: Record<string, unknown> = {
       waysToHelp: arr('waysToHelp'),
       waysToHelpOther: str('waysToHelpOther'),
       hospitals: arr('areas'),
@@ -211,9 +96,12 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
         address: str('host_address'),
       },
     }
+    if (Object.keys(extra).length > 0) volunteer.extra = extra
 
     await submitRequest('Volunteer', contact, volunteer, str('company'), str('turnstileToken'))
   }
+
+  if (!form) return <WizardLoading onClose={onClose} />
 
   return (
     <Wizard
@@ -221,9 +109,9 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
       initial={initial}
       onSubmit={handleSubmit}
       onClose={onClose}
-      submitLabel="Sign me up"
-      successTitle="Thank you"
-      successMessage="We’ve added you to our volunteer list and will reach out when there’s a need that matches what you can offer."
+      submitLabel={form.submitLabel}
+      successTitle={form.successTitle}
+      successMessage={form.successMessage}
     />
   )
 }
