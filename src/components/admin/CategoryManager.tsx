@@ -33,6 +33,8 @@ export default function CategoryManager({ token }: { token: string }) {
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<CategoryConfig | 'new' | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -51,6 +53,25 @@ export default function CategoryManager({ token }: { token: string }) {
   useEffect(() => {
     load()
   }, [load])
+
+  async function deleteCategory(id: string) {
+    setError(null)
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/admin/categories/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      setConfirmDeleteId(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   if (editing) {
     return (
@@ -98,35 +119,69 @@ export default function CategoryManager({ token }: { token: string }) {
               ...(c.upvotesEnabled ? ['Upvotes'] : []),
             ]
             return (
-              <div
-                key={c.id}
-                className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 text-sm">
-                    <span className="mr-1">{c.icon}</span>
-                    {c.pluralLabel}
-                    <span className="ml-2 font-normal text-xs text-muted">{c.id}</span>
-                  </p>
-                  <p className="text-xs text-muted mt-1">
-                    {(() => {
-                      // Count only visible details (hidden ones aren't editable here).
-                      const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
-                      const filters = shown.filter((f) => f.filterable).length
-                      return (
-                        `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
-                        (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
-                      )
-                    })()}
-                    {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
-                  </p>
+              <div key={c.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 text-sm">
+                      <span className="mr-1">{c.icon}</span>
+                      {c.pluralLabel}
+                      <span className="ml-2 font-normal text-xs text-muted">{c.id}</span>
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      {(() => {
+                        // Count only visible details (hidden ones aren't editable here).
+                        const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
+                        const filters = shown.filter((f) => f.filterable).length
+                        return (
+                          `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
+                          (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
+                        )
+                      })()}
+                      {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      onClick={() => setEditing(c)}
+                      className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(c.id)}
+                      className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setEditing(c)}
-                  className="shrink-0 text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  Edit
-                </button>
+
+                {confirmDeleteId === c.id && (
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                      <p className="text-sm text-red-800">
+                        Permanently delete <span className="font-semibold">{c.pluralLabel}</span> and
+                        every listing in it? This can’t be undone.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => deleteCategory(c.id)}
+                          disabled={deletingId === c.id}
+                          className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+                        >
+                          {deletingId === c.id ? 'Deleting…' : 'Delete category & listings'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          disabled={deletingId === c.id}
+                          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -188,8 +243,6 @@ function CategoryEditor({
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -284,26 +337,6 @@ function CategoryEditor({
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function deleteCat() {
-    if (isNew) return
-    setErrors([])
-    setDeleting(true)
-    try {
-      const res = await fetch(`/api/admin/categories/${initial!.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
-      onSaved()
-    } catch (err) {
-      setErrors([err instanceof Error ? err.message : 'Delete failed.'])
-      setConfirmingDelete(false)
-    } finally {
-      setDeleting(false)
     }
   }
 
@@ -413,43 +446,6 @@ function CategoryEditor({
             Cancel
           </button>
         </div>
-
-        {/* Danger zone — existing categories only */}
-        {!isNew && (
-          <div className="border-t border-slate-200 pt-4">
-            {!confirmingDelete ? (
-              <button
-                onClick={() => { setErrors([]); setConfirmingDelete(true) }}
-                className="text-sm font-medium text-red-600 hover:underline cursor-pointer"
-              >
-                Delete this category
-              </button>
-            ) : (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-                <p className="text-sm text-red-800">
-                  Permanently delete <span className="font-semibold">{initial!.pluralLabel}</span> and
-                  every listing in it? This can’t be undone.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={deleteCat}
-                    disabled={deleting}
-                    className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-                  >
-                    {deleting ? 'Deleting…' : 'Delete category & listings'}
-                  </button>
-                  <button
-                    onClick={() => setConfirmingDelete(false)}
-                    disabled={deleting}
-                    className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )
