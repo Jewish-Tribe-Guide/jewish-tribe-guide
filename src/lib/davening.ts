@@ -1,8 +1,8 @@
 // Shared types and helpers for structured minyanim data.
 //
 // Each synagogue stores `details.minyanim`: a Minyan[] array.
-// The DaveningTimesModal and SynagogueCard components use the grouping
-// helpers here to render tefillah-grouped or day-grouped views.
+// DaveningTimesModal and the shared DaveningTimes card component use the
+// grouping helpers here to render tefillah-grouped or day-grouped views.
 //
 // Day key types are re-used from hours.ts to avoid duplication.
 

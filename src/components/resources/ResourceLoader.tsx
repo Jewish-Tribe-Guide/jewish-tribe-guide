@@ -5,7 +5,6 @@ import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
-import SynagogueDirectory from './SynagogueDirectory'
 import UpButton from '@/components/UpButton'
 
 type Props = {
@@ -95,24 +94,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   // Distance-sorted categories prompt for a location when none is set yet.
   // Community categories (e.g. WhatsApp groups) aren't distance-based, so skip it.
   const addressPrompt = !anchor.label && !category.community
-
-  // Synagogues get the rich collapsible card instead of the generic flat-row renderer.
-  if (category.id === 'synagogue') {
-    return (
-      <SynagogueDirectory
-        category={category}
-        items={withDistance}
-        anchorLabel={anchorLabel}
-        addressPrompt={addressPrompt}
-        reopenItemId={reopenItemId}
-        onUp={onUp}
-        onAdd={onAdd}
-        onEdit={onEdit}
-        onReport={onReport}
-        onViewMap={onViewMap}
-      />
-    )
-  }
 
   return (
     <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />

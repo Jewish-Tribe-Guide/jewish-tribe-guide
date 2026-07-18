@@ -171,6 +171,7 @@ export const categories = [
         renderAs: 'badge',
         filterable: true,
         filterLabel: 'Denomination',
+        multiSelect: true,
         options: [
           { value: 'Orthodox', label: 'Orthodox' },
           { value: 'Orthodox (Sephardic)', label: 'Orthodox (Sephardic)' },
@@ -180,7 +181,8 @@ export const categories = [
         ],
       },
       {
-        // Structured minyanim field — rendered by SynagogueCard, not GenericDirectory.
+        // Structured minyanim field — rendered via the generic listing card's
+        // shared DaveningTimes component (src/components/resources/DaveningTimes.tsx).
         key: 'minyanim',
         label: 'Davening Times (Minyanim)',
         type: 'minyanim',

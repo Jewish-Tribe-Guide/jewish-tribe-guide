@@ -5,6 +5,7 @@ import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
+import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import Chip from './Chip'
@@ -85,9 +86,16 @@ export function GenericListingCard({
   const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
   const headerUrlFields = fields.filter((f) => f.type === 'url' && f.showInHeader)
   const hoursFields = fields.filter((f) => f.type === 'hours')
-  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours'
+  const minyanimField = fields.find((f) => f.type === 'minyanim')
+  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim'
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
+
+  // Structured minyanim (or the legacy flat-text fallback some older rows still
+  // carry under a fixed `davening` key) — see DaveningTimes.
+  const minyanimValue = minyanimField ? item[minyanimField.key] : undefined
+  const legacyDavening = item.davening as string | undefined
+  const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
   const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
   const isOpen = hoursVal !== undefined && hoursOpenNow(hoursVal) === true && isStructuredHours(hoursVal)
@@ -341,6 +349,13 @@ export function GenericListingCard({
               </p>
             )
           })}
+
+          {showDavening && (
+            <div>
+              <p className="text-xs text-muted mb-1">Davening Times</p>
+              <DaveningTimes minyanim={minyanimValue} legacyText={legacyDavening} />
+            </div>
+          )}
 
           {(hoursVal !== undefined || item.businessStatus) && (
             <HoursDisplay value={hoursVal} businessStatus={item.businessStatus} syncedAt={item.googleSyncedAt} />
