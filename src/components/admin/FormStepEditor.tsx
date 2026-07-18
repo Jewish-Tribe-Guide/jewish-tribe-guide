@@ -9,7 +9,7 @@ import {
   type StepOption,
 } from '@/lib/forms'
 
-// ── One question in a form (see FormManager). Mirrors CategoryManager's
+// ── One question in a form (see FormEditor). Mirrors CategoryManager's
 // FieldEditor: the id auto-fills from the question text while blank, then
 // freezes, so renaming a question later never orphans its stored answers or
 // breaks another step's condition that points at it. ──────────────────────────

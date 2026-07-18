@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CATEGORY_CAPABILITY_KEYS,
+  DEFAULT_CATEGORY_ICON,
   FIELD_TYPES,
   FIELD_TYPE_SHAPE,
   TYPE_HAS_SHAPE_CHOICE,
@@ -14,10 +15,17 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
+import type { FormConfig } from '@/lib/forms'
+import FormEditor from './FormEditor'
+import ListingForm from '@/components/resources/ListingForm'
 
-// ── The category manager: list every category, edit its presentation, fields,
-// and per-category UI capabilities, or create a new one. Mounted on /admin.
-// All writes go through the admin-only /api/admin/categories routes. ──────────
+// ── The categories manager: one list mixing the two kinds of thing a
+// community configures — Listing categories (Grocery Stores, Synagogues, …,
+// each with its own detail fields and capabilities) and Forms (the fixed
+// Request Support / Volunteer wizards). Edit either's presentation and fields,
+// or create a new Listing category (forms are a fixed pair — see FormEditor).
+// Mounted on /admin. Listing writes go through /api/admin/categories; form
+// writes through /api/admin/forms. ──────────────────────────────────────────
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -30,6 +38,19 @@ const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
   map: 'Map button',
 }
 
+type Entry =
+  | { kind: 'category'; data: CategoryConfig }
+  | { kind: 'form'; data: FormConfig }
+
+function entryLabel(e: Entry): string {
+  return e.kind === 'category' ? e.data.pluralLabel : e.data.title
+}
+
+// editingId is opaque to the admin page's history plumbing — encoded here as
+// 'cat:<id>', 'cat:new', or 'form:<id>' so one string covers both kinds.
+const CAT_PREFIX = 'cat:'
+const FORM_PREFIX = 'form:'
+
 export default function CategoryManager({
   token,
   editingId,
@@ -37,13 +58,12 @@ export default function CategoryManager({
   onCloseEditor,
 }: {
   token: string
-  /** Category id being edited, 'new' for a fresh category, or null when showing the list.
-   *  Owned by the admin page so Back walks editor → list → moderation tab in one stack. */
-  editingId: string | 'new' | null
-  onOpenEditor: (id: string | 'new') => void
+  editingId: string | null
+  onOpenEditor: (id: string) => void
   onCloseEditor: () => void
 }) {
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
+  const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -51,12 +71,15 @@ export default function CategoryManager({
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch('/api/admin/categories', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setCategories(body.categories as CategoryConfig[])
+      const [catRes, formRes] = await Promise.all([
+        fetch('/api/admin/categories', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/forms', { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      const [catBody, formBody] = await Promise.all([catRes.json(), formRes.json()])
+      if (!catRes.ok || !catBody.ok) throw new Error(catBody.errors?.join(' ') || 'Failed to load categories.')
+      if (!formRes.ok || !formBody.ok) throw new Error(formBody.errors?.join(' ') || 'Failed to load forms.')
+      setCategories(catBody.categories as CategoryConfig[])
+      setForms(formBody.forms as FormConfig[])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -65,6 +88,15 @@ export default function CategoryManager({
   useEffect(() => {
     load()
   }, [load])
+
+  const entries = useMemo<Entry[] | null>(() => {
+    if (!categories || !forms) return null
+    const all: Entry[] = [
+      ...categories.map((data): Entry => ({ kind: 'category', data })),
+      ...forms.map((data): Entry => ({ kind: 'form', data })),
+    ]
+    return all.sort((a, b) => entryLabel(a).localeCompare(entryLabel(b)))
+  }, [categories, forms])
 
   async function deleteCategory(id: string) {
     setError(null)
@@ -85,8 +117,24 @@ export default function CategoryManager({
     }
   }
 
-  if (editingId) {
-    const initial = editingId === 'new' ? null : categories?.find((c) => c.id === editingId) ?? null
+  if (editingId === `${CAT_PREFIX}new`) {
+    return (
+      <CategoryEditor
+        token={token}
+        initial={null}
+        onSaved={() => {
+          onCloseEditor()
+          load()
+        }}
+        onCancel={onCloseEditor}
+      />
+    )
+  }
+
+  if (editingId?.startsWith(CAT_PREFIX)) {
+    const id = editingId.slice(CAT_PREFIX.length)
+    const initial = categories?.find((c) => c.id === id) ?? null
+    if (!initial) return <p className="text-sm text-muted">Loading…</p>
     return (
       <CategoryEditor
         token={token}
@@ -100,15 +148,32 @@ export default function CategoryManager({
     )
   }
 
+  if (editingId?.startsWith(FORM_PREFIX)) {
+    const id = editingId.slice(FORM_PREFIX.length)
+    const form = forms?.find((f) => f.id === id) ?? null
+    if (!form) return <p className="text-sm text-muted">Loading…</p>
+    return (
+      <FormEditor
+        token={token}
+        form={form}
+        onDone={() => {
+          onCloseEditor()
+          load()
+        }}
+        onCancel={onCloseEditor}
+      />
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted">
-          Choose what each category shows — its buttons, search bar, upvotes, and the details (and
-          filters) on its listings.
+          Listing categories (Grocery Stores, Synagogues, …) and Forms (Request Support, Volunteer) —
+          choose what each shows, and edit their fields or questions.
         </p>
         <button
-          onClick={() => onOpenEditor('new')}
+          onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
           className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
         >
           + New category
@@ -119,87 +184,153 @@ export default function CategoryManager({
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
-      {categories === null ? (
-        <p className="text-sm text-muted">Loading categories…</p>
-      ) : categories.length === 0 ? (
-        <p className="text-sm text-muted">No categories yet.</p>
+      {entries === null ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : entries.length === 0 ? (
+        <p className="text-sm text-muted">Nothing here yet.</p>
       ) : (
         <div className="space-y-2">
-          {categories.map((c) => {
-            const caps = resolveCapabilities(c.capabilities)
-            const on = [
-              ...CATEGORY_CAPABILITY_KEYS.filter((k) => caps[k]).map((k) => CAPABILITY_LABELS[k]),
-              ...(c.upvotesEnabled ? ['Upvotes'] : []),
-            ]
-            return (
-              <div key={c.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 text-sm">
-                      <span className="mr-1">{c.icon}</span>
-                      {c.pluralLabel}
-                      <span className="ml-2 font-normal text-xs text-muted">{c.id}</span>
-                    </p>
-                    <p className="text-xs text-muted mt-1">
-                      {(() => {
-                        // Count only visible details (hidden ones aren't editable here).
-                        const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
-                        const filters = shown.filter((f) => f.filterable).length
-                        return (
-                          `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
-                          (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
-                        )
-                      })()}
-                      {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      onClick={() => onOpenEditor(c.id)}
-                      className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(c.id)}
-                      className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                {confirmDeleteId === c.id && (
-                  <div className="mt-3 border-t border-slate-200 pt-3">
-                    <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-                      <p className="text-sm text-red-800">
-                        Permanently delete <span className="font-semibold">{c.pluralLabel}</span> and
-                        every listing in it? This can’t be undone.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => deleteCategory(c.id)}
-                          disabled={deletingId === c.id}
-                          className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
-                        >
-                          {deletingId === c.id ? 'Deleting…' : 'Delete category & listings'}
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(null)}
-                          disabled={deletingId === c.id}
-                          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {entries.map((e) =>
+            e.kind === 'category' ? (
+              <CategoryRow
+                key={`cat:${e.data.id}`}
+                category={e.data}
+                confirmingDelete={confirmDeleteId === e.data.id}
+                deleting={deletingId === e.data.id}
+                onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
+                onAskDelete={() => setConfirmDeleteId(e.data.id)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+                onConfirmDelete={() => deleteCategory(e.data.id)}
+              />
+            ) : (
+              <FormRow key={`form:${e.data.id}`} form={e.data} onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)} />
+            ),
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── List rows ─────────────────────────────────────────────────────────────────
+
+const TYPE_BADGE = 'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0'
+
+function CategoryRow({
+  category: c,
+  confirmingDelete,
+  deleting,
+  onEdit,
+  onAskDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  category: CategoryConfig
+  confirmingDelete: boolean
+  deleting: boolean
+  onEdit: () => void
+  onAskDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
+}) {
+  const caps = resolveCapabilities(c.capabilities)
+  const on = [
+    ...CATEGORY_CAPABILITY_KEYS.filter((k) => caps[k]).map((k) => CAPABILITY_LABELS[k]),
+    ...(c.upvotesEnabled ? ['Upvotes'] : []),
+  ]
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+            <span className={`${TYPE_BADGE} bg-blue-50 text-blue-600`}>Listing</span>
+            <span>
+              <span className="mr-1">{c.icon}</span>
+              {c.pluralLabel}
+            </span>
+            <span className="font-normal text-xs text-muted">{c.id}</span>
+          </p>
+          <p className="text-xs text-muted mt-1">
+            {(() => {
+              // Count only visible details (hidden ones aren't editable here).
+              const shown = c.detailFields.filter((f) => f.renderAs !== 'hidden')
+              const filters = shown.filter((f) => f.filterable).length
+              return (
+                `${shown.length} detail${shown.length !== 1 ? 's' : ''}` +
+                (filters > 0 ? ` · ${filters} filter${filters !== 1 ? 's' : ''}` : '')
+              )
+            })()}
+            {on.length > 0 ? ` · ${on.join(', ')}` : ' · no buttons'}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onEdit}
+            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Edit
+          </button>
+          <button
+            onClick={onAskDelete}
+            className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {confirmingDelete && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+            <p className="text-sm text-red-800">
+              Permanently delete <span className="font-semibold">{c.pluralLabel}</span> and every
+              listing in it? This can’t be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={onConfirmDelete}
+                disabled={deleting}
+                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {deleting ? 'Deleting…' : 'Delete category & listings'}
+              </button>
+              <button
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FormRow({ form: f, onEdit }: { form: FormConfig; onEdit: () => void }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+          <span className={`${TYPE_BADGE} bg-purple-50 text-purple-600`}>Form</span>
+          <span>{f.title}</span>
+          <span className="font-normal text-xs text-muted">{f.id}</span>
+          {f.draft && (
+            <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
+              Unpublished draft
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
+      </div>
+      <button
+        onClick={onEdit}
+        className="shrink-0 text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+      >
+        Edit
+      </button>
     </div>
   )
 }
@@ -256,6 +387,7 @@ function CategoryEditor({
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [previewing, setPreviewing] = useState(false)
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
@@ -353,6 +485,32 @@ function CategoryEditor({
     }
   }
 
+  if (previewing) {
+    // A throwaway config built from the in-progress draft (never saved) — lets
+    // the admin see the real "Add a listing" form update live as they edit
+    // fields, same idea as the Forms editor's Preview.
+    const previewCategory: CategoryConfig = {
+      id: initial?.id ?? 'preview',
+      label: draft.label || 'Listing',
+      pluralLabel: draft.pluralLabel || draft.label || 'Preview',
+      icon: initial?.icon ?? DEFAULT_CATEGORY_ICON,
+      description: draft.description,
+      detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
+      community: initial?.community ?? false,
+      upvotesEnabled: draft.upvotesEnabled,
+      capabilities: draft.capabilities,
+    }
+    return (
+      <ListingForm
+        category={previewCategory}
+        mode="create"
+        preview
+        onUp={() => setPreviewing(false)}
+        onSubmitted={() => setPreviewing(false)}
+      />
+    )
+  }
+
   return (
     <div>
       <button
@@ -444,6 +602,12 @@ function CategoryEditor({
         )}
 
         <div className="flex gap-2">
+          <button
+            onClick={() => setPreviewing(true)}
+            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Preview
+          </button>
           <button
             onClick={save}
             disabled={saving}
