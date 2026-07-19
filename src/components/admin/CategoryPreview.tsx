@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, MapFilters } from '@/types'
+import type { Coords } from '@/lib/useStoredLocation'
+import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
@@ -42,6 +44,11 @@ export default function CategoryPreview({
   // `items` below), the same way a brand-new one is simply appended.
   const [localListings, setLocalListings] = useState<DirectoryResource[]>([])
   const [action, setAction] = useState<Action | null>(null)
+  // The preview's own address anchor — session-only (not persisted to the
+  // visitor's real stored location) so setting a location here can't leak into
+  // the live site, and vice versa.
+  const [address, setAddress] = useState('')
+  const [coords, setCoords] = useState<Coords | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -105,6 +112,7 @@ export default function CategoryPreview({
     content = (
       <ResourceMapView
         onUp={goToDirectory}
+        userLocation={coords}
         initialCategory={category.id}
         initialQuery={action.query}
         initialFilters={action.filters}
@@ -119,7 +127,9 @@ export default function CategoryPreview({
     content = (
       <GenericDirectory
         category={category}
-        items={items}
+        items={itemsWithDistance(items, category, coords)}
+        anchorLabel={address || undefined}
+        addressPrompt={!address && !category.community}
         onUp={onClose}
         onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
@@ -131,9 +141,23 @@ export default function CategoryPreview({
 
   return (
     <DevicePreviewFrame onClose={onClose}>
-      <SiteHeader onGoHome={onClose} location={{ address: '', onAddressChange: () => {}, onCoords: () => {} }} />
+      <SiteHeader
+        onGoHome={onClose}
+        location={{ address, onAddressChange: setAddress, onCoords: setCoords }}
+      />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
       <SiteFooter />
     </DevicePreviewFrame>
   )
+}
+
+// Mirrors ResourceLoader's distance annotation — straight-line miles from the
+// preview's own address anchor to each listing's geocoded coordinates.
+function itemsWithDistance(
+  items: DirectoryResource[],
+  category: CategoryConfig,
+  coords: Coords | null,
+): DirectoryResource[] {
+  if (category.community || !coords) return items
+  return items.map((item) => (item.geo ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) } : item))
 }
