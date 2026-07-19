@@ -142,6 +142,18 @@ function ReadyState({ data }: { data: ZmanimData }) {
           <ShabbosRow label="Havdalah" entry={shabbos.havdalah} emphasized={isShabbos} />
         </div>
       </div>
+
+      <p className="pt-1 text-[11px] text-muted">
+        Zmanim from{' '}
+        <a
+          href="https://www.hebcal.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-primary"
+        >
+          Hebcal.com
+        </a>
+      </p>
     </div>
   )
 }

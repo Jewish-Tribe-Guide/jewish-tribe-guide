@@ -300,7 +300,7 @@ export function GenericListingCard({
             </div>
           )}
           {tagsSometimes.length > 0 && (
-            <p className="text-[11px] text-muted sm:hidden">~ = not always in stock — call ahead</p>
+            <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
           )}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">
