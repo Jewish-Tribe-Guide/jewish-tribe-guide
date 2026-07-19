@@ -43,14 +43,6 @@ const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
 // or off. See CategoryConfig.kind.
 const SINGLETON_KIND_LABELS = { map: 'Map', zmanim: 'Zmanim' } as const
 
-type Entry =
-  | { kind: 'category'; data: CategoryConfig }
-  | { kind: 'form'; data: FormConfig }
-
-function entryLabel(e: Entry): string {
-  return e.kind === 'category' ? e.data.pluralLabel : e.data.title
-}
-
 // editingId is opaque to the admin page's history plumbing — encoded here as
 // 'cat:<id>', 'cat:new', or 'form:<id>' so one string covers both kinds.
 const CAT_PREFIX = 'cat:'
@@ -95,14 +87,23 @@ export default function CategoryManager({
     load()
   }, [load])
 
-  const entries = useMemo<Entry[] | null>(() => {
-    if (!categories || !forms) return null
-    const all: Entry[] = [
-      ...categories.map((data): Entry => ({ kind: 'category', data })),
-      ...forms.map((data): Entry => ({ kind: 'form', data })),
-    ]
-    return all.sort((a, b) => entryLabel(a).localeCompare(entryLabel(b)))
-  }, [categories, forms])
+  // Three distinct groups, each its own section below — Map/Zmanim are visually
+  // singled out as "home screen cards" rather than sorted into the same flat
+  // list as real listing categories, so they read as their own kind of thing
+  // rather than blending in as "just more rows" (most noticeable on mobile,
+  // where there's no room for the LISTING/MAP/ZMANIM badge alone to do that job).
+  const listingEntries = useMemo(
+    () => categories?.filter((c) => c.kind === 'listing').sort((a, b) => a.pluralLabel.localeCompare(b.pluralLabel)) ?? null,
+    [categories],
+  )
+  const singletonEntries = useMemo(
+    () => categories?.filter((c): c is CategoryConfig & { kind: 'map' | 'zmanim' } => c.kind !== 'listing') ?? null,
+    [categories],
+  )
+  const formEntries = useMemo(
+    () => forms?.slice().sort((a, b) => a.title.localeCompare(b.title)) ?? null,
+    [forms],
+  )
 
   // Adds the singleton "Map" or "Zmanim" pseudo-category directly — there's
   // nothing to configure, so this skips the editor entirely. The DB's partial
@@ -202,81 +203,107 @@ export default function CategoryManager({
   }
 
   const hasZmanim = !!categories?.some((c) => c.kind === 'zmanim')
+  const loading = listingEntries === null || singletonEntries === null || formEntries === null
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <p className="text-sm text-muted">
           Listing categories (Grocery Stores, Synagogues, …), Forms (Request Support, Volunteer), and
-          the Map / Zmanim cards — choose what each shows, and edit their fields or questions.
+          the Map / Zmanim home screen cards — choose what each shows, and edit their fields or questions.
         </p>
-        <div className="flex shrink-0 gap-2">
-          {!hasMap && (
-            <button
-              onClick={() => addSingleton('map')}
-              disabled={addingSingleton === 'map'}
-              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-            >
-              {addingSingleton === 'map' ? 'Adding…' : '+ Add Map'}
-            </button>
-          )}
-          {!hasZmanim && (
-            <button
-              onClick={() => addSingleton('zmanim')}
-              disabled={addingSingleton === 'zmanim'}
-              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-            >
-              {addingSingleton === 'zmanim' ? 'Adding…' : '+ Add Zmanim'}
-            </button>
-          )}
-          <button
-            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-            className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-          >
-            + New category
-          </button>
-        </div>
+        <button
+          onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+          className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+        >
+          + New category
+        </button>
       </div>
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
-      {entries === null ? (
+      {loading ? (
         <p className="text-sm text-muted">Loading…</p>
-      ) : entries.length === 0 ? (
-        <p className="text-sm text-muted">Nothing here yet.</p>
       ) : (
-        <div className="space-y-2">
-          {entries.map((e) =>
-            e.kind === 'category' && e.data.kind === 'listing' ? (
-              <CategoryRow
-                key={`cat:${e.data.id}`}
-                category={e.data}
-                confirmingDelete={confirmDeleteId === e.data.id}
-                deleting={deletingId === e.data.id}
-                onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
-                onAskDelete={() => setConfirmDeleteId(e.data.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(e.data.id)}
-              />
-            ) : e.kind === 'category' ? (
-              <SingletonRow
-                key={`cat:${e.data.id}`}
-                category={e.data}
-                confirmingDelete={confirmDeleteId === e.data.id}
-                deleting={deletingId === e.data.id}
-                onAskDelete={() => setConfirmDeleteId(e.data.id)}
-                onCancelDelete={() => setConfirmDeleteId(null)}
-                onConfirmDelete={() => deleteCategory(e.data.id)}
-              />
+        <div className="space-y-6">
+          {/* Map/Zmanim are their own section, distinct from real listing
+              categories — see the comment on listingEntries/singletonEntries. */}
+          <Section title="Home screen cards">
+            <div className="space-y-2">
+              {singletonEntries!.map((c) => (
+                <SingletonRow
+                  key={`cat:${c.id}`}
+                  category={c}
+                  confirmingDelete={confirmDeleteId === c.id}
+                  deleting={deletingId === c.id}
+                  onAskDelete={() => setConfirmDeleteId(c.id)}
+                  onCancelDelete={() => setConfirmDeleteId(null)}
+                  onConfirmDelete={() => deleteCategory(c.id)}
+                />
+              ))}
+              {!hasMap && (
+                <button
+                  onClick={() => addSingleton('map')}
+                  disabled={addingSingleton === 'map'}
+                  className="w-full text-sm font-medium border border-dashed border-slate-300 text-slate-500 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {addingSingleton === 'map' ? 'Adding…' : '+ Add Map'}
+                </button>
+              )}
+              {!hasZmanim && (
+                <button
+                  onClick={() => addSingleton('zmanim')}
+                  disabled={addingSingleton === 'zmanim'}
+                  className="w-full text-sm font-medium border border-dashed border-slate-300 text-slate-500 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {addingSingleton === 'zmanim' ? 'Adding…' : '+ Add Zmanim'}
+                </button>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Listing categories">
+            {listingEntries!.length === 0 ? (
+              <p className="text-sm text-muted">Nothing here yet.</p>
             ) : (
-              <FormRow key={`form:${e.data.id}`} form={e.data} onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)} />
-            ),
-          )}
+              <div className="space-y-2">
+                {listingEntries!.map((c) => (
+                  <CategoryRow
+                    key={`cat:${c.id}`}
+                    category={c}
+                    confirmingDelete={confirmDeleteId === c.id}
+                    deleting={deletingId === c.id}
+                    onEdit={() => onOpenEditor(`${CAT_PREFIX}${c.id}`)}
+                    onAskDelete={() => setConfirmDeleteId(c.id)}
+                    onCancelDelete={() => setConfirmDeleteId(null)}
+                    onConfirmDelete={() => deleteCategory(c.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Forms">
+            <div className="space-y-2">
+              {formEntries!.map((f) => (
+                <FormRow key={`form:${f.id}`} form={f} onEdit={() => onOpenEditor(`${FORM_PREFIX}${f.id}`)} />
+              ))}
+            </div>
+          </Section>
         </div>
       )}
     </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{title}</h3>
+      {children}
+    </section>
   )
 }
 
