@@ -3,6 +3,7 @@
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { StarOfDavid, PinIcon } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
@@ -10,10 +11,14 @@ type Props = {
   onGoHome: () => void
   /** Address anchor for proximity sorting (top-right pill). */
   location: LocationControls
+  /** Admin-preview only: render with these settings instead of the live,
+   *  fetched ones — used by the Site tab's Preview button. */
+  previewSettings?: SiteSettings
 }
 
-export default function SiteHeader({ onGoHome, location }: Props) {
-  const settings = useSiteSettings()
+export default function SiteHeader({ onGoHome, location, previewSettings }: Props) {
+  const live = useSiteSettings()
+  const settings = previewSettings ?? live
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)]">
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">

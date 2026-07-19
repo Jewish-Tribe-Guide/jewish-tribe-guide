@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
+import SiteSettingsPreview from './SiteSettingsPreview'
 
 // ── The site tab: the header/hero/footer branding text — name, tagline, home
 // screen heading, and mission. A single record, no create/delete/draft — just
@@ -16,6 +17,27 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNotice, setSavedNotice] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+
+  // Preview gets its own history entry so browser/trackpad Back (and the
+  // preview's own Back button, which calls closePreview) land back on this
+  // editor instead of skipping past it to the categories list.
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  function openPreview() {
+    setPreviewing(true)
+    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+  }
+
+  function closePreview() {
+    history.back()
+  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -70,6 +92,10 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     return <p className="text-sm text-muted">Loading…</p>
   }
 
+  if (previewing) {
+    return <SiteSettingsPreview settings={draft} onClose={closePreview} />
+  }
+
   const dirty = !settings || JSON.stringify(settings) !== JSON.stringify(draft)
 
   return (
@@ -110,6 +136,12 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
 
       <div className="flex items-center gap-3 mt-4">
         <button
+          onClick={openPreview}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          Preview
+        </button>
+        <button
           onClick={save}
           disabled={saving || !dirty}
           className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
@@ -120,9 +152,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       </div>
 
       <p className="text-[11px] text-muted mt-5 max-w-xl">
-        The browser tab title, search-engine description, and app icon name aren’t covered here —
-        those come from <code className="px-1 py-0.5 bg-slate-100 rounded">community.config.ts</code>{' '}
-        and need a code change.
+        These also drive the browser tab title, search-engine description, and “Add to Home Screen”
+        app name.
       </p>
     </div>
   )
