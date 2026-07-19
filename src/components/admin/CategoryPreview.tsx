@@ -7,6 +7,7 @@ import GenericDirectory from '@/components/resources/GenericDirectory'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import ResourceMapView from '@/components/map/ResourceMapView'
+import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the real directory page for a category — the exact same
 // GenericDirectory/ListingForm/ReportListing components a visitor sees, driven
@@ -66,8 +67,9 @@ export default function CategoryPreview({
     goToDirectory()
   }
 
+  let content: React.ReactNode
   if (action?.mode === 'create') {
-    return (
+    content = (
       <ListingForm
         category={category}
         mode="create"
@@ -76,9 +78,8 @@ export default function CategoryPreview({
         onPreviewSubmit={addOrReplaceLocal}
       />
     )
-  }
-  if (action?.mode === 'edit') {
-    return (
+  } else if (action?.mode === 'edit') {
+    content = (
       <ListingForm
         category={category}
         mode="edit"
@@ -88,9 +89,8 @@ export default function CategoryPreview({
         onPreviewSubmit={addOrReplaceLocal}
       />
     )
-  }
-  if (action?.mode === 'report') {
-    return (
+  } else if (action?.mode === 'report') {
+    content = (
       <ReportListing
         listing={action.listing}
         upLabel={category.pluralLabel}
@@ -99,9 +99,8 @@ export default function CategoryPreview({
         preview
       />
     )
-  }
-  if (action?.mode === 'map') {
-    return (
+  } else if (action?.mode === 'map') {
+    content = (
       <ResourceMapView
         onUp={goToDirectory}
         initialCategory={category.id}
@@ -109,25 +108,28 @@ export default function CategoryPreview({
         initialFilters={action.filters}
       />
     )
+  } else if (realListings === null) {
+    content = <p className="text-sm text-muted p-4">Loading…</p>
+  } else {
+    // A locally added/edited listing shadows any real listing with the same id.
+    const localIds = new Set(localListings.map((l) => l.id))
+    const items = [...realListings.filter((r) => !localIds.has(r.id)), ...localListings]
+    content = (
+      <GenericDirectory
+        category={category}
+        items={items}
+        onUp={onClose}
+        onAdd={() => setAction({ mode: 'create' })}
+        onEdit={(listing) => setAction({ mode: 'edit', listing })}
+        onReport={(listing) => setAction({ mode: 'report', listing })}
+        onViewMap={(query, filters) => setAction({ mode: 'map', query, filters })}
+      />
+    )
   }
-
-  if (realListings === null) {
-    return <p className="text-sm text-muted">Loading…</p>
-  }
-
-  // A locally added/edited listing shadows any real listing with the same id.
-  const localIds = new Set(localListings.map((l) => l.id))
-  const items = [...realListings.filter((r) => !localIds.has(r.id)), ...localListings]
 
   return (
-    <GenericDirectory
-      category={category}
-      items={items}
-      onUp={onClose}
-      onAdd={() => setAction({ mode: 'create' })}
-      onEdit={(listing) => setAction({ mode: 'edit', listing })}
-      onReport={(listing) => setAction({ mode: 'report', listing })}
-      onViewMap={(query, filters) => setAction({ mode: 'map', query, filters })}
-    />
+    <DevicePreviewFrame onClose={onClose}>
+      <div className="p-4">{content}</div>
+    </DevicePreviewFrame>
   )
 }

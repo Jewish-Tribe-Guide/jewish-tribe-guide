@@ -2,6 +2,7 @@
 
 import Wizard, { type Step } from '@/components/wizard/Wizard'
 import type { FormContent, FormStep } from '@/lib/forms'
+import DevicePreviewFrame from './DevicePreviewFrame'
 
 // Runs the exact Wizard component visitors see, against the admin's in-memory
 // draft — so "what does this look like" can never drift from what actually
@@ -30,13 +31,15 @@ function resolvePreviewSteps(steps: FormStep[]): Step[] {
 
 export default function FormPreview({ content, onClose }: { content: FormContent; onClose: () => void }) {
   return (
-    <Wizard
-      steps={resolvePreviewSteps(content.steps)}
-      onSubmit={async () => {}}
-      onClose={onClose}
-      submitLabel={content.submitLabel}
-      successTitle={content.successTitle}
-      successMessage={content.successMessage}
-    />
+    <DevicePreviewFrame onClose={onClose}>
+      <Wizard
+        steps={resolvePreviewSteps(content.steps)}
+        onSubmit={async () => {}}
+        onClose={onClose}
+        submitLabel={content.submitLabel}
+        successTitle={content.successTitle}
+        successMessage={content.successMessage}
+      />
+    </DevicePreviewFrame>
   )
 }
