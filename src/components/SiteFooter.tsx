@@ -2,9 +2,11 @@
 
 import FeedbackButton from './FeedbackButton'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import type { SiteSettings } from '@/lib/siteSettings'
 
-export default function SiteFooter() {
-  const settings = useSiteSettings()
+export default function SiteFooter({ previewSettings }: { previewSettings?: SiteSettings } = {}) {
+  const live = useSiteSettings()
+  const settings = previewSettings ?? live
   const year = new Date().getFullYear()
 
   return (
