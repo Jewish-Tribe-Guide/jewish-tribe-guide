@@ -2,7 +2,7 @@
 
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { StarOfDavid, PinIcon } from '@/components/icons'
-import { community } from '@/community.config'
+import { useSiteSettings } from '@/lib/useSiteSettings'
 
 type Props = {
   /** Called when the visitor clicks the site title — takes them back to the
@@ -13,6 +13,7 @@ type Props = {
 }
 
 export default function SiteHeader({ onGoHome, location }: Props) {
+  const settings = useSiteSettings()
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)]">
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
@@ -30,10 +31,10 @@ export default function SiteHeader({ onGoHome, location }: Props) {
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
-              {community.name}
+              {settings.name}
             </span>
             <span className="block truncate text-[11px] text-slate-500">
-              {community.tagline}
+              {settings.tagline}
             </span>
           </span>
         </button>

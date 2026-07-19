@@ -12,6 +12,7 @@ import type {
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
 import CategoryManager from '@/components/admin/CategoryManager'
+import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -42,11 +43,12 @@ export default function AdminPage() {
   )
 }
 
-type AdminTab = 'queue' | 'categories'
+type AdminTab = 'queue' | 'categories' | 'site'
 
 const TAB_LABELS: Record<AdminTab, string> = {
   queue: 'Moderation queue',
   categories: 'Categories',
+  site: 'Site',
 }
 
 // The history.state shape this screen stamps on every pushState call, mirroring
@@ -100,7 +102,7 @@ function AdminTabs({ session }: { session: Session }) {
   return (
     <div>
       <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {(['queue', 'categories'] as const).map((t) => (
+        {(['queue', 'categories', 'site'] as const).map((t) => (
           <button
             key={t}
             onClick={() => goToTab(t)}
@@ -117,13 +119,15 @@ function AdminTabs({ session }: { session: Session }) {
 
       {tab === 'queue' ? (
         <ModerationQueue session={session} />
-      ) : (
+      ) : tab === 'categories' ? (
         <CategoryManager
           token={session.access_token}
           editingId={editingId}
           onOpenEditor={openEditor}
           onCloseEditor={closeEditor}
         />
+      ) : (
+        <SiteSettingsEditor token={session.access_token} />
       )}
     </div>
   )

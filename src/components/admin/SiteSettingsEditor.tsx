@@ -1,0 +1,129 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import type { SiteSettings } from '@/lib/siteSettings'
+
+// ── The site tab: the header/hero/footer branding text — name, tagline, home
+// screen heading, and mission. A single record, no create/delete/draft — just
+// edit and save, live immediately. Mounted on /admin. ─────────────────────────
+
+const inputClass =
+  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
+
+export default function SiteSettingsEditor({ token }: { token: string }) {
+  const [settings, setSettings] = useState<SiteSettings | null>(null)
+  const [draft, setDraft] = useState<SiteSettings | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedNotice, setSavedNotice] = useState(false)
+
+  const load = useCallback(async () => {
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/site-settings', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
+      setSettings(body.settings as SiteSettings)
+      setDraft(body.settings as SiteSettings)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+    }
+  }, [token])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
+    setDraft((d) => (d ? { ...d, [key]: value } : d))
+    setSavedNotice(false)
+  }
+
+  async function save() {
+    if (!draft) return
+    setError(null)
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/site-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(draft),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+      setSettings(body.settings as SiteSettings)
+      setDraft(body.settings as SiteSettings)
+      setSavedNotice(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (error && !draft) {
+    return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
+  }
+  if (!draft) {
+    return <p className="text-sm text-muted">Loading…</p>
+  }
+
+  const dirty = !settings || JSON.stringify(settings) !== JSON.stringify(draft)
+
+  return (
+    <div>
+      <p className="text-sm text-muted mb-4">
+        The site name, tagline, and home screen heading and mission — shown in the header, hero, and
+        footer. Changes go live immediately.
+      </p>
+
+      {error && (
+        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl">
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
+          <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">Shown in the header and footer.</span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
+          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">Shown under the site name in the header.</span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
+          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
+          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">
+            Shown under the home screen heading, and reused as the footer blurb.
+          </span>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3 mt-4">
+        <button
+          onClick={save}
+          disabled={saving || !dirty}
+          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+        {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
+      </div>
+
+      <p className="text-[11px] text-muted mt-5 max-w-xl">
+        The browser tab title, search-engine description, and app icon name aren’t covered here —
+        those come from <code className="px-1 py-0.5 bg-slate-100 rounded">community.config.ts</code>{' '}
+        and need a code change.
+      </p>
+    </div>
+  )
+}

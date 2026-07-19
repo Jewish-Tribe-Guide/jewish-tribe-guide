@@ -2,20 +2,29 @@ import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { community } from '@/community.config'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
 
 const figtree = Figtree({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: community.name,
-  description: community.mission,
-  manifest: '/manifest.webmanifest',
-  // Standalone "Add to Home Screen" experience on iOS.
-  appleWebApp: {
-    capable: true,
-    title: community.shortName,
-    statusBarStyle: 'default',
-  },
+// Reads the admin-edited site name/mission for the tab title and meta
+// description. Falls back to the community.config defaults on any failure
+// (e.g. the site_settings table not migrated yet) — a settings hiccup must
+// never break metadata generation for the whole page.
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings().catch(() => SITE_SETTINGS_DEFAULTS)
+  return {
+    title: settings.name,
+    description: settings.mission,
+    manifest: '/manifest.webmanifest',
+    // Standalone "Add to Home Screen" experience on iOS.
+    appleWebApp: {
+      capable: true,
+      title: community.shortName,
+      statusBarStyle: 'default',
+    },
+  }
 }
 
 export const viewport: Viewport = {

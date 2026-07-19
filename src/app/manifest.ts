@@ -1,12 +1,15 @@
 import type { MetadataRoute } from 'next'
 import { community } from '@/community.config'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 
 // Web app manifest — enables "Add to Home Screen" with an app-like standalone
 // window. Icons currently point at the favicon; swap in dedicated 192/512 PNGs
 // when available for a sharper home-screen icon.
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const settings = await getSiteSettings().catch(() => SITE_SETTINGS_DEFAULTS)
   return {
-    name: community.name,
+    name: settings.name,
     short_name: community.shortName,
     description: community.manifestDescription,
     start_url: '/',
