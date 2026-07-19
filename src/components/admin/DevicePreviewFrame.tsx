@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // Wraps a preview in a full-viewport overlay with a Desktop/Mobile toggle, so
 // "what does this look like" isn't stuck at the admin shell's ~768px content
@@ -87,6 +88,30 @@ export default function DevicePreviewFrame({
   children: React.ReactNode
 }) {
   const [device, setDevice] = useState<Device>('desktop')
+  // If the admin is already viewing this from a phone-width browser, that IS
+  // the mobile viewport — a Desktop/Mobile toggle has nothing useful to offer
+  // (a 1280px desktop iframe can't fit either way, and a 390px mobile iframe
+  // plus its phone-bezel chrome doesn't fit a real ~375-414px screen without
+  // getting clipped). Skip the toggle and the iframe entirely and just render
+  // the preview inline, exactly like the rest of the admin page — the real
+  // window is already the right width for every `sm:` rule to respond to.
+  const ambientIsMobile = useIsMobile()
+
+  if (ambientIsMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-white">
+        <div className="sticky top-0 z-10 flex shrink-0 items-center border-b border-slate-200 bg-white px-4 py-2.5">
+          <button
+            onClick={onClose}
+            className="text-sm font-medium text-slate-600 hover:text-slate-900 underline cursor-pointer"
+          >
+            ← Back to editor
+          </button>
+        </div>
+        {children}
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-200">
