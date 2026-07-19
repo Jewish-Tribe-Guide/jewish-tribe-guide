@@ -7,6 +7,8 @@ import GenericDirectory from '@/components/resources/GenericDirectory'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import ResourceMapView from '@/components/map/ResourceMapView'
+import SiteHeader from '@/components/SiteHeader'
+import SiteFooter from '@/components/SiteFooter'
 import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the real directory page for a category — the exact same
@@ -129,7 +131,9 @@ export default function CategoryPreview({
 
   return (
     <DevicePreviewFrame onClose={onClose}>
-      <div className="p-4">{content}</div>
+      <SiteHeader onGoHome={onClose} location={{ address: '', onAddressChange: () => {}, onCoords: () => {} }} />
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
+      <SiteFooter />
     </DevicePreviewFrame>
   )
 }
