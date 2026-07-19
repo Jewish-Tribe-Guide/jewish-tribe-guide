@@ -38,6 +38,11 @@ const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
   map: 'Map button',
 }
 
+// The two singleton pseudo-categories an admin can add/remove but never edit —
+// there's nothing to configure, they just turn a fixed, code-driven screen on
+// or off. See CategoryConfig.kind.
+const SINGLETON_KIND_LABELS = { map: 'Map', zmanim: 'Zmanim' } as const
+
 type Entry =
   | { kind: 'category'; data: CategoryConfig }
   | { kind: 'form'; data: FormConfig }
@@ -67,6 +72,7 @@ export default function CategoryManager({
   const [error, setError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [addingSingleton, setAddingSingleton] = useState<'map' | 'zmanim' | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -98,6 +104,30 @@ export default function CategoryManager({
     return all.sort((a, b) => entryLabel(a).localeCompare(entryLabel(b)))
   }, [categories, forms])
 
+  // Adds the singleton "Map" or "Zmanim" pseudo-category directly — there's
+  // nothing to configure, so this skips the editor entirely. The DB's partial
+  // unique index (category_kind_singleton) is the real guard against a second
+  // one; hiding the button once one exists (see the render below) is just UX.
+  async function addSingleton(kind: 'map' | 'zmanim') {
+    setError(null)
+    setAddingSingleton(kind)
+    try {
+      const label = SINGLETON_KIND_LABELS[kind]
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ label, pluralLabel: label, kind }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not add it.')
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add it.')
+    } finally {
+      setAddingSingleton(null)
+    }
+  }
+
   async function deleteCategory(id: string) {
     setError(null)
     setDeletingId(id)
@@ -117,11 +147,14 @@ export default function CategoryManager({
     }
   }
 
+  const hasMap = !!categories?.some((c) => c.kind === 'map')
+
   if (editingId === `${CAT_PREFIX}new`) {
     return (
       <CategoryEditor
         token={token}
         initial={null}
+        hasMapCategory={hasMap}
         onSaved={() => {
           onCloseEditor()
           load()
@@ -131,14 +164,17 @@ export default function CategoryManager({
     )
   }
 
+  // Map/Zmanim rows never render an Edit button (see the list below), so this
+  // only ever opens for a real listing category.
   if (editingId?.startsWith(CAT_PREFIX)) {
     const id = editingId.slice(CAT_PREFIX.length)
-    const initial = categories?.find((c) => c.id === id) ?? null
+    const initial = categories?.find((c) => c.id === id && c.kind === 'listing') ?? null
     if (!initial) return <p className="text-sm text-muted">Loading…</p>
     return (
       <CategoryEditor
         token={token}
         initial={initial}
+        hasMapCategory={hasMap}
         onSaved={() => {
           onCloseEditor()
           load()
@@ -165,19 +201,41 @@ export default function CategoryManager({
     )
   }
 
+  const hasZmanim = !!categories?.some((c) => c.kind === 'zmanim')
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <p className="text-sm text-muted">
-          Listing categories (Grocery Stores, Synagogues, …) and Forms (Request Support, Volunteer) —
-          choose what each shows, and edit their fields or questions.
+          Listing categories (Grocery Stores, Synagogues, …), Forms (Request Support, Volunteer), and
+          the Map / Zmanim cards — choose what each shows, and edit their fields or questions.
         </p>
-        <button
-          onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
-          className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
-        >
-          + New category
-        </button>
+        <div className="flex shrink-0 gap-2">
+          {!hasMap && (
+            <button
+              onClick={() => addSingleton('map')}
+              disabled={addingSingleton === 'map'}
+              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              {addingSingleton === 'map' ? 'Adding…' : '+ Add Map'}
+            </button>
+          )}
+          {!hasZmanim && (
+            <button
+              onClick={() => addSingleton('zmanim')}
+              disabled={addingSingleton === 'zmanim'}
+              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              {addingSingleton === 'zmanim' ? 'Adding…' : '+ Add Zmanim'}
+            </button>
+          )}
+          <button
+            onClick={() => onOpenEditor(`${CAT_PREFIX}new`)}
+            className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:bg-primary/90 transition-colors cursor-pointer"
+          >
+            + New category
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -191,13 +249,23 @@ export default function CategoryManager({
       ) : (
         <div className="space-y-2">
           {entries.map((e) =>
-            e.kind === 'category' ? (
+            e.kind === 'category' && e.data.kind === 'listing' ? (
               <CategoryRow
                 key={`cat:${e.data.id}`}
                 category={e.data}
                 confirmingDelete={confirmDeleteId === e.data.id}
                 deleting={deletingId === e.data.id}
                 onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
+                onAskDelete={() => setConfirmDeleteId(e.data.id)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+                onConfirmDelete={() => deleteCategory(e.data.id)}
+              />
+            ) : e.kind === 'category' ? (
+              <SingletonRow
+                key={`cat:${e.data.id}`}
+                category={e.data}
+                confirmingDelete={confirmDeleteId === e.data.id}
+                deleting={deletingId === e.data.id}
                 onAskDelete={() => setConfirmDeleteId(e.data.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteCategory(e.data.id)}
@@ -309,6 +377,75 @@ function CategoryRow({
   )
 }
 
+// A Map/Zmanim row — nothing to edit, just presence + a Delete button, reusing
+// the exact same delete/confirm flow as a real listing category.
+function SingletonRow({
+  category: c,
+  confirmingDelete,
+  deleting,
+  onAskDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  category: CategoryConfig
+  confirmingDelete: boolean
+  deleting: boolean
+  onAskDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
+}) {
+  const badgeLabel = c.kind === 'map' ? 'Map' : 'Zmanim'
+  const description =
+    c.kind === 'map'
+      ? 'The sitewide Map — also unlocks the Map button on listing categories.'
+      : 'The Zmanim & Shabbos card.'
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+            <span className={`${TYPE_BADGE} bg-emerald-50 text-emerald-600`}>{badgeLabel}</span>
+            <span>{c.pluralLabel}</span>
+          </p>
+          <p className="text-xs text-muted mt-1">{description}</p>
+        </div>
+        <button
+          onClick={onAskDelete}
+          className="shrink-0 text-xs font-medium text-red-600 hover:underline cursor-pointer"
+        >
+          Delete
+        </button>
+      </div>
+
+      {confirmingDelete && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+            <p className="text-sm text-red-800">
+              Remove the <span className="font-semibold">{c.pluralLabel}</span> card from the site?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={onConfirmDelete}
+                disabled={deleting}
+                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {deleting ? 'Removing…' : 'Remove'}
+              </button>
+              <button
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FormRow({ form: f, onEdit }: { form: FormConfig; onEdit: () => void }) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex items-start justify-between gap-3">
@@ -375,11 +512,16 @@ function toDraft(c: CategoryConfig | null): Draft {
 function CategoryEditor({
   token,
   initial,
+  hasMapCategory,
   onSaved,
   onCancel,
 }: {
   token: string
   initial: CategoryConfig | null
+  /** Whether a Map pseudo-category currently exists — the "Map button"
+   *  capability only makes sense (and is only offered) when there's a map for
+   *  it to send this category's listings to. */
+  hasMapCategory: boolean
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -516,6 +658,7 @@ function CategoryEditor({
       icon: initial?.icon ?? DEFAULT_CATEGORY_ICON,
       description: draft.description,
       detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
+      kind: 'listing',
       community: initial?.community ?? false,
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
@@ -560,7 +703,7 @@ function CategoryEditor({
             here regardless.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {CATEGORY_CAPABILITY_KEYS.map((k) => (
+            {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || hasMapCategory).map((k) => (
               <label key={k} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input type="checkbox" checked={draft.capabilities[k]} onChange={(e) => setCap(k, e.target.checked)} className="rounded border-slate-300" />
                 {CAPABILITY_LABELS[k]}

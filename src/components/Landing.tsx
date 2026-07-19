@@ -58,7 +58,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           go: () => onOpenFlow('volunteer'),
         }]
       : []),
-    ...(ui.map.enabled
+    ...(categories?.some((c) => c.kind === 'map')
       ? [{
           title: 'View Map',
           keywords: [

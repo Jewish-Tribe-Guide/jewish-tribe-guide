@@ -156,7 +156,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   }
 
   // ── Database-backed categories (with add / edit / report) ───────────────────
-  const category = view ? categories?.find((c) => c.id === view) : undefined
+  const category = view ? categories?.find((c) => c.id === view && c.kind === 'listing') : undefined
   if (category) {
     if (action?.mode === 'create') {
       return <ListingForm category={category} mode="create" onUp={goToCategoryList} onSubmitted={goToCategoryList} />

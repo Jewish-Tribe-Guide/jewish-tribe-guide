@@ -139,6 +139,13 @@ export function resolveCapabilities(
   return { ...CATEGORY_CAPABILITY_DEFAULTS, ...(raw ?? {}) }
 }
 
+/** Almost every category row is a real listing directory ('listing'). The other
+ *  two kinds are singleton pseudo-categories — an admin can add/remove at most
+ *  one of each, and they render as a fixed, code-driven screen (the sitewide
+ *  map, the Zmanim card) instead of a generic directory. A category's `kind` is
+ *  immutable once created, like its `id`. */
+export type CategoryKind = 'listing' | 'map' | 'zmanim'
+
 export type CategoryConfig = {
   /** Slug stored in `resource.category`, e.g. 'grocery'. */
   id: string
@@ -148,6 +155,8 @@ export type CategoryConfig = {
   description: string
   /** Category-specific fields, stored in each listing's `details`. */
   detailFields: CategoryField[]
+  /** Defaults to 'listing' for every real directory category. */
+  kind: CategoryKind
   sortOrder?: number
   /** Community-wide (not tied to a hospital): the listing form hides
    *  hospital/address/distance/phone, and the list shows every entry regardless
