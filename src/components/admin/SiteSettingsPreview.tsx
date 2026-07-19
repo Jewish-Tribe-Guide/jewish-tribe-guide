@@ -5,6 +5,7 @@ import type { SiteSettings } from '@/lib/siteSettings'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import HeroHeading from '@/components/home/HeroHeading'
+import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the header, home screen hero, and footer — the exact same
 // components a visitor sees, fed by the admin's in-progress (unsaved) draft.
@@ -15,15 +16,8 @@ export default function SiteSettingsPreview({ settings, onClose }: { settings: S
   const [query, setQuery] = useState('')
 
   return (
-    <div>
+    <DevicePreviewFrame onClose={onClose}>
       <SiteHeader onGoHome={() => {}} location={{ address: '', onAddressChange: () => {}, onCoords: () => {} }} previewSettings={settings} />
-
-      <button
-        onClick={onClose}
-        className="text-sm text-muted hover:text-slate-700 underline my-4 cursor-pointer"
-      >
-        ← Back to editor
-      </button>
 
       <HeroHeading settings={settings} query={query} onQueryChange={setQuery} interactive={false} />
 
@@ -32,6 +26,6 @@ export default function SiteSettingsPreview({ settings, onClose }: { settings: S
       </p>
 
       <SiteFooter previewSettings={settings} />
-    </div>
+    </DevicePreviewFrame>
   )
 }
