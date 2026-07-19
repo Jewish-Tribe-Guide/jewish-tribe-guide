@@ -10,7 +10,7 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import { useStoredLocation } from '@/lib/useStoredLocation'
-import { ui } from '@/lib/uiConfig'
+import { useCategories } from '@/lib/useCategories'
 
 // Which guided form is open as a full-screen overlay (Support / Volunteer), and
 // any need pre-checked from the card or a search result.
@@ -40,6 +40,7 @@ export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
   // Location persists across reloads/return visits — it drives all distance sorting.
   const { address, coords, setAddress, setCoords } = useStoredLocation()
+  const categories = useCategories()
   const [flow, setFlow] = useState<Flow | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)
@@ -189,7 +190,7 @@ export default function Page() {
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
-        {mode === 'map' && ui.map.enabled && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
+        {mode === 'map' && categories?.some((c) => c.kind === 'map') && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
       </main>
       <SiteFooter />
       {overlay}

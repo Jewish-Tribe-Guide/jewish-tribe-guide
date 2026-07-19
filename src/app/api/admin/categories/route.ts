@@ -1,6 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listCategories, createCategory } from '@/lib/categoryStore'
-import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
+import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
 
 // GET /api/admin/categories — every category (resolved config, incl. fields and
 // capabilities) for the admin category manager. Admin only. The public
@@ -26,6 +26,7 @@ type CreateBody = {
   description?: string
   sortOrder?: number
   fields?: CategoryField[]
+  kind?: CategoryKind
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
 }
@@ -55,12 +56,14 @@ export async function POST(request: Request) {
       description: body.description,
       sortOrder: body.sortOrder,
       fields: body.fields,
+      kind: body.kind,
       upvotesEnabled: body.upvotesEnabled,
       capabilities: body.capabilities,
     })
     return Response.json({ ok: true, category })
   } catch (err) {
     console.error('[admin/categories] POST failed:', err)
-    return Response.json({ ok: false, errors: ['Could not create category.'] }, { status: 502 })
+    const message = err instanceof Error ? err.message : 'Could not create category.'
+    return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
 }

@@ -247,12 +247,12 @@ export function resourceCards(
           go: () => nav('patient', 'find', { findView: 'hospitals' }),
         }]
       : []),
-    ...categories.map((c) => ({
+    ...categories.filter((c) => c.kind === 'listing').map((c) => ({
       title: c.pluralLabel,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
     })),
-    ...(features.zmanim
+    ...(categories.some((c) => c.kind === 'zmanim')
       ? [{
           title: 'Zmanim & Shabbos',
           keywords: [

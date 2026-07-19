@@ -6,6 +6,7 @@ import {
   type CategoryCapabilities,
   type CategoryConfig,
   type CategoryField,
+  type CategoryKind,
 } from './categories'
 
 type CategoryRow = {
@@ -15,6 +16,7 @@ type CategoryRow = {
   icon: string
   description: string
   fields: CategoryField[]
+  kind: CategoryKind
   sort_order: number
   upvotes_enabled: boolean
   capabilities: Partial<CategoryCapabilities> | null
@@ -28,6 +30,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     icon: row.icon,
     description: row.description,
     detailFields: row.fields ?? [],
+    kind: row.kind,
     sortOrder: row.sort_order,
     community: COMMUNITY_CATEGORY_IDS.has(row.id),
     upvotesEnabled: !!row.upvotes_enabled,
@@ -72,18 +75,22 @@ export function slugify(label: string): string {
 // Creates a category, picking a unique slug derived from its label. Returns the
 // created config (with its final id). New categories start with no detail fields
 // (the owner can add fields later); they render via the generic card renderer.
+const KIND_LABELS: Record<CategoryKind, string> = { listing: 'category', map: 'Map category', zmanim: 'Zmanim category' }
+
 export async function createCategory(input: {
   label: string
   pluralLabel?: string
   icon?: string
   description?: string
   fields?: CategoryField[]
+  kind?: CategoryKind
   sortOrder?: number
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
+  const kind = input.kind ?? 'listing'
 
   // Ensure a unique id.
   let id = base
@@ -100,13 +107,21 @@ export async function createCategory(input: {
     icon: input.icon?.trim() || DEFAULT_CATEGORY_ICON,
     description: input.description?.trim() || '',
     fields: input.fields ?? [],
+    kind,
     sort_order: input.sortOrder ?? 100,
     upvotes_enabled: !!input.upvotesEnabled,
     capabilities: input.capabilities ?? {},
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
-  if (error) throw new Error(`Failed to create category: ${error.message}`)
+  if (error) {
+    // A Map/Zmanim row already exists (category_kind_singleton) — surface a
+    // friendly message instead of the raw constraint-violation text.
+    if (error.code === '23505' && kind !== 'listing') {
+      throw new Error(`A ${KIND_LABELS[kind]} already exists.`)
+    }
+    throw new Error(`Failed to create category: ${error.message}`)
+  }
   return toConfig(data as CategoryRow)
 }
 
