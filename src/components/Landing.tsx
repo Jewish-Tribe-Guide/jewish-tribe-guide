@@ -10,6 +10,7 @@ import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 import { community } from '@/community.config'
 import { ui } from '@/lib/uiConfig'
+import { useSiteSettings } from '@/lib/useSiteSettings'
 
 const ADD_CATEGORY = '__add_category__'
 
@@ -30,6 +31,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const isMobile = useIsMobile()
+  const settings = useSiteSettings()
 
   const entryCards: CardDef[] = [
     ...(community.features.patientSupport
@@ -118,10 +120,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
       <section className="pt-12 sm:pt-16 text-center">
         <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 leading-tight">
-          What are you looking for?
+          {settings.heroTitle}
         </h1>
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
-          {community.mission}
+          {settings.mission}
         </p>
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">

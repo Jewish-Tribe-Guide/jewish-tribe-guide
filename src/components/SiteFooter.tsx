@@ -1,7 +1,10 @@
+'use client'
+
 import FeedbackButton from './FeedbackButton'
-import { community } from '@/community.config'
+import { useSiteSettings } from '@/lib/useSiteSettings'
 
 export default function SiteFooter() {
+  const settings = useSiteSettings()
   const year = new Date().getFullYear()
 
   return (
@@ -10,10 +13,10 @@ export default function SiteFooter() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-md">
             <p className="text-sm font-semibold text-slate-900">
-              {community.name}
+              {settings.name}
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              {community.mission}
+              {settings.mission}
             </p>
           </div>
 
@@ -34,7 +37,7 @@ export default function SiteFooter() {
         <div className="mt-8 border-t border-slate-100 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
-            on them. © {year} {community.name}.
+            on them. © {year} {settings.name}.
           </p>
           <FeedbackButton />
         </div>
