@@ -5,6 +5,7 @@ import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, res
 import HeroHeading from '@/components/home/HeroHeading'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
+import { useForm } from '@/lib/useForms'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
@@ -31,11 +32,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
+  // Card labels mirror whatever the admin named each form (Forms tab) — falls
+  // back to the historical copy while the form is still loading.
+  const supportForm = useForm('support')
+  const volunteerForm = useForm('volunteer')
 
   const entryCards: CardDef[] = [
     ...(community.features.patientSupport
       ? [{
-          title: 'Patient & Family Support',
+          title: supportForm?.title ?? 'Patient & Family Support',
           keywords: [
             'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
             'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
@@ -49,7 +54,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       : []),
     ...(community.features.volunteer
       ? [{
-          title: 'Volunteer for Patients',
+          title: volunteerForm?.title ?? 'Volunteer for Patients',
           keywords: [
             'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
             'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
