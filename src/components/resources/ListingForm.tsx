@@ -66,8 +66,27 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
 
+  // Which audience-scoped detail sections (see CategoryField.audienceKey) are
+  // expanded — e.g. a mikvah's "Women's"/"Men's"/"Keilim" groups. Starts open
+  // only for audiences already marked true (editing an existing listing);
+  // setDetail below also opens a section the moment its audience checkbox is
+  // turned on, so filling out a new listing doesn't require manually
+  // expanding what you just said applies.
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    for (const field of config?.detailFields ?? []) {
+      if (field.audienceKey && !(field.audienceKey in init)) {
+        init[field.audienceKey] = !!existing?.[field.audienceKey]
+      }
+    }
+    return init
+  })
+
   function setDetail(key: string, value: unknown) {
     setDetails((prev) => ({ ...prev, [key]: value }))
+    if (value && config.detailFields.some((f) => f.audienceKey === key)) {
+      setExpandedSections((prev) => ({ ...prev, [key]: true }))
+    }
   }
 
   function handlePlaceSelect(result: PlaceSelectResult) {
@@ -228,32 +247,66 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           <div className="space-y-4 border-t border-slate-200 pt-4">
             {(() => {
               const visible = config.detailFields.filter((field) => fieldIsVisible(field, details))
-              let prevAudienceKey: string | undefined
-              return visible.map((field) => {
-                // A heading whenever the "audience" (see CategoryField.audienceKey)
-                // changes from the previous field — groups things like a mikvah's
-                // separate men's/women's/keilim hours & contact info instead of one
-                // long undifferentiated list. Labeled with the audience field's own
-                // label (e.g. "Women's Tevillah").
-                const showHeading = field.audienceKey && field.audienceKey !== prevAudienceKey
-                prevAudienceKey = field.audienceKey
-                const audienceLabel = showHeading
-                  ? config.detailFields.find((f) => f.key === field.audienceKey)?.label
-                  : undefined
+
+              // Group into ungrouped fields and audience sections — see
+              // CategoryField.audienceKey. A section renders where its FIRST
+              // field appears (stable, not necessarily contiguous), so a
+              // mikvah's separate men's/women's/keilim hours & contact info
+              // collapse into named, expandable groups instead of one long
+              // undifferentiated list.
+              type Block =
+                | { kind: 'field'; field: CategoryField }
+                | { kind: 'section'; audienceKey: string; label: string; fields: CategoryField[] }
+              const blocks: Block[] = []
+              const sectionAt = new Map<string, number>()
+              for (const field of visible) {
+                if (!field.audienceKey) {
+                  blocks.push({ kind: 'field', field })
+                  continue
+                }
+                const at = sectionAt.get(field.audienceKey)
+                const existingBlock = at !== undefined ? blocks[at] : undefined
+                if (existingBlock?.kind === 'section') {
+                  existingBlock.fields.push(field)
+                } else {
+                  sectionAt.set(field.audienceKey, blocks.length)
+                  const label = config.detailFields.find((f) => f.key === field.audienceKey)?.label ?? field.audienceKey
+                  blocks.push({ kind: 'section', audienceKey: field.audienceKey, label, fields: [field] })
+                }
+              }
+
+              const renderField = (field: CategoryField) => (
+                <DetailFieldInput
+                  key={field.key}
+                  field={field}
+                  value={details[field.key]}
+                  onChange={(v) => setDetail(field.key, v)}
+                  sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+                  onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                />
+              )
+
+              return blocks.map((block) => {
+                if (block.kind === 'field') return renderField(block.field)
+
+                const open = !!expandedSections[block.audienceKey]
                 return (
-                  <div key={field.key}>
-                    {audienceLabel && (
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-2 pt-1">
-                        {audienceLabel}
-                      </p>
-                    )}
-                    <DetailFieldInput
-                      field={field}
-                      value={details[field.key]}
-                      onChange={(v) => setDetail(field.key, v)}
-                      sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
-                      onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
-                    />
+                  <div key={block.audienceKey} className="border border-slate-200 rounded-md overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSections((prev) => ({ ...prev, [block.audienceKey]: !prev[block.audienceKey] }))}
+                      aria-expanded={open}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">{block.label}</span>
+                      <svg
+                        className={`w-3.5 h-3.5 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {open && <div className="p-3 space-y-4">{block.fields.map(renderField)}</div>}
                   </div>
                 )
               })
