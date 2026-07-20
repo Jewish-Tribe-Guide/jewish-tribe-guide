@@ -9,6 +9,10 @@ type Row = {
   tagline: string
   hero_title: string
   mission: string
+  feedback_enabled: boolean
+  feedback_button_label: string
+  feedback_heading: string
+  feedback_success_message: string
 }
 
 function toSettings(row: Row | null): SiteSettings {
@@ -18,6 +22,10 @@ function toSettings(row: Row | null): SiteSettings {
     tagline: row.tagline,
     heroTitle: row.hero_title,
     mission: row.mission,
+    feedbackEnabled: row.feedback_enabled,
+    feedbackButtonLabel: row.feedback_button_label,
+    feedbackHeading: row.feedback_heading,
+    feedbackSuccessMessage: row.feedback_success_message,
   }
 }
 
@@ -49,6 +57,10 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
         tagline: merged.tagline,
         hero_title: merged.heroTitle,
         mission: merged.mission,
+        feedback_enabled: merged.feedbackEnabled,
+        feedback_button_label: merged.feedbackButtonLabel,
+        feedback_heading: merged.feedbackHeading,
+        feedback_success_message: merged.feedbackSuccessMessage,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },

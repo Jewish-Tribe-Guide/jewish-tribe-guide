@@ -134,6 +134,61 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         </label>
       </div>
 
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <span className="block text-sm font-medium text-slate-800">Feedback form</span>
+            <span className="block text-[11px] text-muted mt-0.5">
+              The &ldquo;Send feedback&rdquo; link and form shown in the footer. Turn it off to remove it
+              from the site entirely.
+            </span>
+          </div>
+          <label className="inline-flex items-center gap-2 shrink-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.feedbackEnabled}
+              onChange={(e) => set('feedbackEnabled', e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            <span className="text-xs font-medium text-slate-700">Enabled</span>
+          </label>
+        </div>
+
+        {draft.feedbackEnabled && (
+          <>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Button label</span>
+              <input
+                value={draft.feedbackButtonLabel}
+                onChange={(e) => set('feedbackButtonLabel', e.target.value)}
+                className={inputClass}
+              />
+              <span className="block text-[11px] text-muted mt-1">
+                The footer link text (an arrow is added automatically).
+              </span>
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Form heading</span>
+              <input
+                value={draft.feedbackHeading}
+                onChange={(e) => set('feedbackHeading', e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Success message</span>
+              <textarea
+                rows={2}
+                value={draft.feedbackSuccessMessage}
+                onChange={(e) => set('feedbackSuccessMessage', e.target.value)}
+                className={inputClass}
+              />
+              <span className="block text-[11px] text-muted mt-1">Shown after someone submits feedback.</span>
+            </label>
+          </>
+        )}
+      </div>
+
       <div className="flex items-center gap-3 mt-4">
         <button
           onClick={openPreview}

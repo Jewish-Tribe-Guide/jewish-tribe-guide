@@ -41,7 +41,13 @@ export default function SiteFooter({ previewSettings }: { previewSettings?: Site
             Community-maintained — please confirm details directly before relying
             on them. © {year} {settings.name}.
           </p>
-          <FeedbackButton />
+          {settings.feedbackEnabled && (
+            <FeedbackButton
+              buttonLabel={settings.feedbackButtonLabel}
+              heading={settings.feedbackHeading}
+              successMessage={settings.feedbackSuccessMessage}
+            />
+          )}
         </div>
       </div>
     </footer>

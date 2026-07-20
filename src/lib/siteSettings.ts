@@ -24,9 +24,22 @@ export type SiteSettings = {
   heroTitle: string
   /** Shown under the home screen heading, and reused as the footer blurb. */
   mission: string
+  /** Whether the footer's "Send feedback" button/form is shown at all. */
+  feedbackEnabled: boolean
+  /** The footer link text that opens the feedback form (an arrow is appended
+   *  in the UI, no need to include one here). */
+  feedbackButtonLabel: string
+  /** The feedback modal's heading. */
+  feedbackHeading: string
+  /** Shown after a successful feedback submission. */
+  feedbackSuccessMessage: string
 }
 
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
+
+export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the site? Send a note'
+export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
+export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
 
 /** The code-configured defaults — used as the client fallback (if the API is
  *  unreachable) and whenever no row exists yet in `site_settings`. */
@@ -35,4 +48,8 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   tagline: community.tagline,
   heroTitle: DEFAULT_HERO_TITLE,
   mission: community.mission,
+  feedbackEnabled: true,
+  feedbackButtonLabel: DEFAULT_FEEDBACK_BUTTON_LABEL,
+  feedbackHeading: DEFAULT_FEEDBACK_HEADING,
+  feedbackSuccessMessage: DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
 }

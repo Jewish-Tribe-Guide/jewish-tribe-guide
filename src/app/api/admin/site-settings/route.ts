@@ -38,6 +38,15 @@ export async function PATCH(request: Request) {
   if (body.heroTitle !== undefined && !body.heroTitle.trim()) {
     return Response.json({ ok: false, errors: ['Home screen heading cannot be empty.'] }, { status: 400 })
   }
+  if (body.feedbackButtonLabel !== undefined && !body.feedbackButtonLabel.trim()) {
+    return Response.json({ ok: false, errors: ['Feedback button label cannot be empty.'] }, { status: 400 })
+  }
+  if (body.feedbackHeading !== undefined && !body.feedbackHeading.trim()) {
+    return Response.json({ ok: false, errors: ['Feedback heading cannot be empty.'] }, { status: 400 })
+  }
+  if (body.feedbackSuccessMessage !== undefined && !body.feedbackSuccessMessage.trim()) {
+    return Response.json({ ok: false, errors: ['Feedback success message cannot be empty.'] }, { status: 400 })
+  }
 
   try {
     const settings = await updateSiteSettings(body)
