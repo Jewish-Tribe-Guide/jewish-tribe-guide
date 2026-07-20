@@ -778,11 +778,14 @@ function CategoryEditor({
       return key
     }
 
+    // Full label (e.g. "Women's Phone") for the card, which doesn't group by
+    // section; shortLabel (e.g. "Phone") for the intake form's collapsible
+    // section, where the heading already says who it's for.
     const newFields: CategoryField[] = []
-    if (hours) newFields.push({ key: nextKey(`${p} Hours`), label: `${p} Hours`, type: 'hours', renderAs: 'row', filterable: true, audienceKey })
-    if (phone) newFields.push({ key: nextKey(`${p} Phone`), label: `${p} Phone`, type: 'tel', renderAs: 'row', filterable: false, audienceKey })
-    if (email) newFields.push({ key: nextKey(`${p} Email`), label: `${p} Email`, type: 'text', renderAs: 'row', filterable: false, audienceKey })
-    if (notes) newFields.push({ key: nextKey(`${p} Notes`), label: `${p} Notes`, type: 'textarea', renderAs: 'row', filterable: false, audienceKey })
+    if (hours) newFields.push({ key: nextKey(`${p} Hours`), label: `${p} Hours`, shortLabel: 'Hours', type: 'hours', renderAs: 'row', filterable: true, audienceKey })
+    if (phone) newFields.push({ key: nextKey(`${p} Phone`), label: `${p} Phone`, shortLabel: 'Phone', type: 'tel', renderAs: 'row', filterable: false, audienceKey })
+    if (email) newFields.push({ key: nextKey(`${p} Email`), label: `${p} Email`, shortLabel: 'Email', type: 'text', renderAs: 'row', filterable: false, audienceKey })
+    if (notes) newFields.push({ key: nextKey(`${p} Notes`), label: `${p} Notes`, shortLabel: 'Notes', type: 'textarea', renderAs: 'row', filterable: false, audienceKey })
     if (newFields.length === 0) return
 
     setDraft((d) => ({ ...d, fields: [...d.fields, ...newFields] }))
@@ -1447,6 +1450,23 @@ function FieldEditor({
             When a visitor turns on that filter, cards hide every other audience-scoped detail —
             useful for things like separate men&rsquo;s/women&rsquo;s hours so they don&rsquo;t all show
             at once.
+          </span>
+        </label>
+      )}
+
+      {f.audienceKey && (
+        <label className="block sm:w-1/2">
+          <span className={fieldLabel}>Short label in that section (optional)</span>
+          <input
+            value={f.shortLabel ?? ''}
+            onChange={(e) => onChange({ shortLabel: e.target.value || undefined })}
+            className={inputClass}
+            placeholder="e.g. Phone"
+          />
+          <span className="block text-[11px] text-muted mt-0.5">
+            Shown instead of the full name in the intake form&rsquo;s collapsible section (e.g.
+            &ldquo;Phone&rdquo; instead of &ldquo;Women&rsquo;s Phone&rdquo;, since the section heading
+            already says who it&rsquo;s for). The card still uses the full name above.
           </span>
         </label>
       )}

@@ -98,6 +98,14 @@ export type CategoryField = {
    *  separate men's/women's/keilim hours, phone, notes, …) doesn't show all of
    *  them at once. Fields with no audienceKey always show. */
   audienceKey?: string
+  /** Shown instead of `label` when this field renders inside its audienceKey
+   *  section in the intake form — e.g. "Phone" instead of "Women's Phone",
+   *  since the section heading (the audience field's filterLabel/label,
+   *  "Women's") already says who it's for. Card display and everywhere else
+   *  still use the full `label`, since a card doesn't group by section and
+   *  "Phone" alone would be ambiguous next to a Men's Phone on the same
+   *  listing. Ignored on fields without an audienceKey. */
+  shortLabel?: string
 }
 
 /** Per-category UI affordances, layered UNDER the site-wide `ui.*` master

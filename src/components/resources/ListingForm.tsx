@@ -66,6 +66,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
 
+  // Which audience sections (Women's/Men's/Keilim, …) are expanded — purely a
+  // display preference layered on top of fieldIsVisible's hard gate (a
+  // section only exists here at all once its checkbox is on; this just lets
+  // it be tucked away again without hiding what it means). Absent from the
+  // map = expanded, so a section defaults open the moment it first appears.
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
+
   function setDetail(key: string, value: unknown) {
     setDetails((prev) => ({ ...prev, [key]: value }))
   }
@@ -253,15 +260,20 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                   existingBlock.fields.push(field)
                 } else {
                   sectionAt.set(field.audienceKey, blocks.length)
-                  const label = config.detailFields.find((f) => f.key === field.audienceKey)?.label ?? field.audienceKey
+                  // filterLabel is the short form ("Women's") the filter chip
+                  // already uses; label ("Women's Tevillah") is the fallback
+                  // for a boolean that has no filterLabel set.
+                  const audienceField = config.detailFields.find((f) => f.key === field.audienceKey)
+                  const label = audienceField?.filterLabel ?? audienceField?.label ?? field.audienceKey
                   blocks.push({ kind: 'section', audienceKey: field.audienceKey, label, fields: [field] })
                 }
               }
 
-              const renderField = (field: CategoryField) => (
+              const renderField = (field: CategoryField, labelOverride?: string) => (
                 <DetailFieldInput
                   key={field.key}
                   field={field}
+                  labelOverride={labelOverride}
                   value={details[field.key]}
                   onChange={(v) => setDetail(field.key, v)}
                   sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
@@ -272,14 +284,33 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               return blocks.map((block) => {
                 if (block.kind === 'field') return renderField(block.field)
 
+                // Prefixed so this can never collide with a field's own key —
+                // the audienceKey is itself a field's key (the checkbox this
+                // section is scoped to), so an unprefixed key here would
+                // duplicate that field's `key={field.key}` below.
+                const sectionKey = `section:${block.audienceKey}`
+                const open = !collapsedSections[sectionKey]
                 return (
-                  // Prefixed so this can never collide with a field's own key
-                  // — the audienceKey is itself a field's key (the checkbox
-                  // this section is scoped to), so an unprefixed key here
-                  // would duplicate that field's `key={field.key}` below.
-                  <div key={`section:${block.audienceKey}`} className="border border-slate-200 rounded-md p-3 space-y-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{block.label}</p>
-                    {block.fields.map(renderField)}
+                  <div key={sectionKey} className="border border-slate-200 rounded-md overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedSections((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }))}
+                      aria-expanded={open}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">{block.label}</span>
+                      <svg
+                        className={`w-3.5 h-3.5 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {open && (
+                      <div className="p-3 space-y-4">
+                        {block.fields.map((field) => renderField(field, field.shortLabel))}
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -323,18 +354,22 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
 function DetailFieldInput({
   field,
+  labelOverride,
   value,
   onChange,
   sometimes,
   onChangeSometimes,
 }: {
   field: CategoryField
+  /** Shown instead of field.label — used inside an audience section so
+   *  "Women's Phone" reads as just "Phone" under the "Women's" heading. */
+  labelOverride?: string
   value: unknown
   onChange: (value: unknown) => void
   sometimes?: string[]
   onChangeSometimes?: (v: string[]) => void
 }) {
-  const label = `${field.label}${field.required ? ' *' : ''}`
+  const label = `${labelOverride ?? field.label}${field.required ? ' *' : ''}`
 
   if (field.type === 'tags') {
     return (
@@ -373,7 +408,7 @@ function DetailFieldInput({
           onChange={(e) => onChange(e.target.checked)}
           className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
         />
-        <span className="text-sm font-medium text-slate-700">{field.label}</span>
+        <span className="text-sm font-medium text-slate-700">{labelOverride ?? field.label}</span>
       </label>
     )
   }
