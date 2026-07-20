@@ -57,3 +57,31 @@ export async function listFormResponses(): Promise<InboxResponse[]> {
   if (error) throw new Error(`Failed to load responses: ${error.message}`)
   return (data as FormResponseRow[]).map(toView)
 }
+
+// Corrects a response's contact info and/or submitted data (e.g. a typo'd
+// phone number) — request_id/request_type/status are immutable here, same
+// spirit as a category's id. Only the provided keys change.
+export async function updateFormResponse(
+  id: string,
+  patch: { contact?: ContactHospitalData; data?: Record<string, unknown> },
+): Promise<InboxResponse | null> {
+  const row: Record<string, unknown> = {}
+  if (patch.contact !== undefined) row.contact = patch.contact
+  if (patch.data !== undefined) row.data = patch.data
+  if (Object.keys(row).length === 0) return null
+
+  const { data, error } = await getAdminClient()
+    .from('form_response')
+    .update(row)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle()
+  if (error) throw new Error(`Failed to update the request: ${error.message}`)
+  return data ? toView(data as FormResponseRow) : null
+}
+
+// Permanently deletes a response.
+export async function deleteFormResponse(id: string): Promise<void> {
+  const { error } = await getAdminClient().from('form_response').delete().eq('id', id)
+  if (error) throw new Error(`Failed to delete the request: ${error.message}`)
+}
