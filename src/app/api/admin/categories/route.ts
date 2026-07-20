@@ -1,5 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listCategories, createCategory } from '@/lib/categoryStore'
+import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
 
 // GET /api/admin/categories — every category (resolved config, incl. fields and
@@ -31,6 +32,7 @@ type CreateBody = {
   hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
+  externalLink?: { label: string; url: string } | null
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -49,6 +51,9 @@ export async function POST(request: Request) {
   if (!body.label?.trim()) {
     return Response.json({ ok: false, errors: ['Category name is required.'] }, { status: 400 })
   }
+  if (body.externalLink && !isHttpUrl(body.externalLink.url)) {
+    return Response.json({ ok: false, errors: ['The external link must be a valid http(s) URL.'] }, { status: 400 })
+  }
 
   try {
     const category = await createCategory({
@@ -63,6 +68,7 @@ export async function POST(request: Request) {
       hasPhone: body.hasPhone,
       upvotesEnabled: body.upvotesEnabled,
       capabilities: body.capabilities,
+      externalLink: body.externalLink,
     })
     return Response.json({ ok: true, category })
   } catch (err) {

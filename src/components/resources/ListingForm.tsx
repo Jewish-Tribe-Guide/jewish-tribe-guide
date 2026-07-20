@@ -226,18 +226,38 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
         {config.detailFields.some((f) => fieldIsVisible(f, details)) && (
           <div className="space-y-4 border-t border-slate-200 pt-4">
-            {config.detailFields
-              .filter((field) => fieldIsVisible(field, details))
-              .map((field) => (
-                <DetailFieldInput
-                  key={field.key}
-                  field={field}
-                  value={details[field.key]}
-                  onChange={(v) => setDetail(field.key, v)}
-                  sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
-                  onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
-                />
-              ))}
+            {(() => {
+              const visible = config.detailFields.filter((field) => fieldIsVisible(field, details))
+              let prevAudienceKey: string | undefined
+              return visible.map((field) => {
+                // A heading whenever the "audience" (see CategoryField.audienceKey)
+                // changes from the previous field — groups things like a mikvah's
+                // separate men's/women's/keilim hours & contact info instead of one
+                // long undifferentiated list. Labeled with the audience field's own
+                // label (e.g. "Women's Tevillah").
+                const showHeading = field.audienceKey && field.audienceKey !== prevAudienceKey
+                prevAudienceKey = field.audienceKey
+                const audienceLabel = showHeading
+                  ? config.detailFields.find((f) => f.key === field.audienceKey)?.label
+                  : undefined
+                return (
+                  <div key={field.key}>
+                    {audienceLabel && (
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted mb-2 pt-1">
+                        {audienceLabel}
+                      </p>
+                    )}
+                    <DetailFieldInput
+                      field={field}
+                      value={details[field.key]}
+                      onChange={(v) => setDetail(field.key, v)}
+                      sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+                      onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+                    />
+                  </div>
+                )
+              })
+            })()}
           </div>
         )}
 

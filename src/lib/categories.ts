@@ -90,6 +90,14 @@ export type CategoryField = {
    *  for food establishments that carry a hechsher but aren't entirely kosher
    *  (the note says what isn't). The note is authored per listing, not generic. */
   caveat?: { flagField: string; noteField: string }
+  /** Ties this field to one of the category's own filterable boolean fields
+   *  (its `key`), e.g. a "Women's Hours" field tagged with the "Women's
+   *  Tevillah" boolean's key. When that filter is the only audience filter
+   *  active in the directory, cards hide every OTHER audience-tagged field —
+   *  so a category with several audience-specific detail sets (a mikvah's
+   *  separate men's/women's/keilim hours, phone, notes, …) doesn't show all of
+   *  them at once. Fields with no audienceKey always show. */
+  audienceKey?: string
 }
 
 /** Per-category UI affordances, layered UNDER the site-wide `ui.*` master
@@ -172,6 +180,10 @@ export type CategoryConfig = {
    *  sets this via `resolveCapabilities`; client consumers should still guard
    *  with `resolveCapabilities` in case of cached/fallback data. */
   capabilities?: CategoryCapabilities
+  /** An external link shown as its own button in the directory header, next to
+   *  Map/Add — e.g. "Other Mikvahs" pointing at a broader directory the site
+   *  doesn't curate itself. Not tied to any listing. */
+  externalLink?: { label: string; url: string } | null
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'
