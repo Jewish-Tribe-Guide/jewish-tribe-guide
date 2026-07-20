@@ -11,6 +11,10 @@ import {
   type InboxTab,
   type InboxResponse,
 } from '@/lib/inbox'
+import type { ContactHospitalData } from '@/types'
+
+const inputClass =
+  'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 // The inbox: a separate, separately-gated viewer for form response data
 // (support requests, volunteer signups/edits/removals, feedback), read from
@@ -127,6 +131,15 @@ function InboxTabs({ session }: { session: Session }) {
     await getBrowserClient().auth.signOut()
   }
 
+  function handleUpdated(updated: InboxResponse) {
+    setItems((prev) => prev?.map((it) => (it.id === updated.id ? updated : it)) ?? prev)
+  }
+
+  function handleDeleted(id: string) {
+    setItems((prev) => prev?.filter((it) => it.id !== id) ?? prev)
+    setExpandedId((cur) => (cur === id ? null : cur))
+  }
+
   // Group once per render — cheap at this volume, and keeps inboxTabForRequestType
   // (the RequestType → InboxTab mapping) as the single source of truth rather
   // than duplicating it into a query param.
@@ -182,8 +195,11 @@ function InboxTabs({ session }: { session: Session }) {
             <ResponseCard
               key={item.id}
               item={item}
+              token={token}
               expanded={expandedId === item.id}
               onToggle={() => setExpandedId((id) => (id === item.id ? null : item.id))}
+              onUpdated={handleUpdated}
+              onDeleted={handleDeleted}
             />
           ))}
         </div>
@@ -224,18 +240,76 @@ function nonEmptyEntries(data: Record<string, unknown>): [string, unknown][] {
 
 function ResponseCard({
   item,
+  token,
   expanded,
   onToggle,
+  onUpdated,
+  onDeleted,
 }: {
   item: InboxResponse
+  token: string
   expanded: boolean
   onToggle: () => void
+  onUpdated: (item: InboxResponse) => void
+  onDeleted: (id: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
+  const [draftContact, setDraftContact] = useState<ContactHospitalData>(item.contact)
+  const [draftData, setDraftData] = useState<Record<string, unknown>>(item.data)
+  const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const created = new Date(item.createdAt).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
   const entries = nonEmptyEntries(item.data)
+
+  function startEdit() {
+    setDraftContact(item.contact)
+    setDraftData(item.data)
+    setError(null)
+    setEditing(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/inbox/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact: draftContact, data: draftData }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+      onUpdated(body.response as InboxResponse)
+      setEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function confirmDelete() {
+    setDeleting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/inbox/${item.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      onDeleted(item.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed.')
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
@@ -259,22 +333,203 @@ function ResponseCard({
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-100 px-4 py-3 space-y-2">
-          {item.contact.hospitalId && (
-            <Field label="Hospital / room">
-              {item.contact.hospitalId}
-              {item.contact.unitFloorRoom ? ` — ${item.contact.unitFloorRoom}` : ''}
-            </Field>
+        <div className="border-t border-slate-100 px-4 py-3 space-y-3">
+          {editing ? (
+            <>
+              <EditableContact contact={draftContact} onChange={setDraftContact} />
+              <div className="pt-2 border-t border-slate-100">
+                <EditableFields obj={draftData} onChange={setDraftData} />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="text-xs font-medium bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  onClick={() => { setEditing(false); setError(null) }}
+                  disabled={saving}
+                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {item.contact.hospitalId && (
+                  <Field label="Hospital / room">
+                    {item.contact.hospitalId}
+                    {item.contact.unitFloorRoom ? ` — ${item.contact.unitFloorRoom}` : ''}
+                  </Field>
+                )}
+                {item.contact.preferredContact && (
+                  <Field label="Preferred contact">{item.contact.preferredContact}</Field>
+                )}
+                {entries.map(([key, value]) => (
+                  <DataField key={key} label={labelize(key)} value={value} />
+                ))}
+              </div>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              <div className="flex gap-3 pt-2 border-t border-slate-100">
+                <button
+                  onClick={startEdit}
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+
+              {confirmingDelete && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                  <p className="text-sm text-red-800">Permanently delete this request? This can’t be undone.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={confirmDelete}
+                      disabled={deleting}
+                      className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-          {item.contact.preferredContact && (
-            <Field label="Preferred contact">{item.contact.preferredContact}</Field>
-          )}
-          {entries.map(([key, value]) => (
-            <DataField key={key} label={labelize(key)} value={value} />
-          ))}
         </div>
       )}
     </div>
+  )
+}
+
+// ── Editing ───────────────────────────────────────────────────────────────────
+
+function EditableContact({
+  contact,
+  onChange,
+}: {
+  contact: ContactHospitalData
+  onChange: (c: ContactHospitalData) => void
+}) {
+  function set<K extends keyof ContactHospitalData>(key: K, value: ContactHospitalData[K]) {
+    onChange({ ...contact, [key]: value })
+  }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <TextField label="Full name" value={contact.fullName} onChange={(v) => set('fullName', v)} />
+      <TextField label="Phone" value={contact.phone} onChange={(v) => set('phone', v)} />
+      <TextField label="Email" value={contact.email} onChange={(v) => set('email', v)} />
+      <TextField label="Preferred contact" value={contact.preferredContact} onChange={(v) => set('preferredContact', v)} />
+      <TextField label="Hospital" value={contact.hospitalId} onChange={(v) => set('hospitalId', v)} />
+      <TextField label="Unit / floor / room" value={contact.unitFloorRoom} onChange={(v) => set('unitFloorRoom', v)} />
+    </div>
+  )
+}
+
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block text-sm">
+      <span className="block text-xs text-muted mb-0.5">{label}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+    </label>
+  )
+}
+
+// Editable counterpart to DataField/nonEmptyEntries — one level of nesting,
+// same as the read view. Every leaf in a form response's `data` is a string,
+// a string[] (rendered as a comma-separated field), or a boolean (checkbox);
+// see the Answers type in Wizard.tsx.
+function EditableFields({
+  obj,
+  onChange,
+}: {
+  obj: Record<string, unknown>
+  onChange: (next: Record<string, unknown>) => void
+}) {
+  function setField(key: string, value: unknown) {
+    onChange({ ...obj, [key]: value })
+  }
+
+  return (
+    <div className="space-y-2">
+      {Object.entries(obj).map(([key, value]) =>
+        isPlainObject(value) ? (
+          <div key={key} className="text-sm">
+            <span className="block text-xs text-muted mb-1">{labelize(key)}</span>
+            <div className="ml-3 border-l-2 border-slate-100 pl-3">
+              <EditableFields obj={value} onChange={(next) => setField(key, next)} />
+            </div>
+          </div>
+        ) : (
+          <EditableLeafField key={key} label={labelize(key)} value={value} onChange={(v) => setField(key, v)} />
+        ),
+      )}
+    </div>
+  )
+}
+
+function EditableLeafField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: unknown
+  onChange: (v: unknown) => void
+}) {
+  if (typeof value === 'boolean') {
+    return (
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={value}
+          onChange={(e) => onChange(e.target.checked)}
+          className="rounded border-slate-300"
+        />
+        {label}
+      </label>
+    )
+  }
+  if (Array.isArray(value)) {
+    return (
+      <label className="block text-sm">
+        <span className="block text-xs text-muted mb-0.5">{label} (comma-separated)</span>
+        <input
+          value={value.map(String).join(', ')}
+          onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+          className={inputClass}
+        />
+      </label>
+    )
+  }
+  return (
+    <label className="block text-sm">
+      <span className="block text-xs text-muted mb-0.5">{label}</span>
+      <input
+        value={typeof value === 'string' ? value : String(value ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+        className={inputClass}
+      />
+    </label>
   )
 }
 

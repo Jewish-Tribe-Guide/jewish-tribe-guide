@@ -64,9 +64,14 @@ To enable it:
 
 Each is inert until you set it; the app works without them.
 
-- **Resend** (`RESEND_API_KEY`, `RESEND_FROM`) — emails to submitters + admins.
-  To email the public you must verify a domain at resend.com/domains and send
-  from an address on it.
+- **Resend** (`RESEND_API_KEY`, `RESEND_FROM`) — emails to submitters + admins,
+  including the magic sign-in links for `/admin` and `/inbox`. Until you verify
+  a domain at resend.com/domains and send from an address on it, Resend's
+  sandbox `onboarding@resend.dev` sender can only deliver to the Resend
+  account's own email — every other recipient (including admins/inbox viewers
+  signing in) gets a silent failure. Verifying a domain is a one-time DNS step
+  (~10-30 min including propagation); after that, sending works for any
+  recipient.
 - **Upstash Redis** (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) —
   durable rate limiting. Without it a best-effort in-memory limiter is used.
 - **Cloudflare Turnstile** (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
