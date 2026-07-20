@@ -21,14 +21,32 @@ const DAY_SHORT: Record<DayKey, string> = {
   sat: 'Sat',
 }
 
-let _counter = 1
-function genId() {
-  return `m${_counter++}`
+// crypto.randomUUID(), not a sequential counter — a counter restarts at 1 on
+// every fresh page load, so a newly-added row can collide with the id an
+// existing (loaded-from-storage) row already has. Since updateRow/toggleDay/
+// removeRow all match by id, a collision meant editing the new row silently
+// also edited whichever saved row shared its id (e.g. adding a second Mincha
+// for Sons of Israel overwrote its existing Shacharis entry to Mincha too).
+function genId(): string {
+  return crypto.randomUUID()
 }
 
 function initMinyanim(value: unknown): Minyan[] {
-  if (isMinyanim(value)) return value
-  return []
+  if (!isMinyanim(value)) return []
+  // isMinyanim doesn't require `id` (older stored rows may predate it, or two
+  // could otherwise coincidentally share one) — backfill any missing/duplicate
+  // id so every row is guaranteed unique before it ever reaches updateRow's
+  // id-based matching.
+  const seen = new Set<string>()
+  return value.map((m) => {
+    if (m.id && !seen.has(m.id)) {
+      seen.add(m.id)
+      return m
+    }
+    const id = genId()
+    seen.add(id)
+    return { ...m, id }
+  })
 }
 
 type Props = {
