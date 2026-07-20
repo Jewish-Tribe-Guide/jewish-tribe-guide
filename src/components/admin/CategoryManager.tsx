@@ -609,6 +609,7 @@ type Draft = {
   label: string
   pluralLabel: string
   description: string
+  community: boolean
   upvotesEnabled: boolean
   capabilities: CategoryCapabilities
   /** The editable fields (everything shown on a card). */
@@ -625,6 +626,7 @@ function toDraft(c: CategoryConfig | null): Draft {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
     description: c?.description ?? '',
+    community: !!c?.community,
     upvotesEnabled: !!c?.upvotesEnabled,
     capabilities: resolveCapabilities(c?.capabilities),
     fields: all.filter((f) => f.renderAs !== 'hidden'),
@@ -746,6 +748,7 @@ function CategoryEditor({
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         description: draft.description,
+        community: draft.community,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
@@ -782,7 +785,7 @@ function CategoryEditor({
       description: draft.description,
       detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
       kind: 'listing',
-      community: initial?.community ?? false,
+      community: draft.community,
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
     }
@@ -814,6 +817,22 @@ function CategoryEditor({
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
+          </label>
+          <label className="inline-flex items-start gap-2 text-sm text-slate-700 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={draft.community}
+              onChange={(e) => set('community', e.target.checked)}
+              className="mt-0.5 rounded border-slate-300"
+            />
+            <span>
+              Community-wide (not tied to an address)
+              <span className="block text-[11px] text-muted font-normal">
+                For listings like WhatsApp groups that aren’t a physical place — hides the address,
+                phone, distance, and map for this category, and shows every entry regardless of the
+                visitor’s location.
+              </span>
+            </span>
           </label>
         </section>
 
@@ -1022,6 +1041,30 @@ function FieldEditor({
             placeholder={'Elementary\nMiddle\nHigh'}
           />
         </label>
+      )}
+
+      {f.type === 'url' && (
+        <>
+          <label className="block sm:w-1/2">
+            <span className={fieldLabel}>Button text</span>
+            <input
+              value={f.linkLabel ?? ''}
+              onChange={(e) => onChange({ linkLabel: e.target.value })}
+              className={inputClass}
+              placeholder="e.g. Join Group"
+            />
+            <span className="block text-[11px] text-muted mt-0.5">Defaults to the detail&rsquo;s name if left blank.</span>
+          </label>
+          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
+            <input
+              type="checkbox"
+              checked={!!f.showInHeader}
+              onChange={(e) => onChange({ showInHeader: e.target.checked })}
+              className="rounded border-slate-300"
+            />
+            Show as a button on the card itself, not just inside the details
+          </label>
+        </>
       )}
 
       {canChooseShape && (
