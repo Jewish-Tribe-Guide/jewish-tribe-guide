@@ -609,7 +609,8 @@ type Draft = {
   label: string
   pluralLabel: string
   description: string
-  community: boolean
+  hasAddress: boolean
+  hasPhone: boolean
   upvotesEnabled: boolean
   capabilities: CategoryCapabilities
   /** The editable fields (everything shown on a card). */
@@ -626,7 +627,8 @@ function toDraft(c: CategoryConfig | null): Draft {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
     description: c?.description ?? '',
-    community: !!c?.community,
+    hasAddress: c?.hasAddress ?? true,
+    hasPhone: c?.hasPhone ?? true,
     upvotesEnabled: !!c?.upvotesEnabled,
     capabilities: resolveCapabilities(c?.capabilities),
     fields: all.filter((f) => f.renderAs !== 'hidden'),
@@ -748,7 +750,8 @@ function CategoryEditor({
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         description: draft.description,
-        community: draft.community,
+        hasAddress: draft.hasAddress,
+        hasPhone: draft.hasPhone,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
@@ -785,7 +788,8 @@ function CategoryEditor({
       description: draft.description,
       detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
       kind: 'listing',
-      community: draft.community,
+      hasAddress: draft.hasAddress,
+      hasPhone: draft.hasPhone,
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
     }
@@ -818,22 +822,32 @@ function CategoryEditor({
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
           </label>
-          <label className="inline-flex items-start gap-2 text-sm text-slate-700 cursor-pointer pt-1">
-            <input
-              type="checkbox"
-              checked={draft.community}
-              onChange={(e) => set('community', e.target.checked)}
-              className="mt-0.5 rounded border-slate-300"
-            />
-            <span>
-              Community-wide (not tied to an address)
-              <span className="block text-[11px] text-muted font-normal">
-                For listings like WhatsApp groups that aren’t a physical place — hides the address,
-                phone, distance, and map for this category, and shows every entry regardless of the
-                visitor’s location.
-              </span>
+          <div className="pt-1 space-y-1.5">
+            <span className="block text-xs font-medium text-slate-700">Every listing also has</span>
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.hasAddress}
+                onChange={(e) => set('hasAddress', e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              An address
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.hasPhone}
+                onChange={(e) => set('hasPhone', e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              A phone number
+            </label>
+            <span className="block text-[11px] text-muted">
+              On by default. Turn either off for listings that aren’t a physical place — like WhatsApp
+              groups — and it disappears from the form and the card. With no address, distance sorting
+              and the Map button don’t apply either.
             </span>
-          </label>
+          </div>
         </section>
 
         {/* Capabilities */}
@@ -845,7 +859,7 @@ function CategoryEditor({
             here regardless.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || hasMapCategory).map((k) => (
+            {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || (hasMapCategory && draft.hasAddress)).map((k) => (
               <label key={k} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input type="checkbox" checked={draft.capabilities[k]} onChange={(e) => setCap(k, e.target.checked)} className="rounded border-slate-300" />
                 {CAPABILITY_LABELS[k]}
@@ -1055,14 +1069,14 @@ function FieldEditor({
             />
             <span className="block text-[11px] text-muted mt-0.5">Defaults to the detail&rsquo;s name if left blank.</span>
           </label>
-          <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
             <input
               type="checkbox"
               checked={!!f.showInHeader}
               onChange={(e) => onChange({ showInHeader: e.target.checked })}
               className="rounded border-slate-300"
             />
-            Show as a button on the card itself, not just inside the details
+            Show as a button on the card itself, not inside the details
           </label>
         </>
       )}
@@ -1078,7 +1092,7 @@ function FieldEditor({
       )}
 
       {canRequire && (
-        <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
           <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
           Required when adding a listing
         </label>

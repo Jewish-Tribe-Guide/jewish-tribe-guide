@@ -65,13 +65,13 @@ export function validateSubmission(
 
   if (!category) errs.push('Please choose a valid category.')
   if (!submission.name?.trim()) errs.push('Name is required.')
-  // Community categories (e.g. WhatsApp groups) have no address. Other listings
-  // need an address (distance to each hospital is computed from it).
-  if (!category?.community) {
-    if (!submission.address?.trim()) errs.push('Address is required.')
-    if (submission.phone?.trim() && !isValidPhone(submission.phone)) {
-      errs.push('Please enter a valid phone number.')
-    }
+  // Categories without an address (e.g. WhatsApp groups) skip the requirement —
+  // other listings need one (distance to each hospital is computed from it).
+  if (category?.hasAddress !== false && !submission.address?.trim()) {
+    errs.push('Address is required.')
+  }
+  if (category?.hasPhone !== false && submission.phone?.trim() && !isValidPhone(submission.phone)) {
+    errs.push('Please enter a valid phone number.')
   }
 
   // Required category-specific fields (only those currently visible via showIf).

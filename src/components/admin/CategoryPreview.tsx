@@ -129,7 +129,7 @@ export default function CategoryPreview({
         category={category}
         items={itemsWithDistance(items, category, coords)}
         anchorLabel={address || undefined}
-        addressPrompt={!address && !category.community}
+        addressPrompt={!address && category.hasAddress !== false}
         onUp={onClose}
         onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
@@ -158,6 +158,6 @@ function itemsWithDistance(
   category: CategoryConfig,
   coords: Coords | null,
 ): DirectoryResource[] {
-  if (category.community || !coords) return items
+  if (category.hasAddress === false || !coords) return items
   return items.map((item) => (item.geo ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) } : item))
 }

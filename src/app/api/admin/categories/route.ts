@@ -27,7 +27,8 @@ type CreateBody = {
   sortOrder?: number
   fields?: CategoryField[]
   kind?: CategoryKind
-  community?: boolean
+  hasAddress?: boolean
+  hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
 }
@@ -58,7 +59,8 @@ export async function POST(request: Request) {
       sortOrder: body.sortOrder,
       fields: body.fields,
       kind: body.kind,
-      community: body.community,
+      hasAddress: body.hasAddress,
+      hasPhone: body.hasPhone,
       upvotesEnabled: body.upvotesEnabled,
       capabilities: body.capabilities,
     })
