@@ -49,6 +49,7 @@ export function GenericListingCard({
   upvotes,
   count,
   defaultExpanded,
+  activeBoolFilterKeys,
   onVote,
   onTagClick,
   onFilterOpen,
@@ -62,6 +63,12 @@ export function GenericListingCard({
   upvotes: boolean
   count: number
   defaultExpanded?: boolean
+  /** Keys of the boolean filters currently toggled on in the directory (e.g.
+   *  ['menTevillah']). When one or more of these match a field's
+   *  `audienceKey`, every OTHER audience-tagged field is hidden on this card —
+   *  see the `audienceKey` doc on CategoryField. Fields with no audienceKey
+   *  are unaffected. */
+  activeBoolFilterKeys?: string[]
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
@@ -77,7 +84,15 @@ export function GenericListingCard({
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const isMobile = useIsMobile()
 
-  const fields = category.detailFields
+  // Which audience(s) the visitor has filtered to, if any — only the keys that
+  // actually tag a field on this category count (an unrelated boolean filter,
+  // e.g. "Open now" has no bearing here).
+  const activeAudienceKeys = (activeBoolFilterKeys ?? []).filter((k) =>
+    category.detailFields.some((f) => f.audienceKey === k),
+  )
+  const fields = category.detailFields.filter(
+    (f) => !f.audienceKey || activeAudienceKeys.length === 0 || activeAudienceKeys.includes(f.audienceKey),
+  )
   // Per-category capabilities layered under the global `ui.contributions` switches.
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
@@ -97,11 +112,17 @@ export function GenericListingCard({
   const legacyDavening = item.davening as string | undefined
   const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
-  const hoursVal = hoursFields[0] ? item[hoursFields[0].key] : undefined
-  const isOpen = hoursVal !== undefined && hoursOpenNow(hoursVal) === true && isStructuredHours(hoursVal)
+  // A listing is "Open" if ANY of its hours fields say so — most categories
+  // have exactly one, but a few (e.g. Mikvah's separate men's/women's/keilim
+  // hours) have several, and any one being open now is enough to show green.
+  const openHoursVal = hoursFields
+    .map((f) => item[f.key])
+    .find((v) => v !== undefined && hoursOpenNow(v) === true && isStructuredHours(v))
+  const isOpen = openHoursVal !== undefined
   // Within the last hour before closing, the "Open" chip reads "Closes soon"
   // (still green — the place is usable now) with the exact close time on hover.
-  const closing = isOpen ? hoursClosing(hoursVal) : null
+  const closing = isOpen ? hoursClosing(openHoursVal) : null
+  const anyHoursVal = hoursFields.some((f) => item[f.key] !== undefined)
   const travel = travelParts(item)
   const tags = tagFields.flatMap((f) => asTags(item[f.key]))
   const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
@@ -341,7 +362,7 @@ export function GenericListingCard({
               <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
                 {item.phone}
               </a>
-              {item.placeId && !hoursVal && (
+              {item.placeId && !anyHoursVal && (
                 <span className="ml-2 text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none align-middle">via Google</span>
               )}
             </div>
@@ -365,9 +386,23 @@ export function GenericListingCard({
             </div>
           )}
 
-          {(hoursVal !== undefined || item.businessStatus) && (
-            <HoursDisplay value={hoursVal} businessStatus={item.businessStatus} syncedAt={item.googleSyncedAt} />
-          )}
+          {hoursFields.map((f, i) => {
+            const val = item[f.key]
+            if (val === undefined && !(i === 0 && item.businessStatus)) return null
+            return (
+              <div key={f.key}>
+                {/* Only label each block when there's more than one — keeps
+                    every category with a single Hours field looking exactly
+                    as it did before. */}
+                {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+                <HoursDisplay
+                  value={val}
+                  businessStatus={i === 0 ? item.businessStatus : undefined}
+                  syncedAt={i === 0 ? item.googleSyncedAt : undefined}
+                />
+              </div>
+            )
+          })}
 
           {urlFields.map((f) => {
             const href = display(item[f.key])

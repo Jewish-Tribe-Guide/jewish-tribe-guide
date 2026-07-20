@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory } from '@/lib/categoryStore'
 import { clearCategoryFieldData } from '@/lib/resourceStore'
+import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
 
 type PatchBody = {
@@ -15,6 +16,7 @@ type PatchBody = {
   hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
+  externalLink?: { label: string; url: string } | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
@@ -40,6 +42,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
   if (body.label !== undefined && !body.label.trim()) {
     return Response.json({ ok: false, errors: ['Category name cannot be empty.'] }, { status: 400 })
+  }
+  if (body.externalLink && !isHttpUrl(body.externalLink.url)) {
+    return Response.json({ ok: false, errors: ['The external link must be a valid http(s) URL.'] }, { status: 400 })
   }
 
   try {

@@ -21,6 +21,8 @@ type CategoryRow = {
   has_address: boolean
   has_phone: boolean
   capabilities: Partial<CategoryCapabilities> | null
+  external_link_label: string | null
+  external_link_url: string | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -37,6 +39,10 @@ function toConfig(row: CategoryRow): CategoryConfig {
     hasPhone: row.has_phone !== false,
     upvotesEnabled: !!row.upvotes_enabled,
     capabilities: resolveCapabilities(row.capabilities),
+    externalLink:
+      row.external_link_label && row.external_link_url
+        ? { label: row.external_link_label, url: row.external_link_url }
+        : null,
   }
 }
 
@@ -91,6 +97,7 @@ export async function createCategory(input: {
   hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
+  externalLink?: { label: string; url: string } | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
@@ -117,6 +124,8 @@ export async function createCategory(input: {
     has_phone: input.hasPhone ?? true,
     upvotes_enabled: !!input.upvotesEnabled,
     capabilities: input.capabilities ?? {},
+    external_link_label: input.externalLink?.label ?? null,
+    external_link_url: input.externalLink?.url ?? null,
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -147,6 +156,7 @@ export async function updateCategory(
     hasPhone?: boolean
     upvotesEnabled?: boolean
     capabilities?: Partial<CategoryCapabilities>
+    externalLink?: { label: string; url: string } | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -162,6 +172,10 @@ export async function updateCategory(
   if (patch.hasPhone !== undefined) row.has_phone = !!patch.hasPhone
   if (patch.upvotesEnabled !== undefined) row.upvotes_enabled = !!patch.upvotesEnabled
   if (patch.capabilities !== undefined) row.capabilities = patch.capabilities
+  if (patch.externalLink !== undefined) {
+    row.external_link_label = patch.externalLink?.label ?? null
+    row.external_link_url = patch.externalLink?.url ?? null
+  }
 
   if (Object.keys(row).length === 0) return getCategoryById(id)
 

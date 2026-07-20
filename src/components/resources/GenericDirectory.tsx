@@ -165,6 +165,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setOpenNow(false)
   }
 
+  // Keys of the boolean filters currently on — passed to each card so it can
+  // hide other audiences' fields when one (e.g. "Men's") is active.
+  const activeBoolFilterKeys = Object.keys(boolFilters).filter((k) => boolFilters[k])
+
   // The active field filters in the shape the map consumes (see MapFilters).
   const mapFilters = (): MapFilters => ({
     openNow: openNow || undefined,
@@ -192,6 +196,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               >
                 🗺️ Map
               </button>
+            )}
+            {category.externalLink && (
+              <a
+                href={category.externalLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                /* Desktop only, mirrors the Map button — mobile gets its own
+                   copy in the filter row below. */
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors whitespace-nowrap"
+              >
+                {category.externalLink.label} ↗
+              </a>
             )}
             {canAdd && (
               <button
@@ -254,6 +270,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 >
                   🗺️ Map
                 </button>
+              )}
+              {category.externalLink && (
+                <a
+                  href={category.externalLink.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                >
+                  {category.externalLink.label} ↗
+                </a>
               )}
               {hasMinyanim && (
                 <button
@@ -441,6 +467,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}
+              activeBoolFilterKeys={activeBoolFilterKeys}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
               onFilterOpen={() => setOpenNow((v) => !v)}

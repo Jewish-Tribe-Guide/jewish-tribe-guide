@@ -619,6 +619,10 @@ type Draft = {
    *  preserved as-is and re-merged on save so editing a category never drops
    *  or exposes them. */
   hiddenFields: CategoryField[]
+  /** A button in the directory header linking out, e.g. "Other Mikvahs" →
+   *  mikvah.org. Both blank means none. */
+  externalLinkLabel: string
+  externalLinkUrl: string
 }
 
 function toDraft(c: CategoryConfig | null): Draft {
@@ -633,6 +637,8 @@ function toDraft(c: CategoryConfig | null): Draft {
     capabilities: resolveCapabilities(c?.capabilities),
     fields: all.filter((f) => f.renderAs !== 'hidden'),
     hiddenFields: all.filter((f) => f.renderAs === 'hidden'),
+    externalLinkLabel: c?.externalLink?.label ?? '',
+    externalLinkUrl: c?.externalLink?.url ?? '',
   }
 }
 
@@ -814,6 +820,10 @@ function CategoryEditor({
         hasPhone: draft.hasPhone,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
+        externalLink:
+          draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+            ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
+            : null,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
         // fields so editing never drops them.
         fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
@@ -860,6 +870,10 @@ function CategoryEditor({
       hasPhone: draft.hasPhone,
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
+      externalLink:
+        draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+          ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
+          : null,
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
   }
@@ -916,6 +930,27 @@ function CategoryEditor({
               and the Map button don’t apply either.
             </span>
           </div>
+          <div className="pt-1 space-y-1.5">
+            <span className="block text-xs font-medium text-slate-700">External link (optional)</span>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={draft.externalLinkLabel}
+                onChange={(e) => set('externalLinkLabel', e.target.value)}
+                className={`${inputClass} sm:w-1/3`}
+                placeholder="Button text, e.g. Other Mikvahs"
+              />
+              <input
+                value={draft.externalLinkUrl}
+                onChange={(e) => set('externalLinkUrl', e.target.value)}
+                className={`${inputClass} flex-1`}
+                placeholder="https://…"
+              />
+            </div>
+            <span className="block text-[11px] text-muted">
+              Shown as its own button in this category’s directory, next to Map/Add — for pointing
+              somewhere broader the site doesn’t curate itself. Not tied to any listing.
+            </span>
+          </div>
         </section>
 
         {/* Capabilities */}
@@ -963,6 +998,12 @@ function CategoryEditor({
                   total={draft.fields.length}
                   // "Required" only matters if people can add or edit listings.
                   canRequire={draft.capabilities.add || draft.capabilities.edit}
+                  // Boolean fields make sense as an "audience" a field is
+                  // scoped to (e.g. "Women's Tevillah") — a field can't be
+                  // scoped to itself.
+                  audienceOptions={draft.fields
+                    .filter((other) => other.type === 'boolean' && other.key !== f.key)
+                    .map((other) => ({ key: other.key, label: other.label }))}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
@@ -1132,6 +1173,7 @@ function FieldEditor({
   index,
   total,
   canRequire,
+  audienceOptions,
   onChange,
   onRemove,
   onMove,
@@ -1140,6 +1182,10 @@ function FieldEditor({
   index: number
   total: number
   canRequire: boolean
+  /** The category's own boolean fields this one could be scoped to — see
+   *  CategoryField.audienceKey. Empty when the category has no boolean
+   *  fields yet. */
+  audienceOptions: { key: string; label: string }[]
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
@@ -1225,6 +1271,27 @@ function FieldEditor({
             <option value="badge">Badge — a chip, and a filter</option>
             <option value="row">Row — a labeled line</option>
           </select>
+        </label>
+      )}
+
+      {audienceOptions.length > 0 && (
+        <label className="block sm:w-1/2">
+          <span className={fieldLabel}>Only show when this filter is on (optional)</span>
+          <select
+            value={f.audienceKey ?? ''}
+            onChange={(e) => onChange({ audienceKey: e.target.value || undefined })}
+            className={inputClass}
+          >
+            <option value="">Always show</option>
+            {audienceOptions.map((o) => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+          <span className="block text-[11px] text-muted mt-0.5">
+            When a visitor turns on that filter, cards hide every other audience-scoped detail —
+            useful for things like separate men&rsquo;s/women&rsquo;s hours so they don&rsquo;t all show
+            at once.
+          </span>
         </label>
       )}
 
