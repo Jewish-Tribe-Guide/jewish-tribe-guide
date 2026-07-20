@@ -182,17 +182,14 @@ export function slugifyFieldKey(label: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
-// Category ids that are community-wide rather than hospital-scoped (e.g. WhatsApp
-// groups). Kept in code since these are rare and owner-defined.
-export const COMMUNITY_CATEGORY_IDS = new Set<string>(['whatsapp'])
-
 // Category ids whose listings must NOT auto-sync from Google Places. Two kinds:
-//   • community categories (not real map places, e.g. whatsapp), and
+//   • community-wide categories (not real map places, e.g. whatsapp — see the
+//     `community` column/CategoryConfig field), and
 //   • categories whose value is hand-curated community info Google doesn't have
 //     (synagogue davening times, mikvah schedules, bikur cholim rooms).
 // The place-id backfill skips these, so no placeId is ever assigned and the
 // sync can never overwrite their curated fields. Ids that don't exist are
-// harmless. (Mirrors COMMUNITY_CATEGORY_IDS for 'whatsapp'.)
+// harmless.
 export const SYNC_EXCLUDED_CATEGORY_IDS = new Set<string>([
   'whatsapp',
   'synagogue',
