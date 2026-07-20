@@ -218,6 +218,22 @@ export async function sendAdminMagicLink(email: string, link: string): Promise<v
   await sendEmail({ to: email, subject: 'Your sign-in link — Resource Moderation', html })
 }
 
+// Emails an inbox-viewer sign-in link. Used by /api/inbox/request-link AFTER
+// the email has been verified against INBOX_EMAILS (a separate allowlist from
+// ADMIN_EMAILS — see inboxAuth.ts), so only allowed viewers ever receive one.
+export async function sendInboxMagicLink(email: string, link: string): Promise<void> {
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;">
+    <h2 style="color:#1d4ed8;">Sign in to the Inbox</h2>
+    <p style="color:#334155;font-size:14px;">Click the button below to sign in. This link is for ${escapeHtml(email)} and expires shortly.</p>
+    <p style="margin:24px 0;">
+      <a href="${escapeHtml(link)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Sign in</a>
+    </p>
+    <p style="color:#94a3b8;font-size:12px;">If you didn't request this, you can ignore this email.</p>
+  </div>`
+
+  await sendEmail({ to: email, subject: 'Your sign-in link — Inbox', html })
+}
+
 // Notifies the moderator that a new resource was submitted and is awaiting
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
