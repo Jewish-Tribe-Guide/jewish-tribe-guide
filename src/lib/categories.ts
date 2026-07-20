@@ -221,6 +221,11 @@ export function isCategorySyncEligible(categoryId: string): boolean {
 
 // Evaluates a field's `showIf` against the current detail values.
 export function fieldIsVisible(field: CategoryField, details: Record<string, unknown>): boolean {
+  // An audience-scoped field (see CategoryField.audienceKey) is a hard gate,
+  // same as showIf: it isn't shown — or submittable — on a listing that
+  // hasn't checked the matching boolean, full stop. No way to peek at it
+  // manually; the form only ever offers what applies to this listing.
+  if (field.audienceKey && !details[field.audienceKey]) return false
   if (!field.showIf) return true
   return details[field.showIf.field] === field.showIf.equals
 }
