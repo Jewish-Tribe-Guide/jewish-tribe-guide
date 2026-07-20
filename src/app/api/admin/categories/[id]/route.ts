@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory } from '@/lib/categoryStore'
+import { clearCategoryFieldData } from '@/lib/resourceStore'
 import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
 
 type PatchBody = {
@@ -14,6 +15,11 @@ type PatchBody = {
   hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
+  /** When address/phone is being turned off or a field removed on a category
+   *  that already has listings, the editor confirms with the admin (via
+   *  field-usage) before including this — it wipes that data from every
+   *  listing in the category, right after the category itself is saved. */
+  clearFields?: { address?: boolean; phone?: boolean; keys?: string[] }
 }
 
 // PATCH /api/admin/categories/:id — edit a category's presentation, fields, and
@@ -41,7 +47,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
     }
-    return Response.json({ ok: true, category })
+    let cleared: number | undefined
+    if (body.clearFields && (body.clearFields.address || body.clearFields.phone || body.clearFields.keys?.length)) {
+      ;({ updated: cleared } = await clearCategoryFieldData(id, {
+        address: body.clearFields.address,
+        phone: body.clearFields.phone,
+        fieldKeys: body.clearFields.keys,
+      }))
+    }
+    return Response.json({ ok: true, category, cleared })
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update category.'] }, { status: 502 })

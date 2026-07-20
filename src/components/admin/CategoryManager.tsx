@@ -657,6 +657,18 @@ function CategoryEditor({
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
+  // Set once a save attempt finds existing listings with data in a field the
+  // admin just removed (or an address/phone toggle they just turned off) — a
+  // confirmation gate before that data is wiped for real. Cleared on cancel or
+  // once the confirmed save completes.
+  const [pendingCleanup, setPendingCleanup] = useState<{
+    address: number
+    phone: number
+    fields: Record<string, number>
+    addressOff: boolean
+    phoneOff: boolean
+    removedKeys: string[]
+  } | null>(null)
 
   // Preview gets its own history entry so browser/trackpad Back (and the
   // preview's own Up button, which calls closePreview) land back on this
@@ -737,6 +749,20 @@ function CategoryEditor({
     return errs
   }
 
+  // Detail field keys that existed on the saved category but aren't in the
+  // draft anymore — i.e. the admin removed them (not just renamed one, which
+  // keeps the same key). Hidden fields are never offered for removal here, so
+  // they're excluded from "before" on purpose.
+  function removedFieldKeys(): string[] {
+    if (!initial) return []
+    const keptKeys = new Set(draft.fields.map((f) => f.key))
+    return initial.detailFields.filter((f) => f.renderAs !== 'hidden' && !keptKeys.has(f.key)).map((f) => f.key)
+  }
+
+  function cancelCleanup() {
+    setPendingCleanup(null)
+  }
+
   async function save() {
     const errs = validate()
     if (errs.length) {
@@ -744,6 +770,40 @@ function CategoryEditor({
       return
     }
     setErrors([])
+
+    // Editing an existing category, turning off address/phone or dropping a
+    // field: check whether any existing listings actually have data there
+    // before wiping it — skip the check once the admin has already confirmed
+    // (pendingCleanup is set) so re-clicking Save doesn't loop.
+    if (!isNew && !pendingCleanup) {
+      const addressOff = initial!.hasAddress !== false && !draft.hasAddress
+      const phoneOff = initial!.hasPhone !== false && !draft.hasPhone
+      const removedKeys = removedFieldKeys()
+      if (addressOff || phoneOff || removedKeys.length > 0) {
+        setSaving(true)
+        try {
+          const res = await fetch(`/api/admin/categories/${initial!.id}/field-usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ address: addressOff, phone: phoneOff, fieldKeys: removedKeys }),
+          })
+          const body = await res.json()
+          if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not check existing listings.')
+          const usage = body.usage as { address: number; phone: number; fields: Record<string, number> }
+          const total = usage.address + usage.phone + Object.values(usage.fields).reduce((a, b) => a + b, 0)
+          if (total > 0) {
+            setPendingCleanup({ ...usage, addressOff, phoneOff, removedKeys })
+            return
+          }
+        } catch (err) {
+          setErrors([err instanceof Error ? err.message : 'Could not check existing listings.'])
+          return
+        } finally {
+          setSaving(false)
+        }
+      }
+    }
+
     setSaving(true)
     try {
       const payload = {
@@ -757,6 +817,13 @@ function CategoryEditor({
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
         // fields so editing never drops them.
         fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
+        ...(pendingCleanup && {
+          clearFields: {
+            address: pendingCleanup.addressOff,
+            phone: pendingCleanup.phoneOff,
+            keys: pendingCleanup.removedKeys,
+          },
+        }),
       }
       const res = await fetch(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
@@ -773,6 +840,7 @@ function CategoryEditor({
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
     } finally {
       setSaving(false)
+      setPendingCleanup(null)
     }
   }
 
@@ -912,28 +980,97 @@ function CategoryEditor({
           </ul>
         )}
 
-        <div className="flex gap-2">
-          <button
-            onClick={openPreview}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            Preview
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            {saving ? 'Saving…' : isNew ? 'Create category' : 'Save changes'}
-          </button>
-          <button
-            onClick={onCancel}
-            disabled={saving}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-          >
-            Cancel
-          </button>
-        </div>
+        {pendingCleanup ? (
+          <CleanupConfirm
+            cleanup={pendingCleanup}
+            initial={initial}
+            saving={saving}
+            onCancel={cancelCleanup}
+            onConfirm={save}
+          />
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={openPreview}
+              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Preview
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              {saving ? 'Saving…' : isNew ? 'Create category' : 'Save changes'}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Blocks the save until the admin explicitly confirms wiping the field(s) they
+// just removed (or turned off) from every existing listing in this category —
+// irreversible, so it replaces the normal Save/Cancel row rather than being an
+// easy-to-miss inline notice.
+function CleanupConfirm({
+  cleanup,
+  initial,
+  saving,
+  onCancel,
+  onConfirm,
+}: {
+  cleanup: { address: number; phone: number; fields: Record<string, number>; addressOff: boolean; phoneOff: boolean; removedKeys: string[] }
+  initial: CategoryConfig | null
+  saving: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const items: { label: string; count: number }[] = [
+    ...(cleanup.addressOff && cleanup.address > 0 ? [{ label: 'Address', count: cleanup.address }] : []),
+    ...(cleanup.phoneOff && cleanup.phone > 0 ? [{ label: 'Phone number', count: cleanup.phone }] : []),
+    ...cleanup.removedKeys
+      .filter((k) => (cleanup.fields[k] ?? 0) > 0)
+      .map((k) => ({
+        label: initial?.detailFields.find((f) => f.key === k)?.label ?? k,
+        count: cleanup.fields[k],
+      })),
+  ]
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+      <p className="text-sm font-medium text-amber-900">This will permanently clear data from existing listings</p>
+      <ul className="text-sm text-amber-800 list-disc list-inside space-y-0.5">
+        {items.map((it) => (
+          <li key={it.label}>
+            {it.label} — {it.count} listing{it.count !== 1 ? 's' : ''}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-amber-700">This can&rsquo;t be undone. To keep the data, cancel and undo the removal above instead.</p>
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={saving}
+          className="text-sm font-medium bg-red-600 text-white rounded-md px-4 py-2 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {saving ? 'Saving…' : 'Clear and save'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   )
