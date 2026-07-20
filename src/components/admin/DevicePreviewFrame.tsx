@@ -53,9 +53,27 @@ function IframeViewport({
       const doc = iframe!.contentDocument
       if (!doc) return
       done = true
-      document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
-        doc.head.appendChild(node.cloneNode(true))
-      })
+      // Inline the *actual currently-applied* CSS text (via CSSOM) rather than
+      // cloning <link>/<style> nodes and letting the iframe re-fetch them — a
+      // second fetch of a dev-server CSS chunk can race or silently fail,
+      // leaving the iframe's copy unstyled. This bit us with the Google Places
+      // widget: its ::part() sizing override (globals.css) never arrived, so
+      // it rendered at Google's huge, unstyled default instead of matching the
+      // app's compact inputs. Reading document.styleSheets is synchronous —
+      // no network round-trip, no race.
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          const style = doc.createElement('style')
+          style.textContent = Array.from(sheet.cssRules).map((r) => r.cssText).join('\n')
+          doc.head.appendChild(style)
+        } catch {
+          // Cross-origin stylesheet (e.g. a font host) — cssRules is
+          // inaccessible. Fall back to cloning the <link> as a best effort;
+          // not required for anything this preview actually needs styled.
+          const owner = sheet.ownerNode as Element | null
+          if (owner) doc.head.appendChild(owner.cloneNode(true))
+        }
+      }
       doc.documentElement.className = document.documentElement.className
       doc.body.className = 'bg-surface text-slate-900 antialiased min-h-screen flex flex-col'
       doc.body.style.margin = '0'
