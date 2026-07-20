@@ -9,12 +9,15 @@ import FindResources from '@/components/FindResources'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
+import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import { useStoredLocation } from '@/lib/useStoredLocation'
 import { useCategories } from '@/lib/useCategories'
 
-// Which guided form is open as a full-screen overlay (Support / Volunteer), and
-// any need pre-checked from the card or a search result.
-export type Flow = { kind: 'support' | 'volunteer'; preselect?: string[] }
+// Which guided form is open as a full-screen overlay, and any need
+// pre-checked from the card or a search result. `kind` is 'support'/
+// 'volunteer' for the two built-in forms, or any other form's id for an
+// admin-created custom form (see GenericFormWizard.tsx).
+export type Flow = { kind: string; preselect?: string[] }
 
 // What we persist in the browser history stack so back/forward can restore state.
 // `flowStep` is the wizard's current step index — each step is its own history
@@ -131,8 +134,10 @@ export default function Page() {
   const overlay = flow && (
     flow.kind === 'support' ? (
       <SupportWizard preselect={flow.preselect} onClose={closeFlow} />
-    ) : (
+    ) : flow.kind === 'volunteer' ? (
       <VolunteerWizard preselect={flow.preselect} onClose={closeFlow} />
+    ) : (
+      <GenericFormWizard formId={flow.kind} onClose={closeFlow} />
     )
   )
 

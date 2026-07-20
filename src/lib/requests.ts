@@ -15,8 +15,11 @@ export type RequestType =
 // The payload every form POSTs to /api/requests. `contact` carries the shared
 // name/phone/email/hospital fields; `formData` is the request-type-specific blob
 // that gets stored verbatim as JSON (system of record keeps everything).
+// `requestType` is one of the 5 built-in strings, or (paired with `formId`) a
+// custom admin-created form's title — see GenericFormWizard.tsx.
 export type SubmissionPayload = {
-  requestType: RequestType
+  requestType: RequestType | string
+  formId?: string
   contact: ContactHospitalData
   formData: Record<string, unknown>
 }

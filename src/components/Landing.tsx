@@ -5,7 +5,7 @@ import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, res
 import HeroHeading from '@/components/home/HeroHeading'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
-import { useForm } from '@/lib/useForms'
+import { useForm, useForms } from '@/lib/useForms'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
@@ -36,6 +36,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // back to the historical copy while the form is still loading.
   const supportForm = useForm('support')
   const volunteerForm = useForm('volunteer')
+  // Every other form is an admin-created custom one — support/volunteer keep
+  // their own dedicated cards above (fixed copy/keywords), so exclude them
+  // here rather than double-listing.
+  const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
 
   const entryCards: CardDef[] = [
     ...(community.features.patientSupport
@@ -73,6 +77,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           go: () => onNavigate('patient', 'map'),
         }]
       : []),
+    ...customForms.map((f) => ({
+      title: f.title,
+      go: () => onOpenFlow(f.id),
+    })),
   ]
 
   const resources = resourceCards(onNavigate, categories)

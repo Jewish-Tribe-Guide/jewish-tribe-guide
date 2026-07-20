@@ -64,6 +64,7 @@ export async function POST(request: Request) {
     await insertFormResponse({
       requestId,
       requestType: payload.requestType,
+      formId: payload.formId,
       contact: payload.contact,
       data: payload.formData,
     })
