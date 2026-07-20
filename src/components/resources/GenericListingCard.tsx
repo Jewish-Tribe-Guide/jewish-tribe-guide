@@ -130,11 +130,19 @@ export function GenericListingCard({
     return String(item[f.caveat.noteField] ?? '').trim()
   }
 
+  // Gate on the category's current address/phone toggles, not just whether the
+  // listing happens to have stored values — if a category turns address or
+  // phone off after listings already had it filled in, that stale data should
+  // stop rendering rather than linger on the card. Matches how a removed
+  // custom detail field already behaves (data persists, display doesn't).
+  const showAddress = category.hasAddress !== false && !!item.address
+  const showPhone = category.hasPhone !== false && !!item.phone
+
   // A quiet second line under the name — mirrors the synagogue card's denomination
   // subtitle. The address gives "where is this" context without expanding; items
   // with no address (e.g. community groups) fall back to a short Google blurb.
-  const subtitle = item.address
-    ? shortAddress(item.address)
+  const subtitle = showAddress
+    ? shortAddress(item.address!)
     : (item.googleDescription as string | undefined) || null
 
   return (
@@ -315,11 +323,11 @@ export function GenericListingCard({
             </div>
           )}
 
-          {item.address && (
+          {showAddress && (
             <div>
               <p className="text-sm text-slate-800">{item.address}</p>
               <a
-                href={businessUrl(item.name, item.address, item.placeId as string | undefined)}
+                href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
                 target="_blank" rel="noopener noreferrer"
                 className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
               >
@@ -328,9 +336,9 @@ export function GenericListingCard({
             </div>
           )}
 
-          {item.phone && (
+          {showPhone && (
             <div>
-              <a href={`tel:${item.phone.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
+              <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
                 {item.phone}
               </a>
               {item.placeId && !hoursVal && (
