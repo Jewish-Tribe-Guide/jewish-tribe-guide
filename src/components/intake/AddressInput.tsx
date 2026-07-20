@@ -29,9 +29,16 @@ type Props = {
    *  When set, Google returns the matching business's name/hours/phone rather
    *  than just the address. Leave unset for general address inputs. */
   includedPrimaryTypes?: string[]
+  /** Skip Google's autocomplete widget and render a plain text input instead.
+   *  Needed inside the admin preview: PlaceAutocompleteElement is a custom
+   *  element registered against the main document, but the preview portals
+   *  into a separate <iframe> document — a custom element created in one
+   *  document never upgrades (renders) when appended into another, so it'd
+   *  otherwise show up as an invisible, empty tag. */
+  disableAutocomplete?: boolean
 }
 
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const elementRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
@@ -55,7 +62,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
   })
 
   useEffect(() => {
-    if (!MAPS_API_KEY || mapsAuthFailed()) return
+    if (disableAutocomplete || !MAPS_API_KEY || mapsAuthFailed()) return
     const container = containerRef.current
     if (!container || elementRef.current) return
 
@@ -135,10 +142,13 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       elementRef.current?.remove()
       elementRef.current = null
     }
-  }, [])
+    // `disableAutocomplete` is fixed for a given mount in practice (callers
+    // don't flip it mid-session) — included for correctness, not because it's
+    // expected to change.
+  }, [disableAutocomplete])
 
-  // No key, or Google rejected the key — plain text input.
-  if (!MAPS_API_KEY || authFailed) {
+  // No key, Google rejected the key, or autocomplete is explicitly disabled — plain text input.
+  if (disableAutocomplete || !MAPS_API_KEY || authFailed) {
     return (
       <TextInput
         value={value}
