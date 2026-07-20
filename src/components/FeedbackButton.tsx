@@ -2,8 +2,19 @@
 
 import { useState } from 'react'
 import FeedbackForm from './FeedbackForm'
+import { DEFAULT_FEEDBACK_BUTTON_LABEL, DEFAULT_FEEDBACK_HEADING, DEFAULT_FEEDBACK_SUCCESS_MESSAGE } from '@/lib/siteSettings'
 
-export default function FeedbackButton() {
+type Props = {
+  buttonLabel?: string
+  heading?: string
+  successMessage?: string
+}
+
+export default function FeedbackButton({
+  buttonLabel = DEFAULT_FEEDBACK_BUTTON_LABEL,
+  heading = DEFAULT_FEEDBACK_HEADING,
+  successMessage = DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
+}: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -12,9 +23,11 @@ export default function FeedbackButton() {
         onClick={() => setOpen(true)}
         className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
       >
-        Have general feedback about the site? Send a note &rarr;
+        {buttonLabel} &rarr;
       </button>
-      {open && <FeedbackForm onClose={() => setOpen(false)} />}
+      {open && (
+        <FeedbackForm heading={heading} successMessage={successMessage} onClose={() => setOpen(false)} />
+      )}
     </>
   )
 }

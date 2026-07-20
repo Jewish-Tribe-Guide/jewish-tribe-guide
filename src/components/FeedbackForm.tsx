@@ -6,9 +6,9 @@ import TurnstileWidget from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
 import type { ContactHospitalData } from '@/types'
 
-type Props = { onClose: () => void }
+type Props = { heading: string; successMessage: string; onClose: () => void }
 
-export default function FeedbackForm({ onClose }: Props) {
+export default function FeedbackForm({ heading, successMessage, onClose }: Props) {
   const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
   const [honeypot, setHoneypot] = useState('')
@@ -43,9 +43,7 @@ export default function FeedbackForm({ onClose }: Props) {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
         <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
           <h3 className="text-lg font-semibold text-slate-900">Thanks for your note!</h3>
-          <p className="mt-2 text-sm text-slate-600">
-            We appreciate your feedback and will take it into account.
-          </p>
+          <p className="mt-2 text-sm text-slate-600">{successMessage}</p>
           <button
             onClick={onClose}
             className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -61,7 +59,7 @@ export default function FeedbackForm({ onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">Send feedback</h3>
+          <h3 className="text-lg font-semibold text-slate-900">{heading}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             &times;
           </button>
