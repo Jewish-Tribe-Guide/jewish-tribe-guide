@@ -207,7 +207,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               onCoords={setCoords}
               onPlaceSelect={handlePlaceSelect}
               placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
-              disableAutocomplete={!!onPreviewSubmit}
             />
           </div>
         )}

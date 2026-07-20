@@ -40,33 +40,51 @@ declare global {
   }
 }
 
-// Load the Maps JS API once, then resolve only when `importLibrary` is
-// available. With `loading=async`, that function is attached shortly *after*
-// the script's load event fires, so resolving on `onload` alone would call
-// importLibrary too early — hence the poll.
-let scriptPromise: Promise<void> | null = null
+// Load the Maps JS API once per window, then resolve only when
+// `importLibrary` is available. With `loading=async`, that function is
+// attached shortly *after* the script's load event fires, so resolving on
+// `onload` alone would call importLibrary too early — hence the poll.
+//
+// Keyed per-window (not just once globally) because a custom element like
+// PlaceAutocompleteElement only renders in the document/window that defined
+// it — the admin category preview portals its Add/Edit form into a separate
+// <iframe> document (see DevicePreviewFrame.tsx), so AddressInput loads a
+// second, independent copy of the script into that iframe's own window
+// rather than reusing the main page's `google` global.
+const scriptPromises = new WeakMap<Window, Promise<void>>()
 
-export function loadGoogleMaps(): Promise<void> {
+// `google` is a bare ambient global (from @types/google.maps), not a property
+// declared on the `Window` interface — so a `Window`-typed variable other than
+// the literal `window` needs a cast to read it off.
+function windowGoogle(win: Window): typeof google | undefined {
+  return (win as Partial<Window & { google: typeof google }>).google
+}
+
+export function loadGoogleMaps(targetWindow?: Window): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
-  if (scriptPromise) return scriptPromise
+  const win = targetWindow ?? window
 
-  scriptPromise = new Promise<void>((resolve, reject) => {
-    // Google calls this global on auth failure (bad key, no billing, etc.).
-    window.gm_authFailure = reportMapsAuthFailure
+  const existing = scriptPromises.get(win)
+  if (existing) return existing
 
-    if (!document.getElementById('google-maps-script') && !window.google?.maps) {
-      const script = document.createElement('script')
+  const promise = new Promise<void>((resolve, reject) => {
+    // Google calls this global on auth failure (bad key, no billing, etc.) —
+    // shared across every window, since a rejected key is rejected everywhere.
+    win.gm_authFailure = reportMapsAuthFailure
+
+    if (!win.document.getElementById('google-maps-script') && !windowGoogle(win)?.maps) {
+      const script = win.document.createElement('script')
       script.id = 'google-maps-script'
       script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&loading=async`
       script.async = true
       script.onerror = () => reject(new Error('Failed to load Google Maps script'))
-      document.head.appendChild(script)
+      win.document.head.appendChild(script)
     }
 
     // Poll for the modern loader to become ready (up to ~10s).
     let tries = 0
     const check = () => {
-      if (typeof window.google?.maps?.importLibrary === 'function') {
+      if (typeof windowGoogle(win)?.maps?.importLibrary === 'function') {
         resolve()
       } else if (++tries > 200) {
         reject(new Error('Google Maps importLibrary did not become available'))
@@ -76,5 +94,6 @@ export function loadGoogleMaps(): Promise<void> {
     }
     check()
   })
-  return scriptPromise
+  scriptPromises.set(win, promise)
+  return promise
 }
