@@ -10,7 +10,8 @@ type PatchBody = {
   description?: string
   sortOrder?: number
   fields?: CategoryField[]
-  community?: boolean
+  hasAddress?: boolean
+  hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
 }

@@ -158,10 +158,14 @@ export type CategoryConfig = {
   /** Defaults to 'listing' for every real directory category. */
   kind: CategoryKind
   sortOrder?: number
-  /** Community-wide (not tied to a hospital): the listing form hides
-   *  hospital/address/distance/phone, and the list shows every entry regardless
-   *  of the selected hospital. */
-  community?: boolean
+  /** Whether listings in this category have an address (default true when
+   *  unset). Off for things like WhatsApp groups that aren't a physical place
+   *  — the listing form hides the address field, distance/sorting-by-location
+   *  is skipped, and the "Map" capability has no effect (nothing to plot). */
+  hasAddress?: boolean
+  /** Whether listings in this category have a phone number (default true when
+   *  unset) — the listing form hides the phone field when off. */
+  hasPhone?: boolean
   /** Whether listings in this category can be upvoted. */
   upvotesEnabled?: boolean
   /** Per-category UI affordances (resolved with defaults). Server code always

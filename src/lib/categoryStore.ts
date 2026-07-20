@@ -18,7 +18,8 @@ type CategoryRow = {
   kind: CategoryKind
   sort_order: number
   upvotes_enabled: boolean
-  community: boolean
+  has_address: boolean
+  has_phone: boolean
   capabilities: Partial<CategoryCapabilities> | null
 }
 
@@ -32,7 +33,8 @@ function toConfig(row: CategoryRow): CategoryConfig {
     detailFields: row.fields ?? [],
     kind: row.kind,
     sortOrder: row.sort_order,
-    community: !!row.community,
+    hasAddress: row.has_address !== false,
+    hasPhone: row.has_phone !== false,
     upvotesEnabled: !!row.upvotes_enabled,
     capabilities: resolveCapabilities(row.capabilities),
   }
@@ -85,7 +87,8 @@ export async function createCategory(input: {
   fields?: CategoryField[]
   kind?: CategoryKind
   sortOrder?: number
-  community?: boolean
+  hasAddress?: boolean
+  hasPhone?: boolean
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
 }): Promise<CategoryConfig> {
@@ -110,7 +113,8 @@ export async function createCategory(input: {
     fields: input.fields ?? [],
     kind,
     sort_order: input.sortOrder ?? 100,
-    community: !!input.community,
+    has_address: input.hasAddress ?? true,
+    has_phone: input.hasPhone ?? true,
     upvotes_enabled: !!input.upvotesEnabled,
     capabilities: input.capabilities ?? {},
   }
@@ -139,7 +143,8 @@ export async function updateCategory(
     description?: string
     fields?: CategoryField[]
     sortOrder?: number
-    community?: boolean
+    hasAddress?: boolean
+    hasPhone?: boolean
     upvotesEnabled?: boolean
     capabilities?: Partial<CategoryCapabilities>
   },
@@ -153,7 +158,8 @@ export async function updateCategory(
   if (patch.description !== undefined) row.description = patch.description.trim()
   if (patch.fields !== undefined) row.fields = patch.fields
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
-  if (patch.community !== undefined) row.community = !!patch.community
+  if (patch.hasAddress !== undefined) row.has_address = !!patch.hasAddress
+  if (patch.hasPhone !== undefined) row.has_phone = !!patch.hasPhone
   if (patch.upvotesEnabled !== undefined) row.upvotes_enabled = !!patch.upvotesEnabled
   if (patch.capabilities !== undefined) row.capabilities = patch.capabilities
 

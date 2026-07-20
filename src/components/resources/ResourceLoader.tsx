@@ -58,7 +58,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   // typed address to each listing's geocoded coordinates.
   const withDistance = useMemo(() => {
     if (!items) return items
-    if (category.community) return items
+    if (category.hasAddress === false) return items
 
     const coords = anchorCoords
     if (!coords) return items
@@ -66,7 +66,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
       if (!item.geo) return item
       return { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
     })
-  }, [items, anchorCoords, category.community])
+  }, [items, anchorCoords, category.hasAddress])
 
   if (error) {
     return (
@@ -92,8 +92,8 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   const anchorLabel = anchor.label || undefined
 
   // Distance-sorted categories prompt for a location when none is set yet.
-  // Community categories (e.g. WhatsApp groups) aren't distance-based, so skip it.
-  const addressPrompt = !anchor.label && !category.community
+  // Categories with no address (e.g. WhatsApp groups) aren't distance-based, so skip it.
+  const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
     <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />

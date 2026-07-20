@@ -31,7 +31,8 @@ const inputClass =
 
 export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit }: Props) {
   const config = category
-  const community = !!category.community
+  const hasAddress = category.hasAddress !== false
+  const hasPhone = category.hasPhone !== false
   const syncEligible = isCategorySyncEligible(category.id)
 
   const [name, setName] = useState(existing?.name ?? '')
@@ -103,11 +104,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         id: existing?.id ?? `preview-${Date.now()}`,
         category: category.id,
         name,
-        anchorId: community ? 'community' : 'all',
+        anchorId: hasAddress ? 'all' : 'community',
         distance: 0,
-        address: community ? '' : address,
-        phone: community ? '' : phone,
-        geo: community ? null : coords,
+        address: hasAddress ? address : '',
+        phone: hasPhone ? phone : '',
+        geo: hasAddress ? coords : null,
         ...visibleDetails,
       })
       return
@@ -117,19 +118,19 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       category: category.id,
       name,
       // Listings aren't hospital-scoped; distance is computed from the geocoded
-      // address. `anchorId` is just a grouping key ('community' for community
-      // categories, which have no address at all; 'all' otherwise).
-      anchorId: community ? 'community' : 'all',
+      // address. `anchorId` is just a grouping key ('community' for categories
+      // with no address at all; 'all' otherwise).
+      anchorId: hasAddress ? 'all' : 'community',
       distance: null,
-      address: community ? '' : address,
-      phone: community ? '' : phone,
+      address: hasAddress ? address : '',
+      phone: hasPhone ? phone : '',
       details: {
         ...visibleDetails,
         // Carry the Google place id through so the sync job can pick it up as
         // soon as the listing is approved. Only set for sync-eligible categories.
         ...(syncEligible && placeId ? { placeId } : {}),
       },
-      geo: community ? null : coords,
+      geo: hasAddress ? coords : null,
     }
     const submittedBy =
       submitterName.trim() || submitterEmail.trim()
@@ -197,20 +198,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Honeypot value={honeypot} onChange={setHoneypot} />
-        {!community && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
-              <AddressInput
-                value={address}
-                onChange={setAddress}
-                onCoords={setCoords}
-                onPlaceSelect={handlePlaceSelect}
-                placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
-              />
-            </div>
-
-          </>
+        {hasAddress && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
+            <AddressInput
+              value={address}
+              onChange={setAddress}
+              onCoords={setCoords}
+              onPlaceSelect={handlePlaceSelect}
+              placeholder={syncEligible ? 'Search by business name or address…' : 'Start typing an address…'}
+            />
+          </div>
         )}
 
         <div>
@@ -218,7 +216,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
         </div>
 
-        {!community && (
+        {hasPhone && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="(215) 555-0100" />

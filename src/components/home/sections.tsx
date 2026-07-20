@@ -144,9 +144,9 @@ export function searchListings(
       .sort((a, b) => score(b) - score(a) || a.length - b.length)
       .slice(0, 3)
     // Stamp straight-line distance the same way the directory does (ResourceLoader):
-    // address-anchored, non-community categories, when the listing has coordinates.
+    // address-anchored categories only, when the listing has coordinates.
     const withDistance =
-      coords && !category.community && item.geo
+      coords && category.hasAddress !== false && item.geo
         ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
         : item
     hits.push({
