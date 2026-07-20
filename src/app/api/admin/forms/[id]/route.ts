@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
-import { saveDraft, discardDraft } from '@/lib/formStore'
+import { saveDraft, deleteForm } from '@/lib/formStore'
 import type { FormStep } from '@/lib/forms'
 
 type PatchBody = {
@@ -50,20 +50,22 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 }
 
-// DELETE /api/admin/forms/:id — discard the form's pending draft (NOT the form
-// itself — forms are a fixed pair, never deleted). Leaves published content
-// untouched. Admin only.
+// DELETE /api/admin/forms/:id — permanently delete a form and every response
+// to it. Blocked for 'support'/'volunteer' (see deleteForm — they're wired
+// directly into the home screen and their own wizard components). Admin
+// only. To discard a pending draft instead (leaving the form itself intact),
+// see DELETE /api/admin/forms/:id/draft.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]'>) {
   const admin = await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const form = await discardDraft(id)
-    if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
-    return Response.json({ ok: true, form })
+    const { responses } = await deleteForm(id)
+    return Response.json({ ok: true, responses })
   } catch (err) {
     console.error('[admin/forms/:id] DELETE failed:', err)
-    return Response.json({ ok: false, errors: ['Could not discard draft.'] }, { status: 502 })
+    const message = err instanceof Error ? err.message : 'Could not delete form.'
+    return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
 }

@@ -5,12 +5,12 @@ import type { FormConfig, FormContent, FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
 
-// ── Editor for one form (Request Support / Volunteer) — title, chrome text,
-// and questions. Mounted from CategoryManager's unified list alongside listing
-// categories. Unlike categories, forms are a fixed pair (no create/delete) —
-// the schema seeds exactly 'support' and 'volunteer'. Edits save as a draft;
-// nothing reaches a real visitor until the admin explicitly publishes (see the
-// draft/publish notes in formStore.ts). ─────────────────────────────────────
+// ── Editor for one form — title, chrome text, and questions. Mounted from
+// CategoryManager's unified list, both for the two built-in forms (Request
+// Support / Volunteer) and any admin-created custom form (add/delete lives in
+// CategoryManager; this component only edits an existing row either way).
+// Edits save as a draft; nothing reaches a real visitor until the admin
+// explicitly publishes (see the draft/publish notes in formStore.ts). ──────
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -164,7 +164,7 @@ export default function FormEditor({
     setDiscarding(true)
     setErrors([])
     try {
-      const res = await fetch(`/api/admin/forms/${form.id}`, {
+      const res = await fetch(`/api/admin/forms/${form.id}/draft`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

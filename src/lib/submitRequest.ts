@@ -5,20 +5,23 @@ type SubmitResult = { ok: true; requestId: string }
 
 // Client-side helper used by every intake form. POSTs to /api/requests and
 // either resolves with the new request id or throws an Error whose message is
-// suitable for display to the user.
+// suitable for display to the user. `requestType` is one of the 5 built-in
+// strings for Support/Volunteer/Feedback, or a custom form's title (free
+// text) — paired with `formId`, the stable identity, for GenericFormWizard.
 export async function submitRequest(
-  requestType: RequestType,
+  requestType: RequestType | string,
   contact: ContactHospitalData,
   formData: Record<string, unknown>,
   honeypot = '',
   turnstileToken = '',
+  formId?: string,
 ): Promise<SubmitResult> {
   let res: Response
   try {
     res = await fetch('/api/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestType, contact, formData, company: honeypot, turnstileToken }),
+      body: JSON.stringify({ requestType, formId, contact, formData, company: honeypot, turnstileToken }),
     })
   } catch {
     throw new Error('Network error. Please check your connection and try again.')

@@ -28,10 +28,9 @@ const FALLBACK_FORMS: FormConfig[] = (seededForms as SeedForm[]).map((f) => ({
 let cache: FormConfig[] | null = null
 let inflight: Promise<FormConfig[]> | null = null
 
-/** The published config for one form ('support' | 'volunteer'), or null while
- *  loading. Falls back to the seeded form set (src/data/forms.js) if the API
- *  fails or returns nothing. */
-export function useForm(id: string): FormConfig | null {
+/** Every published form, or null while loading. Falls back to the seeded
+ *  form set (src/data/forms.js) if the API fails or returns nothing. */
+export function useForms(): FormConfig[] | null {
   const [forms, setForms] = useState<FormConfig[] | null>(cache)
 
   useEffect(() => {
@@ -52,5 +51,10 @@ export function useForm(id: string): FormConfig | null {
     }
   }, [])
 
-  return forms?.find((f) => f.id === id) ?? null
+  return forms
+}
+
+/** The published config for one form by id, or null while loading / not found. */
+export function useForm(id: string): FormConfig | null {
+  return useForms()?.find((f) => f.id === id) ?? null
 }

@@ -21,11 +21,11 @@ import CategoryPreview from './CategoryPreview'
 
 // ── The categories manager: one list mixing the two kinds of thing a
 // community configures — Listing categories (Grocery Stores, Synagogues, …,
-// each with its own detail fields and capabilities) and Forms (the fixed
-// Request Support / Volunteer wizards). Edit either's presentation and fields,
-// or create a new Listing category (forms are a fixed pair — see FormEditor).
-// Mounted on /admin. Listing writes go through /api/admin/categories; form
-// writes through /api/admin/forms. ──────────────────────────────────────────
+// each with its own detail fields and capabilities) and Forms (Request
+// Support / Volunteer, plus any custom form an admin creates). Add/edit/
+// delete either kind; a custom form's responses live in /admin's Responses
+// tab (see ResponsesManager.tsx), not here. Mounted on /admin. Listing writes
+// go through /api/admin/categories; form writes through /api/admin/forms. ──
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -73,6 +73,7 @@ export default function CategoryManager({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addingSingleton, setAddingSingleton] = useState<'map' | 'zmanim' | null>(null)
+  const [addingForm, setAddingForm] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -133,6 +134,51 @@ export default function CategoryManager({
     setDeletingId(id)
     try {
       const res = await fetch(`/api/admin/categories/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      setConfirmDeleteId(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // Creates a form directly (no editor step for the name — mirrors
+  // addSingleton) then immediately opens the real editor on it, where the
+  // admin renames it and adds questions. No client-side "new form" draft
+  // state: FormEditor always assumes the row already exists.
+  async function addForm() {
+    setError(null)
+    setAddingForm(true)
+    try {
+      const res = await fetch('/api/admin/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ label: 'New form' }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create form.')
+      await load()
+      onOpenEditor(`${FORM_PREFIX}${body.form.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create form.')
+    } finally {
+      setAddingForm(false)
+    }
+  }
+
+  // Delete state is shared with categories' confirm/deleting state, keyed by
+  // `form:<id>` so a form and a category can never collide.
+  async function deleteFormEntry(id: string) {
+    setError(null)
+    setDeletingId(`${FORM_PREFIX}${id}`)
+    try {
+      const res = await fetch(`/api/admin/forms/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -235,6 +281,13 @@ export default function CategoryManager({
           >
             + New category
           </button>
+          <button
+            onClick={addForm}
+            disabled={addingForm}
+            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+          >
+            {addingForm ? 'Adding…' : '+ Add Form'}
+          </button>
         </div>
       </div>
 
@@ -271,7 +324,16 @@ export default function CategoryManager({
                 onConfirmDelete={() => deleteCategory(e.data.id)}
               />
             ) : (
-              <FormRow key={`form:${e.data.id}`} form={e.data} onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)} />
+              <FormRow
+                key={`form:${e.data.id}`}
+                form={e.data}
+                confirmingDelete={confirmDeleteId === `${FORM_PREFIX}${e.data.id}`}
+                deleting={deletingId === `${FORM_PREFIX}${e.data.id}`}
+                onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)}
+                onAskDelete={() => setConfirmDeleteId(`${FORM_PREFIX}${e.data.id}`)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+                onConfirmDelete={() => deleteFormEntry(e.data.id)}
+              />
             ),
           )}
         </div>
@@ -446,28 +508,89 @@ function SingletonRow({
   )
 }
 
-function FormRow({ form: f, onEdit }: { form: FormConfig; onEdit: () => void }) {
+// 'support'/'volunteer' are wired directly into the home screen and their own
+// wizard components — deleting them is blocked server-side (see formStore
+// .deleteForm) and the Delete button is hidden here to match.
+const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
+
+function FormRow({
+  form: f,
+  confirmingDelete,
+  deleting,
+  onEdit,
+  onAskDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  form: FormConfig
+  confirmingDelete: boolean
+  deleting: boolean
+  onEdit: () => void
+  onAskDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
+}) {
+  const canDelete = !PROTECTED_FORM_IDS.has(f.id)
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
-          <span className={`${TYPE_BADGE} bg-purple-50 text-purple-600`}>Form</span>
-          <span>{f.title}</span>
-          <span className="font-normal text-xs text-muted">{f.id}</span>
-          {f.draft && (
-            <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
-              Unpublished draft
-            </span>
+    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+            <span className={`${TYPE_BADGE} bg-purple-50 text-purple-600`}>Form</span>
+            <span>{f.title}</span>
+            <span className="font-normal text-xs text-muted">{f.id}</span>
+            {f.draft && (
+              <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">
+                Unpublished draft
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onEdit}
+            className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Edit
+          </button>
+          {canDelete && (
+            <button
+              onClick={onAskDelete}
+              className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+            >
+              Delete
+            </button>
           )}
-        </p>
-        <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
+        </div>
       </div>
-      <button
-        onClick={onEdit}
-        className="shrink-0 text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
-      >
-        Edit
-      </button>
+
+      {confirmingDelete && (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+            <p className="text-sm text-red-800">
+              Permanently delete <span className="font-semibold">{f.title}</span> and every response to
+              it? This can’t be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={onConfirmDelete}
+                disabled={deleting}
+                className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                {deleting ? 'Deleting…' : 'Delete form & responses'}
+              </button>
+              <button
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
