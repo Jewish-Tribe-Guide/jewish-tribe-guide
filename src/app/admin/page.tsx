@@ -13,6 +13,7 @@ import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
 import CategoryManager from '@/components/admin/CategoryManager'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
+import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null)
@@ -33,7 +34,15 @@ export default function AdminPage() {
   }
 
   if (!session) {
-    return <Shell><LoginForm /></Shell>
+    return (
+      <Shell>
+        <MagicLinkLogin
+          requestLinkUrl="/api/admin/request-link"
+          emailLabel="Admin email"
+          sentMessage="an authorized admin"
+        />
+      </Shell>
+    )
   }
 
   return (
@@ -140,66 +149,6 @@ function Shell({ children }: { children: React.ReactNode }) {
       <p className="text-sm text-muted mb-6">Review and approve submitted resources.</p>
       {children}
     </main>
-  )
-}
-
-function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSending(true)
-    try {
-      const res = await fetch('/api/admin/request-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.error || 'Could not send the sign-in link.')
-      setSent(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send the sign-in link.')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  if (sent) {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-5">
-        <p className="text-sm text-green-800">
-          If that email is an authorized admin, a sign-in link is on its way. Open it on this device
-          to continue.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
-      <label className="block text-sm font-medium text-slate-700">Admin email</label>
-      <input
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-      />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={sending}
-        className="bg-primary text-white font-medium px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
-      >
-        {sending ? 'Sending…' : 'Send magic link'}
-      </button>
-    </form>
   )
 }
 
