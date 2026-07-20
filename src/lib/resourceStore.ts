@@ -52,6 +52,58 @@ export async function getResourceById(id: string): Promise<DirectoryResource | n
   return data ? normalizeRow(data as ResourceRow) : null
 }
 
+// ── Archived listings (admin) ────────────────────────────────────────────────
+// A listing "removal" (an approved delete-type submission — see
+// submissionStore.ts) is a soft delete: the row moves to status='archived'
+// instead of being dropped, so it never shows publicly but stays recoverable.
+// Nothing purges these on its own, so without an admin view they'd just
+// accumulate forever — these back that view.
+
+// Archived listings, newest-removed first. Any status other than 'archived'
+// is out of scope here — this is specifically the cleanup queue.
+export async function listArchivedResources(): Promise<ResourceRow[]> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('status', 'archived')
+    .order('reviewed_at', { ascending: false })
+
+  if (error) throw new Error(`Failed to load archived listings: ${error.message}`)
+  return data as ResourceRow[]
+}
+
+// Un-archives a listing back to 'approved' — it reappears on the public site
+// exactly as it was. Scoped to currently-archived rows so this can't be used
+// to force an unrelated pending/rejected row live.
+export async function restoreResource(id: string): Promise<ResourceRow | null> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'archived')
+    .select('*')
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to restore listing: ${error.message}`)
+  return data as ResourceRow | null
+}
+
+// Permanently deletes an archived listing (votes/tags cascade via FK) —
+// irreversible. Scoped to currently-archived rows for the same reason as
+// restoreResource: this is a cleanup action, not a general-purpose delete.
+export async function hardDeleteArchivedResource(id: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'archived')
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to permanently delete listing: ${error.message}`)
+  return !!data
+}
+
 // ── Validation ───────────────────────────────────────────────────────────────
 
 // Validates a listing submission payload against its category. `category` is the
