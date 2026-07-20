@@ -19,6 +19,7 @@ export type Tefillah =
   | 'shabbos_mussaf'
   | 'mincha'
   | 'maariv'
+  | 'mincha_maariv'
   | 'other'
 
 /** Canonical tefillah display order. */
@@ -28,6 +29,7 @@ export const TEFILLAH_ORDER: Tefillah[] = [
   'shabbos_mussaf',
   'mincha',
   'maariv',
+  'mincha_maariv',
   'other',
 ]
 
@@ -37,6 +39,7 @@ export const TEFILLAH_LABELS: Record<Tefillah, string> = {
   shabbos_mussaf: 'Shabbos Mussaf',
   mincha: 'Mincha',
   maariv: 'Maariv',
+  mincha_maariv: 'Mincha & Maariv',
   other: 'Other',
 }
 
