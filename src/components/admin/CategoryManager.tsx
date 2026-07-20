@@ -16,6 +16,7 @@ import {
   type FieldType,
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
+import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import FormEditor from './FormEditor'
 import CategoryPreview from './CategoryPreview'
 
@@ -675,6 +676,17 @@ function CategoryEditor({
     phoneOff: boolean
     removedKeys: string[]
   } | null>(null)
+  // The "+ Add audience group" mini-form's own draft state — separate from
+  // `draft` since it's discarded on cancel and only ever produces a batch of
+  // new fields, never edits an existing one.
+  const [groupForm, setGroupForm] = useState<{
+    audienceKey: string
+    prefix: string
+    phone: boolean
+    email: boolean
+    hours: boolean
+    notes: boolean
+  } | null>(null)
 
   // Preview gets its own history entry so browser/trackpad Back (and the
   // preview's own Up button, which calls closePreview) land back on this
@@ -710,6 +722,25 @@ function CategoryEditor({
     setDraft((d) => ({ ...d, capabilities: { ...d.capabilities, [key]: value } }))
   }
 
+  // Pre-fills the draft's fields/capabilities from a starter template — only
+  // offered on a brand-new, still-empty category (see the picker below); a
+  // category with real listings already has data under specific field keys,
+  // so templates don't retrofit onto those.
+  function applyTemplate(templateId: string) {
+    const template = CATEGORY_TEMPLATES.find((t) => t.id === templateId)
+    if (!template) return
+    setDraft((d) => ({
+      ...d,
+      pluralLabel: d.pluralLabel || template.pluralLabel,
+      label: d.label || singularize(template.pluralLabel),
+      hasAddress: template.hasAddress ?? d.hasAddress,
+      hasPhone: template.hasPhone ?? d.hasPhone,
+      upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
+      capabilities: { ...d.capabilities, ...template.capabilities },
+      fields: template.fields.map((f) => ({ ...f })),
+    }))
+  }
+
   function updateField(i: number, patch: Partial<CategoryField>) {
     setDraft((d) => ({
       ...d,
@@ -726,6 +757,36 @@ function CategoryEditor({
 
   function removeField(i: number) {
     setDraft((d) => ({ ...d, fields: d.fields.filter((_, idx) => idx !== i) }))
+  }
+
+  // Adds a standard Phone/Email/Hours/Notes set in one action, each tagged
+  // with the chosen audienceKey — the quick way to set up a mikvah-style
+  // "click the checkbox, see that audience's fields" group without adding
+  // four fields one at a time. See the audience-group panel below.
+  function addAudienceGroup() {
+    if (!groupForm) return
+    const { audienceKey, prefix, phone, email, hours, notes } = groupForm
+    const p = prefix.trim()
+    if (!audienceKey || !p) return
+
+    const usedKeys = new Set([...draft.fields, ...draft.hiddenFields].map((f) => f.key))
+    function nextKey(label: string): string {
+      const base = slugifyFieldKey(label)
+      let key = base
+      for (let n = 2; usedKeys.has(key); n++) key = `${base}${n}`
+      usedKeys.add(key)
+      return key
+    }
+
+    const newFields: CategoryField[] = []
+    if (hours) newFields.push({ key: nextKey(`${p} Hours`), label: `${p} Hours`, type: 'hours', renderAs: 'row', filterable: true, audienceKey })
+    if (phone) newFields.push({ key: nextKey(`${p} Phone`), label: `${p} Phone`, type: 'tel', renderAs: 'row', filterable: false, audienceKey })
+    if (email) newFields.push({ key: nextKey(`${p} Email`), label: `${p} Email`, type: 'text', renderAs: 'row', filterable: false, audienceKey })
+    if (notes) newFields.push({ key: nextKey(`${p} Notes`), label: `${p} Notes`, type: 'textarea', renderAs: 'row', filterable: false, audienceKey })
+    if (newFields.length === 0) return
+
+    setDraft((d) => ({ ...d, fields: [...d.fields, ...newFields] }))
+    setGroupForm(null)
   }
 
   function moveField(i: number, dir: -1 | 1) {
@@ -893,6 +954,28 @@ function CategoryEditor({
       </h2>
 
       <div className="space-y-6">
+        {isNew && draft.fields.length === 0 && CATEGORY_TEMPLATES.length > 0 && (
+          <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
+            <span className="block text-xs font-medium text-slate-700">Start from a template (optional)</span>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => applyTemplate(t.id)}
+                  className="text-left border border-slate-300 rounded-md px-3 py-2 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer max-w-xs"
+                >
+                  <span className="block text-sm font-medium text-slate-800">{t.label}</span>
+                  <span className="block text-[11px] text-muted mt-0.5">{t.description}</span>
+                </button>
+              ))}
+            </div>
+            <span className="block text-[11px] text-muted">
+              Pre-fills the details below — everything stays fully editable, and nothing here is
+              locked to the template afterward.
+            </span>
+          </section>
+        )}
+
         {/* Presentation */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
           <label className="block">
@@ -977,15 +1060,88 @@ function CategoryEditor({
 
         {/* Details */}
         <section className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-slate-800">Details</h3>
-            <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
-              + Add detail
-            </button>
+            <div className="flex items-center gap-3">
+              {draft.fields.some((f) => f.type === 'boolean') && (
+                <button
+                  onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                >
+                  + Add audience group
+                </button>
+              )}
+              <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
+                + Add detail
+              </button>
+            </div>
           </div>
           <p className="text-xs text-muted mb-3">
             What each listing shows, beyond its name, address, and phone.
           </p>
+
+          {groupForm && (
+            <div className="border border-primary/40 rounded-md p-3 mb-3 bg-primary/5 space-y-2.5">
+              <p className="text-xs font-medium text-slate-700">
+                Add a Phone/Email/Hours/Notes set, all scoped to one filter — e.g. pick &ldquo;Women&rsquo;s
+                Tevillah&rdquo; and prefix &ldquo;Women&rsquo;s&rdquo; to add Women&rsquo;s Phone, Women&rsquo;s
+                Email, and Women&rsquo;s Hours in one go.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="block sm:w-1/2">
+                  <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Which filter</span>
+                  <select
+                    value={groupForm.audienceKey}
+                    onChange={(e) => setGroupForm((g) => (g ? { ...g, audienceKey: e.target.value } : g))}
+                    className={inputClass}
+                  >
+                    <option value="">Select…</option>
+                    {draft.fields.filter((f) => f.type === 'boolean').map((f) => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block sm:w-1/2">
+                  <span className="block text-[11px] font-medium text-slate-600 mb-0.5">Label prefix</span>
+                  <input
+                    value={groupForm.prefix}
+                    onChange={(e) => setGroupForm((g) => (g ? { ...g, prefix: e.target.value } : g))}
+                    className={inputClass}
+                    placeholder="e.g. Women's"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                {([['hours', 'Hours'], ['phone', 'Phone'], ['email', 'Email'], ['notes', 'Notes']] as const).map(([key, lbl]) => (
+                  <label key={key} className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={groupForm[key]}
+                      onChange={(e) => setGroupForm((g) => (g ? { ...g, [key]: e.target.checked } : g))}
+                      className="rounded border-slate-300"
+                    />
+                    {lbl}
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={addAudienceGroup}
+                  disabled={!groupForm.audienceKey || !groupForm.prefix.trim()}
+                  className="text-xs font-medium bg-primary text-white rounded px-3 py-1.5 hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Add fields
+                </button>
+                <button
+                  onClick={() => setGroupForm(null)}
+                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {draft.fields.length === 0 ? (
             <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
