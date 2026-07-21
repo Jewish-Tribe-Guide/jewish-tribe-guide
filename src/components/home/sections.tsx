@@ -17,7 +17,9 @@ export type CardDef = {
    *  (e.g. "shul" for Synagogues, "supermarket" for Grocery Stores). */
   keywords?: string[]
   /** One emoji shown above the title — from the category's own `icon` field
-   *  where there is one; a few hand-built cards set a fixed one directly. */
+   *  where there is one; a few hand-built cards set a fixed one directly.
+   *  Ignored when `cardImageUrl` is set (see `Card`) — an emoji over a photo
+   *  never reads as a clean icon, so those cards go title-only. */
   icon?: string
   /** Stable id (category id, or a fixed one for hand-built cards like 'map',
    *  'support') — used to sort cards into home-screen sections; title alone
@@ -46,20 +48,14 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
         style={hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       >
         {/* A photo card gets a dark scrim regardless of the photo's own
-            brightness, so the title/icon stay legible no matter what's
-            pasted in — same idea as the cRc-style reference. */}
+            brightness, so the title stays legible no matter what's pasted in
+            — same idea as the cRc-style reference. */}
         {hasImage && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" aria-hidden="true" />}
-        {card.icon && (
-          <span
-            className={`relative text-3xl leading-none ${hasImage ? 'drop-shadow' : ''}`}
-            // Photo cards render the icon as a flat white silhouette (like the
-            // cRc reference) instead of the emoji's own colors — emoji are
-            // color glyphs, not strokable outlines, so this is a filter over
-            // the rendered glyph rather than a true hollow-line icon. The
-            // title's own color is still admin-set via `textColor` below.
-            style={hasImage ? { filter: 'brightness(0) invert(1)' } : undefined}
-            aria-hidden="true"
-          >
+        {/* The icon only shows on the flat-tint look — over a photo, an emoji
+            (a color glyph, not a strokable outline) never reads as a clean
+            icon, so photo cards go title-only instead. */}
+        {card.icon && !hasImage && (
+          <span className="relative text-3xl leading-none" aria-hidden="true">
             {card.icon}
           </span>
         )}
