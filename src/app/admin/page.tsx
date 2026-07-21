@@ -20,6 +20,7 @@ import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
+  const [devLoginError, setDevLoginError] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = getBrowserClient()
@@ -31,6 +32,34 @@ export default function AdminPage() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  // Local-dev-only shortcut: /admin?devToken=<DEV_ADMIN_BYPASS_SECRET> signs in
+  // instantly via /api/admin/dev-login instead of the magic-link email — see
+  // that route for why this can't do anything on a real deployment. Strips the
+  // secret from the URL bar/history immediately either way.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const devToken = params.get('devToken')
+    if (!devToken) return
+
+    history.replaceState(history.state, '', window.location.pathname)
+
+    fetch('/api/admin/dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: devToken }),
+    })
+      .then((res) => res.json())
+      .then(async (body) => {
+        if (!body.ok) throw new Error(body.error || 'Dev login failed.')
+        const { error } = await getBrowserClient().auth.setSession({
+          access_token: body.accessToken,
+          refresh_token: body.refreshToken,
+        })
+        if (error) throw error
+      })
+      .catch((err) => setDevLoginError(err instanceof Error ? err.message : 'Dev login failed.'))
+  }, [])
+
   if (!ready) {
     return <Shell><p className="text-sm text-muted">Loading…</p></Shell>
   }
@@ -38,6 +67,11 @@ export default function AdminPage() {
   if (!session) {
     return (
       <Shell>
+        {devLoginError && (
+          <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
+            Dev login failed: {devLoginError}
+          </p>
+        )}
         <MagicLinkLogin
           requestLinkUrl="/api/admin/request-link"
           emailLabel="Admin email"

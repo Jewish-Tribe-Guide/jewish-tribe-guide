@@ -281,12 +281,25 @@ export default function CategoryManager({
     )
   }
 
-  // Map/Zmanim rows never render an Edit button (see the list below), so this
-  // only ever opens for a real listing category.
   if (editingId?.startsWith(CAT_PREFIX)) {
     const id = editingId.slice(CAT_PREFIX.length)
-    const initial = categories?.find((c) => c.id === id && c.kind === 'listing') ?? null
+    const initial = categories?.find((c) => c.id === id) ?? null
     if (!initial) return <p className="text-sm text-muted">Loading…</p>
+    // Map/Zmanim/Eruv only offer the lightweight icon/background editor
+    // (see SINGLETON_EDITABLE_KINDS) — everything else is a real category.
+    if (initial.kind !== 'listing') {
+      return (
+        <SingletonEditor
+          token={token}
+          category={initial}
+          onSaved={() => {
+            onCloseEditor()
+            load()
+          }}
+          onCancel={onCloseEditor}
+        />
+      )
+    }
     return (
       <CategoryEditor
         token={token}
@@ -385,6 +398,7 @@ export default function CategoryManager({
                 category={e.data}
                 confirmingDelete={confirmDeleteId === e.data.id}
                 deleting={deletingId === e.data.id}
+                onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
                 onAskDelete={() => setConfirmDeleteId(e.data.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteCategory(e.data.id)}
@@ -516,10 +530,17 @@ const SINGLETON_DESCRIPTIONS: Record<SingletonKind, string> = {
 // A Map/Zmanim/Eruv/Medical row — nothing to edit, just presence + a Delete
 // button, reusing the exact same delete/confirm flow as a real listing
 // category.
+// Jewish Medical Resources' card is intentionally left delete-only (no Edit
+// button) — its content is still hardcoded and likely to change, per the
+// admin's call; Map/Zmanim/Eruv get the same icon/background editor as a
+// real category.
+const SINGLETON_EDITABLE_KINDS = new Set<SingletonKind>(['map', 'zmanim', 'eruv'])
+
 function SingletonRow({
   category: c,
   confirmingDelete,
   deleting,
+  onEdit,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
@@ -527,6 +548,7 @@ function SingletonRow({
   category: CategoryConfig
   confirmingDelete: boolean
   deleting: boolean
+  onEdit: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
@@ -544,12 +566,19 @@ function SingletonRow({
           </p>
           <p className="text-xs text-muted mt-1">{description}</p>
         </div>
-        <button
-          onClick={onAskDelete}
-          className="shrink-0 text-xs font-medium text-red-600 hover:underline cursor-pointer"
-        >
-          Delete
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          {SINGLETON_EDITABLE_KINDS.has(kind) && (
+            <button onClick={onEdit} className="text-xs font-medium text-primary hover:underline cursor-pointer">
+              Edit
+            </button>
+          )}
+          <button
+            onClick={onAskDelete}
+            className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       {confirmingDelete && (
@@ -577,6 +606,107 @@ function SingletonRow({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// A lightweight editor for Map/Zmanim/Eruv — there's no name, description, or
+// fields to change (it's a fixed, code-driven screen), just the icon and the
+// home-screen card's photo/text color, reusing the exact same fields as the
+// full category editor.
+function SingletonEditor({
+  token,
+  category,
+  onSaved,
+  onCancel,
+}: {
+  token: string
+  category: CategoryConfig
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const [icon, setIcon] = useState(category.icon || '')
+  const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
+  const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+
+  async function save() {
+    setErrors([])
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/categories/${category.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          icon,
+          cardImageUrl: cardImageUrl.trim() || null,
+          cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+      onSaved()
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Save failed.'])
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={onCancel}
+        className="text-sm text-muted hover:text-slate-700 underline mb-4 cursor-pointer"
+      >
+        ← Back to categories
+      </button>
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">
+        Edit “{category.pluralLabel}”
+        <span className="ml-2 text-xs font-normal text-muted">{category.id}</span>
+      </h2>
+      <p className="text-xs text-muted mb-4">
+        This is a fixed, code-driven card — only its icon and home-screen appearance are editable
+        here.
+      </p>
+
+      <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <IconField icon={icon} onChange={setIcon} />
+        <CardBackgroundField
+          cardImageUrl={cardImageUrl}
+          onCardImageUrl={setCardImageUrl}
+          cardTextColor={cardTextColor}
+          onCardTextColor={setCardTextColor}
+          previewIcon={icon}
+          previewTitle={category.pluralLabel}
+        />
+      </section>
+
+      {errors.length > 0 && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
+          {errors.map((e) => (
+            <p key={e} className="text-sm text-red-700">{e}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }
@@ -731,6 +861,137 @@ function toDraft(c: CategoryConfig | null): Draft {
   }
 }
 
+// The emoji field + curated browse panel — shared by the full category editor
+// and SingletonEditor (Map/Zmanim/Eruv), which has nothing else to edit.
+function IconField({ icon, onChange }: { icon: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <label className="block">
+      <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
+      <div className="flex gap-2">
+        {/* inputClass bakes in w-full — wrap it rather than adding a competing
+            w-16 to the same className, which Tailwind doesn't resolve by
+            source order and would silently lose to w-full. */}
+        <div className="w-16 shrink-0">
+          <input
+            value={icon}
+            onChange={(e) => onChange(e.target.value)}
+            className={`${inputClass} text-center text-lg`}
+            placeholder={DEFAULT_CATEGORY_ICON}
+            maxLength={4}
+            aria-label="Icon"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="text-sm font-medium border border-slate-300 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          {open ? 'Hide icons' : 'Browse icons…'}
+        </button>
+      </div>
+      {/* A plain scrolling div, not a native <select> — the browser's own
+          dropdown popup can't be restyled (comes out cramped regardless of
+          how the closed control is sized) and its built-in overflow arrows
+          only scroll one direction at a time. This scrolls like any other
+          page content. */}
+      {open && (
+        <div className="mt-2 border border-slate-200 rounded-md p-2 max-h-52 overflow-y-auto space-y-2 bg-slate-50/60">
+          {ICON_CHOICES.map((group) => (
+            <div key={group.group}>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                {group.group}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {group.options.map((o) => (
+                  <button
+                    key={o.emoji}
+                    type="button"
+                    onClick={() => { onChange(o.emoji); setOpen(false) }}
+                    title={o.label}
+                    className={`text-lg leading-none rounded-md px-2 py-1.5 transition-colors cursor-pointer ${
+                      icon === o.emoji ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-white'
+                    }`}
+                  >
+                    {o.emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <span className="block text-[11px] text-muted mt-1">
+        Browse a curated list, or type/paste any emoji directly into the box. Shown before the
+        name on the home screen and map legend.
+      </span>
+    </label>
+  )
+}
+
+// The image-URL + text-color fields + live preview — shared by the full
+// category editor and SingletonEditor.
+function CardBackgroundField({
+  cardImageUrl,
+  onCardImageUrl,
+  cardTextColor,
+  onCardTextColor,
+  previewIcon,
+  previewTitle,
+}: {
+  cardImageUrl: string
+  onCardImageUrl: (value: string) => void
+  cardTextColor: string
+  onCardTextColor: (value: string) => void
+  previewIcon: string
+  previewTitle: string
+}) {
+  return (
+    <div className="pt-1">
+      <span className="block text-xs font-medium text-slate-700 mb-1">Home-screen card background (optional)</span>
+      <div className="flex gap-3">
+        <div className="flex-1 space-y-2">
+          <input
+            value={cardImageUrl}
+            onChange={(e) => onCardImageUrl(e.target.value)}
+            className={inputClass}
+            placeholder="https://… (a photo instead of the flat tint)"
+          />
+          {cardImageUrl.trim() && (
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <span className="text-xs font-medium text-slate-700">Text color</span>
+              <input
+                type="color"
+                value={cardTextColor}
+                onChange={(e) => onCardTextColor(e.target.value)}
+                className="h-8 w-14 rounded border border-slate-300 cursor-pointer"
+              />
+            </label>
+          )}
+          <span className="block text-[11px] text-muted">
+            A pasted image URL, not an upload. A dark gradient is applied automatically so the
+            title stays readable — the color picker only affects the text/icon, not the photo.
+          </span>
+        </div>
+        {/* A live preview using the exact same Card the home screen renders,
+            so what's shown here is what visitors will see. */}
+        <div className="w-32 shrink-0">
+          <HomeCard
+            card={{
+              title: previewTitle,
+              icon: previewIcon || undefined,
+              cardImageUrl: cardImageUrl.trim() || null,
+              cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+              go: () => {},
+            }}
+            tint={TINTS[0]}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CategoryEditor({
   token,
   initial,
@@ -758,7 +1019,6 @@ function CategoryEditor({
   // template's name/icon, safe to swap in the new one" apart from "the admin
   // already customized this," which should be left alone.
   const [lastAppliedTemplate, setLastAppliedTemplate] = useState<CategoryTemplate | null>(null)
-  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   // Set once a save attempt finds existing listings with data in a field the
   // admin just removed (or an address/phone toggle they just turned off) — a
   // confirmation gate before that data is wiped for real. Cleared on cancel or
@@ -1108,61 +1368,7 @@ function CategoryEditor({
 
         {/* Presentation */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
-            <div className="flex gap-2">
-              <input
-                value={draft.icon}
-                onChange={(e) => set('icon', e.target.value)}
-                className={`${inputClass} w-16 shrink-0 text-center text-lg`}
-                placeholder={DEFAULT_CATEGORY_ICON}
-                maxLength={4}
-                aria-label="Icon"
-              />
-              <button
-                type="button"
-                onClick={() => setIconPickerOpen((o) => !o)}
-                className="text-sm font-medium border border-slate-300 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                {iconPickerOpen ? 'Hide icons' : 'Browse icons…'}
-              </button>
-            </div>
-            {/* A plain scrolling div, not a native <select> — the browser's own
-                dropdown popup can't be restyled (comes out cramped regardless
-                of how the closed control is sized) and its built-in overflow
-                arrows only scroll one direction at a time. This scrolls like
-                any other page content. */}
-            {iconPickerOpen && (
-              <div className="mt-2 border border-slate-200 rounded-md p-2 max-h-52 overflow-y-auto space-y-2 bg-slate-50/60">
-                {ICON_CHOICES.map((group) => (
-                  <div key={group.group}>
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
-                      {group.group}
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {group.options.map((o) => (
-                        <button
-                          key={o.emoji}
-                          type="button"
-                          onClick={() => { set('icon', o.emoji); setIconPickerOpen(false) }}
-                          title={o.label}
-                          className={`text-lg leading-none rounded-md px-2 py-1.5 transition-colors cursor-pointer ${
-                            draft.icon === o.emoji ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-white'
-                          }`}
-                        >
-                          {o.emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <span className="block text-[11px] text-muted mt-1">
-              Browse a curated list, or type/paste any emoji directly into the box. Shown before the
-              name on the home screen and map legend.
-            </span>
-          </label>
+          <IconField icon={draft.icon} onChange={(v) => set('icon', v)} />
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
             <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
@@ -1174,48 +1380,14 @@ function CategoryEditor({
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
           </label>
-          <div className="pt-1">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Home-screen card background (optional)</span>
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-2">
-                <input
-                  value={draft.cardImageUrl}
-                  onChange={(e) => set('cardImageUrl', e.target.value)}
-                  className={inputClass}
-                  placeholder="https://… (a photo instead of the flat tint)"
-                />
-                {draft.cardImageUrl.trim() && (
-                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                    <span className="text-xs font-medium text-slate-700">Text color</span>
-                    <input
-                      type="color"
-                      value={draft.cardTextColor}
-                      onChange={(e) => set('cardTextColor', e.target.value)}
-                      className="h-8 w-14 rounded border border-slate-300 cursor-pointer"
-                    />
-                  </label>
-                )}
-                <span className="block text-[11px] text-muted">
-                  A pasted image URL, not an upload. A dark gradient is applied automatically so the
-                  title stays readable — the color picker only affects the text/icon, not the photo.
-                </span>
-              </div>
-              {/* A live preview using the exact same Card the home screen
-                  renders, so what's shown here is what visitors will see. */}
-              <div className="w-32 shrink-0">
-                <HomeCard
-                  card={{
-                    title: draft.pluralLabel || 'Category',
-                    icon: draft.icon || undefined,
-                    cardImageUrl: draft.cardImageUrl.trim() || null,
-                    cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
-                    go: () => {},
-                  }}
-                  tint={TINTS[0]}
-                />
-              </div>
-            </div>
-          </div>
+          <CardBackgroundField
+            cardImageUrl={draft.cardImageUrl}
+            onCardImageUrl={(v) => set('cardImageUrl', v)}
+            cardTextColor={draft.cardTextColor}
+            onCardTextColor={(v) => set('cardTextColor', v)}
+            previewIcon={draft.icon}
+            previewTitle={draft.pluralLabel || 'Category'}
+          />
         </section>
 
         {/* Capabilities */}
