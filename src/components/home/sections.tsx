@@ -15,6 +15,9 @@ export type CardDef = {
   keywords?: string[]
   /** Renders as the dashed "suggest a category" affordance instead of a tile. */
   dashed?: boolean
+  /** One emoji shown above the title — from the category's own `icon` field
+   *  where there is one; a few hand-built cards set a fixed one directly. */
+  icon?: string
 }
 
 // Soft tile tints, cycled per card across the grid.
@@ -34,8 +37,9 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
   return (
     <button onClick={card.go} className="group w-full cursor-pointer">
       <div
-        className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex items-center justify-center p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
+        className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
+        {card.icon && <span className="text-3xl leading-none" aria-hidden="true">{card.icon}</span>}
         <span className="text-[17px] font-semibold leading-snug text-slate-900 group-hover:text-primary group-active:text-primary transition-colors">
           {card.title}
         </span>
@@ -230,10 +234,15 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
+  const medical = categories.find((c) => c.kind === 'medical')
+  const zmanim = categories.find((c) => c.kind === 'zmanim')
+  const eruv = categories.find((c) => c.kind === 'eruv')
+
   return [
-    ...(categories.some((c) => c.kind === 'medical')
+    ...(medical
       ? [{
           title: 'Jewish Medical Resources',
+          icon: medical.icon,
           keywords: [
             'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
             'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
@@ -246,12 +255,14 @@ export function resourceCards(
       : []),
     ...categories.filter((c) => c.kind === 'listing').map((c) => ({
       title: c.pluralLabel,
+      icon: c.icon,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
     })),
-    ...(categories.some((c) => c.kind === 'zmanim')
+    ...(zmanim
       ? [{
           title: 'Zmanim & Shabbos',
+          icon: zmanim.icon,
           keywords: [
             'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
             'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
@@ -260,9 +271,10 @@ export function resourceCards(
           go: () => nav('patient', 'find', { findView: 'zmanim' }),
         }]
       : []),
-    ...(categories.some((c) => c.kind === 'eruv')
+    ...(eruv
       ? [{
           title: 'Eruv Information',
+          icon: eruv.icon,
           keywords: [
             'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
             'techum', 'stroller on shabbos',

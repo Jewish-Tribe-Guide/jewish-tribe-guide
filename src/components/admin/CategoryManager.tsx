@@ -50,6 +50,15 @@ const SINGLETON_KIND_LABELS = {
 } as const
 type SingletonKind = keyof typeof SINGLETON_KIND_LABELS
 
+// A fitting default icon for each — set at creation since there's no editor
+// screen to pick one later.
+const SINGLETON_ICONS: Record<SingletonKind, string> = {
+  map: '🗺️',
+  zmanim: '🕯️',
+  eruv: '🧵',
+  medical: '🏥',
+}
+
 type Entry =
   | { kind: 'category'; data: CategoryConfig }
   | { kind: 'form'; data: FormConfig }
@@ -125,7 +134,7 @@ export default function CategoryManager({
       const res = await fetch('/api/admin/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ label, pluralLabel: label, kind }),
+        body: JSON.stringify({ label, pluralLabel: label, kind, icon: SINGLETON_ICONS[kind] }),
       })
       const body = await res.json()
       if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not add it.')
@@ -618,6 +627,8 @@ function singularize(plural: string): string {
 type Draft = {
   label: string
   pluralLabel: string
+  /** One emoji shown on the card (home grid, map legend, admin list). */
+  icon: string
   description: string
   hasAddress: boolean
   hasPhone: boolean
@@ -629,6 +640,10 @@ type Draft = {
    *  preserved as-is and re-merged on save so editing a category never drops
    *  or exposes them. */
   hiddenFields: CategoryField[]
+  /** Whether the external-link button section is turned on — kept separate
+   *  from the label/url text so unchecking hides the fields without losing
+   *  whatever was typed (in case the admin re-checks it). */
+  externalLinkEnabled: boolean
   /** A button in the directory header linking out, e.g. "Other Mikvahs" →
    *  mikvah.org. Both blank means none. */
   externalLinkLabel: string
@@ -640,6 +655,7 @@ function toDraft(c: CategoryConfig | null): Draft {
   return {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
+    icon: c?.icon ?? '',
     description: c?.description ?? '',
     hasAddress: c?.hasAddress ?? true,
     hasPhone: c?.hasPhone ?? true,
@@ -647,6 +663,7 @@ function toDraft(c: CategoryConfig | null): Draft {
     capabilities: resolveCapabilities(c?.capabilities),
     fields: all.filter((f) => f.renderAs !== 'hidden'),
     hiddenFields: all.filter((f) => f.renderAs === 'hidden'),
+    externalLinkEnabled: !!c?.externalLink,
     externalLinkLabel: c?.externalLink?.label ?? '',
     externalLinkUrl: c?.externalLink?.url ?? '',
   }
@@ -742,6 +759,7 @@ function CategoryEditor({
       ...d,
       pluralLabel: d.pluralLabel || template.pluralLabel,
       label: d.label || singularize(template.pluralLabel),
+      icon: d.icon || template.icon || '',
       hasAddress: template.hasAddress ?? d.hasAddress,
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
@@ -888,13 +906,14 @@ function CategoryEditor({
       const payload = {
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
+        icon: draft.icon,
         description: draft.description,
         hasAddress: draft.hasAddress,
         hasPhone: draft.hasPhone,
         upvotesEnabled: draft.upvotesEnabled,
         capabilities: draft.capabilities,
         externalLink:
-          draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+          draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
             ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
             : null,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
@@ -935,7 +954,7 @@ function CategoryEditor({
       id: initial?.id ?? 'preview',
       label: draft.label || 'Listing',
       pluralLabel: draft.pluralLabel || draft.label || 'Preview',
-      icon: initial?.icon ?? DEFAULT_CATEGORY_ICON,
+      icon: draft.icon.trim() || DEFAULT_CATEGORY_ICON,
       description: draft.description,
       detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
       kind: 'listing',
@@ -944,7 +963,7 @@ function CategoryEditor({
       upvotesEnabled: draft.upvotesEnabled,
       capabilities: draft.capabilities,
       externalLink:
-        draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
+        draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
           : null,
     }
@@ -976,7 +995,10 @@ function CategoryEditor({
                   onClick={() => applyTemplate(t.id)}
                   className="text-left border border-slate-300 rounded-md px-3 py-2 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer max-w-xs"
                 >
-                  <span className="block text-sm font-medium text-slate-800">{t.label}</span>
+                  <span className="block text-sm font-medium text-slate-800">
+                    {t.icon && <span className="mr-1">{t.icon}</span>}
+                    {t.label}
+                  </span>
                   <span className="block text-[11px] text-muted mt-0.5">{t.description}</span>
                 </button>
               ))}
@@ -990,16 +1012,108 @@ function CategoryEditor({
 
         {/* Presentation */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
-            <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
-            <span className="block text-[11px] text-muted mt-1">Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.</span>
-          </label>
+          <div className="flex gap-3">
+            <label className="block w-20 shrink-0">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
+              <input
+                value={draft.icon}
+                onChange={(e) => set('icon', e.target.value)}
+                className={`${inputClass} text-center text-lg`}
+                placeholder={DEFAULT_CATEGORY_ICON}
+                maxLength={4}
+              />
+            </label>
+            <label className="block flex-1">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
+              <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
+            </label>
+          </div>
+          <span className="block -mt-2 text-[11px] text-muted">
+            One emoji, shown before the name on the home screen and map legend. Plural name, as it
+            appears on the card — the singular (for “Add a …”) is derived automatically.
+          </span>
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
           </label>
-          <div className="pt-1 space-y-1.5">
+        </section>
+
+        {/* Capabilities */}
+        <section className="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">What this category shows</h3>
+          <p className="text-xs text-muted mb-3">
+            Turn an affordance off to hide it (and block that action on the server) for this category
+            only. These sit under the site-wide switches — if something is off site-wide, it stays off
+            here regardless.
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || (hasMapCategory && draft.hasAddress)).map((k) => (
+              <label key={k} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input type="checkbox" checked={draft.capabilities[k]} onChange={(e) => setCap(k, e.target.checked)} className="rounded border-slate-300" />
+                {CAPABILITY_LABELS[k]}
+              </label>
+            ))}
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={draft.upvotesEnabled} onChange={(e) => set('upvotesEnabled', e.target.checked)} className="rounded border-slate-300" />
+              Upvotes
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.externalLinkEnabled}
+                onChange={(e) => set('externalLinkEnabled', e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              External link
+            </label>
+          </div>
+          {draft.externalLinkEnabled && (
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={draft.externalLinkLabel}
+                  onChange={(e) => set('externalLinkLabel', e.target.value)}
+                  className={`${inputClass} sm:w-1/3`}
+                  placeholder="Button text, e.g. Other Mikvahs"
+                />
+                <input
+                  value={draft.externalLinkUrl}
+                  onChange={(e) => set('externalLinkUrl', e.target.value)}
+                  className={`${inputClass} flex-1`}
+                  placeholder="https://…"
+                />
+              </div>
+              <span className="block text-[11px] text-muted">
+                Shown as its own button in this category’s directory, next to Map/Add — for pointing
+                somewhere broader the site doesn’t curate itself. Not tied to any listing.
+              </span>
+            </div>
+          )}
+        </section>
+
+        {/* Details */}
+        <section className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-slate-800">Details</h3>
+            <div className="flex items-center gap-3">
+              {draft.fields.some((f) => f.type === 'boolean') && (
+                <button
+                  onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                >
+                  + Add audience group
+                </button>
+              )}
+              <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
+                + Add detail
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-muted mb-3">
+            What each listing shows, beyond its name, address, and phone.
+          </p>
+
+          <div className="pb-4 mb-4 border-b border-slate-100 space-y-1.5">
             <span className="block text-xs font-medium text-slate-700">Every listing also has</span>
             <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
@@ -1025,72 +1139,6 @@ function CategoryEditor({
               and the Map button don’t apply either.
             </span>
           </div>
-          <div className="pt-1 space-y-1.5">
-            <span className="block text-xs font-medium text-slate-700">External link (optional)</span>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                value={draft.externalLinkLabel}
-                onChange={(e) => set('externalLinkLabel', e.target.value)}
-                className={`${inputClass} sm:w-1/3`}
-                placeholder="Button text, e.g. Other Mikvahs"
-              />
-              <input
-                value={draft.externalLinkUrl}
-                onChange={(e) => set('externalLinkUrl', e.target.value)}
-                className={`${inputClass} flex-1`}
-                placeholder="https://…"
-              />
-            </div>
-            <span className="block text-[11px] text-muted">
-              Shown as its own button in this category’s directory, next to Map/Add — for pointing
-              somewhere broader the site doesn’t curate itself. Not tied to any listing.
-            </span>
-          </div>
-        </section>
-
-        {/* Capabilities */}
-        <section className="bg-white border border-slate-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">What this category shows</h3>
-          <p className="text-xs text-muted mb-3">
-            Turn an affordance off to hide it (and block that action on the server) for this category
-            only. These sit under the site-wide switches — if something is off site-wide, it stays off
-            here regardless.
-          </p>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || (hasMapCategory && draft.hasAddress)).map((k) => (
-              <label key={k} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input type="checkbox" checked={draft.capabilities[k]} onChange={(e) => setCap(k, e.target.checked)} className="rounded border-slate-300" />
-                {CAPABILITY_LABELS[k]}
-              </label>
-            ))}
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input type="checkbox" checked={draft.upvotesEnabled} onChange={(e) => set('upvotesEnabled', e.target.checked)} className="rounded border-slate-300" />
-              Upvotes
-            </label>
-          </div>
-        </section>
-
-        {/* Details */}
-        <section className="bg-white border border-slate-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-slate-800">Details</h3>
-            <div className="flex items-center gap-3">
-              {draft.fields.some((f) => f.type === 'boolean') && (
-                <button
-                  onClick={() => setGroupForm({ audienceKey: '', prefix: '', phone: true, email: true, hours: true, notes: false })}
-                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                >
-                  + Add audience group
-                </button>
-              )}
-              <button onClick={addField} className="text-xs font-medium text-primary hover:underline cursor-pointer">
-                + Add detail
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-muted mb-3">
-            What each listing shows, beyond its name, address, and phone.
-          </p>
 
           {groupForm && (
             <div className="border border-primary/40 rounded-md p-3 mb-3 bg-primary/5 space-y-2.5">

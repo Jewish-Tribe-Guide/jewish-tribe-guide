@@ -23,6 +23,8 @@ export type CategoryTemplate = {
   /** One-line summary of what makes this template's shape distinctive. */
   description: string
   pluralLabel: string
+  /** Pre-fills the new category's icon — still fully editable afterward. */
+  icon?: string
   hasAddress?: boolean
   hasPhone?: boolean
   upvotesEnabled?: boolean
@@ -32,11 +34,41 @@ export type CategoryTemplate = {
 
 export const CATEGORY_TEMPLATES: CategoryTemplate[] = [
   {
+    id: 'synagogue',
+    label: 'Synagogue',
+    description:
+      'Denomination (multi-select), Davening Times (Minyanim), and a Website link — the shape this deployment’s own Synagogues category uses.',
+    pluralLabel: 'Synagogues',
+    icon: '✡️',
+    fields: [
+      {
+        key: 'denomination',
+        type: 'select',
+        label: 'Denomination',
+        options: [
+          { label: 'Conservative', value: 'Conservative' },
+          { label: 'Orthodox', value: 'Orthodox' },
+          { label: 'Orthodox (Sephardic)', value: 'Orthodox (Sephardic)' },
+          { label: 'Reform', value: 'Reform' },
+          { label: 'Reconstructionist', value: 'Reconstructionist' },
+          { label: 'Other', value: 'Other' },
+        ],
+        renderAs: 'badge',
+        filterable: true,
+        filterLabel: 'Denomination',
+        multiSelect: true,
+      },
+      { key: 'minyanim', type: 'minyanim', label: 'Davening Times (Minyanim)', renderAs: 'row', filterable: false },
+      { key: 'website', type: 'url', label: 'Website', linkLabel: 'Website', renderAs: 'row', filterable: false },
+    ],
+  },
+  {
     id: 'mikvah',
     label: 'Mikvah',
     description:
       "Separate Hours/Phone per audience (Women's/Men's/Keilim), plus Women's Email and appointment notes — each audience's fields only show once its checkbox is on.",
     pluralLabel: 'Mikvah',
+    icon: '💧',
     fields: [
       { key: 'e', type: 'text', label: 'General Email', renderAs: 'row', filterable: false },
       { key: 'hours', type: 'hours', label: 'Hours', renderAs: 'row', filterable: true },

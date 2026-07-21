@@ -40,11 +40,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // their own dedicated cards above (fixed copy/keywords), so exclude them
   // here rather than double-listing.
   const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
+  const mapCategory = categories?.find((c) => c.kind === 'map')
 
   const entryCards: CardDef[] = [
     ...(community.features.patientSupport
       ? [{
           title: supportForm?.title ?? 'Patient & Family Support',
+          icon: '🤝',
           keywords: [
             'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
             'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
@@ -59,6 +61,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     ...(community.features.volunteer
       ? [{
           title: volunteerForm?.title ?? 'Volunteer for Patients',
+          icon: '💛',
           keywords: [
             'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
             'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
@@ -67,9 +70,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           go: () => onOpenFlow('volunteer'),
         }]
       : []),
-    ...(categories?.some((c) => c.kind === 'map')
+    ...(mapCategory
       ? [{
           title: 'View Map',
+          icon: mapCategory.icon,
           keywords: [
             'map', 'maps', 'view map', 'locations', 'where', 'nearby', 'directions', 'address',
             'addresses', 'google map', 'pin', 'pins', 'navigate', 'around me',
