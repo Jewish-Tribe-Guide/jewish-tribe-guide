@@ -17,6 +17,8 @@ type PatchBody = {
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
+  cardImageUrl?: string | null
+  cardTextColor?: string | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
@@ -45,6 +47,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
   if (body.externalLink && !isHttpUrl(body.externalLink.url)) {
     return Response.json({ ok: false, errors: ['The external link must be a valid http(s) URL.'] }, { status: 400 })
+  }
+  if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
+    return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
   }
 
   try {

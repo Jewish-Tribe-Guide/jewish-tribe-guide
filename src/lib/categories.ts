@@ -193,6 +193,14 @@ export type CategoryConfig = {
    *  Map/Add — e.g. "Other Mikvahs" pointing at a broader directory the site
    *  doesn't curate itself. Not tied to any listing. */
   externalLink?: { label: string; url: string } | null
+  /** A photo shown as the home-screen card's background instead of the flat
+   *  tint — a pasted image URL, not an upload. Null/unset falls back to the
+   *  tint + icon look. */
+  cardImageUrl?: string | null
+  /** Text color over `cardImageUrl` (a hex string) — kept separate from the
+   *  image so the title/icon stay legible regardless of the photo. Ignored
+   *  when there's no image. */
+  cardTextColor?: string | null
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

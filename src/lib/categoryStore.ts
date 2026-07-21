@@ -23,6 +23,8 @@ type CategoryRow = {
   capabilities: Partial<CategoryCapabilities> | null
   external_link_label: string | null
   external_link_url: string | null
+  card_image_url: string | null
+  card_text_color: string | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -43,6 +45,8 @@ function toConfig(row: CategoryRow): CategoryConfig {
       row.external_link_label && row.external_link_url
         ? { label: row.external_link_label, url: row.external_link_url }
         : null,
+    cardImageUrl: row.card_image_url,
+    cardTextColor: row.card_text_color,
   }
 }
 
@@ -104,6 +108,8 @@ export async function createCategory(input: {
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
+  cardImageUrl?: string | null
+  cardTextColor?: string | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
@@ -132,6 +138,8 @@ export async function createCategory(input: {
     capabilities: input.capabilities ?? {},
     external_link_label: input.externalLink?.label ?? null,
     external_link_url: input.externalLink?.url ?? null,
+    card_image_url: input.cardImageUrl?.trim() || null,
+    card_text_color: input.cardTextColor?.trim() || null,
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -163,6 +171,8 @@ export async function updateCategory(
     upvotesEnabled?: boolean
     capabilities?: Partial<CategoryCapabilities>
     externalLink?: { label: string; url: string } | null
+    cardImageUrl?: string | null
+    cardTextColor?: string | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -182,6 +192,8 @@ export async function updateCategory(
     row.external_link_label = patch.externalLink?.label ?? null
     row.external_link_url = patch.externalLink?.url ?? null
   }
+  if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
+  if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
 
   if (Object.keys(row).length === 0) return getCategoryById(id)
 
