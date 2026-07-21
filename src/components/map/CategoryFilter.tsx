@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
   id: string
@@ -24,44 +26,88 @@ type Props = {
  *  legend, plus "Show all" / "Hide all" shortcuts. */
 export default function CategoryFilter({ options, selected, onToggle, onAll, onNone }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
+  const scrollRef = useRef<HTMLDivElement>(null)
+  // Thumb geometry as a fraction of the track (0–1). null while there's
+  // nothing to scroll, so the track renders empty instead of a full-width bar.
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null)
+
+  // Native scrollbars are hidden (see .chip-scroll in globals.css — macOS's
+  // overlay scrollbars auto-hide on trackpads and don't reliably render even
+  // when styled), so this row draws its own always-visible scroll indicator
+  // instead, kept in sync with real scroll position/extent.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const update = () => {
+      const { scrollWidth, clientWidth, scrollLeft } = el
+      if (scrollWidth <= clientWidth + 1) {
+        setThumb(null)
+        return
+      }
+      setThumb({
+        left: scrollLeft / scrollWidth,
+        width: clientWidth / scrollWidth,
+      })
+    }
+
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [options])
 
   return (
-    // Single horizontal-scroll row (mirrors the directory filter row) so the
-    // chips — which double as the map's color legend — stay glanceable without
-    // eating three wrapped rows of vertical space. chip-scroll shows a slim
-    // scrollbar under the row on desktop as a cue that it overflows.
-    <div className="chip-scroll flex flex-nowrap items-center gap-2 overflow-x-auto pb-2.5">
-      <button
-        onClick={allOn ? onNone : onAll}
-        className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
-      >
-        {allOn ? 'Hide all' : 'Show all'}
-      </button>
-      {options.map((o) => {
-        const on = selected.has(o.id)
-        return (
-          <button
-            key={o.id}
-            onClick={() => onToggle(o.id)}
-            aria-pressed={on}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
-              on
-                ? 'border-transparent text-white'
-                : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
-            }`}
-            style={on ? { backgroundColor: o.color } : undefined}
-          >
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full ring-1 ring-white/60"
-              style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
-              aria-hidden="true"
-            />
-            {o.icon && <span aria-hidden="true">{o.icon}</span>}
-            <span>{o.label}</span>
-            <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
-          </button>
-        )
-      })}
+    <div>
+      {/* Single horizontal-scroll row (mirrors the directory filter row) so the
+          chips — which double as the map's color legend — stay glanceable
+          without eating three wrapped rows of vertical space. */}
+      <div ref={scrollRef} className="chip-scroll flex flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={allOn ? onNone : onAll}
+          className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+        >
+          {allOn ? 'Hide all' : 'Show all'}
+        </button>
+        {options.map((o) => {
+          const on = selected.has(o.id)
+          return (
+            <button
+              key={o.id}
+              onClick={() => onToggle(o.id)}
+              aria-pressed={on}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
+                on
+                  ? 'border-transparent text-white'
+                  : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
+              }`}
+              style={on ? { backgroundColor: o.color } : undefined}
+            >
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full ring-1 ring-white/60"
+                style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
+                aria-hidden="true"
+              />
+              {o.icon && <span aria-hidden="true">{o.icon}</span>}
+              <span>{o.label}</span>
+              <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
+            </button>
+          )
+        })}
+      </div>
+      {/* Custom scroll indicator — desktop only (see .chip-scroll-track). */}
+      {thumb && (
+        <div className="chip-scroll-track mt-1 h-1 rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-slate-300"
+            style={{ marginLeft: `${thumb.left * 100}%`, width: `${thumb.width * 100}%` }}
+          />
+        </div>
+      )}
     </div>
   )
 }
