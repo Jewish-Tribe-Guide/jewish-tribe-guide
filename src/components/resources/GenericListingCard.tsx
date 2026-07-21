@@ -264,14 +264,19 @@ export function GenericListingCard({
           {/* Upvote + distance grouped together so the count reads as "how
               popular", not a stray control — stacked on mobile where there's
               no room to sit side by side, next to each other on desktop
-              (where they already sit under the Popular/Distance toggle). */}
+              (where they already sit under the Popular/Distance toggle).
+              The upvote stays left-aligned rather than matching distance's
+              right edge: right-aligned, it sat flush against the collapse
+              chevron (too easy to fat-finger the wrong one) and directly
+              under distance's 📍 emoji (too easy to miss as its own tappable
+              control). Left keeps it clear of both. */}
           {(upvotes || travel.length > 0) && (
-            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
               {upvotes && (
                 <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
               )}
               {travel.length > 0 && (
-                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap self-end sm:self-auto">
                   {travel.map((t) => <span key={t}>{t}</span>)}
                 </div>
               )}
