@@ -352,12 +352,11 @@ export function resourceCards(
 }
 
 /** The hand-built cards at the front of the grid — Patient & Family Support,
- *  Volunteer, View Map, and every admin-created custom form. Shared by the
- *  live home page (Landing.tsx) and the admin Home page preview, so the two
- *  never drift apart. */
+ *  Volunteer, and every admin-created custom form. (The Map card lives
+ *  outside the grid now — see the "View Map" button in HeroHeading.) Shared
+ *  by the live home page (Landing.tsx) and the admin Home page preview, so
+ *  the two never drift apart. */
 export function useEntryCards(
-  categories: CategoryConfig[] | null,
-  onNavigate: NavigateFn,
   onOpenFlow: (kind: string, preselect?: string[]) => void,
 ): CardDef[] {
   const supportForm = useForm('support')
@@ -366,7 +365,6 @@ export function useEntryCards(
   // their own dedicated cards below (fixed copy/keywords), so exclude them
   // here rather than double-listing.
   const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
-  const mapCategory = categories?.find((c) => c.kind === 'map')
 
   return [
     ...(community.features.patientSupport
@@ -400,18 +398,6 @@ export function useEntryCards(
             'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
           ],
           go: () => onOpenFlow('volunteer'),
-        }]
-      : []),
-    ...(mapCategory
-      ? [{
-          title: 'View Map',
-          id: 'map',
-          icon: mapCategory.icon,
-          keywords: [
-            'map', 'maps', 'view map', 'locations', 'where', 'nearby', 'directions', 'address',
-            'addresses', 'google map', 'pin', 'pins', 'navigate', 'around me',
-          ],
-          go: () => onNavigate('patient', 'map'),
         }]
       : []),
     ...customForms.map((f) => ({

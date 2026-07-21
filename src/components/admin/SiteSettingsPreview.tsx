@@ -12,6 +12,7 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 
 const noopNavigate = () => {}
 const noopOpenFlow = () => {}
+const noopViewMap = () => {}
 
 // A preview of the whole home page — header, hero, card grid (in the current,
 // already-saved section grouping), and footer — the exact same components a
@@ -25,7 +26,8 @@ export default function SiteSettingsPreview({ settings, onClose }: { settings: S
   const [query, setQuery] = useState('')
   const categories = useCategories()
   const homeSections = useHomeSections()
-  const entryCards = useEntryCards(categories, noopNavigate, noopOpenFlow)
+  const entryCards = useEntryCards(noopOpenFlow)
+  const mapCategory = categories?.find((c) => c.kind === 'map')
   const resources = resourceCards(noopNavigate, categories)
   const allCards = resources ? [...entryCards, ...resources] : null
   const sections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
@@ -35,7 +37,14 @@ export default function SiteSettingsPreview({ settings, onClose }: { settings: S
       <SiteHeader onGoHome={() => {}} location={{ address: '', onAddressChange: () => {}, onCoords: () => {} }} previewSettings={settings} />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 w-full flex-1">
-        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} interactive={false} />
+        <HeroHeading
+          settings={settings}
+          query={query}
+          onQueryChange={setQuery}
+          interactive={false}
+          mapIcon={mapCategory?.icon}
+          onViewMap={noopViewMap}
+        />
 
         <section className="mt-12 sm:mt-14 space-y-10 pointer-events-none">
           {allCards === null ? (

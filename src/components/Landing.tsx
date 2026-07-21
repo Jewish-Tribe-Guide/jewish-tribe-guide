@@ -29,7 +29,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
-  const entryCards = useEntryCards(categories, onNavigate, onOpenFlow)
+  const entryCards = useEntryCards(onOpenFlow)
+  // The Map pseudo-category still exists so this can be turned back into a
+  // card later — it just drives the "View Map" button instead of a tile now.
+  const mapCategory = categories?.find((c) => c.kind === 'map')
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -70,7 +73,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
-      <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+      <HeroHeading
+        settings={settings}
+        query={query}
+        onQueryChange={setQuery}
+        mapIcon={mapCategory?.icon}
+        onViewMap={() => onNavigate('patient', 'map')}
+      />
 
       {/* ── The grid — grouped into labeled sections; a search narrows each
               section's cards and hides any section left empty. ────────────── */}

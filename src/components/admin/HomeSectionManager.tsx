@@ -28,13 +28,14 @@ function useCardOptions(): CardOption[] {
     const medical = categories.find((c) => c.kind === 'medical')
     const zmanim = categories.find((c) => c.kind === 'zmanim')
     const eruv = categories.find((c) => c.kind === 'eruv')
-    const mapCategory = categories.find((c) => c.kind === 'map')
     const customForms = (forms ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
 
+    // Note: the Map pseudo-category isn't listed here — "View Map" is now a
+    // fixed button next to the search box (see HeroHeading), not a card that
+    // can be placed in a section.
     return [
       ...(community.features.patientSupport ? [{ id: 'support', label: 'Patient & Family Support' }] : []),
       ...(community.features.volunteer ? [{ id: 'volunteer', label: 'Volunteer for Patients' }] : []),
-      ...(mapCategory ? [{ id: 'map', label: 'View Map' }] : []),
       ...customForms.map((f) => ({ id: f.id, label: f.title })),
       ...(medical ? [{ id: 'medical', label: medical.pluralLabel }] : []),
       ...categories.filter((c) => c.kind === 'listing').map((c) => ({ id: c.id, label: c.pluralLabel })),
