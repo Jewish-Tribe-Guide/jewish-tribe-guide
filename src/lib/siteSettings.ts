@@ -24,6 +24,9 @@ export type SiteSettings = {
   heroTitle: string
   /** Shown under the home screen heading, and reused as the footer blurb. */
   mission: string
+  /** A pasted image URL shown in the header instead of the built-in Star of
+   *  David mark. Null/empty keeps the default mark. */
+  logoUrl: string | null
   /** Whether the footer's "Send feedback" button/form is shown at all. */
   feedbackEnabled: boolean
   /** The footer link text that opens the feedback form (an arrow is appended
@@ -48,6 +51,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   tagline: community.tagline,
   heroTitle: DEFAULT_HERO_TITLE,
   mission: community.mission,
+  logoUrl: null,
   feedbackEnabled: true,
   feedbackButtonLabel: DEFAULT_FEEDBACK_BUTTON_LABEL,
   feedbackHeading: DEFAULT_FEEDBACK_HEADING,
