@@ -33,6 +33,8 @@ type CreateBody = {
   upvotesEnabled?: boolean
   capabilities?: Partial<CategoryCapabilities>
   externalLink?: { label: string; url: string } | null
+  cardImageUrl?: string | null
+  cardTextColor?: string | null
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -54,6 +56,9 @@ export async function POST(request: Request) {
   if (body.externalLink && !isHttpUrl(body.externalLink.url)) {
     return Response.json({ ok: false, errors: ['The external link must be a valid http(s) URL.'] }, { status: 400 })
   }
+  if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
+    return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
+  }
 
   try {
     const category = await createCategory({
@@ -69,6 +74,8 @@ export async function POST(request: Request) {
       upvotesEnabled: body.upvotesEnabled,
       capabilities: body.capabilities,
       externalLink: body.externalLink,
+      cardImageUrl: body.cardImageUrl,
+      cardTextColor: body.cardTextColor,
     })
     return Response.json({ ok: true, category })
   } catch (err) {

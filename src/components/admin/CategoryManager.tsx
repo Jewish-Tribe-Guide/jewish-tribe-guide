@@ -17,6 +17,7 @@ import {
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
+import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import FormEditor from './FormEditor'
 import CategoryPreview from './CategoryPreview'
 
@@ -701,6 +702,12 @@ type Draft = {
    *  mikvah.org. Both blank means none. */
   externalLinkLabel: string
   externalLinkUrl: string
+  /** Photo shown as the home-screen card's background instead of the flat
+   *  tint. Blank means none — the text color below is only used when this
+   *  is set. */
+  cardImageUrl: string
+  /** Text color over the card image (a hex string). */
+  cardTextColor: string
 }
 
 function toDraft(c: CategoryConfig | null): Draft {
@@ -719,6 +726,8 @@ function toDraft(c: CategoryConfig | null): Draft {
     externalLinkEnabled: !!c?.externalLink,
     externalLinkLabel: c?.externalLink?.label ?? '',
     externalLinkUrl: c?.externalLink?.url ?? '',
+    cardImageUrl: c?.cardImageUrl ?? '',
+    cardTextColor: c?.cardTextColor || '#ffffff',
   }
 }
 
@@ -987,6 +996,8 @@ function CategoryEditor({
           draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
             ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
             : null,
+        cardImageUrl: draft.cardImageUrl.trim() || null,
+        cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
         // fields so editing never drops them.
         fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
@@ -1037,6 +1048,8 @@ function CategoryEditor({
         draft.externalLinkEnabled && draft.externalLinkLabel.trim() && draft.externalLinkUrl.trim()
           ? { label: draft.externalLinkLabel.trim(), url: draft.externalLinkUrl.trim() }
           : null,
+      cardImageUrl: draft.cardImageUrl.trim() || null,
+      cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
   }
@@ -1161,6 +1174,48 @@ function CategoryEditor({
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
           </label>
+          <div className="pt-1">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Home-screen card background (optional)</span>
+            <div className="flex gap-3">
+              <div className="flex-1 space-y-2">
+                <input
+                  value={draft.cardImageUrl}
+                  onChange={(e) => set('cardImageUrl', e.target.value)}
+                  className={inputClass}
+                  placeholder="https://… (a photo instead of the flat tint)"
+                />
+                {draft.cardImageUrl.trim() && (
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <span className="text-xs font-medium text-slate-700">Text color</span>
+                    <input
+                      type="color"
+                      value={draft.cardTextColor}
+                      onChange={(e) => set('cardTextColor', e.target.value)}
+                      className="h-8 w-14 rounded border border-slate-300 cursor-pointer"
+                    />
+                  </label>
+                )}
+                <span className="block text-[11px] text-muted">
+                  A pasted image URL, not an upload. A dark gradient is applied automatically so the
+                  title stays readable — the color picker only affects the text/icon, not the photo.
+                </span>
+              </div>
+              {/* A live preview using the exact same Card the home screen
+                  renders, so what's shown here is what visitors will see. */}
+              <div className="w-32 shrink-0">
+                <HomeCard
+                  card={{
+                    title: draft.pluralLabel || 'Category',
+                    icon: draft.icon || undefined,
+                    cardImageUrl: draft.cardImageUrl.trim() || null,
+                    cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
+                    go: () => {},
+                  }}
+                  tint={TINTS[0]}
+                />
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Capabilities */}

@@ -22,6 +22,13 @@ export type CardDef = {
    *  'support') — used to sort cards into home-screen sections; title alone
    *  would break grouping if a label gets renamed. */
   id?: string
+  /** A photo for the tile's background instead of the flat tint — set via the
+   *  category editor. Unset/null falls back to the tint + icon look. */
+  cardImageUrl?: string | null
+  /** Text color over `cardImageUrl` (defaults to white — a photo gets a dark
+   *  scrim underneath regardless, but the color is still admin-editable for
+   *  photos where white doesn't read well). Ignored without an image. */
+  cardTextColor?: string | null
 }
 
 // Soft tile tints, cycled per card across the grid.
@@ -38,13 +45,33 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
       </button>
     )
   }
+  const hasImage = !!card.cardImageUrl
+  const textColor = card.cardTextColor || '#ffffff'
   return (
     <button onClick={card.go} className="group w-full cursor-pointer">
       <div
-        className={`aspect-[4/3] rounded-2xl ${tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
+        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
+        style={hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       >
-        {card.icon && <span className="text-3xl leading-none" aria-hidden="true">{card.icon}</span>}
-        <span className="text-[17px] font-semibold leading-snug text-slate-900 group-hover:text-primary group-active:text-primary transition-colors">
+        {/* A photo card gets a dark scrim regardless of the photo's own
+            brightness, so the title/icon stay legible no matter what's
+            pasted in — same idea as the cRc-style reference. */}
+        {hasImage && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" aria-hidden="true" />}
+        {card.icon && (
+          <span
+            className={`relative text-3xl leading-none ${hasImage ? 'drop-shadow' : ''}`}
+            style={hasImage ? { color: textColor } : undefined}
+            aria-hidden="true"
+          >
+            {card.icon}
+          </span>
+        )}
+        <span
+          className={`relative text-[17px] font-semibold leading-snug transition-colors ${
+            hasImage ? 'drop-shadow' : 'text-slate-900 group-hover:text-primary group-active:text-primary'
+          }`}
+          style={hasImage ? { color: textColor } : undefined}
+        >
           {card.title}
         </span>
       </div>
@@ -297,6 +324,8 @@ export function resourceCards(
       title: c.pluralLabel,
       id: c.id,
       icon: c.icon,
+      cardImageUrl: c.cardImageUrl,
+      cardTextColor: c.cardTextColor,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
     })),
