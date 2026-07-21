@@ -11,12 +11,19 @@ type Props = {
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
+  /** The Map pseudo-category's icon — shows the "View Map" button below the
+   *  search box when set. Null/undefined (no Map category configured) hides
+   *  it entirely, same as the old card did. */
+  mapIcon?: string | null
+  /** Preview mode has nothing to navigate to, so it's left undefined there —
+   *  the button still renders (for visual fidelity) but doesn't do anything. */
+  onViewMap?: () => void
 }
 
-// The home screen's heading, mission, and filter box — its own component so
-// the admin Site preview can render the exact same markup the live home
-// screen does, fed by a draft instead of the saved settings.
-export default function HeroHeading({ settings, query, onQueryChange, interactive = true }: Props) {
+// The home screen's heading, mission, filter box, and "View Map" button — its
+// own component so the admin Site preview can render the exact same markup
+// the live home screen does, fed by a draft instead of the saved settings.
+export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap }: Props) {
   const isMobile = useIsMobile()
 
   return (
@@ -53,6 +60,15 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
             )}
           </div>
         </div>
+      )}
+      {mapIcon != null && (
+        <button
+          onClick={onViewMap}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+        >
+          <span aria-hidden="true">{mapIcon}</span>
+          View Map
+        </button>
       )}
     </section>
   )

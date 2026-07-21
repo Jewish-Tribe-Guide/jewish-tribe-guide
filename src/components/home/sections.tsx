@@ -7,6 +7,8 @@ import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
+import { useForm, useForms } from '@/lib/useForms'
+import { community } from '@/community.config'
 
 export type CardDef = {
   title: string
@@ -15,7 +17,9 @@ export type CardDef = {
    *  (e.g. "shul" for Synagogues, "supermarket" for Grocery Stores). */
   keywords?: string[]
   /** One emoji shown above the title — from the category's own `icon` field
-   *  where there is one; a few hand-built cards set a fixed one directly. */
+   *  where there is one; a few hand-built cards set a fixed one directly.
+   *  Ignored when `cardImageUrl` is set (see `Card`) — an emoji over a photo
+   *  never reads as a clean icon, so those cards go title-only. */
   icon?: string
   /** Stable id (category id, or a fixed one for hand-built cards like 'map',
    *  'support') — used to sort cards into home-screen sections; title alone
@@ -24,9 +28,10 @@ export type CardDef = {
   /** A photo for the tile's background instead of the flat tint — set via the
    *  category editor. Unset/null falls back to the tint + icon look. */
   cardImageUrl?: string | null
-  /** Text color over `cardImageUrl` (defaults to white — a photo gets a dark
-   *  scrim underneath regardless, but the color is still admin-editable for
-   *  photos where white doesn't read well). Ignored without an image. */
+  /** Title text color over `cardImageUrl` (defaults to white — a photo gets a
+   *  dark scrim underneath regardless, but the color is still admin-editable
+   *  for photos where white doesn't read well). Ignored without an image, and
+   *  doesn't affect the icon — that always renders as a white silhouette. */
   cardTextColor?: string | null
 }
 
@@ -43,15 +48,14 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
         style={hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       >
         {/* A photo card gets a dark scrim regardless of the photo's own
-            brightness, so the title/icon stay legible no matter what's
-            pasted in — same idea as the cRc-style reference. */}
+            brightness, so the title stays legible no matter what's pasted in
+            — same idea as the cRc-style reference. */}
         {hasImage && <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" aria-hidden="true" />}
-        {card.icon && (
-          <span
-            className={`relative text-3xl leading-none ${hasImage ? 'drop-shadow' : ''}`}
-            style={hasImage ? { color: textColor } : undefined}
-            aria-hidden="true"
-          >
+        {/* The icon only shows on the flat-tint look — over a photo, an emoji
+            (a color glyph, not a strokable outline) never reads as a clean
+            icon, so photo cards go title-only instead. */}
+        {card.icon && !hasImage && (
+          <span className="relative text-3xl leading-none" aria-hidden="true">
             {card.icon}
           </span>
         )}
@@ -344,5 +348,65 @@ export function resourceCards(
           go: () => nav('patient', 'find', { findView: 'eruv' }),
         }]
       : []),
+  ]
+}
+
+/** The hand-built cards at the front of the grid — Patient & Family Support,
+ *  Volunteer, and every admin-created custom form. (The Map card lives
+ *  outside the grid now — see the "View Map" button in HeroHeading.) Shared
+ *  by the live home page (Landing.tsx) and the admin Home page preview, so
+ *  the two never drift apart. */
+export function useEntryCards(
+  onOpenFlow: (kind: string, preselect?: string[]) => void,
+): CardDef[] {
+  const supportForm = useForm('support')
+  const volunteerForm = useForm('volunteer')
+  // Every other form is an admin-created custom one — support/volunteer keep
+  // their own dedicated cards below (fixed copy/keywords), so exclude them
+  // here rather than double-listing.
+  const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
+
+  return [
+    ...(community.features.patientSupport
+      ? [{
+          title: supportForm?.title ?? 'Patient & Family Support',
+          id: 'support',
+          icon: supportForm?.icon || '🤝',
+          cardImageUrl: supportForm?.cardImageUrl,
+          cardTextColor: supportForm?.cardTextColor,
+          keywords: [
+            'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
+            'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
+            'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
+            'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
+            'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
+            'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
+          ],
+          go: () => onOpenFlow('support'),
+        }]
+      : []),
+    ...(community.features.volunteer
+      ? [{
+          title: volunteerForm?.title ?? 'Volunteer for Patients',
+          id: 'volunteer',
+          icon: volunteerForm?.icon || '💛',
+          cardImageUrl: volunteerForm?.cardImageUrl,
+          cardTextColor: volunteerForm?.cardTextColor,
+          keywords: [
+            'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
+            'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
+            'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
+          ],
+          go: () => onOpenFlow('volunteer'),
+        }]
+      : []),
+    ...customForms.map((f) => ({
+      title: f.title,
+      id: f.id,
+      icon: f.icon,
+      cardImageUrl: f.cardImageUrl,
+      cardTextColor: f.cardTextColor,
+      go: () => onOpenFlow(f.id),
+    })),
   ]
 }

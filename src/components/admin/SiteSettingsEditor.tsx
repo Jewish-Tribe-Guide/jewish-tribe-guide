@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import SiteSettingsPreview from './SiteSettingsPreview'
+import HomeSectionManager from './HomeSectionManager'
 
-// ── The site tab: the header/hero/footer branding text — name, tagline, home
-// screen heading, and mission. A single record, no create/delete/draft — just
-// edit and save, live immediately. Mounted on /admin. ─────────────────────────
+// ── The Home page tab: the header/hero/footer branding text (name, tagline,
+// heading, mission, logo), the home-screen section grouping, and the footer's
+// feedback form — laid out in the same top-to-bottom order they appear on the
+// actual home page. Everything here saves immediately (no draft/publish step)
+// except the text fields, which batch into one Save. Mounted on /admin. ──────
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -101,8 +104,9 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   return (
     <div>
       <p className="text-sm text-muted mb-4">
-        The site name, tagline, and home screen heading and mission — shown in the header, hero, and
-        footer. Changes go live immediately.
+        The site name, tagline, logo, home screen heading and mission, the sections on the home
+        screen, and the feedback form — laid out in the order they appear on the page. Changes go
+        live immediately.
       </p>
 
       {error && (
@@ -155,7 +159,12 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         </label>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-4">
+      <div className="mt-6 max-w-2xl">
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
+        <HomeSectionManager token={token} />
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <span className="block text-sm font-medium text-slate-800">Feedback form</span>
