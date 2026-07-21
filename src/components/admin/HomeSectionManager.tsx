@@ -36,10 +36,10 @@ function useCardOptions(): CardOption[] {
       ...(community.features.volunteer ? [{ id: 'volunteer', label: 'Volunteer for Patients' }] : []),
       ...(mapCategory ? [{ id: 'map', label: 'View Map' }] : []),
       ...customForms.map((f) => ({ id: f.id, label: f.title })),
-      ...(medical ? [{ id: 'medical', label: 'Jewish Medical Resources' }] : []),
+      ...(medical ? [{ id: 'medical', label: medical.pluralLabel }] : []),
       ...categories.filter((c) => c.kind === 'listing').map((c) => ({ id: c.id, label: c.pluralLabel })),
-      ...(zmanim ? [{ id: 'zmanim', label: 'Zmanim & Shabbos' }] : []),
-      ...(eruv ? [{ id: 'eruv', label: 'Eruv Information' }] : []),
+      ...(zmanim ? [{ id: 'zmanim', label: zmanim.pluralLabel }] : []),
+      ...(eruv ? [{ id: 'eruv', label: eruv.pluralLabel }] : []),
     ]
   }, [categories, forms])
 }

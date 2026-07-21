@@ -14,9 +14,12 @@ type Props = {
   /** Subtitle shown under the heading — the visitor's location or community name. */
   locationLabel: string
   onUp: () => void
+  /** The category's own (admin-editable) name — falls back to the historical
+   *  copy while categories are still loading. */
+  title?: string
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos' }: Props) {
   const [data, setData] = useState<ZmanimData | null>(null)
   const [status, setStatus] = useState<Status>('loading')
 
@@ -56,7 +59,7 @@ export default function ZmanimCard({ coords, locationLabel, onUp }: Props) {
 
       {/* Heading */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-800">Zmanim &amp; Shabbos</h2>
+        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
         <p className="text-sm text-muted mt-0.5">{locationLabel}</p>
       </div>
 

@@ -562,9 +562,12 @@ function SingletonRow({
           </p>
           <p className="text-xs text-muted mt-1">{description}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           {SINGLETON_EDITABLE_KINDS.has(kind) && (
-            <button onClick={onEdit} className="text-xs font-medium text-primary hover:underline cursor-pointer">
+            <button
+              onClick={onEdit}
+              className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+            >
               Edit
             </button>
           )}
@@ -606,10 +609,9 @@ function SingletonRow({
   )
 }
 
-// A lightweight editor for Map/Zmanim/Eruv — there's no name, description, or
-// fields to change (it's a fixed, code-driven screen), just the icon and the
-// home-screen card's photo/text color, reusing the exact same fields as the
-// full category editor.
+// A lightweight editor for Map/Zmanim/Eruv/Medical — no fields to change (it's
+// a fixed, code-driven screen), just the card's name, icon, and home-screen
+// photo/text color, reusing the exact same fields as the full category editor.
 function SingletonEditor({
   token,
   category,
@@ -621,6 +623,7 @@ function SingletonEditor({
   onSaved: () => void
   onCancel: () => void
 }) {
+  const [name, setName] = useState(category.pluralLabel)
   const [icon, setIcon] = useState(category.icon || '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
@@ -629,12 +632,18 @@ function SingletonEditor({
 
   async function save() {
     setErrors([])
+    if (!name.trim()) {
+      setErrors(['Name is required.'])
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`/api/admin/categories/${category.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          label: name.trim(),
+          pluralLabel: name.trim(),
           icon,
           cardImageUrl: cardImageUrl.trim() || null,
           cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
@@ -663,11 +672,20 @@ function SingletonEditor({
         <span className="ml-2 text-xs font-normal text-muted">{category.id}</span>
       </h2>
       <p className="text-xs text-muted mb-4">
-        This is a fixed, code-driven card — only its icon and home-screen appearance are editable
-        here.
+        This is a fixed, code-driven card — only its name, icon, and home-screen appearance are
+        editable here.
       </p>
 
       <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <span className="block text-[11px] text-muted mt-1">The card&rsquo;s title on the home screen.</span>
+        </label>
         <IconField icon={icon} onChange={setIcon} />
         <CardBackgroundField
           cardImageUrl={cardImageUrl}
@@ -675,7 +693,7 @@ function SingletonEditor({
           cardTextColor={cardTextColor}
           onCardTextColor={setCardTextColor}
           previewIcon={icon}
-          previewTitle={category.pluralLabel}
+          previewTitle={name || category.pluralLabel}
         />
       </section>
 
@@ -753,14 +771,17 @@ function FormRow({
           >
             Edit
           </button>
-          {canDelete && (
-            <button
-              onClick={onAskDelete}
-              className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
-            >
-              Delete
-            </button>
-          )}
+          {/* Rendered (but hidden) even when this form can't be deleted, so
+              every row's Edit button sits in the same spot — a row with no
+              Delete button shouldn't shift Edit over to fill the gap. */}
+          <button
+            onClick={onAskDelete}
+            className={`text-xs font-medium text-red-600 hover:underline cursor-pointer ${canDelete ? '' : 'invisible'}`}
+            aria-hidden={!canDelete}
+            tabIndex={canDelete ? 0 : -1}
+          >
+            Delete
+          </button>
         </div>
       </div>
 
@@ -1078,9 +1099,10 @@ function CategoryEditor({
   // real listings already has data under specific field keys, so templates
   // don't retrofit onto those. Stays pickable after applying one, so trying a
   // different template is just another click — re-applying always replaces
-  // fields/capabilities, but name/icon are only swapped in if they still
-  // match the *previous* template's own values (i.e. the admin hasn't
-  // customized them); a name/icon typed by hand, before or after, is left alone.
+  // fields/capabilities, but name/icon/description/card image are only
+  // swapped in if they still match the *previous* template's own values (i.e.
+  // the admin hasn't customized them); anything typed by hand, before or
+  // after, is left alone.
   function applyTemplate(templateId: string) {
     const template = CATEGORY_TEMPLATES.find((t) => t.id === templateId)
     if (!template) return
@@ -1095,6 +1117,15 @@ function CategoryEditor({
       icon: lastAppliedTemplate
         ? (d.icon === (lastAppliedTemplate.icon ?? '') ? (template.icon ?? '') : d.icon)
         : (d.icon || template.icon || ''),
+      description: lastAppliedTemplate
+        ? (d.description === (lastAppliedTemplate.categoryDescription ?? '') ? (template.categoryDescription ?? '') : d.description)
+        : (d.description || template.categoryDescription || ''),
+      cardImageUrl: lastAppliedTemplate
+        ? (d.cardImageUrl === (lastAppliedTemplate.cardImageUrl ?? '') ? (template.cardImageUrl ?? '') : d.cardImageUrl)
+        : (d.cardImageUrl || template.cardImageUrl || ''),
+      cardTextColor: lastAppliedTemplate
+        ? (d.cardTextColor === (lastAppliedTemplate.cardTextColor ?? '#ffffff') ? (template.cardTextColor ?? '#ffffff') : d.cardTextColor)
+        : (template.cardTextColor || d.cardTextColor),
       hasAddress: template.hasAddress ?? d.hasAddress,
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,

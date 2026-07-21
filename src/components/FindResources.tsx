@@ -136,16 +136,32 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     // (Patient feature — hospitals is non-empty whenever this view is reachable.)
     const id = hospitalDetailId ?? hospitals[0]?.id ?? ''
     const hospital = hospitals.find((h) => h.id === id)
-    return <AboutYourHospital hospitalName={hospital?.name ?? ''} info={hospital?.info} onUp={goToHospitals} />
+    const medical = categories?.find((c) => c.kind === 'medical')
+    return (
+      <AboutYourHospital
+        hospitalName={hospital?.name ?? ''}
+        info={hospital?.info}
+        onUp={goToHospitals}
+        upLabel={medical?.pluralLabel}
+      />
+    )
   }
   if (view === 'eruv') {
-    return <EruvInfo eruvim={eruvim} onUp={onUp} />
+    const eruv = categories?.find((c) => c.kind === 'eruv')
+    return <EruvInfo eruvim={eruvim} onUp={onUp} title={eruv?.pluralLabel} />
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
     // API computes zmanim directly — no hospital lookup.
+    const zmanim = categories?.find((c) => c.kind === 'zmanim')
     return (
-      <ZmanimCard key={locationLabel} coords={zmanimCoords} locationLabel={locationLabel} onUp={onUp} />
+      <ZmanimCard
+        key={locationLabel}
+        coords={zmanimCoords}
+        locationLabel={locationLabel}
+        onUp={onUp}
+        title={zmanim?.pluralLabel}
+      />
     )
   }
   // ── Database-backed categories (with add / edit / report) ───────────────────
