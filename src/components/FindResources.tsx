@@ -7,7 +7,6 @@ import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
-import CategoryForm from '@/components/resources/CategoryForm'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
@@ -15,8 +14,6 @@ import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
 import { community } from '@/community.config'
-
-const ADD_CATEGORY = '__add_category__'
 
 // The history shape page.tsx stamps on every pushState/replaceState call, plus
 // the two extra fields this view adds when opening a listing form.
@@ -151,10 +148,6 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
       <ZmanimCard key={locationLabel} coords={zmanimCoords} locationLabel={locationLabel} onUp={onUp} />
     )
   }
-  if (view === ADD_CATEGORY) {
-    return <CategoryForm onUp={onUp} onSubmitted={onUp} />
-  }
-
   // ── Database-backed categories (with add / edit / report) ───────────────────
   const category = view ? categories?.find((c) => c.id === view && c.kind === 'listing') : undefined
   if (category) {

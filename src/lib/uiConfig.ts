@@ -6,7 +6,7 @@ import { community } from '@/community.config'
 // `community.ui` directly, so the defaults always apply.
 
 type UiConfig = {
-  contributions: { add: boolean; edit: boolean; report: boolean; suggestCategory: boolean }
+  contributions: { add: boolean; edit: boolean; report: boolean }
   search: { landing: boolean; directory: boolean; map: boolean }
   map: { enabled: boolean; liveTracking: boolean; nearbyList: boolean }
   upvotes: boolean
@@ -21,7 +21,6 @@ export const ui: UiConfig = {
     add: raw.contributions?.add ?? true,
     edit: raw.contributions?.edit ?? true,
     report: raw.contributions?.report ?? true,
-    suggestCategory: raw.contributions?.suggestCategory ?? true,
   },
   search: {
     landing: raw.search?.landing ?? true,
@@ -41,5 +40,4 @@ export const ui: UiConfig = {
 export const contributionsEnabled =
   ui.contributions.add ||
   ui.contributions.edit ||
-  ui.contributions.report ||
-  ui.contributions.suggestCategory
+  ui.contributions.report

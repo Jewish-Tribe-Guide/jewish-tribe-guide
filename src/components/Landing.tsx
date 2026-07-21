@@ -5,15 +5,13 @@ import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSec
 import HeroHeading from '@/components/home/HeroHeading'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
+import { useHomeSections } from '@/lib/useHomeSections'
 import { useForm, useForms } from '@/lib/useForms'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 import { community } from '@/community.config'
-import { ui } from '@/lib/uiConfig'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-
-const ADD_CATEGORY = '__add_category__'
 
 type Props = {
   onNavigate: NavigateFn
@@ -29,6 +27,7 @@ type Props = {
 // Synagogues), with no dropdown to click through.
 export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const categories = useCategories()
+  const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
@@ -99,8 +98,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   ]
 
   const resources = resourceCards(onNavigate, categories)
-  // Order is no longer alphabetical — see HOME_SECTIONS in sections.tsx, which
-  // sorts these into labeled groups for the grid below.
+  // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
+  // into the admin-configured labeled groups for the grid.
   const allCards = resources ? [...entryCards, ...resources] : null
 
   const q = query.trim()
@@ -130,14 +129,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     source: 'Home',
   })
 
-  const suggestCard: CardDef = {
-    title: 'Suggest a new category',
-    dashed: true,
-    go: () => onNavigate('patient', 'find', { findView: ADD_CATEGORY }),
-  }
   // Sections only exist once loading is done and there's something to group;
   // while loading, a single flat grid of entry cards + skeletons stands in.
-  const sections = filtered ? groupCardsIntoSections(filtered) : []
+  const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
@@ -149,21 +143,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       <section className="mt-12 sm:mt-14 space-y-10">
         {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
           <p className="text-center text-sm text-slate-500">
-            Nothing matches “{q}”. Try a different word, clear the filter, or suggest it below.
+            Nothing matches “{q}”. Try a different word or clear the filter.
           </p>
         )}
         {loading ? (
           <CardGrid cards={entryCards} loadingCount={6} />
         ) : (
-          <>
-            {sections.map((s) => (
-              <div key={s.title}>
-                <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-                <CardGrid cards={s.cards} />
-              </div>
-            ))}
-            {ui.contributions.suggestCategory && <CardGrid cards={[suggestCard]} />}
-          </>
+          sections.map((s) => (
+            <div key={s.title}>
+              <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
+              <CardGrid cards={s.cards} />
+            </div>
+          ))
         )}
       </section>
 
