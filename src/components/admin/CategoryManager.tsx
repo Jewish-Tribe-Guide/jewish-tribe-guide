@@ -1111,14 +1111,19 @@ function CategoryEditor({
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
             <div className="flex gap-2">
-              <input
-                value={draft.icon}
-                onChange={(e) => set('icon', e.target.value)}
-                className={`${inputClass} w-16 shrink-0 text-center text-lg`}
-                placeholder={DEFAULT_CATEGORY_ICON}
-                maxLength={4}
-                aria-label="Icon"
-              />
+              {/* inputClass bakes in w-full — wrap it rather than adding a
+                  competing w-16 to the same className, which Tailwind doesn't
+                  resolve by source order and would silently lose to w-full. */}
+              <div className="w-16 shrink-0">
+                <input
+                  value={draft.icon}
+                  onChange={(e) => set('icon', e.target.value)}
+                  className={`${inputClass} text-center text-lg`}
+                  placeholder={DEFAULT_CATEGORY_ICON}
+                  maxLength={4}
+                  aria-label="Icon"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setIconPickerOpen((o) => !o)}
