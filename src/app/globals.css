@@ -84,28 +84,24 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Slim, always-visible scrollbar for horizontally-scrolling chip rows (map
-   category filter, directory filters) — desktop only. Mac/trackpad overlay
-   scrollbars auto-hide until you scroll, so without this there's no visual
-   cue the row overflows. Touch devices keep native (hidden) momentum scroll,
-   which is already discoverable by swipe. */
+/* Horizontally-scrolling chip rows (map category filter, directory filters):
+   the native scrollbar is hidden everywhere (macOS overlay scrollbars
+   auto-hide on trackpads and don't reserve layout space even when
+   ::-webkit-scrollbar is customized, so it can't be relied on as a visible
+   cue) — CategoryFilter.tsx renders its own always-on track + thumb under the
+   row instead, shown on desktop only via .chip-scroll-track. */
+.chip-scroll {
+  scrollbar-width: none;
+}
+.chip-scroll::-webkit-scrollbar {
+  display: none;
+}
+.chip-scroll-track {
+  display: none;
+}
 @media (hover: hover) and (pointer: fine) {
-  .chip-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent; /* slate-300 thumb */
-  }
-  .chip-scroll::-webkit-scrollbar {
-    height: 6px;
-  }
-  .chip-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .chip-scroll::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1; /* slate-300 */
-    border-radius: 9999px;
-  }
-  .chip-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8; /* slate-400 */
+  .chip-scroll-track {
+    display: block;
   }
 }
 
