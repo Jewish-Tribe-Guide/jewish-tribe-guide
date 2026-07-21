@@ -310,6 +310,8 @@ export function resourceCards(
           title: 'Jewish Medical Resources',
           id: 'medical',
           icon: medical.icon,
+          cardImageUrl: medical.cardImageUrl,
+          cardTextColor: medical.cardTextColor,
           keywords: [
             'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
             'prayer space', 'shabbat elevator', 'shabbos elevator', 'kosher cafeteria',
@@ -334,6 +336,8 @@ export function resourceCards(
           title: 'Zmanim & Shabbos',
           id: 'zmanim',
           icon: zmanim.icon,
+          cardImageUrl: zmanim.cardImageUrl,
+          cardTextColor: zmanim.cardTextColor,
           keywords: [
             'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
             'shabbat', 'sunset', 'sunrise', 'shkia', 'netz', 'hebrew date', 'davening times', 'shema',
@@ -347,6 +351,8 @@ export function resourceCards(
           title: 'Eruv Information',
           id: 'eruv',
           icon: eruv.icon,
+          cardImageUrl: eruv.cardImageUrl,
+          cardTextColor: eruv.cardTextColor,
           keywords: [
             'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
             'techum', 'stroller on shabbos',
