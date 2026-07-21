@@ -987,7 +987,8 @@ export function CardBackgroundField({
           )}
           <span className="block text-[11px] text-muted">
             A pasted image URL, not an upload. A dark gradient is applied automatically so the
-            title stays readable — the color picker only affects the text/icon, not the photo.
+            title stays readable, and the icon renders as a flat white silhouette — the color
+            picker only affects the title text, not the photo or icon.
           </span>
         </div>
         {/* A live preview using the exact same Card the home screen renders,

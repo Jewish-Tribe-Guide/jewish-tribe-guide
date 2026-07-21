@@ -26,9 +26,10 @@ export type CardDef = {
   /** A photo for the tile's background instead of the flat tint — set via the
    *  category editor. Unset/null falls back to the tint + icon look. */
   cardImageUrl?: string | null
-  /** Text color over `cardImageUrl` (defaults to white — a photo gets a dark
-   *  scrim underneath regardless, but the color is still admin-editable for
-   *  photos where white doesn't read well). Ignored without an image. */
+  /** Title text color over `cardImageUrl` (defaults to white — a photo gets a
+   *  dark scrim underneath regardless, but the color is still admin-editable
+   *  for photos where white doesn't read well). Ignored without an image, and
+   *  doesn't affect the icon — that always renders as a white silhouette. */
   cardTextColor?: string | null
 }
 
@@ -51,7 +52,12 @@ export function Card({ card, tint }: { card: CardDef; tint: string }) {
         {card.icon && (
           <span
             className={`relative text-3xl leading-none ${hasImage ? 'drop-shadow' : ''}`}
-            style={hasImage ? { color: textColor } : undefined}
+            // Photo cards render the icon as a flat white silhouette (like the
+            // cRc reference) instead of the emoji's own colors — emoji are
+            // color glyphs, not strokable outlines, so this is a filter over
+            // the rendered glyph rather than a true hollow-line icon. The
+            // title's own color is still admin-set via `textColor` below.
+            style={hasImage ? { filter: 'brightness(0) invert(1)' } : undefined}
             aria-hidden="true"
           >
             {card.icon}
