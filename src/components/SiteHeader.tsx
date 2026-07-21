@@ -31,9 +31,17 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
               for the row, and dropping the mark frees the ~46px needed to keep
               the text full. Once a location is set the pill collapses to just its
               pin, so the logo comes back. Always shown from sm up. */}
-          <span className={`${location.address ? 'grid' : 'hidden'} sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white`}>
-            <StarOfDavid className="h-5 w-5" />
-          </span>
+          {settings.logoUrl?.trim() ? (
+            <span
+              className={`${location.address ? 'block' : 'hidden'} sm:block h-9 w-9 shrink-0 rounded-xl bg-cover bg-center`}
+              style={{ backgroundImage: `url(${settings.logoUrl})` }}
+              aria-hidden="true"
+            />
+          ) : (
+            <span className={`${location.address ? 'grid' : 'hidden'} sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white`}>
+              <StarOfDavid className="h-5 w-5" />
+            </span>
+          )}
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               {settings.name}

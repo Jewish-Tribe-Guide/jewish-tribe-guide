@@ -132,6 +132,27 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
             Shown under the home screen heading, and reused as the footer blurb.
           </span>
         </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
+          <div className="flex items-center gap-3">
+            {draft.logoUrl?.trim() && (
+              <div
+                className="h-9 w-9 rounded-xl shrink-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${draft.logoUrl})` }}
+              />
+            )}
+            <input
+              value={draft.logoUrl ?? ''}
+              onChange={(e) => set('logoUrl', e.target.value.trim() || null)}
+              placeholder="https://…"
+              className={inputClass}
+            />
+          </div>
+          <span className="block text-[11px] text-muted mt-1">
+            A pasted image URL, not an upload. Shown in the header instead of the default mark. Leave
+            blank to keep the default.
+          </span>
+        </label>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-4">

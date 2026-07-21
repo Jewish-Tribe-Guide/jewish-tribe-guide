@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
+import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
@@ -13,8 +14,6 @@ export type CardDef = {
   /** Hidden search terms — the words people type that should surface this card
    *  (e.g. "shul" for Synagogues, "supermarket" for Grocery Stores). */
   keywords?: string[]
-  /** Renders as the dashed "suggest a category" affordance instead of a tile. */
-  dashed?: boolean
   /** One emoji shown above the title — from the category's own `icon` field
    *  where there is one; a few hand-built cards set a fixed one directly. */
   icon?: string
@@ -35,16 +34,6 @@ export type CardDef = {
 export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
 export function Card({ card, tint }: { card: CardDef; tint: string }) {
-  if (card.dashed) {
-    return (
-      <button onClick={card.go} className="group w-full cursor-pointer">
-        <div className="aspect-[4/3] rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 flex flex-col items-center justify-center gap-1.5 p-4 text-center transition-all duration-200 group-hover:border-primary group-hover:bg-primary/10 group-active:border-primary group-active:bg-primary/10">
-          <span className="text-2xl leading-none text-primary" aria-hidden="true">＋</span>
-          <span className="text-[15px] font-semibold leading-snug text-primary">{card.title}</span>
-        </div>
-      </button>
-    )
-  }
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
   return (
@@ -115,38 +104,33 @@ export function cardMatches(card: CardDef, query: string): boolean {
 }
 
 // ── Home-screen sections ──────────────────────────────────────────────────────
-// The requested grouping — each row lists a section's cards by CardDef `id`, in
-// display order. A card not listed here (a category with no assigned home yet,
-// like Hotels or the Map, or any future custom form) falls into a trailing
-// "More" section instead of silently disappearing from the home screen.
-const HOME_SECTIONS: { title: string; ids: string[] }[] = [
-  { title: 'Food Establishments', ids: ['restaurant', 'grocery'] },
-  { title: 'Jewish Institutions and Information', ids: ['synagogue', 'mikvah', 'eruv', 'zmanim'] },
-  { title: 'Family Resources', ids: ['childcare', 'school'] },
-  { title: 'Medical Resources', ids: ['medical', 'support', 'volunteer'] },
-  { title: 'Get Connected', ids: ['whatsapp', 'young-professional'] },
-]
+// The grouping shown on the home page — admin-editable (title + which cards, in
+// what order) via the Sections tab in /admin; see src/lib/homeSections.ts and
+// useHomeSections.ts. A card not listed in any section (a category with no
+// assigned home yet, or any future custom form) falls into a trailing "More"
+// section instead of silently disappearing from the home screen.
 
 export type CardSectionDef = { title: string; cards: CardDef[] }
 
-/** Sorts cards into the sections above (in each section's own listed order),
+/** Sorts cards into the given sections (in each section's own listed order),
  *  then a trailing untitled "More" section for anything left over — never
- *  drops a card just because it has no assigned section. The dashed "suggest
- *  a category" card is excluded; render it separately, after every section. */
-export function groupCardsIntoSections(cards: CardDef[]): CardSectionDef[] {
+ *  drops a card just because it has no assigned section. */
+export function groupCardsIntoSections(cards: CardDef[], sections: HomeSection[]): CardSectionDef[] {
   const byId = new Map(cards.filter((c) => c.id).map((c) => [c.id as string, c]))
   const used = new Set<string>()
 
-  const sections = HOME_SECTIONS.map(({ title, ids }) => {
-    const sectionCards = ids.map((id) => byId.get(id)).filter((c): c is CardDef => !!c)
-    sectionCards.forEach((c) => used.add(c.id as string))
-    return { title, cards: sectionCards }
-  }).filter((s) => s.cards.length > 0)
+  const grouped = sections
+    .map(({ title, cardIds }) => {
+      const sectionCards = cardIds.map((id) => byId.get(id)).filter((c): c is CardDef => !!c)
+      sectionCards.forEach((c) => used.add(c.id as string))
+      return { title, cards: sectionCards }
+    })
+    .filter((s) => s.cards.length > 0)
 
-  const leftover = cards.filter((c) => !c.dashed && !(c.id && used.has(c.id)))
-  if (leftover.length > 0) sections.push({ title: 'More', cards: leftover })
+  const leftover = cards.filter((c) => !(c.id && used.has(c.id)))
+  if (leftover.length > 0) grouped.push({ title: 'More', cards: leftover })
 
-  return sections
+  return grouped
 }
 
 // ── Listing (within-card) search ───────────────────────────────────────────────

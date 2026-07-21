@@ -5,31 +5,32 @@ import {
   submitListingCreate,
   submitListingUpdate,
   submitListingDelete,
-  submitCategoryCreate,
 } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
-import { isValidPhone } from '@/lib/validation'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { ui } from '@/lib/uiConfig'
-import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
+import type { ResourceSubmission, SubmissionRow } from '@/types'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
   targetType?: 'listing' | 'category'
   targetId?: string
-  payload?: ResourceSubmission | CategorySubmissionPayload
+  payload?: ResourceSubmission
   note?: string
   submittedBy?: { name?: string; email?: string }
   turnstileToken?: string
 }
 
 // POST /api/submissions — public endpoint for proposing a change: add/edit/report
-// a listing, or request a new category (with its first listing). Everything lands
-// in the moderation queue as `pending`; nothing goes live until an admin approves.
+// a listing. Everything lands in the moderation queue as `pending`; nothing goes
+// live until an admin approves. (`targetType: 'category'` is rejected outright —
+// suggesting a new category is no longer a public path; feedback comes through
+// the general feedback form instead. Older `category` rows may still exist in the
+// queue for moderators to clear, but nothing new can create one.)
 export async function POST(request: Request) {
   // Each submission geocodes + emails, and floods the moderation queue if
   // abused — throttle per IP.
@@ -60,25 +61,23 @@ export async function POST(request: Request) {
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null
 
+  if (targetType === 'category') {
+    return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
+  }
+
   // Curated-directory gate: refuse whichever contribution paths the community
   // turned off in community.config (ui.contributions), so hiding a button can't
   // be bypassed by posting directly.
   const allowed =
-    targetType === 'category'
-      ? ui.contributions.suggestCategory
-      : operation === 'create'
-        ? ui.contributions.add
-        : operation === 'update'
-          ? ui.contributions.edit
-          : operation === 'delete'
-            ? ui.contributions.report
-            : true // unknown operations fall through to the 400 below
+    operation === 'create'
+      ? ui.contributions.add
+      : operation === 'update'
+        ? ui.contributions.edit
+        : operation === 'delete'
+          ? ui.contributions.report
+          : true // unknown operations fall through to the 400 below
   if (!allowed) {
     return Response.json({ ok: false, errors: ['This action is not available.'] }, { status: 403 })
-  }
-
-  if (targetType === 'category') {
-    return handleCategory(body, submittedBy)
   }
 
   if (operation !== 'create' && operation !== 'update' && operation !== 'delete') {
@@ -137,37 +136,6 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error('[submissions] insert failed:', err)
-    return Response.json(
-      { ok: false, errors: ['Could not save your submission. Please try again.'] },
-      { status: 502 },
-    )
-  }
-
-  notify(submission)
-  return Response.json({ ok: true, id: submission.id })
-}
-
-async function handleCategory(body: Body, submittedBy: { name?: string; email?: string } | null) {
-  const payload = body.payload as CategorySubmissionPayload | undefined
-  if (body.operation !== 'create' || !payload) {
-    return Response.json({ ok: false, errors: ['Invalid category submission.'] }, { status: 400 })
-  }
-
-  const errors: string[] = []
-  if (!payload.label?.trim()) errors.push('Category name is required.')
-  const f = payload.firstListing
-  if (!f?.name?.trim()) errors.push('The first listing’s name is required.')
-  if (!f?.address?.trim()) errors.push('The first listing’s address is required.')
-  if (f?.phone?.trim() && !isValidPhone(f.phone)) errors.push('Please enter a valid phone number.')
-  if (errors.length > 0) {
-    return Response.json({ ok: false, errors }, { status: 400 })
-  }
-
-  let submission: SubmissionRow
-  try {
-    submission = await submitCategoryCreate(payload, submittedBy)
-  } catch (err) {
-    console.error('[submissions] category insert failed:', err)
     return Response.json(
       { ok: false, errors: ['Could not save your submission. Please try again.'] },
       { status: 502 },

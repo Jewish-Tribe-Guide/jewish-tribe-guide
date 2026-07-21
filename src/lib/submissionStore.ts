@@ -52,22 +52,11 @@ export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {
   })
 }
 
-// Records a proposed NEW category (with its first listing).
-export async function submitCategoryCreate(
-  payload: CategorySubmissionPayload,
-  submittedBy: { name?: string; email?: string } | null,
-): Promise<SubmissionRow> {
-  return insertSubmission({
-    operation: 'create',
-    target_type: 'category',
-    target_id: null,
-    payload: payload as unknown as Record<string, unknown>,
-    note: null,
-    submitted_by: submittedBy,
-  })
-}
-
 // ── Writes (public submissions) ──────────────────────────────────────────────
+// NOTE: there is no `submitCategoryCreate` — suggesting a new category is no
+// longer a public path (see src/app/api/submissions/route.ts). `applyCategory`
+// below still exists to let moderators approve/reject any older `category`
+// submissions still sitting in the queue.
 
 function listingColumns(payload: ResourceSubmission) {
   return {

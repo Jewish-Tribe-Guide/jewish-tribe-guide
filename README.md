@@ -51,15 +51,19 @@ The single source of truth for branding. Edit:
   (`eruv`, `zmanim`, `medicalResources`, `patientSupport`, `volunteer`). The
   card and its page/flow disappear when a flag is `false`.
 - `ui` — capability toggles for the app's affordances (all default on): public
-  `contributions` (Add / Edit / Report / suggest-category — off = a curated,
-  admin-only directory, enforced on the server too), `search` bars per screen
-  (landing / directory / map), the `map` and its extras (live tracking, nearby
-  list), and `upvotes`. Read through `src/lib/uiConfig.ts`, which applies the
-  defaults so any key can be flipped or omitted.
+  `contributions` (Add / Edit / Report — off = a curated, admin-only directory,
+  enforced on the server too), `search` bars per screen (landing / directory /
+  map), the `map` and its extras (live tracking, nearby list), and `upvotes`.
+  Read through `src/lib/uiConfig.ts`, which applies the defaults so any key can
+  be flipped or omitted. (General site feedback, including category requests,
+  comes through the feedback form in the footer instead — no separate
+  suggest-a-category path.)
 
 ### 2. Logo & favicon
 
-- **In-app mark:** replace the `StarOfDavid` SVG in `src/components/icons.tsx`.
+- **In-app mark:** the header shows a pasted logo image URL set via the Site
+  tab in `/admin` (`Logo`), or the built-in `StarOfDavid` SVG in
+  `src/components/icons.tsx` if none is set.
 - **Browser / home-screen icon:** replace `src/app/favicon.ico`.
 
 ### 3. Location data — `src/data/`

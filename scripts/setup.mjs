@@ -120,6 +120,7 @@ async function main() {
   run('seed-forms.mjs')
   run('seed-tags.mjs')
   run('seed-upvotes.mjs')
+  run('seed-home-sections.mjs')
 
   const existing = await resourceCount()
   if (existing > 0) {

@@ -13,6 +13,7 @@ import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
 import CategoryManager from '@/components/admin/CategoryManager'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
+import HomeSectionManager from '@/components/admin/HomeSectionManager'
 import ResponsesManager from '@/components/admin/ResponsesManager'
 import ArchivedListings from '@/components/admin/ArchivedListings'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
@@ -88,11 +89,12 @@ export default function AdminPage() {
   )
 }
 
-type AdminTab = 'queue' | 'categories' | 'responses' | 'archived' | 'site'
+type AdminTab = 'queue' | 'categories' | 'sections' | 'responses' | 'archived' | 'site'
 
 const TAB_LABELS: Record<AdminTab, string> = {
   queue: 'Moderation queue',
   categories: 'Categories',
+  sections: 'Sections',
   responses: 'Responses',
   archived: 'Archived',
   site: 'Site',
@@ -149,7 +151,7 @@ function AdminTabs({ session }: { session: Session }) {
   return (
     <div>
       <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {(['queue', 'categories', 'responses', 'archived', 'site'] as const).map((t) => (
+        {(['queue', 'categories', 'sections', 'responses', 'archived', 'site'] as const).map((t) => (
           <button
             key={t}
             onClick={() => goToTab(t)}
@@ -173,6 +175,8 @@ function AdminTabs({ session }: { session: Session }) {
           onOpenEditor={openEditor}
           onCloseEditor={closeEditor}
         />
+      ) : tab === 'sections' ? (
+        <HomeSectionManager token={session.access_token} />
       ) : tab === 'responses' ? (
         <ResponsesManager token={session.access_token} />
       ) : tab === 'archived' ? (

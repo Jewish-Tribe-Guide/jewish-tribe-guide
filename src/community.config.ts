@@ -76,8 +76,6 @@ export const community = {
       edit: true,
       /** Per-listing "Report" button. */
       report: true,
-      /** The "Suggest a new category" card on the home screen. */
-      suggestCategory: true,
     },
     /** Show/hide the search bar on each screen independently. */
     search: {

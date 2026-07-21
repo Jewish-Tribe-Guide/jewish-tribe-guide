@@ -9,6 +9,7 @@ type Row = {
   tagline: string
   hero_title: string
   mission: string
+  logo_url: string | null
   feedback_enabled: boolean
   feedback_button_label: string
   feedback_heading: string
@@ -22,6 +23,7 @@ function toSettings(row: Row | null): SiteSettings {
     tagline: row.tagline,
     heroTitle: row.hero_title,
     mission: row.mission,
+    logoUrl: row.logo_url,
     feedbackEnabled: row.feedback_enabled,
     feedbackButtonLabel: row.feedback_button_label,
     feedbackHeading: row.feedback_heading,
@@ -57,6 +59,7 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
         tagline: merged.tagline,
         hero_title: merged.heroTitle,
         mission: merged.mission,
+        logo_url: merged.logoUrl,
         feedback_enabled: merged.feedbackEnabled,
         feedback_button_label: merged.feedbackButtonLabel,
         feedback_heading: merged.feedbackHeading,
