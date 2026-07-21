@@ -1,16 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, type CardDef, resourceCards } from '@/components/home/sections'
+import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
-import { useForm, useForms } from '@/lib/useForms'
 import { useAllListings } from '@/lib/useAllListings'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
-import { community } from '@/community.config'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 
 type Props = {
@@ -31,71 +29,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
-  // Card labels mirror whatever the admin named each form (Forms tab) — falls
-  // back to the historical copy while the form is still loading.
-  const supportForm = useForm('support')
-  const volunteerForm = useForm('volunteer')
-  // Every other form is an admin-created custom one — support/volunteer keep
-  // their own dedicated cards above (fixed copy/keywords), so exclude them
-  // here rather than double-listing.
-  const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
-  const mapCategory = categories?.find((c) => c.kind === 'map')
-
-  const entryCards: CardDef[] = [
-    ...(community.features.patientSupport
-      ? [{
-          title: supportForm?.title ?? 'Patient & Family Support',
-          id: 'support',
-          icon: supportForm?.icon || '🤝',
-          cardImageUrl: supportForm?.cardImageUrl,
-          cardTextColor: supportForm?.cardTextColor,
-          keywords: [
-            'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
-            'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
-            'lunch', 'breakfast', 'shabbos food', 'ride', 'rides', 'car', 'drive', 'lift', 'transport',
-            'transportation', 'taxi', 'uber', 'pickup', 'appointment', 'housing', 'place to stay',
-            'room', 'apartment', 'lodging', 'overnight', 'out of town', 'visit', 'visitor', 'visitors',
-            'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
-          ],
-          go: () => onOpenFlow('support'),
-        }]
-      : []),
-    ...(community.features.volunteer
-      ? [{
-          title: volunteerForm?.title ?? 'Volunteer for Patients',
-          id: 'volunteer',
-          icon: volunteerForm?.icon || '💛',
-          cardImageUrl: volunteerForm?.cardImageUrl,
-          cardTextColor: volunteerForm?.cardTextColor,
-          keywords: [
-            'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
-            'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
-            'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
-          ],
-          go: () => onOpenFlow('volunteer'),
-        }]
-      : []),
-    ...(mapCategory
-      ? [{
-          title: 'View Map',
-          id: 'map',
-          icon: mapCategory.icon,
-          keywords: [
-            'map', 'maps', 'view map', 'locations', 'where', 'nearby', 'directions', 'address',
-            'addresses', 'google map', 'pin', 'pins', 'navigate', 'around me',
-          ],
-          go: () => onNavigate('patient', 'map'),
-        }]
-      : []),
-    ...customForms.map((f) => ({
-      title: f.title,
-      id: f.id,
-      icon: f.icon,
-      cardImageUrl: f.cardImageUrl,
-      cardTextColor: f.cardTextColor,
-      go: () => onOpenFlow(f.id),
-    })),
-  ]
+  const entryCards = useEntryCards(categories, onNavigate, onOpenFlow)
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
