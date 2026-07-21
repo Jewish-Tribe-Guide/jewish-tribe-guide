@@ -28,8 +28,9 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
   return (
     // Single horizontal-scroll row (mirrors the directory filter row) so the
     // chips — which double as the map's color legend — stay glanceable without
-    // eating three wrapped rows of vertical space.
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+    // eating three wrapped rows of vertical space. chip-scroll shows a slim
+    // scrollbar under the row on desktop as a cue that it overflows.
+    <div className="chip-scroll flex flex-nowrap items-center gap-2 overflow-x-auto pb-2.5">
       <button
         onClick={allOn ? onNone : onAll}
         className="shrink-0 rounded-full border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
