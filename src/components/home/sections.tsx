@@ -291,7 +291,7 @@ export function resourceCards(
   return [
     ...(medical
       ? [{
-          title: 'Jewish Medical Resources',
+          title: medical.pluralLabel,
           id: 'medical',
           icon: medical.icon,
           cardImageUrl: medical.cardImageUrl,
@@ -317,7 +317,7 @@ export function resourceCards(
     })),
     ...(zmanim
       ? [{
-          title: 'Zmanim & Shabbos',
+          title: zmanim.pluralLabel,
           id: 'zmanim',
           icon: zmanim.icon,
           cardImageUrl: zmanim.cardImageUrl,
@@ -332,7 +332,7 @@ export function resourceCards(
       : []),
     ...(eruv
       ? [{
-          title: 'Eruv Information',
+          title: eruv.pluralLabel,
           id: 'eruv',
           icon: eruv.icon,
           cardImageUrl: eruv.cardImageUrl,
