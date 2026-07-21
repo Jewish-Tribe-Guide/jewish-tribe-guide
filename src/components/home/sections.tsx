@@ -6,7 +6,6 @@ import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import { community } from '@/community.config'
 
 export type CardDef = {
   title: string
@@ -231,10 +230,8 @@ export function resourceCards(
 ): CardDef[] | null {
   if (categories === null) return null
 
-  const { features } = community
-
   return [
-    ...(features.medicalResources
+    ...(categories.some((c) => c.kind === 'medical')
       ? [{
           title: 'Jewish Medical Resources',
           keywords: [
@@ -263,7 +260,7 @@ export function resourceCards(
           go: () => nav('patient', 'find', { findView: 'zmanim' }),
         }]
       : []),
-    ...(features.eruv
+    ...(categories.some((c) => c.kind === 'eruv')
       ? [{
           title: 'Eruv Information',
           keywords: [

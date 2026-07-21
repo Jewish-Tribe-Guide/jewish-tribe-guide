@@ -83,7 +83,13 @@ export function slugify(label: string): string {
 // Creates a category, picking a unique slug derived from its label. Returns the
 // created config (with its final id). New categories start with no detail fields
 // (the owner can add fields later); they render via the generic card renderer.
-const KIND_LABELS: Record<CategoryKind, string> = { listing: 'category', map: 'Map category', zmanim: 'Zmanim category' }
+const KIND_LABELS: Record<CategoryKind, string> = {
+  listing: 'category',
+  map: 'Map category',
+  zmanim: 'Zmanim category',
+  eruv: 'Eruv Information category',
+  medical: 'Jewish Medical Resources category',
+}
 
 export async function createCategory(input: {
   label: string

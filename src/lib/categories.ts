@@ -156,11 +156,12 @@ export function resolveCapabilities(
 }
 
 /** Almost every category row is a real listing directory ('listing'). The other
- *  two kinds are singleton pseudo-categories — an admin can add/remove at most
- *  one of each, and they render as a fixed, code-driven screen (the sitewide
- *  map, the Zmanim card) instead of a generic directory. A category's `kind` is
- *  immutable once created, like its `id`. */
-export type CategoryKind = 'listing' | 'map' | 'zmanim'
+ *  kinds are singleton pseudo-categories — an admin can add/remove at most one
+ *  of each, and they render as a fixed, code-driven screen (the sitewide map,
+ *  the Zmanim card, the Eruv Information card, the Jewish Medical Resources
+ *  card) instead of a generic directory. A category's `kind` is immutable once
+ *  created, like its `id`. */
+export type CategoryKind = 'listing' | 'map' | 'zmanim' | 'eruv' | 'medical'
 
 export type CategoryConfig = {
   /** Slug stored in `resource.category`, e.g. 'grocery'. */
