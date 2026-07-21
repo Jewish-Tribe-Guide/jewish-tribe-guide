@@ -74,6 +74,12 @@ export type FormContent = {
   successTitle: string
   successMessage: string
   steps: FormStep[]
+  /** One emoji shown on the form's home-screen card. */
+  icon?: string
+  /** A photo for the card's background instead of the flat tint. */
+  cardImageUrl?: string | null
+  /** Text color over `cardImageUrl` (a hex string). Ignored without an image. */
+  cardTextColor?: string | null
 }
 
 export type FormConfig = FormContent & {

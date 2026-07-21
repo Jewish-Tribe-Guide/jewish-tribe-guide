@@ -527,14 +527,10 @@ const SINGLETON_DESCRIPTIONS: Record<SingletonKind, string> = {
   medical: 'The Jewish Medical Resources card — per-hospital Jewish life.',
 }
 
-// A Map/Zmanim/Eruv/Medical row — nothing to edit, just presence + a Delete
-// button, reusing the exact same delete/confirm flow as a real listing
-// category.
-// Jewish Medical Resources' card is intentionally left delete-only (no Edit
-// button) — its content is still hardcoded and likely to change, per the
-// admin's call; Map/Zmanim/Eruv get the same icon/background editor as a
-// real category.
-const SINGLETON_EDITABLE_KINDS = new Set<SingletonKind>(['map', 'zmanim', 'eruv'])
+// A Map/Zmanim/Eruv/Medical row — nothing to edit but icon/background (see
+// SingletonEditor), plus a Delete button, reusing the exact same delete/
+// confirm flow as a real listing category.
+const SINGLETON_EDITABLE_KINDS = new Set<SingletonKind>(['map', 'zmanim', 'eruv', 'medical'])
 
 function SingletonRow({
   category: c,
@@ -863,7 +859,7 @@ function toDraft(c: CategoryConfig | null): Draft {
 
 // The emoji field + curated browse panel — shared by the full category editor
 // and SingletonEditor (Map/Zmanim/Eruv), which has nothing else to edit.
-function IconField({ icon, onChange }: { icon: string; onChange: (value: string) => void }) {
+export function IconField({ icon, onChange }: { icon: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <label className="block">
@@ -931,7 +927,7 @@ function IconField({ icon, onChange }: { icon: string; onChange: (value: string)
 
 // The image-URL + text-color fields + live preview — shared by the full
 // category editor and SingletonEditor.
-function CardBackgroundField({
+export function CardBackgroundField({
   cardImageUrl,
   onCardImageUrl,
   cardTextColor,

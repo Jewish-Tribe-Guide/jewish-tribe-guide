@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { FormConfig, FormContent, FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
+import { IconField, CardBackgroundField } from './CategoryManager'
 
 // ── Editor for one form — title, chrome text, and questions. Mounted from
 // CategoryManager's unified list, both for the two built-in forms (Request
@@ -24,6 +25,9 @@ function toContent(f: FormConfig): FormContent {
     successTitle: f.successTitle,
     successMessage: f.successMessage,
     steps: f.steps,
+    icon: f.icon,
+    cardImageUrl: f.cardImageUrl,
+    cardTextColor: f.cardTextColor,
   }
 }
 
@@ -176,6 +180,9 @@ export default function FormEditor({
         successTitle: form.successTitle,
         successMessage: form.successMessage,
         steps: form.steps,
+        icon: form.icon,
+        cardImageUrl: form.cardImageUrl,
+        cardTextColor: form.cardTextColor,
       })
       setSavedNotice(false)
     } catch (err) {
@@ -208,6 +215,7 @@ export default function FormEditor({
       <div className="space-y-6">
         {/* Chrome text */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+          <IconField icon={draft.icon ?? ''} onChange={(v) => set('icon', v)} />
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Title</span>
             <input value={draft.title} onChange={(e) => set('title', e.target.value)} className={inputClass} />
@@ -224,6 +232,14 @@ export default function FormEditor({
             <span className="block text-xs font-medium text-slate-700 mb-1">Success screen message</span>
             <textarea rows={2} value={draft.successMessage} onChange={(e) => set('successMessage', e.target.value)} className={inputClass} />
           </label>
+          <CardBackgroundField
+            cardImageUrl={draft.cardImageUrl ?? ''}
+            onCardImageUrl={(v) => set('cardImageUrl', v)}
+            cardTextColor={draft.cardTextColor || '#ffffff'}
+            onCardTextColor={(v) => set('cardTextColor', v)}
+            previewIcon={draft.icon ?? ''}
+            previewTitle={draft.title || 'Form'}
+          />
         </section>
 
         {/* Steps */}

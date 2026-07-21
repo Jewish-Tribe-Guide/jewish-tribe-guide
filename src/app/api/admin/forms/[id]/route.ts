@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
+import { isHttpUrl } from '@/lib/validation'
 import type { FormStep } from '@/lib/forms'
 
 type PatchBody = {
@@ -9,6 +10,9 @@ type PatchBody = {
   successTitle?: string
   successMessage?: string
   steps?: FormStep[]
+  icon?: string
+  cardImageUrl?: string | null
+  cardTextColor?: string | null
 }
 
 // PATCH /api/admin/forms/:id — save a full draft copy of the form's title,
@@ -33,6 +37,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (!Array.isArray(body.steps) || body.steps.length === 0) {
     return Response.json({ ok: false, errors: ['A form needs at least one step.'] }, { status: 400 })
   }
+  if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
+    return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
+  }
 
   try {
     const form = await saveDraft(id, {
@@ -41,6 +48,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       successTitle: body.successTitle || 'All set',
       successMessage: body.successMessage || '',
       steps: body.steps,
+      icon: body.icon,
+      cardImageUrl: body.cardImageUrl,
+      cardTextColor: body.cardTextColor,
     })
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     return Response.json({ ok: true, form })

@@ -55,6 +55,9 @@ type FormRow = {
   success_message: string
   steps: FormStep[]
   draft: FormContent | null
+  icon: string | null
+  card_image_url: string | null
+  card_text_color: string | null
 }
 
 function toConfig(row: FormRow): FormConfig {
@@ -66,6 +69,9 @@ function toConfig(row: FormRow): FormConfig {
     successMessage: row.success_message,
     steps: row.steps ?? [],
     draft: row.draft ?? null,
+    icon: row.icon ?? '',
+    cardImageUrl: row.card_image_url,
+    cardTextColor: row.card_text_color,
   }
 }
 
@@ -118,6 +124,9 @@ export async function publishDraft(id: string): Promise<FormConfig | null> {
       success_title: form.draft.successTitle,
       success_message: form.draft.successMessage,
       steps: form.draft.steps,
+      icon: form.draft.icon?.trim() || null,
+      card_image_url: form.draft.cardImageUrl?.trim() || null,
+      card_text_color: form.draft.cardImageUrl?.trim() ? form.draft.cardTextColor : null,
       draft: null,
       updated_at: new Date().toISOString(),
     })
