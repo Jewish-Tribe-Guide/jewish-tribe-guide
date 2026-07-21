@@ -10,7 +10,6 @@ import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
-import { community } from '@/community.config'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
@@ -96,7 +95,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     const out: (MapPoint & { filterId: string; searchText: string; raw?: DirectoryResource })[] = []
 
     // Hospital pins are a patient-oriented overlay — only when that module is on.
-    if (community.features.medicalResources) {
+    if ((categories ?? []).some((c) => c.kind === 'medical')) {
       for (const h of hospitals) {
         out.push({
           filterId: HOSPITALS_ID,
