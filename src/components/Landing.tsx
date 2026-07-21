@@ -47,7 +47,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       ? [{
           title: supportForm?.title ?? 'Patient & Family Support',
           id: 'support',
-          icon: '🤝',
+          icon: supportForm?.icon || '🤝',
+          cardImageUrl: supportForm?.cardImageUrl,
+          cardTextColor: supportForm?.cardTextColor,
           keywords: [
             'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
             'family', 'families', 'need help', 'meal', 'meals', 'food', 'kosher food', 'dinner',
@@ -63,7 +65,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       ? [{
           title: volunteerForm?.title ?? 'Volunteer for Patients',
           id: 'volunteer',
-          icon: '💛',
+          icon: volunteerForm?.icon || '💛',
+          cardImageUrl: volunteerForm?.cardImageUrl,
+          cardTextColor: volunteerForm?.cardTextColor,
           keywords: [
             'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
             'cook for a family', 'deliver meals', 'host', 'hosting', 'drive', 'rides', 'give rides',
@@ -87,6 +91,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     ...customForms.map((f) => ({
       title: f.title,
       id: f.id,
+      icon: f.icon,
+      cardImageUrl: f.cardImageUrl,
+      cardTextColor: f.cardTextColor,
       go: () => onOpenFlow(f.id),
     })),
   ]
