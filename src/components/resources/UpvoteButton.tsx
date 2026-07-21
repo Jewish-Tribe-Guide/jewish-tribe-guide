@@ -112,7 +112,7 @@ export default function UpvoteButton({
           // without shifting the surrounding header layout. Mobile only — desktop
           // keeps the original compact hit area (sm:m-0 sm:p-0).
           'inline-flex items-center gap-1 -m-2 p-2 sm:m-0 sm:p-0 text-xs font-medium whitespace-nowrap cursor-pointer transition-colors disabled:opacity-60',
-          voted ? 'text-primary' : 'text-slate-500 hover:text-primary',
+          voted ? 'text-primary' : 'text-slate-600 hover:text-primary',
         ].join(' ')}
       >
         <span aria-hidden="true">▲</span>

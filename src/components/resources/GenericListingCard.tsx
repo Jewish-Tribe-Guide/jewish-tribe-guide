@@ -271,7 +271,7 @@ export function GenericListingCard({
               under distance's 📍 emoji (too easy to miss as its own tappable
               control). Left keeps it clear of both. */}
           {(upvotes || travel.length > 0) && (
-            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-3">
               {upvotes && (
                 <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
               )}
