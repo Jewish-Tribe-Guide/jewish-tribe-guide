@@ -184,17 +184,7 @@ export function GenericListingCard({
             so it never gets crowded; on desktop they share a line. */}
         <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-          {/* On mobile the upvote flows inline right after the name text, so it
-              follows the last word even when the name wraps to two lines. On desktop
-              it's hidden here and appears in the right-side cluster instead. */}
-          <span className="min-w-0 font-semibold text-slate-900">
-            {item.name}
-            {upvotes && (
-              <span className="sm:hidden inline-flex align-middle relative -top-0.5 ml-2">
-                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-              </span>
-            )}
-          </span>
+          <span className="min-w-0 font-semibold text-slate-900">{item.name}</span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           {isOpen && (closing?.closesSoon ? (
             <span className="relative group/tip">
@@ -271,14 +261,20 @@ export function GenericListingCard({
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {upvotes && (
-            <span className="hidden sm:block">
-              <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-            </span>
-          )}
-          {travel.length > 0 && (
-            <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-              {travel.map((t) => <span key={t}>{t}</span>)}
+          {/* Upvote + distance grouped together so the count reads as "how
+              popular", not a stray control — stacked on mobile where there's
+              no room to sit side by side, next to each other on desktop
+              (where they already sit under the Popular/Distance toggle). */}
+          {(upvotes || travel.length > 0) && (
+            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+              {upvotes && (
+                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+              )}
+              {travel.length > 0 && (
+                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                  {travel.map((t) => <span key={t}>{t}</span>)}
+                </div>
+              )}
             </div>
           )}
           {headerUrlFields.map((f) => {
