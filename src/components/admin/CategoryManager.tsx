@@ -16,7 +16,7 @@ import {
   type FieldType,
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
-import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
+import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
 import FormEditor from './FormEditor'
 import CategoryPreview from './CategoryPreview'
 
@@ -743,6 +743,13 @@ function CategoryEditor({
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [previewing, setPreviewing] = useState(false)
+  // The most recently applied template, if any — stays visible/pickable
+  // afterward (see the render below) so switching to a different one is just
+  // another click. Tracked so a *second* apply can tell "still the first
+  // template's name/icon, safe to swap in the new one" apart from "the admin
+  // already customized this," which should be left alone.
+  const [lastAppliedTemplate, setLastAppliedTemplate] = useState<CategoryTemplate | null>(null)
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   // Set once a save attempt finds existing listings with data in a field the
   // admin just removed (or an address/phone toggle they just turned off) — a
   // confirmation gate before that data is wiped for real. Cleared on cancel or
@@ -802,23 +809,34 @@ function CategoryEditor({
   }
 
   // Pre-fills the draft's fields/capabilities from a starter template — only
-  // offered on a brand-new, still-empty category (see the picker below); a
-  // category with real listings already has data under specific field keys,
-  // so templates don't retrofit onto those.
+  // offered on a brand-new category (see the picker below); a category with
+  // real listings already has data under specific field keys, so templates
+  // don't retrofit onto those. Stays pickable after applying one, so trying a
+  // different template is just another click — re-applying always replaces
+  // fields/capabilities, but name/icon are only swapped in if they still
+  // match the *previous* template's own values (i.e. the admin hasn't
+  // customized them); a name/icon typed by hand, before or after, is left alone.
   function applyTemplate(templateId: string) {
     const template = CATEGORY_TEMPLATES.find((t) => t.id === templateId)
     if (!template) return
     setDraft((d) => ({
       ...d,
-      pluralLabel: d.pluralLabel || template.pluralLabel,
-      label: d.label || singularize(template.pluralLabel),
-      icon: d.icon || template.icon || '',
+      pluralLabel: lastAppliedTemplate
+        ? (d.pluralLabel === lastAppliedTemplate.pluralLabel ? template.pluralLabel : d.pluralLabel)
+        : (d.pluralLabel || template.pluralLabel),
+      label: lastAppliedTemplate
+        ? (d.label === singularize(lastAppliedTemplate.pluralLabel) ? singularize(template.pluralLabel) : d.label)
+        : (d.label || singularize(template.pluralLabel)),
+      icon: lastAppliedTemplate
+        ? (d.icon === (lastAppliedTemplate.icon ?? '') ? (template.icon ?? '') : d.icon)
+        : (d.icon || template.icon || ''),
       hasAddress: template.hasAddress ?? d.hasAddress,
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
       capabilities: { ...d.capabilities, ...template.capabilities },
       fields: template.fields.map((f) => ({ ...f })),
     }))
+    setLastAppliedTemplate(template)
   }
 
   function updateField(i: number, patch: Partial<CategoryField>) {
@@ -1038,29 +1056,39 @@ function CategoryEditor({
       </h2>
 
       <div className="space-y-6">
-        {isNew && draft.fields.length === 0 && CATEGORY_TEMPLATES.length > 0 && (
+        {isNew && CATEGORY_TEMPLATES.length > 0 && (
           <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
             <span className="block text-xs font-medium text-slate-700">Start from a template (optional)</span>
             {/* Compact chips rather than a card per template — hover (or a
                 screen reader's accessible name) surfaces what makes each
                 template's shape distinctive via `title`, so the list can grow
-                without eating the whole screen. */}
+                without eating the whole screen. Stays visible after applying
+                one (rather than disappearing once fields exist) so trying a
+                different shape is just another click. */}
             <div className="flex flex-wrap gap-2">
-              {CATEGORY_TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => applyTemplate(t.id)}
-                  title={t.description}
-                  className="inline-flex items-center gap-1.5 border border-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  {t.icon && <span aria-hidden="true">{t.icon}</span>}
-                  {t.label}
-                </button>
-              ))}
+              {CATEGORY_TEMPLATES.map((t) => {
+                const active = lastAppliedTemplate?.id === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => applyTemplate(t.id)}
+                    title={t.description}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
+                      active
+                        ? 'border border-primary bg-primary/5 text-primary'
+                        : 'border border-slate-300 text-slate-700 hover:border-primary hover:bg-primary/5'
+                    }`}
+                  >
+                    {t.icon && <span aria-hidden="true">{t.icon}</span>}
+                    {t.label}
+                  </button>
+                )
+              })}
             </div>
             <span className="block text-[11px] text-muted">
-              Hover a template to see what makes its shape distinctive. Pre-fills the details below —
-              everything stays fully editable, and nothing here is locked to the template afterward.
+              Hover a template to see what makes its shape distinctive. Applying one replaces the
+              details below with its fields — everything stays fully editable, and picking a different
+              template swaps in that one&rsquo;s fields instead.
             </span>
           </section>
         )}
@@ -1070,32 +1098,56 @@ function CategoryEditor({
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
             <div className="flex gap-2">
-              <select
-                value=""
-                onChange={(e) => { if (e.target.value) set('icon', e.target.value) }}
-                className={`${inputClass} flex-1`}
-              >
-                <option value="">Choose an icon…</option>
-                {ICON_CHOICES.map((group) => (
-                  <optgroup key={group.group} label={group.group}>
-                    {group.options.map((o) => (
-                      <option key={o.emoji} value={o.emoji}>{o.emoji} {o.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
               <input
                 value={draft.icon}
                 onChange={(e) => set('icon', e.target.value)}
-                className={`${inputClass} w-16 text-center text-lg`}
+                className={`${inputClass} w-16 shrink-0 text-center text-lg`}
                 placeholder={DEFAULT_CATEGORY_ICON}
                 maxLength={4}
-                aria-label="Custom icon"
+                aria-label="Icon"
               />
+              <button
+                type="button"
+                onClick={() => setIconPickerOpen((o) => !o)}
+                className="text-sm font-medium border border-slate-300 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                {iconPickerOpen ? 'Hide icons' : 'Browse icons…'}
+              </button>
             </div>
+            {/* A plain scrolling div, not a native <select> — the browser's own
+                dropdown popup can't be restyled (comes out cramped regardless
+                of how the closed control is sized) and its built-in overflow
+                arrows only scroll one direction at a time. This scrolls like
+                any other page content. */}
+            {iconPickerOpen && (
+              <div className="mt-2 border border-slate-200 rounded-md p-2 max-h-52 overflow-y-auto space-y-2 bg-slate-50/60">
+                {ICON_CHOICES.map((group) => (
+                  <div key={group.group}>
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">
+                      {group.group}
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {group.options.map((o) => (
+                        <button
+                          key={o.emoji}
+                          type="button"
+                          onClick={() => { set('icon', o.emoji); setIconPickerOpen(false) }}
+                          title={o.label}
+                          className={`text-lg leading-none rounded-md px-2 py-1.5 transition-colors cursor-pointer ${
+                            draft.icon === o.emoji ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-white'
+                          }`}
+                        >
+                          {o.emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <span className="block text-[11px] text-muted mt-1">
-              Pick from the list, or paste any emoji directly into the box on the right. Shown before
-              the name on the home screen and map legend.
+              Browse a curated list, or type/paste any emoji directly into the box. Shown before the
+              name on the home screen and map legend.
             </span>
           </label>
           <label className="block">
