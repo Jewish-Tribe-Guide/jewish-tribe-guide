@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CardGrid, PlacesResults, cardMatches, searchListings, type CardDef, resourceCards } from '@/components/home/sections'
+import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, type CardDef, resourceCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
@@ -46,6 +46,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     ...(community.features.patientSupport
       ? [{
           title: supportForm?.title ?? 'Patient & Family Support',
+          id: 'support',
           icon: '🤝',
           keywords: [
             'request support', 'support', 'help', 'assistance', 'request', 'patient', 'patients',
@@ -61,6 +62,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     ...(community.features.volunteer
       ? [{
           title: volunteerForm?.title ?? 'Volunteer for Patients',
+          id: 'volunteer',
           icon: '💛',
           keywords: [
             'volunteer', 'volunteering', 'help out', 'give', 'give back', 'chesed', 'mitzvah', 'cook',
@@ -73,6 +75,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     ...(mapCategory
       ? [{
           title: 'View Map',
+          id: 'map',
           icon: mapCategory.icon,
           keywords: [
             'map', 'maps', 'view map', 'locations', 'where', 'nearby', 'directions', 'address',
@@ -83,14 +86,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       : []),
     ...customForms.map((f) => ({
       title: f.title,
+      id: f.id,
       go: () => onOpenFlow(f.id),
     })),
   ]
 
   const resources = resourceCards(onNavigate, categories)
-  const allCards = resources
-    ? [...entryCards, ...resources].sort((a, b) => a.title.localeCompare(b.title))
-    : null
+  // Order is no longer alphabetical — see HOME_SECTIONS in sections.tsx, which
+  // sorts these into labeled groups for the grid below.
+  const allCards = resources ? [...entryCards, ...resources] : null
 
   const q = query.trim()
   const loading = !q && allCards === null
@@ -124,26 +128,36 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     dashed: true,
     go: () => onNavigate('patient', 'find', { findView: ADD_CATEGORY }),
   }
-  // While categories load, show entry cards + skeletons (suggest card waits until
-  // the real cards are in). Otherwise show the filtered grid + suggest card (when
-  // community contributions allow suggesting categories).
-  const gridCards = loading
-    ? entryCards
-    : [...(filtered ?? []), ...(ui.contributions.suggestCategory ? [suggestCard] : [])]
+  // Sections only exist once loading is done and there's something to group;
+  // while loading, a single flat grid of entry cards + skeletons stands in.
+  const sections = filtered ? groupCardsIntoSections(filtered) : []
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
       <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-      {/* ── The grid ─────────────────────────────────────────────────────────── */}
-      <section className="mt-12 sm:mt-14">
+      {/* ── The grid — grouped into labeled sections; a search narrows each
+              section's cards and hides any section left empty. ────────────── */}
+      <section className="mt-12 sm:mt-14 space-y-10">
         {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-          <p className="mb-5 text-center text-sm text-slate-500">
+          <p className="text-center text-sm text-slate-500">
             Nothing matches “{q}”. Try a different word, clear the filter, or suggest it below.
           </p>
         )}
-        <CardGrid cards={gridCards} loadingCount={loading ? 6 : 0} />
+        {loading ? (
+          <CardGrid cards={entryCards} loadingCount={6} />
+        ) : (
+          <>
+            {sections.map((s) => (
+              <div key={s.title}>
+                <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
+                <CardGrid cards={s.cards} />
+              </div>
+            ))}
+            {ui.contributions.suggestCategory && <CardGrid cards={[suggestCard]} />}
+          </>
+        )}
       </section>
 
       {/* ── Matching places (individual listings within the cards) ───────────── */}

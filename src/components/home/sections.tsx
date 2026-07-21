@@ -18,6 +18,10 @@ export type CardDef = {
   /** One emoji shown above the title — from the category's own `icon` field
    *  where there is one; a few hand-built cards set a fixed one directly. */
   icon?: string
+  /** Stable id (category id, or a fixed one for hand-built cards like 'map',
+   *  'support') — used to sort cards into home-screen sections; title alone
+   *  would break grouping if a label gets renamed. */
+  id?: string
 }
 
 // Soft tile tints, cycled per card across the grid.
@@ -65,7 +69,7 @@ export function CardGrid({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
       {cards.map((card, i) => (
-        <Card key={card.title} card={card} tint={TINTS[i % TINTS.length]} />
+        <Card key={card.id ?? card.title} card={card} tint={TINTS[i % TINTS.length]} />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />
@@ -81,6 +85,41 @@ export function cardMatches(card: CardDef, query: string): boolean {
   if (tokens.length === 0) return true
   const hay = [card.title, ...(card.keywords ?? [])].join(' ').toLowerCase()
   return tokens.every((t) => hay.includes(t))
+}
+
+// ── Home-screen sections ──────────────────────────────────────────────────────
+// The requested grouping — each row lists a section's cards by CardDef `id`, in
+// display order. A card not listed here (a category with no assigned home yet,
+// like Hotels or the Map, or any future custom form) falls into a trailing
+// "More" section instead of silently disappearing from the home screen.
+const HOME_SECTIONS: { title: string; ids: string[] }[] = [
+  { title: 'Food Establishments', ids: ['restaurant', 'grocery'] },
+  { title: 'Jewish Institutions and Information', ids: ['synagogue', 'mikvah', 'eruv', 'zmanim'] },
+  { title: 'Family Resources', ids: ['childcare', 'school'] },
+  { title: 'Medical Resources', ids: ['medical', 'support', 'volunteer'] },
+  { title: 'Get Connected', ids: ['whatsapp', 'young-professional'] },
+]
+
+export type CardSectionDef = { title: string; cards: CardDef[] }
+
+/** Sorts cards into the sections above (in each section's own listed order),
+ *  then a trailing untitled "More" section for anything left over — never
+ *  drops a card just because it has no assigned section. The dashed "suggest
+ *  a category" card is excluded; render it separately, after every section. */
+export function groupCardsIntoSections(cards: CardDef[]): CardSectionDef[] {
+  const byId = new Map(cards.filter((c) => c.id).map((c) => [c.id as string, c]))
+  const used = new Set<string>()
+
+  const sections = HOME_SECTIONS.map(({ title, ids }) => {
+    const sectionCards = ids.map((id) => byId.get(id)).filter((c): c is CardDef => !!c)
+    sectionCards.forEach((c) => used.add(c.id as string))
+    return { title, cards: sectionCards }
+  }).filter((s) => s.cards.length > 0)
+
+  const leftover = cards.filter((c) => !c.dashed && !(c.id && used.has(c.id)))
+  if (leftover.length > 0) sections.push({ title: 'More', cards: leftover })
+
+  return sections
 }
 
 // ── Listing (within-card) search ───────────────────────────────────────────────
@@ -242,6 +281,7 @@ export function resourceCards(
     ...(medical
       ? [{
           title: 'Jewish Medical Resources',
+          id: 'medical',
           icon: medical.icon,
           keywords: [
             'hospital', 'hospitals', 'about your hospital', 'chaplain', 'rabbi', 'prayer room',
@@ -255,6 +295,7 @@ export function resourceCards(
       : []),
     ...categories.filter((c) => c.kind === 'listing').map((c) => ({
       title: c.pluralLabel,
+      id: c.id,
       icon: c.icon,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
@@ -262,6 +303,7 @@ export function resourceCards(
     ...(zmanim
       ? [{
           title: 'Zmanim & Shabbos',
+          id: 'zmanim',
           icon: zmanim.icon,
           keywords: [
             'zmanim', 'zman', 'candle lighting', 'candles', 'havdalah', 'shabbat times', 'shabbos',
@@ -274,6 +316,7 @@ export function resourceCards(
     ...(eruv
       ? [{
           title: 'Eruv Information',
+          id: 'eruv',
           icon: eruv.icon,
           keywords: [
             'eruv', 'carry', 'carrying', 'eruv map', 'eruv status', 'eruv hotline', 'shabbat boundary',
