@@ -31,6 +31,59 @@ import CategoryPreview from './CategoryPreview'
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
+// A starter palette for the icon picker — common, recognizable choices for a
+// community directory, grouped for scanability. Not exhaustive: the text
+// field next to it accepts any emoji, so this is a shortcut, not a limit.
+const ICON_CHOICES: { group: string; options: { emoji: string; label: string }[] }[] = [
+  {
+    group: 'Places',
+    options: [
+      { emoji: '🏫', label: 'School' },
+      { emoji: '🏥', label: 'Hospital' },
+      { emoji: '🏨', label: 'Hotel' },
+      { emoji: '🏠', label: 'House' },
+      { emoji: '🏢', label: 'Building' },
+      { emoji: '🕍', label: 'Synagogue' },
+      { emoji: '💧', label: 'Water drop' },
+      { emoji: '🏦', label: 'Bank' },
+      { emoji: '📚', label: 'Library' },
+    ],
+  },
+  {
+    group: 'Food & shopping',
+    options: [
+      { emoji: '🍽️', label: 'Restaurant' },
+      { emoji: '🛒', label: 'Grocery cart' },
+      { emoji: '☕', label: 'Cafe' },
+      { emoji: '🍞', label: 'Bakery' },
+      { emoji: '🛍️', label: 'Shopping' },
+    ],
+  },
+  {
+    group: 'People & community',
+    options: [
+      { emoji: '🧑‍🤝‍🧑', label: 'People' },
+      { emoji: '🤝', label: 'Handshake' },
+      { emoji: '💛', label: 'Heart' },
+      { emoji: '👶', label: 'Childcare' },
+      { emoji: '🙏', label: 'Prayer' },
+    ],
+  },
+  {
+    group: 'Symbols & info',
+    options: [
+      { emoji: '✡️', label: 'Star of David' },
+      { emoji: '🕯️', label: 'Candle' },
+      { emoji: '🗺️', label: 'Map' },
+      { emoji: '💬', label: 'Chat' },
+      { emoji: '📅', label: 'Calendar' },
+      { emoji: '☎️', label: 'Phone' },
+      { emoji: '🌐', label: 'Website' },
+      { emoji: '📋', label: 'Clipboard (default)' },
+    ],
+  },
+]
+
 const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
   add: 'Add button',
   edit: 'Edit button',
@@ -988,50 +1041,70 @@ function CategoryEditor({
         {isNew && draft.fields.length === 0 && CATEGORY_TEMPLATES.length > 0 && (
           <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-2">
             <span className="block text-xs font-medium text-slate-700">Start from a template (optional)</span>
+            {/* Compact chips rather than a card per template — hover (or a
+                screen reader's accessible name) surfaces what makes each
+                template's shape distinctive via `title`, so the list can grow
+                without eating the whole screen. */}
             <div className="flex flex-wrap gap-2">
               {CATEGORY_TEMPLATES.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => applyTemplate(t.id)}
-                  className="text-left border border-slate-300 rounded-md px-3 py-2 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer max-w-xs"
+                  title={t.description}
+                  className="inline-flex items-center gap-1.5 border border-slate-300 rounded-full px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
                 >
-                  <span className="block text-sm font-medium text-slate-800">
-                    {t.icon && <span className="mr-1">{t.icon}</span>}
-                    {t.label}
-                  </span>
-                  <span className="block text-[11px] text-muted mt-0.5">{t.description}</span>
+                  {t.icon && <span aria-hidden="true">{t.icon}</span>}
+                  {t.label}
                 </button>
               ))}
             </div>
             <span className="block text-[11px] text-muted">
-              Pre-fills the details below — everything stays fully editable, and nothing here is
-              locked to the template afterward.
+              Hover a template to see what makes its shape distinctive. Pre-fills the details below —
+              everything stays fully editable, and nothing here is locked to the template afterward.
             </span>
           </section>
         )}
 
         {/* Presentation */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <div className="flex gap-3">
-            <label className="block w-20 shrink-0">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
+            <div className="flex gap-2">
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) set('icon', e.target.value) }}
+                className={`${inputClass} flex-1`}
+              >
+                <option value="">Choose an icon…</option>
+                {ICON_CHOICES.map((group) => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.options.map((o) => (
+                      <option key={o.emoji} value={o.emoji}>{o.emoji} {o.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <input
                 value={draft.icon}
                 onChange={(e) => set('icon', e.target.value)}
-                className={`${inputClass} text-center text-lg`}
+                className={`${inputClass} w-16 text-center text-lg`}
                 placeholder={DEFAULT_CATEGORY_ICON}
                 maxLength={4}
+                aria-label="Custom icon"
               />
-            </label>
-            <label className="block flex-1">
-              <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
-              <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
-            </label>
-          </div>
-          <span className="block -mt-2 text-[11px] text-muted">
-            One emoji, shown before the name on the home screen and map legend. Plural name, as it
-            appears on the card — the singular (for “Add a …”) is derived automatically.
-          </span>
+            </div>
+            <span className="block text-[11px] text-muted mt-1">
+              Pick from the list, or paste any emoji directly into the box on the right. Shown before
+              the name on the home screen and map legend.
+            </span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
+            <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
+            <span className="block text-[11px] text-muted mt-1">
+              Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.
+            </span>
+          </label>
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
             <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
