@@ -27,9 +27,14 @@ type Props = {
 export default function CategoryFilter({ options, selected, onToggle, onAll, onNone }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
   const scrollRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   // Thumb geometry as a fraction of the track (0–1). null while there's
   // nothing to scroll, so the track renders empty instead of a full-width bar.
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null)
+  // px-per-px conversion between dragging the thumb and scrolling the row,
+  // and the pointer's starting position — recomputed on every drag start so
+  // it stays correct if the row's content changes size mid-drag.
+  const dragState = useRef<{ startX: number; startScrollLeft: number; pxPerPx: number } | null>(null)
 
   // Native scrollbars are hidden (see .chip-scroll in globals.css — macOS's
   // overlay scrollbars auto-hide on trackpads and don't reliably render even
@@ -60,6 +65,45 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
       observer.disconnect()
     }
   }, [options])
+
+  // Dragging the indicator scrolls the row — a click elsewhere on the track
+  // jumps straight there, like a normal scrollbar.
+  function handleTrackPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const scrollEl = scrollRef.current
+    const trackEl = trackRef.current
+    if (!scrollEl || !trackEl || !thumb) return
+
+    const trackWidth = trackEl.clientWidth
+    const thumbWidthPx = thumb.width * trackWidth
+    const scrollableRange = scrollEl.scrollWidth - scrollEl.clientWidth
+    const trackRange = Math.max(trackWidth - thumbWidthPx, 1)
+    const pxPerPx = scrollableRange / trackRange
+
+    const rect = trackEl.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const onThumb = clickX >= thumb.left * trackWidth && clickX <= (thumb.left + thumb.width) * trackWidth
+    if (!onThumb) {
+      const targetLeftPx = clickX - thumbWidthPx / 2
+      scrollEl.scrollLeft = Math.max(0, Math.min(scrollableRange, targetLeftPx * pxPerPx))
+    }
+
+    dragState.current = { startX: e.clientX, startScrollLeft: scrollEl.scrollLeft, pxPerPx }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleTrackPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const state = dragState.current
+    const scrollEl = scrollRef.current
+    if (!state || !scrollEl) return
+    const scrollableRange = scrollEl.scrollWidth - scrollEl.clientWidth
+    const dx = e.clientX - state.startX
+    scrollEl.scrollLeft = Math.max(0, Math.min(scrollableRange, state.startScrollLeft + dx * state.pxPerPx))
+  }
+
+  function handleTrackPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    dragState.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
 
   return (
     <div>
@@ -99,13 +143,24 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
           )
         })}
       </div>
-      {/* Custom scroll indicator — desktop only (see .chip-scroll-track). */}
+      {/* Custom scroll indicator — desktop only (see .chip-scroll-track).
+          Wrapped in a taller, invisible hit area (padding offset by a
+          matching negative margin) so it's easy to grab without changing the
+          bar's visual thickness. */}
       {thumb && (
-        <div className="chip-scroll-track mt-1 h-1 rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-slate-300"
-            style={{ marginLeft: `${thumb.left * 100}%`, width: `${thumb.width * 100}%` }}
-          />
+        <div
+          className="chip-scroll-track -my-1.5 cursor-pointer touch-none py-1.5 select-none"
+          onPointerDown={handleTrackPointerDown}
+          onPointerMove={handleTrackPointerMove}
+          onPointerUp={handleTrackPointerUp}
+          onPointerCancel={handleTrackPointerUp}
+        >
+          <div ref={trackRef} className="mt-1 h-1 rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-slate-300 hover:bg-slate-400"
+              style={{ marginLeft: `${thumb.left * 100}%`, width: `${thumb.width * 100}%` }}
+            />
+          </div>
         </div>
       )}
     </div>
