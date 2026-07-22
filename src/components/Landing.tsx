@@ -78,10 +78,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
       <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-      {/* ── The map — full-width, right on the home screen ─────────────────────── */}
+      {/* ── The map — the real full map screen, right on the home screen ───────── */}
       {hasMap && (
         <div className="mt-8">
-          <HomeMap onNavigate={onNavigate} />
+          <HomeMap onNavigate={onNavigate} coords={coords} />
         </div>
       )}
 
