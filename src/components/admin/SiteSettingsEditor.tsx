@@ -2,21 +2,30 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
+import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
+import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import SiteSettingsPreview from './SiteSettingsPreview'
 import HomeSectionManager from './HomeSectionManager'
 
 // ── The Home page tab: the header/hero/footer branding text (name, tagline,
 // heading, mission, logo), the home-screen section grouping, and the footer's
 // feedback form — laid out in the same top-to-bottom order they appear on the
-// actual home page. Everything here saves immediately (no draft/publish step)
-// except the text fields, which batch into one Save. Mounted on /admin. ──────
+// actual home page. Everything here is a draft, batched into the one shared
+// Save changes button — nothing goes live until you save. Mounted on /admin.
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
+function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
+  const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds }) => ({ id, title, cardIds }))
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
+}
+
 export default function SiteSettingsEditor({ token }: { token: string }) {
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
+  const [sections, setSections] = useState<HomeSection[] | null>(null)
+  const [sectionsDraft, setSectionsDraft] = useState<DraftHomeSection[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNotice, setSavedNotice] = useState(false)
@@ -45,13 +54,19 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch('/api/admin/site-settings', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setSettings(body.settings as SiteSettings)
-      setDraft(body.settings as SiteSettings)
+      const [settingsRes, sectionsRes] = await Promise.all([
+        fetch('/api/admin/site-settings', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/admin/home-sections', { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+      const settingsBody = await settingsRes.json()
+      if (!settingsRes.ok || !settingsBody.ok) throw new Error(settingsBody.errors?.join(' ') || 'Failed to load.')
+      const sectionsBody = await sectionsRes.json()
+      if (!sectionsRes.ok || !sectionsBody.ok) throw new Error(sectionsBody.errors?.join(' ') || 'Failed to load.')
+
+      setSettings(settingsBody.settings as SiteSettings)
+      setDraft(settingsBody.settings as SiteSettings)
+      setSections(sectionsBody.sections as HomeSection[])
+      setSectionsDraft(sectionsBody.sections as HomeSection[])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -66,20 +81,34 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     setSavedNotice(false)
   }
 
+  function setSectionsAndClearNotice(next: DraftHomeSection[]) {
+    setSectionsDraft(next)
+    setSavedNotice(false)
+  }
+
   async function save() {
-    if (!draft) return
+    if (!draft || !sections || !sectionsDraft) return
     setError(null)
     setSaving(true)
     try {
-      const res = await fetch('/api/admin/site-settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(draft),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
-      setSettings(body.settings as SiteSettings)
-      setDraft(body.settings as SiteSettings)
+      if (JSON.stringify(settings) !== JSON.stringify(draft)) {
+        const res = await fetch('/api/admin/site-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(draft),
+        })
+        const body = await res.json()
+        if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+        setSettings(body.settings as SiteSettings)
+        setDraft(body.settings as SiteSettings)
+      }
+
+      if (!sectionsEqual(sections, sectionsDraft)) {
+        const saved = await saveHomeSections(token, sections, sectionsDraft)
+        setSections(saved)
+        setSectionsDraft(saved)
+      }
+
       setSavedNotice(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
@@ -91,22 +120,23 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   if (error && !draft) {
     return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
   }
-  if (!draft) {
+  if (!draft || !sectionsDraft) {
     return <p className="text-sm text-muted">Loading…</p>
   }
 
   if (previewing) {
-    return <SiteSettingsPreview settings={draft} onClose={closePreview} />
+    return <SiteSettingsPreview settings={draft} sections={sectionsDraft} onClose={closePreview} />
   }
 
-  const dirty = !settings || JSON.stringify(settings) !== JSON.stringify(draft)
+  const dirty =
+    !settings || JSON.stringify(settings) !== JSON.stringify(draft) || !sections || !sectionsEqual(sections, sectionsDraft)
 
   return (
     <div>
       <p className="text-sm text-muted mb-4">
         The site name, tagline, logo, home screen heading and mission, the sections on the home
-        screen, and the feedback form — laid out in the order they appear on the page. Changes go
-        live immediately.
+        screen, and the feedback form — laid out in the order they appear on the page. Nothing here
+        goes live until you click Save changes below.
       </p>
 
       {error && (
@@ -161,7 +191,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
 
       <div className="mt-6 max-w-2xl">
         <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
-        <HomeSectionManager token={token} />
+        <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-6">
