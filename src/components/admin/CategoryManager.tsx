@@ -143,7 +143,6 @@ export default function CategoryManager({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addingSingleton, setAddingSingleton] = useState<SingletonKind | null>(null)
-  const [addingForm, setAddingForm] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -219,30 +218,6 @@ export default function CategoryManager({
     }
   }
 
-  // Creates a form directly (no editor step for the name — mirrors
-  // addSingleton) then immediately opens the real editor on it, where the
-  // admin renames it and adds questions. No client-side "new form" draft
-  // state: FormEditor always assumes the row already exists.
-  async function addForm() {
-    setError(null)
-    setAddingForm(true)
-    try {
-      const res = await fetch('/api/admin/forms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ label: 'New form' }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create form.')
-      await load()
-      onOpenEditor(`${FORM_PREFIX}${body.form.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create form.')
-    } finally {
-      setAddingForm(false)
-    }
-  }
-
   // Delete state is shared with categories' confirm/deleting state, keyed by
   // `form:<id>` so a form and a category can never collide.
   async function deleteFormEntry(id: string) {
@@ -314,6 +289,20 @@ export default function CategoryManager({
     )
   }
 
+  if (editingId === `${FORM_PREFIX}new`) {
+    return (
+      <FormEditor
+        token={token}
+        form={null}
+        onDone={() => {
+          onCloseEditor()
+          load()
+        }}
+        onCancel={onCloseEditor}
+      />
+    )
+  }
+
   if (editingId?.startsWith(FORM_PREFIX)) {
     const id = editingId.slice(FORM_PREFIX.length)
     const form = forms?.find((f) => f.id === id) ?? null
@@ -361,11 +350,10 @@ export default function CategoryManager({
             + New category
           </button>
           <button
-            onClick={addForm}
-            disabled={addingForm}
-            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+            onClick={() => onOpenEditor(`${FORM_PREFIX}new`)}
+            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            {addingForm ? 'Adding…' : '+ Add Form'}
+            + Add Form
           </button>
         </div>
       </div>

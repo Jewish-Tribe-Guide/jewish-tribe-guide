@@ -1,41 +1,5 @@
 import { getAdminClient } from './supabase/admin'
-import type { FormConfig, FormContent, FormStep } from './forms'
-
-// The same "name / how can we reach you / preferred contact" block every
-// existing form (support, volunteer) starts with — see CONTACT_STEPS in
-// src/data/forms.js. A fresh custom form is seeded with a copy so
-// buildContact() (src/components/wizard/contactSteps.ts) always has
-// something to read, without requiring the admin to hand-assemble it (the
-// step-type picker in the admin editor deliberately doesn't offer 'contact'
-// as a pickable type — see STEP_KINDS in forms.ts).
-const CONTACT_SECTION = '👋 Your details'
-const DEFAULT_CONTACT_STEPS: FormStep[] = [
-  { id: 'name', kind: 'text', section: CONTACT_SECTION, question: 'What’s your name?', placeholder: 'Your full name' },
-  { id: 'contact', kind: 'contact', section: CONTACT_SECTION, question: 'How can we reach you?' },
-  {
-    id: 'preferredContact',
-    kind: 'single',
-    section: CONTACT_SECTION,
-    when: [{ field: 'phone', op: 'notEmpty' }, { field: 'email', op: 'empty' }],
-    question: 'How should we reach you?',
-    options: [
-      { value: 'phone', label: 'Call me' },
-      { value: 'text', label: 'Text me' },
-    ],
-  },
-  {
-    id: 'preferredContact',
-    kind: 'single',
-    section: CONTACT_SECTION,
-    when: [{ field: 'phone', op: 'notEmpty' }, { field: 'email', op: 'notEmpty' }],
-    question: 'How should we reach you?',
-    options: [
-      { value: 'phone', label: 'Call me' },
-      { value: 'text', label: 'Text me' },
-      { value: 'email', label: 'Email me' },
-    ],
-  },
-]
+import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from './forms'
 
 // Turns a human label into a URL-safe slug, e.g. "Event RSVP" → "event-rsvp".
 // Mirrors categoryStore.slugify — small enough not to be worth sharing.
@@ -149,14 +113,16 @@ export async function discardDraft(id: string): Promise<FormConfig | null> {
   return data ? toConfig(data as FormRow) : null
 }
 
-// Creates a new form, picking a unique slug from its label — same pattern as
-// categoryStore.createCategory. Published immediately (no draft) with the
-// standard contact step block, so it's a usable, submittable form right away;
-// the admin adds its actual questions afterward in the same editor used for
-// support/volunteer.
-export async function createForm(label: string): Promise<FormConfig> {
+// Creates a new form, picking a unique slug from its title — same pattern as
+// categoryStore.createCategory. Called only from the admin's Publish button
+// on a brand-new (never-yet-saved) form — see FormEditor.tsx — so a form
+// never exists, even in the admin list, until it's actually published; there
+// is deliberately no "create a blank draft" step before that. Falls back to
+// the standard contact step block if the admin published with none, so it's
+// always a usable, submittable form.
+export async function createForm(content: FormContent): Promise<FormConfig> {
   const supabase = getAdminClient()
-  const base = slugify(label) || 'form'
+  const base = slugify(content.title) || 'form'
 
   let id = base
   for (let n = 2; ; n++) {
@@ -167,11 +133,14 @@ export async function createForm(label: string): Promise<FormConfig> {
 
   const row = {
     id,
-    title: label.trim(),
-    submit_label: 'Submit',
-    success_title: 'All set',
-    success_message: 'Thanks — we’ll be in touch.',
-    steps: DEFAULT_CONTACT_STEPS,
+    title: content.title.trim(),
+    submit_label: content.submitLabel.trim() || 'Submit',
+    success_title: content.successTitle.trim() || 'All set',
+    success_message: content.successMessage.trim() || 'Thanks — we’ll be in touch.',
+    steps: content.steps.length > 0 ? content.steps : DEFAULT_CONTACT_STEPS,
+    icon: content.icon?.trim() || null,
+    card_image_url: content.cardImageUrl?.trim() || null,
+    card_text_color: content.cardImageUrl?.trim() ? content.cardTextColor || null : null,
   }
 
   const { data, error } = await supabase.from('form').insert(row).select('*').single()
