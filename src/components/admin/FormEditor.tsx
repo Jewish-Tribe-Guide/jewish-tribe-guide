@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { FormConfig, FormContent, FormStep } from '@/lib/forms'
+import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
 import { IconField, CardBackgroundField } from './CategoryManager'
@@ -11,12 +11,29 @@ import { IconField, CardBackgroundField } from './CategoryManager'
 // Support / Volunteer) and any admin-created custom form (add/delete lives in
 // CategoryManager; this component only edits an existing row either way).
 // Edits save as a draft; nothing reaches a real visitor until the admin
-// explicitly publishes (see the draft/publish notes in formStore.ts). ──────
+// explicitly publishes (see the draft/publish notes in formStore.ts).
+//
+// `form: null` means a brand-new, not-yet-created form (opened straight from
+// "+ Add Form" — see CategoryManager's addForm): nothing is POSTed until
+// Publish, so Cancel at this stage leaves no trace, and there's no "Save
+// draft"/"Discard draft" to offer (there's no row yet to attach a draft to).
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-function toContent(f: FormConfig): FormContent {
+const NEW_FORM_DEFAULTS: FormContent = {
+  title: 'New form',
+  submitLabel: 'Submit',
+  successTitle: 'All set',
+  successMessage: 'Thanks — we’ll be in touch.',
+  steps: DEFAULT_CONTACT_STEPS,
+  icon: '',
+  cardImageUrl: null,
+  cardTextColor: null,
+}
+
+function toContent(f: FormConfig | null): FormContent {
+  if (!f) return NEW_FORM_DEFAULTS
   // Continue an existing draft if there is one; otherwise start from what's
   // currently published.
   return f.draft ?? {
@@ -38,10 +55,11 @@ export default function FormEditor({
   onCancel,
 }: {
   token: string
-  form: FormConfig
+  form: FormConfig | null
   onDone: () => void
   onCancel: () => void
 }) {
+  const isNew = form === null
   const [draft, setDraft] = useState<FormContent>(() => toContent(form))
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -120,6 +138,7 @@ export default function FormEditor({
   }
 
   async function saveDraft(): Promise<boolean> {
+    if (!form) return false
     const errs = validate()
     if (errs.length) {
       setErrors(errs)
@@ -145,7 +164,35 @@ export default function FormEditor({
     }
   }
 
+  // A brand-new form: nothing exists on the server yet, so Publish is the one
+  // action that creates it (with its final content, already published) —
+  // there's no separate draft-row step to save into first.
+  async function createAndPublish() {
+    const errs = validate()
+    if (errs.length) {
+      setErrors(errs)
+      return
+    }
+    setErrors([])
+    setPublishing(true)
+    try {
+      const res = await fetch('/api/admin/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(draft),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create form.')
+      onDone()
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : 'Could not create form.'])
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   async function publish() {
+    if (isNew) return createAndPublish()
     setPublishing(true)
     try {
       const ok = await saveDraft()
@@ -165,6 +212,7 @@ export default function FormEditor({
   }
 
   async function discard() {
+    if (!form) return
     setDiscarding(true)
     setErrors([])
     try {
@@ -207,9 +255,15 @@ export default function FormEditor({
         ← Back to categories
       </button>
 
-      <h2 className="text-lg font-semibold text-slate-900 mb-1">Edit “{form.title}”</h2>
+      <h2 className="text-lg font-semibold text-slate-900 mb-1">
+        {isNew ? 'New form' : `Edit “${form.title}”`}
+      </h2>
       <p className="text-xs text-muted mb-4">
-        {form.draft ? 'Continuing an unpublished draft.' : 'Editing a copy — publishing replaces the live form.'}
+        {isNew
+          ? 'Nothing is created until you publish — Cancel discards this.'
+          : form.draft
+            ? 'Continuing an unpublished draft.'
+            : 'Editing a copy — publishing replaces the live form.'}
       </p>
 
       <div className="space-y-6">
@@ -282,13 +336,15 @@ export default function FormEditor({
         >
           Preview
         </button>
-        <button
-          onClick={saveDraft}
-          disabled={busy}
-          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-        >
-          {saving ? 'Saving…' : 'Save draft'}
-        </button>
+        {!isNew && (
+          <button
+            onClick={saveDraft}
+            disabled={busy}
+            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+          >
+            {saving ? 'Saving…' : 'Save draft'}
+          </button>
+        )}
         <button
           onClick={publish}
           disabled={busy}
@@ -303,7 +359,7 @@ export default function FormEditor({
         >
           Cancel
         </button>
-        {form.draft && (
+        {form?.draft && (
           <button
             onClick={discard}
             disabled={busy}

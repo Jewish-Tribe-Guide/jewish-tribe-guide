@@ -90,6 +90,44 @@ export type FormConfig = FormContent & {
   draft?: FormContent | null
 }
 
+// The same "name / how can we reach you / preferred contact" block every
+// existing form (support, volunteer) starts with — see CONTACT_STEPS in
+// src/data/forms.js. A brand-new custom form (admin's FormEditor, before it's
+// ever published) is pre-filled with a copy so buildContact()
+// (src/components/wizard/contactSteps.ts) always has something to read,
+// without requiring the admin to hand-assemble it (the step-type picker in
+// the admin editor deliberately doesn't offer 'contact' as a pickable type —
+// see STEP_KINDS above). Shared by the client (FormEditor's new-form default)
+// and the server (formStore.createForm's fallback if steps end up empty).
+const CONTACT_SECTION = '👋 Your details'
+export const DEFAULT_CONTACT_STEPS: FormStep[] = [
+  { id: 'name', kind: 'text', section: CONTACT_SECTION, question: 'What’s your name?', placeholder: 'Your full name' },
+  { id: 'contact', kind: 'contact', section: CONTACT_SECTION, question: 'How can we reach you?' },
+  {
+    id: 'preferredContact',
+    kind: 'single',
+    section: CONTACT_SECTION,
+    when: [{ field: 'phone', op: 'notEmpty' }, { field: 'email', op: 'empty' }],
+    question: 'How should we reach you?',
+    options: [
+      { value: 'phone', label: 'Call me' },
+      { value: 'text', label: 'Text me' },
+    ],
+  },
+  {
+    id: 'preferredContact',
+    kind: 'single',
+    section: CONTACT_SECTION,
+    when: [{ field: 'phone', op: 'notEmpty' }, { field: 'email', op: 'notEmpty' }],
+    question: 'How should we reach you?',
+    options: [
+      { value: 'phone', label: 'Call me' },
+      { value: 'text', label: 'Text me' },
+      { value: 'email', label: 'Email me' },
+    ],
+  },
+]
+
 /** Turns a human question into a safe step id, e.g. "How many guests?" →
  *  "how_many_guests". Used by the admin step editor to auto-fill new step ids. */
 export function slugifyStepId(question: string): string {

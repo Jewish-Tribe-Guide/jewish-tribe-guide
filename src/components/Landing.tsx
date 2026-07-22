@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
+import HomeMap from '@/components/home/HomeMap'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -30,9 +31,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
-  // The Map pseudo-category still exists so this can be turned back into a
-  // card later — it just drives the "View Map" button instead of a tile now.
-  const mapCategory = categories?.find((c) => c.kind === 'map')
+  // The Map pseudo-category still gates whether the map shows at all —
+  // experimenting with rendering it directly on the home screen (below)
+  // instead of behind a button; still just as easy to turn back into a card
+  // or a button later if this doesn't stick.
+  const hasMap = !!categories?.some((c) => c.kind === 'map')
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -73,13 +76,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
-      <HeroHeading
-        settings={settings}
-        query={query}
-        onQueryChange={setQuery}
-        mapIcon={mapCategory?.icon}
-        onViewMap={() => onNavigate('patient', 'map')}
-      />
+      <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+
+      {/* ── The map — the real full map screen, right on the home screen ───────── */}
+      {hasMap && (
+        <div className="mt-8">
+          <HomeMap onNavigate={onNavigate} coords={coords} />
+        </div>
+      )}
 
       {/* ── The grid — grouped into labeled sections; a search narrows each
               section's cards and hides any section left empty. ────────────── */}
