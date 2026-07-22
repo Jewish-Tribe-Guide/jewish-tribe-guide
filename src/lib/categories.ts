@@ -92,11 +92,11 @@ export type CategoryField = {
   caveat?: { flagField: string; noteField: string }
   /** Ties this field to one of the category's own filterable boolean fields
    *  (its `key`), e.g. a "Women's Hours" field tagged with the "Women's
-   *  Tevillah" boolean's key. When that filter is the only audience filter
-   *  active in the directory, cards hide every OTHER audience-tagged field —
-   *  so a category with several audience-specific detail sets (a mikvah's
-   *  separate men's/women's/keilim hours, phone, notes, …) doesn't show all of
-   *  them at once. Fields with no audienceKey always show. */
+   *  Tevillah" boolean's key. Groups audience-specific fields (a mikvah's
+   *  separate men's/women's/keilim hours, phone, notes, …) into their own
+   *  section in the intake form, and gates each field to listings that have
+   *  checked the matching boolean (see `fieldIsVisible`). Cards always show
+   *  every field the listing has, regardless of which filters are active. */
   audienceKey?: string
   /** Shown instead of `label` when this field renders inside its audienceKey
    *  section in the intake form — e.g. "Phone" instead of "Women's Phone",

@@ -49,7 +49,6 @@ export function GenericListingCard({
   upvotes,
   count,
   defaultExpanded,
-  activeBoolFilterKeys,
   onVote,
   onTagClick,
   onFilterOpen,
@@ -63,12 +62,6 @@ export function GenericListingCard({
   upvotes: boolean
   count: number
   defaultExpanded?: boolean
-  /** Keys of the boolean filters currently toggled on in the directory (e.g.
-   *  ['menTevillah']). When one or more of these match a field's
-   *  `audienceKey`, every OTHER audience-tagged field is hidden on this card —
-   *  see the `audienceKey` doc on CategoryField. Fields with no audienceKey
-   *  are unaffected. */
-  activeBoolFilterKeys?: string[]
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
@@ -84,15 +77,7 @@ export function GenericListingCard({
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const isMobile = useIsMobile()
 
-  // Which audience(s) the visitor has filtered to, if any — only the keys that
-  // actually tag a field on this category count (an unrelated boolean filter,
-  // e.g. "Open now" has no bearing here).
-  const activeAudienceKeys = (activeBoolFilterKeys ?? []).filter((k) =>
-    category.detailFields.some((f) => f.audienceKey === k),
-  )
-  const fields = category.detailFields.filter(
-    (f) => !f.audienceKey || activeAudienceKeys.length === 0 || activeAudienceKeys.includes(f.audienceKey),
-  )
+  const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
@@ -413,7 +398,7 @@ export function GenericListingCard({
                 key={f.key}
                 href={href}
                 target="_blank" rel="noopener noreferrer"
-                className="block w-fit ml-auto text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+                className="block w-fit text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
               >
                 {f.linkLabel ?? f.label}
               </a>

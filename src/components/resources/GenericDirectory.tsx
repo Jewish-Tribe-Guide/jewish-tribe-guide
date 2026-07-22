@@ -165,10 +165,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setOpenNow(false)
   }
 
-  // Keys of the boolean filters currently on — passed to each card so it can
-  // hide other audiences' fields when one (e.g. "Men's") is active.
-  const activeBoolFilterKeys = Object.keys(boolFilters).filter((k) => boolFilters[k])
-
   // The active field filters in the shape the map consumes (see MapFilters).
   const mapFilters = (): MapFilters => ({
     openNow: openNow || undefined,
@@ -478,7 +474,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}
-              activeBoolFilterKeys={activeBoolFilterKeys}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
               onFilterOpen={() => setOpenNow((v) => !v)}
