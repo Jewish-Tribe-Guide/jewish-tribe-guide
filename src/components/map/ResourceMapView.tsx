@@ -318,73 +318,76 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     <div>
       <UpButton label="Home" onClick={onUp} />
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource map</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Filter by category, then tap any pin or listing for directions.
-          </p>
-        </div>
-
-        {/* Map / Nearby tab toggle */}
-        {!loading && ui.map.nearbyList && (
-          <div className="flex shrink-0 rounded-xl bg-slate-100 p-1">
-            <button
-              onClick={() => setTab('map')}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                tab === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Map
-            </button>
-            <button
-              onClick={() => setTab('nearby')}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                tab === 'nearby' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Nearby
-            </button>
-          </div>
-        )}
+      {/* ── Header — full width now that the Map/Nearby toggle has moved down
+              to share a row with the live-tracking bar below. ─────────────── */}
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource map</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Filter by category, then tap any pin or listing for directions.
+        </p>
       </div>
 
-      {/* ── Live tracking bar ─────────────────────────────────────────────────── */}
-      {!loading && ui.map.liveTracking && (
+      {/* ── Live tracking bar + Map/Nearby toggle (same row) ─────────────────── */}
+      {!loading && (ui.map.liveTracking || ui.map.nearbyList) && (
         <div className="mb-4">
-          {tracking ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Pulsing indicator */}
-              <span className="inline-flex items-center gap-2 rounded-full bg-blue-600 pl-2.5 pr-3 py-1.5 text-sm font-semibold text-white shadow-sm">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-                </span>
-                Live — updating as you move
-              </span>
-              <button
-                onClick={stop}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Stop tracking
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleStart}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 cursor-pointer"
-              >
-                <span aria-hidden="true">📍</span>
-                Start live tracking
-              </button>
-              <p className="text-xs text-slate-400">
-                Track your position as you walk — the nearest places update in real time.
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            {ui.map.liveTracking && (
+              tracking ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Pulsing indicator */}
+                  <span className="inline-flex items-center gap-2 rounded-full bg-blue-600 pl-2.5 pr-3 py-1.5 text-sm font-semibold text-white shadow-sm">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+                    </span>
+                    Live — updating as you move
+                  </span>
+                  <button
+                    onClick={stop}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Stop tracking
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStart}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 cursor-pointer"
+                >
+                  <span aria-hidden="true">📍</span>
+                  Start live tracking
+                </button>
+              )
+            )}
+
+            {/* Map / Nearby tab toggle */}
+            {ui.map.nearbyList && (
+              <div className="flex shrink-0 rounded-xl bg-slate-100 p-1">
+                <button
+                  onClick={() => setTab('map')}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                    tab === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Map
+                </button>
+                <button
+                  onClick={() => setTab('nearby')}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
+                    tab === 'nearby' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Nearby
+                </button>
+              </div>
+            )}
+          </div>
+          {ui.map.liveTracking && !tracking && (
+            <p className="mt-2 text-xs text-slate-400">
+              Track your position as you walk — the nearest places update in real time.
+            </p>
           )}
-          {geoError && (
+          {ui.map.liveTracking && geoError && (
             <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{geoError}</p>
           )}
         </div>
