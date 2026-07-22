@@ -939,8 +939,8 @@ export function IconField({ icon, onChange }: { icon: string; onChange: (value: 
         </div>
       )}
       <span className="block text-[11px] text-muted mt-1">
-        Browse a curated list, or type/paste any emoji directly into the box. Shown before the
-        name on the home screen and map legend.
+        Browse a curated list, or type/paste any emoji directly into the box. Used as the map
+        marker, and as the card icon if no background photo is set.
       </span>
     </label>
   )
