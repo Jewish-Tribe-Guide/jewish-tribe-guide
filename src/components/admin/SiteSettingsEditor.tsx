@@ -86,6 +86,15 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
     setSavedNotice(false)
   }
 
+  // Discards every unsaved edit on this tab — text fields and sections alike
+  // — back to what's actually live.
+  function cancel() {
+    setDraft(settings)
+    setSectionsDraft(sections)
+    setError(null)
+    setSavedNotice(false)
+  }
+
   async function save() {
     if (!draft || !sections || !sectionsDraft) return
     setError(null)
@@ -262,6 +271,13 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
         >
           {saving ? 'Saving…' : 'Save changes'}
+        </button>
+        <button
+          onClick={cancel}
+          disabled={saving || !dirty}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          Cancel
         </button>
         {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
       </div>

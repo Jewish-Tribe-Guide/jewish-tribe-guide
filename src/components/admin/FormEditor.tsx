@@ -296,6 +296,13 @@ export default function FormEditor({
         >
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
+        <button
+          onClick={onCancel}
+          disabled={busy}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          Cancel
+        </button>
         {form.draft && (
           <button
             onClick={discard}
