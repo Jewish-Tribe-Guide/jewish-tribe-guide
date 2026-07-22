@@ -1395,19 +1395,18 @@ function CategoryEditor({
           </section>
         )}
 
-        {/* Presentation */}
+        {/* Presentation — just the front card itself: what a visitor actually
+            sees on the home screen. Icon and Description moved out (below) —
+            neither renders on the card once a background photo is set (every
+            built-in category has one today), so they belong with the other
+            behind-the-scenes settings instead. */}
         <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <IconField icon={draft.icon} onChange={(v) => set('icon', v)} />
           <label className="block">
             <span className="block text-xs font-medium text-slate-700 mb-1">Name *</span>
             <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
             <span className="block text-[11px] text-muted mt-1">
               Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.
             </span>
-          </label>
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
-            <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="Shown under the card title" />
           </label>
           <CardBackgroundField
             cardImageUrl={draft.cardImageUrl}
@@ -1427,6 +1426,14 @@ function CategoryEditor({
             only. These sit under the site-wide switches — if something is off site-wide, it stays off
             here regardless.
           </p>
+          <label className="block mb-3">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Description</span>
+            <input value={draft.description} onChange={(e) => set('description', e.target.value)} className={inputClass} placeholder="e.g. Kosher and local grocery stores near the hospital" />
+            <span className="block text-[11px] text-muted mt-1">
+              Not shown to visitors directly — helps this category surface when someone searches for
+              a word that&rsquo;s in here but not in the name.
+            </span>
+          </label>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {CATEGORY_CAPABILITY_KEYS.filter((k) => k !== 'map' || (hasMapCategory && draft.hasAddress)).map((k) => (
               <label key={k} className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
@@ -1448,6 +1455,14 @@ function CategoryEditor({
               External link
             </label>
           </div>
+          {draft.capabilities.map && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <IconField icon={draft.icon} onChange={(v) => set('icon', v)} />
+              <span className="block text-[11px] text-muted mt-1">
+                Used as this category&rsquo;s marker on the map.
+              </span>
+            </div>
+          )}
           {draft.externalLinkEnabled && (
             <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
               <div className="flex flex-col sm:flex-row gap-2">
