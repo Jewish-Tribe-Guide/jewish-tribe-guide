@@ -197,18 +197,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 🗺️ Map
               </button>
             )}
-            {category.externalLink && (
-              <a
-                href={category.externalLink.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                /* Desktop only, mirrors the Map button — mobile gets its own
-                   copy in the filter row below. */
-                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors whitespace-nowrap"
-              >
-                {category.externalLink.label} ↗
-              </a>
-            )}
             {canAdd && (
               <button
                 onClick={onAdd}
@@ -276,7 +264,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   href={category.externalLink.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
                 >
                   {category.externalLink.label} ↗
                 </a>
@@ -288,7 +276,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   title="All davening times"
                   className={[
                     'inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes ? 'ml-auto' : '',
+                    !upvotes && !category.externalLink ? 'ml-auto' : '',
                   ].join(' ')}
                 >
                   <ClockIcon className="h-4 w-4" />
@@ -298,7 +286,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 </button>
               )}
               {upvotes && (
-                <div className="flex rounded-md border border-slate-300 overflow-hidden ml-auto">
+                <div
+                  className={[
+                    'flex rounded-md border border-slate-300 overflow-hidden',
+                    !hasMinyanim && !category.externalLink ? 'ml-auto' : '',
+                  ].join(' ')}
+                >
                   {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
                     <button
                       key={opt.label}
@@ -401,12 +394,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   </select>
                 )
               })}
+              {category.externalLink && (
+                <a
+                  href={category.externalLink.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:inline-flex sm:ml-auto shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                >
+                  {category.externalLink.label} ↗
+                </a>
+              )}
               {hasMinyanim && (
                 <button
                   onClick={() => setDaveningModalOpen(true)}
                   className={[
                     'hidden sm:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes ? 'sm:ml-auto' : '',
+                    !upvotes && !category.externalLink ? 'sm:ml-auto' : '',
                   ].join(' ')}
                 >
                   <ClockIcon className="h-4 w-4" />
@@ -414,7 +417,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 </button>
               )}
               {upvotes && (
-                <div className="hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0 sm:ml-auto">
+                <div
+                  className={[
+                    'hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
+                    !hasMinyanim && !category.externalLink ? 'sm:ml-auto' : '',
+                  ].join(' ')}
+                >
                   {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
                     <button
                       key={opt.label}
