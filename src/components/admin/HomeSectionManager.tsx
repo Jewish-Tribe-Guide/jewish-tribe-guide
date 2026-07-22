@@ -1,14 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { HomeSection } from '@/lib/homeSections'
+import { useMemo, useState } from 'react'
+import { newDraftSectionId, type DraftHomeSection } from '@/lib/homeSections'
 import { useCategories } from '@/lib/useCategories'
 import { useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
 
-// ── The Sections tab: the home-screen grouping (title + which cards belong to
-// each, in order). Every action saves immediately (no draft/publish step) —
-// same as the rest of /admin. Mounted on /admin. ───────────────────────────────
+// ── The home-screen section grouping (title + which cards belong to each, in
+// order), part of the Home page tab (see SiteSettingsEditor.tsx). Purely a
+// controlled editor over a local draft — every action here just calls
+// `onChange`; nothing reaches the server until the tab's shared "Save
+// changes" button reconciles the draft (see homeSectionsDraft.ts). ──────────
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -45,200 +47,76 @@ function useCardOptions(): CardOption[] {
   }, [categories, forms])
 }
 
-export default function HomeSectionManager({ token }: { token: string }) {
-  const [sections, setSections] = useState<HomeSection[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+export default function HomeSectionManager({
+  sections,
+  onChange,
+}: {
+  sections: DraftHomeSection[]
+  onChange: (sections: DraftHomeSection[]) => void
+}) {
   const [newTitle, setNewTitle] = useState('')
-  const [busy, setBusy] = useState(false)
   const cardOptions = useCardOptions()
   const labelById = useMemo(() => new Map(cardOptions.map((c) => [c.id, c.label])), [cardOptions])
 
-  const load = useCallback(async () => {
-    setError(null)
-    try {
-      const res = await fetch('/api/admin/home-sections', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setSections(body.sections as HomeSection[])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
-    }
-  }, [token])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const assignedIds = useMemo(
-    () => new Set((sections ?? []).flatMap((s) => s.cardIds)),
-    [sections],
-  )
+  const assignedIds = useMemo(() => new Set(sections.flatMap((s) => s.cardIds)), [sections])
   const unassigned = cardOptions.filter((c) => !assignedIds.has(c.id))
 
-  async function patchSection(id: string, patch: { title?: string; cardIds?: string[]; sortOrder?: number }) {
-    const res = await fetch(`/api/admin/home-sections/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(patch),
-    })
-    const body = await res.json()
-    if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
-    return body.section as HomeSection
-  }
-
-  async function addSection() {
+  function addSection() {
     if (!newTitle.trim()) return
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/admin/home-sections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: newTitle }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create section.')
-      setSections((prev) => [...(prev ?? []), body.section as HomeSection])
-      setNewTitle('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
-    } finally {
-      setBusy(false)
-    }
+    onChange([...sections, { id: newDraftSectionId(), title: newTitle.trim(), cardIds: [] }])
+    setNewTitle('')
   }
 
-  async function renameSection(id: string, title: string) {
-    setSections((prev) => prev?.map((s) => (s.id === id ? { ...s, title } : s)) ?? prev)
-    try {
-      await patchSection(id, { title })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.')
-      load()
-    }
+  function renameSection(id: string, title: string) {
+    onChange(sections.map((s) => (s.id === id ? { ...s, title } : s)))
   }
 
-  async function deleteSection(id: string, title: string) {
-    if (!confirm(`Delete "${title}"? Its cards will fall into the home page's trailing "More" section until reassigned.`)) return
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/admin/home-sections/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not delete section.')
-      setSections((prev) => prev?.filter((s) => s.id !== id) ?? prev)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
-    } finally {
-      setBusy(false)
-    }
+  function deleteSection(id: string, title: string) {
+    if (!confirm(`Remove "${title}"? Its cards will fall into the home page's trailing "More" section until reassigned.`)) return
+    onChange(sections.filter((s) => s.id !== id))
   }
 
-  async function moveSection(index: number, dir: -1 | 1) {
-    if (!sections) return
+  function moveSection(index: number, dir: -1 | 1) {
     const other = index + dir
     if (other < 0 || other >= sections.length) return
-    const a = sections[index]
-    const b = sections[other]
     const next = [...sections]
-    next[index] = b
-    next[other] = a
-    setSections(next)
-    setError(null)
-    try {
-      await Promise.all([
-        patchSection(a.id, { sortOrder: b.sortOrder }),
-        patchSection(b.id, { sortOrder: a.sortOrder }),
-      ])
-      setSections((prev) =>
-        prev?.map((s) => (s.id === a.id ? { ...s, sortOrder: b.sortOrder } : s.id === b.id ? { ...s, sortOrder: a.sortOrder } : s)) ?? prev,
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.')
-      load()
-    }
+    ;[next[index], next[other]] = [next[other], next[index]]
+    onChange(next)
   }
 
   // Adds a card to `sectionId`, first pulling it out of whatever section it's
   // currently in (a card only ever lives in one section).
-  async function addCard(sectionId: string, cardId: string) {
-    if (!sections) return
-    const from = sections.find((s) => s.cardIds.includes(cardId))
-    const next = sections.map((s) => {
-      if (s.id === sectionId) return { ...s, cardIds: [...s.cardIds, cardId] }
-      if (from && s.id === from.id) return { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) }
-      return s
-    })
-    setSections(next)
-    setError(null)
-    try {
-      if (from && from.id !== sectionId) {
-        await patchSection(from.id, { cardIds: from.cardIds.filter((id) => id !== cardId) })
-      }
-      const target = next.find((s) => s.id === sectionId)!
-      await patchSection(sectionId, { cardIds: target.cardIds })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.')
-      load()
-    }
-  }
-
-  async function removeCard(sectionId: string, cardId: string) {
-    if (!sections) return
-    const next = sections.map((s) =>
-      s.id === sectionId ? { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) } : s,
+  function addCard(sectionId: string, cardId: string) {
+    onChange(
+      sections.map((s) => {
+        if (s.id === sectionId) return { ...s, cardIds: [...s.cardIds, cardId] }
+        if (s.cardIds.includes(cardId)) return { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) }
+        return s
+      }),
     )
-    setSections(next)
-    setError(null)
-    try {
-      const target = next.find((s) => s.id === sectionId)!
-      await patchSection(sectionId, { cardIds: target.cardIds })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.')
-      load()
-    }
   }
 
-  async function moveCard(sectionId: string, index: number, dir: -1 | 1) {
-    if (!sections) return
+  function removeCard(sectionId: string, cardId: string) {
+    onChange(sections.map((s) => (s.id === sectionId ? { ...s, cardIds: s.cardIds.filter((id) => id !== cardId) } : s)))
+  }
+
+  function moveCard(sectionId: string, index: number, dir: -1 | 1) {
     const section = sections.find((s) => s.id === sectionId)
     if (!section) return
     const other = index + dir
     if (other < 0 || other >= section.cardIds.length) return
     const cardIds = [...section.cardIds]
     ;[cardIds[index], cardIds[other]] = [cardIds[other], cardIds[index]]
-    const next = sections.map((s) => (s.id === sectionId ? { ...s, cardIds } : s))
-    setSections(next)
-    setError(null)
-    try {
-      await patchSection(sectionId, { cardIds })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed.')
-      load()
-    }
-  }
-
-  if (error && !sections) {
-    return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
-  }
-  if (!sections) {
-    return <p className="text-sm text-muted">Loading…</p>
+    onChange(sections.map((s) => (s.id === sectionId ? { ...s, cardIds } : s)))
   }
 
   return (
     <div>
       <p className="text-sm text-muted mb-4">
         Groups of cards shown on the home screen, in order. A card not placed in any section falls into a
-        trailing &ldquo;More&rdquo; section instead of disappearing. Changes go live immediately.
+        trailing &ldquo;More&rdquo; section instead of disappearing. Part of this tab&rsquo;s Save changes
+        below — nothing here goes live until you save.
       </p>
-
-      {error && (
-        <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
 
       <div className="space-y-4 max-w-2xl">
         {sections.map((s, i) => (
@@ -246,14 +124,13 @@ export default function HomeSectionManager({ token }: { token: string }) {
             <div className="flex items-start justify-between gap-3 mb-3">
               <input
                 value={s.title}
-                onChange={(e) => setSections((prev) => prev?.map((x) => (x.id === s.id ? { ...x, title: e.target.value } : x)) ?? prev)}
-                onBlur={(e) => renameSection(s.id, e.target.value)}
+                onChange={(e) => renameSection(s.id, e.target.value)}
                 className={`${inputClass} font-medium`}
               />
               <div className="flex items-center gap-1 shrink-0 pt-1.5">
                 <button onClick={() => moveSection(i, -1)} disabled={i === 0} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move section up">↑</button>
                 <button onClick={() => moveSection(i, 1)} disabled={i === sections.length - 1} className="text-xs text-muted hover:text-slate-700 disabled:opacity-30 cursor-pointer px-1" aria-label="Move section down">↓</button>
-                <button onClick={() => deleteSection(s.id, s.title)} disabled={busy} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Delete</button>
+                <button onClick={() => deleteSection(s.id, s.title)} className="text-xs text-red-600 hover:underline cursor-pointer ml-2">Delete</button>
               </div>
             </div>
 
@@ -299,7 +176,7 @@ export default function HomeSectionManager({ token }: { token: string }) {
         />
         <button
           onClick={addSection}
-          disabled={busy || !newTitle.trim()}
+          disabled={!newTitle.trim()}
           className="shrink-0 text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
         >
           Add section

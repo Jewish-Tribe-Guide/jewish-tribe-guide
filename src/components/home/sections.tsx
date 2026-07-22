@@ -118,8 +118,13 @@ export type CardSectionDef = { title: string; cards: CardDef[] }
 
 /** Sorts cards into the given sections (in each section's own listed order),
  *  then a trailing untitled "More" section for anything left over — never
- *  drops a card just because it has no assigned section. */
-export function groupCardsIntoSections(cards: CardDef[], sections: HomeSection[]): CardSectionDef[] {
+ *  drops a card just because it has no assigned section. Takes just
+ *  title/cardIds (not the full `HomeSection`) so the admin preview can pass
+ *  its in-progress draft — which has no `sortOrder` yet — straight through. */
+export function groupCardsIntoSections(
+  cards: CardDef[],
+  sections: Pick<HomeSection, 'title' | 'cardIds'>[],
+): CardSectionDef[] {
   const byId = new Map(cards.filter((c) => c.id).map((c) => [c.id as string, c]))
   const used = new Set<string>()
 
