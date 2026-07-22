@@ -292,6 +292,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   ].join(' ')}
                 >
                   <ClockIcon className="h-4 w-4" />
+                  {/* Full label once the row has room — hidden below this so it
+                      never crowds Filters/Map on the narrowest phones. */}
+                  <span className="hidden min-[390px]:inline">All davening times</span>
                 </button>
               )}
               {upvotes && (
