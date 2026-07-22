@@ -279,7 +279,7 @@ export type MapFilters = {
   select?: Record<string, string[]>
 }
 
-export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback'
 
 /** page.tsx's central navigation function, passed down to every screen that
  *  deep-links. `extra` is merged into the history state so the target screen
