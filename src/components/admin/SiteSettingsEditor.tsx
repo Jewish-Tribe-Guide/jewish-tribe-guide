@@ -143,7 +143,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
@@ -194,7 +194,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-xl mt-6">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl mt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <span className="block text-sm font-medium text-slate-800">Feedback form</span>
