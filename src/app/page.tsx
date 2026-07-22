@@ -10,8 +10,11 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
+import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar'
+import FeedbackForm from '@/components/FeedbackForm'
 import { useStoredLocation } from '@/lib/useStoredLocation'
 import { useCategories } from '@/lib/useCategories'
+import { useSiteSettings } from '@/lib/useSiteSettings'
 
 // Which guided form is open as a full-screen overlay, and any need
 // pre-checked from the card or a search result. `kind` is 'support'/
@@ -44,6 +47,7 @@ export default function Page() {
   // Location persists across reloads/return visits — it drives all distance sorting.
   const { address, coords, setAddress, setCoords } = useStoredLocation()
   const categories = useCategories()
+  const settings = useSiteSettings()
   const [flow, setFlow] = useState<Flow | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)
@@ -131,6 +135,19 @@ export default function Page() {
     navigate(null, 'home')
   }
 
+  // Mobile tab bar — Categories/Find both read as the "Categories" tab (see
+  // MobileTabBar's `modes` map), and re-tapping it always resets to the root
+  // Landing grid rather than staying wherever the visitor drilled into.
+  const hasMap = !!categories?.some((c) => c.kind === 'map')
+  const selectTab = (tab: MobileTab) => {
+    if (tab === 'categories') navigate(null, 'home')
+    else if (tab === 'map') navigate(null, 'map')
+    else navigate(null, 'feedback')
+  }
+  const tabBar = (
+    <MobileTabBar mode={mode} onSelect={selectTab} showMapTab={hasMap} showFeedbackTab={settings.feedbackEnabled} />
+  )
+
   const overlay = flow && (
     flow.kind === 'support' ? (
       <SupportWizard preselect={flow.preselect} onClose={closeFlow} />
@@ -149,7 +166,10 @@ export default function Page() {
         <div className="flex-1">
           <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
         </div>
-        <SiteFooter />
+        <div className="hidden sm:block">
+          <SiteFooter />
+        </div>
+        {tabBar}
         {overlay}
       </>
     )
@@ -193,11 +213,17 @@ export default function Page() {
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pb-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
-        {mode === 'map' && categories?.some((c) => c.kind === 'map') && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
+        {mode === 'map' && hasMap && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
+        {mode === 'feedback' && (
+          <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
+        )}
       </main>
-      <SiteFooter />
+      <div className="hidden sm:block">
+        <SiteFooter />
+      </div>
+      {tabBar}
       {overlay}
     </>
   )

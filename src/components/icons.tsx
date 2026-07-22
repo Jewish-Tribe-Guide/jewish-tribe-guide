@@ -89,3 +89,35 @@ export function ExternalIcon({ className = 'h-3.5 w-3.5' }: IconProps) {
     </svg>
   )
 }
+
+// 2x2 grid — the mobile tab bar's "Categories" tab.
+export function GridIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+// Folded map — the mobile tab bar's "Map" tab.
+export function MapFoldIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+      <path d="M9 4v14" />
+      <path d="M15 6v14" />
+    </svg>
+  )
+}
+
+// Speech bubble — the mobile tab bar's "Feedback" tab.
+export function MessageIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 5h16v11H8l-4 4V5z" />
+    </svg>
+  )
+}

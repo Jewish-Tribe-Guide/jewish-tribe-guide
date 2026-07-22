@@ -78,9 +78,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       {/* ── Heading + filter ─────────────────────────────────────────────────── */}
       <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-      {/* ── The map — the real full map screen, right on the home screen ───────── */}
+      {/* ── The map — the real full map screen, right on the home screen.
+              Desktop only: mobile now reaches the same map via its own tab
+              bar entry, so it's dropped from this scroll to avoid showing it
+              twice. ──────────────────────────────────────────────────────── */}
       {hasMap && (
-        <div className="mt-8">
+        <div className="mt-8 hidden sm:block">
           <HomeMap onNavigate={onNavigate} coords={coords} />
         </div>
       )}
