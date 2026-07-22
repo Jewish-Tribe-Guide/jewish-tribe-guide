@@ -27,6 +27,7 @@ type Props = {
 export default function CategoryFilter({ options, selected, onToggle, onAll, onNone }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
   const scrollRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   // Percent width/offset of the little track thumb below the row. Mirrors the
   // real scrollbar chip-scroll (globals.css) already styles for desktop, but
   // touch browsers hide even a styled scrollbar until you're mid-scroll — so
@@ -59,6 +60,27 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
     }
     // Re-measure whenever the chip set itself changes length (filters loading in).
   }, [options.length])
+
+  // Click-or-drag-to-seek — a real scrollbar isn't just a progress readout,
+  // it's also a shortcut past however many chips are in the way.
+  function seekTo(clientX: number) {
+    const track = trackRef.current
+    const el = scrollRef.current
+    if (!track || !el) return
+    const rect = track.getBoundingClientRect()
+    const ratio = rect.width > 0 ? Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) : 0
+    el.scrollLeft = ratio * (el.scrollWidth - el.clientWidth)
+  }
+
+  function onTrackPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    seekTo(e.clientX)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function onTrackPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.buttons !== 1) return // only while actively pressed
+    seekTo(e.clientX)
+  }
 
   return (
     <div>
@@ -99,11 +121,20 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
         })}
       </div>
       {thumb && (
-        <div className="-mt-1.5 mb-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
-          <div
-            className="h-full rounded-full bg-slate-400"
-            style={{ width: `${thumb.widthPct}%`, marginLeft: `${thumb.leftPct}%` }}
-          />
+        // A taller invisible hit area around the thin visible bar — easier to
+        // grab with a finger than the 4px track alone would be.
+        <div
+          ref={trackRef}
+          onPointerDown={onTrackPointerDown}
+          onPointerMove={onTrackPointerMove}
+          className="-mt-1 mb-1 flex h-3 w-full cursor-pointer touch-none items-center"
+        >
+          <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-slate-400"
+              style={{ width: `${thumb.widthPct}%`, marginLeft: `${thumb.leftPct}%` }}
+            />
+          </div>
         </div>
       )}
     </div>
