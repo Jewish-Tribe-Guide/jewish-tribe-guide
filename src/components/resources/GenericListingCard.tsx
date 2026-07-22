@@ -413,7 +413,7 @@ export function GenericListingCard({
                 key={f.key}
                 href={href}
                 target="_blank" rel="noopener noreferrer"
-                className="inline-block text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+                className="block w-fit ml-auto text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
               >
                 {f.linkLabel ?? f.label}
               </a>
