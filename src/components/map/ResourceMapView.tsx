@@ -7,7 +7,7 @@ import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import NearbyList from './NearbyList'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
 import type { LatLng } from '@/lib/googleMapsLinks'
@@ -16,8 +16,19 @@ import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
 import type { DirectoryResource, MapFilters } from '@/types'
 
-const HOSPITALS_ID = '__hospitals__'
-const HOSPITAL_COLOR = '#dc2626'
+// Exported so callers syncing external UI (e.g. the home page's category
+// list) with the map's points use the exact same id for hospitals.
+export const HOSPITALS_ID = '__hospitals__'
+// The approved bright, warm-leaning accent palette — used for map pins,
+// category colors, and (cycled) as border colors on buttons/tiles/widgets
+// elsewhere (see sections.tsx, CategoryRow.tsx, HospitalRow.tsx,
+// ZmanimWidget.tsx). Moderately-to-highly saturated, consistent intensity —
+// avoid mixing in muted/desaturated tones outside this set.
+export const ACCENT_PALETTE = ['#ffc145', '#df4c73', '#f9a66c', '#aecf80', '#3bba9c', '#6f7bc5']
+
+// Exported so callers coloring external UI to match the map's legend (e.g.
+// the home page's category list) use the exact same colors.
+export const HOSPITAL_COLOR = '#df4c73'
 const HOSPITAL_ICON = '🏥'
 
 // Typing one of these in the search pins the open-now filter (rather than a plain
@@ -25,18 +36,29 @@ const HOSPITAL_ICON = '🏥'
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
-const PALETTE = [
-  '#2563eb', // blue
-  '#16a34a', // green
-  '#9333ea', // purple
-  '#ea580c', // orange
-  '#0891b2', // cyan
-  '#db2777', // pink
-  '#ca8a04', // amber
-  '#4f46e5', // indigo
-  '#0d9488', // teal
-  '#65a30d', // lime
-]
+// A direct, stable color per category (rather than a cycled palette index) —
+// each specific category gets an intentional, permanent color regardless of
+// display order. All drawn from ACCENT_PALETTE above except Eruv, which gets
+// its own similar-range color since it has no real map pins to match against.
+// Keyed by category id for regular listing categories; kind: 'medical'/
+// 'zmanim'/'eruv'/'map' categories aren't uniquely identified by a fixed id
+// the way listing categories are, so eruv is matched by kind instead below.
+const CATEGORY_COLORS: Record<string, string> = {
+  synagogue: '#6f7bc5', // indigo
+  restaurant: '#f9a66c', // warm orange
+  grocery: '#3bba9c', // teal-green
+  hotel: '#aecf80', // lime green
+  mikvah: '#ffc145', // gold
+}
+const ERUV_COLOR = '#e8735a' // coral
+
+// Exported so external UI (the home page's category list) computes the exact
+// same color as the map's pins for a given category.
+export function colorForListingCategory(categories: CategoryConfig[], categoryId: string): string {
+  const category = categories.find((c) => c.id === categoryId)
+  if (category?.kind === 'eruv') return ERUV_COLOR
+  return CATEGORY_COLORS[categoryId] ?? '#64748b'
+}
 
 type Props = {
   onUp: () => void
@@ -57,11 +79,31 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** Rendered beside the map/nearby panel (not the header above it), so it
+   *  top-aligns with the actual map border. Used by the home page's "Browse
+   *  by Category" list. */
+  sidebar?: React.ReactNode
+  /** The id of a single point to isolate on the map (hides every other pin
+   *  and force-zooms to it) — set when the visitor taps a facility in
+   *  `sidebar`. Controlled from the parent so the same tap can also expand
+   *  that facility's row in the list. Takes priority over
+   *  `focusedCategoryId` when both are set. */
+  focusedListingId?: string | null
+  onFocusListingChange?: (id: string | null) => void
+  /** A category (or `HOSPITALS_ID`) to isolate on the map — hides every other
+   *  pin and zooms to fit just this category's points. Set when the visitor
+   *  expands a category's row in `sidebar`. */
+  focusedCategoryId?: string | null
+  onFocusCategoryChange?: (id: string | null) => void
+  /** The exact point ids currently surviving the isolated category's own
+   *  filters (search/open-now/kosher/etc., applied inside `sidebar`) — when
+   *  set, narrows the isolation to just these instead of the whole category. */
+  focusedCategoryItemIds?: string[] | null
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, sidebar, focusedListingId, onFocusListingChange, focusedCategoryId, onFocusCategoryChange, focusedCategoryItemIds }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -85,7 +127,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
-    ;(categories ?? []).forEach((c, i) => map.set(c.id, PALETTE[i % PALETTE.length]))
+    ;(categories ?? []).forEach((c) => map.set(c.id, colorForListingCategory(categories ?? [], c.id)))
     return map
   }, [categories])
 
@@ -296,21 +338,47 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     )
   }, [terms, selected, openNowOn, boolFields, selectFilters])
 
+  // Isolating one facility (tapped in `sidebar`) overrides every other filter —
+  // show exactly that pin, regardless of category/search/field filters. Isolating
+  // a whole category (a row expanded, not a facility within it) is the next
+  // priority — show every pin in that category, narrowed further to exactly
+  // `focusedCategoryItemIds` once the row has reported its own filtered set
+  // (search/open-now/kosher/etc. applied inside the sidebar), so the map
+  // always matches whatever's actually showing in the list.
+  const focusedPoint = focusedListingId ? allPoints.find((p) => p.id === focusedListingId) : undefined
+  const focusedCategoryPoints = !focusedPoint && focusedCategoryId
+    ? focusedCategoryItemIds
+      ? allPoints.filter((p) => focusedCategoryItemIds.includes(p.id))
+      : allPoints.filter((p) => p.filterId === focusedCategoryId)
+    : undefined
+
   const visiblePoints = useMemo(() => {
+    if (focusedPoint) return [focusedPoint]
+    if (focusedCategoryPoints) return focusedCategoryPoints
     return allPoints
       .filter((p) => effectiveSelected.has(p.filterId))
       .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
-  }, [allPoints, effectiveSelected, activeTerms, filterChips])
+  }, [allPoints, effectiveSelected, activeTerms, filterChips, focusedPoint, focusedCategoryPoints])
 
   const toggle = (id: string) => {
+    onFocusListingChange?.(null)
+    onFocusCategoryChange?.(null)
     const next = new Set(effectiveSelected)
     if (next.has(id)) next.delete(id)
     else next.add(id)
     setSelected(next)
   }
-  const showAll = () => setSelected(new Set(options.map((o) => o.id)))
-  const hideAll = () => setSelected(new Set())
+  const showAll = () => {
+    onFocusListingChange?.(null)
+    onFocusCategoryChange?.(null)
+    setSelected(new Set(options.map((o) => o.id)))
+  }
+  const hideAll = () => {
+    onFocusListingChange?.(null)
+    onFocusCategoryChange?.(null)
+    setSelected(new Set())
+  }
 
   const loading = listings === null || categories === null
 
@@ -319,12 +387,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       <UpButton label="Home" onClick={onUp} />
 
       {/* ── Header — full width now that the Map/Nearby toggle has moved down
-              to share a row with the live-tracking bar below. ─────────────── */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource map</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Filter by category, then tap any pin or listing for directions.
-        </p>
+              to share a row with the live-tracking bar below. Compact on the
+              home page (a `sidebar` is given): the map is one of several
+              sections there, not the whole screen, so its label shouldn't
+              compete for space. ─────────────────────────────────────────── */}
+      <div className={sidebar ? 'mb-2' : 'mb-4'}>
+        <h1 className={sidebar ? 'text-sm font-semibold uppercase tracking-wide text-slate-500' : 'text-2xl font-bold tracking-tight text-slate-900'}>
+          Resource map
+        </h1>
+        {!sidebar && (
+          <p className="mt-1 text-sm text-slate-500">
+            Filter by category, then tap any pin or listing for directions.
+          </p>
+        )}
       </div>
 
       {/* ── Live tracking bar + Map/Nearby toggle (same row) ─────────────────── */}
@@ -394,8 +469,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       )}
 
       {/* ── Category filter chips (broad filter, above search's narrower text
-              filter — a single scroll row so they stay compact) ─────────────── */}
-      {!loading && options.length > 0 && (
+              filter — a single scroll row so they stay compact). Skipped when
+              a `sidebar` is given (the home page): its "Browse by Category"
+              list already covers category selection — with per-category
+              search/sort/field filters this chip row can't — so showing both
+              would just be redundant. The standalone map screen (no sidebar)
+              still needs these, since it has no other way to filter. ────── */}
+      {!loading && !sidebar && options.length > 0 && (
         <div className="mb-4">
           <CategoryFilter
             options={options}
@@ -409,12 +489,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {/* ── Search + filters — type a term (Enter to pin it as a chip); typing
               "open now" pins the open-now filter. Filters carried from a category
-              show as chips too. Every chip narrows the results. ──────────────── */}
-      {!loading && ui.search.map && (
+              show as chips too. Every chip narrows the results. Skipped on the
+              home page (a `sidebar` is given): each category row already has
+              its own search/filters, so this box would be redundant there —
+              the standalone map screen (no sidebar) still needs it. ───────── */}
+      {!loading && !sidebar && ui.search.map && (
         <div className="mb-4">
           <input
             type="text"
-            placeholder={terms.length ? 'Add another term…' : "Search name, address, or 'open now'…"}
+            placeholder={terms.length ? 'Add another term…' : 'Filter — name, synagogues, kosher food, open now…'}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -478,49 +561,69 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Map view ────────────────────────────────────────────────────────── */}
-      {tab === 'map' && (
-        <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5">
-          {loading ? (
-            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
-              Loading map…
+      {/* ── Map/Nearby panel + sidebar — a flex row so the sidebar (when given)
+              top-aligns with the actual map border, not the title/chips/search
+              UI above. ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+        <div className="min-w-0 flex-1">
+          {/* ── Map view ──────────────────────────────────────────────────── */}
+          {tab === 'map' && (
+            <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]">
+              {loading ? (
+                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
+                  Loading map…
+                </div>
+              ) : (
+                <ResourceMap
+                  points={visiblePoints}
+                  userLocation={activeLocation}
+                  follow={follow}
+                  onResumeFollow={() => setFollow(true)}
+                  onViewListing={onViewListing}
+                  focusPoints={
+                    focusedPoint
+                      ? [{ lat: focusedPoint.lat, lng: focusedPoint.lng }]
+                      : focusedCategoryPoints
+                        ? focusedCategoryPoints.map((p) => ({ lat: p.lat, lng: p.lng }))
+                        : null
+                  }
+                />
+              )}
             </div>
-          ) : (
-            <ResourceMap
-              points={visiblePoints}
-              userLocation={activeLocation}
-              follow={follow}
-              onResumeFollow={() => setFollow(true)}
-              onViewListing={onViewListing}
-            />
+          )}
+
+          {/* ── Nearby list view ──────────────────────────────────────────── */}
+          {tab === 'nearby' && !loading && ui.map.nearbyList && (
+            <>
+              {activeLocation ? (
+                <p className="mb-3 text-xs text-slate-400">
+                  Sorted by distance from your location
+                  {tracking ? ', updating live as you move.' : '.'}
+                </p>
+              ) : (
+                <p className="mb-3 text-xs text-slate-400">
+                  Start live tracking above to sort by distance.
+                </p>
+              )}
+              <NearbyList points={visiblePoints} userLocation={activeLocation} onViewListing={onViewListing} />
+            </>
+          )}
+
+          {!loading && visiblePoints.length === 0 && (
+            <p className="mt-3 text-center text-sm text-slate-500">
+              {activeTerms.length > 0 || filterChips.length > 0
+                ? 'No places match every filter. Try removing one.'
+                : 'No places shown. Turn on a category above to see locations.'}
+            </p>
           )}
         </div>
-      )}
 
-      {/* ── Nearby list view ─────────────────────────────────────────────────── */}
-      {tab === 'nearby' && !loading && ui.map.nearbyList && (
-        <>
-          {activeLocation ? (
-            <p className="mb-3 text-xs text-slate-400">
-              Sorted by distance from your location
-              {tracking ? ', updating live as you move.' : '.'}
-            </p>
-          ) : (
-            <p className="mb-3 text-xs text-slate-400">
-              Start live tracking above to sort by distance.
-            </p>
-          )}
-          <NearbyList points={visiblePoints} userLocation={activeLocation} onViewListing={onViewListing} />
-        </>
-      )}
-
-      {!loading && visiblePoints.length === 0 && (
-        <p className="mt-3 text-center text-sm text-slate-500">
-          {activeTerms.length > 0 || filterChips.length > 0
-            ? 'No places match every filter. Try removing one.'
-            : 'No places shown. Turn on a category above to see locations.'}
-        </p>
-      )}
+        {sidebar && (
+          <div className="w-full shrink-0 lg:w-80 lg:sticky lg:top-4">
+            {sidebar}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

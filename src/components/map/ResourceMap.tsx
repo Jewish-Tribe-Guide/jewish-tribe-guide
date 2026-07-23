@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
@@ -39,6 +39,12 @@ type Props = {
   fallbackCenter?: { lat: number; lng: number }
   /** Called when the user taps "View listing" in an info window. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** Forces the map to frame exactly these points — a close zoom centered on
+   *  a single one, or a bounds-fit enveloping several (e.g. a facility or a
+   *  whole category isolated in a list beside the map) — regardless of the
+   *  usual "keep the user centered" behavior, since isolating something is a
+   *  deliberate, one-off request. */
+  focusPoints?: { lat: number; lng: number }[] | null
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -124,7 +130,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, focusPoints }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -223,6 +229,30 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // identity are read via refs so an open info window survives them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, ready])
+
+  // ── Force-frame isolated points (a facility or a whole category, tapped in
+  //    a list beside the map) ────────────────────────────────────────────────
+  // Runs after the effect above, so this wins when both fire together (e.g.
+  // isolating changes `points` too). A stable string key (not the array
+  // reference, which is new every render) is the real dependency, so this
+  // only refires when the actual coordinates change.
+  const focusKey = useMemo(
+    () => (focusPoints && focusPoints.length ? focusPoints.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|') : ''),
+    [focusPoints],
+  )
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map || !focusPoints || focusPoints.length === 0) return
+    if (focusPoints.length === 1) {
+      map.panTo(focusPoints[0])
+      map.setZoom(16)
+    } else {
+      const bounds = new google.maps.LatLngBounds()
+      focusPoints.forEach((p) => bounds.extend(p))
+      map.fitBounds(bounds, 64)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey, ready])
 
   // ── The visitor's "you are here" marker, centered on when set ─────────────
   useEffect(() => {

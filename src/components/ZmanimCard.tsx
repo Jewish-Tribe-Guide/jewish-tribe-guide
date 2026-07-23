@@ -63,7 +63,7 @@ export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmani
         <p className="text-sm text-muted mt-0.5">{locationLabel}</p>
       </div>
 
-      <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+      <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 sm:border-2 sm:border-slate-300 sm:shadow-none">
         {status === 'loading' && <LoadingState />}
         {status === 'no-location' && <NoLocationState />}
         {status === 'error' && <ErrorState />}

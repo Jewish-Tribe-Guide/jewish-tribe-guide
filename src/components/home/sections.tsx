@@ -9,6 +9,7 @@ import { distanceMiles } from '@/lib/geo'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
+import { ACCENT_PALETTE } from '@/components/map/ResourceMapView'
 
 export type CardDef = {
   title: string
@@ -38,14 +39,35 @@ export type CardDef = {
 // Soft tile tints, cycled per card across the grid.
 export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
-export function Card({ card, tint }: { card: CardDef; tint: string }) {
+// Light tints of the same ACCENT_PALETTE hues used for the map's category
+// colors/dropdown buttons — for grids that should visually match that palette
+// (e.g. "Get Connected") instead of the generic pastel TINTS above. Written
+// out as literal classes (not derived from ACCENT_PALETTE at runtime) since
+// Tailwind's arbitrary-value classes must appear as complete strings in the
+// source to be picked up.
+// Higher opacity than a generic pastel tint on purpose — these tiles sit on
+// the "Get Connected" section's own solid blue background (see Landing.tsx),
+// so they need real contrast against it rather than reading as a faint wash.
+export const MAP_ACCENT_TINTS = [
+  'bg-[#ffc145]/70', // gold
+  'bg-[#df4c73]/70', // rose
+  'bg-[#f9a66c]/70', // orange
+  'bg-[#aecf80]/70', // lime
+  'bg-[#3bba9c]/70', // teal
+  'bg-[#6f7bc5]/70', // indigo
+]
+
+export function Card({ card, tint, borderColor }: { card: CardDef; tint: string; borderColor: string }) {
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
   return (
     <button onClick={card.go} className="group w-full cursor-pointer">
       <div
-        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
-        style={hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10 sm:ring-0 sm:border-2`}
+        style={{
+          borderColor,
+          ...(hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
+        }}
       >
         {/* A photo card gets a dark scrim regardless of the photo's own
             brightness, so the title stays legible no matter what's pasted in
@@ -82,14 +104,29 @@ export function CardSkeleton() {
 export function CardGrid({
   cards,
   loadingCount = 0,
+  tints = TINTS,
+  oneRow = false,
 }: {
   cards: CardDef[]
   loadingCount?: number
+  /** Override the tint cycle — e.g. MAP_ACCENT_TINTS for a grid that should
+   *  match the map's category-color palette instead of the generic pastels. */
+  tints?: string[]
+  /** Force every card into a single row (one column per card) instead of the
+   *  usual wrapping grid — used by the desktop "Get Connected" section, whose
+   *  small, fixed set of tiles should read as one deliberate row. Only ever
+   *  used by a grid already scoped to desktop, so it doesn't need its own
+   *  sm: gating — there's no mobile render path to leak into. */
+  oneRow?: boolean
 }) {
+  const total = cards.length + loadingCount
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
+    <div
+      className={oneRow ? 'grid gap-3' : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5 sm:gap-x-3 sm:gap-y-3'}
+      style={oneRow ? { gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` } : undefined}
+    >
       {cards.map((card, i) => (
-        <Card key={card.id ?? card.title} card={card} tint={TINTS[i % TINTS.length]} />
+        <Card key={card.id ?? card.title} card={card} tint={tints[i % tints.length]} borderColor={ACCENT_PALETTE[i % ACCENT_PALETTE.length]} />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />

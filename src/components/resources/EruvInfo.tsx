@@ -13,7 +13,7 @@ type Props = {
 
 function EruvCard({ eruv }: { eruv: EruvRecord }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm sm:border-2 sm:border-slate-300 sm:shadow-none">
       <h3 className="text-sm font-semibold text-slate-900">{eruv.name}</h3>
       <p className="text-xs text-muted mb-2">{eruv.area}</p>
       <p className="text-sm text-slate-700">{eruv.notes}</p>

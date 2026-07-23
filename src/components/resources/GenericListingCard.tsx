@@ -56,6 +56,7 @@ export function GenericListingCard({
   onFilterSelect,
   onEdit,
   onReport,
+  onExpandedChange,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -73,8 +74,19 @@ export function GenericListingCard({
   onFilterSelect: (key: string, value: string, multi: boolean) => void
   onEdit: () => void
   onReport: () => void
+  /** Fires whenever the card's own expand/collapse toggles (e.g. so the home
+   *  page's map can isolate + zoom to whatever facility just expanded). */
+  onExpandedChange?: (expanded: boolean) => void
 }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  // Two plain statements, not a functional setExpanded(p => ...) updater —
+  // calling onExpandedChange (which sets state in a different component)
+  // from inside an updater fires during React's render phase and throws.
+  const toggleExpanded = () => {
+    const next = !expanded
+    setExpanded(next)
+    onExpandedChange?.(next)
+  }
   const isMobile = useIsMobile()
 
   const fields = category.detailFields
@@ -155,13 +167,13 @@ export function GenericListingCard({
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
     // collapsed card. Corners stay clean because the header and expanded panel
     // round their own edges below.
-    <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
+    <div className="border border-slate-200 rounded-lg bg-white shadow-sm sm:border-2 sm:border-slate-300 sm:shadow-none">
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
-        onClick={() => setExpanded((p) => !p)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
+        onClick={toggleExpanded}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded() } }}
         className={`w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches).
@@ -232,7 +244,7 @@ export function GenericListingCard({
             </span>
           ))}
           {hiddenTagCount > 0 && (
-            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); setExpanded(true) }} title="Show all tags">
+            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); setExpanded(true); onExpandedChange?.(true) }} title="Show all tags">
               +{hiddenTagCount}
             </Chip>
           )}

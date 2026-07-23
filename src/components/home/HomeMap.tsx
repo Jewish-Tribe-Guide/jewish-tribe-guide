@@ -12,9 +12,26 @@ import type { NavigateFn } from '@/types'
 export default function HomeMap({
   onNavigate,
   coords,
+  sidebar,
+  focusedListingId,
+  onFocusListingChange,
+  focusedCategoryId,
+  onFocusCategoryChange,
+  focusedCategoryItemIds,
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
+  /** Rendered beside the map, top-aligned with its border. */
+  sidebar?: React.ReactNode
+  /** The map point to isolate + zoom to — see ResourceMapView. */
+  focusedListingId?: string | null
+  onFocusListingChange?: (id: string | null) => void
+  /** The category (or hospitals) to isolate + zoom-to-fit — see ResourceMapView. */
+  focusedCategoryId?: string | null
+  onFocusCategoryChange?: (id: string | null) => void
+  /** The exact point ids surviving the isolated category's own filters —
+   *  narrows the isolation further than the whole category. */
+  focusedCategoryItemIds?: string[] | null
 }) {
   return (
     <ResourceMapView
@@ -23,6 +40,12 @@ export default function HomeMap({
       onViewListing={(categoryId, listingId) =>
         onNavigate('patient', 'find', { findView: categoryId, findItemId: listingId })
       }
+      sidebar={sidebar}
+      focusedListingId={focusedListingId}
+      onFocusListingChange={onFocusListingChange}
+      focusedCategoryId={focusedCategoryId}
+      onFocusCategoryChange={onFocusCategoryChange}
+      focusedCategoryItemIds={focusedCategoryItemIds}
     />
   )
 }

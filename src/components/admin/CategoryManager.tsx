@@ -18,6 +18,7 @@ import {
 import type { FormConfig } from '@/lib/forms'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
+import { ACCENT_PALETTE } from '@/components/map/ResourceMapView'
 import FormEditor from './FormEditor'
 import CategoryPreview from './CategoryPreview'
 
@@ -992,6 +993,7 @@ export function CardBackgroundField({
               go: () => {},
             }}
             tint={TINTS[0]}
+            borderColor={ACCENT_PALETTE[0]}
           />
         </div>
       </div>

@@ -27,11 +27,11 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
   const isMobile = useIsMobile()
 
   return (
-    <section className="pt-12 sm:pt-16 text-center">
+    <section className="pt-12 text-center sm:mt-10 sm:rounded-3xl sm:border-2 sm:border-[#ffc145] sm:bg-[#6aaffe] sm:px-6 sm:py-16 sm:shadow-sm">
       <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 leading-tight">
         {settings.heroTitle}
       </h1>
-      <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
+      <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500 sm:text-slate-900/70">
         {settings.mission}
       </p>
       {ui.search.landing && (
@@ -64,7 +64,7 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
       {mapIcon != null && (
         <button
           onClick={onViewMap}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer sm:border-2 sm:border-[#ffc145] sm:hover:bg-[#ffc145]/10"
         >
           <span aria-hidden="true">{mapIcon}</span>
           View Map

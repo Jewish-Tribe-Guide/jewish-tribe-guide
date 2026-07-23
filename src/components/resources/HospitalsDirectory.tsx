@@ -112,7 +112,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
               <button
                 key={h.id}
                 onClick={() => onSelect(h.id)}
-                className="group w-full text-left bg-white border border-slate-200 rounded-2xl shadow-sm px-4 py-4 flex items-start gap-4 hover:border-primary hover:shadow-md transition-all cursor-pointer"
+                className="group w-full text-left bg-white border border-slate-200 rounded-2xl shadow-sm px-4 py-4 flex items-start gap-4 hover:border-primary hover:shadow-md transition-all cursor-pointer sm:border-2 sm:border-slate-300"
               >
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                   <BuildingIcon className="h-6 w-6" />

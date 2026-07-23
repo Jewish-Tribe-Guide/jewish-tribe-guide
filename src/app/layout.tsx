@@ -6,6 +6,7 @@ import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
 
+// One sans-serif everywhere — headings and body alike, no serif mixed in.
 const figtree = Figtree({ subsets: ['latin'] })
 
 // Reads the admin-edited site name/mission for the tab title and meta

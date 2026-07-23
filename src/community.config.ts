@@ -19,7 +19,7 @@
 
 export const community = {
   /** Full name — page title, header, footer, and PWA manifest. */
-  name: 'Philadelphia Jewish Community',
+  name: 'Philly Jewish Guide',
   /** Short name for the iOS/Android home-screen icon (keep it ~12 chars). */
   shortName: 'PJC',
   /** Subtitle shown under the name in the header. */
