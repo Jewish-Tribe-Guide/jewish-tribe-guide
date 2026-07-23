@@ -30,6 +30,8 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null)
   const [savedNotice, setSavedNotice] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
 
   // Preview gets its own history entry so browser/trackpad Back (and the
   // preview's own Back button, which calls closePreview) land back on this
@@ -79,6 +81,30 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d))
     setSavedNotice(false)
+  }
+
+  // Uploads the picked file to storage and drops the resulting public URL
+  // onto the draft — same as pasting a URL, so it's still batched into the
+  // normal Save changes flow rather than taking effect immediately.
+  async function uploadLogo(file: File) {
+    setLogoError(null)
+    setUploadingLogo(true)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/api/admin/site-settings/logo', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      })
+      const json = await res.json()
+      if (!res.ok || !json.ok) throw new Error(json.errors?.join(' ') || 'Upload failed.')
+      set('logoUrl', json.url as string)
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   function setSectionsAndClearNotice(next: DraftHomeSection[]) {
@@ -175,7 +201,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
             Shown under the home screen heading, and reused as the footer blurb.
           </span>
         </label>
-        <label className="block">
+        <div className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
           <div className="flex items-center gap-3">
             {draft.logoUrl?.trim() && (
@@ -184,18 +210,44 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
                 style={{ backgroundImage: `url(${draft.logoUrl})` }}
               />
             )}
+            <label className="shrink-0 text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer">
+              {uploadingLogo ? 'Uploading…' : 'Upload image'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) uploadLogo(file)
+                }}
+                disabled={uploadingLogo}
+                className="hidden"
+              />
+            </label>
+            {draft.logoUrl?.trim() && (
+              <button
+                type="button"
+                onClick={() => set('logoUrl', null)}
+                className="shrink-0 text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          {logoError && <span className="block text-[11px] text-red-600 mt-1">{logoError}</span>}
+          <label className="block mt-2">
+            <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
             <input
               value={draft.logoUrl ?? ''}
               onChange={(e) => set('logoUrl', e.target.value.trim() || null)}
               placeholder="https://…"
               className={inputClass}
             />
-          </div>
+          </label>
           <span className="block text-[11px] text-muted mt-1">
-            A pasted image URL, not an upload. Shown in the header instead of the default mark. Leave
-            blank to keep the default.
+            Shown in the header instead of the default mark. Leave blank to keep the default.
           </span>
-        </label>
+        </div>
       </div>
 
       <div className="mt-6 max-w-2xl">
