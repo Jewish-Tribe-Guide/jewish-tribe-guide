@@ -1,10 +1,14 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import NearbyList from './NearbyList'
+import NearbyList, { type ScoredPoint } from './NearbyList'
+import MapPlaceDetail from './MapPlaceDetail'
 import type { MapPoint } from './ResourceMap'
+import type { CategoryConfig } from '@/lib/categories'
+import type { DirectoryResource } from '@/types'
 
 type Snap = 'peek' | 'half' | 'full'
+type Point = MapPoint & { filterId: string; raw?: DirectoryResource }
 
 // Collapsed height (handle + one-line summary) and how much room the 'full'
 // snap leaves at the top so it never covers the floating search bar above it.
@@ -12,9 +16,13 @@ const PEEK_PX = 64
 const TOP_INSET_PX = 76
 
 type Props = {
-  points: (MapPoint & { filterId: string })[]
+  points: Point[]
   userLocation: { lat: number; lng: number } | null
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** Looked up by a selected point's filterId to render its full detail panel
+   *  — same category config the directory pages use, so fields/hours/tags
+   *  render identically. */
+  categories: CategoryConfig[]
   /** Measured px height of the map box this sheet overlays — snap points
    *  (half/full) are computed relative to it, not the viewport, since the
    *  map box itself doesn't always fill the viewport (e.g. desktop, though
@@ -31,12 +39,14 @@ type Props = {
  * Three snap points: peek (a collapsed handle + summary), half (partial
  * list, map still mostly visible), full (the list takes over). Drag ends
  * snap to whichever of the three is closest; tapping the peek handle jumps
- * straight to half.
+ * straight to half. Tapping a place shows its full details right here (see
+ * MapPlaceDetail) instead of navigating away to the category directory.
  */
-export default function MobileNearbySheet({ points, userLocation, onViewListing, containerHeight }: Props) {
+export default function MobileNearbySheet({ points, userLocation, onViewListing, categories, containerHeight }: Props) {
   const [snap, setSnap] = useState<Snap>('peek')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragRef = useRef<{ startY: number; startHeight: number; moved: boolean } | null>(null)
+  const [selected, setSelected] = useState<ScoredPoint | null>(null)
 
   const heights: Record<Snap, number> = {
     peek: PEEK_PX,
@@ -44,6 +54,11 @@ export default function MobileNearbySheet({ points, userLocation, onViewListing,
     full: Math.max(PEEK_PX, containerHeight - TOP_INSET_PX),
   }
   const currentHeight = dragHeight ?? heights[snap]
+
+  function selectPlace(point: ScoredPoint) {
+    setSelected(point)
+    setSnap('full') // give the details room, same as tapping a pin in Google Maps
+  }
 
   function onPointerDown(e: React.PointerEvent) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
@@ -76,6 +91,8 @@ export default function MobileNearbySheet({ points, userLocation, onViewListing,
     setDragHeight(null)
   }
 
+  const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
+
   return (
     <div
       className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] sm:hidden"
@@ -94,14 +111,24 @@ export default function MobileNearbySheet({ points, userLocation, onViewListing,
         aria-label={snap === 'peek' ? 'Expand nearby list' : 'Drag to resize nearby list'}
       >
         <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
-        {snap === 'peek' && (
+        {snap === 'peek' && !selected && (
           <span className="text-xs font-medium text-slate-500">
             {points.length} place{points.length !== 1 ? 's' : ''} nearby — drag up
           </span>
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} />
+        {selected && selected.raw && selectedCategory ? (
+          <MapPlaceDetail
+            item={selected.raw}
+            category={selectedCategory}
+            glyph={selected.glyph}
+            color={selected.color}
+            onBack={() => setSelected(null)}
+          />
+        ) : (
+          <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
+        )}
       </div>
     </div>
   )

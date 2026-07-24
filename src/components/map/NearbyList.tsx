@@ -4,19 +4,27 @@ import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import { directionsUrl } from '@/lib/googleMapsLinks'
 import type { MapPoint } from './ResourceMap'
+import type { DirectoryResource } from '@/types'
 
 type LatLng = { lat: number; lng: number }
-type ScoredPoint = MapPoint & { filterId: string; miles: number | null }
+type InputPoint = MapPoint & { filterId: string; raw?: DirectoryResource }
+export type ScoredPoint = InputPoint & { miles: number | null }
 
 // Hospitals are curated data — they have no directory listing to open.
 const HOSPITALS_FILTER_ID = '__hospitals__'
 
 type Props = {
-  points: (MapPoint & { filterId: string })[]
+  points: InputPoint[]
   userLocation: LatLng | null
   /** Called when the user taps a listing row — opens that listing's detail card
-   *  in the category directory. Not fired for hospitals (no directory entry). */
+   *  in the category directory. Not fired for hospitals (no directory entry).
+   *  Ignored when `onSelectPlace` is provided. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** When provided, tapping a row calls this instead of onViewListing — the
+   *  mobile map's bottom sheet uses it to show details inline over the map
+   *  instead of navigating away to the category directory. Desktop's Nearby
+   *  tab leaves this unset and keeps the normal navigate-away behavior. */
+  onSelectPlace?: (point: ScoredPoint) => void
 }
 
 function distanceLabel(miles: number): string {
@@ -25,7 +33,7 @@ function distanceLabel(miles: number): string {
   return `${(Math.round(miles * 10) / 10).toFixed(1)} mi`
 }
 
-export default function NearbyList({ points, userLocation, onViewListing }: Props) {
+export default function NearbyList({ points, userLocation, onViewListing, onSelectPlace }: Props) {
   const sorted = useMemo<ScoredPoint[]>(() => {
     const scored = points.map((p) => ({
       ...p,
@@ -52,7 +60,7 @@ export default function NearbyList({ points, userLocation, onViewListing }: Prop
       {sorted.map((p) => {
         const dest = p.address || `${p.lat},${p.lng}`
         const href = directionsUrl(dest)
-        const canViewListing = !!onViewListing && p.filterId !== HOSPITALS_FILTER_ID
+        const canViewListing = !!(onSelectPlace || onViewListing) && p.filterId !== HOSPITALS_FILTER_ID
 
         return (
           <div key={p.id} className="flex items-center gap-3 px-4 py-3.5">
@@ -67,7 +75,7 @@ export default function NearbyList({ points, userLocation, onViewListing }: Prop
 
             {/* Name + category + address — tappable when a directory exists */}
             <button
-              onClick={canViewListing ? () => onViewListing(p.filterId, p.id) : undefined}
+              onClick={canViewListing ? () => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id)) : undefined}
               disabled={!canViewListing}
               className={`min-w-0 flex-1 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
             >
