@@ -217,8 +217,17 @@ export default function Page() {
           just a flex item of body), so a flex-1 child — the mobile full-bleed
           map — can grow to fill it via flex-grow. A plain h-full percentage
           wouldn't reliably resolve here since main's own height is itself
-          only "definite" as a resolved flex value, not an explicit one. */}
-      <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pb-8">
+          only "definite" as a resolved flex value, not an explicit one.
+          Bottom padding: every other mobile screen scrolls, so pb-24 gives
+          generous clearance above the tab bar. The map screen doesn't scroll
+          — it's sized to fill exactly what's left, so that same generous
+          padding would just leave a dead gray strip between the map and the
+          tab bar. Match the tab bar's own height instead. */}
+      <main
+        className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 sm:pb-8 ${
+          mode === 'map' ? 'pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pb-24'
+        }`}
+      >
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
         {mode === 'map' && hasMap && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
         {mode === 'feedback' && (
