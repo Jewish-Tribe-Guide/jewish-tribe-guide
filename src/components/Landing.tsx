@@ -6,7 +6,7 @@ import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import CategoryList from '@/components/home/CategoryList'
 import ZmanimWidget from '@/components/home/ZmanimWidget'
-import { HOSPITALS_ID, HOSPITAL_COLOR, colorForListingCategory } from '@/components/map/ResourceMapView'
+import { HOSPITALS_ID, HOSPITAL_COLOR, colorForListingCategory, rankMapId } from '@/components/map/ResourceMapView'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -26,15 +26,15 @@ type Props = {
   coords: { lat: number; lng: number } | null
 }
 
-// Fixed display order for the map's "Browse by Category" list — requested
-// explicitly, rather than the categories' natural (alphabetical) order.
-// Medical/Eruv are singleton kinds without a stable, meaningful id to key on
-// the same way listing categories are, so they're matched by kind instead.
-const MAP_LIST_ORDER = ['synagogue', 'restaurant', 'grocery', 'medical', 'hotel', 'mikvah', 'eruv']
+// Fixed display order for the map's "Browse by Category" list — the exact
+// same order (and rank function) the map's own bottom key bar sorts by, so
+// the two never drift apart. Medical/Eruv are singleton kinds without a
+// stable, meaningful id to key on the same way listing categories are, so
+// they're matched by kind instead (medical -> HOSPITALS_ID, same id the key
+// bar and map pins use for hospitals).
 function mapListRank(c: CategoryConfig): number {
-  const key = c.kind === 'medical' ? 'medical' : c.kind === 'eruv' ? 'eruv' : c.id
-  const index = MAP_LIST_ORDER.indexOf(key)
-  return index === -1 ? MAP_LIST_ORDER.length : index
+  const key = c.kind === 'medical' ? HOSPITALS_ID : c.kind === 'eruv' ? 'eruv' : c.id
+  return rankMapId(key)
 }
 
 // The whole site is one screen: a filter box, then a grid of cards. Typing
@@ -73,21 +73,35 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   // Isolating a single facility or a whole category on the map — layered, not
   // exclusive: a facility can only be tapped from inside its (already
-  // expanded/isolated) category row, so focusing one doesn't touch the
-  // category — collapsing it (or expanding a different one) does, since
-  // whatever facility was showing is no longer visible either way.
-  // ResourceMapView itself prioritizes the single facility over the whole
-  // category whenever both are set.
+  // expanded/isolated) category row, so focusing one doesn't touch which
+  // categories are isolated — collapsing one (or expanding another) does,
+  // since whatever facility was showing is no longer visible either way.
+  // ResourceMapView itself prioritizes the single facility over whichever
+  // categories are isolated whenever both are set. Multiple categories can be
+  // expanded — and isolated together on the map — at once.
   const [focusedListingId, setFocusedListingId] = useState<string | null>(null)
-  const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null)
-  // The exact ids currently surviving the expanded category row's own filters
-  // (search/open-now/kosher/etc.) — null until that row reports its first
-  // batch, in which case the map falls back to the whole category meanwhile.
-  const [focusedCategoryItemIds, setFocusedCategoryItemIds] = useState<string[] | null>(null)
-  const focusCategory = (id: string | null) => {
-    setFocusedCategoryId(id)
+  const [focusedCategoryIds, setFocusedCategoryIds] = useState<Set<string>>(new Set())
+  // The exact ids currently surviving each expanded category row's own
+  // filters (search/open-now/kosher/etc.), keyed by that category's map id —
+  // no entry yet until that row reports its first batch, in which case the
+  // map falls back to the whole category meanwhile.
+  const [categoryItemIdsByCategory, setCategoryItemIdsByCategory] = useState<Record<string, string[]>>({})
+  // Toggles one category's membership in the isolated set (add if absent,
+  // remove if present) — this is what expanding/collapsing a row calls.
+  const toggleCategory = (id: string) => {
     setFocusedListingId(null)
-    setFocusedCategoryItemIds(null)
+    setFocusedCategoryIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setCategoryItemIdsByCategory((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
   // Scroll targets for the search box's "jump to" results below — a category
@@ -101,7 +115,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const jumpToMapCategory = (cardId: string) => {
     const found = categoriesOnMap.find((c) => (c.kind === 'medical' ? 'medical' : c.kind === 'eruv' ? 'eruv' : c.id) === cardId)
     if (!found) return
-    focusCategory(mapIdForCategoryConfig(found))
+    const mapId = mapIdForCategoryConfig(found)
+    // Only turn it on — a "jump to" result shouldn't toggle an already-open
+    // category back off.
+    if (!focusedCategoryIds.has(mapId)) toggleCategory(mapId)
     mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   const jumpToZmanim = () => {
@@ -243,9 +260,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             coords={coords}
             focusedListingId={focusedListingId}
             onFocusListingChange={setFocusedListingId}
-            focusedCategoryId={focusedCategoryId}
-            onFocusCategoryChange={focusCategory}
-            focusedCategoryItemIds={focusedCategoryItemIds}
+            focusedCategoryIds={focusedCategoryIds}
+            onFocusCategoryChange={toggleCategory}
+            categoryItemIdsByCategory={categoryItemIdsByCategory}
             sidebar={
               categoriesOnMap.length > 0 && listings ? (
                 <CategoryList
@@ -255,10 +272,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   onNavigate={onNavigate}
                   coords={coords}
                   onFocusListing={setFocusedListingId}
-                  focusedCategoryId={focusedCategoryId}
-                  onFocusCategory={focusCategory}
+                  focusedCategoryIds={focusedCategoryIds}
+                  onFocusCategory={toggleCategory}
                   colorFor={colorFor}
-                  onVisibleIdsChange={setFocusedCategoryItemIds}
+                  onVisibleIdsChange={(mapId, ids) =>
+                    setCategoryItemIdsByCategory((prev) => ({ ...prev, [mapId]: ids }))
+                  }
                 />
               ) : undefined
             }

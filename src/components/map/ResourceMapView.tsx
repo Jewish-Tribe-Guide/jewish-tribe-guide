@@ -31,6 +31,16 @@ export const ACCENT_PALETTE = ['#ffc145', '#df4c73', '#f9a66c', '#aecf80', '#3bb
 export const HOSPITAL_COLOR = '#df4c73'
 const HOSPITAL_ICON = '🏥'
 
+// Fixed display order — Synagogues, Restaurants and Bakeries, Grocery Stores,
+// Hospitals, Hotels, Mikvah, then Eruv last (no pins of its own) — shared by
+// the map's own bottom key bar (`options` below) and the home page's "Browse
+// by Category" sidebar list (Landing.tsx), so the two always agree.
+export const MAP_CATEGORY_ORDER = ['synagogue', 'restaurant', 'grocery', HOSPITALS_ID, 'hotel', 'mikvah', 'eruv']
+export function rankMapId(id: string): number {
+  const index = MAP_CATEGORY_ORDER.indexOf(id)
+  return index === -1 ? MAP_CATEGORY_ORDER.length : index
+}
+
 // Typing one of these in the search pins the open-now filter (rather than a plain
 // text term), so it's entered from the search box like every other chip.
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
@@ -87,23 +97,31 @@ type Props = {
    *  and force-zooms to it) — set when the visitor taps a facility in
    *  `sidebar`. Controlled from the parent so the same tap can also expand
    *  that facility's row in the list. Takes priority over
-   *  `focusedCategoryId` when both are set. */
+   *  `focusedCategoryIds` when both are set. */
   focusedListingId?: string | null
   onFocusListingChange?: (id: string | null) => void
-  /** A category (or `HOSPITALS_ID`) to isolate on the map — hides every other
-   *  pin and zooms to fit just this category's points. Set when the visitor
-   *  expands a category's row in `sidebar`. */
-  focusedCategoryId?: string | null
-  onFocusCategoryChange?: (id: string | null) => void
-  /** The exact point ids currently surviving the isolated category's own
-   *  filters (search/open-now/kosher/etc., applied inside `sidebar`) — when
-   *  set, narrows the isolation to just these instead of the whole category. */
-  focusedCategoryItemIds?: string[] | null
+  /** Every category (or `HOSPITALS_ID`) currently isolated on the map — hides
+   *  every other pin and zooms to fit the union of these categories' points.
+   *  Set is built up as the visitor expands multiple rows in `sidebar` at
+   *  once (multi-select), not just the single most-recent one. */
+  focusedCategoryIds?: Set<string>
+  /** Toggles one category's membership in `focusedCategoryIds` — called by
+   *  the map's own bottom key bar (a compact alternative to expanding a row
+   *  in `sidebar` just to filter that category), kept in sync with `sidebar`
+   *  since both read/write the same `focusedCategoryIds` set. */
+  onFocusCategoryChange?: (id: string) => void
+  /** The exact point ids currently surviving each isolated category's own
+   *  filters (search/open-now/kosher/etc., applied inside `sidebar`), keyed
+   *  by that category's map id — when a category has an entry here, its
+   *  isolation narrows to just these ids instead of the whole category
+   *  (falls back to the whole category meanwhile, before its row has
+   *  reported its first filtered set). */
+  categoryItemIdsByCategory?: Record<string, string[]>
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, sidebar, focusedListingId, onFocusListingChange, focusedCategoryId, onFocusCategoryChange, focusedCategoryItemIds }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, sidebar, focusedListingId, onFocusListingChange, focusedCategoryIds, onFocusCategoryChange, categoryItemIdsByCategory }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -197,7 +215,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (count === 0) continue
       opts.push({ id: c.id, label: c.pluralLabel, icon: c.icon, color: colorById.get(c.id) ?? '#64748b', count })
     }
-    return opts
+    return opts.sort((a, b) => rankMapId(a.id) - rankMapId(b.id))
   }, [allPoints, categories, colorById])
 
   // initialSelectedCategories (a full toggle set restored from history after
@@ -340,16 +358,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   // Isolating one facility (tapped in `sidebar`) overrides every other filter —
   // show exactly that pin, regardless of category/search/field filters. Isolating
-  // a whole category (a row expanded, not a facility within it) is the next
-  // priority — show every pin in that category, narrowed further to exactly
-  // `focusedCategoryItemIds` once the row has reported its own filtered set
-  // (search/open-now/kosher/etc. applied inside the sidebar), so the map
-  // always matches whatever's actually showing in the list.
+  // one or more whole categories (rows expanded, not a facility within one) is
+  // the next priority — show every pin across every selected category, each
+  // narrowed further to exactly its own entry in `categoryItemIdsByCategory`
+  // once that row has reported its own filtered set (search/open-now/kosher/
+  // etc. applied inside the sidebar), so the map always matches whatever's
+  // actually showing in the list.
   const focusedPoint = focusedListingId ? allPoints.find((p) => p.id === focusedListingId) : undefined
-  const focusedCategoryPoints = !focusedPoint && focusedCategoryId
-    ? focusedCategoryItemIds
-      ? allPoints.filter((p) => focusedCategoryItemIds.includes(p.id))
-      : allPoints.filter((p) => p.filterId === focusedCategoryId)
+  const focusedCategoryPoints = !focusedPoint && focusedCategoryIds && focusedCategoryIds.size > 0
+    ? allPoints.filter((p) => {
+        if (!focusedCategoryIds.has(p.filterId)) return false
+        const narrowed = categoryItemIdsByCategory?.[p.filterId]
+        return narrowed ? narrowed.includes(p.id) : true
+      })
     : undefined
 
   const visiblePoints = useMemo(() => {
@@ -363,7 +384,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const toggle = (id: string) => {
     onFocusListingChange?.(null)
-    onFocusCategoryChange?.(null)
     const next = new Set(effectiveSelected)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -371,12 +391,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }
   const showAll = () => {
     onFocusListingChange?.(null)
-    onFocusCategoryChange?.(null)
     setSelected(new Set(options.map((o) => o.id)))
   }
   const hideAll = () => {
     onFocusListingChange?.(null)
-    onFocusCategoryChange?.(null)
     setSelected(new Set())
   }
 
@@ -568,26 +586,57 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         <div className="min-w-0 flex-1">
           {/* ── Map view ──────────────────────────────────────────────────── */}
           {tab === 'map' && (
-            <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]">
-              {loading ? (
-                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
-                  Loading map…
+            <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145] flex flex-col">
+              <div className="min-h-0 flex-1">
+                {loading ? (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
+                    Loading map…
+                  </div>
+                ) : (
+                  <ResourceMap
+                    points={visiblePoints}
+                    userLocation={activeLocation}
+                    follow={follow}
+                    onResumeFollow={() => setFollow(true)}
+                    onViewListing={onViewListing}
+                    focusPoints={
+                      focusedPoint
+                        ? [{ lat: focusedPoint.lat, lng: focusedPoint.lng }]
+                        : focusedCategoryPoints
+                          ? focusedCategoryPoints.map((p) => ({ lat: p.lat, lng: p.lng }))
+                          : null
+                    }
+                  />
+                )}
+              </div>
+
+              {/* ── Map key — a compact filter per category, right along the
+                      bottom inside the map's own border, so filtering doesn't
+                      require expanding a row in `sidebar`. Reads/writes the
+                      exact same `focusedCategoryIds` set as `sidebar`'s own
+                      rows, so the two stay in sync in both directions. Only
+                      shown alongside `sidebar` (the home page's embedded map)
+                      — the standalone map screen has no such list to sync
+                      with; it keeps its own chip row above instead. ──────── */}
+              {!loading && sidebar && options.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 border-t-2 border-[#ffc145] bg-white px-3 py-2">
+                  {options.map((o) => {
+                    const active = !!focusedCategoryIds?.has(o.id)
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => onFocusCategoryChange?.(o.id)}
+                        style={active ? { backgroundColor: o.color, borderColor: o.color } : { borderColor: o.color }}
+                        className={`inline-flex items-center gap-1 rounded-full border-2 px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                          active ? 'text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                        {o.label}
+                      </button>
+                    )
+                  })}
                 </div>
-              ) : (
-                <ResourceMap
-                  points={visiblePoints}
-                  userLocation={activeLocation}
-                  follow={follow}
-                  onResumeFollow={() => setFollow(true)}
-                  onViewListing={onViewListing}
-                  focusPoints={
-                    focusedPoint
-                      ? [{ lat: focusedPoint.lat, lng: focusedPoint.lng }]
-                      : focusedCategoryPoints
-                        ? focusedCategoryPoints.map((p) => ({ lat: p.lat, lng: p.lng }))
-                        : null
-                  }
-                />
               )}
             </div>
           )}

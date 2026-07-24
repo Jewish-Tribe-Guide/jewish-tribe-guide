@@ -15,9 +15,9 @@ export default function HomeMap({
   sidebar,
   focusedListingId,
   onFocusListingChange,
-  focusedCategoryId,
+  focusedCategoryIds,
   onFocusCategoryChange,
-  focusedCategoryItemIds,
+  categoryItemIdsByCategory,
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
@@ -26,12 +26,16 @@ export default function HomeMap({
   /** The map point to isolate + zoom to — see ResourceMapView. */
   focusedListingId?: string | null
   onFocusListingChange?: (id: string | null) => void
-  /** The category (or hospitals) to isolate + zoom-to-fit — see ResourceMapView. */
-  focusedCategoryId?: string | null
-  onFocusCategoryChange?: (id: string | null) => void
-  /** The exact point ids surviving the isolated category's own filters —
-   *  narrows the isolation further than the whole category. */
-  focusedCategoryItemIds?: string[] | null
+  /** Every category (or hospitals) currently isolated + zoomed-to-fit
+   *  together — see ResourceMapView. */
+  focusedCategoryIds?: Set<string>
+  /** Toggles one category's membership in `focusedCategoryIds` — called by
+   *  the map's own bottom key bar, see ResourceMapView. */
+  onFocusCategoryChange?: (id: string) => void
+  /** The exact point ids surviving each isolated category's own filters,
+   *  keyed by category — narrows each one's isolation further than the
+   *  whole category. */
+  categoryItemIdsByCategory?: Record<string, string[]>
 }) {
   return (
     <ResourceMapView
@@ -43,9 +47,9 @@ export default function HomeMap({
       sidebar={sidebar}
       focusedListingId={focusedListingId}
       onFocusListingChange={onFocusListingChange}
-      focusedCategoryId={focusedCategoryId}
+      focusedCategoryIds={focusedCategoryIds}
       onFocusCategoryChange={onFocusCategoryChange}
-      focusedCategoryItemIds={focusedCategoryItemIds}
+      categoryItemIdsByCategory={categoryItemIdsByCategory}
     />
   )
 }

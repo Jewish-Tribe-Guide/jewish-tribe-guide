@@ -22,17 +22,20 @@ type Props = {
   /** Tapping a facility calls this with its map point id (or null to clear) —
    *  isolates + zooms to it on the map beside this list. */
   onFocusListing?: (mapPointId: string | null) => void
-  /** The category (or HOSPITALS_ID) currently isolated on the map — a row is
-   *  expanded exactly when its map id matches, and expanding/collapsing it
-   *  calls `onFocusCategory` instead of managing its own open state. */
-  focusedCategoryId?: string | null
-  onFocusCategory?: (id: string | null) => void
+  /** Every category (or HOSPITALS_ID) currently isolated on the map — a row is
+   *  expanded exactly when its map id is a member, and expanding/collapsing it
+   *  calls `onFocusCategory` (which toggles just that id) instead of managing
+   *  its own open state. Multiple rows can be expanded — and isolated on the
+   *  map — at once. */
+  focusedCategoryIds?: Set<string>
+  onFocusCategory?: (id: string) => void
   /** Same color as this category's pins/chip on the map — see Landing.tsx,
    *  which computes this from the exact same palette ResourceMapView uses. */
   colorFor?: (mapId: string) => string
-  /** Reports the map point ids currently surviving the expanded row's own
-   *  filters, so the map can narrow to exactly what's shown there. */
-  onVisibleIdsChange?: (ids: string[]) => void
+  /** Reports the map point ids currently surviving a row's own filters, keyed
+   *  by that row's map id, so the map can narrow each isolated category to
+   *  exactly what's shown there. */
+  onVisibleIdsChange?: (mapId: string, ids: string[]) => void
 }
 
 // The map's chip for hospitals uses a fixed id (not the category's own slug)
@@ -48,7 +51,7 @@ const mapIdFor = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITAL
  *  as toggling just its chip on the map), and narrows further as its own
  *  filters are applied; tapping an individual facility narrows the isolation
  *  down to just that one point. */
-export default function CategoryList({ categories, listings, hospitals, onNavigate, coords, onFocusListing, focusedCategoryId, onFocusCategory, colorFor, onVisibleIdsChange }: Props) {
+export default function CategoryList({ categories, listings, hospitals, onNavigate, coords, onFocusListing, focusedCategoryIds, onFocusCategory, colorFor, onVisibleIdsChange }: Props) {
   if (categories.length === 0) return null
 
   return (
@@ -56,16 +59,16 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
       {categories.map((c) => {
         const mapId = mapIdFor(c)
         const title = c.icon ? `${c.icon} ${c.pluralLabel}` : c.pluralLabel
-        const synced = focusedCategoryId !== undefined
+        const synced = focusedCategoryIds !== undefined
         const collapsibleProps = synced
-          ? { open: focusedCategoryId === mapId, onToggle: () => onFocusCategory?.(focusedCategoryId === mapId ? null : mapId) }
+          ? { open: focusedCategoryIds!.has(mapId), onToggle: () => onFocusCategory?.(mapId) }
           : {}
         const accentColor = colorFor?.(mapId)
 
         if (c.kind === 'medical') {
           return (
             <Collapsible key={c.id} title={title} accentColor={accentColor} count={hospitals.length} {...collapsibleProps}>
-              <HospitalRow hospitals={hospitals} coords={coords} onNavigate={onNavigate} onFocusListing={onFocusListing} onVisibleIdsChange={onVisibleIdsChange} />
+              <HospitalRow hospitals={hospitals} coords={coords} onNavigate={onNavigate} onFocusListing={onFocusListing} onVisibleIdsChange={(ids) => onVisibleIdsChange?.(mapId, ids)} />
             </Collapsible>
           )
         }
@@ -112,7 +115,7 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
               coords={coords}
               onNavigate={onNavigate}
               onFocusListing={onFocusListing}
-              onVisibleIdsChange={onVisibleIdsChange}
+              onVisibleIdsChange={(ids) => onVisibleIdsChange?.(mapId, ids)}
             />
           </Collapsible>
         )
