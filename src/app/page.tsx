@@ -213,7 +213,22 @@ export default function Page() {
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pb-8">
+      {/* flex + flex-col: makes main a flex container in its own right (not
+          just a flex item of body), so a flex-1 child — the mobile full-bleed
+          map — can grow to fill it via flex-grow. A plain h-full percentage
+          wouldn't reliably resolve here since main's own height is itself
+          only "definite" as a resolved flex value, not an explicit one.
+          Top/bottom padding: every other mobile screen scrolls, so pt-8/pb-24
+          give it breathing room and generous clearance above the tab bar. The
+          map screen doesn't scroll — it's sized to fill exactly what's left —
+          and wants to run flush against the header and tab bar, Google-Maps-
+          style, so it drops both paddings on mobile (search/filters float on
+          the map itself instead of sitting in that top gap). */}
+      <main
+        className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 sm:pt-8 sm:pb-8 ${
+          mode === 'map' ? 'pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pt-8 pb-24'
+        }`}
+      >
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
         {mode === 'map' && hasMap && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
         {mode === 'feedback' && (

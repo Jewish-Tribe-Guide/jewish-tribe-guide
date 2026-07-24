@@ -177,6 +177,29 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Keep the map's tile layer in sync with its container's actual size ────
+  // Google Maps snapshots its container's dimensions at init and never
+  // re-checks them — markers still reposition correctly on a resize (their
+  // placement is computed from lat/lng, not pixels), but the tile layer
+  // itself stays painted for the old size, leaving mostly-blank gray outside
+  // it. Anything that changes the container after mount (this full-bleed
+  // mobile layout swapping in, a tab switch, orientation change) needs an
+  // explicit nudge — the documented fix is triggering 'resize' and
+  // re-applying the center so Maps re-fetches tiles for the new viewport.
+  useEffect(() => {
+    const map = mapRef.current
+    const container = containerRef.current
+    if (!ready || !map || !container) return
+
+    const ro = new ResizeObserver(() => {
+      const center = map.getCenter()
+      google.maps.event.trigger(map, 'resize')
+      if (center) map.setCenter(center)
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [ready])
+
   // ── Sync category/hospital markers whenever the visible points change ─────
   useEffect(() => {
     const map = mapRef.current
@@ -274,7 +297,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
   if (!MAPS_API_KEY || authFailed) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
+      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
         The map couldn’t load. Check that the Google Maps API key is configured and the
         Maps JavaScript API is enabled.
       </div>
@@ -282,12 +305,20 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   }
 
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full rounded-2xl" />
+    // flex-1/min-h-0 (not a plain h-full percentage) all the way down to the
+    // actual map div: a percentage height only resolves against an ancestor
+    // with an explicit height, and a flex-grow-resolved height (like this
+    // component's own parent uses on the mobile full-bleed map) doesn't
+    // count — each level needs to keep passing size down via flex, or
+    // everything below silently collapses to 0 height.
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
+      <div ref={containerRef} className="w-full min-h-0 flex-1 rounded-2xl" />
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className={`absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors ${
+          // bottom-[4.75rem] on mobile clears MobileNearbySheet's peek height
+          // (64px) plus a little margin; desktop has no sheet, so bottom-3.
+          className={`absolute bottom-[4.75rem] right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:bottom-3 ${
             follow
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-white text-blue-600 hover:bg-blue-50'
