@@ -20,6 +20,15 @@ type Props = {
   coords: { lat: number; lng: number } | null
   onNavigate: NavigateFn
   onFocusListing?: (mapPointId: string | null) => void
+  /** The map point id currently isolated — e.g. tapped as a pin on the map
+   *  beside this list — so this row can expand + scroll to that card, same
+   *  as tapping it here directly would. */
+  focusedListingId?: string | null
+  /** Same color as this category's pins/chip on the map — painted on a card
+   *  when it's the one currently focused (see `focusedListingId`), so the
+   *  highlight reads as "this category, this pin" rather than a generic
+   *  selected state. */
+  accentColor?: string
   /** Reports the ids currently surviving this row's own filters (in the same
    *  order) — lets the map narrow to exactly what's shown here as filters
    *  change, instead of the whole category. */
@@ -71,7 +80,7 @@ function distinctOptions(field: CategoryField, items: DirectoryResource[]) {
 /** One category's search + sort + filters + listing cards, inline in the home
  *  page's sidebar — the same behavior as that category's own directory page
  *  (GenericDirectory), just compact and without a page navigation. */
-export default function CategoryRow({ category, items, coords, onNavigate, onFocusListing, onVisibleIdsChange }: Props) {
+export default function CategoryRow({ category, items, coords, onNavigate, onFocusListing, focusedListingId, accentColor, onVisibleIdsChange }: Props) {
   const [search, setSearch] = useState('')
   const [openNow, setOpenNow] = useState(false)
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
@@ -156,7 +165,7 @@ export default function CategoryRow({ category, items, coords, onNavigate, onFoc
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={tagField ? `Search or ${tagField.label.toLowerCase()} (e.g. cheese)…` : 'Search…'}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
         />
       )}
 
@@ -226,6 +235,9 @@ export default function CategoryRow({ category, items, coords, onNavigate, onFoc
               category={category}
               upvotes={upvotes}
               count={liveCount(item)}
+              expanded={item.id === focusedListingId}
+              highlightColor={accentColor}
+              dense
               onVote={(count) => setVoteCounts((prev) => ({ ...prev, [item.id]: count }))}
               onTagClick={(tag) => setSearch(tag)}
               onFilterOpen={() => setOpenNow(true)}

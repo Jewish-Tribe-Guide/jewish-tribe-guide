@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards, type CardDef, MAP_ACCENT_TINTS } from '@/components/home/sections'
+import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards, type CardDef } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import CategoryList from '@/components/home/CategoryList'
@@ -139,46 +139,39 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const allCards = resources ? [...entryCards, ...resources] : null
 
   // Desktop only: any category already shown in the map + "Browse by
-  // Category" list above is dropped from the grid below (it'd just be a
-  // duplicate tile) — what's left (Support/Volunteer/custom forms, plus any
-  // category that isn't on the map, e.g. WhatsApp) goes into one "Get
-  // Involved" section instead of the admin's multi-section grouping. Zmanim
-  // is dropped from the grid entirely too — it has its own live widget at the
-  // bottom of the page instead of a plain tile (see ZmanimWidget below).
-  // Mobile has no map to be redundant with, so it keeps the original combined
-  // grid (`allCards`/`filtered`/`sections`) untouched, Zmanim/Eruv tiles
-  // included. resourceCards() gives 'medical'/'eruv' fixed ids (not the DB
-  // category slug) for those two, so the id mapping below matches that.
+  // Category" list above is excluded from the "jump to" results below (it'd
+  // just be a duplicate of what expanding that row already does). Mobile has
+  // no map to be redundant with, so it keeps the original combined grid
+  // (`allCards`/`filtered`/`sections`) untouched, Zmanim/Eruv tiles included.
+  // resourceCards() gives 'medical'/'eruv' fixed ids (not the DB category
+  // slug) for those two, so the id mapping below matches that.
   const onMapCardIds = new Set(
     categoriesOnMap.map((c) => (c.kind === 'medical' ? 'medical' : c.kind === 'eruv' ? 'eruv' : c.id)),
   )
-  const offMapResources = resources?.filter((card) => !card.id || (!onMapCardIds.has(card.id) && card.id !== 'zmanim')) ?? []
-  // Not tied to any real category/form yet — placeholder tiles until there's
-  // somewhere for them to go.
-  const placeholderCards: CardDef[] = [
-    {
-      title: 'Events and Involvement Opportunities',
-      id: 'events-and-involvement-opportunities',
-      icon: '🤝',
-      keywords: ['volunteer', 'volunteering', 'community events', 'get involved'],
-      go: () => {},
-    },
-    {
-      title: 'Shul Involvement',
-      id: 'shul-involvement',
-      icon: '🕍',
-      keywords: ['synagogue involvement', 'shul committee', 'membership'],
-      go: () => {},
-    },
-  ]
-  const desktopAllCards = resources ? [...entryCards, ...offMapResources, ...placeholderCards] : null
+  // Desktop-only fixed "quick links" row, shown inside the hero band between
+  // the mission text and the search box (see HeroHeading's `quickLinks`
+  // prop) — a small fixed set in a fixed order, NOT the dynamic
+  // search-filtered grid the old "Get Connected" section used to be (that
+  // whole section/band was removed). Support/Volunteer are the same cards
+  // `entryCards` builds (same `go`/icon), just relabeled for this row;
+  // WhatsApp reuses its normal category card unchanged. Any card not found
+  // yet (e.g. `resources` still loading) is simply omitted until it is.
+  const quickLinksCards: CardDef[] = (() => {
+    const volunteer = entryCards.find((c) => c.id === 'volunteer')
+    const support = entryCards.find((c) => c.id === 'support')
+    const whatsapp = resources?.find((c) => c.id === 'whatsapp')
+    return [
+      volunteer && { ...volunteer, title: 'Volunteer Opportunities' },
+      support && { ...support, title: 'Support' },
+      { title: 'Young Professional Groups', id: 'young-professional-groups', icon: '🤝', go: () => {} },
+      whatsapp,
+    ].filter((c): c is CardDef => !!c)
+  })()
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
 
   const q = query.trim()
   const loading = !q && allCards === null
   const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q)) : allCards
-  const desktopLoading = !q && desktopAllCards === null
-  const desktopFiltered = q && desktopAllCards ? desktopAllCards.filter((c) => cardMatches(c, q)) : desktopAllCards
 
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
@@ -218,16 +211,40 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
       {/* ── Splashy site banner — logo + name + tagline, large and centered.
-              Desktop only: mobile keeps its existing compact top, untouched. ── */}
-      <section className="hidden sm:block pt-10 text-center">
-        <h1 className="text-6xl lg:text-7xl font-extrabold tracking-tighter text-slate-900">
+              Desktop only: mobile keeps its existing compact top, untouched.
+              Full-bleed sage band (same breakout as the sections below it),
+              touching the hero band directly beneath it with no gap — see
+              [[project_art_deco_home_redesign]]. ────────────────────────── */}
+      <section className="hidden sm:block pt-10 text-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
+        <h1 className="text-6xl lg:text-7xl font-extrabold tracking-tighter text-[#393535]">
           {settings.name}
         </h1>
-        <p className="mt-2 text-lg text-slate-500">{settings.tagline}</p>
+        {/* Fixed copy per explicit request, not `settings.tagline` — this
+                exact sentence replaces whatever the admin-configured tagline
+                would otherwise show here. */}
+        <p className="mt-2 text-lg text-[#393535]">
+          A Guide to Jewish Philadelphia: Community Resources for Residents, Visitors, and Hospital Patients
+        </p>
       </section>
 
-      {/* ── Heading + filter ─────────────────────────────────────────────────── */}
-      <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+      {/* ── Heading + filter, with the "Get Connected" quick-links row
+              (Volunteer Opportunities / Support / Young Professional Groups /
+              WhatsApp Groups — fixed set, fixed order) rendered inside the
+              hero band between the mission text and the search box. The old
+              standalone "Get Connected" section/band (below the map) was
+              removed entirely — this row replaces it. ────────────────────── */}
+      <HeroHeading
+        settings={settings}
+        query={query}
+        onQueryChange={setQuery}
+        quickLinks={
+          quickLinksCards.length > 0 ? (
+            <div className="sm:mx-auto sm:max-w-2xl">
+              <CardGrid cards={quickLinksCards} tints={['bg-[#fefefe] sm:group-hover:opacity-70']} borderColor="#700F0F" textColor="#000000" showIcons={false} compact oneRow />
+            </div>
+          ) : undefined
+        }
+      />
 
       {/* ── Desktop: "jump to" results — categories/Zmanim that match the search
               box's query but no longer have a tile of their own (they moved into
@@ -253,8 +270,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               a "Browse by Category" list beside it. Desktop only: mobile now
               reaches the same map via its own tab bar entry, so it's dropped
               from this scroll to avoid showing it twice. ─────────────────── */}
+      {/* Full-bleed white band (same `w-screen` + `margin-left: calc(50% -
+              50vw)` breakout as the hero above) — the map itself now goes
+              edge-to-edge with it too (no inner max-w-6xl wrapper, no
+              horizontal padding), rather than staying pinned to the page's
+              normal content column inside the color band. Its own border was
+              dropped to match (see ResourceMapView.tsx) — a border would just
+              look clipped at the browser's edge. ─────────────────────────── */}
       {hasMap && (
-        <div ref={mapSectionRef} className="mt-8 hidden sm:block scroll-mt-24">
+        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535] sm:pt-6 sm:pb-10">
           <HomeMap
             onNavigate={onNavigate}
             coords={coords}
@@ -272,6 +296,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   onNavigate={onNavigate}
                   coords={coords}
                   onFocusListing={setFocusedListingId}
+                  focusedListingId={focusedListingId}
                   focusedCategoryIds={focusedCategoryIds}
                   onFocusCategory={toggleCategory}
                   colorFor={colorFor}
@@ -284,31 +309,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           />
         </div>
       )}
-
-      {/* ── Desktop: "Get Connected" — whatever's left once the map above
-              already covers a category (Support/Volunteer/custom forms, plus
-              any category not on the map, e.g. WhatsApp/Eruv/Zmanim). Visually
-              set apart from the plain page background (tinted, bordered) so it
-              reads as its own distinct section. ─────────────────────────── */}
-      <section className="mt-8 hidden sm:block sm:rounded-3xl sm:border-2 sm:border-[#df4c73] sm:bg-[#437fc7] sm:px-6 sm:py-10">
-        {q && (desktopFiltered?.length ?? 0) === 0 && placeHits.length === 0 && hiddenFeatureMatches.length === 0 && (
-          <p className="text-center text-sm text-slate-500">
-            Nothing matches “{q}”. Try a different word or clear the filter.
-          </p>
-        )}
-        {desktopLoading ? (
-          <CardGrid cards={entryCards} loadingCount={6} />
-        ) : (
-          (desktopFiltered?.length ?? 0) > 0 && (
-            <div>
-              <h2 className="mb-6 text-center text-3xl font-extrabold uppercase tracking-wide text-slate-900">
-                Get Connected
-              </h2>
-              <CardGrid cards={desktopFiltered!} tints={MAP_ACCENT_TINTS} oneRow />
-            </div>
-          )
-        )}
-      </section>
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
               sections — untouched, since mobile has no map to be redundant
@@ -338,9 +338,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
       {/* ── Zmanim widget — live candle-lighting/Havdalah times, replacing the
               plain Zmanim tile that used to sit in the grid above. Desktop
-              only: mobile keeps its Zmanim tile in the combined grid. ────── */}
-      <div ref={zmanimSectionRef} className="mt-8 hidden sm:block scroll-mt-24">
-        <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
+              only: mobile keeps its Zmanim tile in the combined grid. Same
+              full-bleed white band treatment as the map section — no border,
+              no gap before it (touches the Get Connected band directly above
+              it) — but its content stays re-inset to the normal max-w-6xl
+              column (like the hero/Get Connected bands), since a two-column
+              list of zman times shouldn't stretch across the whole browser
+              width the way the map benefits from. ─────────────────────── */}
+      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535] sm:py-10">
+        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
+          <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
+        </div>
       </div>
     </main>
   )

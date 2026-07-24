@@ -57,15 +57,38 @@ export const MAP_ACCENT_TINTS = [
   'bg-[#6f7bc5]/70', // indigo
 ]
 
-export function Card({ card, tint, borderColor }: { card: CardDef; tint: string; borderColor: string }) {
+export function Card({
+  card,
+  tint,
+  borderColor,
+  showIcon = true,
+  compact = false,
+  textColor: textColorOverride,
+}: {
+  card: CardDef
+  tint: string
+  /** Omit (or pass `'transparent'`) for no visible border. */
+  borderColor?: string
+  /** Hide the emoji icon — e.g. the desktop "Get Connected" tiles, which
+   *  dropped their icons to fit smaller, denser text instead. */
+  showIcon?: boolean
+  /** Smaller, non-bold title text, a thinner 1px border instead of the usual
+   *  2px, and a short wide-rectangle shape instead of the usual near-square
+   *  aspect ratio — same "Get Connected"-style tiles, sized down so more can
+   *  fit per row without taking up much vertical space. */
+  compact?: boolean
+  /** Fixed title color, overriding the default dark `text-slate-900` — e.g.
+   *  the quick-links tiles once their fill went dark and needed light text. */
+  textColor?: string
+}) {
   const hasImage = !!card.cardImageUrl
-  const textColor = card.cardTextColor || '#ffffff'
+  const textColor = textColorOverride ?? card.cardTextColor ?? '#ffffff'
   return (
-    <button onClick={card.go} className="group w-full cursor-pointer">
+    <button onClick={card.go} className={`group w-full cursor-pointer ${compact ? 'h-full' : ''}`}>
       <div
-        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10 sm:ring-0 sm:border-2`}
+        className={`relative ${compact ? 'h-full py-4 px-4' : 'aspect-[4/3] p-4'} ${compact ? 'rounded-full' : 'rounded-2xl'} ${compact ? 'shadow-inner' : ''} overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10 sm:ring-0 sm:border-2`}
         style={{
-          borderColor,
+          borderColor: borderColor ?? 'transparent',
           ...(hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
         }}
       >
@@ -76,16 +99,16 @@ export function Card({ card, tint, borderColor }: { card: CardDef; tint: string;
         {/* The icon only shows on the flat-tint look — over a photo, an emoji
             (a color glyph, not a strokable outline) never reads as a clean
             icon, so photo cards go title-only instead. */}
-        {card.icon && !hasImage && (
+        {card.icon && !hasImage && showIcon && (
           <span className="relative text-3xl leading-none" aria-hidden="true">
             {card.icon}
           </span>
         )}
         <span
-          className={`relative text-[17px] font-semibold leading-snug transition-colors ${
-            hasImage ? 'drop-shadow' : 'text-slate-900 group-hover:text-primary group-active:text-primary'
+          className={`relative leading-snug transition-colors ${compact ? 'text-sm font-normal' : 'text-[17px] font-semibold'} ${
+            hasImage ? 'drop-shadow' : textColorOverride ? '' : 'text-slate-900 group-hover:text-primary group-active:text-primary'
           }`}
-          style={hasImage ? { color: textColor } : undefined}
+          style={hasImage || textColorOverride ? { color: textColor } : undefined}
         >
           {card.title}
         </span>
@@ -106,6 +129,10 @@ export function CardGrid({
   loadingCount = 0,
   tints = TINTS,
   oneRow = false,
+  borderColor,
+  showIcons = true,
+  compact = false,
+  textColor,
 }: {
   cards: CardDef[]
   loadingCount?: number
@@ -118,6 +145,18 @@ export function CardGrid({
    *  used by a grid already scoped to desktop, so it doesn't need its own
    *  sm: gating — there's no mobile render path to leak into. */
   oneRow?: boolean
+  /** Fixed border color for every card, overriding the default cycled
+   *  ACCENT_PALETTE border-per-card. Pass `'transparent'` for no visible
+   *  border at all. */
+  borderColor?: string
+  /** Hide every card's emoji icon — e.g. the desktop "Get Connected" tiles. */
+  showIcons?: boolean
+  /** Smaller, non-bold title text on every card instead of the usual 17px
+   *  semibold — same "Get Connected" tiles. */
+  compact?: boolean
+  /** Fixed title color for every card, overriding the default dark
+   *  `text-slate-900`. */
+  textColor?: string
 }) {
   const total = cards.length + loadingCount
   return (
@@ -126,7 +165,15 @@ export function CardGrid({
       style={oneRow ? { gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` } : undefined}
     >
       {cards.map((card, i) => (
-        <Card key={card.id ?? card.title} card={card} tint={tints[i % tints.length]} borderColor={ACCENT_PALETTE[i % ACCENT_PALETTE.length]} />
+        <Card
+          key={card.id ?? card.title}
+          card={card}
+          tint={tints[i % tints.length]}
+          borderColor={borderColor ?? ACCENT_PALETTE[i % ACCENT_PALETTE.length]}
+          showIcon={showIcons}
+          compact={compact}
+          textColor={textColor}
+        />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />

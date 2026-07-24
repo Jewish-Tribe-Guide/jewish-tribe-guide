@@ -22,6 +22,9 @@ type Props = {
   /** Tapping a facility calls this with its map point id (or null to clear) —
    *  isolates + zooms to it on the map beside this list. */
   onFocusListing?: (mapPointId: string | null) => void
+  /** The map point id currently isolated — e.g. tapped as a pin on the map —
+   *  so the matching row's card can expand + scroll into view here too. */
+  focusedListingId?: string | null
   /** Every category (or HOSPITALS_ID) currently isolated on the map — a row is
    *  expanded exactly when its map id is a member, and expanding/collapsing it
    *  calls `onFocusCategory` (which toggles just that id) instead of managing
@@ -51,7 +54,7 @@ const mapIdFor = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITAL
  *  as toggling just its chip on the map), and narrows further as its own
  *  filters are applied; tapping an individual facility narrows the isolation
  *  down to just that one point. */
-export default function CategoryList({ categories, listings, hospitals, onNavigate, coords, onFocusListing, focusedCategoryIds, onFocusCategory, colorFor, onVisibleIdsChange }: Props) {
+export default function CategoryList({ categories, listings, hospitals, onNavigate, coords, onFocusListing, focusedListingId, focusedCategoryIds, onFocusCategory, colorFor, onVisibleIdsChange }: Props) {
   if (categories.length === 0) return null
 
   return (
@@ -68,7 +71,7 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
         if (c.kind === 'medical') {
           return (
             <Collapsible key={c.id} title={title} accentColor={accentColor} count={hospitals.length} {...collapsibleProps}>
-              <HospitalRow hospitals={hospitals} coords={coords} onNavigate={onNavigate} onFocusListing={onFocusListing} onVisibleIdsChange={(ids) => onVisibleIdsChange?.(mapId, ids)} />
+              <HospitalRow hospitals={hospitals} coords={coords} onNavigate={onNavigate} onFocusListing={onFocusListing} focusedListingId={focusedListingId} accentColor={accentColor} onVisibleIdsChange={(ids) => onVisibleIdsChange?.(mapId, ids)} />
             </Collapsible>
           )
         }
@@ -115,6 +118,8 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
               coords={coords}
               onNavigate={onNavigate}
               onFocusListing={onFocusListing}
+              focusedListingId={focusedListingId}
+              accentColor={accentColor}
               onVisibleIdsChange={(ids) => onVisibleIdsChange?.(mapId, ids)}
             />
           </Collapsible>

@@ -28,7 +28,7 @@ export const ACCENT_PALETTE = ['#ffc145', '#df4c73', '#f9a66c', '#aecf80', '#3bb
 
 // Exported so callers coloring external UI to match the map's legend (e.g.
 // the home page's category list) use the exact same colors.
-export const HOSPITAL_COLOR = '#df4c73'
+export const HOSPITAL_COLOR = '#F08C8C'
 const HOSPITAL_ICON = '🏥'
 
 // Fixed display order — Synagogues, Restaurants and Bakeries, Grocery Stores,
@@ -48,19 +48,30 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
 // A direct, stable color per category (rather than a cycled palette index) —
 // each specific category gets an intentional, permanent color regardless of
-// display order. All drawn from ACCENT_PALETTE above except Eruv, which gets
-// its own similar-range color since it has no real map pins to match against.
-// Keyed by category id for regular listing categories; kind: 'medical'/
-// 'zmanim'/'eruv'/'map' categories aren't uniquely identified by a fixed id
-// the way listing categories are, so eruv is matched by kind instead below.
+// display order. A single-hue tint/shade ramp derived from `#EB6969`, darkest
+// (`#E85151`) to lightest (`#F8C7C7`), one step per category in
+// MAP_CATEGORY_ORDER order — reverted back to this pinker/brighter-red family
+// after a `#700F0F`-anchored darker/browner ramp read as "not pink enough."
+// Lightness varies a lot across these, so white text/
+// glyphs sitting on a solid fill of one of these colors (Collapsible row
+// headers, pin glyphs) can wash out on the paler ones — `Collapsible.tsx`
+// picks dark vs. white header text per-accentColor via a relative-luminance
+// check to handle this. Pin glyphs are NOT covered by that (still
+// unconditionally white in `ResourceMap.tsx`) — a known, separately-flagged
+// gap, not addressed here. Keyed by category id for regular listing
+// categories; kind: 'medical'/'zmanim'/'eruv'/'map' categories aren't
+// uniquely identified by a fixed id the way listing categories are, so eruv
+// is matched by kind instead below (hospitals use HOSPITAL_COLOR directly,
+// not this dict — see allPoints below).
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#6f7bc5', // indigo
-  restaurant: '#f9a66c', // warm orange
-  grocery: '#3bba9c', // teal-green
-  hotel: '#aecf80', // lime green
-  mikvah: '#ffc145', // gold
+  synagogue: '#E85151',
+  restaurant: '#EB6565',
+  grocery: '#ED7878',
+  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#F08C8C' itself.)
+  hotel: '#F3A0A0',
+  mikvah: '#F5B3B3',
 }
-const ERUV_COLOR = '#e8735a' // coral
+const ERUV_COLOR = '#F8C7C7'
 
 // Exported so external UI (the home page's category list) computes the exact
 // same color as the map's pins for a given category.
@@ -365,9 +376,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // etc. applied inside the sidebar), so the map always matches whatever's
   // actually showing in the list.
   const focusedPoint = focusedListingId ? allPoints.find((p) => p.id === focusedListingId) : undefined
-  const focusedCategoryPoints = !focusedPoint && focusedCategoryIds && focusedCategoryIds.size > 0
+  // Only isolate when at least one focused id actually has pins — Eruv (a
+  // `sidebar` row with no map presence, see Landing.tsx) can be the sole
+  // focused id, and isolating on it would filter every point out (an empty
+  // but truthy array), wrongly blanking the map instead of leaving it
+  // exactly as it was, its intended "expanding this changes nothing on the
+  // map" behavior.
+  const canIsolateCategories =
+    !focusedPoint && focusedCategoryIds && [...focusedCategoryIds].some((id) => allPoints.some((p) => p.filterId === id))
+  const focusedCategoryPoints = canIsolateCategories
     ? allPoints.filter((p) => {
-        if (!focusedCategoryIds.has(p.filterId)) return false
+        if (!focusedCategoryIds!.has(p.filterId)) return false
         const narrowed = categoryItemIdsByCategory?.[p.filterId]
         return narrowed ? narrowed.includes(p.id) : true
       })
@@ -402,26 +421,29 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   return (
     <div>
-      <UpButton label="Home" onClick={onUp} />
+      {/* Home button, title, and the Map/Nearby toggle + live-tracking bar
+              below are all standalone-page-only chrome — the home page's
+              embedded map (`sidebar` given) drops them: Home is a no-op there
+              anyway (see HomeMap.tsx), the title/subtitle just repeated what
+              the section is already visually obvious as, and live tracking
+              moves to a floating control over the map itself instead (below,
+              near `<ResourceMap`). ─────────────────────────────────────────── */}
+      {!sidebar && <UpButton label="Home" onClick={onUp} />}
 
-      {/* ── Header — full width now that the Map/Nearby toggle has moved down
-              to share a row with the live-tracking bar below. Compact on the
-              home page (a `sidebar` is given): the map is one of several
-              sections there, not the whole screen, so its label shouldn't
-              compete for space. ─────────────────────────────────────────── */}
-      <div className={sidebar ? 'mb-2' : 'mb-4'}>
-        <h1 className={sidebar ? 'text-sm font-semibold uppercase tracking-wide text-slate-500' : 'text-2xl font-bold tracking-tight text-slate-900'}>
-          Resource map
-        </h1>
-        {!sidebar && (
+      {!sidebar && (
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Resource map
+          </h1>
           <p className="mt-1 text-sm text-slate-500">
             Filter by category, then tap any pin or listing for directions.
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* ── Live tracking bar + Map/Nearby toggle (same row) ─────────────────── */}
-      {!loading && (ui.map.liveTracking || ui.map.nearbyList) && (
+      {/* ── Live tracking bar + Map/Nearby toggle (same row) — standalone map
+              screen only, see note above. ────────────────────────────────── */}
+      {!sidebar && !loading && (ui.map.liveTracking || ui.map.nearbyList) && (
         <div className="mb-4">
           <div className="flex items-center justify-between gap-3">
             {ui.map.liveTracking && (
@@ -579,15 +601,103 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Map/Nearby panel + sidebar — a flex row so the sidebar (when given)
-              top-aligns with the actual map border, not the title/chips/search
-              UI above. ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-        <div className="min-w-0 flex-1">
+      {/* ── Map/Nearby panel + sidebar — `relative` so the sidebar (when given)
+              can float on top of the map as an overlay panel on lg+ instead of
+              sharing its width, letting the map fill the full column. ──────── */}
+      <div className="relative">
+        <div>
           {/* ── Map view ──────────────────────────────────────────────────── */}
           {tab === 'map' && (
-            <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145] flex flex-col">
-              <div className="min-h-0 flex-1">
+            // No border, and square (not rounded) corners, on the home page's
+            // embedded map (`sidebar` given) — it now runs full-bleed to the
+            // browser's edges (see Landing.tsx), where a border or a curved
+            // corner would just look clipped/cut-off. The standalone /map
+            // screen keeps its own border + rounded corners, framing the
+            // whole page as a card.
+            <div
+              className={`h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 flex flex-col ${
+                sidebar ? 'sm:rounded-none sm:ring-0' : 'sm:ring-0 sm:border-2 sm:border-[#ffc145]'
+              }`}
+            >
+              <div className="relative min-h-0 flex-1">
+                {/* ── Live tracking, floated over the map's own top-left
+                        corner instead of a bar above it — home page's
+                        embedded map only (see note near the old bar above).
+                        No Map/Nearby toggle here since Nearby is dropped
+                        for the embedded map — `sidebar`'s own list already
+                        covers browsing every listing. ────────────────── */}
+                {sidebar && !loading && ui.map.liveTracking && (
+                  <div className="absolute left-3 top-3 z-10">
+                    {tracking ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-[#E85151] pl-2.5 pr-3 py-1.5 text-sm font-semibold text-white shadow-sm">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+                          </span>
+                          Live — updating as you move
+                        </span>
+                        <button
+                          onClick={stop}
+                          className="rounded-full bg-[#E85151] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
+                        >
+                          Stop tracking
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleStart}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#EB6969] px-4 py-2 text-sm font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
+                      >
+                        <span aria-hidden="true">📍</span>
+                        Start live tracking
+                      </button>
+                    )}
+                    {geoError && (
+                      <p className="mt-2 max-w-[240px] rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm">{geoError}</p>
+                    )}
+                  </div>
+                )}
+                {/* ── Map key — a compact filter per category, floated over
+                        the map's own bottom edge instead of a bar below it,
+                        so filtering doesn't require expanding a row in
+                        `sidebar`. Reads/writes the exact same
+                        `focusedCategoryIds` set as `sidebar`'s own rows, so
+                        the two stay in sync in both directions. Inset from
+                        the right at lg+ so it stops short of the floating
+                        `sidebar` panel (320px wide, plus a gap) instead of
+                        running underneath it — below lg the sidebar isn't
+                        overlaid on the map at all, so the full width is free.
+                        Only shown alongside `sidebar` (the home page's
+                        embedded map) — the standalone map screen has no such
+                        list to sync with; it keeps its own chip row above
+                        instead. ─────────────────────────────────────────── */}
+                {!loading && sidebar && options.length > 0 && (
+                  <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-1.5 lg:right-[336px]">
+                    {options.map((o) => {
+                      const active = !!focusedCategoryIds?.has(o.id)
+                      return (
+                        <button
+                          key={o.id}
+                          onClick={() => onFocusCategoryChange?.(o.id)}
+                          // Interior always stays #fefefe — only the border
+                          // carries this category's color (both active and
+                          // inactive), per an explicit "keep the inside of
+                          // the buttons at fefefe" instruction. Active is
+                          // instead signaled by a thicker border + the
+                          // category color on the text too.
+                          style={{ borderColor: o.color, color: active ? o.color : undefined }}
+                          className={`inline-flex items-center gap-1 rounded-full bg-[#fefefe]/85 px-2.5 py-1 text-xs font-medium shadow-md transition-colors cursor-pointer ${
+                            active ? 'border-[3px] font-semibold' : 'border-2 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                          {o.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 {loading ? (
                   <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
                     Loading map…
@@ -599,6 +709,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     follow={follow}
                     onResumeFollow={() => setFollow(true)}
                     onViewListing={onViewListing}
+                    square={!!sidebar}
+                    hasSidebar={!!sidebar}
+                    onMarkerClick={(p) => {
+                      // Always opens/scrolls to this facility's card in
+                      // `sidebar` too, not just the map's own info window —
+                      // expanding its category's row first if it wasn't
+                      // already (mirrors how a "jump to" search result
+                      // expands a row it isn't already in — see
+                      // jumpToMapCategory in Landing.tsx). `onFocusCategoryChange`
+                      // TOGGLES, so only call it when the row isn't already
+                      // open, or a click on an already-expanded category's
+                      // pin would collapse it instead.
+                      if (!p.filterId) return
+                      if (!focusedCategoryIds?.has(p.filterId)) onFocusCategoryChange?.(p.filterId)
+                      onFocusListingChange?.(p.id)
+                    }}
                     focusPoints={
                       focusedPoint
                         ? [{ lat: focusedPoint.lat, lng: focusedPoint.lng }]
@@ -609,35 +735,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   />
                 )}
               </div>
-
-              {/* ── Map key — a compact filter per category, right along the
-                      bottom inside the map's own border, so filtering doesn't
-                      require expanding a row in `sidebar`. Reads/writes the
-                      exact same `focusedCategoryIds` set as `sidebar`'s own
-                      rows, so the two stay in sync in both directions. Only
-                      shown alongside `sidebar` (the home page's embedded map)
-                      — the standalone map screen has no such list to sync
-                      with; it keeps its own chip row above instead. ──────── */}
-              {!loading && sidebar && options.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 border-t-2 border-[#ffc145] bg-white px-3 py-2">
-                  {options.map((o) => {
-                    const active = !!focusedCategoryIds?.has(o.id)
-                    return (
-                      <button
-                        key={o.id}
-                        onClick={() => onFocusCategoryChange?.(o.id)}
-                        style={active ? { backgroundColor: o.color, borderColor: o.color } : { borderColor: o.color }}
-                        className={`inline-flex items-center gap-1 rounded-full border-2 px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                          active ? 'text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {o.icon && <span aria-hidden="true">{o.icon}</span>}
-                        {o.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
             </div>
           )}
 
@@ -668,7 +765,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
 
         {sidebar && (
-          <div className="w-full shrink-0 lg:w-80 lg:sticky lg:top-4">
+          // Below lg: a normal block underneath the map, full width. lg+: an
+          // overlay panel floating on top of the map's right edge (absolute,
+          // out of flow — the map above no longer shares its width with it),
+          // inset from the map's own border on all sides (top/right/bottom),
+          // so its bottom edge lines up with the map card's own bottom border
+          // — the map key (above) is a floating overlay now too, not a
+          // separate bar eating into the map's height, so there's no longer
+          // anything else to dodge vertically here. The key row instead stays
+          // clear of this panel horizontally (`lg:right-[336px]` on the key,
+          // matching this panel's own width + gap). Scrolls internally, with
+          // an opaque card treatment (background/border/shadow) so it reads
+          // clearly over the map tiles beneath it.
+          <div className="mt-6 w-full lg:absolute lg:top-4 lg:right-4 lg:bottom-4 lg:z-10 lg:mt-0 lg:w-80 lg:overflow-y-auto lg:rounded-2xl lg:border-2 lg:border-[#700F0F]/50 lg:bg-[#fefefe]/75 lg:p-3 lg:shadow-xl">
             {sidebar}
           </div>
         )}

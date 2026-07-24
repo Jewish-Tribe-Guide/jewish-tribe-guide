@@ -48,7 +48,12 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
   }, [coords?.lat, coords?.lng])
 
   return (
-    <div className="rounded-2xl border-2 border-[#ffc145] bg-white p-5">
+    // Bordered again — the Zmanim band behind it is now #56a8ef (blue) while
+    // this card stays #fefefe (white), and the border marks the boundary
+    // between the two explicitly rather than relying on the color contrast
+    // alone. Only ever rendered inside Landing.tsx's desktop-only Zmanim
+    // band, so this border never shows up anywhere else.
+    <div className="rounded-2xl border-2 border-[#700F0F] bg-[#FEFEFE] p-5">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
         <span className="text-xs text-muted">{coords ? locationLabel : community.region}</span>

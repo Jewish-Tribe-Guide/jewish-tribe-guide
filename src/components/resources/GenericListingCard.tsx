@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
@@ -49,6 +49,9 @@ export function GenericListingCard({
   upvotes,
   count,
   defaultExpanded,
+  expanded: expandedProp,
+  highlightColor,
+  dense = false,
   onVote,
   onTagClick,
   onFilterOpen,
@@ -63,6 +66,21 @@ export function GenericListingCard({
   upvotes: boolean
   count: number
   defaultExpanded?: boolean
+  /** Controlled mode: the parent owns open/closed state (e.g. syncing a
+   *  facility tapped on the home page's map to its card in the sidebar list)
+   *  instead of this card tracking it internally. Omit to keep the card
+   *  uncontrolled (its usual behavior). */
+  expanded?: boolean
+  /** This category's pin/chip color on the map — painted on the card as its
+   *  highlight when `expanded` is controlled true, so the highlight matches
+   *  the category it's in rather than one fixed color for every category. */
+  highlightColor?: string
+  /** Smaller text/padding throughout — the home page's map sidebar list
+   *  (via `CategoryRow.tsx`) uses this since a full column of these cards
+   *  reads as overwhelming at the normal directory-page size. Defaults to
+   *  the original size everywhere else (the standalone directory, Places
+   *  search results). */
+  dense?: boolean
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
@@ -78,16 +96,26 @@ export function GenericListingCard({
    *  page's map can isolate + zoom to whatever facility just expanded). */
   onExpandedChange?: (expanded: boolean) => void
 }) {
-  const [expanded, setExpanded] = useState(!!defaultExpanded)
+  const [internalExpanded, setInternalExpanded] = useState(!!defaultExpanded)
+  const isControlled = expandedProp !== undefined
+  const expanded = isControlled ? expandedProp : internalExpanded
   // Two plain statements, not a functional setExpanded(p => ...) updater —
   // calling onExpandedChange (which sets state in a different component)
   // from inside an updater fires during React's render phase and throws.
   const toggleExpanded = () => {
     const next = !expanded
-    setExpanded(next)
+    if (!isControlled) setInternalExpanded(next)
     onExpandedChange?.(next)
   }
   const isMobile = useIsMobile()
+  // Scrolls this card into view whenever it opens — covers the controlled
+  // case (a map pin tapped while this facility's card was off-screen in the
+  // sidebar list) as well as a manual tap, where it's a no-op since the card
+  // is already in view.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (expanded) rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [expanded])
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -163,25 +191,49 @@ export function GenericListingCard({
     ? shortAddress(item.address!)
     : (item.googleDescription as string | undefined) || null
 
+  // Controlled + expanded means an outside trigger (a map pin, most notably)
+  // put this card in focus — highlighted in that category's own pin/chip
+  // color (falling back to the app's general "#df4c73" selected-accent if a
+  // color wasn't passed) so a visitor arriving from a pin tap can find it
+  // here, and so it's this category's own color, not one fixed color for
+  // every category. Colors are per-listing data, unknown at build time, so
+  // Tailwind can't generate arbitrary-value classes for them — inline style
+  // (via color-mix) is the only way to apply them.
+  const highlighted = isControlled && expanded
+  const highlightHex = highlightColor ?? '#df4c73'
+
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
     // collapsed card. Corners stay clean because the header and expanded panel
     // round their own edges below.
-    <div className="border border-slate-200 rounded-lg bg-white shadow-sm sm:border-2 sm:border-slate-300 sm:shadow-none">
+    <div
+      ref={rootRef}
+      style={
+        highlighted
+          ? { borderColor: highlightHex, boxShadow: `0 0 0 2px color-mix(in srgb, ${highlightHex} 30%, transparent)` }
+          : undefined
+      }
+      className={`rounded-lg bg-white shadow-sm sm:shadow-none ${
+        highlighted ? 'border-2' : 'border border-slate-200 sm:border-2 sm:border-slate-300'
+      }`}
+    >
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
         onClick={toggleExpanded}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded() } }}
-        className={`w-full flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
+        style={highlighted ? { backgroundColor: `color-mix(in srgb, ${highlightHex} 6%, white)` } : undefined}
+        className={`w-full flex items-center justify-between gap-3 transition-colors cursor-pointer ${dense ? 'px-3 py-2.5' : 'px-4 py-4'} ${
+          highlighted ? '' : 'hover:bg-slate-50 active:bg-slate-100'
+        } ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches).
             On mobile the name sits on its own line with the chips on a row below
             so it never gets crowded; on desktop they share a line. */}
         <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-          <span className="min-w-0 font-semibold text-slate-900">{item.name}</span>
+          <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-sm' : ''}`}>{item.name}</span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           {isOpen && (closing?.closesSoon ? (
             <span className="relative group/tip">
@@ -244,7 +296,7 @@ export function GenericListingCard({
             </span>
           ))}
           {hiddenTagCount > 0 && (
-            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); setExpanded(true); onExpandedChange?.(true) }} title="Show all tags">
+            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); if (!isControlled) setInternalExpanded(true); onExpandedChange?.(true) }} title="Show all tags">
               +{hiddenTagCount}
             </Chip>
           )}
@@ -254,7 +306,7 @@ export function GenericListingCard({
             // Hidden on mobile to keep collapsed cards uncluttered — distance shows
             // on the right once a location is set, and the full address is one tap
             // away in the expanded panel. Still shown on desktop where there's room.
-            <p className="hidden sm:block text-sm text-muted truncate">{subtitle}</p>
+            <p className={`hidden sm:block text-muted truncate ${dense ? 'text-xs' : 'text-sm'}`}>{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -305,7 +357,7 @@ export function GenericListingCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
+        <div className={`border-t border-slate-100 space-y-3 bg-slate-50 rounded-b-lg ${dense ? 'px-3 py-3' : 'px-4 py-4'}`}>
           {/* Full tag list — only when the collapsed header capped it (mobile). */}
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -344,7 +396,7 @@ export function GenericListingCard({
 
           {showAddress && (
             <div>
-              <p className="text-sm text-slate-800">{item.address}</p>
+              <p className={`text-slate-800 ${dense ? 'text-xs' : 'text-sm'}`}>{item.address}</p>
               <a
                 href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
                 target="_blank" rel="noopener noreferrer"
@@ -357,7 +409,7 @@ export function GenericListingCard({
 
           {showPhone && (
             <div>
-              <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
+              <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className={`text-primary hover:underline ${dense ? 'text-xs' : 'text-sm'}`}>
                 {item.phone}
               </a>
               {item.placeId && !anyHoursVal && (
@@ -370,7 +422,7 @@ export function GenericListingCard({
             const v = display(item[f.key])
             if (!v) return null
             return (
-              <p key={f.key} className="text-sm text-slate-700">
+              <p key={f.key} className={`text-slate-700 ${dense ? 'text-xs' : 'text-sm'}`}>
                 {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
                 {v}
               </p>

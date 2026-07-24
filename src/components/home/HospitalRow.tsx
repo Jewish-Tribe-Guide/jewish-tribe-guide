@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Hospital, NavigateFn } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import { ACCENT_PALETTE } from '@/components/map/ResourceMapView'
@@ -10,6 +10,12 @@ type Props = {
   coords: { lat: number; lng: number } | null
   onNavigate: NavigateFn
   onFocusListing?: (mapPointId: string | null) => void
+  /** The map point id currently isolated — e.g. tapped as a pin on the map —
+   *  so the matching hospital button here can highlight + scroll into view. */
+  focusedListingId?: string | null
+  /** Hospitals' own pin/chip color on the map — painted on the focused
+   *  button's highlight, same as CategoryRow does for listing categories. */
+  accentColor?: string
   /** Reports the map point ids currently surviving this row's own filters —
    *  lets the map narrow to exactly what's shown here as filters change. */
   onVisibleIdsChange?: (ids: string[]) => void
@@ -48,10 +54,54 @@ function ToggleButton({
   )
 }
 
+// One hospital row — highlights and scrolls into view when it's the facility
+// currently isolated on the map beside this list (e.g. a pin was just
+// tapped), same as a tapped facility card does in CategoryRow.
+function HospitalButton({
+  hospital: h,
+  focused,
+  borderColor,
+  accentColor,
+  onClick,
+}: {
+  hospital: Hospital & { miles: number | null }
+  focused: boolean
+  borderColor: string
+  /** Hospitals' own pin/chip color — used for the focused highlight instead
+   *  of `borderColor` (which just cycles the general accent palette). Falls
+   *  back to the app's general "#df4c73" selected-accent if not passed. */
+  accentColor?: string
+  onClick: () => void
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [focused])
+  const highlightHex = accentColor ?? '#df4c73'
+
+  return (
+    <button
+      ref={ref}
+      onClick={onClick}
+      style={
+        focused
+          ? { borderColor: highlightHex, backgroundColor: `color-mix(in srgb, ${highlightHex} 10%, white)` }
+          : { borderColor }
+      }
+      className="w-full flex items-center justify-between gap-3 rounded-lg border-2 bg-white px-2.5 py-2 text-left text-xs font-medium text-slate-900 transition-colors cursor-pointer"
+    >
+      <span>{h.name}</span>
+      {h.miles != null && (
+        <span className="shrink-0 text-[11px] font-medium text-slate-500">📍 {h.miles} mi</span>
+      )}
+    </button>
+  )
+}
+
 /** The Hospital category's search + filters + list, inline in the home page's
  *  sidebar — mirrors HospitalsDirectory's own badges (Chaplain/Bikkur
  *  Cholim/Prayer space/Kosher & Shabbos), turned into real filter toggles. */
-export default function HospitalRow({ hospitals, coords, onNavigate, onFocusListing, onVisibleIdsChange }: Props) {
+export default function HospitalRow({ hospitals, coords, onNavigate, onFocusListing, focusedListingId, accentColor, onVisibleIdsChange }: Props) {
   const [search, setSearch] = useState('')
   const [active, setActive] = useState<Set<FilterKey>>(new Set())
 
@@ -95,7 +145,7 @@ export default function HospitalRow({ hospitals, coords, onNavigate, onFocusList
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search hospitals…"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
       />
 
       <div className="flex flex-wrap gap-1.5">
@@ -111,17 +161,14 @@ export default function HospitalRow({ hospitals, coords, onNavigate, onFocusList
       ) : (
         <div className="space-y-2">
           {filtered.map((h, i) => (
-            <button
+            <HospitalButton
               key={h.id}
+              hospital={h}
+              focused={focusedListingId === `hospital:${h.id}`}
+              borderColor={ACCENT_PALETTE[i % ACCENT_PALETTE.length]}
+              accentColor={accentColor}
               onClick={() => onFocusListing?.(`hospital:${h.id}`)}
-              style={{ borderColor: ACCENT_PALETTE[i % ACCENT_PALETTE.length] }}
-              className="w-full flex items-center justify-between gap-3 rounded-lg border-2 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-900 transition-colors cursor-pointer"
-            >
-              <span>{h.name}</span>
-              {h.miles != null && (
-                <span className="shrink-0 text-xs font-medium text-slate-500">📍 {h.miles} mi</span>
-              )}
-            </button>
+            />
           ))}
         </div>
       )}

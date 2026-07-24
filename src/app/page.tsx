@@ -162,7 +162,9 @@ export default function Page() {
   if (mode === 'home' || mode === 'community-home') {
     return (
       <>
-        <SiteHeader onGoHome={goToLanding} location={locationControls} />
+        <div className="sm:hidden">
+          <SiteHeader onGoHome={goToLanding} location={locationControls} />
+        </div>
         <div className="flex-1">
           <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
         </div>
@@ -212,7 +214,9 @@ export default function Page() {
 
   return (
     <>
-      <SiteHeader onGoHome={goToLanding} location={locationControls} />
+      <div className="sm:hidden">
+        <SiteHeader onGoHome={goToLanding} location={locationControls} />
+      </div>
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pb-8">
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
         {mode === 'map' && hasMap && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
