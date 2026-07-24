@@ -5,12 +5,13 @@ import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import NearbyList from './NearbyList'
-import MobileNearbySheet from './MobileNearbySheet'
+import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
@@ -88,6 +89,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+  // Tapping a marker on mobile should raise the bottom sheet's place detail
+  // (Google-Maps-app-style) instead of opening the small info-window bubble
+  // ResourceMap shows by default — desktop keeps that default.
+  const isMobile = useIsMobile()
+  const nearbySheetRef = useRef<MobileNearbySheetHandle>(null)
   // follow = map pans with every GPS tick. Turns off automatically when the
   // user manually drags the map (we detect this via the Re-center button press,
   // which flips it back on).
@@ -542,6 +548,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 follow={follow}
                 onResumeFollow={() => setFollow(true)}
                 onViewListing={onViewListing}
+                onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -631,6 +638,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       MobileNearbySheet for the peek/half/full snap points. ── */}
               {ui.map.nearbyList && (
                 <MobileNearbySheet
+                  ref={nearbySheetRef}
                   points={visiblePoints}
                   userLocation={activeLocation}
                   onViewListing={onViewListing}
