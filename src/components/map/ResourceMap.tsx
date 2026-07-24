@@ -316,7 +316,9 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className={`absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors ${
+          // bottom-[4.75rem] on mobile clears MobileNearbySheet's peek height
+          // (64px) plus a little margin; desktop has no sheet, so bottom-3.
+          className={`absolute bottom-[4.75rem] right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:bottom-3 ${
             follow
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-white text-blue-600 hover:bg-blue-50'

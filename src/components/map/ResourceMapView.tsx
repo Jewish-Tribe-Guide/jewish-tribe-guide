@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import NearbyList from './NearbyList'
+import MobileNearbySheet from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
@@ -75,6 +76,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // Mobile only — the category chip row moves behind this sheet (see the
   // "Filters" button) so the floating search bar over the map stays compact.
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  // Measured px height of the map box — the draggable mobile nearby sheet
+  // computes its half/full snap points from this rather than the viewport,
+  // since the box itself doesn't always fill the viewport.
+  const mapBoxRef = useRef<HTMLDivElement>(null)
+  const [mapBoxHeight, setMapBoxHeight] = useState(0)
+  useEffect(() => {
+    const el = mapBoxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setMapBoxHeight(entry.contentRect.height))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   // follow = map pans with every GPS tick. Turns off automatically when the
   // user manually drags the map (we detect this via the Re-center button press,
   // which flips it back on).
@@ -513,7 +526,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               below), same as Google Maps. Desktop keeps the boxed 70vh card
               with search/filters above it in normal flow. ────────────────── */}
       {tab === 'map' && (
-        <div className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+        <div
+          ref={mapBoxRef}
+          className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5"
+        >
           {loading ? (
             <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
               Loading map…
@@ -589,11 +605,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   (bottom-right) takes over automatically once activeLocation
                   is set, so this only needs to cover the "not started yet"
                   state and the explicit stop action. */}
+              {/* bottom-[4.75rem]: clears MobileNearbySheet's peek height
+                  (64px) + margin, same offset as ResourceMap's own re-center
+                  pill uses once tracking is active. */}
               {ui.map.liveTracking && !activeLocation && (
                 <button
                   onClick={handleStart}
                   aria-label="Start live tracking"
-                  className="absolute bottom-3 right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+                  className="absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
                 >
                   <span aria-hidden="true">📍</span>
                 </button>
@@ -601,10 +620,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               {ui.map.liveTracking && tracking && (
                 <button
                   onClick={stop}
-                  className="absolute bottom-16 right-3 z-10 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+                  className="absolute bottom-36 right-3 z-10 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
                 >
                   Stop tracking
                 </button>
+              )}
+
+              {/* ── Mobile nearby list — a draggable bottom sheet over the
+                      map instead of the desktop Map/Nearby toggle; see
+                      MobileNearbySheet for the peek/half/full snap points. ── */}
+              {ui.map.nearbyList && (
+                <MobileNearbySheet
+                  points={visiblePoints}
+                  userLocation={activeLocation}
+                  onViewListing={onViewListing}
+                  containerHeight={mapBoxHeight}
+                />
               )}
             </>
           )}
