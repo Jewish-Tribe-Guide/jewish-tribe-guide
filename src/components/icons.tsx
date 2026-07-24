@@ -135,3 +135,31 @@ export function SlidersIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Left chevron — the map place-detail panel's "Back to list" control.
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
+// Handset — phone number rows on the map place-detail panel.
+export function PhoneIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4.5 4h3.5l1.5 4.5-2 1.5a12 12 0 0 0 5.5 5.5l1.5-2 4.5 1.5v3.5c0 1-.9 1.8-1.9 1.7A17.5 17.5 0 0 1 3.3 5.9c-.1-1 .7-1.9 1.7-1.9z" />
+    </svg>
+  )
+}
+
+// Turn arrow — the map place-detail panel's "Directions" action button.
+export function DirectionsIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M9 18l6-6-6-6" />
+      <path d="M4 21v-6a3 3 0 0 1 3-3h8" />
+    </svg>
+  )
+}

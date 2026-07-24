@@ -634,6 +634,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   points={visiblePoints}
                   userLocation={activeLocation}
                   onViewListing={onViewListing}
+                  categories={categories ?? []}
                   containerHeight={mapBoxHeight}
                 />
               )}
