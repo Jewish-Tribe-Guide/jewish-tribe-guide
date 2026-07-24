@@ -297,7 +297,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
   if (!MAPS_API_KEY || authFailed) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
+      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
         The map couldn’t load. Check that the Google Maps API key is configured and the
         Maps JavaScript API is enabled.
       </div>
@@ -305,8 +305,14 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   }
 
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full rounded-2xl" />
+    // flex-1/min-h-0 (not a plain h-full percentage) all the way down to the
+    // actual map div: a percentage height only resolves against an ancestor
+    // with an explicit height, and a flex-grow-resolved height (like this
+    // component's own parent uses on the mobile full-bleed map) doesn't
+    // count — each level needs to keep passing size down via flex, or
+    // everything below silently collapses to 0 height.
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
+      <div ref={containerRef} className="w-full min-h-0 flex-1 rounded-2xl" />
       {ready && userLocation && (
         <button
           onClick={centerOnMe}

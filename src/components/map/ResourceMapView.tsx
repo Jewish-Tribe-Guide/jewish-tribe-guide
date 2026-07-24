@@ -369,23 +369,33 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const hiddenCategoryCount = options.length - effectiveSelected.size
 
   return (
-    <div>
-      <UpButton label="Home" onClick={onUp} />
+    // Mobile: a flex column that grows to fill <main> (itself a flex column —
+    // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
+    // everything between the site header and the tab bar with no guessed
+    // pixel height. Desktop cancels all of this back to plain block flow,
+    // unaffected. ─────────────────────────────────────────────────────────
+    <div className="flex flex-1 min-h-0 flex-col sm:flex-none sm:block">
+      <div className="hidden sm:block">
+        <UpButton label="Home" onClick={onUp} />
+      </div>
 
-      {/* ── Header — full width now that the Map/Nearby toggle has moved down
-              to share a row with the live-tracking bar below. ─────────────── */}
-      <div className="mb-4">
+      {/* ── Header — desktop only. Google Maps doesn't caption its own map,
+              and the mobile tab bar already says "Map" — this text just ate
+              space better spent on the map. ────────────────────────────── */}
+      <div className="mb-4 hidden sm:block">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource map</h1>
         <p className="mt-1 text-sm text-slate-500">
           Filter by category, then tap any pin or listing for directions.
         </p>
       </div>
 
-      {/* ── Live tracking bar + Map/Nearby toggle (same row). The live-tracking
-              piece is desktop only — on mobile a FAB on the map itself handles
-              start/stop/re-center instead (see the map box below). ─────────── */}
+      {/* ── Live tracking bar + Map/Nearby toggle (same row) — desktop only.
+              On mobile: live-tracking is a FAB on the map itself (see the map
+              box below), and the Nearby list — which Google Maps doesn't
+              surface as its own toggle either — is off the table for now,
+              pending the bottom-sheet redesign that'll bring it back. ────── */}
       {!loading && (ui.map.liveTracking || ui.map.nearbyList) && (
-        <div className="mb-4">
+        <div className="mb-4 hidden sm:block">
           <div className="flex items-center justify-between gap-3">
             {ui.map.liveTracking && (
               <div className="hidden sm:block">
@@ -500,7 +510,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               category chips tucked behind a "Filters" button (opens the sheet
               below) so this row stays compact over the map. ─────────────────── */}
       {!loading && ui.search.map && (
-        <div className="mb-3 sm:hidden">
+        <div className="mb-3 shrink-0 sm:hidden">
           <div className="flex items-center gap-2">
             <div className="flex flex-1 items-center rounded-full border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
               <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
@@ -546,17 +556,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       )}
 
       {/* ── Map view. Mobile: full-bleed (breaks out of the page's max-width/
-              padding) and taller, with a start-tracking FAB in the corner —
-              closer to how a native maps app fills the screen. Desktop keeps
-              the boxed 70vh card. ────────────────────────────────────────── */}
+              padding) and fills the rest of the flex column (flex-1) between
+              the search bar above and the tab bar below — no guessed height,
+              it just takes whatever's left, edge to edge. Desktop keeps the
+              boxed 70vh card. ───────────────────────────────────────────── */}
       {tab === 'map' && (
         <>
           {ui.map.liveTracking && geoError && (
-            <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:hidden">{geoError}</p>
+            <p className="mb-2 shrink-0 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:hidden">{geoError}</p>
           )}
-          <div className="relative left-1/2 h-[calc(100dvh-19rem)] min-h-[440px] w-screen -translate-x-1/2 overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+          <div className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
             {loading ? (
-              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
+              <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
                 Loading map…
               </div>
             ) : (
