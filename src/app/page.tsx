@@ -218,14 +218,15 @@ export default function Page() {
           map — can grow to fill it via flex-grow. A plain h-full percentage
           wouldn't reliably resolve here since main's own height is itself
           only "definite" as a resolved flex value, not an explicit one.
-          Bottom padding: every other mobile screen scrolls, so pb-24 gives
-          generous clearance above the tab bar. The map screen doesn't scroll
-          — it's sized to fill exactly what's left, so that same generous
-          padding would just leave a dead gray strip between the map and the
-          tab bar. Match the tab bar's own height instead. */}
+          Top/bottom padding: every other mobile screen scrolls, so pt-8/pb-24
+          give it breathing room and generous clearance above the tab bar. The
+          map screen doesn't scroll — it's sized to fill exactly what's left —
+          and wants to run flush against the header and tab bar, Google-Maps-
+          style, so it drops both paddings on mobile (search/filters float on
+          the map itself instead of sitting in that top gap). */}
       <main
-        className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 sm:pb-8 ${
-          mode === 'map' ? 'pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pb-24'
+        className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 sm:pt-8 sm:pb-8 ${
+          mode === 'map' ? 'pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pt-8 pb-24'
         }`}
       >
         {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}

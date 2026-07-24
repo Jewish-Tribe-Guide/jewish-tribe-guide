@@ -506,104 +506,109 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Search + filters (mobile) — a floating pill search box with the
-              category chips tucked behind a "Filters" button (opens the sheet
-              below) so this row stays compact over the map. ─────────────────── */}
-      {!loading && ui.search.map && (
-        <div className="mb-3 shrink-0 sm:hidden">
-          <div className="flex items-center gap-2">
-            <div className="flex flex-1 items-center rounded-full border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm">
-              <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-              </svg>
-              <input
-                type="text"
-                placeholder={terms.length ? 'Add another term…' : "Search name, address, 'open now'…"}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addTerm(input)
-                  } else if (e.key === 'Backspace' && !input && terms.length) {
-                    removeTerm(terms[terms.length - 1])
-                  }
-                }}
-                className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
-              />
-            </div>
-            {options.length > 0 && (
-              <button
-                onClick={() => setFilterSheetOpen(true)}
-                aria-label="Filter categories"
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm cursor-pointer"
-              >
-                <SlidersIcon className="h-[1.125rem] w-[1.125rem]" />
-                {hiddenCategoryCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
-                    {hiddenCategoryCount}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-          {chipsRow}
-          <p className="mt-1.5 text-xs text-muted">
-            {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
-            {(activeTerms.length > 0 || filterChips.length > 0) && ' · filtered'}
-          </p>
-        </div>
-      )}
-
       {/* ── Map view. Mobile: full-bleed (breaks out of the page's max-width/
-              padding) and fills the rest of the flex column (flex-1) between
-              the search bar above and the tab bar below — no guessed height,
-              it just takes whatever's left, edge to edge. Desktop keeps the
-              boxed 70vh card. ───────────────────────────────────────────── */}
+              padding) and fills the rest of the flex column (flex-1) —
+              genuinely edge to edge, right up to the header, since search/
+              filters now float ON the map instead of pushing it down (see
+              below), same as Google Maps. Desktop keeps the boxed 70vh card
+              with search/filters above it in normal flow. ────────────────── */}
       {tab === 'map' && (
-        <>
-          {ui.map.liveTracking && geoError && (
-            <p className="mb-2 shrink-0 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:hidden">{geoError}</p>
+        <div className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+          {loading ? (
+            <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
+              Loading map…
+            </div>
+          ) : (
+            <>
+              <ResourceMap
+                points={visiblePoints}
+                userLocation={activeLocation}
+                follow={follow}
+                onResumeFollow={() => setFollow(true)}
+                onViewListing={onViewListing}
+              />
+
+              {/* ── Floating search + filters (mobile) — laid directly over the
+                      map, Google-Maps-style, instead of pushing it down. Category
+                      chips tuck behind the "Filters" button (opens the sheet
+                      below) so this stays a single compact row. ───────────────── */}
+              {ui.search.map && (
+                <div
+                  className="absolute inset-x-0 top-0 z-10 px-3 pb-2 sm:hidden"
+                  style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-1 items-center rounded-full bg-white px-3.5 py-2.5 shadow-lg">
+                      <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder={terms.length ? 'Add another term…' : "Search name, address, 'open now'…"}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addTerm(input)
+                          } else if (e.key === 'Backspace' && !input && terms.length) {
+                            removeTerm(terms[terms.length - 1])
+                          }
+                        }}
+                        className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                      />
+                    </div>
+                    {options.length > 0 && (
+                      <button
+                        onClick={() => setFilterSheetOpen(true)}
+                        aria-label="Filter categories"
+                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg cursor-pointer"
+                      >
+                        <SlidersIcon className="h-[1.125rem] w-[1.125rem]" />
+                        {hiddenCategoryCount > 0 && (
+                          <span className="absolute -top-1 -right-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
+                            {hiddenCategoryCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {chipsRow}
+                  {(activeTerms.length > 0 || filterChips.length > 0) && (
+                    <p className="mt-1.5 inline-block rounded-full bg-white/90 px-2.5 py-1 text-xs text-muted shadow">
+                      {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown · filtered
+                    </p>
+                  )}
+                  {ui.map.liveTracking && geoError && (
+                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-lg">{geoError}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Mobile-only tracking FAB — ResourceMap's own re-center pill
+                  (bottom-right) takes over automatically once activeLocation
+                  is set, so this only needs to cover the "not started yet"
+                  state and the explicit stop action. */}
+              {ui.map.liveTracking && !activeLocation && (
+                <button
+                  onClick={handleStart}
+                  aria-label="Start live tracking"
+                  className="absolute bottom-3 right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+                >
+                  <span aria-hidden="true">📍</span>
+                </button>
+              )}
+              {ui.map.liveTracking && tracking && (
+                <button
+                  onClick={stop}
+                  className="absolute bottom-16 right-3 z-10 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+                >
+                  Stop tracking
+                </button>
+              )}
+            </>
           )}
-          <div className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
-            {loading ? (
-              <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
-                Loading map…
-              </div>
-            ) : (
-              <>
-                <ResourceMap
-                  points={visiblePoints}
-                  userLocation={activeLocation}
-                  follow={follow}
-                  onResumeFollow={() => setFollow(true)}
-                  onViewListing={onViewListing}
-                />
-                {/* Mobile-only tracking FAB — ResourceMap's own re-center pill
-                    (bottom-right) takes over automatically once activeLocation
-                    is set, so this only needs to cover the "not started yet"
-                    state and the explicit stop action. */}
-                {ui.map.liveTracking && !activeLocation && (
-                  <button
-                    onClick={handleStart}
-                    aria-label="Start live tracking"
-                    className="absolute bottom-3 right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
-                  >
-                    <span aria-hidden="true">📍</span>
-                  </button>
-                )}
-                {ui.map.liveTracking && tracking && (
-                  <button
-                    onClick={stop}
-                    className="absolute bottom-16 right-3 z-10 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
-                  >
-                    Stop tracking
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </>
+        </div>
       )}
 
       {/* ── Nearby list view ─────────────────────────────────────────────────── */}
