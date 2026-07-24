@@ -177,6 +177,29 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Keep the map's tile layer in sync with its container's actual size ────
+  // Google Maps snapshots its container's dimensions at init and never
+  // re-checks them — markers still reposition correctly on a resize (their
+  // placement is computed from lat/lng, not pixels), but the tile layer
+  // itself stays painted for the old size, leaving mostly-blank gray outside
+  // it. Anything that changes the container after mount (this full-bleed
+  // mobile layout swapping in, a tab switch, orientation change) needs an
+  // explicit nudge — the documented fix is triggering 'resize' and
+  // re-applying the center so Maps re-fetches tiles for the new viewport.
+  useEffect(() => {
+    const map = mapRef.current
+    const container = containerRef.current
+    if (!ready || !map || !container) return
+
+    const ro = new ResizeObserver(() => {
+      const center = map.getCenter()
+      google.maps.event.trigger(map, 'resize')
+      if (center) map.setCenter(center)
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [ready])
+
   // ── Sync category/hospital markers whenever the visible points change ─────
   useEffect(() => {
     const map = mapRef.current
