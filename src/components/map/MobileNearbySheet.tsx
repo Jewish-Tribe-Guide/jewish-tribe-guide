@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import NearbyList, { type ScoredPoint } from './NearbyList'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import type { MapPoint } from './ResourceMap'
 import type { CategoryConfig } from '@/lib/categories'
@@ -30,6 +30,13 @@ type Props = {
   containerHeight: number
 }
 
+export type MobileNearbySheetHandle = {
+  /** Selects a place and snaps to 'half' — called when a marker is tapped
+   *  directly on the map, so a pin tap and a list-row tap land in the same
+   *  spot (see ResourceMapView's onSelectPoint wiring to ResourceMap). */
+  selectPoint: (point: Point) => void
+}
+
 /**
  * A draggable bottom sheet laid over the mobile map (Google-Maps-style),
  * replacing the old Map/Nearby toggle there — the map and the nearby list are
@@ -39,14 +46,19 @@ type Props = {
  * Three snap points: peek (a collapsed handle + summary), half (partial
  * list, map still mostly visible), full (the list takes over). Drag ends
  * snap to whichever of the three is closest; tapping the peek handle jumps
- * straight to half. Tapping a place shows its full details right here (see
- * MapPlaceDetail) instead of navigating away to the category directory.
+ * straight to half. Selecting a place — from the list or by tapping its pin
+ * — shows its full details right here (see MapPlaceDetail) instead of
+ * navigating away to the category directory, snapping to 'half' so the map
+ * is still visible underneath.
  */
-export default function MobileNearbySheet({ points, userLocation, onViewListing, categories, containerHeight }: Props) {
+const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
+  { points, userLocation, onViewListing, categories, containerHeight },
+  ref,
+) {
   const [snap, setSnap] = useState<Snap>('peek')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragRef = useRef<{ startY: number; startHeight: number; moved: boolean } | null>(null)
-  const [selected, setSelected] = useState<ScoredPoint | null>(null)
+  const [selected, setSelected] = useState<Point | null>(null)
 
   const heights: Record<Snap, number> = {
     peek: PEEK_PX,
@@ -55,10 +67,12 @@ export default function MobileNearbySheet({ points, userLocation, onViewListing,
   }
   const currentHeight = dragHeight ?? heights[snap]
 
-  function selectPlace(point: ScoredPoint) {
+  function selectPlace(point: Point) {
     setSelected(point)
-    setSnap('full') // give the details room, same as tapping a pin in Google Maps
+    setSnap('half')
   }
+
+  useImperativeHandle(ref, () => ({ selectPoint: selectPlace }))
 
   function onPointerDown(e: React.PointerEvent) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
@@ -132,4 +146,6 @@ export default function MobileNearbySheet({ points, userLocation, onViewListing,
       </div>
     </div>
   )
-}
+})
+
+export default MobileNearbySheet

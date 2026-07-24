@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
+import type { DirectoryResource } from '@/types'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -21,6 +22,10 @@ export type MapPoint = {
   categoryLabel?: string
   /** Category id used to deep-link into the directory. Absent for hospitals. */
   filterId?: string
+  /** The underlying listing, when this point has one (absent for hospitals) —
+   *  carried through so a marker tap can show full details without a second
+   *  lookup. See MapPlaceDetail. */
+  raw?: DirectoryResource
 }
 
 const HOSPITALS_FILTER_ID = '__hospitals__'
@@ -39,6 +44,11 @@ type Props = {
   fallbackCenter?: { lat: number; lng: number }
   /** Called when the user taps "View listing" in an info window. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** When provided, tapping a marker calls this instead of opening the small
+   *  Google info-window bubble — the mobile map uses it to bring up the
+   *  bottom sheet's place detail instead, Google-Maps-app-style. Desktop
+   *  leaves this unset and keeps the info-window behavior. */
+  onSelectPoint?: (point: MapPoint) => void
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -124,7 +134,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -138,8 +148,10 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   // when the actual points change. Rebuilding on every GPS tick was destroying
   // the marker an open info window was anchored to, closing it mid-tap.
   const onViewListingRef = useRef(onViewListing)
+  const onSelectPointRef = useRef(onSelectPoint)
   const userLocationRef = useRef(userLocation)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
+  useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
@@ -224,6 +236,10 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         content: pin.element,
       })
       marker.addListener('gmp-click', () => {
+        if (onSelectPointRef.current) {
+          onSelectPointRef.current(p)
+          return
+        }
         const iw = infoWindowRef.current
         if (!iw) return
         iw.setContent(buildInfoContent(p, onViewListingRef.current))
