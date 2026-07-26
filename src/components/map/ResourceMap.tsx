@@ -66,6 +66,11 @@ type Props = {
    *  marker gets drawn larger so it's clear which listing the sheet is
    *  showing (see the selection-highlight effect below). */
   selectedId?: string
+  /** Current px height of the mobile nearby sheet covering the bottom of the
+   *  map, if any — a newly-selected pin centers within the remaining visible
+   *  strip above it instead of the whole container's center (which the sheet
+   *  would otherwise mostly hide it behind). 0 on desktop (no sheet). */
+  obscuredBottomPx?: number
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -158,6 +163,32 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   return wrap
 }
 
+// Pans so `point` lands in the vertical middle of the map's visible strip —
+// the part not covered by the mobile bottom sheet — rather than the whole
+// container's center, which the sheet would otherwise mostly hide it behind.
+// Shifts the map's actual center southward by half the obscured height (in
+// world-plane units at the current zoom) so the point itself, unmoved, ends
+// up that same distance north of center — i.e. higher on screen, centered in
+// what's left visible above the sheet. Falls back to a plain center (no
+// offset) if the projection isn't ready yet, rather than not moving at all.
+function panToVisibleCenter(map: google.maps.Map, point: { lat: number; lng: number }, obscuredBottomPx: number) {
+  const projection = obscuredBottomPx > 0 ? map.getProjection() : null
+  const zoom = map.getZoom()
+  if (!projection || zoom == null) {
+    map.panTo(point)
+    return
+  }
+  const worldPoint = projection.fromLatLngToPoint(new google.maps.LatLng(point.lat, point.lng))
+  if (!worldPoint) {
+    map.panTo(point)
+    return
+  }
+  const scale = 2 ** zoom
+  const shifted = new google.maps.Point(worldPoint.x, worldPoint.y + (obscuredBottomPx / 2) / scale)
+  const shiftedLatLng = projection.fromPointToLatLng(shifted)
+  map.panTo(shiftedLatLng ?? point)
+}
+
 // The "you are here" dot: a solid blue marker with a white ring and an
 // expanding pulse so it's unmistakable against the category pins. Keyframes are
 // injected once, app-wide.
@@ -184,7 +215,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -210,6 +241,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const userLocationRef = useRef(userLocation)
   const searchActiveRef = useRef(searchActive)
   const selectedIdRef = useRef(selectedId)
+  const obscuredBottomPxRef = useRef(obscuredBottomPx)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -217,6 +249,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
+  useEffect(() => { obscuredBottomPxRef.current = obscuredBottomPx }, [obscuredBottomPx])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -370,15 +403,26 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)
+        const obscured = obscuredBottomPxRef.current
         // Frame the selected place alongside the visitor's own location, same
         // as a search result — so picking a listing from the sheet (or a pin
         // that wasn't already selected) shows how far it is from "you are
-        // here" instead of just centering on the pin alone.
+        // here" instead of just centering on the pin alone. The mobile sheet
+        // covers the bottom of the map, so its height is reserved as extra
+        // bottom padding — otherwise "centered" bounds would land the pin
+        // behind (or right at the edge of) the sheet instead of the visible
+        // strip above it.
         if (userLocationRef.current) {
           const bounds = new google.maps.LatLngBounds()
           bounds.extend(userLocationRef.current)
           bounds.extend({ lat: current.point.lat, lng: current.point.lng })
-          map.fitBounds(bounds, 64)
+          map.fitBounds(bounds, { top: 64, left: 64, right: 64, bottom: 64 + obscured })
+        } else {
+          // No location set to frame alongside it — just center the pin
+          // itself, but still account for the sheet: instead of the whole
+          // container's center (which sheet mostly covers), aim for the
+          // middle of the strip still visible above it.
+          panToVisibleCenter(map, current.point, obscured)
         }
       }
     }
