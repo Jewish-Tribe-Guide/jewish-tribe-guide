@@ -281,8 +281,17 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // Don't auto-reframe to the points if the visitor has a location set —
     // keeping "where am I" in view matters more than framing every pin —
     // unless a search is actively narrowing them, in which case showing the
-    // result(s) takes priority, same as the Google Maps app.
-    if (userLocationRef.current && !searchActiveRef.current) return
+    // result(s) takes priority, same as the Google Maps app. When a location
+    // IS set during a search, fit both it and the result(s) in view together
+    // instead of just the result(s) — so searching for something across town
+    // doesn't leave you looking at a result with no idea how far it is from
+    // where you are.
+    if (userLocationRef.current && searchActiveRef.current) {
+      bounds.extend(userLocationRef.current)
+      map.fitBounds(bounds, 64)
+      return
+    }
+    if (userLocationRef.current) return
     if (points.length === 1) {
       map.setCenter(bounds.getCenter())
       map.setZoom(15)
