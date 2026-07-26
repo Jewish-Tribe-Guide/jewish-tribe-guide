@@ -45,7 +45,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       // build-time fallback. `--color-primary-dark` derives from this in CSS.
       style={{ '--color-primary': community.themeColor } as React.CSSProperties}
     >
-      <body className="bg-surface text-slate-900 antialiased min-h-screen flex flex-col">
+      {/* min-h-dvh, not min-h-screen: 100vh is the LARGEST possible mobile
+          viewport (address bar hidden) — on a page that's meant to scroll
+          that's invisible, but the map screen sizes itself to fill exactly
+          this height (see ResourceMapView), so a 100vh body taller than the
+          actually-visible area pushed its bottom edge (the sheet) just past
+          the fold, needing a small scroll to reveal it. 100dvh tracks the
+          real visible viewport as the browser chrome shows/hides. */}
+      <body className="bg-surface text-slate-900 antialiased min-h-dvh flex flex-col">
         {children}
         <Analytics />
       </body>
