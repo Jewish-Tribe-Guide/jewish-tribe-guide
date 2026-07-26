@@ -318,14 +318,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNowOn, boolFields, selectFilters, categories, initialCategory, hoursKeysByCat])
 
-  const hasAnyChip = filterChips.length > 0 || !!input.trim()
-  const clearAllFilters = () => {
-    clearQuery()
-    setOpenNowOn(false)
-    setBoolFields([])
-    setSelectFilters({})
-  }
-
   // Keep the current history entry in sync with the committed query/filters/
   // selection, so returning via browser Back restores what was actually on
   // screen — not just the snapshot from when the map was first opened (or
@@ -393,7 +385,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // directory) — shared between the desktop search box and the mobile
   // floating one. The free-text query itself lives in the search box, not as
   // a separate chip — there's only ever one active query, Google-Maps-style.
-  const chipsRow = hasAnyChip && (
+  const chipsRow = filterChips.length > 0 && (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
       {filterChips.map((c) => (
         <span
@@ -410,12 +402,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           </button>
         </span>
       ))}
-      <button
-        onClick={clearAllFilters}
-        className="ml-1 text-xs text-muted underline hover:text-slate-700 cursor-pointer"
-      >
-        Clear all
-      </button>
     </div>
   )
 
@@ -617,10 +603,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            // With suggestions open, Enter picks the top one —
-                            // same as the Google Maps app — otherwise it commits
-                            // the typed text as the (single) active query.
-                            if (searchSuggestions.length > 0) selectSuggestion(searchSuggestions[0])
+                            // Enter only jumps straight to a place when it's the
+                            // single unambiguous match — with several ("Giant"
+                            // matching multiple branches), it commits as a
+                            // regular query so the sheet shows the full list
+                            // instead of guessing which one you meant.
+                            if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
                             else commitQuery(input)
                           } else if (e.key === 'Escape') {
                             setSearchFocused(false)
