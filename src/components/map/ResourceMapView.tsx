@@ -196,28 +196,32 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     [selected, options],
   )
 
-  // Search terms shown as removable chips — each is an AND filter (a place shows
-  // only if it matches every term against its name / address / tags / detail
-  // fields). Pre-filled from a directory's active search on arrival; the term
-  // being typed filters live and becomes a chip on Enter.
-  const [terms, setTerms] = useState<string[]>(() =>
-    (initialQuery ?? '').split(/\s+/).map((t) => t.trim()).filter(Boolean),
-  )
-  const [input, setInput] = useState('')
+  // A single active search query — like Google Maps, committing a new one
+  // replaces whatever was there rather than stacking as separate chips.
+  // `committedQuery` only changes on Enter/suggestion-pick (not each
+  // keystroke), so the sheet-raise/map-refit effects below fire once you
+  // actually search, not mid-typing; `input` (the box's live value) still
+  // drives the live text filter and stays visible after a search, same as
+  // the Google Maps app — it isn't cleared back to a blank box + chip.
+  const [input, setInput] = useState(initialQuery ?? '')
+  const [committedQuery, setCommittedQuery] = useState(initialQuery ?? '')
 
-  const addTerm = (raw: string) => {
+  const commitQuery = (raw: string) => {
     const v = raw.trim()
     if (!v) return
-    // "open now" pins the open-now filter instead of a text term.
+    // "open now" pins the open-now filter instead of a text query.
     if (isOpenNowWord(v)) {
       setOpenNowOn(true)
       setInput('')
+      setCommittedQuery('')
       return
     }
-    setTerms((prev) => (prev.some((t) => t.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))
-    setInput('')
+    setCommittedQuery(v)
   }
-  const removeTerm = (term: string) => setTerms((prev) => prev.filter((t) => t !== term))
+  const clearQuery = () => {
+    setInput('')
+    setCommittedQuery('')
+  }
 
   // ── Mobile search autocomplete — Google-Maps-style dropdown of matching
   // places while typing, independent of the live text-filter above (which
@@ -242,18 +246,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // — instead of just adding it as a narrowing text filter.
   const selectSuggestion = (p: (typeof allPoints)[number]) => {
     setInput(p.name)
+    setCommittedQuery(p.name)
     setSearchFocused(false)
     mobileSearchInputRef.current?.blur()
     nearbySheetRef.current?.selectPoint(p)
   }
 
-  // The typed-but-not-yet-added text also filters, so results update live — except
-  // an "open now" keyword, which becomes the filter on Enter, not a text match.
+  // The live text always filters as one phrase (not per-word AND terms) —
+  // except an "open now" keyword, which becomes the filter chip on commit.
   const activeTerms = useMemo(() => {
-    const live = input.trim()
-    const includeLive = live && !isOpenNowWord(live) && !terms.some((t) => t.toLowerCase() === live.toLowerCase())
-    return (includeLive ? [...terms, live] : terms).map((t) => t.toLowerCase())
-  }, [terms, input])
+    const live = input.trim().toLowerCase()
+    return live && !isOpenNowWord(live) ? [live] : []
+  }, [input])
 
   // ── Field filters (open-now / kosher / type / …) ─────────────────────────────
   // Held as a serializable spec (also what's persisted to history); carried in
@@ -314,18 +318,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNowOn, boolFields, selectFilters, categories, initialCategory, hoursKeysByCat])
 
-  const hasAnyChip = terms.length > 0 || filterChips.length > 0
+  const hasAnyChip = filterChips.length > 0 || !!input.trim()
   const clearAllFilters = () => {
-    setTerms([])
-    setInput('')
+    clearQuery()
     setOpenNowOn(false)
     setBoolFields([])
     setSelectFilters({})
   }
 
-  // Keep the current history entry in sync with the live terms/filters/selection,
-  // so returning via browser Back restores what was actually on screen — not just
-  // the snapshot from when the map was first opened (or last touched a chip).
+  // Keep the current history entry in sync with the committed query/filters/
+  // selection, so returning via browser Back restores what was actually on
+  // screen — not just the snapshot from when the map was first opened (or
+  // last touched a chip). Persists committedQuery, not the live `input`, so
+  // this doesn't fire on every keystroke.
   useEffect(() => {
     const current = window.history.state as { mode?: string } | null
     if (current?.mode !== 'map') return
@@ -333,7 +338,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     history.replaceState(
       {
         ...current,
-        mapQuery: terms.join(' ') || undefined,
+        mapQuery: committedQuery || undefined,
         mapSelected: selected ? Array.from(selected) : undefined,
         mapFilters: anyFilter
           ? {
@@ -345,7 +350,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       },
       '',
     )
-  }, [terms, selected, openNowOn, boolFields, selectFilters])
+  }, [committedQuery, selected, openNowOn, boolFields, selectFilters])
 
   const visiblePoints = useMemo(() => {
     return allPoints
@@ -354,18 +359,24 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
   }, [allPoints, effectiveSelected, activeTerms, filterChips])
 
-  // Committing a search term or filter chip (not each keystroke — terms/
-  // filterChips only change at commit points, unlike activeTerms/visiblePoints
-  // which also track the live-typed-but-uncommitted text) surfaces the result
-  // the way Google Maps does: exactly one match opens straight to its card,
-  // more than one raises the sheet enough to show the list.
+  // Whether a search/filter is meaningfully "active" — used to (a) gate the
+  // sheet-raise/auto-select effect below to commit points instead of every
+  // keystroke, and (b) tell ResourceMap it should refit the viewport to the
+  // results even when a user location is set (which normally takes priority
+  // over reframing — see ResourceMap's marker-sync effect).
+  const searchActive = !!committedQuery || filterChips.length > 0
+
+  // Committing a search query or filter chip (not each keystroke —
+  // committedQuery/filterChips only change at commit points, unlike
+  // activeTerms/visiblePoints which also track the live-typed text) surfaces
+  // the result the way Google Maps does: exactly one match opens straight to
+  // its card, more than one raises the sheet enough to show the list.
   useEffect(() => {
-    if (!isMobile) return
-    if (terms.length === 0 && filterChips.length === 0) return
+    if (!isMobile || !searchActive) return
     if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
     else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terms, filterChips])
+  }, [committedQuery, filterChips])
 
   const toggle = (id: string) => {
     const next = new Set(effectiveSelected)
@@ -378,11 +389,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const loading = listings === null || categories === null
 
-  // Removable filter/search-term chips — shared between the desktop search box
-  // and the mobile floating one, so the two don't drift out of sync.
+  // Removable filter chips (open-now / kosher / type carried from the
+  // directory) — shared between the desktop search box and the mobile
+  // floating one. The free-text query itself lives in the search box, not as
+  // a separate chip — there's only ever one active query, Google-Maps-style.
   const chipsRow = hasAnyChip && (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      {/* Filters carried from the directory (open-now / kosher / type). */}
       {filterChips.map((c) => (
         <span
           key={c.id}
@@ -392,22 +404,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           <button
             onClick={c.remove}
             aria-label={`Remove ${c.label} filter`}
-            className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      {/* Free-text search terms — same blue as the filter chips. */}
-      {terms.map((t) => (
-        <span
-          key={t}
-          className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
-        >
-          {t}
-          <button
-            onClick={() => removeTerm(t)}
-            aria-label={`Remove ${t}`}
             className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
           >
             ×
@@ -544,19 +540,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       {!loading && ui.search.map && (
         <div className="mb-4 hidden sm:block">
           <input
-            type="text"
-            placeholder={terms.length ? 'Add another term…' : "Search name, address, or 'open now'…"}
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            placeholder="Search name, address, or 'open now'…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                addTerm(input)
-              } else if (e.key === 'Backspace' && !input && terms.length) {
-                removeTerm(terms[terms.length - 1])
+                commitQuery(input)
               }
             }}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
           />
           {chipsRow}
           <p className="mt-1.5 text-xs text-muted">
@@ -591,6 +587,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onViewListing={onViewListing}
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
                 onBackgroundClick={isMobile ? () => nearbySheetRef.current?.collapse() : undefined}
+                searchActive={searchActive}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -609,8 +606,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       </svg>
                       <input
                         ref={mobileSearchInputRef}
-                        type="text"
-                        placeholder={terms.length ? 'Add another term…' : "Search name, address, 'open now'…"}
+                        type="search"
+                        enterKeyHint="search"
+                        autoComplete="off"
+                        placeholder="Search name, address, 'open now'…"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onFocus={() => setSearchFocused(true)}
@@ -619,22 +618,20 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                           if (e.key === 'Enter') {
                             e.preventDefault()
                             // With suggestions open, Enter picks the top one —
-                            // same as the Google Maps app — otherwise it pins
-                            // the typed text as a narrowing filter.
+                            // same as the Google Maps app — otherwise it commits
+                            // the typed text as the (single) active query.
                             if (searchSuggestions.length > 0) selectSuggestion(searchSuggestions[0])
-                            else addTerm(input)
+                            else commitQuery(input)
                           } else if (e.key === 'Escape') {
                             setSearchFocused(false)
                             ;(e.target as HTMLInputElement).blur()
-                          } else if (e.key === 'Backspace' && !input && terms.length) {
-                            removeTerm(terms[terms.length - 1])
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
                       />
                       {input && (
                         <button
-                          onClick={() => { setInput(''); mobileSearchInputRef.current?.focus() }}
+                          onClick={() => { clearQuery(); mobileSearchInputRef.current?.focus() }}
                           aria-label="Clear search"
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
                         >
