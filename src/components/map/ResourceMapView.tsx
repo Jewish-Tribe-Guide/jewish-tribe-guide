@@ -16,6 +16,7 @@ import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
+import { ChevronLeftIcon } from '@/components/icons'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
@@ -81,6 +82,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const activeLocation: LatLng | null = livePosition ?? userLocation ?? null
 
   const [tab, setTab] = useState<Tab>('map')
+  // Mobile only — the quick chip row over the map shows a handful of
+  // categories plus a trailing "More" chip; tapping it opens this full-screen
+  // picker with every category, Google-Maps-style.
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
@@ -401,6 +406,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }, [committedQuery, filterChips])
 
   const toggle = (id: string) => {
+    // Starting from "everything shown", a tap on a single chip should narrow
+    // straight down to just that category — same as Google Maps' filter
+    // chips — rather than requiring "Hide all" first and then re-enabling
+    // the one category you actually wanted. Once you've narrowed down,
+    // further taps add/remove from that subset as before.
+    if (effectiveSelected.size === options.length) {
+      setSelected(new Set([id]))
+      return
+    }
     const next = new Set(effectiveSelected)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -686,6 +700,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onToggle={toggle}
                         onAll={showAll}
                         onNone={hideAll}
+                        maxVisible={4}
+                        onMore={() => setCategoriesOpen(true)}
                       />
                     </div>
                   )}
@@ -803,6 +819,37 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </p>
       )}
 
+      {/* ── Full-screen category picker (mobile) — the quick chip row's
+              trailing "More" chip opens this, same as Google Maps expanding
+              its own filter row into a dedicated screen. Every category
+              wraps into a grid here since there's real vertical room. ────── */}
+      {categoriesOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white sm:hidden">
+          <div
+            className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-4 pb-3"
+            style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+          >
+            <button
+              onClick={() => setCategoriesOpen(false)}
+              aria-label="Back to map"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+            >
+              <ChevronLeftIcon className="h-5 w-5" />
+            </button>
+            <h2 className="text-base font-semibold text-slate-900">Categories</h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <CategoryFilter
+              options={options}
+              selected={effectiveSelected}
+              onToggle={toggle}
+              onAll={showAll}
+              onNone={hideAll}
+              wrap
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
