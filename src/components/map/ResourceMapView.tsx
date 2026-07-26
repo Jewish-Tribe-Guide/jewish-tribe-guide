@@ -256,6 +256,31 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     nearbySheetRef.current?.selectPoint(p)
   }
 
+  // Submitting the search (the mobile keyboard's "Search" action key, via the
+  // wrapping <form> below, not a keydown check — the one reliable way to
+  // catch that key across mobile browsers) does everything the Google Maps
+  // app does: picks the place directly if it's the one unambiguous match,
+  // otherwise commits the query so the sheet shows the result list, dismisses
+  // the dropdown, and closes the keyboard.
+  const submitSearch = () => {
+    if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
+    else commitQuery(input)
+    setSearchFocused(false)
+    mobileSearchInputRef.current?.blur()
+  }
+
+  // Clearing the search (the × button) resets the sheet back to its normal
+  // browsing state — same as Google Maps: the selected place/result list
+  // disappears and the sheet collapses — and does NOT refocus the input, so
+  // the keyboard stays down until the visitor deliberately taps the search
+  // box again.
+  const clearSearch = () => {
+    clearQuery()
+    setSearchFocused(false)
+    mobileSearchInputRef.current?.blur()
+    nearbySheetRef.current?.collapse()
+  }
+
   // The committed query filters as one phrase (not per-word AND terms) —
   // except "open now", which is its own predicate (openNowActive above), not
   // a literal text match. Derived from committedQuery, not the live `input`,
@@ -526,23 +551,28 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               chip); typing "open now" pins the open-now filter. Filters carried
               from a category show as chips too. Every chip narrows the
               results. ─────────────────────────────────────────────────────── */}
-      {!loading && ui.search.map && (
+      {/* Real conditional mount (not just CSS hidden) — mobile browsers' virtual
+              keyboard "next/previous field" navigation bar is driven by how many
+              actual <input> elements exist in the DOM, so leaving a
+              CSS-hidden duplicate around still triggers it. Only one of
+              desktop/mobile search inputs is ever actually mounted. */}
+      {!loading && ui.search.map && !isMobile && (
         <div className="mb-4 hidden sm:block">
-          <input
-            type="text"
-            enterKeyHint="search"
-            autoComplete="off"
-            placeholder="Search name, address, or 'open now'…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                commitQuery(input)
-              }
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              commitQuery(input)
             }}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          >
+            <input
+              type="text"
+              autoComplete="off"
+              placeholder="Search name, address, or 'open now'…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </form>
           {chipsRow}
           <p className="mt-1.5 text-xs text-muted">
             {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
@@ -583,13 +613,21 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       map, Google-Maps-style, instead of pushing it down. Category
                       chips tuck behind the "Filters" button (opens the sheet
                       below) so this stays a single compact row. ───────────────── */}
-              {ui.search.map && (
+              {ui.search.map && isMobile && (
                 <div
                   className="absolute inset-x-0 top-0 z-10 px-3 pb-2 sm:hidden"
                   style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="flex flex-1 items-center rounded-full bg-white px-3.5 py-2.5 shadow-lg">
+                    {/* A real <form> is the one reliable way to catch a mobile
+                        keyboard's "Search" action key across browsers — it
+                        guarantees submission the same way pressing Enter on a
+                        desktop keyboard does, rather than depending on that
+                        key reliably dispatching a keydown 'Enter'. */}
+                    <form
+                      onSubmit={(e) => { e.preventDefault(); submitSearch() }}
+                      className="flex flex-1 items-center rounded-full bg-white px-3.5 py-2.5 shadow-lg"
+                    >
                       <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                       </svg>
@@ -604,16 +642,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onFocus={() => setSearchFocused(true)}
                         onBlur={() => setSearchFocused(false)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            // Enter only jumps straight to a place when it's the
-                            // single unambiguous match — with several ("Giant"
-                            // matching multiple branches), it commits as a
-                            // regular query so the sheet shows the full list
-                            // instead of guessing which one you meant.
-                            if (searchSuggestions.length === 1) selectSuggestion(searchSuggestions[0])
-                            else commitQuery(input)
-                          } else if (e.key === 'Escape') {
+                          if (e.key === 'Escape') {
                             setSearchFocused(false)
                             ;(e.target as HTMLInputElement).blur()
                           }
@@ -622,7 +651,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       />
                       {input && (
                         <button
-                          onClick={() => { clearQuery(); mobileSearchInputRef.current?.focus() }}
+                          type="button"
+                          onClick={clearSearch}
                           aria-label="Clear search"
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
                         >
@@ -631,7 +661,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                           </svg>
                         </button>
                       )}
-                    </div>
+                    </form>
                     {options.length > 0 && (
                       <button
                         onClick={() => setFilterSheetOpen(true)}
