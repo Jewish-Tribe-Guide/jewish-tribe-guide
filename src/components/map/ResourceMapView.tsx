@@ -102,6 +102,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // ResourceMap shows by default — desktop keeps that default.
   const isMobile = useIsMobile()
   const nearbySheetRef = useRef<MobileNearbySheetHandle>(null)
+  // The sheet's currently-selected place, reported up via onSelectionChange —
+  // passed to ResourceMap as selectedId so it can highlight the matching
+  // marker, making it clear which listing on the map the sheet is showing.
+  const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
   // follow = map pans with every GPS tick. Turns off automatically when the
   // user manually drags the map (we detect this via the Re-center button press,
   // which flips it back on).
@@ -609,6 +613,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
                 onBackgroundClick={isMobile ? () => nearbySheetRef.current?.lower() : undefined}
                 searchActive={searchActive}
+                selectedId={selectedPointId}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -760,6 +765,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   onViewListing={onViewListing}
                   categories={categories ?? []}
                   containerHeight={mapBoxHeight}
+                  onSelectionChange={(point) => setSelectedPointId(point?.id)}
                 />
               )}
             </>

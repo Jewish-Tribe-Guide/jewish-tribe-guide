@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import NearbyList from './NearbyList'
 import MapPlaceDetail from './MapPlaceDetail'
 import type { MapPoint } from './ResourceMap'
@@ -36,6 +36,10 @@ type Props = {
    *  map box itself doesn't always fill the viewport (e.g. desktop, though
    *  this sheet only ever renders on mobile). */
   containerHeight: number
+  /** Reports the currently-selected place (or null) upward — ResourceMapView
+   *  forwards this to ResourceMap so it can highlight the matching marker,
+   *  making it clear which listing on the map the sheet is showing. */
+  onSelectionChange?: (point: Point | null) => void
 }
 
 export type MobileNearbySheetHandle = {
@@ -75,7 +79,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, containerHeight },
+  { points, userLocation, onViewListing, categories, containerHeight, onSelectionChange },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -84,6 +88,14 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const contentDragRef = useRef<(DragState & { active: boolean }) | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<Point | null>(null)
+  // Read via a ref, like ResourceMap's own callback props, so this effect
+  // only re-fires when the selection itself changes, not on every parent
+  // render that happens to pass a new inline function identity.
+  const onSelectionChangeRef = useRef(onSelectionChange)
+  useEffect(() => { onSelectionChangeRef.current = onSelectionChange }, [onSelectionChange])
+  useEffect(() => {
+    onSelectionChangeRef.current?.(selected)
+  }, [selected])
 
   const heights: Record<Snap, number> = {
     peek: PEEK_PX,
