@@ -16,6 +16,7 @@ import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { CategoryConfig } from '@/lib/categories'
+import { ui } from '@/lib/uiConfig'
 
 type Props = {
   onNavigate: NavigateFn
@@ -161,9 +162,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     const support = entryCards.find((c) => c.id === 'support')
     const whatsapp = resources?.find((c) => c.id === 'whatsapp')
     return [
-      volunteer && { ...volunteer, title: 'Volunteer Opportunities' },
+      volunteer && { ...volunteer, title: 'Volunteer' },
       support && { ...support, title: 'Support' },
-      { title: 'Young Professional Groups', id: 'young-professional-groups', icon: '🤝', go: () => {} },
+      { title: 'Young Professionals', id: 'young-professional-groups', icon: '🤝', go: () => {} },
       whatsapp,
     ].filter((c): c is CardDef => !!c)
   })()
@@ -209,41 +210,78 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
-      {/* ── Splashy site banner — logo + name + tagline, large and centered.
-              Desktop only: mobile keeps its existing compact top, untouched.
-              Full-bleed sage band (same breakout as the sections below it),
-              touching the hero band directly beneath it with no gap — see
-              [[project_art_deco_home_redesign]]. ────────────────────────── */}
-      <section className="hidden sm:block pt-10 text-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
-        <h1 className="text-6xl lg:text-7xl font-extrabold tracking-tighter text-[#393535]">
-          {settings.name}
-        </h1>
-        {/* Fixed copy per explicit request, not `settings.tagline` — this
-                exact sentence replaces whatever the admin-configured tagline
-                would otherwise show here. */}
-        <p className="mt-2 text-lg text-[#393535]">
-          A Guide to Jewish Philadelphia: Community Resources for Residents, Visitors, and Hospital Patients
-        </p>
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 sm:pb-0">
+      {/* ── Condensed top bar — site name + tagline + search box (top-left,
+              no longer large/centered — the search box moved here from the
+              old "What are you looking for?" band below, which is now
+              desktop-hidden entirely, see HeroHeading.tsx) and the "Get
+              Connected" quick-links (Volunteer Opportunities / Support /
+              Young Professional Groups / WhatsApp Groups — fixed set, fixed
+              order) as bordered buttons to the right, all in one row.
+              Desktop only: mobile keeps its existing compact top (with its
+              own separate title/search in HeroHeading), untouched. Full-bleed
+              band (same breakout as the sections below it) — see
+              [[project_art_deco_home_redesign]]. */}
+      <section className="hidden sm:flex sm:items-center sm:justify-between sm:gap-6 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6">
+        <div className="text-left">
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#fefefe]">
+            {settings.name}
+          </h1>
+          {/* Fixed copy per explicit request, not `settings.tagline` — this
+                  exact sentence replaces whatever the admin-configured tagline
+                  would otherwise show here. */}
+          <p className="text-xs text-[#fefefe]">
+            Community resources for residents, visitors, and hospital patients
+          </p>
+        </div>
+        {(quickLinksCards.length > 0 || ui.search.landing) && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {quickLinksCards.map((c) => (
+              <button
+                key={c.id ?? c.title}
+                onClick={c.go}
+                className="whitespace-nowrap rounded-full border-2 border-[#E1E4E5] bg-white px-3 py-1.5 text-xs font-semibold text-[#393535] transition-colors hover:bg-[#700F0F] hover:text-[#fefefe] cursor-pointer"
+              >
+                {c.title}
+              </button>
+            ))}
+            {ui.search.landing && (
+              <div className="w-56">
+                <div className="flex items-center rounded-full border-2 border-[#E1E4E5] bg-white pl-4 pr-1.5 py-1.5 shadow-sm transition-shadow focus-within:shadow-md">
+                  <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Filter — kosher food, rides, housing, synagogues…"
+                    aria-label="Filter resources"
+                    className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                  />
+                  {query && (
+                    <button
+                      onClick={() => setQuery('')}
+                      aria-label="Clear filter"
+                      className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
-      {/* ── Heading + filter, with the "Get Connected" quick-links row
-              (Volunteer Opportunities / Support / Young Professional Groups /
-              WhatsApp Groups — fixed set, fixed order) rendered inside the
-              hero band between the mission text and the search box. The old
-              standalone "Get Connected" section/band (below the map) was
-              removed entirely — this row replaces it. ────────────────────── */}
+      {/* ── Mobile-only now: "What are you looking for?" heading + filter —
+              desktop hides this whole band since its title was removed and
+              its search box moved into the condensed bar above. ─────────── */}
       <HeroHeading
         settings={settings}
         query={query}
         onQueryChange={setQuery}
-        quickLinks={
-          quickLinksCards.length > 0 ? (
-            <div className="sm:mx-auto sm:max-w-2xl">
-              <CardGrid cards={quickLinksCards} tints={['bg-[#fefefe] sm:group-hover:opacity-70']} borderColor="#700F0F" textColor="#000000" showIcons={false} compact oneRow />
-            </div>
-          ) : undefined
-        }
       />
 
       {/* ── Desktop: "jump to" results — categories/Zmanim that match the search
@@ -256,7 +294,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             <button
               key={card.id}
               onClick={() => (card.id === 'zmanim' ? jumpToZmanim() : jumpToMapCategory(card.id!))}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-[#ffc145] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[#ffc145]/10 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-[#ffc145] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[#ffc145] cursor-pointer"
             >
               {card.icon && <span aria-hidden="true">{card.icon}</span>}
               {card.title}
@@ -278,7 +316,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               dropped to match (see ResourceMapView.tsx) — a border would just
               look clipped at the browser's edge. ─────────────────────────── */}
       {hasMap && (
-        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535] sm:pt-6 sm:pb-10">
+        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535]">
           <HomeMap
             onNavigate={onNavigate}
             coords={coords}
@@ -345,7 +383,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               column (like the hero/Get Connected bands), since a two-column
               list of zman times shouldn't stretch across the whole browser
               width the way the map benefits from. ─────────────────────── */}
-      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535] sm:py-10">
+      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
         <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
           <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
         </div>

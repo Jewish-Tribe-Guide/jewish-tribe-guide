@@ -5,7 +5,7 @@ import type { DirectoryResource, Hospital, NavigateFn } from '@/types'
 import Collapsible from '@/components/Collapsible'
 import CategoryRow from './CategoryRow'
 import HospitalRow from './HospitalRow'
-import { HOSPITALS_ID } from '@/components/map/ResourceMapView'
+import { HOSPITALS_ID, HOSPITAL_ICON, glyphForListingCategory } from '@/components/map/ResourceMapView'
 import { ExternalIcon } from '@/components/icons'
 import { eruvim } from '@/data/resources'
 
@@ -61,12 +61,31 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
     <div className="space-y-3">
       {categories.map((c) => {
         const mapId = mapIdFor(c)
-        const title = c.icon ? `${c.icon} ${c.pluralLabel}` : c.pluralLabel
+        const accentColor = colorFor?.(mapId)
+        // Fixed pin glyph for this category (same one shown on the map itself
+        // and in the map key) takes priority over the admin-configured icon —
+        // hospitals aren't in that dict (see ResourceMapView.tsx), so they're
+        // special-cased to HOSPITAL_ICON directly, same as the map key does.
+        const glyph = mapId === HOSPITALS_ID ? HOSPITAL_ICON : (glyphForListingCategory(categories, c.id) ?? c.icon)
+        // Forced to a flat white silhouette when the header has its colored
+        // fill — the exact same `brightness(0) invert(1)` treatment the pin
+        // glyph gets (see monoGlyphElement in ResourceMap.tsx) and the map
+        // key chips get (see ResourceMapView.tsx), so all three match
+        // exactly instead of showing the glyph's natural color. Unconditionally
+        // white regardless of `needsDarkText` (Collapsible.tsx) — mirrors the
+        // pin's own known "always white" gap rather than introducing a
+        // separate dark-glyph variant here.
+        const title = !glyph ? c.pluralLabel : accentColor ? (
+          <>
+            <span aria-hidden="true" style={{ filter: 'brightness(0) invert(1)' }}>{glyph}</span> {c.pluralLabel}
+          </>
+        ) : (
+          `${glyph} ${c.pluralLabel}`
+        )
         const synced = focusedCategoryIds !== undefined
         const collapsibleProps = synced
           ? { open: focusedCategoryIds!.has(mapId), onToggle: () => onFocusCategory?.(mapId) }
           : {}
-        const accentColor = colorFor?.(mapId)
 
         if (c.kind === 'medical') {
           return (

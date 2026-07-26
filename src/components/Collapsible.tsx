@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 
-// WCAG relative luminance of a `#rrggbb` hex color, used below to pick
-// white vs. dark header text against `accentColor` — that color's own ramp
-// now spans dark navy to a genuinely pale blue (see CATEGORY_COLORS in
-// ResourceMapView.tsx), so a hardcoded "always white" text color would wash
-// out on the lighter end.
+// WCAG relative luminance of a `#rrggbb` hex color — used below to pick white
+// vs. dark header text against a solid `accentColor` fill. The category-color
+// ramp spans a dark navy down to a fairly light blue, so a hardcoded "always
+// white" text color would wash out on the lightest couple of steps.
 function relativeLuminance(hex: string): number {
   const n = parseInt(hex.replace('#', ''), 16)
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c / 255)
@@ -23,7 +22,7 @@ function needsDarkText(hex: string): boolean {
 }
 
 type Props = {
-  title: string
+  title: React.ReactNode
   children: React.ReactNode
   /** Render expanded on first paint (the visitor can still collapse it).
    *  Ignored in controlled mode (see `open`). */
@@ -34,12 +33,9 @@ type Props = {
    *  together, or neither. */
   open?: boolean
   onToggle?: () => void
-  /** When set, the whole header is filled with this color (e.g. matching the
-   *  category's map pin color) instead of the default white/muted look —
-   *  text switches to white (or dark, see `needsDarkText`) for contrast.
-   *  The border is always `#000000` regardless of this color (matches the
-   *  1px black border convention used everywhere else on this page — see
-   *  [[project_art_deco_home_redesign]]), not the fill color anymore. */
+  /** When set, this category's map pin color fills the ENTIRE header (not
+   *  just the border) — text/count/chevron switch to white or dark (see
+   *  `needsDarkText`) for contrast against that fill. */
   accentColor?: string
   /** A count shown after the title (e.g. how many listings this category
    *  has), same idea as the map's own filter-chip counts. */
@@ -56,12 +52,12 @@ export default function Collapsible({ title, children, defaultOpen = false, open
   return (
     <div
       style={accentColor ? { borderColor: accentColor } : undefined}
-      className={`border rounded-lg bg-white overflow-hidden ${accentColor ? '' : 'border-slate-300'}`}
+      className={`rounded-lg overflow-hidden ${accentColor ? 'border-2' : 'border border-slate-300 bg-[#fefefe]'}`}
     >
       <button
         onClick={toggle}
         aria-expanded={isExpanded}
-        style={accentColor ? { backgroundColor: `${accentColor}BF` } : undefined}
+        style={accentColor ? { backgroundColor: accentColor } : undefined}
         className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors cursor-pointer ${
           accentColor ? 'hover:brightness-110' : 'hover:bg-slate-50'
         }`}
@@ -73,7 +69,7 @@ export default function Collapsible({ title, children, defaultOpen = false, open
         >
           {title}
           {count != null && (
-            <span className={accentColor ? (darkText ? 'text-slate-900/70' : 'text-white/80') : 'text-slate-400'}>{count}</span>
+            <span className={accentColor ? '' : 'text-slate-400'}>{count}</span>
           )}
         </span>
         <svg

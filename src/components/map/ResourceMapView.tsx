@@ -28,8 +28,11 @@ export const ACCENT_PALETTE = ['#ffc145', '#df4c73', '#f9a66c', '#aecf80', '#3bb
 
 // Exported so callers coloring external UI to match the map's legend (e.g.
 // the home page's category list) use the exact same colors.
-export const HOSPITAL_COLOR = '#F08C8C'
-const HOSPITAL_ICON = '🏥'
+export const HOSPITAL_COLOR = '#6E91A4'
+// The letter "H" (a fixed pin glyph, not the admin-configurable category
+// icon — see CATEGORY_GLYPHS below) — same "H for Hospital" convention as
+// hospital signage generally.
+export const HOSPITAL_ICON = 'H'
 
 // Fixed display order — Synagogues, Restaurants and Bakeries, Grocery Stores,
 // Hospitals, Hotels, Mikvah, then Eruv last (no pins of its own) — shared by
@@ -48,30 +51,26 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
 // A direct, stable color per category (rather than a cycled palette index) —
 // each specific category gets an intentional, permanent color regardless of
-// display order. A single-hue tint/shade ramp derived from `#EB6969`, darkest
-// (`#E85151`) to lightest (`#F8C7C7`), one step per category in
-// MAP_CATEGORY_ORDER order — reverted back to this pinker/brighter-red family
-// after a `#700F0F`-anchored darker/browner ramp read as "not pink enough."
-// Lightness varies a lot across these, so white text/
-// glyphs sitting on a solid fill of one of these colors (Collapsible row
-// headers, pin glyphs) can wash out on the paler ones — `Collapsible.tsx`
-// picks dark vs. white header text per-accentColor via a relative-luminance
-// check to handle this. Pin glyphs are NOT covered by that (still
-// unconditionally white in `ResourceMap.tsx`) — a known, separately-flagged
-// gap, not addressed here. Keyed by category id for regular listing
-// categories; kind: 'medical'/'zmanim'/'eruv'/'map' categories aren't
-// uniquely identified by a fixed id the way listing categories are, so eruv
-// is matched by kind instead below (hospitals use HOSPITAL_COLOR directly,
-// not this dict — see allPoints below).
+// display order. A single-hue tint/shade ramp anchored to `#0C3D57` (darkest,
+// unchanged) lightening to `#D0E5F1` (lightest — pushed noticeably paler than
+// before to widen the spread between steps), linearly interpolated in RGB
+// across the 7 steps of MAP_CATEGORY_ORDER. The lightest three steps
+// (hotel/mikvah/eruv) now cross the `needsDarkText` contrast threshold in
+// Collapsible.tsx, which already handles that per-accentColor. Keyed by
+// category id for regular listing categories; kind:
+// 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified by a
+// fixed id the way listing categories are, so eruv is matched by kind instead
+// below (hospitals use HOSPITAL_COLOR directly, not this dict — see
+// allPoints below).
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#E85151',
-  restaurant: '#EB6565',
-  grocery: '#ED7878',
-  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#F08C8C' itself.)
-  hotel: '#F3A0A0',
-  mikvah: '#F5B3B3',
+  synagogue: '#0C3D57',
+  restaurant: '#2D5971',
+  grocery: '#4D758A',
+  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#6E91A4' itself.)
+  hotel: '#8FADBE',
+  mikvah: '#AFC9D7',
 }
-const ERUV_COLOR = '#F8C7C7'
+const ERUV_COLOR = '#D0E5F1'
 
 // Exported so external UI (the home page's category list) computes the exact
 // same color as the map's pins for a given category.
@@ -79,6 +78,35 @@ export function colorForListingCategory(categories: CategoryConfig[], categoryId
   const category = categories.find((c) => c.id === categoryId)
   if (category?.kind === 'eruv') return ERUV_COLOR
   return CATEGORY_COLORS[categoryId] ?? '#64748b'
+}
+
+// Fixed pin glyphs, one per category — deliberately NOT the admin-configurable
+// `CategoryConfig.icon` field (that's still used for filter chips/list-row
+// icons elsewhere; this only overrides what renders inside the map PIN
+// itself). Each renders through `monoGlyphElement` in ResourceMap.tsx, which
+// flattens it to a solid white silhouette regardless of source color, so a
+// plain letter ("H") and an emoji are handled identically. Mirrors
+// CATEGORY_COLORS' structure exactly (hospitals/eruv pulled out of the dict
+// for the same "not identified by a fixed listing-category id" reason).
+const CATEGORY_GLYPHS: Record<string, string> = {
+  synagogue: '✡', // Jewish star
+  restaurant: '🍴', // fork
+  grocery: '🛒', // shopping cart
+  // (Hospitals use HOSPITAL_ICON 'H' directly, not this dict.)
+  hotel: '🛏️', // bed
+  mikvah: '💧', // drop of water
+}
+// Eruv never has pins of its own (see MAP_CATEGORY_ORDER above) — this is
+// unused by any pin today, kept only for parity with ERUV_COLOR in case Eruv
+// ever gains a pin presence, or another caller wants its fixed glyph.
+const ERUV_GLYPH = '🧵' // a string/thread
+
+// Exported so external UI could compute the exact same fixed pin glyph as the
+// map for a given category, mirroring `colorForListingCategory`.
+export function glyphForListingCategory(categories: CategoryConfig[], categoryId: string): string | undefined {
+  const category = categories.find((c) => c.id === categoryId)
+  if (category?.kind === 'eruv') return ERUV_GLYPH
+  return CATEGORY_GLYPHS[categoryId]
 }
 
 type Props = {
@@ -201,7 +229,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         address: r.address || undefined,
         phone: r.phone,
         color: colorById.get(r.category) ?? '#64748b',
-        glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
+        glyph: CATEGORY_GLYPHS[r.category] ?? cat?.icon ?? DEFAULT_CATEGORY_ICON,
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,
         // tags, detail fields) — so a query that matches in the directory
@@ -224,7 +252,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     for (const c of categories ?? []) {
       const count = counts.get(c.id) ?? 0
       if (count === 0) continue
-      opts.push({ id: c.id, label: c.pluralLabel, icon: c.icon, color: colorById.get(c.id) ?? '#64748b', count })
+      opts.push({ id: c.id, label: c.pluralLabel, icon: CATEGORY_GLYPHS[c.id] ?? c.icon, color: colorById.get(c.id) ?? '#64748b', count })
     }
     return opts.sort((a, b) => rankMapId(a.id) - rankMapId(b.id))
   }, [allPoints, categories, colorById])
@@ -632,7 +660,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 rounded-full bg-[#E85151] pl-2.5 pr-3 py-1.5 text-sm font-semibold text-white shadow-sm">
                           <span className="relative flex h-2.5 w-2.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white" />
                             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
                           </span>
                           Live — updating as you move
@@ -665,33 +693,42 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         `focusedCategoryIds` set as `sidebar`'s own rows, so
                         the two stay in sync in both directions. Inset from
                         the right at lg+ so it stops short of the floating
-                        `sidebar` panel (320px wide, plus a gap) instead of
-                        running underneath it — below lg the sidebar isn't
-                        overlaid on the map at all, so the full width is free.
-                        Only shown alongside `sidebar` (the home page's
-                        embedded map) — the standalone map screen has no such
-                        list to sync with; it keeps its own chip row above
-                        instead. ─────────────────────────────────────────── */}
+                        `sidebar` panel (320px wide, flush against the map's
+                        right edge, no gap) instead of running underneath it
+                        — below lg the sidebar isn't overlaid on the map at
+                        all, so the full width is free. Only shown alongside
+                        `sidebar` (the home page's embedded map) — the
+                        standalone map screen has no such list to sync with;
+                        it keeps its own chip row above instead. ─────────── */}
                 {!loading && sidebar && options.length > 0 && (
-                  <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-1.5 lg:right-[336px]">
+                  <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-1.5 lg:right-80">
                     {options.map((o) => {
                       const active = !!focusedCategoryIds?.has(o.id)
                       return (
                         <button
                           key={o.id}
                           onClick={() => onFocusCategoryChange?.(o.id)}
-                          // Interior always stays #fefefe — only the border
-                          // carries this category's color (both active and
-                          // inactive), per an explicit "keep the inside of
-                          // the buttons at fefefe" instruction. Active is
-                          // instead signaled by a thicker border + the
-                          // category color on the text too.
-                          style={{ borderColor: o.color, color: active ? o.color : undefined }}
-                          className={`inline-flex items-center gap-1 rounded-full bg-[#fefefe]/85 px-2.5 py-1 text-xs font-medium shadow-md transition-colors cursor-pointer ${
-                            active ? 'border-[3px] font-semibold' : 'border-2 text-slate-600 hover:bg-slate-50'
-                          }`}
+                          // Filled solid with this category's own pin color —
+                          // like a mini pin — instead of a white pill with a
+                          // colored border, so the key reads as the same
+                          // swatch the pins themselves use. Always full
+                          // opacity — active vs. inactive is signaled by the
+                          // white ring alone, not a dimmed/undimmed fill.
+                          style={{ backgroundColor: o.color }}
+                          // Mikvah's fill is the palest step in the ramp (see
+                          // CATEGORY_COLORS) — white label text washes out on
+                          // it, so this one chip gets black text instead.
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium shadow-md transition-colors cursor-pointer ${
+                            o.id === 'mikvah' ? 'text-black' : 'text-white'
+                          } ${active ? 'ring-2 ring-white font-semibold' : 'hover:brightness-110'}`}
                         >
-                          {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                          {o.icon && (
+                            // Same flat white-silhouette treatment as the pin
+                            // glyph itself (see monoGlyphElement in
+                            // ResourceMap.tsx) — crushes the glyph's own color
+                            // (emoji or plain text alike) to solid white.
+                            <span aria-hidden="true" style={{ filter: 'brightness(0) invert(1)' }}>{o.icon}</span>
+                          )}
                           {o.label}
                         </button>
                       )
@@ -768,16 +805,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           // Below lg: a normal block underneath the map, full width. lg+: an
           // overlay panel floating on top of the map's right edge (absolute,
           // out of flow — the map above no longer shares its width with it),
-          // inset from the map's own border on all sides (top/right/bottom),
-          // so its bottom edge lines up with the map card's own bottom border
-          // — the map key (above) is a floating overlay now too, not a
-          // separate bar eating into the map's height, so there's no longer
-          // anything else to dodge vertically here. The key row instead stays
-          // clear of this panel horizontally (`lg:right-[336px]` on the key,
-          // matching this panel's own width + gap). Scrolls internally, with
-          // an opaque card treatment (background/border/shadow) so it reads
-          // clearly over the map tiles beneath it.
-          <div className="mt-6 w-full lg:absolute lg:top-4 lg:right-4 lg:bottom-4 lg:z-10 lg:mt-0 lg:w-80 lg:overflow-y-auto lg:rounded-2xl lg:border-2 lg:border-[#700F0F]/50 lg:bg-[#fefefe]/75 lg:p-3 lg:shadow-xl">
+          // flush against the map's own top/right/bottom edges (no border, no
+          // rounded corners, no gap) so it reads as part of the map card
+          // rather than a separate floating tile — the map key (above) is a
+          // floating overlay too, not a separate bar eating into the map's
+          // height, so there's no longer anything else to dodge vertically
+          // here. The key row instead stays clear of this panel horizontally
+          // (`lg:right-80` on the key, matching this panel's own width — no
+          // extra gap to add now that it's flush). Scrolls internally, with
+          // an opaque-ish fill so it still reads clearly over the map tiles
+          // beneath it.
+          <div className="mt-6 w-full lg:absolute lg:top-0 lg:right-0 lg:bottom-0 lg:z-10 lg:mt-0 lg:w-80 lg:overflow-y-auto lg:bg-[#fefefe] lg:p-3 lg:shadow-xl">
             {sidebar}
           </div>
         )}

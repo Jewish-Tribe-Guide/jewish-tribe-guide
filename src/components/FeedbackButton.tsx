@@ -21,7 +21,7 @@ export default function FeedbackButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
+        className="text-sm text-[#fefefe]/70 underline underline-offset-2 hover:text-[#fefefe]"
       >
         {buttonLabel} &rarr;
       </button>

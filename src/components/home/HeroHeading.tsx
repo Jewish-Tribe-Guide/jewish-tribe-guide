@@ -32,20 +32,23 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
   const isMobile = useIsMobile()
 
   return (
-    // Full-bleed color band (the standard `w-screen` + `margin-left: calc(50% -
-    // 50vw)` breakout — reaches the browser's edges regardless of `Landing`'s
-    // own `max-w-6xl` column) instead of a bordered card — areas are told
-    // apart by the color change itself now, not a frame around each one. No
-    // top margin — touches the sage banner band directly above it in
-    // Landing.tsx, matching every other band-to-band boundary on the page.
-    <section className="pt-12 text-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535] sm:px-6 sm:pt-16 sm:pb-10">
-      <h1 className="text-3xl sm:text-[40px] font-bold tracking-tight text-slate-900 sm:text-[#fefefe] leading-tight">
+    // Desktop: this whole band is now hidden (`sm:hidden`) — the title was
+    // removed and the search box moved up into Landing.tsx's condensed
+    // banner bar (under the tagline), leaving nothing here worth a full-bleed
+    // band for on desktop (View Map is never actually passed on the live
+    // page either — only the admin preview passes it, so its desktop
+    // appearance in that preview is a known, accepted side effect of this
+    // component now being mobile-only on the live site). Mobile is
+    // completely unaffected — every class below is unprefixed, byte-identical
+    // to before this pass, just no longer reachable at `sm+` widths.
+    <section className="pt-12 text-center sm:hidden">
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900 leading-tight">
         {settings.heroTitle}
       </h1>
-      {quickLinks && <div className="hidden sm:block sm:mt-6">{quickLinks}</div>}
+      {quickLinks && <div className="hidden">{quickLinks}</div>}
       {ui.search.landing && (
         <div className="mt-8 max-w-xl mx-auto">
-          <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)] sm:border-2 sm:border-[#700F0F]">
+          <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
             <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
             </svg>
@@ -73,7 +76,7 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
       {mapIcon != null && (
         <button
           onClick={onViewMap}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer sm:border-2 sm:border-[#ffc145] sm:hover:bg-[#ffc145]/10"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
         >
           <span aria-hidden="true">{mapIcon}</span>
           View Map

@@ -48,12 +48,11 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
   }, [coords?.lat, coords?.lng])
 
   return (
-    // Bordered again — the Zmanim band behind it is now #56a8ef (blue) while
-    // this card stays #fefefe (white), and the border marks the boundary
-    // between the two explicitly rather than relying on the color contrast
-    // alone. Only ever rendered inside Landing.tsx's desktop-only Zmanim
-    // band, so this border never shows up anywhere else.
-    <div className="rounded-2xl border-2 border-[#700F0F] bg-[#FEFEFE] p-5">
+    // No card chrome (border/background/padding) of its own anymore — the
+    // Zmanim band it's rendered inside (see Landing.tsx) IS the widget's
+    // designated area now, `#fefefe` itself, so this just flows directly in
+    // that existing bar instead of floating a separate box on top of it.
+    <div>
       <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
         <span className="text-xs text-muted">{coords ? locationLabel : community.region}</span>
@@ -139,9 +138,9 @@ function ShabbosRow({
 
   if (emphasized) {
     return (
-      <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#df4c73]/10 px-3 py-1.5 -mx-1">
-        <span className="text-sm font-semibold text-[#df4c73]">{label}</span>
-        <span className="text-sm font-semibold text-[#df4c73] tabular-nums">{value}</span>
+      <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#df4c73] px-3 py-1.5 -mx-1">
+        <span className="text-sm font-semibold text-[#fefefe]">{label}</span>
+        <span className="text-sm font-semibold text-[#fefefe] tabular-nums">{value}</span>
       </div>
     )
   }

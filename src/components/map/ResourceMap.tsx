@@ -7,12 +7,12 @@ import { community } from '@/community.config'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 // Width the floating "Browse by Category" sidebar panel actually occludes
-// from the map's right edge at lg+ (w-80 = 320px, plus its right-4 = 16px
-// gap — see ResourceMapView.tsx). Centering math below uses this so a
-// "centered" pin lands in the middle of the visible map area (between the
-// map's own left edge and the sidebar's left edge), not the middle of the
-// full map container, half of which sits behind the sidebar.
-const SIDEBAR_OCCLUSION_PX = 336
+// from the map's right edge at lg+ (w-80 = 320px, flush against the map's
+// right edge, no gap — see ResourceMapView.tsx). Centering math below uses
+// this so a "centered" pin lands in the middle of the visible map area
+// (between the map's own left edge and the sidebar's left edge), not the
+// middle of the full map container, part of which sits behind the sidebar.
+const SIDEBAR_OCCLUSION_PX = 320
 
 // Google Maps animates `panTo` smoothly on its own, but `setZoom` always
 // jumps straight to the target level — so a click that both re-centers AND
@@ -25,6 +25,24 @@ function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: num
   const next = currentZoom + (targetZoom > currentZoom ? 1 : -1)
   map.setZoom(next)
   google.maps.event.addListenerOnce(map, 'idle', () => smoothZoomTo(map, targetZoom, next))
+}
+
+// Category glyphs are admin-configured emoji (🍽️, 🏨, 🕍, …), which render as
+// full-color OS emoji glyphs — `PinElement.glyphColor` has no effect on those
+// (it only tints monochrome vector glyphs, not color emoji). To get a flat
+// white icon look without maintaining a separate emoji→SVG-icon mapping, the
+// emoji is wrapped in a DOM element (PinElement's `glyph` accepts one) with a
+// CSS filter that crushes it to a solid white silhouette: `brightness(0)`
+// turns every non-transparent pixel pure black regardless of its original
+// color, then `invert(1)` flips that black to white — the glyph's own alpha
+// shape survives, just recolored flat white.
+function monoGlyphElement(glyph: string): HTMLElement {
+  const span = document.createElement('span')
+  span.textContent = glyph
+  span.style.fontSize = '15px'
+  span.style.lineHeight = '1'
+  span.style.filter = 'brightness(0) invert(1)'
+  return span
 }
 
 /** One plottable place on the map. */
@@ -247,8 +265,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       const pin = new google.maps.marker.PinElement({
         background: p.color,
         borderColor: '#ffffff',
-        glyph: p.glyph ?? null,
-        glyphColor: '#ffffff',
+        glyph: p.glyph ? monoGlyphElement(p.glyph) : null,
         scale: 1,
       })
       const marker = new google.maps.marker.AdvancedMarkerElement({
