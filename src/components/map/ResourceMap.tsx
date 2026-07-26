@@ -50,6 +50,9 @@ type Props = {
    *  bottom sheet's place detail instead, Google-Maps-app-style. Desktop
    *  leaves this unset and keeps the info-window behavior. */
   onSelectPoint?: (point: MapPoint) => void
+  /** Tapping empty map (not a marker) — mobile uses this to collapse the
+   *  bottom sheet back down, same as tapping the map in the Google Maps app. */
+  onBackgroundClick?: () => void
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -135,7 +138,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -151,9 +154,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   // the marker an open info window was anchored to, closing it mid-tap.
   const onViewListingRef = useRef(onViewListing)
   const onSelectPointRef = useRef(onSelectPoint)
+  const onBackgroundClickRef = useRef(onBackgroundClick)
   const userLocationRef = useRef(userLocation)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
+  useEffect(() => { onBackgroundClickRef.current = onBackgroundClick }, [onBackgroundClick])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
@@ -176,8 +181,12 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         })
         infoWindowRef.current = new google.maps.InfoWindow()
         // Click-away to dismiss: tapping empty map closes the open info window
-        // (marker taps fire 'gmp-click' and don't bubble here, so they still open).
-        mapRef.current.addListener('click', () => infoWindowRef.current?.close())
+        // and collapses the mobile sheet (marker taps fire 'gmp-click' and
+        // don't bubble here, so they still open/select instead).
+        mapRef.current.addListener('click', () => {
+          infoWindowRef.current?.close()
+          onBackgroundClickRef.current?.()
+        })
         setReady(true)
       })
       .catch(() => {
