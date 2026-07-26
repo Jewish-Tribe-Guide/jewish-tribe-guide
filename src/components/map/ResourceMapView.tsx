@@ -28,11 +28,13 @@ const HOSPITAL_ICON = '🏥'
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
-// Mobile keyboards' smart-punctuation autocorrect turns a typed straight
-// apostrophe into a curly one (e.g. "Trader Joe's" → "Trader Joe’s"), which
-// then fails to substring-match data stored with a straight one (or vice
-// versa) — normalize both sides to a single form before comparing.
-const normalizeApostrophes = (s: string) => s.replace(/[‘’ʼʻ]/g, "'")
+// Apostrophes shouldn't matter for matching at all — searching "trader joes"
+// (no apostrophe, as most people type it) should still find "Trader Joe's",
+// same as a mobile keyboard's smart-punctuation autocorrect turning a typed
+// straight apostrophe into a curly one shouldn't break the match either.
+// Stripping every apostrophe variant from both sides makes all of that a
+// non-issue.
+const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
 
 const PALETTE = [
   '#2563eb', // blue
@@ -234,12 +236,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const [searchFocused, setSearchFocused] = useState(false)
   const mobileSearchInputRef = useRef<HTMLInputElement>(null)
   const searchSuggestions = useMemo(() => {
-    const q = normalizeApostrophes(input.trim().toLowerCase())
+    const q = stripApostrophes(input.trim().toLowerCase())
     if (q.length < 2 || isOpenNowWord(q)) return []
     const starts: typeof allPoints = []
     const contains: typeof allPoints = []
     for (const p of allPoints) {
-      const name = normalizeApostrophes(p.name.toLowerCase())
+      const name = stripApostrophes(p.name.toLowerCase())
       if (name.startsWith(q)) starts.push(p)
       else if (name.includes(q)) contains.push(p)
     }
@@ -287,7 +289,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // so nothing actually filters until you commit — see point 3 in the commit
   // this replaces: typing alone no longer narrows the map/list.
   const activeTerms = useMemo(() => {
-    const q = normalizeApostrophes(committedQuery.trim().toLowerCase())
+    const q = stripApostrophes(committedQuery.trim().toLowerCase())
     return q && !isOpenNowWord(q) ? [q] : []
   }, [committedQuery])
 
@@ -370,7 +372,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const visiblePoints = useMemo(() => {
     return allPoints
       .filter((p) => effectiveSelected.has(p.filterId))
-      .filter((p) => activeTerms.every((t) => normalizeApostrophes(p.searchText).includes(t)))
+      .filter((p) => activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
       .filter((p) => {
         if (!openNowActive || !p.raw) return true
@@ -605,7 +607,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onResumeFollow={() => setFollow(true)}
                 onViewListing={onViewListing}
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
-                onBackgroundClick={isMobile ? () => nearbySheetRef.current?.collapse() : undefined}
+                onBackgroundClick={isMobile ? () => nearbySheetRef.current?.lower() : undefined}
                 searchActive={searchActive}
               />
 
