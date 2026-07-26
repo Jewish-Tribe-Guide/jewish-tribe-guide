@@ -219,6 +219,34 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }
   const removeTerm = (term: string) => setTerms((prev) => prev.filter((t) => t !== term))
 
+  // ── Mobile search autocomplete — Google-Maps-style dropdown of matching
+  // places while typing, independent of the live text-filter above (which
+  // narrows the map/list) and of category toggles (a name match should surface
+  // even if that category's chip happens to be off). ───────────────────────
+  const [searchFocused, setSearchFocused] = useState(false)
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null)
+  const searchSuggestions = useMemo(() => {
+    const q = input.trim().toLowerCase()
+    if (q.length < 2 || isOpenNowWord(q)) return []
+    const starts: typeof allPoints = []
+    const contains: typeof allPoints = []
+    for (const p of allPoints) {
+      const name = p.name.toLowerCase()
+      if (name.startsWith(q)) starts.push(p)
+      else if (name.includes(q)) contains.push(p)
+    }
+    return [...starts, ...contains].slice(0, 6)
+  }, [allPoints, input])
+
+  // Picking a suggestion jumps straight to that place — map pin + sheet detail
+  // — instead of just adding it as a narrowing text filter.
+  const selectSuggestion = (p: (typeof allPoints)[number]) => {
+    setInput(p.name)
+    setSearchFocused(false)
+    mobileSearchInputRef.current?.blur()
+    nearbySheetRef.current?.selectPoint(p)
+  }
+
   // The typed-but-not-yet-added text also filters, so results update live — except
   // an "open now" keyword, which becomes the filter on Enter, not a text match.
   const activeTerms = useMemo(() => {
@@ -325,6 +353,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
   }, [allPoints, effectiveSelected, activeTerms, filterChips])
+
+  // Committing a search term or filter chip (not each keystroke — terms/
+  // filterChips only change at commit points, unlike activeTerms/visiblePoints
+  // which also track the live-typed-but-uncommitted text) surfaces the result
+  // the way Google Maps does: exactly one match opens straight to its card,
+  // more than one raises the sheet enough to show the list.
+  useEffect(() => {
+    if (!isMobile) return
+    if (terms.length === 0 && filterChips.length === 0) return
+    if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
+    else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terms, filterChips])
 
   const toggle = (id: string) => {
     const next = new Set(effectiveSelected)
@@ -567,20 +608,41 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                       </svg>
                       <input
+                        ref={mobileSearchInputRef}
                         type="text"
                         placeholder={terms.length ? 'Add another term…' : "Search name, address, 'open now'…"}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        onFocus={() => setSearchFocused(true)}
+                        onBlur={() => setSearchFocused(false)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            addTerm(input)
+                            // With suggestions open, Enter picks the top one —
+                            // same as the Google Maps app — otherwise it pins
+                            // the typed text as a narrowing filter.
+                            if (searchSuggestions.length > 0) selectSuggestion(searchSuggestions[0])
+                            else addTerm(input)
+                          } else if (e.key === 'Escape') {
+                            setSearchFocused(false)
+                            ;(e.target as HTMLInputElement).blur()
                           } else if (e.key === 'Backspace' && !input && terms.length) {
                             removeTerm(terms[terms.length - 1])
                           }
                         }}
                         className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                       />
+                      {input && (
+                        <button
+                          onClick={() => { setInput(''); mobileSearchInputRef.current?.focus() }}
+                          aria-label="Clear search"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                     {options.length > 0 && (
                       <button
@@ -597,6 +659,39 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       </button>
                     )}
                   </div>
+
+                  {/* ── Autocomplete dropdown — Google-Maps-style: matching
+                          places while typing, tap one to jump straight to its
+                          card instead of just narrowing the list. ─────────── */}
+                  {searchFocused && searchSuggestions.length > 0 && (
+                    <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
+                      {searchSuggestions.map((p) => (
+                        <button
+                          key={p.id}
+                          // Prevents the input's blur (which would close this
+                          // dropdown before the click lands) from firing at all.
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectSuggestion(p)}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+                        >
+                          <span
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
+                            style={{ backgroundColor: p.color + '22' }}
+                            aria-hidden="true"
+                          >
+                            {p.glyph ?? '📍'}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
+                            <p className="truncate text-xs text-slate-400">
+                              {p.categoryLabel}
+                              {p.address ? ` · ${p.address}` : ''}
+                            </p>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {chipsRow}
                   {(activeTerms.length > 0 || filterChips.length > 0) && (
                     <p className="mt-1.5 inline-block rounded-full bg-white/90 px-2.5 py-1 text-xs text-muted shadow">
