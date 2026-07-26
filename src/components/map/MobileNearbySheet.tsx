@@ -52,9 +52,11 @@ export type MobileNearbySheetHandle = {
    *  back up brings the same place back, rather than losing it in favor of
    *  the plain nearby list (see ResourceMap's onBackgroundClick). */
   lower: () => void
-  /** Raises a collapsed sheet to 'half' without selecting anything — called
-   *  when a search narrows the results, so the (possibly multi-result) list
-   *  becomes visible instead of staying hidden behind the peek handle. */
+  /** Clears any selected place and raises a collapsed sheet to 'half' —
+   *  called when a search narrows to several results, so the list becomes
+   *  visible (instead of staying hidden behind the peek handle) and replaces
+   *  whatever single place's card might have been showing from a previous
+   *  search. */
   raise: () => void
 }
 
@@ -108,6 +110,10 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   function raise() {
+    // Clears any previously-selected place — a new search that resolves to
+    // several results should show that list, not leave an old place's card
+    // sitting on screen from before this search started.
+    setSelected(null)
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
