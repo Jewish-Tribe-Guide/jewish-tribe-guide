@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { DirectoryResource } from '@/types'
 
 /** One plottable place on the map. */
@@ -142,6 +143,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
+  const isMobile = useIsMobile()
 
   // Read these inside the marker effect via refs so it does NOT rebuild markers
   // when the live GPS position ticks or the callback identity changes — only
@@ -188,6 +190,18 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── One-finger pan/zoom on mobile ──────────────────────────────────────────
+  // Google's default ('auto'/'cooperative') asks for two fingers to pan
+  // whenever it thinks the map sits inside a scrollable page — showing a
+  // "Use two fingers to move the map" overlay on the first touch instead of
+  // just panning. That's the right call for a map embedded among other
+  // scrollable content (desktop's boxed map), but this mobile screen IS the
+  // map — nothing behind it needs to scroll — so 'greedy' lets one finger
+  // pan/zoom immediately, like the native Google Maps app.
+  useEffect(() => {
+    mapRef.current?.setOptions({ gestureHandling: isMobile ? 'greedy' : 'auto' })
+  }, [isMobile, ready])
 
   // ── Keep the map's tile layer in sync with its container's actual size ────
   // Google Maps snapshots its container's dimensions at init and never
