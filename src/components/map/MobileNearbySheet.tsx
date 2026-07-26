@@ -14,6 +14,10 @@ type Point = MapPoint & { filterId: string; raw?: DirectoryResource }
 // snap leaves at the top so it never covers the floating search bar above it.
 const PEEK_PX = 64
 const TOP_INSET_PX = 76
+const SNAP_ORDER: Snap[] = ['peek', 'half', 'full']
+// Google Maps' sheet advances an extra snap point on a fast flick even if you
+// release well short of it — px/ms measured over the last pointer move.
+const FLING_VELOCITY = 0.5
 
 type Props = {
   points: Point[]
@@ -57,7 +61,14 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
-  const dragRef = useRef<{ startY: number; startHeight: number; moved: boolean } | null>(null)
+  const dragRef = useRef<{
+    startY: number
+    startHeight: number
+    moved: boolean
+    lastY: number
+    lastT: number
+    velocity: number
+  } | null>(null)
   const [selected, setSelected] = useState<Point | null>(null)
 
   const heights: Record<Snap, number> = {
@@ -76,7 +87,14 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   function onPointerDown(e: React.PointerEvent) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    dragRef.current = { startY: e.clientY, startHeight: heights[snap], moved: false }
+    dragRef.current = {
+      startY: e.clientY,
+      startHeight: heights[snap],
+      moved: false,
+      lastY: e.clientY,
+      lastT: e.timeStamp,
+      velocity: 0,
+    }
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -85,6 +103,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     const delta = drag.startY - e.clientY // dragging up (finger moves up) grows the sheet
     if (Math.abs(delta) > 3) drag.moved = true
     setDragHeight(Math.min(heights.full, Math.max(PEEK_PX, drag.startHeight + delta)))
+
+    const dt = e.timeStamp - drag.lastT
+    if (dt > 0) drag.velocity = (drag.lastY - e.clientY) / dt // px/ms, positive = growing
+    drag.lastY = e.clientY
+    drag.lastT = e.timeStamp
   }
 
   function onPointerUp() {
@@ -99,9 +122,13 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       return
     }
     const settled = dragHeight ?? heights[snap]
-    const closest = (Object.entries(heights) as [Snap, number][]).reduce((best, [s, h]) =>
-      Math.abs(h - settled) < Math.abs(heights[best] - settled) ? s : best, 'peek' as Snap)
-    setSnap(closest)
+    let index = SNAP_ORDER.reduce((bestIdx, s, i) =>
+      Math.abs(heights[s] - settled) < Math.abs(heights[SNAP_ORDER[bestIdx]] - settled) ? i : bestIdx, 0)
+    // A fast flick jumps one snap further in its direction even if the
+    // release point landed closer to the current one.
+    if (drag.velocity > FLING_VELOCITY) index = Math.min(index + 1, SNAP_ORDER.length - 1)
+    else if (drag.velocity < -FLING_VELOCITY) index = Math.max(index - 1, 0)
+    setSnap(SNAP_ORDER[index])
     setDragHeight(null)
   }
 
@@ -112,7 +139,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       className="absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.18)] sm:hidden"
       style={{
         height: currentHeight,
-        transition: dragHeight === null ? 'height 200ms ease-out' : 'none',
+        transition: dragHeight === null ? 'height 280ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
       }}
     >
       <div
