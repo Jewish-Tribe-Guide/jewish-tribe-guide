@@ -549,6 +549,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onResumeFollow={() => setFollow(true)}
                 onViewListing={onViewListing}
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
+                onBackgroundClick={isMobile ? () => nearbySheetRef.current?.collapse() : undefined}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the

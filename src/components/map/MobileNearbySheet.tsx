@@ -19,6 +19,9 @@ const SNAP_ORDER: Snap[] = ['peek', 'half', 'full']
 // Google Maps' sheet advances an extra snap point on a fast flick even if you
 // release well short of it — px/ms measured over the last pointer move.
 const FLING_VELOCITY = 0.5
+// 'half' only claims this fraction of the full peek↔full drag range around
+// its own height — see resolveSnap.
+const HALF_BAND_FRACTION = 0.14
 
 type Props = {
   points: Point[]
@@ -36,10 +39,15 @@ type Props = {
 }
 
 export type MobileNearbySheetHandle = {
-  /** Selects a place and snaps to 'half' — called when a marker is tapped
-   *  directly on the map, so a pin tap and a list-row tap land in the same
-   *  spot (see ResourceMapView's onSelectPoint wiring to ResourceMap). */
+  /** Selects a place, raising the sheet to 'half' only if it's currently
+   *  collapsed — called when a marker is tapped directly on the map, so a
+   *  pin tap and a list-row tap land in the same spot (see ResourceMapView's
+   *  onSelectPoint wiring to ResourceMap). */
   selectPoint: (point: Point) => void
+  /** Collapses the sheet and clears any selected place — called when the
+   *  visitor taps empty map, same as dismissing the card in the Google Maps
+   *  app (see ResourceMap's onBackgroundClick). */
+  collapse: () => void
 }
 
 /**
@@ -76,10 +84,18 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   function selectPlace(point: Point) {
     setSelected(point)
-    setSnap('half')
+    // Only raise a collapsed sheet — if it's already half or full (the
+    // visitor deliberately expanded it, e.g. browsing the full list), picking
+    // a place shouldn't shrink it back down, same as the Google Maps app.
+    setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
-  useImperativeHandle(ref, () => ({ selectPoint: selectPlace }))
+  function collapse() {
+    setSelected(null)
+    setSnap('peek')
+  }
+
+  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse }))
 
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
@@ -97,12 +113,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     return delta
   }
 
-  /** Picks the snap point closest to where the drag settled, then nudges it
-   *  one step further in the fling direction if the release was fast enough —
-   *  the same "flick past where you let go" behavior Google Maps' sheet has. */
+  /** Picks the snap point a drag settles on. 'half' only claims a narrow band
+   *  around its own height — everywhere else in the drag range resolves to
+   *  peek or full instead, so a drag from full mostly falls straight to peek
+   *  (the common "close the sheet" gesture) and only a careful release right
+   *  near half actually stops there, same asymmetry Google Maps' sheet has.
+   *  A fast-enough flick then nudges one step further in its direction. */
   function resolveSnap(drag: DragState, settled: number): Snap {
-    let index = SNAP_ORDER.reduce((bestIdx, s, i) =>
-      Math.abs(heights[s] - settled) < Math.abs(heights[SNAP_ORDER[bestIdx]] - settled) ? i : bestIdx, 0)
+    const band = (heights.full - heights.peek) * HALF_BAND_FRACTION
+    let index = settled < heights.half - band ? 0 : settled > heights.half + band ? 2 : 1
     if (drag.velocity > FLING_VELOCITY) index = Math.min(index + 1, SNAP_ORDER.length - 1)
     else if (drag.velocity < -FLING_VELOCITY) index = Math.max(index - 1, 0)
     return SNAP_ORDER[index]
