@@ -85,7 +85,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const [snap, setSnap] = useState<Snap>('peek')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragRef = useRef<DragState | null>(null)
-  const contentDragRef = useRef<(DragState & { active: boolean }) | null>(null)
+  const contentDragRef = useRef<(DragState & { active: boolean; startX: number; lockedDir: 'horizontal' | 'vertical' | null }) | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<Point | null>(null)
   // Read via a ref, like ResourceMap's own callback props, so this effect
@@ -192,15 +192,33 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
    *  expanded — dragging over the list just grows the sheet instead of
    *  scrolling it. Only once full does the list scroll normally, and even
    *  then, dragging down once you're already scrolled to the top hands
-   *  control back to the sheet so it collapses instead of doing nothing. */
+   *  control back to the sheet so it collapses instead of doing nothing.
+   *
+   *  This same content area also catches a leftward swipe as "back to list"
+   *  while a place is selected — same action as tapping "Back to list", but
+   *  as a gesture. It's handled here (covering the sheet's full content
+   *  area) rather than inside MapPlaceDetail itself, so it still works over
+   *  blank space below a short place's card, not just over its text. */
   function onContentPointerDown(e: React.PointerEvent) {
-    contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full' }
+    contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full', startX: e.clientX, lockedDir: null }
   }
 
   function onContentPointerMove(e: React.PointerEvent) {
     const drag = contentDragRef.current
     if (!drag) return
     trackDrag(drag, e.clientY, e.timeStamp)
+
+    // Decide, once, whether this gesture is the swipe-back (horizontal) or
+    // the sheet's usual vertical drag/scroll — whichever axis moves further
+    // first wins, so a swipe doesn't also nudge the sheet's height.
+    if (drag.lockedDir === null) {
+      const dx = e.clientX - drag.startX
+      const dy = e.clientY - drag.startY
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        drag.lockedDir = selected && Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
+      }
+    }
+    if (drag.lockedDir === 'horizontal') return // resolved at pointerup
 
     if (!drag.active) {
       // Only armed when snap === 'full' (see onContentPointerDown) — hand
@@ -219,10 +237,16 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setDragHeight(Math.min(heights.full, Math.max(PEEK_PX, drag.startHeight + (drag.startY - e.clientY))))
   }
 
-  function onContentPointerUp() {
+  function onContentPointerUp(e: React.PointerEvent) {
     const drag = contentDragRef.current
     contentDragRef.current = null
-    if (!drag || !drag.moved || !drag.active) return
+    if (!drag) return
+    if (drag.lockedDir === 'horizontal') {
+      if (selected && e.clientX - drag.startX < -60) setSelected(null)
+      setDragHeight(null)
+      return
+    }
+    if (!drag.moved || !drag.active) return
     setSnap(resolveSnap(drag, dragHeight ?? heights[snap]))
     setDragHeight(null)
   }

@@ -1,6 +1,5 @@
 'use client'
 
-import { useRef } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
@@ -99,44 +98,8 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
   const showPhone = category.hasPhone !== false && !!item.phone
   const website = urlFields.map((f) => display(item[f.key])).find(Boolean)
 
-  // Swiping left goes back to the list, same as tapping "Back to list" — a
-  // gesture, not just a check, so it doesn't fight the sheet's own vertical
-  // drag-to-resize: only once a touch has moved further horizontally than
-  // vertically do we lock in as a horizontal swipe and stop the event from
-  // reaching the sheet's drag handling.
-  const swipeRef = useRef<{ startX: number; startY: number; locked: 'horizontal' | 'vertical' | null } | null>(null)
-
-  function onSwipePointerDown(e: React.PointerEvent) {
-    swipeRef.current = { startX: e.clientX, startY: e.clientY, locked: null }
-  }
-
-  function onSwipePointerMove(e: React.PointerEvent) {
-    const s = swipeRef.current
-    if (!s) return
-    const dx = e.clientX - s.startX
-    const dy = e.clientY - s.startY
-    if (s.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-      s.locked = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
-    }
-    if (s.locked === 'horizontal') e.stopPropagation()
-  }
-
-  function onSwipePointerUp(e: React.PointerEvent) {
-    const s = swipeRef.current
-    swipeRef.current = null
-    if (!s || s.locked !== 'horizontal') return
-    e.stopPropagation()
-    if (e.clientX - s.startX < -60) onBack()
-  }
-
   return (
-    <div
-      className="space-y-4 pb-2"
-      onPointerDown={onSwipePointerDown}
-      onPointerMove={onSwipePointerMove}
-      onPointerUp={onSwipePointerUp}
-      onPointerCancel={onSwipePointerUp}
-    >
+    <div className="space-y-4 pb-2">
       <button
         onClick={onBack}
         className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
