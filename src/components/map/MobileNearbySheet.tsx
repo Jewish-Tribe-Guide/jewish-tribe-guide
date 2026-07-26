@@ -48,6 +48,11 @@ export type MobileNearbySheetHandle = {
    *  pin tap and a list-row tap land in the same spot (see ResourceMapView's
    *  onSelectPoint wiring to ResourceMap). */
   selectPoint: (point: Point) => void
+  /** Clears the selected place without touching the snap point — called when
+   *  a second tap lands on the pin that's already selected, so the sheet
+   *  falls back to the nearby list at whatever height it was already at
+   *  (same as swiping left on the place's card). */
+  deselectPoint: () => void
   /** Collapses the sheet and clears any selected place — called when
    *  clearing the search box, so it resets back to the default browse state. */
   collapse: () => void
@@ -114,6 +119,10 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
+  function deselectPoint() {
+    setSelected(null)
+  }
+
   function collapse() {
     setSelected(null)
     setSnap('peek')
@@ -131,7 +140,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
-  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse, lower, raise }))
+  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, deselectPoint, collapse, lower, raise }))
 
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
