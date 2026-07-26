@@ -611,6 +611,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onResumeFollow={() => setFollow(true)}
                 onViewListing={onViewListing}
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
+                onDeselectPoint={isMobile ? () => nearbySheetRef.current?.deselectPoint() : undefined}
                 onBackgroundClick={isMobile ? () => nearbySheetRef.current?.lower() : undefined}
                 searchActive={searchActive}
                 selectedId={selectedPointId}

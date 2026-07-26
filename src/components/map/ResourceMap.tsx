@@ -50,6 +50,10 @@ type Props = {
    *  bottom sheet's place detail instead, Google-Maps-app-style. Desktop
    *  leaves this unset and keeps the info-window behavior. */
   onSelectPoint?: (point: MapPoint) => void
+  /** Called instead of onSelectPoint when the tapped marker is already the
+   *  selected one — lets a second tap on the same pin deselect it, same as
+   *  tapping "Back to list" or swiping left on its card. */
+  onDeselectPoint?: () => void
   /** Tapping empty map (not a marker) — mobile uses this to drop the bottom
    *  sheet back to peek height, keeping any selected place so dragging back
    *  up returns to it instead of losing it in favor of the nearby list. */
@@ -160,7 +164,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick, searchActive, selectedId }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -181,15 +185,18 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   // the marker an open info window was anchored to, closing it mid-tap.
   const onViewListingRef = useRef(onViewListing)
   const onSelectPointRef = useRef(onSelectPoint)
+  const onDeselectPointRef = useRef(onDeselectPoint)
   const onBackgroundClickRef = useRef(onBackgroundClick)
   const userLocationRef = useRef(userLocation)
   const searchActiveRef = useRef(searchActive)
   const selectedIdRef = useRef(selectedId)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
+  useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
   useEffect(() => { onBackgroundClickRef.current = onBackgroundClick }, [onBackgroundClick])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
+  useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -285,7 +292,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       })
       marker.addListener('gmp-click', () => {
         if (onSelectPointRef.current) {
-          onSelectPointRef.current(p)
+          if (selectedIdRef.current === p.id) {
+            onDeselectPointRef.current?.()
+          } else {
+            onSelectPointRef.current(p)
+          }
           return
         }
         const iw = infoWindowRef.current
@@ -329,15 +340,28 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   // one enlarged) instead of rebuilding the whole marker set on every tap.
   const prevSelectedIdRef = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (!ready) return
+    const map = mapRef.current
+    if (!ready || !map) return
     const prevId = prevSelectedIdRef.current
     if (prevId && prevId !== selectedId) {
       const prev = markersByIdRef.current.get(prevId)
       if (prev) prev.marker.content = buildPin(prev.point, false).element
     }
-    if (selectedId) {
+    if (selectedId && selectedId !== prevId) {
       const current = markersByIdRef.current.get(selectedId)
-      if (current) current.marker.content = buildPin(current.point, true).element
+      if (current) {
+        current.marker.content = buildPin(current.point, true).element
+        // Frame the selected place alongside the visitor's own location, same
+        // as a search result — so picking a listing from the sheet (or a pin
+        // that wasn't already selected) shows how far it is from "you are
+        // here" instead of just centering on the pin alone.
+        if (userLocationRef.current) {
+          const bounds = new google.maps.LatLngBounds()
+          bounds.extend(userLocationRef.current)
+          bounds.extend({ lat: current.point.lat, lng: current.point.lng })
+          map.fitBounds(bounds, 64)
+        }
+      }
     }
     prevSelectedIdRef.current = selectedId
   }, [selectedId, ready])

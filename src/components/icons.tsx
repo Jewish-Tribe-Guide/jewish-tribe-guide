@@ -49,12 +49,15 @@ export function ClockIcon({ className }: IconProps) {
   )
 }
 
-// Location pin — the header's "Set location" mark and the mobile distance strip.
-export function PinIcon({ className }: IconProps) {
+// Location pin — the header's "Set location" mark. Rendered filled once a
+// location is actually set (see LocationControl) — that's the only feedback
+// mobile gets that the address stuck, since the pill's text collapses down to
+// just this icon there.
+export function PinIcon({ className, filled }: IconProps & { filled?: boolean }) {
   return (
-    <svg {...base} className={className}>
+    <svg {...base} fill={filled ? 'currentColor' : 'none'} className={className}>
       <path d="M12 21c-4.4-3.9-7-7.4-7-10.8A7 7 0 0 1 12 3a7 7 0 0 1 7 7.2c0 3.4-2.6 6.9-7 10.8z" />
-      <circle cx="12" cy="10" r="2.6" />
+      <circle cx="12" cy="10" r="2.6" {...(filled ? { fill: 'white', stroke: 'none' } : {})} />
     </svg>
   )
 }
