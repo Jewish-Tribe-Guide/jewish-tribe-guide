@@ -646,7 +646,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         placeholder="Search name, address, 'open now'…"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onFocus={() => setSearchFocused(true)}
+                        onFocus={() => {
+                          setSearchFocused(true)
+                          // Drop the sheet out of the way while actively
+                          // searching — at half or full it sits over the
+                          // search box/dropdown. Keeps any selected place
+                          // (lower, not collapse), so dismissing the keyboard
+                          // brings it right back to where it was.
+                          nearbySheetRef.current?.lower()
+                        }}
                         onBlur={() => setSearchFocused(false)}
                         onKeyDown={(e) => {
                           if (e.key === 'Escape') {

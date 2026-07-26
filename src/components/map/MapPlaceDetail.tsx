@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
@@ -7,7 +8,7 @@ import HoursDisplay from '@/components/resources/HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from '@/components/resources/DaveningTimes'
 import Chip from '@/components/resources/Chip'
 import { businessUrl } from '@/lib/googleMapsLinks'
-import { ChevronLeftIcon, PinIcon, PhoneIcon, DirectionsIcon, ExternalIcon } from '@/components/icons'
+import { ChevronLeftIcon, PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon } from '@/components/icons'
 
 // ── Field helpers (same rules GenericListingCard uses, so a place looks
 // identical whether you found it from the map or the category directory) ──
@@ -98,8 +99,44 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
   const showPhone = category.hasPhone !== false && !!item.phone
   const website = urlFields.map((f) => display(item[f.key])).find(Boolean)
 
+  // Swiping left goes back to the list, same as tapping "Back to list" — a
+  // gesture, not just a check, so it doesn't fight the sheet's own vertical
+  // drag-to-resize: only once a touch has moved further horizontally than
+  // vertically do we lock in as a horizontal swipe and stop the event from
+  // reaching the sheet's drag handling.
+  const swipeRef = useRef<{ startX: number; startY: number; locked: 'horizontal' | 'vertical' | null } | null>(null)
+
+  function onSwipePointerDown(e: React.PointerEvent) {
+    swipeRef.current = { startX: e.clientX, startY: e.clientY, locked: null }
+  }
+
+  function onSwipePointerMove(e: React.PointerEvent) {
+    const s = swipeRef.current
+    if (!s) return
+    const dx = e.clientX - s.startX
+    const dy = e.clientY - s.startY
+    if (s.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      s.locked = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
+    }
+    if (s.locked === 'horizontal') e.stopPropagation()
+  }
+
+  function onSwipePointerUp(e: React.PointerEvent) {
+    const s = swipeRef.current
+    swipeRef.current = null
+    if (!s || s.locked !== 'horizontal') return
+    e.stopPropagation()
+    if (e.clientX - s.startX < -60) onBack()
+  }
+
   return (
-    <div className="space-y-4 pb-2">
+    <div
+      className="space-y-4 pb-2"
+      onPointerDown={onSwipePointerDown}
+      onPointerMove={onSwipePointerMove}
+      onPointerUp={onSwipePointerUp}
+      onPointerCancel={onSwipePointerUp}
+    >
       <button
         onClick={onBack}
         className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
@@ -196,13 +233,16 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
           const val = item[f.key]
           if (val === undefined && !(i === 0 && item.businessStatus)) return null
           return (
-            <div key={f.key}>
-              {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
-              <HoursDisplay
-                value={val}
-                businessStatus={i === 0 ? item.businessStatus : undefined}
-                syncedAt={i === 0 ? item.googleSyncedAt : undefined}
-              />
+            <div key={f.key} className="flex items-start gap-3">
+              <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+              <div className="min-w-0 flex-1">
+                {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+                <HoursDisplay
+                  value={val}
+                  businessStatus={i === 0 ? item.businessStatus : undefined}
+                  syncedAt={i === 0 ? item.googleSyncedAt : undefined}
+                />
+              </div>
             </div>
           )
         })}
