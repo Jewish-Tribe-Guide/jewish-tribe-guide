@@ -22,14 +22,19 @@ export default function LocationControl({ controls }: Props) {
   const [geoError, setGeoError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Close when clicking anywhere outside the popover.
+  // Close when tapping/clicking anywhere outside the popover. Listens during
+  // the CAPTURE phase, not bubble — the Google Map (mobile's Map tab) runs its
+  // own gesture handling on tap that stops the event from ever bubbling up to
+  // document, so a normal bubble-phase listener never saw taps on the map and
+  // the popover was stuck open. Capture runs on the way down, before the
+  // map's own handler gets a chance to swallow it, so this fires regardless.
   useEffect(() => {
     if (!open) return
-    function onDown(e: MouseEvent) {
+    function onDown(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
   }, [open])
 
   // Allow any component (e.g. AddressPrompt) to open the picker without prop drilling.
