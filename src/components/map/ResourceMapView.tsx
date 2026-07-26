@@ -16,7 +16,6 @@ import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
-import { SlidersIcon } from '@/components/icons'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
@@ -82,9 +81,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const activeLocation: LatLng | null = livePosition ?? userLocation ?? null
 
   const [tab, setTab] = useState<Tab>('map')
-  // Mobile only — the category chip row moves behind this sheet (see the
-  // "Filters" button) so the floating search bar over the map stays compact.
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
@@ -439,11 +435,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     </div>
   )
 
-  // How many of the available categories are currently turned off — the badge
-  // on the mobile "Filters" button, so it's clear at a glance that the map
-  // isn't showing everything.
-  const hiddenCategoryCount = options.length - effectiveSelected.size
-
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
@@ -539,8 +530,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {/* ── Category filter chips (broad filter, above search's narrower text
               filter — a single scroll row so they stay compact). Desktop only —
-              on mobile these move behind the "Filters" button next to the
-              search box, opening the same CategoryFilter in a sheet below. ─── */}
+              on mobile the same CategoryFilter renders inline under the
+              floating search bar instead (see below). ────────────────────── */}
       {!loading && options.length > 0 && (
         <div className="mb-4 hidden sm:block">
           <CategoryFilter
@@ -619,8 +610,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
               {/* ── Floating search + filters (mobile) — laid directly over the
                       map, Google-Maps-style, instead of pushing it down. Category
-                      chips tuck behind the "Filters" button (opens the sheet
-                      below) so this stays a single compact row. ───────────────── */}
+                      chips sit right under the search bar as their own
+                      always-visible scroll row, same as Google Maps — no
+                      separate "Filters" button/sheet. ───────────────────────── */}
               {ui.search.map && isMobile && (
                 <div
                   className="absolute inset-x-0 top-0 z-10 px-3 pb-2 sm:hidden"
@@ -678,21 +670,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         </button>
                       )}
                     </form>
-                    {options.length > 0 && (
-                      <button
-                        onClick={() => setFilterSheetOpen(true)}
-                        aria-label="Filter categories"
-                        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg cursor-pointer"
-                      >
-                        <SlidersIcon className="h-[1.125rem] w-[1.125rem]" />
-                        {hiddenCategoryCount > 0 && (
-                          <span className="absolute -top-1 -right-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white">
-                            {hiddenCategoryCount}
-                          </span>
-                        )}
-                      </button>
-                    )}
                   </div>
+
+                  {/* ── Category filter chips — Google-Maps-style: a always-
+                          visible horizontal-scroll row of pill toggles right
+                          under the search bar, floating directly on the map
+                          (no separate "Filters" button/sheet). Ducks out of the
+                          way while the autocomplete dropdown below is showing,
+                          same as Google Maps swapping chips for suggestions. ── */}
+                  {options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
+                    <div className="mt-2">
+                      <CategoryFilter
+                        options={options}
+                        selected={effectiveSelected}
+                        onToggle={toggle}
+                        onAll={showAll}
+                        onNone={hideAll}
+                      />
+                    </div>
+                  )}
 
                   {/* ── Autocomplete dropdown — Google-Maps-style: matching
                           places while typing, tap one to jump straight to its
@@ -807,43 +803,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </p>
       )}
 
-      {/* ── Mobile filter sheet — the category chip row from the desktop layout,
-              reached from the "Filters" button next to the mobile search box. ── */}
-      {filterSheetOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-slate-900/40 sm:hidden"
-          onClick={(e) => { if (e.target === e.currentTarget) setFilterSheetOpen(false) }}
-          role="presentation"
-        >
-          <div className="max-h-[75vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Categories</h3>
-              <button
-                onClick={() => setFilterSheetOpen(false)}
-                aria-label="Close"
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <CategoryFilter
-              options={options}
-              selected={effectiveSelected}
-              onToggle={toggle}
-              onAll={showAll}
-              onNone={hideAll}
-            />
-            <button
-              onClick={() => setFilterSheetOpen(false)}
-              className="mt-4 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
