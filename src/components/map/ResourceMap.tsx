@@ -53,6 +53,10 @@ type Props = {
   /** Tapping empty map (not a marker) — mobile uses this to collapse the
    *  bottom sheet back down, same as tapping the map in the Google Maps app. */
   onBackgroundClick?: () => void
+  /** True while a search query or filter chip is narrowing `points` — overrides
+   *  the "don't reframe if a user location is set" rule below, so searching
+   *  actually takes you to the result(s), same as the Google Maps app. */
+  searchActive?: boolean
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -138,7 +142,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick, searchActive }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -156,10 +160,12 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const onSelectPointRef = useRef(onSelectPoint)
   const onBackgroundClickRef = useRef(onBackgroundClick)
   const userLocationRef = useRef(userLocation)
+  const searchActiveRef = useRef(searchActive)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onBackgroundClickRef.current = onBackgroundClick }, [onBackgroundClick])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
+  useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -273,8 +279,10 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     }
 
     // Don't auto-reframe to the points if the visitor has a location set —
-    // keeping "where am I" in view matters more than framing every pin.
-    if (userLocationRef.current) return
+    // keeping "where am I" in view matters more than framing every pin —
+    // unless a search is actively narrowing them, in which case showing the
+    // result(s) takes priority, same as the Google Maps app.
+    if (userLocationRef.current && !searchActiveRef.current) return
     if (points.length === 1) {
       map.setCenter(bounds.getCenter())
       map.setZoom(15)
