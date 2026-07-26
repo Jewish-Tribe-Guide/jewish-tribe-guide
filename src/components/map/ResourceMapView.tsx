@@ -86,6 +86,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // categories plus a trailing "More" chip; tapping it opens this full-screen
   // picker with every category, Google-Maps-style.
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+  // Dismissible for the rest of this visit once tapped away — plain local
+  // state (not persisted), so it resets on a real page reload but, since
+  // ResourceMapView now stays mounted across tab switches (see page.tsx),
+  // doesn't nag again just for leaving and returning to the Map tab.
+  const [locationPromptDismissed, setLocationPromptDismissed] = useState(false)
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
@@ -778,6 +783,39 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 >
                   Stop tracking
                 </button>
+              )}
+
+              {/* ── No-location prompt (mobile) — without an anchor, distances/
+                      sorting and the re-center dot have nothing to work from, and
+                      it's easy to land here from the Categories tab without ever
+                      noticing the "Set location" pill up in the header. Sits above
+                      the tracking FAB (bottom-[8.25rem] clears its 4.75rem offset
+                      + 3rem height + a small gap) so the two never collide. Opens
+                      the same header popover as AddressPrompt, via the same
+                      'jpc:open-location' event, rather than duplicating an address
+                      input here. */}
+              {!activeLocation && !locationPromptDismissed && (
+                <div className="absolute bottom-[8.25rem] inset-x-3 z-10 flex items-center gap-2.5 rounded-2xl bg-white px-3.5 py-3 shadow-lg ring-1 ring-slate-900/5 sm:hidden">
+                  <span className="text-xl shrink-0" aria-hidden="true">📍</span>
+                  <p className="min-w-0 flex-1 text-xs text-slate-600">
+                    Set your location to see how far places are.
+                  </p>
+                  <button
+                    onClick={() => document.dispatchEvent(new CustomEvent('jpc:open-location'))}
+                    className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white cursor-pointer"
+                  >
+                    Set location
+                  </button>
+                  <button
+                    onClick={() => setLocationPromptDismissed(true)}
+                    aria-label="Dismiss"
+                    className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               )}
 
               {/* ── Mobile nearby list — a draggable bottom sheet over the
