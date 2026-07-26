@@ -1,7 +1,7 @@
 'use client'
 
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
-import { StarOfDavid, PinIcon } from '@/components/icons'
+import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { SiteSettings } from '@/lib/siteSettings'
 
@@ -56,26 +56,6 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
           <LocationControl controls={location} />
         </div>
       </div>
-
-      {/* Mobile-only confirmation that a location is set. On desktop the pill
-          already shows the address; on mobile the pill collapses to just the
-          pin, so this strip is where the visitor sees (and can re-tap to
-          change) their selected location. */}
-      {location.address && (
-        <button
-          type="button"
-          onClick={() => document.dispatchEvent(new Event('jpc:open-location'))}
-          className="sm:hidden flex w-full items-center gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-1.5 text-left active:bg-slate-100"
-        >
-          <PinIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
-          <span className="truncate text-[12px] text-slate-600">
-            Distances from{' '}
-            <span className="font-semibold text-slate-800">
-              {location.address === 'Current location' ? 'your current location' : location.address}
-            </span>
-          </span>
-        </button>
-      )}
     </header>
   )
 }
