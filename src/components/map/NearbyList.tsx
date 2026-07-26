@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import { directionsUrl } from '@/lib/googleMapsLinks'
+import { DirectionsIcon } from '@/components/icons'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
@@ -63,38 +64,42 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
         const canViewListing = !!(onSelectPlace || onViewListing) && p.filterId !== HOSPITALS_FILTER_ID
 
         return (
-          <div key={p.id} className="flex items-center gap-3 px-4 py-3.5">
-            {/* Category dot */}
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg"
-              style={{ backgroundColor: p.color + '22' }}
-              aria-hidden="true"
-            >
-              {p.glyph ?? '📍'}
-            </span>
-
-            {/* Name + category + address — tappable when a directory exists */}
+          <div key={p.id} className="flex items-stretch gap-2 px-4 py-3">
+            {/* Name + category + address — tappable when a directory exists.
+                Icon lives inside the button too so the whole left cluster is
+                one tap target, Google-Maps-style, not just the text. */}
             <button
               onClick={canViewListing ? () => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id)) : undefined}
               disabled={!canViewListing}
-              className={`min-w-0 flex-1 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
+              className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
             >
-              <p className={`truncate text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
-                {p.name}
-                {canViewListing && (
-                  <span className="ml-1 text-slate-300 group-hover:text-blue-400 transition-colors text-xs">›</span>
-                )}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5 truncate">
-                {p.categoryLabel}
-                {p.address ? ` · ${p.address}` : ''}
-              </p>
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg"
+                style={{ backgroundColor: p.color + '22' }}
+                aria-hidden="true"
+              >
+                {p.glyph ?? '📍'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className={`truncate text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
+                  {p.name}
+                  {canViewListing && (
+                    <span className="ml-1 text-slate-300 group-hover:text-blue-400 transition-colors text-xs">›</span>
+                  )}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">
+                  {p.categoryLabel}
+                  {p.address ? ` · ${p.address}` : ''}
+                </p>
+              </span>
             </button>
 
-            {/* Distance + Directions */}
-            <div className="flex shrink-0 flex-col items-end gap-1.5 ml-2">
+            {/* Distance + Directions — a quiet round icon button, not a
+                labeled blue pill, so it reads like Google Maps' understated
+                directions shortcut instead of competing with the row tap target. */}
+            <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
               {p.miles !== null && (
-                <span className="text-xs font-semibold tabular-nums" style={{ color: p.color }}>
+                <span className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>
                   {distanceLabel(p.miles)}
                 </span>
               )}
@@ -102,10 +107,11 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-1.5 py-0.5 text-[10px] sm:px-2.5 sm:py-1 sm:text-xs font-semibold text-white hover:bg-blue-700 active:bg-blue-800"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Directions to ${p.name}`}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300 transition-colors"
               >
-                <span className="sm:hidden">↗</span>
-                <span className="hidden sm:inline">Directions ↗</span>
+                <DirectionsIcon className="h-4 w-4" />
               </a>
             </div>
           </div>
