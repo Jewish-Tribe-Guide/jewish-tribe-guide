@@ -209,14 +209,19 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     trackDrag(drag, e.clientY, e.timeStamp)
 
     // Decide, once, whether this gesture is the swipe-back (horizontal) or
-    // the sheet's usual vertical drag/scroll — whichever axis moves further
-    // first wins, so a swipe doesn't also nudge the sheet's height.
+    // the sheet's usual vertical drag/scroll. A real thumb swipe often has a
+    // few px of vertical wobble before it straightens out, so horizontal
+    // only locks in once it's clearly (not just barely) the dominant axis;
+    // vertical keeps the sheet's normal quick response since that's the
+    // common case. Left unlocked, small ambiguous movement falls through to
+    // the vertical handling below same as before, until one side wins.
     if (drag.lockedDir === null) {
       const dx = e.clientX - drag.startX
       const dy = e.clientY - drag.startY
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-        drag.lockedDir = selected && Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
-      }
+      const adx = Math.abs(dx)
+      const ady = Math.abs(dy)
+      if (selected && adx > 16 && adx > ady * 1.3) drag.lockedDir = 'horizontal'
+      else if (ady > 10 && ady >= adx) drag.lockedDir = 'vertical'
     }
     if (drag.lockedDir === 'horizontal') return // resolved at pointerup
 
