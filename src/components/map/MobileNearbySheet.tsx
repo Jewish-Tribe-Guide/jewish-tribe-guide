@@ -9,6 +9,7 @@ import type { DirectoryResource } from '@/types'
 
 type Snap = 'peek' | 'half' | 'full'
 type Point = MapPoint & { filterId: string; raw?: DirectoryResource }
+type DragState = { startY: number; startHeight: number; moved: boolean; lastY: number; lastT: number; velocity: number }
 
 // Collapsed height (handle + one-line summary) and how much room the 'full'
 // snap leaves at the top so it never covers the floating search bar above it.
@@ -61,14 +62,9 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
-  const dragRef = useRef<{
-    startY: number
-    startHeight: number
-    moved: boolean
-    lastY: number
-    lastT: number
-    velocity: number
-  } | null>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const contentDragRef = useRef<(DragState & { active: boolean }) | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<Point | null>(null)
 
   const heights: Record<Snap, number> = {
@@ -85,29 +81,43 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   useImperativeHandle(ref, () => ({ selectPoint: selectPlace }))
 
+  function startDrag(clientY: number, timeStamp: number): DragState {
+    return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
+  }
+
+  /** Advances a drag state to a new pointer position, returning the
+   *  startY-relative delta (positive = finger moved up). */
+  function trackDrag(drag: DragState, clientY: number, timeStamp: number): number {
+    const delta = drag.startY - clientY
+    if (Math.abs(delta) > 3) drag.moved = true
+    const dt = timeStamp - drag.lastT
+    if (dt > 0) drag.velocity = (drag.lastY - clientY) / dt // px/ms, positive = growing
+    drag.lastY = clientY
+    drag.lastT = timeStamp
+    return delta
+  }
+
+  /** Picks the snap point closest to where the drag settled, then nudges it
+   *  one step further in the fling direction if the release was fast enough —
+   *  the same "flick past where you let go" behavior Google Maps' sheet has. */
+  function resolveSnap(drag: DragState, settled: number): Snap {
+    let index = SNAP_ORDER.reduce((bestIdx, s, i) =>
+      Math.abs(heights[s] - settled) < Math.abs(heights[SNAP_ORDER[bestIdx]] - settled) ? i : bestIdx, 0)
+    if (drag.velocity > FLING_VELOCITY) index = Math.min(index + 1, SNAP_ORDER.length - 1)
+    else if (drag.velocity < -FLING_VELOCITY) index = Math.max(index - 1, 0)
+    return SNAP_ORDER[index]
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    dragRef.current = {
-      startY: e.clientY,
-      startHeight: heights[snap],
-      moved: false,
-      lastY: e.clientY,
-      lastT: e.timeStamp,
-      velocity: 0,
-    }
+    dragRef.current = startDrag(e.clientY, e.timeStamp)
   }
 
   function onPointerMove(e: React.PointerEvent) {
     const drag = dragRef.current
     if (!drag) return
-    const delta = drag.startY - e.clientY // dragging up (finger moves up) grows the sheet
-    if (Math.abs(delta) > 3) drag.moved = true
+    const delta = trackDrag(drag, e.clientY, e.timeStamp)
     setDragHeight(Math.min(heights.full, Math.max(PEEK_PX, drag.startHeight + delta)))
-
-    const dt = e.timeStamp - drag.lastT
-    if (dt > 0) drag.velocity = (drag.lastY - e.clientY) / dt // px/ms, positive = growing
-    drag.lastY = e.clientY
-    drag.lastT = e.timeStamp
   }
 
   function onPointerUp() {
@@ -121,14 +131,46 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       setDragHeight(null)
       return
     }
-    const settled = dragHeight ?? heights[snap]
-    let index = SNAP_ORDER.reduce((bestIdx, s, i) =>
-      Math.abs(heights[s] - settled) < Math.abs(heights[SNAP_ORDER[bestIdx]] - settled) ? i : bestIdx, 0)
-    // A fast flick jumps one snap further in its direction even if the
-    // release point landed closer to the current one.
-    if (drag.velocity > FLING_VELOCITY) index = Math.min(index + 1, SNAP_ORDER.length - 1)
-    else if (drag.velocity < -FLING_VELOCITY) index = Math.max(index - 1, 0)
-    setSnap(SNAP_ORDER[index])
+    setSnap(resolveSnap(drag, dragHeight ?? heights[snap]))
+    setDragHeight(null)
+  }
+
+  /** Google Maps' bottom sheet swallows all vertical drags until it's fully
+   *  expanded — dragging over the list just grows the sheet instead of
+   *  scrolling it. Only once full does the list scroll normally, and even
+   *  then, dragging down once you're already scrolled to the top hands
+   *  control back to the sheet so it collapses instead of doing nothing. */
+  function onContentPointerDown(e: React.PointerEvent) {
+    contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full' }
+  }
+
+  function onContentPointerMove(e: React.PointerEvent) {
+    const drag = contentDragRef.current
+    if (!drag) return
+    trackDrag(drag, e.clientY, e.timeStamp)
+
+    if (!drag.active) {
+      // Only armed when snap === 'full' (see onContentPointerDown) — hand
+      // control to the sheet once the list is scrolled to the top and the
+      // drag continues downward.
+      const atTop = (contentRef.current?.scrollTop ?? 0) <= 0
+      if (atTop && drag.startY - e.clientY < -3) {
+        drag.active = true
+        drag.startY = e.clientY
+        drag.startHeight = heights.full
+      }
+      return
+    }
+
+    if (contentRef.current) contentRef.current.scrollTop = 0
+    setDragHeight(Math.min(heights.full, Math.max(PEEK_PX, drag.startHeight + (drag.startY - e.clientY))))
+  }
+
+  function onContentPointerUp() {
+    const drag = contentDragRef.current
+    contentDragRef.current = null
+    if (!drag || !drag.moved || !drag.active) return
+    setSnap(resolveSnap(drag, dragHeight ?? heights[snap]))
     setDragHeight(null)
   }
 
@@ -158,7 +200,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
           </span>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div
+        ref={contentRef}
+        onPointerDown={onContentPointerDown}
+        onPointerMove={onContentPointerMove}
+        onPointerUp={onContentPointerUp}
+        onPointerCancel={onContentPointerUp}
+        style={{ touchAction: snap === 'full' ? 'pan-y' : 'none' }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      >
         {selected && selected.raw && selectedCategory ? (
           <MapPlaceDetail
             item={selected.raw}
