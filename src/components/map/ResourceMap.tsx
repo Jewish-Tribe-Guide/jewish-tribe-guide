@@ -125,17 +125,37 @@ function buildInfoContent(
   return wrap
 }
 
-// A category pin, enlarged when it's the place currently shown in the mobile
-// sheet — the one visual tie between "what the sheet is showing" and "where
-// that is on the map".
-function buildPin(p: MapPoint, isSelected: boolean): google.maps.marker.PinElement {
-  return new google.maps.marker.PinElement({
+// A category pin — noticeably bigger AND wrapped in a pulsing color halo plus
+// a one-time drop-bounce when it's the place currently shown in the mobile
+// sheet. Scale alone (the old behavior) read as "a little bigger", easy to
+// miss at a glance; the halo gives it a lasting visual difference and the
+// bounce draws the eye the instant a new pin is picked — the one visual tie
+// between "what the sheet is showing" and "where that is on the map".
+function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
+  if (!document.getElementById('jpc-pin-select-style')) {
+    const style = document.createElement('style')
+    style.id = 'jpc-pin-select-style'
+    style.textContent =
+      '@keyframes jpcPinDrop{0%{transform:translateY(-16px);opacity:0}60%{transform:translateY(2px);opacity:1}100%{transform:translateY(0)}}' +
+      '@keyframes jpcPinHalo{0%{transform:scale(.7);opacity:.55}100%{transform:scale(1.6);opacity:0}}'
+    document.head.appendChild(style)
+  }
+
+  const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
     glyph: p.glyph ?? null,
     glyphColor: '#ffffff',
-    scale: isSelected ? 1.35 : 1,
+    scale: isSelected ? 1.6 : 1,
   })
+  if (!isSelected) return pin.element
+
+  const wrap = document.createElement('div')
+  wrap.style.cssText = 'position:relative;display:flex;align-items:flex-end;justify-content:center;animation:jpcPinDrop 0.35s ease-out'
+  const halo = document.createElement('div')
+  halo.style.cssText = `position:absolute;bottom:6px;width:30px;height:30px;border-radius:9999px;background:${p.color};animation:jpcPinHalo 1.4s ease-out infinite`
+  wrap.append(halo, pin.element)
+  return wrap
 }
 
 // The "you are here" dot: a solid blue marker with a white ring and an
@@ -283,12 +303,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
     const bounds = new google.maps.LatLngBounds()
     for (const p of points) {
-      const pin = buildPin(p, p.id === selectedIdRef.current)
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map,
         position: { lat: p.lat, lng: p.lng },
         title: p.name,
-        content: pin.element,
+        content: buildPin(p, p.id === selectedIdRef.current),
       })
       marker.addListener('gmp-click', () => {
         if (onSelectPointRef.current) {
@@ -345,12 +364,12 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     const prevId = prevSelectedIdRef.current
     if (prevId && prevId !== selectedId) {
       const prev = markersByIdRef.current.get(prevId)
-      if (prev) prev.marker.content = buildPin(prev.point, false).element
+      if (prev) prev.marker.content = buildPin(prev.point, false)
     }
     if (selectedId && selectedId !== prevId) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
-        current.marker.content = buildPin(current.point, true).element
+        current.marker.content = buildPin(current.point, true)
         // Frame the selected place alongside the visitor's own location, same
         // as a search result — so picking a listing from the sheet (or a pin
         // that wasn't already selected) shows how far it is from "you are

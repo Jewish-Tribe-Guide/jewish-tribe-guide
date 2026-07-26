@@ -58,6 +58,21 @@ export default function Page() {
   const [mapSelectedCategories, setMapSelectedCategories] = useState<string[] | null>(null)
   // Field filters carried from a directory onto the map — see NavState.mapFilters.
   const [mapFilters, setMapFilters] = useState<MapFilters | null>(null)
+  // Whether ResourceMapView has ever been mounted — once true it stays mounted
+  // forever (see the render below), so switching tabs away and back hides it
+  // via CSS instead of unmounting/remounting, preserving pan/zoom, the
+  // selected pin, search, and filters across the round trip. Starts false so
+  // the Google Maps script/tiles don't load until the visitor actually opens
+  // the Map tab at least once.
+  const [mapMounted, setMapMounted] = useState(false)
+  useEffect(() => {
+    if (mode === 'map') setMapMounted(true)
+  }, [mode])
+  // Bumped only by viewMapForCategory (a deliberate "show me this category on
+  // the map" jump, e.g. from a directory's "View map" button) — remounting
+  // ResourceMapView fresh so its initial* props actually take effect even
+  // though it otherwise stays mounted across ordinary tab switches.
+  const [mapResetToken, setMapResetToken] = useState(0)
 
   // The address anchor, editable from the header's location pill on every screen
   // — it drives all proximity sorting in the directory.
@@ -158,24 +173,6 @@ export default function Page() {
     )
   )
 
-  // ── Landing — the single home screen (search + one card grid) ──────────────
-  if (mode === 'home' || mode === 'community-home') {
-    return (
-      <>
-        <SiteHeader onGoHome={goToLanding} location={locationControls} />
-        <div className="flex-1">
-          <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
-        </div>
-        <div className="hidden sm:block">
-          <SiteFooter />
-        </div>
-        {tabBar}
-        {overlay}
-      </>
-    )
-  }
-
-  // ── Inner screens (directory) ───────────────────────────────────────────────
   // Everything anchors on the visitor's typed address now (the hospital picker
   // was retired from the location pill).
   const anchor: DirectoryAnchor = { coords, label: address }
@@ -199,7 +196,10 @@ export default function Page() {
   // screen with that category pre-selected in the filter. Carries the directory's
   // active search query and field filters so the map shows the same results.
   // Starts fresh (no persisted mapSelected) — the map's own effect will sync the
-  // live selection into this entry once it mounts.
+  // live selection into this entry once it mounts. Bumps mapResetToken so
+  // ResourceMapView remounts fresh even if it was already mounted from an
+  // earlier visit — a deliberate "show me this category" jump should always
+  // take effect, unlike an ordinary tab switch back to the map.
   const viewMapForCategory = (categoryId: string, query?: string, filters?: MapFilters) => {
     setMode('map')
     setMapCategory(categoryId)
@@ -207,34 +207,66 @@ export default function Page() {
     setMapSelectedCategories(null)
     setMapFilters(filters ?? null)
     setFlow(null)
+    setMapResetToken((t) => t + 1)
     history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters } as NavState, '')
   }
 
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
-      {/* flex + flex-col: makes main a flex container in its own right (not
-          just a flex item of body), so a flex-1 child — the mobile full-bleed
-          map — can grow to fill it via flex-grow. A plain h-full percentage
-          wouldn't reliably resolve here since main's own height is itself
-          only "definite" as a resolved flex value, not an explicit one.
-          Top/bottom padding: every other mobile screen scrolls, so pt-8/pb-24
-          give it breathing room and generous clearance above the tab bar. The
-          map screen doesn't scroll — it's sized to fill exactly what's left —
-          and wants to run flush against the header and tab bar, Google-Maps-
-          style, so it drops both paddings on mobile (search/filters float on
-          the map itself instead of sitting in that top gap). */}
-      <main
-        className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 sm:pt-8 sm:pb-8 ${
-          mode === 'map' ? 'pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pt-8 pb-24'
-        }`}
-      >
-        {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
-        {mode === 'map' && hasMap && <ResourceMapView onUp={goToHome} userLocation={coords} initialCategory={mapCategory || undefined} initialQuery={mapQuery || undefined} initialSelectedCategories={mapSelectedCategories || undefined} initialFilters={mapFilters || undefined} onViewListing={viewListing} />}
-        {mode === 'feedback' && (
-          <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
-        )}
-      </main>
+
+      {/* ── Landing — the single home screen (search + one card grid) ────────── */}
+      {(mode === 'home' || mode === 'community-home') && (
+        <div className="flex-1">
+          <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
+        </div>
+      )}
+
+      {/* ── Find/Feedback — ordinary mount-on-demand screens ──────────────────── */}
+      {(mode === 'find' || mode === 'feedback') && (
+        <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
+          {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+          {mode === 'feedback' && (
+            <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
+          )}
+        </main>
+      )}
+
+      {/* ── Map — mounted once (on first visit) and never unmounted again;
+              switching tabs away just hides it (style, not the `hidden` class,
+              since that can lose a specificity fight with the `flex` classes
+              also present) so the Google Map instance, its pan/zoom, the
+              selected pin, search box, and category filters all survive a
+              round trip through another tab instead of resetting every time.
+              flex + flex-col: makes main a flex container in its own right
+              (not just a flex item of body), so a flex-1 child — the mobile
+              full-bleed map — can grow to fill it via flex-grow. Top/bottom
+              padding: every other mobile screen scrolls, so pt-8/pb-24 give it
+              breathing room and generous clearance above the tab bar. The map
+              screen doesn't scroll — it's sized to fill exactly what's left —
+              and wants to run flush against the header and tab bar, Google-
+              Maps-style, so it drops both paddings on mobile (search/filters
+              float on the map itself instead of sitting in that top gap). ── */}
+      {hasMap && mapMounted && (
+        <main
+          className={`flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 sm:pt-8 sm:pb-8 ${
+            mode === 'map' ? 'pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))]' : 'pt-8 pb-24'
+          }`}
+          style={mode === 'map' ? undefined : { display: 'none' }}
+        >
+          <ResourceMapView
+            key={mapResetToken}
+            onUp={goToHome}
+            userLocation={coords}
+            initialCategory={mapCategory || undefined}
+            initialQuery={mapQuery || undefined}
+            initialSelectedCategories={mapSelectedCategories || undefined}
+            initialFilters={mapFilters || undefined}
+            onViewListing={viewListing}
+          />
+        </main>
+      )}
+
       <div className="hidden sm:block">
         <SiteFooter />
       </div>
