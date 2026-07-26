@@ -98,6 +98,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+  // Current px height of the mobile nearby sheet — reported up so ResourceMap
+  // can center a newly-selected pin within the visible strip of map ABOVE the
+  // sheet, instead of the whole box's center (which the sheet mostly covers).
+  const [sheetHeightPx, setSheetHeightPx] = useState(0)
   // Tapping a marker on mobile should raise the bottom sheet's place detail
   // (Google-Maps-app-style) instead of opening the small info-window bubble
   // ResourceMap shows by default — desktop keeps that default.
@@ -620,6 +624,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onBackgroundClick={isMobile ? () => nearbySheetRef.current?.lower() : undefined}
                 searchActive={searchActive}
                 selectedId={selectedPointId}
+                obscuredBottomPx={isMobile ? sheetHeightPx : 0}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -787,6 +792,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   categories={categories ?? []}
                   containerHeight={mapBoxHeight}
                   onSelectionChange={(point) => setSelectedPointId(point?.id)}
+                  onHeightChange={setSheetHeightPx}
                 />
               )}
             </>

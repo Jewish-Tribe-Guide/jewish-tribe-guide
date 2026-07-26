@@ -40,6 +40,11 @@ type Props = {
    *  forwards this to ResourceMap so it can highlight the matching marker,
    *  making it clear which listing on the map the sheet is showing. */
   onSelectionChange?: (point: Point | null) => void
+  /** Reports the sheet's current (target, not mid-drag) px height upward —
+   *  ResourceMapView forwards this to ResourceMap so it can center a newly
+   *  selected pin within the visible strip of map ABOVE the sheet, instead of
+   *  the whole container's center (which the sheet mostly covers at half/full). */
+  onHeightChange?: (px: number) => void
 }
 
 export type MobileNearbySheetHandle = {
@@ -84,7 +89,7 @@ export type MobileNearbySheetHandle = {
  * is still visible underneath.
  */
 const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function MobileNearbySheet(
-  { points, userLocation, onViewListing, categories, containerHeight, onSelectionChange },
+  { points, userLocation, onViewListing, categories, containerHeight, onSelectionChange, onHeightChange },
   ref,
 ) {
   const [snap, setSnap] = useState<Snap>('peek')
@@ -110,6 +115,17 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     full: Math.max(PEEK_PX, containerHeight - TOP_INSET_PX),
   }
   const currentHeight = dragHeight ?? heights[snap]
+
+  // Report the settled (target, not mid-drag) height upward — deliberately
+  // keyed off `snap`/`heights[snap]`, not the live `currentHeight`, so a
+  // finger-drag doesn't spam the parent with a value mid-gesture; it only
+  // updates once a drag actually settles on a new snap point.
+  const onHeightChangeRef = useRef(onHeightChange)
+  useEffect(() => { onHeightChangeRef.current = onHeightChange }, [onHeightChange])
+  useEffect(() => {
+    onHeightChangeRef.current?.(heights[snap])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap, containerHeight])
 
   function selectPlace(point: Point) {
     setSelected(point)
