@@ -48,6 +48,10 @@ export type MobileNearbySheetHandle = {
    *  visitor taps empty map, same as dismissing the card in the Google Maps
    *  app (see ResourceMap's onBackgroundClick). */
   collapse: () => void
+  /** Raises a collapsed sheet to 'half' without selecting anything — called
+   *  when a search narrows the results, so the (possibly multi-result) list
+   *  becomes visible instead of staying hidden behind the peek handle. */
+  raise: () => void
 }
 
 /**
@@ -95,7 +99,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap('peek')
   }
 
-  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse }))
+  function raise() {
+    setSnap((prev) => (prev === 'peek' ? 'half' : prev))
+  }
+
+  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse, raise }))
 
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
