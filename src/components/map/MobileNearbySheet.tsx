@@ -44,10 +44,14 @@ export type MobileNearbySheetHandle = {
    *  pin tap and a list-row tap land in the same spot (see ResourceMapView's
    *  onSelectPoint wiring to ResourceMap). */
   selectPoint: (point: Point) => void
-  /** Collapses the sheet and clears any selected place — called when the
-   *  visitor taps empty map, same as dismissing the card in the Google Maps
-   *  app (see ResourceMap's onBackgroundClick). */
+  /** Collapses the sheet and clears any selected place — called when
+   *  clearing the search box, so it resets back to the default browse state. */
   collapse: () => void
+  /** Drops the sheet to 'peek' WITHOUT clearing a selected place — called
+   *  when the visitor taps empty map while viewing a place's card. Dragging
+   *  back up brings the same place back, rather than losing it in favor of
+   *  the plain nearby list (see ResourceMap's onBackgroundClick). */
+  lower: () => void
   /** Raises a collapsed sheet to 'half' without selecting anything — called
    *  when a search narrows the results, so the (possibly multi-result) list
    *  becomes visible instead of staying hidden behind the peek handle. */
@@ -99,11 +103,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap('peek')
   }
 
+  function lower() {
+    setSnap('peek')
+  }
+
   function raise() {
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
-  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse, raise }))
+  useImperativeHandle(ref, () => ({ selectPoint: selectPlace, collapse, lower, raise }))
 
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }

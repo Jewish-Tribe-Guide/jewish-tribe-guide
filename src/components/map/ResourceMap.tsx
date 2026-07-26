@@ -50,8 +50,9 @@ type Props = {
    *  bottom sheet's place detail instead, Google-Maps-app-style. Desktop
    *  leaves this unset and keeps the info-window behavior. */
   onSelectPoint?: (point: MapPoint) => void
-  /** Tapping empty map (not a marker) — mobile uses this to collapse the
-   *  bottom sheet back down, same as tapping the map in the Google Maps app. */
+  /** Tapping empty map (not a marker) — mobile uses this to drop the bottom
+   *  sheet back to peek height, keeping any selected place so dragging back
+   *  up returns to it instead of losing it in favor of the nearby list. */
   onBackgroundClick?: () => void
   /** True while a search query or filter chip is narrowing `points` — overrides
    *  the "don't reframe if a user location is set" rule below, so searching
