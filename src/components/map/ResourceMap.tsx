@@ -58,6 +58,10 @@ type Props = {
    *  the "don't reframe if a user location is set" rule below, so searching
    *  actually takes you to the result(s), same as the Google Maps app. */
   searchActive?: boolean
+  /** id of the place currently shown in the mobile sheet, if any — that
+   *  marker gets drawn larger so it's clear which listing the sheet is
+   *  showing (see the selection-highlight effect below). */
+  selectedId?: string
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -117,6 +121,19 @@ function buildInfoContent(
   return wrap
 }
 
+// A category pin, enlarged when it's the place currently shown in the mobile
+// sheet — the one visual tie between "what the sheet is showing" and "where
+// that is on the map".
+function buildPin(p: MapPoint, isSelected: boolean): google.maps.marker.PinElement {
+  return new google.maps.marker.PinElement({
+    background: p.color,
+    borderColor: '#ffffff',
+    glyph: p.glyph ?? null,
+    glyphColor: '#ffffff',
+    scale: isSelected ? 1.35 : 1,
+  })
+}
+
 // The "you are here" dot: a solid blue marker with a white ring and an
 // expanding pulse so it's unmistakable against the category pins. Keyframes are
 // injected once, app-wide.
@@ -143,10 +160,15 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick, searchActive }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onBackgroundClick, searchActive, selectedId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
+  // Markers keyed by point id, alongside the point itself (needed to rebuild
+  // a pin when only its selected/unselected style changes) — lets the
+  // selection-highlight effect below restyle just the one marker that
+  // changed instead of rebuilding the whole marker set on every selection.
+  const markersByIdRef = useRef(new Map<string, { marker: google.maps.marker.AdvancedMarkerElement; point: MapPoint }>())
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
@@ -162,6 +184,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const onBackgroundClickRef = useRef(onBackgroundClick)
   const userLocationRef = useRef(userLocation)
   const searchActiveRef = useRef(searchActive)
+  const selectedIdRef = useRef(selectedId)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onBackgroundClickRef.current = onBackgroundClick }, [onBackgroundClick])
@@ -249,16 +272,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
     markersRef.current.forEach((m) => (m.map = null))
     markersRef.current = []
+    markersByIdRef.current.clear()
 
     const bounds = new google.maps.LatLngBounds()
     for (const p of points) {
-      const pin = new google.maps.marker.PinElement({
-        background: p.color,
-        borderColor: '#ffffff',
-        glyph: p.glyph ?? null,
-        glyphColor: '#ffffff',
-        scale: 1,
-      })
+      const pin = buildPin(p, p.id === selectedIdRef.current)
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map,
         position: { lat: p.lat, lng: p.lng },
@@ -276,6 +294,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         iw.open({ map, anchor: marker })
       })
       markersRef.current.push(marker)
+      markersByIdRef.current.set(p.id, { marker, point: p })
       bounds.extend({ lat: p.lat, lng: p.lng })
     }
 
@@ -303,6 +322,25 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // identity are read via refs so an open info window survives them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, ready])
+
+  // ── Highlight whichever marker matches the sheet's selected place ────────
+  // Deliberately its own effect, separate from the marker-rebuild one above —
+  // swaps just the two markers involved (old selection back to normal, new
+  // one enlarged) instead of rebuilding the whole marker set on every tap.
+  const prevSelectedIdRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!ready) return
+    const prevId = prevSelectedIdRef.current
+    if (prevId && prevId !== selectedId) {
+      const prev = markersByIdRef.current.get(prevId)
+      if (prev) prev.marker.content = buildPin(prev.point, false).element
+    }
+    if (selectedId) {
+      const current = markersByIdRef.current.get(selectedId)
+      if (current) current.marker.content = buildPin(current.point, true).element
+    }
+    prevSelectedIdRef.current = selectedId
+  }, [selectedId, ready])
 
   // ── The visitor's "you are here" marker, centered on when set ─────────────
   useEffect(() => {
