@@ -96,6 +96,8 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   useEffect(() => {
     onSelectionChangeRef.current?.(selected)
   }, [selected])
+  const selectedRef = useRef(selected)
+  useEffect(() => { selectedRef.current = selected }, [selected])
 
   const heights: Record<Snap, number> = {
     peek: PEEK_PX,
@@ -255,6 +257,31 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap(resolveSnap(drag, dragHeight ?? heights[snap]))
     setDragHeight(null)
   }
+
+  // On a real phone, a horizontal drag here can otherwise be hijacked by the
+  // browser's own "swipe to go back" navigation gesture (landing you on the
+  // previous page entirely, not our in-app back-to-list) — React's onTouchMove
+  // is passive by default so calling preventDefault from a JSX handler is a
+  // silent no-op; only a manually-attached, non-passive native listener can
+  // actually cancel it. Deliberately more eager than the pointermove lock
+  // above (which decides whether WE treat it as a swipe-back): better to
+  // suppress the browser's gesture a little early than let it hijack the
+  // touch before our own logic finishes deciding.
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    function onTouchMove(e: TouchEvent) {
+      if (!selectedRef.current) return
+      const drag = contentDragRef.current
+      const touch = e.touches[0]
+      if (!drag || !touch) return
+      const dx = touch.clientX - drag.startX
+      const dy = touch.clientY - drag.startY
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) e.preventDefault()
+    }
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [])
 
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
 
