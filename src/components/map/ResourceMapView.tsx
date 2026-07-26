@@ -23,10 +23,16 @@ const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
 const HOSPITAL_ICON = '🏥'
 
-// Typing one of these in the search pins the open-now filter (rather than a plain
-// text term), so it's entered from the search box like every other chip.
+// Typing one of these in the search box searches "open now" instead of
+// matching literal text.
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
+
+// Mobile keyboards' smart-punctuation autocorrect turns a typed straight
+// apostrophe into a curly one (e.g. "Trader Joe's" → "Trader Joe’s"), which
+// then fails to substring-match data stored with a straight one (or vice
+// versa) — normalize both sides to a single form before comparing.
+const normalizeApostrophes = (s: string) => s.replace(/[‘’ʼʻ]/g, "'")
 
 const PALETTE = [
   '#2563eb', // blue
@@ -197,31 +203,29 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   )
 
   // A single active search query — like Google Maps, committing a new one
-  // replaces whatever was there rather than stacking as separate chips.
+  // (including "open now", which is just this same slot's text, not a
+  // separate chip) replaces whatever was there rather than stacking.
   // `committedQuery` only changes on Enter/suggestion-pick (not each
-  // keystroke), so the sheet-raise/map-refit effects below fire once you
-  // actually search, not mid-typing; `input` (the box's live value) still
-  // drives the live text filter and stays visible after a search, same as
-  // the Google Maps app — it isn't cleared back to a blank box + chip.
-  const [input, setInput] = useState(initialQuery ?? '')
-  const [committedQuery, setCommittedQuery] = useState(initialQuery ?? '')
+  // keystroke) — the map/list don't filter at all until you commit (see
+  // activeTerms below); `input` (the box's live value) only drives the
+  // autocomplete dropdown until then, and stays visible after a search,
+  // same as the Google Maps app — it isn't cleared back to a blank box.
+  const initialQueryText = initialQuery ?? (initialFilters?.openNow ? 'open now' : '')
+  const [input, setInput] = useState(initialQueryText)
+  const [committedQuery, setCommittedQuery] = useState(initialQueryText)
 
   const commitQuery = (raw: string) => {
     const v = raw.trim()
     if (!v) return
-    // "open now" pins the open-now filter instead of a text query.
-    if (isOpenNowWord(v)) {
-      setOpenNowOn(true)
-      setInput('')
-      setCommittedQuery('')
-      return
-    }
     setCommittedQuery(v)
   }
   const clearQuery = () => {
     setInput('')
     setCommittedQuery('')
   }
+  // Whether the committed query is asking for "open now" rather than a
+  // literal text match — applied as its own predicate in visiblePoints below.
+  const openNowActive = isOpenNowWord(committedQuery)
 
   // ── Mobile search autocomplete — Google-Maps-style dropdown of matching
   // places while typing, independent of the live text-filter above (which
@@ -230,12 +234,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const [searchFocused, setSearchFocused] = useState(false)
   const mobileSearchInputRef = useRef<HTMLInputElement>(null)
   const searchSuggestions = useMemo(() => {
-    const q = input.trim().toLowerCase()
+    const q = normalizeApostrophes(input.trim().toLowerCase())
     if (q.length < 2 || isOpenNowWord(q)) return []
     const starts: typeof allPoints = []
     const contains: typeof allPoints = []
     for (const p of allPoints) {
-      const name = p.name.toLowerCase()
+      const name = normalizeApostrophes(p.name.toLowerCase())
       if (name.startsWith(q)) starts.push(p)
       else if (name.includes(q)) contains.push(p)
     }
@@ -252,17 +256,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     nearbySheetRef.current?.selectPoint(p)
   }
 
-  // The live text always filters as one phrase (not per-word AND terms) —
-  // except an "open now" keyword, which becomes the filter chip on commit.
+  // The committed query filters as one phrase (not per-word AND terms) —
+  // except "open now", which is its own predicate (openNowActive above), not
+  // a literal text match. Derived from committedQuery, not the live `input`,
+  // so nothing actually filters until you commit — see point 3 in the commit
+  // this replaces: typing alone no longer narrows the map/list.
   const activeTerms = useMemo(() => {
-    const live = input.trim().toLowerCase()
-    return live && !isOpenNowWord(live) ? [live] : []
-  }, [input])
+    const q = normalizeApostrophes(committedQuery.trim().toLowerCase())
+    return q && !isOpenNowWord(q) ? [q] : []
+  }, [committedQuery])
 
-  // ── Field filters (open-now / kosher / type / …) ─────────────────────────────
-  // Held as a serializable spec (also what's persisted to history); carried in
-  // from the directory. Predicates below are derived once categories load.
-  const [openNowOn, setOpenNowOn] = useState(!!initialFilters?.openNow)
+  // ── Field filters (kosher / type / … carried from the directory) ─────────
+  // Held as a serializable spec (also what's persisted to history). "Open
+  // now" isn't here — it's just the committed query text (see openNowActive
+  // above), so it behaves exactly like any other search instead of stacking
+  // as a separate persistent chip. Predicates below are derived once
+  // categories load.
   const [boolFields, setBoolFields] = useState<string[]>(initialFilters?.bool ?? [])
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>(initialFilters?.select ?? {})
 
@@ -286,17 +295,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // listing that lacks the field passes (so "Kosher" ignores shuls, etc.).
   const filterChips = useMemo(() => {
     const chips: { id: string; label: string; test: (r: DirectoryResource) => boolean; remove: () => void }[] = []
-    if (openNowOn) {
-      chips.push({
-        id: '__open',
-        label: 'Open now',
-        test: (r) => {
-          const keys = hoursKeysByCat.get(r.category)
-          return !keys?.length || keys.some((k) => hoursOpenNow(r[k]) === true)
-        },
-        remove: () => setOpenNowOn(false),
-      })
-    }
     for (const field of boolFields) {
       chips.push({
         id: `b:${field}`,
@@ -316,7 +314,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
     return chips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openNowOn, boolFields, selectFilters, categories, initialCategory, hoursKeysByCat])
+  }, [boolFields, selectFilters, categories, initialCategory])
 
   // Keep the current history entry in sync with the committed query/filters/
   // selection, so returning via browser Back restores what was actually on
@@ -326,7 +324,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   useEffect(() => {
     const current = window.history.state as { mode?: string } | null
     if (current?.mode !== 'map') return
-    const anyFilter = openNowOn || boolFields.length > 0 || Object.keys(selectFilters).length > 0
+    const anyFilter = openNowActive || boolFields.length > 0 || Object.keys(selectFilters).length > 0
     history.replaceState(
       {
         ...current,
@@ -334,7 +332,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         mapSelected: selected ? Array.from(selected) : undefined,
         mapFilters: anyFilter
           ? {
-              openNow: openNowOn || undefined,
+              openNow: openNowActive || undefined,
               bool: boolFields.length ? boolFields : undefined,
               select: Object.keys(selectFilters).length ? selectFilters : undefined,
             }
@@ -342,14 +340,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       },
       '',
     )
-  }, [committedQuery, selected, openNowOn, boolFields, selectFilters])
+  }, [committedQuery, selected, openNowActive, boolFields, selectFilters])
 
   const visiblePoints = useMemo(() => {
     return allPoints
       .filter((p) => effectiveSelected.has(p.filterId))
-      .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
+      .filter((p) => activeTerms.every((t) => normalizeApostrophes(p.searchText).includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
-  }, [allPoints, effectiveSelected, activeTerms, filterChips])
+      .filter((p) => {
+        if (!openNowActive || !p.raw) return true
+        const keys = hoursKeysByCat.get(p.raw.category)
+        return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k]) === true)
+      })
+  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, hoursKeysByCat])
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
   // sheet-raise/auto-select effect below to commit points instead of every
@@ -526,7 +529,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       {!loading && ui.search.map && (
         <div className="mb-4 hidden sm:block">
           <input
-            type="search"
+            type="text"
             enterKeyHint="search"
             autoComplete="off"
             placeholder="Search name, address, or 'open now'…"
@@ -538,7 +541,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 commitQuery(input)
               }
             }}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
           {chipsRow}
           <p className="mt-1.5 text-xs text-muted">
@@ -592,7 +595,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       </svg>
                       <input
                         ref={mobileSearchInputRef}
-                        type="search"
+                        type="text"
                         enterKeyHint="search"
                         autoComplete="off"
                         placeholder="Search name, address, 'open now'…"
@@ -615,7 +618,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             ;(e.target as HTMLInputElement).blur()
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
+                        className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                       />
                       {input && (
                         <button
