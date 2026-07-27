@@ -1796,6 +1796,23 @@ function FieldEditor({
     onChange(!f.key ? { label: name, key: slugifyFieldKey(name) } : { label: name })
   }
 
+  // Choices textarea: kept as its own local, uncontrolled-feeling string
+  // instead of round-tripping every keystroke through parseOptions →
+  // serializeOptions. That round trip immediately trimmed each line and
+  // dropped empty ones, so pressing Enter (a blank line) or typing a
+  // trailing space in a multi-word choice got silently erased on the very
+  // next render — Enter and Space effectively did nothing. Only parse (and
+  // re-normalize) on blur, once the admin's done editing that line.
+  const [choicesText, setChoicesText] = useState(() => serializeOptions(f.options))
+  useEffect(() => {
+    setChoicesText(serializeOptions(f.options))
+    // Only resync from the field's own saved options when switching to a
+    // genuinely different field (its stable `key`, not the array index,
+    // which stays the same slot across a reorder) — not on every render,
+    // which would fight the admin's in-progress typing above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.key])
+
   // "Show as" is offered only for Yes/No and Choice — the types where badge-vs-row
   // is a real choice. Badge also means "this is a filter" (applied in
   // normalizeField); a row is display-only. Everything else has a fixed shape.
@@ -1832,8 +1849,9 @@ function FieldEditor({
           <span className={fieldLabel}>Choices (one per line — “value | label”, or just value)</span>
           <textarea
             rows={3}
-            value={serializeOptions(f.options)}
-            onChange={(e) => onChange({ options: parseOptions(e.target.value) })}
+            value={choicesText}
+            onChange={(e) => setChoicesText(e.target.value)}
+            onBlur={(e) => onChange({ options: parseOptions(e.target.value) })}
             className={inputClass}
             placeholder={'Elementary\nMiddle\nHigh'}
           />

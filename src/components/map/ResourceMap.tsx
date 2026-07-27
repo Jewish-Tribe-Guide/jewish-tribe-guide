@@ -424,6 +424,25 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
           // middle of the strip still visible above it.
           panToVisibleCenter(map, current.point, obscured)
         }
+        // The above gets the map roughly right, but a pin's geographic anchor
+        // is its bottom TIP, not its visual middle — the balloon shape (plus
+        // the selected halo) extends well above that point, so centering the
+        // anchor alone leaves the pin itself looking noticeably too high.
+        // Once the pan/zoom actually settles, measure where the marker's own
+        // DOM element really rendered and nudge the rest of the way so the
+        // pin graphic — what a person actually looks at — lands centered in
+        // the visible strip, not just its invisible anchor point.
+        google.maps.event.addListenerOnce(map, 'idle', () => {
+          const markerEl = current.marker as unknown as HTMLElement
+          const mapEl = containerRef.current
+          if (!markerEl?.getBoundingClientRect || !mapEl) return
+          const markerRect = markerEl.getBoundingClientRect()
+          const mapRect = mapEl.getBoundingClientRect()
+          const targetCenterY = mapRect.top + (mapRect.height - obscured) / 2
+          const actualCenterY = markerRect.top + markerRect.height / 2
+          const deltaY = actualCenterY - targetCenterY
+          if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
+        })
       }
     }
     prevSelectedIdRef.current = selectedId

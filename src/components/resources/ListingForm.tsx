@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { fieldIsVisible, isCategorySyncEligible, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { formatPhone } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
@@ -82,7 +83,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // Always overwrite — if you switch from "Trader Joe's" to "Giant", all
     // auto-filled fields should update to match the new selection.
     if (result.name) setName(result.name)
-    if (result.phone) setPhone(result.phone)
+    if (result.phone) setPhone(formatPhone(result.phone))
     if (result.hours) {
       const hoursField = config.detailFields.find((f) => f.type === 'hours')
       if (hoursField) setDetail(hoursField.key, result.hours)
@@ -227,7 +228,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         {hasPhone && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} placeholder="(215) 555-0100" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
           </div>
         )}
 
