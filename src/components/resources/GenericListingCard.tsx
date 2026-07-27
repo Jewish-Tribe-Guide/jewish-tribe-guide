@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
@@ -121,10 +121,12 @@ export function GenericListingCard({
   const headerTagsSometimes = capTags ? tagsSometimes.slice(0, Math.max(0, MOBILE_TAG_LIMIT - headerTags.length)) : tagsSometimes
   const hiddenTagCount = allTags.length - headerTags.length - headerTagsSometimes.length
 
-  // Collapsed signals: boolean true-badges + select badges (e.g. kosher cert).
+  // Collapsed signals: boolean true-badges + select badges (e.g. kosher cert —
+  // a select can now hold more than one chosen value, e.g. a place that's
+  // both a Restaurant and a Caterer, rendered as one badge per value below).
   // Unset booleans and unset selects go in the detail panel.
   const signalBadges = badgeFields.filter((f) =>
-    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? !!item[f.key] : false,
+    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
 
@@ -185,36 +187,41 @@ export function GenericListingCard({
               Open
             </Chip>
           ))}
-          {signalBadges.map((f) => {
-            const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
+          {signalBadges.flatMap((f) => {
+            // A select field can hold more than one chosen value (e.g. a place
+            // that's both a Restaurant and a Caterer) — one badge per value,
+            // each independently clickable to filter by just that value.
+            const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
             const note = caveatNote(f)
             const amber = note !== null
-            // A badge "has a designated filter" when its field is filterable; then
-            // clicking it drives that control. Otherwise it falls back to search.
-            const btn = (
-              <Chip
-                tone={amber ? 'amber' : 'slate'}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
-                  else if (f.filterable && f.type === 'select') onFilterSelect(f.key, String(item[f.key]), !!f.multiSelect)
-                  else onTagClick(text)
-                }}
-                title={amber ? undefined : `Filter by ${text}`}
-              >
-                {text}
-              </Chip>
-            )
-            // Not-fully-kosher cert → amber badge with the per-listing note on hover.
-            if (!amber) return <span key={f.key}>{btn}</span>
-            return (
-              <span key={f.key} className="relative group/tip">
-                {btn}
-                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                  {note || 'Not everything here is kosher — please verify.'}
+            return texts.map((text) => {
+              // A badge "has a designated filter" when its field is filterable; then
+              // clicking it drives that control. Otherwise it falls back to search.
+              const btn = (
+                <Chip
+                  tone={amber ? 'amber' : 'slate'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
+                    else if (f.filterable && f.type === 'select') onFilterSelect(f.key, text, !!f.multiSelect)
+                    else onTagClick(text)
+                  }}
+                  title={amber ? undefined : `Filter by ${text}`}
+                >
+                  {text}
+                </Chip>
+              )
+              // Not-fully-kosher cert → amber badge with the per-listing note on hover.
+              if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
+              return (
+                <span key={`${f.key}:${text}`} className="relative group/tip">
+                  {btn}
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                    {note || 'Not everything here is kosher — please verify.'}
+                  </span>
                 </span>
-              </span>
-            )
+              )
+            })
           })}
           {headerTags.map((t) => (
             <Chip key={t} tone="slate" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>

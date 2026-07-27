@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
-import { resolveCapabilities, type CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow } from '@/lib/hours'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
@@ -107,7 +107,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       }
       for (const f of filterableSelects) {
         const chosen = selectFilters[f.key]
-        if (chosen?.length && !chosen.includes(item[f.key] as string)) return false
+        // A select field can hold more than one value on a single item (e.g. a
+        // place that's both a Restaurant and a Caterer) — it matches a chosen
+        // filter set if ANY of its own values is one of the chosen ones.
+        if (chosen?.length && !selectValues(item[f.key]).some((v) => chosen.includes(v))) return false
       }
       if (openNow && hasFilterableHours) {
         // Item must be open right now according to at least one filterable hours field.
@@ -143,7 +146,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // The toolbar row (filters + sort) only renders when there's something in it;
   // a select needs ≥2 distinct values before it's worth showing.
   const hasRenderedSelects = filterableSelects.some(
-    (f) => new Set(items.map((item) => item[f.key] as string).filter(Boolean)).size >= 2,
+    (f) => new Set(items.flatMap((item) => selectValues(item[f.key]))).size >= 2,
   )
   const hasFilterRow =
     filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes || hasMinyanim
@@ -345,7 +348,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 )
               })}
               {filterableSelects.map((f) => {
-                const presentValues = Array.from(new Set(items.map((item) => item[f.key] as string).filter(Boolean))).sort()
+                const presentValues = Array.from(new Set(items.flatMap((item) => selectValues(item[f.key])))).sort()
                 if (presentValues.length < 2) return null
                 const chosen = selectFilters[f.key] ?? []
                 const toggle = (v: string) =>

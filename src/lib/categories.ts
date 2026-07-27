@@ -51,6 +51,20 @@ export const TYPE_HAS_SHAPE_CHOICE = (type: FieldType): boolean =>
 export const TYPE_IS_FILTERABLE = (type: FieldType): boolean =>
   type === 'boolean' || type === 'select' || type === 'hours'
 
+/** Normalizes a `type: 'select'` field's stored value to an array of chosen
+ *  option values, regardless of shape — a badge-shown select (e.g. "Type":
+ *  Restaurant/Catering) always allows multiple values on one listing (see
+ *  `normalizeField`'s "Choice filter → always multi-select" rule in
+ *  CategoryManager), stored as `string[]`. Older listings (or a row-shown
+ *  select, which stays single-value) may still have a plain string — treated
+ *  as a one-element array so both shapes read identically everywhere a
+ *  select field's value is used (card badges, directory filters). */
+export function selectValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value as string[]
+  if (value === undefined || value === null || value === '') return []
+  return [String(value)]
+}
+
 export type CategoryField = {
   /** Key inside the listing's `details` JSONB object. */
   key: string
