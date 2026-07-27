@@ -10,6 +10,27 @@ export function isValidPhone(value: string): boolean {
   return digits.length >= 7 && digits.length <= 15
 }
 
+// Live-formats a US phone number as the visitor types, matching the shape
+// Google Places' own `nationalPhoneNumber` field already returns when it
+// auto-fills a listing — "(215) 545-0506" — so a manually-typed number reads
+// identically to an auto-filled one instead of looking different. Reformats
+// on every keystroke from the digits alone (so it's idempotent — running it
+// on an already-formatted or Google-provided value is a no-op) and leaves
+// anything that isn't a plausible 10/11-digit US number untouched (an
+// extension, or a non-US number) rather than mangling it into a bad mask.
+export function formatPhone(value: string): string {
+  let digits = value.replace(/\D/g, '')
+  if (digits.length > 11) return value
+  if (digits.length === 11) {
+    if (!digits.startsWith('1')) return value
+    digits = digits.slice(1)
+  }
+  if (digits.length === 0) return ''
+  if (digits.length <= 3) return `(${digits}`
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
+}
+
 // Accepts only http/https URLs. Rejects dangerous schemes (javascript:, data:,
 // vbscript:, file:, etc.) — `url`-type fields render as clickable link buttons
 // on approved listings, so a non-http scheme would be an injection vector.

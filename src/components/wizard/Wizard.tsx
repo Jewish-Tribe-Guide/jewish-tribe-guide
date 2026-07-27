@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { isValidPhone } from '@/lib/validation'
+import { formatPhone, isValidPhone } from '@/lib/validation'
 import { stepIsVisible, type StepCondition } from '@/lib/forms'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -272,7 +272,7 @@ export default function Wizard({
               type={step.kind === 'text' ? 'text' : step.kind}
               inputMode={step.kind === 'tel' ? 'tel' : step.kind === 'number' ? 'numeric' : undefined}
               value={(answers[step.id] as string) ?? ''}
-              onChange={(e) => setAnswer(step.id, e.target.value)}
+              onChange={(e) => setAnswer(step.id, step.kind === 'tel' ? formatPhone(e.target.value) : e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); goNext() } }}
               placeholder={step.placeholder}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -288,7 +288,7 @@ export default function Wizard({
                   type="tel"
                   inputMode="tel"
                   value={(answers.phone as string) ?? ''}
-                  onChange={(e) => setAnswer('phone', e.target.value)}
+                  onChange={(e) => setAnswer('phone', formatPhone(e.target.value))}
                   placeholder="(215) 555-0100"
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[18px] text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
