@@ -356,41 +356,28 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     const cur = prev[f.key] ?? []
                     return { ...prev, [f.key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }
                   })
-                if (f.multiSelect) {
-                  const isOpen = openDropdown === f.key
-                  const label = chosen.length === 0
-                    ? `All ${f.filterLabel ?? f.label}s`
-                    : chosen.length === 1
-                    ? chosen[0]
-                    : `${chosen.length} selected`
-                  return (
-                    <CheckboxDropdown
-                      key={f.key}
-                      label={label}
-                      active={chosen.length > 0}
-                      isOpen={isOpen}
-                      onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
-                      onClose={() => setOpenDropdown(null)}
-                      values={presentValues}
-                      chosen={chosen}
-                      onToggle={toggle}
-                    />
-                  )
-                }
+                // The filter always lets a visitor pick more than one value to
+                // filter by, regardless of whether a single listing can hold more
+                // than one value (that's `f.multiSelect`, a separate, per-listing
+                // setting — see CategoryField.multiSelect).
+                const isOpen = openDropdown === f.key
+                const label = chosen.length === 0
+                  ? `All ${f.filterLabel ?? f.label}s`
+                  : chosen.length === 1
+                  ? chosen[0]
+                  : `${chosen.length} selected`
                 return (
-                  <select
+                  <CheckboxDropdown
                     key={f.key}
-                    value={chosen[0] ?? ''}
-                    onChange={(e) =>
-                      setSelectFilters((prev) => ({ ...prev, [f.key]: e.target.value ? [e.target.value] : [] }))
-                    }
-                    className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-                  >
-                    <option value="">All {f.filterLabel ?? f.label}s</option>
-                    {presentValues.map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
+                    label={label}
+                    active={chosen.length > 0}
+                    isOpen={isOpen}
+                    onToggleOpen={() => setOpenDropdown(isOpen ? null : f.key)}
+                    onClose={() => setOpenDropdown(null)}
+                    values={presentValues}
+                    chosen={chosen}
+                    onToggle={toggle}
+                  />
                 )
               })}
               {category.externalLink && (
@@ -481,12 +468,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               onTagClick={setSearch}
               onFilterOpen={() => setOpenNow((v) => !v)}
               onFilterBool={(key) => setBoolFilters((prev) => ({ ...prev, [key]: !prev[key] }))}
-              onFilterSelect={(key, value, multi) =>
+              onFilterSelect={(key, value) =>
                 setSelectFilters((prev) => {
                   const cur = prev[key] ?? []
-                  // Single-select: toggle between [value] and cleared. Multi-select:
-                  // add/remove this value from the set. Clicking the badge again undoes it.
-                  if (!multi) return { ...prev, [key]: cur.includes(value) ? [] : [value] }
+                  // Add/remove this value from the filter's chosen set. Clicking
+                  // the badge again undoes it.
                   return { ...prev, [key]: cur.includes(value) ? cur.filter((x) => x !== value) : [...cur, value] }
                 })
               }

@@ -52,13 +52,12 @@ export const TYPE_IS_FILTERABLE = (type: FieldType): boolean =>
   type === 'boolean' || type === 'select' || type === 'hours'
 
 /** Normalizes a `type: 'select'` field's stored value to an array of chosen
- *  option values, regardless of shape — a badge-shown select (e.g. "Type":
- *  Restaurant/Catering) always allows multiple values on one listing (see
- *  `normalizeField`'s "Choice filter → always multi-select" rule in
- *  CategoryManager), stored as `string[]`. Older listings (or a row-shown
- *  select, which stays single-value) may still have a plain string — treated
- *  as a one-element array so both shapes read identically everywhere a
- *  select field's value is used (card badges, directory filters). */
+ *  option values, regardless of shape — a field with `multiSelect: true` (e.g.
+ *  "Type": Restaurant/Catering) can hold more than one value on one listing,
+ *  stored as `string[]`. A single-value select (the default) still stores a
+ *  plain string — treated as a one-element array so both shapes read
+ *  identically everywhere a select field's value is used (card badges,
+ *  directory filters). */
 export function selectValues(value: unknown): string[] {
   if (Array.isArray(value)) return value as string[]
   if (value === undefined || value === null || value === '') return []
@@ -92,8 +91,11 @@ export type CategoryField = {
   filterable?: boolean
   /** Label for the filter toggle/chip (e.g. "Kosher"). Defaults to `label`. */
   filterLabel?: string
-  /** For filterable select fields: render chips instead of a single-select dropdown,
-   *  allowing multiple values to be selected simultaneously. */
+  /** For `type: 'select'`: whether a single listing can hold more than one
+   *  chosen value (e.g. a place that's both "Restaurant" and "Catering").
+   *  Defaults to single-value. Independent of the directory's filter for this
+   *  field, which always lets a visitor pick multiple values regardless of
+   *  this setting (see GenericDirectory's filterableSelects rendering). */
   multiSelect?: boolean
   /** For `type: 'url'`: show the link button in the collapsed card header so it's
    *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
