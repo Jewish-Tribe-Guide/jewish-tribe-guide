@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { formatPhone } from '@/lib/validation'
+import { formatPhone, normalizeUrl } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
@@ -10,7 +10,13 @@ import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
-import TurnstileWidget from '@/components/TurnstileWidget'
+import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
+
+// Whether the Turnstile challenge is actually active for this deploy — mirrors
+// TurnstileWidget's own check. When it's not configured, the widget renders
+// nothing and never calls back with a token, so submission can't be gated on
+// having one.
+const TURNSTILE_ACTIVE = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
 type Props = {
   /** The category this listing belongs to (fixed by where the form was opened). */
@@ -62,6 +68,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
   const [honeypot, setHoneypot] = useState('')
   const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef<TurnstileHandle>(null)
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -162,6 +169,19 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       })
       const body = await res.json()
       if (!res.ok || !body.ok) {
+        // Turnstile tokens are single-use and expire after ~5 min — on a form
+        // with this many fields (especially editing, reviewing everything
+        // already filled in) it's easy to take longer than that before
+        // hitting Submit. The server's message tells the visitor to refresh
+        // the page, which would lose everything they just filled in — instead,
+        // silently re-run the challenge for a fresh token so a plain second
+        // tap on Submit (no reload needed) just works.
+        if (res.status === 403) {
+          turnstileRef.current?.reset()
+          setTurnstileToken('')
+          setErrors(['Verification expired. We’ve refreshed it — please tap Submit again.'])
+          return
+        }
         setErrors(body.errors ?? ['Something went wrong. Please try again.'])
         return
       }
@@ -338,14 +358,24 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </ul>
         )}
 
-        <TurnstileWidget onVerify={setTurnstileToken} />
+        <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} />
 
+        {/* Disabled until a token is actually in hand (when Turnstile is
+            configured) — otherwise a visitor who fills the form faster than
+            the background challenge completes could submit with an empty
+            token and get rejected for no visible reason. */}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || (TURNSTILE_ACTIVE && !turnstileToken)}
           className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
         >
-          {submitting ? 'Submitting…' : mode === 'edit' ? 'Submit edit for review' : 'Submit for review'}
+          {submitting
+            ? 'Submitting…'
+            : TURNSTILE_ACTIVE && !turnstileToken
+              ? 'Verifying…'
+              : mode === 'edit'
+                ? 'Submit edit for review'
+                : 'Submit for review'}
         </button>
       </form>
       </div>
@@ -392,7 +422,11 @@ function DetailFieldInput({
           type="url"
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder ?? 'https://…'}
+          // Adds "https://" once they're done typing — almost nobody types the
+          // scheme by hand, but doing this on every keystroke (instead of on
+          // blur) would fight typing/pasting a real https:// URL mid-edit.
+          onBlur={(e) => onChange(normalizeUrl(e.target.value))}
+          placeholder={field.placeholder ?? 'example.com'}
           className={inputClass}
         />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 
 // Cloudflare Turnstile widget. Renders nothing unless NEXT_PUBLIC_TURNSTILE_SITE_KEY
 // is set, so forms work normally before the keys are configured (and on preview
@@ -13,11 +13,20 @@ const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 type TurnstileApi = {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string
   remove: (id: string) => void
+  reset: (id: string) => void
 }
 declare global {
   interface Window {
     turnstile?: TurnstileApi
   }
+}
+
+export type TurnstileHandle = {
+  /** Re-runs the challenge for a fresh token — call this after the server
+   *  rejects a submission for a stale/already-used token (see ListingForm's
+   *  handleSubmit), so the visitor can just retry without losing their
+   *  filled-in form or reloading the page. */
+  reset: () => void
 }
 
 let scriptPromise: Promise<void> | null = null
@@ -37,39 +46,55 @@ function loadTurnstileScript(): Promise<void> {
   return scriptPromise
 }
 
-export default function TurnstileWidget({ onVerify }: { onVerify: (token: string) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  // Keep the latest callback in a ref so re-renders don't re-mount the widget.
-  const cbRef = useRef(onVerify)
-  cbRef.current = onVerify
-  const widgetId = useRef<string | null>(null)
+const TurnstileWidget = forwardRef<TurnstileHandle, { onVerify: (token: string) => void }>(
+  function TurnstileWidget({ onVerify }, ref) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    // Keep the latest callback in a ref so re-renders don't re-mount the widget.
+    const cbRef = useRef(onVerify)
+    cbRef.current = onVerify
+    const widgetId = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (!SITE_KEY) return
-    let cancelled = false
-    loadTurnstileScript()
-      .then(() => {
-        if (cancelled || !containerRef.current || !window.turnstile) return
-        widgetId.current = window.turnstile.render(containerRef.current, {
-          sitekey: SITE_KEY,
-          callback: (token: string) => cbRef.current(token),
-          'error-callback': () => cbRef.current(''),
-          'expired-callback': () => cbRef.current(''),
+    useImperativeHandle(ref, () => ({
+      reset: () => {
+        if (widgetId.current && window.turnstile) {
+          try {
+            window.turnstile.reset(widgetId.current)
+          } catch {
+            // widget already gone
+          }
+        }
+      },
+    }))
+
+    useEffect(() => {
+      if (!SITE_KEY) return
+      let cancelled = false
+      loadTurnstileScript()
+        .then(() => {
+          if (cancelled || !containerRef.current || !window.turnstile) return
+          widgetId.current = window.turnstile.render(containerRef.current, {
+            sitekey: SITE_KEY,
+            callback: (token: string) => cbRef.current(token),
+            'error-callback': () => cbRef.current(''),
+            'expired-callback': () => cbRef.current(''),
+          })
         })
-      })
-      .catch((err) => console.error('[turnstile]', err))
-    return () => {
-      cancelled = true
-      if (widgetId.current && window.turnstile) {
-        try {
-          window.turnstile.remove(widgetId.current)
-        } catch {
-          // widget already gone
+        .catch((err) => console.error('[turnstile]', err))
+      return () => {
+        cancelled = true
+        if (widgetId.current && window.turnstile) {
+          try {
+            window.turnstile.remove(widgetId.current)
+          } catch {
+            // widget already gone
+          }
         }
       }
-    }
-  }, [])
+    }, [])
 
-  if (!SITE_KEY) return null
-  return <div ref={containerRef} className="my-2" />
-}
+    if (!SITE_KEY) return null
+    return <div ref={containerRef} className="my-2" />
+  },
+)
+
+export default TurnstileWidget

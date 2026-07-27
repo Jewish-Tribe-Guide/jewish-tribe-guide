@@ -31,6 +31,22 @@ export function formatPhone(value: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`
 }
 
+// Adds "https://" to a bare website typed without a scheme — "example.com" or
+// "www.example.com", how basically everyone actually types one — since a
+// stored url field is used directly as a link's href (see
+// GenericListingCard), so it needs a real scheme to actually work rather than
+// resolving as a broken relative link on this site. Leaves an existing
+// http(s):// URL alone (idempotent), and leaves any other scheme someone
+// typed on purpose (mailto:, tel:, ftp://) untouched so isHttpUrl's own check
+// can still reject it with a clear message instead of this silently mangling it.
+export function normalizeUrl(value: string): string {
+  const v = value.trim()
+  if (!v) return v
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return v // already has a scheme, e.g. http://, ftp://
+  if (/^mailto:|^tel:/i.test(v)) return v // schemes that don't use "//"
+  return `https://${v}`
+}
+
 // Accepts only http/https URLs. Rejects dangerous schemes (javascript:, data:,
 // vbscript:, file:, etc.) — `url`-type fields render as clickable link buttons
 // on approved listings, so a non-http scheme would be an injection vector.

@@ -12,6 +12,7 @@ import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { normalizeUrl } from '@/lib/validation'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 
@@ -119,6 +120,19 @@ export async function POST(request: Request) {
 
   if (payload) {
     const category = await getCategoryById(payload.category)
+    // Nobody types the "https://" scheme by hand for a website field — add it
+    // before validating (so a bare "example.com" isn't rejected) and before
+    // storing (so the saved value is still a real, working link — the card
+    // renderer uses it as-is for the href). The listing form already does
+    // this client-side on blur; normalizing again here covers any submission
+    // that skips that path (e.g. a stale client, direct API use).
+    if (payload.details) {
+      for (const field of category?.detailFields ?? []) {
+        if (field.type !== 'url') continue
+        const raw = payload.details[field.key]
+        if (typeof raw === 'string' && raw.trim()) payload.details[field.key] = normalizeUrl(raw)
+      }
+    }
     const errors = validateSubmission(payload, category)
     if (errors.length > 0) {
       return Response.json({ ok: false, errors }, { status: 400 })

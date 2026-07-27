@@ -1719,13 +1719,16 @@ function CleanupConfirm({
 
 // ── One field row ─────────────────────────────────────────────────────────────
 
-// The editor only asks Name / Type / Show as / Required; the filter + tag rules
-// are implied and applied here on save:
+// The editor asks Name / Type / Show as / Required, plus (for Choice) whether
+// a listing can hold more than one value; the filter + tag rules are implied
+// and applied here on save:
 //   • Badge (Yes/No, Choice) → a filter. Row → display only, no filter.
-//   • Choice filter → always multi-select.
 //   • Hours → always the "Open now" filter.
 //   • Tags → always chips + click-to-search (never a filter); their tag group is
 //     derived from the name once, then frozen so a rename can't orphan tags.
+// Note: the directory's *filter* for a Choice field always allows picking more
+// than one value, regardless of `multiSelect` — that flag only controls how
+// many values a single listing can be assigned (see CategoryField.multiSelect).
 function normalizeField(f: CategoryField): CategoryField {
   const out: CategoryField = { ...f }
   const isBadge = out.renderAs !== 'row'
@@ -1741,7 +1744,7 @@ function normalizeField(f: CategoryField): CategoryField {
   } else if (TYPE_IS_FILTERABLE(out.type)) {
     // Yes/No or Choice: the badge is the filter; a row is display-only.
     out.filterable = isBadge
-    out.multiSelect = out.type === 'select' && isBadge ? true : undefined
+    if (out.type !== 'select') out.multiSelect = undefined
   } else {
     out.filterable = false
     out.multiSelect = undefined
@@ -1822,7 +1825,10 @@ function FieldEditor({
   function onTypeChange(type: FieldType) {
     // Reset to the type's natural shape; drop choices when leaving Choice.
     const patch: Partial<CategoryField> = { type, renderAs: FIELD_TYPE_SHAPE[type] }
-    if (type !== 'select') patch.options = undefined
+    if (type !== 'select') {
+      patch.options = undefined
+      patch.multiSelect = undefined
+    }
     onChange(patch)
   }
 
@@ -1855,6 +1861,18 @@ function FieldEditor({
             className={inputClass}
             placeholder={'Elementary\nMiddle\nHigh'}
           />
+        </label>
+      )}
+
+      {f.type === 'select' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.multiSelect}
+            onChange={(e) => onChange({ multiSelect: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Allow more than one choice per listing (e.g. Restaurant + Catering)
         </label>
       )}
 

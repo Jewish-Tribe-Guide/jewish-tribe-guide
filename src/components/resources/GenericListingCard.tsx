@@ -68,9 +68,10 @@ export function GenericListingCard({
   onFilterOpen: () => void
   /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
   onFilterBool: (key: string) => void
-  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → select it in
-   *  that field's filter. `multi` adds to the set; otherwise it replaces. */
-  onFilterSelect: (key: string, value: string, multi: boolean) => void
+  /** Click a select badge (e.g. cert "IKC", type "Restaurant") → add/remove it
+   *  from that field's filter (the filter always allows more than one value
+   *  chosen at once, regardless of the field's own `multiSelect` setting). */
+  onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
   onReport: () => void
 }) {
@@ -203,7 +204,7 @@ export function GenericListingCard({
                   onClick={(e) => {
                     e.stopPropagation()
                     if (f.filterable && f.type === 'boolean') onFilterBool(f.key)
-                    else if (f.filterable && f.type === 'select') onFilterSelect(f.key, text, !!f.multiSelect)
+                    else if (f.filterable && f.type === 'select') onFilterSelect(f.key, text)
                     else onTagClick(text)
                   }}
                   title={amber ? undefined : `Filter by ${text}`}
