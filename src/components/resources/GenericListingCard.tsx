@@ -224,7 +224,7 @@ export function GenericListingCard({
         onClick={toggleExpanded}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded() } }}
         style={highlighted ? { backgroundColor: `color-mix(in srgb, ${highlightHex} 6%, white)` } : undefined}
-        className={`w-full flex items-center justify-between gap-3 transition-colors cursor-pointer ${dense ? 'px-3 py-2.5' : 'px-4 py-4'} ${
+        className={`w-full flex items-center justify-between gap-3 transition-colors cursor-pointer ${dense ? 'px-2.5 py-2' : 'px-4 py-4'} ${
           highlighted ? '' : 'hover:bg-slate-50 active:bg-slate-100'
         } ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
@@ -233,7 +233,7 @@ export function GenericListingCard({
             so it never gets crowded; on desktop they share a line. */}
         <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-          <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-sm' : ''}`}>{item.name}</span>
+          <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-xs' : ''}`}>{item.name}</span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           {isOpen && (closing?.closesSoon ? (
             <span className="relative group/tip">
@@ -357,7 +357,7 @@ export function GenericListingCard({
       </div>
 
       {expanded && (
-        <div className={`border-t border-slate-100 space-y-3 bg-slate-50 rounded-b-lg ${dense ? 'px-3 py-3' : 'px-4 py-4'}`}>
+        <div className={`border-t border-slate-100 space-y-3 bg-slate-50 rounded-b-lg ${dense ? 'px-2.5 py-2.5' : 'px-4 py-4'}`}>
           {/* Full tag list — only when the collapsed header capped it (mobile). */}
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

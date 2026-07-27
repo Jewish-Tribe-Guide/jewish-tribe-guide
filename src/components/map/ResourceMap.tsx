@@ -4,15 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
-import { useIsMobile } from '@/lib/useIsMobile'
-
-// Width the floating "Browse by Category" sidebar panel actually occludes
-// from the map's right edge at lg+ (w-80 = 320px, flush against the map's
-// right edge, no gap — see ResourceMapView.tsx). Centering math below uses
-// this so a "centered" pin lands in the middle of the visible map area
-// (between the map's own left edge and the sidebar's left edge), not the
-// middle of the full map container, part of which sits behind the sidebar.
-const SIDEBAR_OCCLUSION_PX = 320
 
 // Google Maps animates `panTo` smoothly on its own, but `setZoom` always
 // jumps straight to the target level — so a click that both re-centers AND
@@ -90,17 +81,6 @@ type Props = {
    *  usual "keep the user centered" behavior, since isolating something is a
    *  deliberate, one-off request. */
   focusPoints?: { lat: number; lng: number }[] | null
-  /** Square off this component's own corners (the "Maps couldn't load"
-   *  fallback) instead of the default rounded ones — set when the parent
-   *  map card itself has square corners (the home page's embedded map), so
-   *  a rounded box doesn't peek out from inside a square-cornered clip. */
-  square?: boolean
-  /** True when a `sidebar` list is passed to the parent `ResourceMapView` —
-   *  i.e. a floating category-list panel MIGHT be overlaying this map's
-   *  right edge (only actually does at lg+, checked live below). When it
-   *  is, centering/fitting math compensates so points land centered in the
-   *  visible map area rather than the full container. */
-  hasSidebar?: boolean
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -186,7 +166,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, square, hasSidebar }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -194,17 +174,6 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
-
-  // The sidebar panel only actually overlays the map at lg+ (1024px) — below
-  // that it's a normal block underneath instead (see ResourceMapView.tsx),
-  // so the centering compensation below must only kick in when both this
-  // prop AND the live viewport agree it's actually overlaying right now.
-  // `useIsMobile` is called unconditionally (Rules of Hooks) even when
-  // `hasSidebar` is false; the `&&` combine happens after.
-  const isWideViewport = useIsMobile('(min-width: 1024px)')
-  const sidebarOverlaying = !!hasSidebar && isWideViewport
-  const sidebarOverlayingRef = useRef(sidebarOverlaying)
-  useEffect(() => { sidebarOverlayingRef.current = sidebarOverlaying }, [sidebarOverlaying])
 
   // Read these inside the marker effect via refs so it does NOT rebuild markers
   // when the live GPS position ticks or the callback identity changes — only
@@ -292,18 +261,13 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       const startZoom = map.getZoom() ?? 15
       map.panTo(bounds.getCenter())
       smoothZoomTo(map, 15, startZoom)
-      // Shift the true center right by half the sidebar's occluded width, so
-      // the pin (which stays put) renders centered within the visible area
-      // instead of the full container's middle (half of which is covered).
-      if (sidebarOverlayingRef.current) map.panBy(SIDEBAR_OCCLUSION_PX / 2, 0)
     } else if (points.length > 1) {
-      const padding = sidebarOverlayingRef.current ? { top: 64, right: 64 + SIDEBAR_OCCLUSION_PX, bottom: 64, left: 64 } : 64
       // Same "measure via a synchronous fitBounds, revert, then glide there"
       // trick as the focus-points effect below — see its comment for why
       // this doesn't flash the intermediate state.
       const startCenter = map.getCenter()
       const startZoom = map.getZoom()
-      map.fitBounds(bounds, padding)
+      map.fitBounds(bounds, 64)
       const targetCenter = map.getCenter()
       const targetZoom = map.getZoom()
       if (startCenter) map.setCenter(startCenter)
@@ -312,9 +276,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       if (targetZoom != null && startZoom != null) smoothZoomTo(map, targetZoom, startZoom)
     }
     // Rebuild only when the points themselves change — GPS ticks and callback
-    // identity (incl. sidebarOverlaying, read via ref) are read via refs so
-    // an open info window survives them.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // identity are read via refs so an open info window survives them.
   }, [points, ready])
 
   // ── Force-frame isolated points (a facility or a whole category, tapped in
@@ -334,12 +296,9 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       const startZoom = map.getZoom() ?? 16
       map.panTo(focusPoints[0])
       smoothZoomTo(map, 16, startZoom)
-      // Same sidebar-occlusion compensation as the effect above.
-      if (sidebarOverlayingRef.current) map.panBy(SIDEBAR_OCCLUSION_PX / 2, 0)
     } else {
       const bounds = new google.maps.LatLngBounds()
       focusPoints.forEach((p) => bounds.extend(p))
-      const padding = sidebarOverlayingRef.current ? { top: 64, right: 64 + SIDEBAR_OCCLUSION_PX, bottom: 64, left: 64 } : 64
       // `fitBounds` computes its target center/zoom synchronously (the map
       // already knows its own pixel size), so calling it and then instantly
       // reading the result back — before the browser paints anything — lets
@@ -347,7 +306,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       // glide there ourselves via panTo/smoothZoomTo instead of snapping.
       const startCenter = map.getCenter()
       const startZoom = map.getZoom()
-      map.fitBounds(bounds, padding)
+      map.fitBounds(bounds, 64)
       const targetCenter = map.getCenter()
       const targetZoom = map.getZoom()
       if (startCenter) map.setCenter(startCenter)
@@ -410,7 +369,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
 
   if (!MAPS_API_KEY || authFailed) {
     return (
-      <div className={`flex h-full w-full items-center justify-center bg-slate-100 p-6 text-center text-sm text-slate-500 ${square ? '' : 'rounded-2xl'}`}>
+      <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
         The map couldn’t load. Check that the Google Maps API key is configured and the
         Maps JavaScript API is enabled.
       </div>

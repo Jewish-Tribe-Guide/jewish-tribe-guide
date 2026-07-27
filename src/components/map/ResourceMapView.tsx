@@ -629,24 +629,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       )}
 
-      {/* ── Map/Nearby panel + sidebar — `relative` so the sidebar (when given)
-              can float on top of the map as an overlay panel on lg+ instead of
-              sharing its width, letting the map fill the full column. ──────── */}
-      <div className="relative">
-        <div>
+      {/* ── Map/Nearby panel + sidebar — side by side at lg+ (each its own
+              bordered card, a narrow gap between them, no longer overlapping),
+              stacked below lg. ────────────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-start lg:gap-3">
+        <div className="min-w-0 flex-1">
           {/* ── Map view ──────────────────────────────────────────────────── */}
           {tab === 'map' && (
-            // No border, and square (not rounded) corners, on the home page's
-            // embedded map (`sidebar` given) — it now runs full-bleed to the
-            // browser's edges (see Landing.tsx), where a border or a curved
-            // corner would just look clipped/cut-off. The standalone /map
-            // screen keeps its own border + rounded corners, framing the
-            // whole page as a card.
-            <div
-              className={`h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 flex flex-col ${
-                sidebar ? 'sm:rounded-none sm:ring-0' : 'sm:ring-0 sm:border-2 sm:border-[#ffc145]'
-              }`}
-            >
+            // Bordered/rounded on both the home page's embedded map (`sidebar`
+            // given) and the standalone /map screen — the embedded map now
+            // stays inset within the page's normal content column (see
+            // Landing.tsx) instead of running full-bleed, so a border no
+            // longer looks clipped at the browser's edge.
+            <div className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145] flex flex-col">
               <div className="relative min-h-0 flex-1">
                 {/* ── Live tracking, floated over the map's own top-left
                         corner instead of a bar above it — home page's
@@ -691,17 +686,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         so filtering doesn't require expanding a row in
                         `sidebar`. Reads/writes the exact same
                         `focusedCategoryIds` set as `sidebar`'s own rows, so
-                        the two stay in sync in both directions. Inset from
-                        the right at lg+ so it stops short of the floating
-                        `sidebar` panel (320px wide, flush against the map's
-                        right edge, no gap) instead of running underneath it
-                        — below lg the sidebar isn't overlaid on the map at
-                        all, so the full width is free. Only shown alongside
-                        `sidebar` (the home page's embedded map) — the
-                        standalone map screen has no such list to sync with;
-                        it keeps its own chip row above instead. ─────────── */}
+                        the two stay in sync in both directions. `sidebar` is
+                        a separate card beside the map now (not an overlay on
+                        top of it), so this key only needs to stay within the
+                        map's own edges — no extra inset for it to dodge.
+                        Only shown alongside `sidebar` (the home page's
+                        embedded map) — the standalone map screen has no such
+                        list to sync with; it keeps its own chip row above
+                        instead. ──────────────────────────────────────────── */}
                 {!loading && sidebar && options.length > 0 && (
-                  <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-1.5 lg:right-80">
+                  <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center gap-1.5">
                     {options.map((o) => {
                       const active = !!focusedCategoryIds?.has(o.id)
                       return (
@@ -746,8 +740,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     follow={follow}
                     onResumeFollow={() => setFollow(true)}
                     onViewListing={onViewListing}
-                    square={!!sidebar}
-                    hasSidebar={!!sidebar}
                     onMarkerClick={(p) => {
                       // Always opens/scrolls to this facility's card in
                       // `sidebar` too, not just the map's own info window —
@@ -802,20 +794,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
 
         {sidebar && (
-          // Below lg: a normal block underneath the map, full width. lg+: an
-          // overlay panel floating on top of the map's right edge (absolute,
-          // out of flow — the map above no longer shares its width with it),
-          // flush against the map's own top/right/bottom edges (no border, no
-          // rounded corners, no gap) so it reads as part of the map card
-          // rather than a separate floating tile — the map key (above) is a
-          // floating overlay too, not a separate bar eating into the map's
-          // height, so there's no longer anything else to dodge vertically
-          // here. The key row instead stays clear of this panel horizontally
-          // (`lg:right-80` on the key, matching this panel's own width — no
-          // extra gap to add now that it's flush). Scrolls internally, with
-          // an opaque-ish fill so it still reads clearly over the map tiles
-          // beneath it.
-          <div className="mt-6 w-full lg:absolute lg:top-0 lg:right-0 lg:bottom-0 lg:z-10 lg:mt-0 lg:w-80 lg:overflow-y-auto lg:bg-[#fefefe] lg:p-3 lg:shadow-xl">
+          // Below lg: a normal block underneath the map, full width. lg+: its
+          // own bordered card beside the map (not an overlay on top of it) —
+          // a narrow gap (`lg:gap-3` on the flex row above) separates the
+          // two instead of them overlapping. Sticky so it stays in view
+          // while the map's own list of pins scrolls past it.
+          <div className="mt-6 w-full rounded-2xl border-2 border-[#ffc145] bg-[#fefefe] p-3 shadow-xl lg:mt-0 lg:w-80 lg:shrink-0 lg:sticky lg:top-4 lg:max-h-[70vh] lg:overflow-y-auto">
             {sidebar}
           </div>
         )}

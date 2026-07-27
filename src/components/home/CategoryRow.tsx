@@ -225,7 +225,7 @@ export default function CategoryRow({ category, items, coords, onNavigate, onFoc
       )}
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-muted">No matches. Try clearing a filter.</p>
+        <p className="text-xs text-muted">No matches. Try clearing a filter.</p>
       ) : (
         <div className="space-y-2">
           {sorted.map((item) => (

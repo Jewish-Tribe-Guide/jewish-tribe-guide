@@ -58,12 +58,12 @@ export default function Collapsible({ title, children, defaultOpen = false, open
         onClick={toggle}
         aria-expanded={isExpanded}
         style={accentColor ? { backgroundColor: accentColor } : undefined}
-        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors cursor-pointer ${
+        className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer ${
           accentColor ? 'hover:brightness-110' : 'hover:bg-slate-50'
         }`}
       >
         <span
-          className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide ${
+          className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-wide ${
             accentColor ? (darkText ? 'text-slate-900' : 'text-white') : 'text-muted'
           }`}
         >
@@ -73,7 +73,7 @@ export default function Collapsible({ title, children, defaultOpen = false, open
           )}
         </span>
         <svg
-          className={`w-4 h-4 transition-transform duration-200 shrink-0 ml-4 ${
+          className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ml-4 ${
             accentColor ? (darkText ? 'text-slate-900' : 'text-white') : 'text-muted'
           } ${isExpanded ? 'rotate-180' : ''}`}
           fill="none"
@@ -87,7 +87,7 @@ export default function Collapsible({ title, children, defaultOpen = false, open
       </button>
 
       {isExpanded && (
-        <div className="border-t-2 border-slate-200 px-4 py-3 bg-slate-50">
+        <div className="border-t-2 border-slate-200 px-3 py-2 bg-slate-50">
           {children}
         </div>
       )}

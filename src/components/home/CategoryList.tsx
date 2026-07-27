@@ -110,8 +110,8 @@ export default function CategoryList({ categories, listings, hospitals, onNaviga
                   </button>
                 </div>
                 {eruvim.map((eruv) => (
-                  <div key={eruv.id} className="border-2 border-slate-300 bg-white px-3 py-2.5">
-                    <p className="text-sm font-semibold text-slate-900">{eruv.name}</p>
+                  <div key={eruv.id} className="rounded-lg border-2 border-slate-300 bg-white px-2.5 py-2">
+                    <p className="text-xs font-semibold text-slate-900">{eruv.name}</p>
                     <p className="text-xs text-muted mb-1.5">{eruv.area}</p>
                     <a
                       href={eruv.statusLink}

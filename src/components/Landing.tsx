@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards, type CardDef } from '@/components/home/sections'
+import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import CategoryList from '@/components/home/CategoryList'
@@ -12,7 +12,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useHospitals } from '@/lib/useHospitals'
-import type { NavigateFn } from '@/types'
+import type { DirectoryResource, NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { CategoryConfig } from '@/lib/categories'
@@ -36,6 +36,47 @@ type Props = {
 function mapListRank(c: CategoryConfig): number {
   const key = c.kind === 'medical' ? HOSPITALS_ID : c.kind === 'eruv' ? 'eruv' : c.id
   return rankMapId(key)
+}
+
+type GetConnectedItem = { id: string; label: string; icon?: string; go: () => void }
+
+/** One list under the "Get Connected" section — its own bordered card with a
+ *  title + a capped-height, internally scrolling list (rather than an
+ *  unbounded column that grows with however many items happen to exist), or
+ *  a placeholder when a column has no items yet. `accentColor` (the same navy
+ *  as the "Get Connected" heading above it) gives the card a top stripe,
+ *  colored title, and matching hover instead of reading flat gray. */
+function GetConnectedColumn({ title, items, accentColor }: { title: string; items: GetConnectedItem[]; accentColor: string }) {
+  return (
+    <div
+      style={{ borderTopColor: accentColor }}
+      className="flex flex-col rounded-2xl border border-slate-200 border-t-4 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+    >
+      <h3 style={{ color: accentColor }} className="shrink-0 text-xs font-extrabold uppercase tracking-wide">{title}</h3>
+      <ul className="mt-3 max-h-56 space-y-2 overflow-y-auto">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <li key={item.id}>
+              <button
+                onClick={item.go}
+                style={{ '--hover-color': accentColor } as React.CSSProperties}
+                className="text-left text-sm font-medium text-slate-700 transition-colors hover:text-[var(--hover-color)] cursor-pointer"
+              >
+                {item.icon && (
+                  <span aria-hidden="true" className="mr-1.5">
+                    {item.icon}
+                  </span>
+                )}
+                {item.label}
+              </button>
+            </li>
+          ))
+        ) : (
+          <li className="text-sm text-slate-400 italic">Coming soon</li>
+        )}
+      </ul>
+    </div>
+  )
 }
 
 // The whole site is one screen: a filter box, then a grid of cards. Typing
@@ -149,26 +190,42 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const onMapCardIds = new Set(
     categoriesOnMap.map((c) => (c.kind === 'medical' ? 'medical' : c.kind === 'eruv' ? 'eruv' : c.id)),
   )
-  // Desktop-only fixed "quick links" row, shown inside the hero band between
-  // the mission text and the search box (see HeroHeading's `quickLinks`
-  // prop) — a small fixed set in a fixed order, NOT the dynamic
-  // search-filtered grid the old "Get Connected" section used to be (that
-  // whole section/band was removed). Support/Volunteer are the same cards
-  // `entryCards` builds (same `go`/icon), just relabeled for this row;
-  // WhatsApp reuses its normal category card unchanged. Any card not found
-  // yet (e.g. `resources` still loading) is simply omitted until it is.
-  const quickLinksCards: CardDef[] = (() => {
-    const volunteer = entryCards.find((c) => c.id === 'volunteer')
-    const support = entryCards.find((c) => c.id === 'support')
-    const whatsapp = resources?.find((c) => c.id === 'whatsapp')
-    return [
-      volunteer && { ...volunteer, title: 'Volunteer' },
-      support && { ...support, title: 'Support' },
-      { title: 'Young Professionals', id: 'young-professional-groups', icon: '🤝', go: () => {} },
-      whatsapp,
-    ].filter((c): c is CardDef => !!c)
-  })()
+  // The WhatsApp quick-link card, shown on its own directly under the "Get
+  // Connected" heading. The Volunteer/Support/Young Professionals quick-links
+  // row that used to sit in the top bar alongside this was removed — it was
+  // duplicative with the "Get Connected" section's own columns further down.
+  const whatsappCard = resources?.find((c) => c.id === 'whatsapp')
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
+
+  // ── "Get Connected" section data — each column's list is pulled straight
+  //         from the real page/flow its old quick-link button opened, not
+  //         duplicated content.
+  // A single "Interest Form" entry — same support flow every individual need
+  // (Meals / A ride / etc.) used to open, just without preselecting one.
+  const supportItems: GetConnectedItem[] = [
+    { id: 'interest-form', label: 'Interest Form', go: () => onOpenFlow('support') },
+  ]
+  // Same treatment as `supportItems` above — one "Interest Form" entry
+  // instead of a separate link per way to help.
+  const volunteeringItems: GetConnectedItem[] = [
+    { id: 'interest-form', label: 'Interest Form', go: () => onOpenFlow('volunteer') },
+  ]
+  // These four young-professional listings read more as social meetups than
+  // professional networking, so they're split out into "Social Opportunities"
+  // instead — same underlying category/page, just grouped differently here.
+  const SOCIAL_OPPORTUNITY_NAMES = new Set(['Tribe 12', 'The Chevra', 'Spruce Street Minyan', 'Mem Global- Moishe House'])
+  const youngProfessionalToItem = (item: DirectoryResource) => ({
+    id: item.id,
+    label: item.name,
+    go: () => onNavigate('patient', 'find', { findView: 'young-professional', findItemId: item.id }),
+  })
+  const youngProfessionalListings = (listings ?? []).filter((item) => item.category === 'young-professional')
+  const professionalNetworkItems: GetConnectedItem[] = youngProfessionalListings
+    .filter((item) => !SOCIAL_OPPORTUNITY_NAMES.has(item.name))
+    .map(youngProfessionalToItem)
+  const socialOpportunityItems: GetConnectedItem[] = youngProfessionalListings
+    .filter((item) => SOCIAL_OPPORTUNITY_NAMES.has(item.name))
+    .map(youngProfessionalToItem)
 
   const q = query.trim()
   const loading = !q && allCards === null
@@ -211,44 +268,43 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 sm:pb-0">
-      {/* ── Condensed top bar — site name + tagline + search box (top-left,
-              no longer large/centered — the search box moved here from the
-              old "What are you looking for?" band below, which is now
-              desktop-hidden entirely, see HeroHeading.tsx) and the "Get
-              Connected" quick-links (Volunteer Opportunities / Support /
-              Young Professional Groups / WhatsApp Groups — fixed set, fixed
-              order) as bordered buttons to the right, all in one row.
-              Desktop only: mobile keeps its existing compact top (with its
-              own separate title/search in HeroHeading), untouched. Full-bleed
-              band (same breakout as the sections below it) — see
-              [[project_art_deco_home_redesign]]. */}
-      <section className="hidden sm:flex sm:items-center sm:justify-between sm:gap-6 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6">
-        <div className="text-left">
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#fefefe]">
-            {settings.name}
-          </h1>
-          {/* Fixed copy per explicit request, not `settings.tagline` — this
-                  exact sentence replaces whatever the admin-configured tagline
-                  would otherwise show here. */}
-          <p className="text-xs text-[#fefefe]">
-            Community resources for residents, visitors, and hospital patients
-          </p>
-        </div>
-        {(quickLinksCards.length > 0 || ui.search.landing) && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {quickLinksCards.map((c) => (
-              <button
-                key={c.id ?? c.title}
-                onClick={c.go}
-                className="whitespace-nowrap rounded-full border-2 border-[#E1E4E5] bg-white px-3 py-1.5 text-xs font-semibold text-[#393535] transition-colors hover:bg-[#700F0F] hover:text-[#fefefe] cursor-pointer"
-              >
-                {c.title}
-              </button>
-            ))}
-            {ui.search.landing && (
-              <div className="w-56">
-                <div className="flex items-center rounded-full border-2 border-[#E1E4E5] bg-white pl-4 pr-1.5 py-1.5 shadow-sm transition-shadow focus-within:shadow-md">
-                  <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+      {/* ── Condensed top bar — site name + tagline only now (the search box
+              moved into its own "What are you looking for?" section right
+              below). Used to also carry a Volunteer/Support/Young
+              Professionals quick-links row here; removed as duplicative once
+              the "Get Connected" section further down covered the same links
+              with real lists under them. Desktop only: mobile keeps its
+              existing compact top (with its own separate title/search in
+              HeroHeading), untouched. Full-bleed band (same breakout as the
+              sections below it) — see [[project_art_deco_home_redesign]]. */}
+      <section className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6 sm:text-center">
+        <h1 className="text-3xl font-extrabold tracking-tight text-[#fefefe]">
+          {settings.name}
+        </h1>
+        {/* Fixed copy per explicit request, not `settings.tagline` — this
+                exact sentence replaces whatever the admin-configured tagline
+                would otherwise show here. */}
+        <p className="text-sm text-[#fefefe]">
+          Community resources for residents, visitors, and hospital patients
+        </p>
+      </section>
+
+      {/* ── "What are you looking for?" search section — its own band between
+              the top bar and the map, centered. `settings.heroTitle` is the
+              same admin-editable heading mobile's HeroHeading shows (defaults
+              to "What are you looking for?"), so the two never drift apart.
+              Full-bleed-outer + `mx-auto max-w-6xl px-6`-inner wrapper, same
+              pattern as the map/Get Connected/Zmanim bands below. ────────── */}
+      {ui.search.landing && (
+        <section className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-8">
+          <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+                {settings.heroTitle}
+              </h2>
+              <div className="w-full max-w-xl">
+                <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                  <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                   </svg>
                   <input
@@ -257,27 +313,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Filter — kosher food, rides, housing, synagogues…"
                     aria-label="Filter resources"
-                    className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
                   />
                   {query && (
                     <button
                       onClick={() => setQuery('')}
                       aria-label="Clear filter"
-                      className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                      className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
                     >
                       ✕
                     </button>
                   )}
                 </div>
               </div>
-            )}
+            </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── Mobile-only now: "What are you looking for?" heading + filter —
               desktop hides this whole band since its title was removed and
-              its search box moved into the condensed bar above. ─────────── */}
+              its search box moved into the dedicated search section above. ─ */}
       <HeroHeading
         settings={settings}
         query={query}
@@ -308,45 +364,86 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               a "Browse by Category" list beside it. Desktop only: mobile now
               reaches the same map via its own tab bar entry, so it's dropped
               from this scroll to avoid showing it twice. ─────────────────── */}
-      {/* Full-bleed white band (same `w-screen` + `margin-left: calc(50% -
-              50vw)` breakout as the hero above) — the map itself now goes
-              edge-to-edge with it too (no inner max-w-6xl wrapper, no
-              horizontal padding), rather than staying pinned to the page's
-              normal content column inside the color band. Its own border was
-              dropped to match (see ResourceMapView.tsx) — a border would just
-              look clipped at the browser's edge. ─────────────────────────── */}
+      {/* Full-bleed band (same `w-screen` + `margin-left: calc(50% - 50vw)`
+              breakout as the hero above) for the background fill only — the
+              map itself stays inset within the page's normal max-w-6xl
+              column (`mx-auto max-w-6xl px-6` inner wrapper below), so it's
+              cropped by a visible border from the sides of the page rather
+              than running edge-to-edge. See ResourceMapView.tsx for the
+              border itself. ──────────────────────────────────────────────── */}
       {hasMap && (
-        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#393535]">
-          <HomeMap
-            onNavigate={onNavigate}
-            coords={coords}
-            focusedListingId={focusedListingId}
-            onFocusListingChange={setFocusedListingId}
-            focusedCategoryIds={focusedCategoryIds}
-            onFocusCategoryChange={toggleCategory}
-            categoryItemIdsByCategory={categoryItemIdsByCategory}
-            sidebar={
-              categoriesOnMap.length > 0 && listings ? (
-                <CategoryList
-                  categories={categoriesOnMap}
-                  listings={listings}
-                  hospitals={hospitals ?? []}
-                  onNavigate={onNavigate}
-                  coords={coords}
-                  onFocusListing={setFocusedListingId}
-                  focusedListingId={focusedListingId}
-                  focusedCategoryIds={focusedCategoryIds}
-                  onFocusCategory={toggleCategory}
-                  colorFor={colorFor}
-                  onVisibleIdsChange={(mapId, ids) =>
-                    setCategoryItemIdsByCategory((prev) => ({ ...prev, [mapId]: ids }))
-                  }
-                />
-              ) : undefined
-            }
-          />
+        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
+          <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
+            <HomeMap
+              onNavigate={onNavigate}
+              coords={coords}
+              focusedListingId={focusedListingId}
+              onFocusListingChange={setFocusedListingId}
+              focusedCategoryIds={focusedCategoryIds}
+              onFocusCategoryChange={toggleCategory}
+              categoryItemIdsByCategory={categoryItemIdsByCategory}
+              sidebar={
+                categoriesOnMap.length > 0 && listings ? (
+                  <CategoryList
+                    categories={categoriesOnMap}
+                    listings={listings}
+                    hospitals={hospitals ?? []}
+                    onNavigate={onNavigate}
+                    coords={coords}
+                    onFocusListing={setFocusedListingId}
+                    focusedListingId={focusedListingId}
+                    focusedCategoryIds={focusedCategoryIds}
+                    onFocusCategory={toggleCategory}
+                    colorFor={colorFor}
+                    onVisibleIdsChange={(mapId, ids) =>
+                      setCategoryItemIdsByCategory((prev) => ({ ...prev, [mapId]: ids }))
+                    }
+                  />
+                ) : undefined
+              }
+            />
+          </div>
         </div>
       )}
+
+      {/* ── Get Connected — desktop only, full-bleed band between the map and
+              the Zmanim widget (the slot the app's original "Get Connected"
+              section held before it was replaced by the top-bar quick-links
+              row — see the history comment on `quickLinksCards` above). The
+              WhatsApp button moved down from that row to sit right under the
+              heading; the four columns below it are lists pulled from the
+              real pages/flows those quick-link buttons already open (not
+              new/duplicated content) — Professional Networks and Social
+              Opportunities both draw from the same young-professional
+              listings, just split by which read as networking vs. purely
+              social (see SOCIAL_OPPORTUNITY_NAMES above). Separated from the
+              map above (and Zmanim below) by a plain divider line rather
+              than a border boxing the whole section in — same #fefefe fill
+              throughout, so the line is the only thing marking the seam. ── */}
+      <div className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-8">
+        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
+          <div className="border-t border-slate-200 pt-8">
+            <div className="text-center">
+              <h2 className="text-3xl font-extrabold tracking-tight text-[#0C3D57]">Get Connected</h2>
+              <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-[#ffc145]" aria-hidden="true" />
+              {whatsappCard && (
+                <button
+                  onClick={whatsappCard.go}
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border-2 border-[#25D366] bg-[#25D366] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                >
+                  {whatsappCard.title}
+                </button>
+              )}
+            </div>
+            <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <GetConnectedColumn title="Support and Resources" items={supportItems} accentColor="#0C3D57" />
+              <GetConnectedColumn title="Professional Networks" items={professionalNetworkItems} accentColor="#0C3D57" />
+              <GetConnectedColumn title="Social Opportunities" items={socialOpportunityItems} accentColor="#0C3D57" />
+              <GetConnectedColumn title="Volunteering" items={volunteeringItems} accentColor="#0C3D57" />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
               sections — untouched, since mobile has no map to be redundant
@@ -377,15 +474,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       {/* ── Zmanim widget — live candle-lighting/Havdalah times, replacing the
               plain Zmanim tile that used to sit in the grid above. Desktop
               only: mobile keeps its Zmanim tile in the combined grid. Same
-              full-bleed white band treatment as the map section — no border,
-              no gap before it (touches the Get Connected band directly above
-              it) — but its content stays re-inset to the normal max-w-6xl
-              column (like the hero/Get Connected bands), since a two-column
-              list of zman times shouldn't stretch across the whole browser
-              width the way the map benefits from. ─────────────────────── */}
+              full-bleed white band treatment as the map section, separated
+              from the Get Connected band above it by a plain divider line
+              (same treatment as Get Connected's own top divider) rather than
+              a border boxing it in — its content stays re-inset to the
+              normal max-w-6xl column (like the hero/Get Connected bands),
+              since a two-column list of zman times shouldn't stretch across
+              the whole browser width the way the map benefits from. ────── */}
       <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
         <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
+          <div className="border-t border-slate-200 pt-10">
+            <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
+          </div>
         </div>
       </div>
     </main>
