@@ -22,7 +22,13 @@ export function listingSearchText(item: DirectoryResource, category?: CategoryCo
         if (Array.isArray(v)) parts.push(...(v as string[]))
         const sometimes = item[f.key + '_sometimes']
         if (Array.isArray(sometimes)) parts.push(...(sometimes as string[]))
-      } else if (f.type === 'text' || f.type === 'textarea' || f.type === 'select') {
+      } else if (f.type === 'select') {
+        // A select field's stored value can now be an array (multi-value
+        // badge fields, e.g. "Restaurant" + "Catering") as well as a plain
+        // string (older listings, or a single-value row field).
+        if (Array.isArray(v)) parts.push(...(v as string[]))
+        else if (typeof v === 'string' && v) parts.push(v)
+      } else if (f.type === 'text' || f.type === 'textarea') {
         if (typeof v === 'string' && v) parts.push(v)
       }
     }

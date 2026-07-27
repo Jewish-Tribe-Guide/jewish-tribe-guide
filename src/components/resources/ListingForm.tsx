@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
@@ -427,6 +427,38 @@ function DetailFieldInput({
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
         <textarea value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+      </div>
+    )
+  }
+
+  if (field.type === 'select' && field.multiSelect) {
+    // Badge-shown choice fields always allow more than one value on a single
+    // listing (e.g. a place that's both a Restaurant and a Caterer) — see
+    // `selectValues` for why the stored shape can still be a bare string on
+    // older listings.
+    const chosen = selectValues(value)
+    function toggle(v: string) {
+      onChange(chosen.includes(v) ? chosen.filter((x) => x !== v) : [...chosen, v])
+    }
+    return (
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <div className="flex flex-wrap gap-2">
+          {field.options?.map((opt) => {
+            const on = chosen.includes(opt.value)
+            return (
+              <label
+                key={opt.value}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm cursor-pointer transition-colors ${
+                  on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <input type="checkbox" checked={on} onChange={() => toggle(opt.value)} className="sr-only" />
+                {opt.label}
+              </label>
+            )
+          })}
+        </div>
       </div>
     )
   }

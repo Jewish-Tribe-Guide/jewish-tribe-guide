@@ -8,6 +8,7 @@ import DaveningTimes, { hasDaveningTimes } from '@/components/resources/Davening
 import Chip from '@/components/resources/Chip'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { ChevronLeftIcon, PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon } from '@/components/icons'
+import { selectValues } from '@/lib/categories'
 
 // ── Field helpers (same rules GenericListingCard uses, so a place looks
 // identical whether you found it from the map or the category directory) ──
@@ -85,7 +86,7 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
   const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
 
   const signalBadges = badgeFields.filter((f) =>
-    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? !!item[f.key] : false,
+    f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
 
@@ -131,14 +132,14 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
               {closing?.closesSoon ? 'Closes Soon' : 'Open'}
             </Chip>
           )}
-          {signalBadges.map((f) => {
-            const text = f.type === 'select' ? String(item[f.key]) : (f.filterLabel ?? f.label)
+          {signalBadges.flatMap((f) => {
+            const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
             const note = caveatNote(f)
-            return (
-              <Chip key={f.key} tone={note !== null ? 'amber' : 'slate'}>
+            return texts.map((text) => (
+              <Chip key={`${f.key}:${text}`} tone={note !== null ? 'amber' : 'slate'}>
                 {text}
               </Chip>
-            )
+            ))
           })}
         </div>
       )}
