@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { formatPhone } from '@/lib/validation'
+import { formatPhone, normalizeUrl } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
@@ -422,7 +422,11 @@ function DetailFieldInput({
           type="url"
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder ?? 'https://…'}
+          // Adds "https://" once they're done typing — almost nobody types the
+          // scheme by hand, but doing this on every keystroke (instead of on
+          // blur) would fight typing/pasting a real https:// URL mid-edit.
+          onBlur={(e) => onChange(normalizeUrl(e.target.value))}
+          placeholder={field.placeholder ?? 'example.com'}
           className={inputClass}
         />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
