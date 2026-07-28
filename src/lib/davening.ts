@@ -199,6 +199,28 @@ export function groupByTefillah(shuls: ShulInfo[]): ByTefillahGroup[] {
   }))
 }
 
+/**
+ * Merges adjacent rows (from a ByTefillahGroup, already sorted by day then
+ * time) that share the same days and notes into one, joining their times with
+ * a comma — e.g. two separate Shacharis minyanim on Sunday (7:30am and
+ * 8:30am, entered as two Minyan entries) read as "Sun  7:30am, 8:30am" on the
+ * compact listing card instead of two stacked lines. The "All davening
+ * times" modal intentionally does NOT use this — every minyan should still
+ * count as its own row there.
+ */
+export function mergeSameDayTimes(rows: ByTefillahGroup['rows']): ByTefillahGroup['rows'] {
+  const merged: ByTefillahGroup['rows'] = []
+  for (const row of rows) {
+    const prev = merged[merged.length - 1]
+    if (prev && prev.daysLabel === row.daysLabel && prev.notes === row.notes) {
+      merged[merged.length - 1] = { ...prev, time: `${prev.time}, ${row.time}` }
+    } else {
+      merged.push(row)
+    }
+  }
+  return merged
+}
+
 export function groupByDay(shuls: ShulInfo[]): ByDayGroup[] {
   const map = new Map<DayKey, ByDayGroup['rows']>()
   for (const d of DAY_KEYS) map.set(d, [])
