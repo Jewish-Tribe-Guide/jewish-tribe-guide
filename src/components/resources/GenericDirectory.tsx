@@ -148,8 +148,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const hasRenderedSelects = filterableSelects.some(
     (f) => new Set(items.flatMap((item) => selectValues(item[f.key]))).size >= 2,
   )
-  const hasFilterRow =
-    filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours || !!upvotes || hasMinyanim
+  // Whether there's an actual filter control to show — as opposed to
+  // `hasFilterRow` below, which also covers the sort toggle/davening button
+  // that can appear in this same row without any filter existing at all. Gates
+  // the "Filters" toggle button itself so it doesn't show (opening onto an
+  // empty panel) for a category with upvotes/minyanim but no filterable field.
+  const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
+  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -231,25 +236,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <>
             {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
             <div className="flex items-center gap-1.5 sm:hidden">
-              <button
-                onClick={() => setFiltersOpen((v) => !v)}
-                className={[
-                  'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
-                  activeFilterCount > 0
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
-                </svg>
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
+              {hasActualFilters && (
+                <button
+                  onClick={() => setFiltersOpen((v) => !v)}
+                  className={[
+                    'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                    activeFilterCount > 0
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
+                  ].join(' ')}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
+                  </svg>
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              )}
               {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (
                 <button
                   onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
@@ -309,7 +316,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
             {/* ── Filter controls: collapsible on mobile, always visible on desktop —
                     one horizontally-scrolling line on both, never wrapping to a
-                    second row (a wrapped row read as broken/cut-off layout). ── */}
+                    second row (a wrapped row read as broken/cut-off layout). This
+                    same row also carries the desktop versions of external
+                    link/davening/sort (their mobile versions are in the row above),
+                    so it still renders even with no actual filter — just without a
+                    mobile Filters button to open it (that's gated separately). ── */}
             <div
               className={[
                 'gap-2 flex-nowrap overflow-x-auto pb-1',
