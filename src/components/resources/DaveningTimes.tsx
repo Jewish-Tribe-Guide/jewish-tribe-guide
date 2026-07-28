@@ -1,4 +1,4 @@
-import { isMinyanim, groupByTefillah } from '@/lib/davening'
+import { isMinyanim, groupByTefillah, mergeSameDayTimes } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 
 // Shared davening-times display for any listing with a `minyanim`-type detail
@@ -41,7 +41,7 @@ function StructuredDaveningTimes({ minyanim }: { minyanim: Minyan[] }) {
         <div key={group.tefillah}>
           <p className="text-xs font-semibold text-muted mb-1">{group.label}</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
-            {group.rows.flatMap((row, i) => [
+            {mergeSameDayTimes(group.rows).flatMap((row, i) => [
               <dt key={`d${i}`} className="text-xs text-muted whitespace-nowrap">
                 {row.daysLabel || 'Daily'}
               </dt>,

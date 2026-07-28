@@ -31,12 +31,21 @@ type Props = {
    *  the category editor's Preview can show it appearing in the directory
    *  without persisting anything. */
   onPreviewSubmit?: (resource: DirectoryResource) => void
+  /** When provided, use this already-in-progress Turnstile challenge (owned by
+   *  a parent that mounted it as soon as the category directory loaded)
+   *  instead of rendering a fresh one here. The challenge takes a few seconds
+   *  to resolve — starting it the moment the visitor lands on the category,
+   *  rather than only once they open Add/Edit, means it's usually already
+   *  solved by the time they hit Submit, instead of making them wait through
+   *  "Verifying…" right when they open the form. Falls back to rendering its
+   *  own widget (the old behavior) when omitted, e.g. in the admin preview. */
+  sharedTurnstile?: { token: string; reset: () => void }
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile }: Props) {
   const config = category
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
@@ -67,8 +76,16 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [submitterEmail, setSubmitterEmail] = useState('')
   // Honeypot — stays empty for humans; bots that auto-fill it get dropped server-side.
   const [honeypot, setHoneypot] = useState('')
-  const [turnstileToken, setTurnstileToken] = useState('')
-  const turnstileRef = useRef<TurnstileHandle>(null)
+  const [ownTurnstileToken, setOwnTurnstileToken] = useState('')
+  const ownTurnstileRef = useRef<TurnstileHandle>(null)
+  const turnstileToken = sharedTurnstile ? sharedTurnstile.token : ownTurnstileToken
+  const resetTurnstile = () => {
+    if (sharedTurnstile) sharedTurnstile.reset()
+    else {
+      ownTurnstileRef.current?.reset()
+      setOwnTurnstileToken('')
+    }
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -177,8 +194,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // silently re-run the challenge for a fresh token so a plain second
         // tap on Submit (no reload needed) just works.
         if (res.status === 403) {
-          turnstileRef.current?.reset()
-          setTurnstileToken('')
+          resetTurnstile()
           setErrors(['Verification expired. We’ve refreshed it — please tap Submit again.'])
           return
         }
@@ -358,7 +374,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </ul>
         )}
 
-        <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} />
+        {!sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
 
         {/* Disabled until a token is actually in hand (when Turnstile is
             configured) — otherwise a visitor who fills the form faster than
