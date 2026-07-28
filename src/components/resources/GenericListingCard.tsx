@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { isStructuredHours, hoursOpenNow, hoursClosing } from '@/lib/hours'
@@ -9,8 +9,7 @@ import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import Chip from './Chip'
-import { PencilIcon, FlagIcon } from '@/components/icons'
-import { useIsMobile } from '@/lib/useIsMobile'
+import { PencilIcon, FlagIcon, PinIcon, PhoneIcon, ClockIcon } from '@/components/icons'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -38,6 +37,72 @@ function asTags(value: unknown): string[] {
 function shortAddress(addr: string): string {
   const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
   return parts.length <= 2 ? parts.join(', ') : `${parts[0]}, ${parts[1]}`
+}
+
+// Clips a flex-wrap row of chips to `maxRows` (measured, not counted — chip
+// width varies with text length so a fixed item count wraps unpredictably),
+// with a "+N more" toggle below it that reveals the rest. Used for
+// expanded-only tags (see CategoryField.expandedOnly): unlike primary/header
+// tags, which always show in full, a niche tag group can still run long once
+// the card is expanded.
+function ClampedChipRow({ maxRows = 2, children }: { maxRows?: number; children: React.ReactNode[] }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [maxHeight, setMaxHeight] = useState<number | null>(null)
+  const [hiddenCount, setHiddenCount] = useState(0)
+  const [expanded, setExpanded] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    function measure() {
+      if (!el) return
+      const items = Array.from(el.children) as HTMLElement[]
+      if (items.length === 0) {
+        setMaxHeight(null)
+        setHiddenCount(0)
+        return
+      }
+      const containerTop = el.getBoundingClientRect().top
+      const tops = items.map((c) => Math.round(c.getBoundingClientRect().top - containerTop))
+      const rowTops = Array.from(new Set(tops)).sort((a, b) => a - b)
+      if (rowTops.length <= maxRows) {
+        setMaxHeight(null)
+        setHiddenCount(0)
+        return
+      }
+      const cutoffTop = rowTops[maxRows]
+      const visibleCount = tops.filter((t) => t < cutoffTop).length
+      const lastVisible = items[visibleCount - 1]
+      setMaxHeight(Math.round(lastVisible.getBoundingClientRect().bottom - el.getBoundingClientRect().top))
+      setHiddenCount(items.length - visibleCount)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [children, maxRows])
+
+  return (
+    <div>
+      <div
+        ref={containerRef}
+        className="flex flex-wrap gap-1.5"
+        style={!expanded && maxHeight != null ? { maxHeight, overflow: 'hidden' } : undefined}
+      >
+        {children}
+      </div>
+      {!expanded && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded(true) }}
+          className="mt-1 text-xs font-medium text-primary hover:underline cursor-pointer"
+        >
+          +{hiddenCount} more
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ── Collapsible listing card ────────────────────────────────────────────────────
@@ -76,7 +141,6 @@ export function GenericListingCard({
   onReport: () => void
 }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
-  const isMobile = useIsMobile()
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -119,15 +183,11 @@ export function GenericListingCard({
   const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
   const expandedOnlyTags = expandedOnlyTagFields.flatMap((f) => asTags(item[f.key]))
   const expandedOnlyTagsSometimes = expandedOnlyTagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
-  // On mobile the name line gets crowded, so cap the tag chips shown collapsed
-  // and surface the rest behind a "+N" chip that expands the card (the full list
-  // renders in the detail panel below). Desktop shows them all inline.
-  const MOBILE_TAG_LIMIT = 3
-  const allTags = [...tags, ...tagsSometimes]
-  const capTags = isMobile && allTags.length > MOBILE_TAG_LIMIT + 1
-  const headerTags = capTags ? tags.slice(0, MOBILE_TAG_LIMIT) : tags
-  const headerTagsSometimes = capTags ? tagsSometimes.slice(0, Math.max(0, MOBILE_TAG_LIMIT - headerTags.length)) : tagsSometimes
-  const hiddenTagCount = allTags.length - headerTags.length - headerTagsSometimes.length
+  // Primary tags always show in full in the header, never capped/hidden behind
+  // a "+N" — see expandedOnlyTags below for the ones that intentionally wait
+  // until the card is expanded.
+  const headerTags = tags
+  const headerTagsSometimes = tagsSometimes
 
   // Collapsed signals: boolean true-badges + select badges (e.g. kosher cert —
   // a select can now hold more than one chosen value, e.g. a place that's
@@ -246,11 +306,6 @@ export function GenericListingCard({
               </span>
             </span>
           ))}
-          {hiddenTagCount > 0 && (
-            <Chip tone="slateMuted" onClick={(e) => { e.stopPropagation(); setExpanded(true) }} title="Show all tags">
-              +{hiddenTagCount}
-            </Chip>
-          )}
           </div>
           </div>
           {subtitle && (
@@ -309,26 +364,6 @@ export function GenericListingCard({
 
       {expanded && (
         <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
-          {/* Full tag list — only when the collapsed header capped it (mobile). */}
-          {capTags && allTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((t) => (
-                <Chip key={t} tone="slate" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
-                  {t}
-                </Chip>
-              ))}
-              {tagsSometimes.map((t) => (
-                <span key={`sometimes:${t}`} className="relative group/tip">
-                  <Chip tone="amber" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
-                    ~{t}
-                  </Chip>
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                    not always in stock
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
           {tagsSometimes.length > 0 && (
             <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
           )}
@@ -336,23 +371,25 @@ export function GenericListingCard({
               more niche tag group that never appears in the collapsed header on
               any device, only here. */}
           {(expandedOnlyTags.length > 0 || expandedOnlyTagsSometimes.length > 0) && (
-            <div className="flex flex-wrap gap-1.5">
-              {expandedOnlyTags.map((t) => (
-                <Chip key={t} tone="slate" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
-                  {t}
-                </Chip>
-              ))}
-              {expandedOnlyTagsSometimes.map((t) => (
-                <span key={`sometimes:${t}`} className="relative group/tip">
-                  <Chip tone="amber" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
-                    ~{t}
+            <ClampedChipRow>
+              {[
+                ...expandedOnlyTags.map((t) => (
+                  <Chip key={t} tone="slate" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
+                    {t}
                   </Chip>
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                    not always in stock
+                )),
+                ...expandedOnlyTagsSometimes.map((t) => (
+                  <span key={`sometimes:${t}`} className="relative group/tip">
+                    <Chip tone="amber" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
+                      ~{t}
+                    </Chip>
+                    <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                      not always in stock
+                    </span>
                   </span>
-                </span>
-              ))}
-            </div>
+                )),
+              ]}
+            </ClampedChipRow>
           )}
           {expandedOnlyTagsSometimes.length > 0 && (
             <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
@@ -371,26 +408,32 @@ export function GenericListingCard({
           )}
 
           {showAddress && (
-            <div>
-              <p className="text-sm text-slate-800">{item.address}</p>
-              <a
-                href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
-                target="_blank" rel="noopener noreferrer"
-                className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
-              >
-                Get directions →
-              </a>
+            <div className="flex items-start gap-3">
+              <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+              <div>
+                <p className="text-sm text-slate-800">{item.address}</p>
+                <a
+                  href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-block mt-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Get directions →
+                </a>
+              </div>
             </div>
           )}
 
           {showPhone && (
-            <div>
-              <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
-                {item.phone}
-              </a>
-              {item.placeId && !anyHoursVal && (
-                <span className="ml-2 text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none align-middle">via Google</span>
-              )}
+            <div className="flex items-center gap-3">
+              <PhoneIcon className="h-4 w-4 shrink-0 text-slate-400" />
+              <div>
+                <a href={`tel:${item.phone!.replace(/\D/g, '')}`} className="text-sm text-primary hover:underline">
+                  {item.phone}
+                </a>
+                {item.placeId && !anyHoursVal && (
+                  <span className="ml-2 text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none align-middle">via Google</span>
+                )}
+              </div>
             </div>
           )}
 
@@ -416,16 +459,19 @@ export function GenericListingCard({
             const val = item[f.key]
             if (val === undefined && !(i === 0 && item.businessStatus)) return null
             return (
-              <div key={f.key}>
-                {/* Only label each block when there's more than one — keeps
-                    every category with a single Hours field looking exactly
-                    as it did before. */}
-                {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
-                <HoursDisplay
-                  value={val}
-                  businessStatus={i === 0 ? item.businessStatus : undefined}
-                  syncedAt={i === 0 ? item.googleSyncedAt : undefined}
-                />
+              <div key={f.key} className="flex items-start gap-3">
+                <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                <div className="min-w-0 flex-1">
+                  {/* Only label each block when there's more than one — keeps
+                      every category with a single Hours field looking exactly
+                      as it did before. */}
+                  {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+                  <HoursDisplay
+                    value={val}
+                    businessStatus={i === 0 ? item.businessStatus : undefined}
+                    syncedAt={i === 0 ? item.googleSyncedAt : undefined}
+                  />
+                </div>
               </div>
             )
           })}
