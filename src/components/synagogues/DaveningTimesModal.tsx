@@ -7,12 +7,36 @@ import {
   isMinyanim,
   groupByTefillah,
   groupByDay,
+  parseTimeToMinutes,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
 } from '@/lib/davening'
 import DenominationFilter from './DenominationFilter'
 
 type GroupMode = 'tefillah' | 'day'
+
+// Most `time` values are a clock time ("7:30am"), which reads fine bold and
+// right-aligned next to the days. Some are relative/freeform text instead
+// ("10 minutes before sundown", "Please call to confirm…") — bolding and
+// right-aligning a whole sentence produces a ragged, hard-to-read block, so
+// those get lighter weight and left-aligned text instead (still right-
+// anchored as a block, so it doesn't jump around relative to other rows).
+const isClockTime = (time: string) => Number.isFinite(parseTimeToMinutes(time))
+
+function TimeValue({ time }: { time: string }) {
+  return (
+    <span
+      className={[
+        'text-sm max-w-[220px] sm:max-w-xs',
+        isClockTime(time)
+          ? 'font-semibold text-slate-800 min-w-[3.5rem] text-right'
+          : 'font-normal text-slate-600 text-left',
+      ].join(' ')}
+    >
+      {time}
+    </span>
+  )
+}
 
 type Props = {
   items: DirectoryResource[]
@@ -194,14 +218,19 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                         {/* Right: days + time. `time` sometimes carries a long
                             freeform note instead of a short time — no nowrap/shrink-0
                             here, or that note alone forces the row (and the whole
-                            modal) wider than the screen. */}
-                        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 max-w-full text-right">
+                            modal) wider than the screen. A freeform note drops to its
+                            own line below the days (see TimeValue) instead of jamming
+                            inline next to them. */}
+                        <div
+                          className={[
+                            'ml-auto flex max-w-full gap-x-2 gap-y-0.5',
+                            isClockTime(row.time) ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
+                          ].join(' ')}
+                        >
                           {row.daysLabel && (
                             <span className="text-xs text-muted whitespace-nowrap">{row.daysLabel}</span>
                           )}
-                          <span className="text-sm font-semibold text-slate-800 min-w-[3.5rem]">
-                            {row.time}
-                          </span>
+                          <TimeValue time={row.time} />
                         </div>
                       </div>
                     ))}
@@ -260,10 +289,10 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                                 </div>
                                 {/* Right: time only (day is already the section header).
                                     No nowrap/shrink-0 — `time` sometimes carries a long
-                                    freeform note instead of a short time. */}
-                                <span className="ml-auto max-w-full text-sm font-semibold text-slate-800 min-w-[3.5rem] text-right">
-                                  {row.time}
-                                </span>
+                                    freeform note instead of a short time (see TimeValue). */}
+                                <div className="ml-auto max-w-full">
+                                  <TimeValue time={row.time} />
+                                </div>
                               </div>
                             ))}
                           </div>
