@@ -118,6 +118,13 @@ type Props = {
   onFilterOpen?: () => void
   onFilterBool?: (key: string) => void
   onFilterSelect?: (key: string, value: string) => void
+  /** Skip the "Open"/"Closes Soon" chip — the caller already shows it
+   *  somewhere the visitor can always see (e.g. the card's collapsed
+   *  header), so repeating it here would just be noise. */
+  hideOpenStatus?: boolean
+  /** Signal-badge field keys to skip in the status row for the same reason —
+   *  they're the ones already showing in the caller's own header. */
+  hiddenBadgeKeys?: string[]
 }
 
 /**
@@ -129,7 +136,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
   const urlFields = fields.filter((f) => f.type === 'url')
@@ -157,6 +164,10 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
+  // The subset of signal badges actually shown in this status row — excludes
+  // whichever ones the caller says it already shows elsewhere (see
+  // `hiddenBadgeKeys`), so a filterable badge doesn't appear twice.
+  const visibleSignalBadges = signalBadges.filter((f) => !hiddenBadgeKeys.includes(f.key))
 
   const caveatNote = (f: CategoryField): string | null => {
     if (!f.caveat || !item[f.caveat.flagField]) return null
@@ -165,14 +176,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
 
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
-  const website = urlFields.map((f) => display(item[f.key])).find(Boolean)
+  const urlButtons = urlFields
+    .map((f) => ({ f, href: display(item[f.key]) }))
+    .filter((x): x is { f: CategoryField; href: string } => !!x.href)
+  const showOpenChip = isOpen && !hideOpenStatus
 
   return (
     <div className="space-y-4">
       {/* ── Status + signal badges ───────────────────────────────────────── */}
-      {(isOpen || signalBadges.length > 0) && (
+      {(showOpenChip || visibleSignalBadges.length > 0) && (
         <div className="flex flex-wrap gap-1.5">
-          {isOpen && (closing?.closesSoon ? (
+          {showOpenChip && (closing?.closesSoon ? (
             <span className="relative group/tip">
               <Chip tone="greenSolid" onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}>
                 Closes Soon
@@ -190,7 +204,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
               Open
             </Chip>
           ))}
-          {signalBadges.flatMap((f) => {
+          {visibleSignalBadges.flatMap((f) => {
             const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
             const note = caveatNote(f)
             const amber = note !== null
@@ -222,9 +236,9 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         </div>
       )}
 
-      {/* ── Quick actions: Directions / Call / Website ───────────────────── */}
-      {(showAddress || showPhone || website) && (
-        <div className="flex gap-6 border-y border-slate-100 py-3">
+      {/* ── Quick actions: Directions / Call / every url field ───────────── */}
+      {(showAddress || showPhone || urlButtons.length > 0) && (
+        <div className="flex flex-wrap gap-x-6 gap-y-4 border-y border-slate-100 py-3">
           {showAddress && (
             <ActionButton
               href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
@@ -239,9 +253,9 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
               label="Call"
             />
           )}
-          {website && (
-            <ActionButton href={website} icon={<ExternalIcon className="h-5 w-5" />} label="Website" />
-          )}
+          {urlButtons.map(({ f, href }) => (
+            <ActionButton key={f.key} href={href} icon={<ExternalIcon className="h-5 w-5" />} label={f.linkLabel ?? f.label} />
+          ))}
         </div>
       )}
 
@@ -345,41 +359,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           </p>
         )
       })}
-
-      {/* Consecutive buttons sit stacked (each own line) by default; a field
-          with `inlineButton` on joins the previous button's line instead —
-          see CategoryField.inlineButton. */}
-      {(() => {
-        const groups: CategoryField[][] = []
-        for (const f of urlFields) {
-          if (f.inlineButton && groups.length > 0) groups[groups.length - 1].push(f)
-          else groups.push([f])
-        }
-        const linkClass = "w-fit text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
-        return groups.map((group) => {
-          const links = group
-            .map((f) => ({ f, href: display(item[f.key]) }))
-            .filter((x): x is { f: CategoryField; href: string } => !!x.href)
-          if (links.length === 0) return null
-          if (links.length === 1) {
-            const { f, href } = links[0]
-            return (
-              <a key={f.key} href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={`block ${linkClass}`}>
-                {f.linkLabel ?? f.label}
-              </a>
-            )
-          }
-          return (
-            <div key={group.map((f) => f.key).join('+')} className="flex flex-wrap gap-2">
-              {links.map(({ f, href }) => (
-                <a key={f.key} href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className={linkClass}>
-                  {f.linkLabel ?? f.label}
-                </a>
-              ))}
-            </div>
-          )
-        })
-      })()}
 
       {/* Not-fully-kosher caveat note — placed under the menu/details so it
           reads in context; the amber cert badge above is the at-a-glance flag. */}

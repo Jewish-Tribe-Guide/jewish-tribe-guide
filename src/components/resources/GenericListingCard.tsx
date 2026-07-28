@@ -43,12 +43,18 @@ export function GenericListingCard({
   onFilterSelect,
   onEdit,
   onReport,
+  showCategoryLabel = true,
 }: {
   item: DirectoryResource
   category: CategoryConfig
   upvotes: boolean
   count: number
   defaultExpanded?: boolean
+  /** Show "Category · address" as the subtitle instead of just the address —
+   *  useful in a mixed-category list (e.g. search results) but redundant on a
+   *  single-category directory page, which already says the category once in
+   *  its header. Defaults on. */
+  showCategoryLabel?: boolean
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
@@ -94,7 +100,7 @@ export function GenericListingCard({
   }
 
   const showAddress = category.hasAddress !== false && !!item.address
-  const subtitleParts = [category.label, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
+  const subtitleParts = [showCategoryLabel ? category.label : null, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
 
   const color = getCategoryColor(categories, category.id)
@@ -208,6 +214,8 @@ export function GenericListingCard({
             onFilterOpen={onFilterOpen}
             onFilterBool={onFilterBool}
             onFilterSelect={onFilterSelect}
+            hideOpenStatus
+            hiddenBadgeKeys={headerBadges.map((f) => f.key)}
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
