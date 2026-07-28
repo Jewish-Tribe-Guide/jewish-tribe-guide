@@ -452,15 +452,18 @@ function DetailFieldInput({
 
   if (field.type === 'boolean') {
     return (
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={!!value}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-        />
-        <span className="text-sm font-medium text-slate-700">{labelOverride ?? field.label}</span>
-      </label>
+      <div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={(e) => onChange(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+          />
+          <span className="text-sm font-medium text-slate-700">{labelOverride ?? field.label}</span>
+        </label>
+        {field.help && <p className="text-xs text-muted mt-1 ml-6">{field.help}</p>}
+      </div>
     )
   }
 
@@ -477,6 +480,7 @@ function DetailFieldInput({
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
         <textarea value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+        {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )
   }
@@ -509,6 +513,7 @@ function DetailFieldInput({
             )
           })}
         </div>
+        {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )
   }
@@ -525,6 +530,7 @@ function DetailFieldInput({
             </option>
           ))}
         </select>
+        {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )
   }
