@@ -364,9 +364,6 @@ export function GenericListingCard({
 
       {expanded && (
         <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
-          {tagsSometimes.length > 0 && (
-            <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
-          )}
           {/* Expanded-only tags (see CategoryField.expandedOnly) — a separate,
               more niche tag group that never appears in the collapsed header on
               any device, only here. */}
@@ -391,8 +388,11 @@ export function GenericListingCard({
               ]}
             </ClampedChipRow>
           )}
-          {expandedOnlyTagsSometimes.length > 0 && (
+          {(tagsSometimes.length > 0 || expandedOnlyTagsSometimes.length > 0) && (
             <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
+          )}
+          {(expandedOnlyTags.length > 0 || expandedOnlyTagsSometimes.length > 0) && (
+            <hr className="border-slate-200" />
           )}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
             <div className="flex flex-wrap gap-1.5">
