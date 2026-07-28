@@ -15,8 +15,11 @@ function relativeLuminance(hex: string): number {
 
 // True once white text on `accentColor` would drop below a safe contrast
 // ratio (~3:1, the WCAG floor for large/bold text like this header) — at
-// that point dark text reads better than white.
-function needsDarkText(hex: string): boolean {
+// that point dark text reads better than white. Exported so other callers
+// cycling the same ACCENT_PALETTE (e.g. Landing.tsx's Get Connected tabs)
+// can reuse this instead of hardcoding a check against one specific hex,
+// which silently stops working the moment the palette's pale step changes.
+export function needsDarkText(hex: string): boolean {
   const contrastWithWhite = 1.05 / (relativeLuminance(hex) + 0.05)
   return contrastWithWhite < 3
 }

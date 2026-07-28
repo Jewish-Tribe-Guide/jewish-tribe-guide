@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { Hospital, NavigateFn } from '@/types'
+import type { Hospital } from '@/types'
 import { distanceMiles } from '@/lib/geo'
 import { ACCENT_PALETTE } from '@/components/map/ResourceMapView'
 
 type Props = {
   hospitals: Hospital[]
   coords: { lat: number; lng: number } | null
-  onNavigate: NavigateFn
   onFocusListing?: (mapPointId: string | null) => void
   /** The map point id currently isolated — e.g. tapped as a pin on the map —
    *  so the matching hospital button here can highlight + scroll into view. */
@@ -101,7 +100,7 @@ function HospitalButton({
 /** The Hospital category's search + filters + list, inline in the home page's
  *  sidebar — mirrors HospitalsDirectory's own badges (Chaplain/Bikkur
  *  Cholim/Prayer space/Kosher & Shabbos), turned into real filter toggles. */
-export default function HospitalRow({ hospitals, coords, onNavigate, onFocusListing, focusedListingId, accentColor, onVisibleIdsChange }: Props) {
+export default function HospitalRow({ hospitals, coords, onFocusListing, focusedListingId, accentColor, onVisibleIdsChange }: Props) {
   const [search, setSearch] = useState('')
   const [active, setActive] = useState<Set<FilterKey>>(new Set())
 
@@ -131,15 +130,6 @@ export default function HospitalRow({ hospitals, coords, onNavigate, onFocusList
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <button
-          onClick={() => onNavigate('patient', 'find', { findView: 'hospitals' })}
-          className="text-xs font-medium text-primary hover:underline cursor-pointer"
-        >
-          View full page →
-        </button>
-      </div>
-
       <input
         type="text"
         value={search}

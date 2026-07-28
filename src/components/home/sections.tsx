@@ -49,12 +49,12 @@ export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50',
 // the "Get Connected" section's own solid blue background (see Landing.tsx),
 // so they need real contrast against it rather than reading as a faint wash.
 export const MAP_ACCENT_TINTS = [
-  'bg-[#ffc145]/70', // gold
-  'bg-[#df4c73]/70', // rose
-  'bg-[#f9a66c]/70', // orange
-  'bg-[#aecf80]/70', // lime
-  'bg-[#3bba9c]/70', // teal
-  'bg-[#6f7bc5]/70', // indigo
+  'bg-[#a8dadc]/70', // pale aqua
+  'bg-[#457b9d]/70', // slate blue
+  'bg-[#1d3557]/70', // deep navy
+  'bg-[#5390d9]/70', // azure
+  'bg-[#84c5f4]/70', // light blue
+  'bg-[#3a86ff]/70', // bright blue
 ]
 
 export function Card({

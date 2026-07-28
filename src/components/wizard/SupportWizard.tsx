@@ -36,9 +36,11 @@ function toWizardSteps(steps: FormStep[]): Step[] {
 type Props = {
   preselect?: string[]
   onClose: () => void
+  /** See `Wizard`'s own `variant` — passed straight through. */
+  variant?: 'modal' | 'inline'
 }
 
-export default function SupportWizard({ preselect, onClose }: Props) {
+export default function SupportWizard({ preselect, onClose, variant = 'modal' }: Props) {
   const form = useForm('support')
   const initial: Answers = preselect && preselect.length ? { needs: preselect } : {}
 
@@ -106,7 +108,7 @@ export default function SupportWizard({ preselect, onClose }: Props) {
     )
   }
 
-  if (!form) return <WizardLoading onClose={onClose} />
+  if (!form) return <WizardLoading onClose={onClose} variant={variant} />
 
   return (
     <Wizard
@@ -117,6 +119,7 @@ export default function SupportWizard({ preselect, onClose }: Props) {
       submitLabel={form.submitLabel}
       successTitle={form.successTitle}
       successMessage={form.successMessage}
+      variant={variant}
     />
   )
 }

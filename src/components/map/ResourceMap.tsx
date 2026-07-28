@@ -11,11 +11,14 @@ import { community } from '@/community.config'
 // instead of one continuous motion. Steps the zoom one level at a time,
 // waiting for the map to settle (`idle`) between steps, so the zoom change
 // reads as a smooth "flowy" glide alongside the pan instead of an abrupt jump.
-function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: number) {
-  if (currentZoom === targetZoom) return
+function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: number, onDone?: () => void) {
+  if (currentZoom === targetZoom) {
+    onDone?.()
+    return
+  }
   const next = currentZoom + (targetZoom > currentZoom ? 1 : -1)
   map.setZoom(next)
-  google.maps.event.addListenerOnce(map, 'idle', () => smoothZoomTo(map, targetZoom, next))
+  google.maps.event.addListenerOnce(map, 'idle', () => smoothZoomTo(map, targetZoom, next, onDone))
 }
 
 // Category glyphs are admin-configured emoji (🍽️, 🏨, 🕍, …), which render as
@@ -58,14 +61,11 @@ const HOSPITALS_FILTER_ID = '__hospitals__'
 
 type Props = {
   points: MapPoint[]
-  /** The visitor's live or set location. Rendered as a pulsing blue dot. */
+  /** The visitor's live or set location. Rendered as a pulsing blue dot. The
+   *  map centers on it once, right when it first appears (tracking just
+   *  started) — every update after that just moves the dot silently; only
+   *  the "Re-center" button (see below) pans the map again after that. */
   userLocation?: LatLng | null
-  /** When true the map pans to keep the user centered as their position updates.
-   *  When false the marker moves silently without interrupting browsing. */
-  follow?: boolean
-  /** Called when the user manually taps "Re-center" so the parent can flip
-   *  follow back on. */
-  onResumeFollow?: () => void
   /** Fallback center when there are no points to fit (e.g. Center City Philly). */
   fallbackCenter?: { lat: number; lng: number }
   /** Called when the user taps "View listing" in an info window. */
@@ -81,6 +81,19 @@ type Props = {
    *  usual "keep the user centered" behavior, since isolating something is a
    *  deliberate, one-off request. */
   focusPoints?: { lat: number; lng: number }[] | null
+  /** Skips the "zoom out to fit every visible pin" behavior that otherwise
+   *  runs whenever `points` changes with no user location set — used by the
+   *  home page's embedded map, which wants to open at a fixed neighborhood
+   *  zoom (see the initial `zoom: 14` below) instead of zooming out to frame
+   *  the whole region's pins the moment they load. `focusPoints` still
+   *  reframes deliberately (e.g. isolating a category) regardless of this. */
+  skipAutoFit?: boolean
+  /** Pixel width of whatever's currently floated over the map's own LEFT
+   *  edge (the map key's dropdown/detail panels) — when framing a single
+   *  focused point or a bounds-fit (see `focusPoints`), the map centers it
+   *  in the space actually still visible to the right of that overlay
+   *  instead of dead-center under it. 0/omitted centers normally. */
+  leftInsetPx?: number
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -166,7 +179,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints }: Props) {
+export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -182,9 +195,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const onViewListingRef = useRef(onViewListing)
   const onMarkerClickRef = useRef(onMarkerClick)
   const userLocationRef = useRef(userLocation)
+  const leftInsetPxRef = useRef(leftInsetPx)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onMarkerClickRef.current = onMarkerClick }, [onMarkerClick])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
+  useEffect(() => { leftInsetPxRef.current = leftInsetPx }, [leftInsetPx])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -197,11 +212,24 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         if (cancelled || !containerRef.current) return
         mapRef.current = new google.maps.Map(containerRef.current, {
           center: fallbackCenter,
-          zoom: 12,
+          // Neighborhood-level default instead of the whole metro area —
+          // matches the zoom the map already settles at once a visitor's
+          // location loads (see the "you are here" effect below), just
+          // applied as the starting view too instead of only after that.
+          zoom: 14,
           mapId: 'resource_map',
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
+          // The vector rendering `mapId` enables also turns on Google's own
+          // camera control by default — a pan/tilt/rotate arrows cluster in
+          // the bottom-right that clutters/competes with our own "Re-center"
+          // button in that same corner. `rotateControl` is the OLDER,
+          // raster-map version of this same idea; `cameraControl` is what
+          // vector maps actually show, so both need to be off. This map
+          // only ever needs straight-down, north-up navigation.
+          rotateControl: false,
+          cameraControl: false,
           clickableIcons: false,
         })
         infoWindowRef.current = new google.maps.InfoWindow()
@@ -255,8 +283,11 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     }
 
     // Don't auto-reframe to the points if the visitor has a location set —
-    // keeping "where am I" in view matters more than framing every pin.
-    if (userLocationRef.current) return
+    // keeping "where am I" in view matters more than framing every pin. Same
+    // for `skipAutoFit` — the embedded home map wants to stay at its fixed
+    // initial zoom/center instead of zooming out to fit everything the
+    // moment pins load (deliberate reframes still happen via `focusPoints`).
+    if (userLocationRef.current || skipAutoFit) return
     if (points.length === 1) {
       const startZoom = map.getZoom() ?? 15
       map.panTo(bounds.getCenter())
@@ -277,7 +308,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     }
     // Rebuild only when the points themselves change — GPS ticks and callback
     // identity are read via refs so an open info window survives them.
-  }, [points, ready])
+  }, [points, ready, skipAutoFit])
 
   // ── Force-frame isolated points (a facility or a whole category, tapped in
   //    a list beside the map) ────────────────────────────────────────────────
@@ -292,10 +323,21 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map || !focusPoints || focusPoints.length === 0) return
+    // Shifts the pin right by half of whatever's currently covering the
+    // map's left edge (the map key's dropdown/detail panels), landing it
+    // centered in the space actually still visible instead of dead-center
+    // under the overlay. Only applied once the target zoom is fully
+    // reached (see `smoothZoomTo`'s `onDone`) — a pixel offset applied
+    // mid-zoom would drift as the pixels-per-degree ratio keeps changing
+    // underneath it.
+    const compensate = () => {
+      const inset = leftInsetPxRef.current
+      if (inset) map.panBy(-inset / 2, 0)
+    }
     if (focusPoints.length === 1) {
       const startZoom = map.getZoom() ?? 16
       map.panTo(focusPoints[0])
-      smoothZoomTo(map, 16, startZoom)
+      smoothZoomTo(map, 16, startZoom, compensate)
     } else {
       const bounds = new google.maps.LatLngBounds()
       focusPoints.forEach((p) => bounds.extend(p))
@@ -312,7 +354,8 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       if (startCenter) map.setCenter(startCenter)
       if (startZoom != null) map.setZoom(startZoom)
       if (targetCenter) map.panTo(targetCenter)
-      if (targetZoom != null && startZoom != null) smoothZoomTo(map, targetZoom, startZoom)
+      if (targetZoom != null && startZoom != null) smoothZoomTo(map, targetZoom, startZoom, compensate)
+      else compensate()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey, ready])
@@ -345,26 +388,34 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         iw.open({ map, anchor: marker })
       })
       userMarkerRef.current = marker
-    } else {
-      userMarkerRef.current.position = userLocation
-    }
-
-    // Only pan/zoom when follow mode is on so the user can browse freely while
-    // their dot still moves in the background.
-    if (follow) {
+      // Center once, right when tracking starts and the marker first
+      // appears — the direct, expected result of tapping "Start live
+      // tracking". Every position update AFTER that just moves the dot
+      // silently in the background; the map itself never auto-pans again
+      // on its own. Re-centering on a later position is only ever the
+      // "Re-center" button's job (see `centerOnMe`), not automatic.
       const startZoom = map.getZoom() ?? 14
       map.panTo(userLocation)
       if (startZoom < 13) smoothZoomTo(map, 14, startZoom)
+    } else {
+      userMarkerRef.current.position = userLocation
     }
-  }, [userLocation, follow, ready])
+  }, [userLocation, ready])
 
   const centerOnMe = () => {
     const map = mapRef.current
     if (!map || !userLocation) return
     const startZoom = map.getZoom() ?? 15
     map.panTo(userLocation)
-    smoothZoomTo(map, 15, startZoom)
-    onResumeFollow?.()
+    // Same left-edge-occlusion compensation as the focus-points effect
+    // above — lands the dot centered in the space actually still visible
+    // to the right of whatever dropdown/detail panel is currently open,
+    // instead of dead-center under it. Only applied once the target zoom
+    // is fully reached — see that effect's own comment for why.
+    smoothZoomTo(map, 15, startZoom, () => {
+      const inset = leftInsetPxRef.current
+      if (inset) map.panBy(-inset / 2, 0)
+    })
   }
 
   if (!MAPS_API_KEY || authFailed) {
@@ -383,20 +434,20 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
           real corner shape comes entirely from the parent card's own
           overflow-hidden clip (see ResourceMapView.tsx). */}
       <div ref={containerRef} className="h-full w-full" />
+      {/* Only an option to recenter on an ALREADY-live location — shown
+          once live tracking is on (`userLocation` set); not a way to turn
+          tracking on in the first place (that's "Start live tracking"
+          elsewhere), and never triggered automatically — the map only ever
+          pans on its own once, right when tracking first starts (see the
+          "you are here" effect above); every tap here after that is a
+          deliberate, explicit re-center. */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className={`absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors ${
-            follow
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-white text-blue-600 hover:bg-blue-50'
-          }`}
+          className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-blue-50"
         >
-          <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ring-2 ${follow ? 'bg-white ring-blue-400' : 'bg-blue-600 ring-white'}`}
-            aria-hidden="true"
-          />
-          {follow ? 'Following' : 'Re-center'}
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" aria-hidden="true" />
+          Re-center
         </button>
       )}
     </div>

@@ -52,6 +52,8 @@ export function GenericListingCard({
   expanded: expandedProp,
   highlightColor,
   dense = false,
+  hideBorder = false,
+  leadingIcon,
   onVote,
   onTagClick,
   onFilterOpen,
@@ -81,6 +83,17 @@ export function GenericListingCard({
    *  the original size everywhere else (the standalone directory, Places
    *  search results). */
   dense?: boolean
+  /** Skips the card's own border/highlight ring, its own opaque white
+   *  background, AND the expanded panel's grey background — used where the
+   *  card already sits inside a bordered/shadowed container of the
+   *  caller's own (the map key's detail panel), so none of those would
+   *  paint over that container's own matching border/background. */
+  hideBorder?: boolean
+  /** Rendered beside the name, in the same row — only that row shifts right
+   *  to make room for it; everything else in the card keeps starting flush
+   *  at the card's own left padding (used by the map key's detail panel for
+   *  its own collapse button, so only the title indents for it). */
+  leadingIcon?: React.ReactNode
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
@@ -209,12 +222,12 @@ export function GenericListingCard({
     <div
       ref={rootRef}
       style={
-        highlighted
+        highlighted && !hideBorder
           ? { borderColor: highlightHex, boxShadow: `0 0 0 2px color-mix(in srgb, ${highlightHex} 30%, transparent)` }
           : undefined
       }
-      className={`rounded-lg bg-white shadow-sm sm:shadow-none ${
-        highlighted ? 'border-2' : 'border border-slate-200 sm:border-2 sm:border-slate-300'
+      className={`rounded-lg shadow-sm sm:shadow-none ${hideBorder ? '' : 'bg-white'} ${
+        hideBorder ? '' : highlighted ? 'border-2' : 'border border-slate-200 sm:border-2 sm:border-slate-300'
       }`}
     >
       <div
@@ -230,8 +243,15 @@ export function GenericListingCard({
       >
         {/* Name + the badges/tags people scan by (tags are clickable searches).
             On mobile the name sits on its own line with the chips on a row below
-            so it never gets crowded; on desktop they share a line. */}
-        <div className="min-w-0 flex flex-col gap-1">
+            so it never gets crowded; on desktop they share a line. `leadingIcon`
+            (when given) sits beside just this name/badges block, in the same
+            flex row — so only the title's own line shifts right to make room
+            for it; everything below (address, phone, the expanded panel) is a
+            separate row entirely and keeps starting flush at the card's own
+            left padding, same as the icon's own left edge. */}
+        <div className="flex min-w-0 items-start gap-1.5">
+          {leadingIcon}
+          <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
           <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-xs' : ''}`}>{item.name}</span>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
@@ -308,6 +328,7 @@ export function GenericListingCard({
             // away in the expanded panel. Still shown on desktop where there's room.
             <p className={`hidden sm:block text-muted truncate ${dense ? 'text-xs' : 'text-sm'}`}>{subtitle}</p>
           )}
+          </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {/* Upvote + distance grouped together so the count reads as "how
@@ -357,7 +378,7 @@ export function GenericListingCard({
       </div>
 
       {expanded && (
-        <div className={`border-t border-slate-100 space-y-3 bg-slate-50 rounded-b-lg ${dense ? 'px-2.5 py-2.5' : 'px-4 py-4'}`}>
+        <div className={`border-t border-slate-100 space-y-3 rounded-b-lg ${hideBorder ? '' : 'bg-slate-50'} ${dense ? 'px-2.5 py-2.5' : 'px-4 py-4'}`}>
           {/* Full tag list — only when the collapsed header capped it (mobile). */}
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

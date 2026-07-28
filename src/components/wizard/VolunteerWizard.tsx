@@ -54,9 +54,11 @@ function toWizardSteps(steps: FormStep[], hospitals: Hospital[]): Step[] {
 type Props = {
   preselect?: string[]
   onClose: () => void
+  /** See `Wizard`'s own `variant` — passed straight through. */
+  variant?: 'modal' | 'inline'
 }
 
-export default function VolunteerWizard({ preselect, onClose }: Props) {
+export default function VolunteerWizard({ preselect, onClose, variant = 'modal' }: Props) {
   const form = useForm('volunteer')
   const hospitals = useHospitals() ?? []
   const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitals) : []), [form, hospitals])
@@ -101,7 +103,7 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
     await submitRequest('Volunteer', contact, volunteer, str('company'), str('turnstileToken'))
   }
 
-  if (!form) return <WizardLoading onClose={onClose} />
+  if (!form) return <WizardLoading onClose={onClose} variant={variant} />
 
   return (
     <Wizard
@@ -112,6 +114,7 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
       submitLabel={form.submitLabel}
       successTitle={form.successTitle}
       successMessage={form.successMessage}
+      variant={variant}
     />
   )
 }

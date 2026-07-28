@@ -138,7 +138,7 @@ function ShabbosRow({
 
   if (emphasized) {
     return (
-      <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#df4c73] px-3 py-1.5 -mx-1">
+      <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#3a86ff] px-3 py-1.5 -mx-1">
         <span className="text-sm font-semibold text-[#fefefe]">{label}</span>
         <span className="text-sm font-semibold text-[#fefefe] tabular-nums">{value}</span>
       </div>

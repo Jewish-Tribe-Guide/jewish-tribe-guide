@@ -12,7 +12,6 @@ import type { NavigateFn } from '@/types'
 export default function HomeMap({
   onNavigate,
   coords,
-  sidebar,
   focusedListingId,
   onFocusListingChange,
   focusedCategoryIds,
@@ -21,8 +20,6 @@ export default function HomeMap({
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
-  /** Rendered beside the map, top-aligned with its border. */
-  sidebar?: React.ReactNode
   /** The map point to isolate + zoom to — see ResourceMapView. */
   focusedListingId?: string | null
   onFocusListingChange?: (id: string | null) => void
@@ -30,7 +27,7 @@ export default function HomeMap({
    *  together — see ResourceMapView. */
   focusedCategoryIds?: Set<string>
   /** Toggles one category's membership in `focusedCategoryIds` — called by
-   *  the map's own bottom key bar, see ResourceMapView. */
+   *  the map's own key tabs, see ResourceMapView. */
   onFocusCategoryChange?: (id: string) => void
   /** The exact point ids surviving each isolated category's own filters,
    *  keyed by category — narrows each one's isolation further than the
@@ -44,7 +41,8 @@ export default function HomeMap({
       onViewListing={(categoryId, listingId) =>
         onNavigate('patient', 'find', { findView: categoryId, findItemId: listingId })
       }
-      sidebar={sidebar}
+      onNavigate={onNavigate}
+      embedded
       focusedListingId={focusedListingId}
       onFocusListingChange={onFocusListingChange}
       focusedCategoryIds={focusedCategoryIds}
