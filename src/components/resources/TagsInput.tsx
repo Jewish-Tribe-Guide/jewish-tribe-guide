@@ -17,29 +17,42 @@ type Props = {
 // item. Values are stored as labels (e.g. "Kosher Cheese") on the listing.
 // Each selected tag can be toggled between "always" (green) and "sometimes" (amber)
 // by clicking the chip itself; × removes it entirely.
+//
+// A field with `fixedVocabulary` is closed — its vocab comes straight from the
+// admin-authored `field.options` (no fetch, no shared cross-listing growth),
+// and there's no "+ Add new" — only picking from that list. Otherwise (the
+// default, and every tags field before this existed) the vocabulary is the
+// open, shared `tagGroup` list from the API, and anyone can add a new tag,
+// which then joins that vocabulary for future submitters too.
 export default function TagsInput({ field, value, onChange, sometimes = [], onChangeSometimes }: Props) {
-  const [vocab, setVocab] = useState<string[]>([])
+  const [fetchedVocab, setFetchedVocab] = useState<string[]>([])
   const [input, setInput] = useState('')
   const always = value ?? []
   const showConsistency = !!onChangeSometimes
+  const vocab = field.fixedVocabulary ? (field.options ?? []).map((o) => o.label) : fetchedVocab
 
   useEffect(() => {
+    if (field.fixedVocabulary) return
     if (!field.tagGroup) return
     let cancelled = false
     fetch(`/api/tags?group=${encodeURIComponent(field.tagGroup)}`)
       .then((r) => r.json())
       .then((b) => {
-        if (!cancelled && b.ok) setVocab((b.tags as { label: string }[]).map((t) => t.label))
+        if (!cancelled && b.ok) setFetchedVocab((b.tags as { label: string }[]).map((t) => t.label))
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [field.tagGroup])
+  }, [field.tagGroup, field.fixedVocabulary])
 
   const add = (label: string) => {
     const v = label.trim()
     if (!v) return
+    // A fixed-vocabulary field can only ever add something already in its
+    // admin-set list — guards the Enter-key path too, not just the hidden
+    // "+ Add new" button.
+    if (field.fixedVocabulary && !vocab.some((t) => t.toLowerCase() === v.toLowerCase())) return
     if (!always.some((s) => s.toLowerCase() === v.toLowerCase()) &&
         !sometimes.some((s) => s.toLowerCase() === v.toLowerCase())) {
       onChange([...always, v])
@@ -71,7 +84,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
     [vocab, always, sometimes, q],
   )
 
-  const canAddNew = q &&
+  const canAddNew = !field.fixedVocabulary && q &&
     !vocab.some((t) => t.toLowerCase() === q) &&
     !allSelected.some((s) => s.toLowerCase() === q)
 
@@ -133,7 +146,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
             add(input)
           }
         }}
-        placeholder="Type to search or add an item…"
+        placeholder={field.fixedVocabulary ? 'Type to search…' : 'Type to search or add an item…'}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary"
       />
 

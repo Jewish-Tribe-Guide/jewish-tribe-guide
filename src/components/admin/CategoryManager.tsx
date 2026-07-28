@@ -1199,6 +1199,8 @@ function CategoryEditor({
       else keys.add(f.key)
       if (f.type === 'select' && !(f.options && f.options.length > 0))
         errs.push(`Detail ${n} (“${f.label || 'unnamed'}”): a Choice needs at least one option.`)
+      if (f.type === 'tags' && f.fixedVocabulary && !(f.options && f.options.length > 0))
+        errs.push(`Detail ${n} (“${f.label || 'unnamed'}”): a fixed-list Tags field needs at least one tag.`)
     })
     return errs
   }
@@ -1823,13 +1825,17 @@ function FieldEditor({
   const showAs: 'badge' | 'row' = f.renderAs === 'row' ? 'row' : 'badge'
 
   function onTypeChange(type: FieldType) {
-    // Reset to the type's natural shape; drop choices when leaving Choice.
+    // Reset to the type's natural shape; drop choices when leaving Choice
+    // (options are also used by a fixed-vocabulary Tags field, so only clear
+    // them when landing on neither).
     const patch: Partial<CategoryField> = { type, renderAs: FIELD_TYPE_SHAPE[type] }
-    if (type !== 'select') {
-      patch.options = undefined
-      patch.multiSelect = undefined
-    }
+    if (type !== 'select' && type !== 'tags') patch.options = undefined
+    if (type !== 'select') patch.multiSelect = undefined
     if (type !== 'url') patch.inlineButton = undefined
+    if (type !== 'tags') {
+      patch.expandedOnly = undefined
+      patch.fixedVocabulary = undefined
+    }
     onChange(patch)
   }
 
@@ -1851,7 +1857,19 @@ function FieldEditor({
         </select>
       </label>
 
-      {f.type === 'select' && (
+      {f.type === 'tags' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.fixedVocabulary}
+            onChange={(e) => onChange({ fixedVocabulary: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Use a fixed list you set below — no new tags can be added by whoever fills out the listing
+        </label>
+      )}
+
+      {(f.type === 'select' || (f.type === 'tags' && f.fixedVocabulary)) && (
         <label className="block">
           <span className={fieldLabel}>Choices (one per line — “value | label”, or just value)</span>
           <textarea
@@ -1874,6 +1892,18 @@ function FieldEditor({
             className="rounded border-slate-300"
           />
           Allow more than one choice per listing (e.g. Restaurant + Catering)
+        </label>
+      )}
+
+      {f.type === 'tags' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.expandedOnly}
+            onChange={(e) => onChange({ expandedOnly: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Only show these tags after expanding the listing (keep the header uncluttered)
         </label>
       )}
 

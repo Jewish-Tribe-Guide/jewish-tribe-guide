@@ -83,7 +83,12 @@ export function GenericListingCard({
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
-  const tagFields = fields.filter((f) => f.type === 'tags')
+  // Split so a category can have a small, prominent tag group visible in the
+  // collapsed header plus a more niche one that only shows once expanded (see
+  // CategoryField.expandedOnly) — both stay equally searchable/clickable,
+  // just in different places on the card.
+  const tagFields = fields.filter((f) => f.type === 'tags' && !f.expandedOnly)
+  const expandedOnlyTagFields = fields.filter((f) => f.type === 'tags' && f.expandedOnly)
   const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
   const headerUrlFields = fields.filter((f) => f.type === 'url' && f.showInHeader)
   const hoursFields = fields.filter((f) => f.type === 'hours')
@@ -112,6 +117,8 @@ export function GenericListingCard({
   const travel = travelParts(item)
   const tags = tagFields.flatMap((f) => asTags(item[f.key]))
   const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
+  const expandedOnlyTags = expandedOnlyTagFields.flatMap((f) => asTags(item[f.key]))
+  const expandedOnlyTagsSometimes = expandedOnlyTagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
   // On mobile the name line gets crowded, so cap the tag chips shown collapsed
   // and surface the rest behind a "+N" chip that expands the card (the full list
   // renders in the detail panel below). Desktop shows them all inline.
@@ -323,6 +330,31 @@ export function GenericListingCard({
             </div>
           )}
           {tagsSometimes.length > 0 && (
+            <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
+          )}
+          {/* Expanded-only tags (see CategoryField.expandedOnly) — a separate,
+              more niche tag group that never appears in the collapsed header on
+              any device, only here. */}
+          {(expandedOnlyTags.length > 0 || expandedOnlyTagsSometimes.length > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {expandedOnlyTags.map((t) => (
+                <Chip key={t} tone="slate" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }} title={`Find places with ${t}`}>
+                  {t}
+                </Chip>
+              ))}
+              {expandedOnlyTagsSometimes.map((t) => (
+                <span key={`sometimes:${t}`} className="relative group/tip">
+                  <Chip tone="amber" size="expanded" onClick={(e) => { e.stopPropagation(); onTagClick(t) }}>
+                    ~{t}
+                  </Chip>
+                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                    not always in stock
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+          {expandedOnlyTagsSometimes.length > 0 && (
             <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
           )}
           {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
