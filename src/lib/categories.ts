@@ -77,6 +77,14 @@ export type CategoryField = {
   /** For `type: 'tags'`: which tag vocabulary group to draw from / add to. The
    *  field's value is an array of tag labels stored on the listing's `details`. */
   tagGroup?: string
+  /** For `type: 'tags'`: keep this field's tags out of the collapsed card
+   *  header — they only show once the listing is expanded. Lets a category
+   *  have a small, prominent tag group visible right away (e.g. broad kosher
+   *  labels) plus a more niche one that's one tap away instead of crowding
+   *  the header. Still fully searchable and clickable, exactly like a header
+   *  tag — only where it displays differs. Defaults to shown in the header
+   *  (today's behavior for every existing tags field). */
+  expandedOnly?: boolean
   /** Only show this field (in the form and on cards) when another detail field
    *  has the given value, e.g. show "Kosher items" only when isKosher is true. */
   showIf?: { field: string; equals: string | number | boolean }

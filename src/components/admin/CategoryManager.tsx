@@ -1830,6 +1830,7 @@ function FieldEditor({
       patch.multiSelect = undefined
     }
     if (type !== 'url') patch.inlineButton = undefined
+    if (type !== 'tags') patch.expandedOnly = undefined
     onChange(patch)
   }
 
@@ -1874,6 +1875,18 @@ function FieldEditor({
             className="rounded border-slate-300"
           />
           Allow more than one choice per listing (e.g. Restaurant + Catering)
+        </label>
+      )}
+
+      {f.type === 'tags' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.expandedOnly}
+            onChange={(e) => onChange({ expandedOnly: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Only show these tags after expanding the listing (keep the header uncluttered)
         </label>
       )}
 
