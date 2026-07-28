@@ -472,6 +472,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <GenericListingCard
               item={item}
               category={category}
+              showCategoryLabel={false}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}

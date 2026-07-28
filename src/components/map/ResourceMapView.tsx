@@ -17,6 +17,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon } from '@/components/icons'
+import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
@@ -35,19 +36,6 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 // Stripping every apostrophe variant from both sides makes all of that a
 // non-issue.
 const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
-
-const PALETTE = [
-  '#2563eb', // blue
-  '#16a34a', // green
-  '#9333ea', // purple
-  '#ea580c', // orange
-  '#0891b2', // cyan
-  '#db2777', // pink
-  '#ca8a04', // amber
-  '#4f46e5', // indigo
-  '#0d9488', // teal
-  '#65a30d', // lime
-]
 
 type Props = {
   onUp: () => void
@@ -146,7 +134,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
-    ;(categories ?? []).forEach((c, i) => map.set(c.id, PALETTE[i % PALETTE.length]))
+    ;(categories ?? []).forEach((c) => map.set(c.id, getCategoryColor(categories, c.id)))
     return map
   }, [categories])
 
