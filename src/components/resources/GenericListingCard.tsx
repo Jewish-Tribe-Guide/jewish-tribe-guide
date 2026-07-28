@@ -398,20 +398,40 @@ export function GenericListingCard({
             )
           })}
 
-          {urlFields.map((f) => {
-            const href = display(item[f.key])
-            if (!href) return null
-            return (
-              <a
-                key={f.key}
-                href={href}
-                target="_blank" rel="noopener noreferrer"
-                className="block w-fit text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
-              >
-                {f.linkLabel ?? f.label}
-              </a>
-            )
-          })}
+          {/* Consecutive buttons sit stacked (each own line) by default; a field
+              with `inlineButton` on joins the previous button's line instead —
+              see CategoryField.inlineButton. */}
+          {(() => {
+            const groups: CategoryField[][] = []
+            for (const f of urlFields) {
+              if (f.inlineButton && groups.length > 0) groups[groups.length - 1].push(f)
+              else groups.push([f])
+            }
+            const linkClass = "w-fit text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+            return groups.map((group) => {
+              const links = group
+                .map((f) => ({ f, href: display(item[f.key]) }))
+                .filter((x): x is { f: CategoryField; href: string } => !!x.href)
+              if (links.length === 0) return null
+              if (links.length === 1) {
+                const { f, href } = links[0]
+                return (
+                  <a key={f.key} href={href} target="_blank" rel="noopener noreferrer" className={`block ${linkClass}`}>
+                    {f.linkLabel ?? f.label}
+                  </a>
+                )
+              }
+              return (
+                <div key={group.map((f) => f.key).join('+')} className="flex flex-wrap gap-2">
+                  {links.map(({ f, href }) => (
+                    <a key={f.key} href={href} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                      {f.linkLabel ?? f.label}
+                    </a>
+                  ))}
+                </div>
+              )
+            })
+          })()}
 
           {/* Not-fully-kosher caveat note — placed under the menu/details so it
               reads in context; the amber cert badge above is the at-a-glance flag. */}

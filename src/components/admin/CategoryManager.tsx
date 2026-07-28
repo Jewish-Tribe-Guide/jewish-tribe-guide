@@ -1829,6 +1829,7 @@ function FieldEditor({
       patch.options = undefined
       patch.multiSelect = undefined
     }
+    if (type !== 'url') patch.inlineButton = undefined
     onChange(patch)
   }
 
@@ -1892,11 +1893,22 @@ function FieldEditor({
             <input
               type="checkbox"
               checked={!!f.showInHeader}
-              onChange={(e) => onChange({ showInHeader: e.target.checked })}
+              onChange={(e) => onChange({ showInHeader: e.target.checked, inlineButton: e.target.checked ? undefined : f.inlineButton })}
               className="rounded border-slate-300"
             />
             Show as a button on the card itself, not inside the details
           </label>
+          {!f.showInHeader && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!f.inlineButton}
+                onChange={(e) => onChange({ inlineButton: e.target.checked })}
+                className="rounded border-slate-300"
+              />
+              Place next to the previous button instead of on its own line
+            </label>
+          )}
         </>
       )}
 
