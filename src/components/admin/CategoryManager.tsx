@@ -1966,18 +1966,6 @@ function FieldEditor({
         />
       </label>
 
-      {f.type === 'tags' && (
-        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={!!f.fixedVocabulary}
-            onChange={(e) => onChange({ fixedVocabulary: e.target.checked })}
-            className="rounded border-slate-300"
-          />
-          Use a fixed list you set below — no new tags can be added by whoever fills out the listing
-        </label>
-      )}
-
       {(f.type === 'select' || (f.type === 'tags' && f.fixedVocabulary)) && (
         <label className="block">
           <span className={fieldLabel}>Choices (one per line — “value | label”, or just value)</span>
@@ -2001,18 +1989,6 @@ function FieldEditor({
             className="rounded border-slate-300"
           />
           Allow more than one choice per listing (e.g. Restaurant + Catering)
-        </label>
-      )}
-
-      {f.type === 'tags' && (
-        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={!!f.expandedOnly}
-            onChange={(e) => onChange({ expandedOnly: e.target.checked })}
-            className="rounded border-slate-300"
-          />
-          Only show these tags after expanding the listing (keep the header uncluttered)
         </label>
       )}
 
