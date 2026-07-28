@@ -307,14 +307,14 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               )}
             </div>
 
-            {/* ── Filter controls: collapsible on mobile, always visible on desktop ── */}
+            {/* ── Filter controls: collapsible on mobile, always visible on desktop —
+                    one horizontally-scrolling line on both, never wrapping to a
+                    second row (a wrapped row read as broken/cut-off layout). ── */}
             <div
               className={[
-                'gap-2',
-                // Mobile: vertical wrap inside collapsed panel
-                filtersOpen ? 'flex flex-wrap' : 'hidden',
-                // Desktop: always show as horizontal scroll row
-                'sm:flex sm:flex-nowrap sm:overflow-x-auto sm:pb-1',
+                'gap-2 flex-nowrap overflow-x-auto pb-1',
+                filtersOpen ? 'flex' : 'hidden',
+                'sm:flex',
               ].join(' ')}
               style={{ scrollbarWidth: 'none' }}
             >
