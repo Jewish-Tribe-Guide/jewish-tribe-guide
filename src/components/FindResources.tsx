@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
@@ -10,9 +10,11 @@ import ReportListing from '@/components/resources/ReportListing'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
+import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
+import { resolveCapabilities } from '@/lib/categories'
 import { community } from '@/community.config'
 
 // The history shape page.tsx stamps on every pushState/replaceState call, plus
@@ -65,6 +67,14 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   const [action, setAction] = useState<ListingAction | null>(null)
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
+
+  // Started as soon as a category with Add/Edit loads (below), not only once
+  // the visitor opens the form — the Turnstile challenge takes a few seconds
+  // to resolve, so kicking it off while they're still browsing the list means
+  // it's usually already solved by the time they hit Submit, instead of
+  // making Add/Edit open into a multi-second "Verifying…" wait every time.
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const turnstileRef = useRef<TurnstileHandle>(null)
   // The listing id most recently opened for edit/report, OR the place tapped on
   // the landing page — restored as expanded when the category list shows.
   const [reopenItemId, setReopenItemId] = useState<string | null>(() => {
@@ -167,28 +177,51 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   // ── Database-backed categories (with add / edit / report) ───────────────────
   const category = view ? categories?.find((c) => c.id === view && c.kind === 'listing') : undefined
   if (category) {
+    const caps = resolveCapabilities(category.capabilities)
+    // Kept mounted across list ⇄ form transitions within this category (same
+    // JSX slot every render, so React never tears it down between them) —
+    // that's what lets the challenge finish in the background before Add/Edit
+    // is even opened. Skipped entirely when neither action is available.
+    const sharedTurnstileWidget = (caps.add || caps.edit) && (
+      <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} />
+    )
+    const sharedTurnstile = { token: turnstileToken, reset: () => { turnstileRef.current?.reset(); setTurnstileToken('') } }
+
     if (action?.mode === 'create') {
-      return <ListingForm category={category} mode="create" onUp={goToCategoryList} onSubmitted={goToCategoryList} />
+      return (
+        <>
+          {sharedTurnstileWidget}
+          <ListingForm category={category} mode="create" onUp={goToCategoryList} onSubmitted={goToCategoryList} sharedTurnstile={sharedTurnstile} />
+        </>
+      )
     }
     if (action?.mode === 'edit') {
-      return <ListingForm category={category} mode="edit" existing={action.listing} onUp={goToCategoryList} onSubmitted={goToCategoryList} />
+      return (
+        <>
+          {sharedTurnstileWidget}
+          <ListingForm category={category} mode="edit" existing={action.listing} onUp={goToCategoryList} onSubmitted={goToCategoryList} sharedTurnstile={sharedTurnstile} />
+        </>
+      )
     }
     if (action?.mode === 'report') {
       return <ReportListing listing={action.listing} upLabel={category.pluralLabel} onUp={goToCategoryList} onSubmitted={goToCategoryList} />
     }
     return (
-      <ResourceLoader
-        key={category.id + (initialSearch ?? '')}
-        category={category}
-        anchor={anchor}
-        reopenItemId={reopenItemId}
-        initialSearch={initialSearch ?? undefined}
-        onUp={onUp}
-        onAdd={() => openAction({ mode: 'create' })}
-        onEdit={(listing) => openAction({ mode: 'edit', listing })}
-        onReport={(listing) => openAction({ mode: 'report', listing })}
-        onViewMap={onViewMap ? (query, filters) => onViewMap(category.id, query, filters) : undefined}
-      />
+      <>
+        {sharedTurnstileWidget}
+        <ResourceLoader
+          key={category.id + (initialSearch ?? '')}
+          category={category}
+          anchor={anchor}
+          reopenItemId={reopenItemId}
+          initialSearch={initialSearch ?? undefined}
+          onUp={onUp}
+          onAdd={() => openAction({ mode: 'create' })}
+          onEdit={(listing) => openAction({ mode: 'edit', listing })}
+          onReport={(listing) => openAction({ mode: 'report', listing })}
+          onViewMap={onViewMap ? (query, filters) => onViewMap(category.id, query, filters) : undefined}
+        />
+      </>
     )
   }
 
