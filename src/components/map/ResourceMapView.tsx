@@ -68,11 +68,16 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** Called once with the first GPS fix after the map's own "start live
+   *  tracking" pin is pressed, so the header's site-wide "Set location" pill
+   *  (and everything that anchors on it — directory distance sorting on other
+   *  pages) picks up the same location, not just the map. */
+  onSetLocation?: (coords: LatLng) => void
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, onSetLocation }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -80,6 +85,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   // Live GPS takes priority over the one-shot header location.
   const activeLocation: LatLng | null = livePosition ?? userLocation ?? null
+
+  // Report the first fix of each tracking session up to the header's location
+  // pill — reset on every fresh "start" press so pressing it again re-syncs
+  // even if the visitor has since typed a different address up there.
+  const syncedThisSessionRef = useRef(false)
+  useEffect(() => {
+    if (!livePosition || syncedThisSessionRef.current) return
+    syncedThisSessionRef.current = true
+    onSetLocation?.({ lat: livePosition.lat, lng: livePosition.lng })
+  }, [livePosition, onSetLocation])
 
   const [tab, setTab] = useState<Tab>('map')
   // Mobile only — the quick chip row over the map shows a handful of
@@ -125,6 +140,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const handleStart = () => {
     setFollow(true)
     setTab('map')
+    syncedThisSessionRef.current = false
     start()
   }
 

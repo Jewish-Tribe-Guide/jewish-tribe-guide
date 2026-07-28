@@ -263,6 +263,10 @@ export default function Page() {
             initialSelectedCategories={mapSelectedCategories || undefined}
             initialFilters={mapFilters || undefined}
             onViewListing={viewListing}
+            onSetLocation={(c) => {
+              setCoords(c)
+              setAddress('Current location')
+            }}
           />
         </main>
       )}
