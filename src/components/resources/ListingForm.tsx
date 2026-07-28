@@ -112,6 +112,15 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       const hoursField = config.detailFields.find((f) => f.type === 'hours')
       if (hoursField) setDetail(hoursField.key, result.hours)
     }
+    if (result.website) {
+      // Matched by label, not key — existing categories' Website fields
+      // predate a fixed key convention (e.g. keyed "w" or "whatsapp"), so
+      // matching on the label people actually see is the reliable signal.
+      const websiteField = config.detailFields.find(
+        (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
+      )
+      if (websiteField) setDetail(websiteField.key, result.website)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

@@ -1176,6 +1176,47 @@ function CategoryEditor({
     setGroupForm(null)
   }
 
+  // "Every listing also has" toggles for Hours/Website (see JSX below) don't
+  // add their own boolean flags like hasAddress/hasPhone — they just manage
+  // one plain (non-audience) field of the right type for you, so the rest of
+  // the app (card rendering, the intake form's Google-autofill lookup by
+  // type/label) needs no special-casing beyond what a manually-added Hours
+  // or Website field already gets.
+  function hasPlainHoursField(fields: CategoryField[]): boolean {
+    return fields.some((f) => f.type === 'hours' && !f.audienceKey)
+  }
+  function hasWebsiteField(fields: CategoryField[]): boolean {
+    return fields.some((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')
+  }
+  function nextFieldKey(fields: CategoryField[], hidden: CategoryField[], base: string): string {
+    const used = new Set([...fields, ...hidden].map((f) => f.key))
+    let key = base
+    for (let n = 2; used.has(key); n++) key = `${base}${n}`
+    return key
+  }
+
+  function toggleHoursField(on: boolean) {
+    setDraft((d) => {
+      if (on) {
+        if (hasPlainHoursField(d.fields)) return d
+        const key = nextFieldKey(d.fields, d.hiddenFields, 'hours')
+        return { ...d, fields: [...d.fields, { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }] }
+      }
+      return { ...d, fields: d.fields.filter((f) => !(f.type === 'hours' && !f.audienceKey)) }
+    })
+  }
+
+  function toggleWebsiteField(on: boolean) {
+    setDraft((d) => {
+      if (on) {
+        if (hasWebsiteField(d.fields)) return d
+        const key = nextFieldKey(d.fields, d.hiddenFields, 'website')
+        return { ...d, fields: [...d.fields, { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row' }] }
+      }
+      return { ...d, fields: d.fields.filter((f) => !(f.type === 'url' && f.label.trim().toLowerCase() === 'website')) }
+    })
+  }
+
   function moveField(i: number, dir: -1 | 1) {
     setDraft((d) => {
       const j = i + dir
@@ -1519,10 +1560,30 @@ function CategoryEditor({
               />
               A phone number
             </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasPlainHoursField(draft.fields)}
+                onChange={(e) => toggleHoursField(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Hours
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasWebsiteField(draft.fields)}
+                onChange={(e) => toggleWebsiteField(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              A website
+            </label>
             <span className="block text-[11px] text-muted">
-              On by default. Turn either off for listings that aren’t a physical place — like WhatsApp
-              groups — and it disappears from the form and the card. With no address, distance sorting
-              and the Map button don’t apply either.
+              Address and phone are on by default; turn either off for listings that aren’t a physical
+              place — like WhatsApp groups — and it disappears from the form and the card. With no
+              address, distance sorting and the Map button don’t apply either. Hours and website start
+              off — turn one on to add it to every listing below. All four fill in automatically from
+              Google when you type the address.
             </span>
           </div>
 

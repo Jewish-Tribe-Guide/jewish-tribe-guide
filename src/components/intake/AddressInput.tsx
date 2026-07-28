@@ -11,6 +11,7 @@ export type PlaceSelectResult = {
   name: string | null
   phone: string | null
   hours: StructuredHours | null
+  website: string | null
 }
 
 type Props = {
@@ -96,7 +97,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         element.addEventListener('gmp-select', async (event) => {
           const place = event.placePrediction.toPlace()
           const extraFields = onPlaceSelectRef.current
-            ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours']
+            ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI']
             : []
           await place.fetchFields({ fields: ['formattedAddress', 'location', ...extraFields] })
 
@@ -113,6 +114,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
               name: p.displayName ?? null,
               phone: p.nationalPhoneNumber ?? null,
               hours: periods ? placesApiHoursToStructured(periods) : null,
+              website: p.websiteURI ?? null,
             })
           }
         })
