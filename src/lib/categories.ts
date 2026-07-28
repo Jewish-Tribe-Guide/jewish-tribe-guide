@@ -285,5 +285,11 @@ export function fieldIsVisible(field: CategoryField, details: Record<string, unk
   // manually; the form only ever offers what applies to this listing.
   if (field.audienceKey && !details[field.audienceKey]) return false
   if (!field.showIf) return true
-  return details[field.showIf.field] === field.showIf.equals
+  const triggerValue = details[field.showIf.field]
+  // The trigger field can itself be a multiSelect select (stored as string[],
+  // e.g. a listing tagged both "Restaurant" and "Out of Town Deliveries") —
+  // match if the target value is one of the chosen ones, not just an exact
+  // (impossible) equality against the whole array.
+  if (Array.isArray(triggerValue)) return triggerValue.includes(field.showIf.equals)
+  return triggerValue === field.showIf.equals
 }

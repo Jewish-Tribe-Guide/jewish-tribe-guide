@@ -1606,6 +1606,12 @@ function CategoryEditor({
                   audienceOptions={draft.fields
                     .filter((other) => other.type === 'boolean' && other.key !== f.key)
                     .map((other) => ({ key: other.key, label: other.label }))}
+                  // Choice fields make sense as a "show only when this equals
+                  // that option" trigger (e.g. "Out of Town Deliveries" on a
+                  // multiSelect Type field) — a field can't be scoped to itself.
+                  showIfOptions={draft.fields
+                    .filter((other) => other.type === 'select' && other.key !== f.key)
+                    .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
@@ -1779,6 +1785,7 @@ function FieldEditor({
   total,
   canRequire,
   audienceOptions,
+  showIfOptions,
   onChange,
   onRemove,
   onMove,
@@ -1791,6 +1798,10 @@ function FieldEditor({
    *  CategoryField.audienceKey. Empty when the category has no boolean
    *  fields yet. */
   audienceOptions: { key: string; label: string }[]
+  /** The category's own Choice fields this one could be shown conditionally
+   *  on — see CategoryField.showIf. Empty when the category has no Choice
+   *  fields yet (besides this one). */
+  showIfOptions: { key: string; label: string; options: { value: string; label: string }[] }[]
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
@@ -1855,6 +1866,16 @@ function FieldEditor({
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
+      </label>
+
+      <label className="block">
+        <span className={fieldLabel}>Help text (optional)</span>
+        <input
+          value={f.help ?? ''}
+          onChange={(e) => onChange({ help: e.target.value || undefined })}
+          className={inputClass}
+          placeholder="A short hint shown under this field in the form"
+        />
       </label>
 
       {f.type === 'tags' && (
@@ -1969,6 +1990,40 @@ function FieldEditor({
             When a visitor turns on that filter, cards hide every other audience-scoped detail —
             useful for things like separate men&rsquo;s/women&rsquo;s hours so they don&rsquo;t all show
             at once.
+          </span>
+        </label>
+      )}
+
+      {showIfOptions.length > 0 && (
+        <label className="block sm:w-1/2">
+          <span className={fieldLabel}>Only show when a Choice equals (optional)</span>
+          <select
+            value={f.showIf ? `${f.showIf.field}::${String(f.showIf.equals)}` : ''}
+            onChange={(e) => {
+              if (!e.target.value) {
+                onChange({ showIf: undefined })
+                return
+              }
+              const sep = e.target.value.indexOf('::')
+              onChange({ showIf: { field: e.target.value.slice(0, sep), equals: e.target.value.slice(sep + 2) } })
+            }}
+            className={inputClass}
+          >
+            <option value="">Always show</option>
+            {showIfOptions.map((trigger) => (
+              <optgroup key={trigger.key} label={trigger.label}>
+                {trigger.options.map((opt) => (
+                  <option key={`${trigger.key}::${opt.value}`} value={`${trigger.key}::${opt.value}`}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <span className="block text-[11px] text-muted mt-0.5">
+            Only shows this detail (in the form and on the card) on listings where that Choice
+            includes the selected option — e.g. a &ldquo;Delivery WhatsApp Group&rdquo; link that only
+            appears once Type includes &ldquo;Out of Town Deliveries.&rdquo;
           </span>
         </label>
       )}
