@@ -27,10 +27,8 @@ function TimeValue({ time }: { time: string }) {
   return (
     <span
       className={[
-        'text-sm max-w-[220px] sm:max-w-xs',
-        isClockTime(time)
-          ? 'font-semibold text-slate-800 min-w-[3.5rem] text-right'
-          : 'font-normal text-slate-600 text-left',
+        'text-sm font-semibold text-slate-800 max-w-[220px] sm:max-w-xs',
+        isClockTime(time) ? 'min-w-[3.5rem] text-right' : 'text-left',
       ].join(' ')}
     >
       {time}
