@@ -6,7 +6,7 @@ import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import ZmanimWidget from '@/components/home/ZmanimWidget'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import { needsDarkText } from '@/components/Collapsible'
+import { needsDarkText, readableTextOnWhite } from '@/components/Collapsible'
 import { ACCENT_PALETTE, HOSPITALS_ID, rankMapId } from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
@@ -132,13 +132,19 @@ function GetConnectedAccordion({
           // hardcoding which hex that is, so it keeps working automatically
           // if the palette's exact colors ever shift again.
           const activeTextClass = needsDarkText(color) ? 'text-[#0C3D57]' : 'text-white'
+          // The raw palette color is fine as a solid FILL (the active tab
+          // background above), but several of its paler steps are too light
+          // to read as TEXT directly on white — `readableTextOnWhite` darkens
+          // just enough to stay legible while still keeping each tab's own
+          // distinct hue when inactive.
+          const inactiveTextColor = readableTextOnWhite(color)
           return (
             <button
               key={cat.id}
               onClick={() => selectTab(cat.id)}
               role="tab"
               aria-selected={isActive}
-              style={isActive ? { backgroundColor: color } : { color }}
+              style={isActive ? { backgroundColor: color } : { color: inactiveTextColor }}
               className={`flex-1 border-r border-b-2 border-slate-200 px-3 py-3.5 text-center text-xs font-bold transition-colors cursor-pointer last:border-r-0 sm:text-sm ${
                 isActive ? activeTextClass : 'bg-white hover:brightness-95'
               }`}
@@ -168,6 +174,11 @@ function GetConnectedAccordion({
             const spanStart = anchorLeft ? listTrack - 2 : listTrack
             const spanEnd = spanStart + 3
 
+            // Raw palette colors are fine as borders/fills, but a couple of
+            // this palette's paler steps are too light to read as TEXT on
+            // the near-white `bg-slate-50` these hover/open states use —
+            // same fix as the tab labels above.
+            const readableActiveColor = readableTextOnWhite(activeColor ?? '#0C3D57')
             const listBox = (
               <div style={{ borderColor: activeColor }} className="min-w-0 flex-1 border border-t-0 bg-white shadow-lg">
                 {active.items.length > 0 ? (
@@ -184,7 +195,7 @@ function GetConnectedAccordion({
                               else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
                               else item.go()
                             }}
-                            style={{ '--hover-color': activeColor } as React.CSSProperties}
+                            style={{ '--hover-color': readableActiveColor } as React.CSSProperties}
                             className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
                               isOpen
                                 ? 'bg-slate-50 text-[var(--hover-color)]'
@@ -725,22 +736,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               (not new/duplicated content) — Professional Networks and
               Social Opportunities both draw from the same young-
               professional listings, just split by which read as networking
-              vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above).
-              Separated from the map above (and Zmanim below) by a plain
-              divider line rather than a border boxing the whole section in
-              — same #fefefe fill throughout, so the line is the only thing
-              marking the seam. ────────────────────────────────────────── */}
+              vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above). No
+              divider line above it anymore — the "Get Connected" heading is
+              its own solid navy rectangle sitting flush on top of the tab
+              strip (no gap between them), same width as it, so the two read
+              as one connected unit — a title bar capping the tabs beneath
+              it — instead of a plain centered heading floating above a
+              separate line. ─────────────────────────────────────────────── */}
       <div className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-8">
         <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <div className="border-t border-slate-200 pt-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-extrabold tracking-tight text-[#0C3D57]">Get Connected</h2>
-              <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-[#3a86ff]" aria-hidden="true" />
-            </div>
-            <div className="mt-8">
-              <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
-            </div>
+          <div className="w-full bg-[#0C3D57] py-2.5 text-center">
+            <h2 className="text-2xl font-extrabold tracking-tight text-[#fefefe]">Get Connected</h2>
           </div>
+          <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
         </div>
       </div>
 

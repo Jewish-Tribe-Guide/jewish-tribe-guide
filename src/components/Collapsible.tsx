@@ -24,6 +24,32 @@ export function needsDarkText(hex: string): boolean {
   return contrastWithWhite < 3
 }
 
+// ACCENT_PALETTE was tuned as FILL colors (solid tab/pin backgrounds), where
+// `needsDarkText` picks white-or-dark text against them — not as text colors
+// drawn directly on a plain white background, which several of its paler
+// steps are too light for (e.g. GetConnectedAccordion's inactive tab
+// labels). Darkens `hex` just enough (mixing toward black) to clear a 4.5:1
+// contrast ratio against white — already-legible colors pass through
+// unchanged (0 iterations), so this is safe to run on every color, not just
+// the pale ones.
+export function readableTextOnWhite(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  let r = (n >> 16) & 255
+  let g = (n >> 8) & 255
+  let b = n & 255
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const luminance = () => 0.2126 * lin(r / 255) + 0.7152 * lin(g / 255) + 0.0722 * lin(b / 255)
+  const contrastWithWhite = () => 1.05 / (luminance() + 0.05)
+  let guard = 0
+  while (contrastWithWhite() < 4.5 && guard++ < 30) {
+    r = Math.round(r * 0.9)
+    g = Math.round(g * 0.9)
+    b = Math.round(b * 0.9)
+  }
+  const toHex = (c: number) => c.toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
 type Props = {
   title: React.ReactNode
   children: React.ReactNode
