@@ -1195,23 +1195,35 @@ function CategoryEditor({
     return key
   }
 
+  // Inserted at the very front of the details list (not appended) — the
+  // intake form renders details right after the fixed Phone field, in this
+  // array's order, so index 0 is what actually lands "right after phone" the
+  // way address/phone themselves always sit first.
   function toggleHoursField(on: boolean) {
     setDraft((d) => {
       if (on) {
         if (hasPlainHoursField(d.fields)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'hours')
-        return { ...d, fields: [...d.fields, { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }] }
+        const field: CategoryField = { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }
+        return { ...d, fields: [field, ...d.fields] }
       }
       return { ...d, fields: d.fields.filter((f) => !(f.type === 'hours' && !f.audienceKey)) }
     })
   }
 
+  // Same front-of-list placement as Hours, but slotted after it (if the
+  // category has one) so the two stay in the same order as their checkboxes
+  // above: Hours, then Website, both right after Phone.
   function toggleWebsiteField(on: boolean) {
     setDraft((d) => {
       if (on) {
         if (hasWebsiteField(d.fields)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'website')
-        return { ...d, fields: [...d.fields, { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row' }] }
+        const field: CategoryField = { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row' }
+        const hoursIndex = d.fields.findIndex((f) => f.type === 'hours' && !f.audienceKey)
+        const fields = [...d.fields]
+        fields.splice(hoursIndex === -1 ? 0 : hoursIndex + 1, 0, field)
+        return { ...d, fields }
       }
       return { ...d, fields: d.fields.filter((f) => !(f.type === 'url' && f.label.trim().toLowerCase() === 'website')) }
     })
