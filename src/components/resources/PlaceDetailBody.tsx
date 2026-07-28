@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus } from '@/lib/hours'
@@ -180,197 +180,217 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     .map((f) => ({ f, href: display(item[f.key]) }))
     .filter((x): x is { f: CategoryField; href: string } => !!x.href)
   const showOpenChip = isOpen && !hideOpenStatus
+  const visibleRowFields = rowFields.filter((f) => display(item[f.key]))
+  const caveatNotes = signalBadges
+    .map((f) => ({ f, note: caveatNote(f) }))
+    .filter((x): x is { f: CategoryField; note: string } => x.note !== null)
+  const hasAddressPhoneHours = showAddress || showPhone || showDavening || hoursFields.length > 0
+
+  // ── Status + signal badges ─────────────────────────────────────────────
+  const statusSection = (showOpenChip || visibleSignalBadges.length > 0) && (
+    <div className="flex flex-wrap gap-1.5">
+      {showOpenChip && (closing?.closesSoon ? (
+        <span className="relative group/tip">
+          <Chip tone="greenSolid" onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}>
+            Closes Soon
+          </Chip>
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+            Closes at {closing.closeLabel}
+          </span>
+        </span>
+      ) : (
+        <Chip
+          tone="green"
+          onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}
+          title={onFilterOpen ? 'Filter to places open now' : undefined}
+        >
+          Open
+        </Chip>
+      ))}
+      {visibleSignalBadges.flatMap((f) => {
+        const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
+        const note = caveatNote(f)
+        const amber = note !== null
+        return texts.map((text) => {
+          const onClick =
+            f.filterable && f.type === 'boolean' && onFilterBool
+              ? (e: MouseEvent) => { e.stopPropagation(); onFilterBool(f.key) }
+              : f.filterable && f.type === 'select' && onFilterSelect
+              ? (e: MouseEvent) => { e.stopPropagation(); onFilterSelect(f.key, text) }
+              : onTagClick
+              ? (e: MouseEvent) => { e.stopPropagation(); onTagClick(text) }
+              : undefined
+          const btn = (
+            <Chip tone={amber ? 'amber' : 'slate'} onClick={onClick} title={amber ? undefined : (onClick ? `Filter by ${text}` : undefined)}>
+              {text}
+            </Chip>
+          )
+          if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
+          return (
+            <span key={`${f.key}:${text}`} className="relative group/tip">
+              {btn}
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                {note || 'Not everything here is kosher — please verify.'}
+              </span>
+            </span>
+          )
+        })
+      })}
+    </div>
+  )
+
+  // ── Quick actions: Directions / Call / every url field ─────────────────
+  const actionsSection = (showAddress || showPhone || urlButtons.length > 0) && (
+    <div className="flex flex-wrap gap-x-6 gap-y-4">
+      {showAddress && (
+        <ActionButton
+          href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
+          icon={<DirectionsIcon className="h-5 w-5" />}
+          label="Directions"
+        />
+      )}
+      {showPhone && (
+        <ActionButton
+          href={`tel:${item.phone!.replace(/\D/g, '')}`}
+          icon={<PhoneIcon className="h-5 w-5" />}
+          label="Call"
+        />
+      )}
+      {urlButtons.map(({ f, href }) => (
+        <ActionButton key={f.key} href={href} icon={<ExternalIcon className="h-5 w-5" />} label={f.linkLabel ?? f.label} />
+      ))}
+    </div>
+  )
+
+  // ── Address / phone / davening / hours ──────────────────────────────────
+  const addressSection = hasAddressPhoneHours && (
+    <div className="space-y-3">
+      {showAddress && (
+        <div className="flex items-start gap-3">
+          <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+          <p className="text-sm text-slate-800">{item.address}</p>
+        </div>
+      )}
+
+      {showPhone && (
+        <div className="flex items-center gap-3">
+          <PhoneIcon className="h-4 w-4 shrink-0 text-slate-400" />
+          <a href={`tel:${item.phone!.replace(/\D/g, '')}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary hover:underline">
+            {item.phone}
+          </a>
+          {item.placeId && !anyHoursVal && (
+            <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
+              via Google
+            </span>
+          )}
+        </div>
+      )}
+
+      {showDavening && (
+        <div>
+          <p className="text-xs text-muted mb-1">Davening Times</p>
+          <DaveningTimes minyanim={minyanimValue} legacyText={legacyDavening} />
+        </div>
+      )}
+
+      {hoursFields.map((f, i) => {
+        const val = item[f.key]
+        if (val === undefined && !(i === 0 && item.businessStatus)) return null
+        return (
+          <div key={f.key} className="flex items-start gap-3">
+            <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+            <div className="min-w-0 flex-1">
+              {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+              <HoursDisplay
+                value={val}
+                businessStatus={i === 0 ? item.businessStatus : undefined}
+                syncedAt={i === 0 ? item.googleSyncedAt : undefined}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  // ── Tags ──────────────────────────────────────────────────────────────
+  const tagsSection = (tags.length > 0 || tagsSometimes.length > 0) && (
+    <div className="space-y-2">
+      <ClampedChipRow>
+        {[
+          ...tags.map((t) => (
+            <Chip key={t} tone="slate" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
+              {t}
+            </Chip>
+          )),
+          ...tagsSometimes.map((t) => (
+            <span key={`sometimes:${t}`} className="relative group/tip">
+              <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
+                ~{t}
+              </Chip>
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                not always in stock
+              </span>
+            </span>
+          )),
+        ]}
+      </ClampedChipRow>
+      {tagsSometimes.length > 0 && (
+        <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
+      )}
+    </div>
+  )
+
+  // ── Other detail fields ─────────────────────────────────────────────────
+  const detailBadgesSection = detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
+    <div className="flex flex-wrap gap-1.5">
+      {detailBadges.map((f) => {
+        const v = item[f.key]
+        if (f.type === 'boolean' ? !v : !display(v)) return null
+        const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
+        return <Chip key={f.key} tone="slate" size="expanded">{text}</Chip>
+      })}
+    </div>
+  )
+
+  const rowFieldsSection = visibleRowFields.length > 0 && (
+    <div className="space-y-1">
+      {visibleRowFields.map((f) => (
+        <p key={f.key} className="text-sm text-slate-700">
+          {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
+          {display(item[f.key])}
+        </p>
+      ))}
+    </div>
+  )
+
+  // Not-fully-kosher caveat notes — placed under the menu/details so they
+  // read in context; the amber cert badge above is the at-a-glance flag.
+  const caveatSection = caveatNotes.length > 0 && (
+    <div className="space-y-1">
+      {caveatNotes.map(({ f, note }) => (
+        <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
+          {note || 'Not everything here is kosher — please verify.'}
+        </p>
+      ))}
+    </div>
+  )
+
+  // Rendered with a divider between any two consecutive sections that both
+  // have content — never before the first or after the last — so a section
+  // only ever gets a separating line when there's actually something on
+  // both sides of it to separate.
+  const sections = [statusSection, actionsSection, addressSection, tagsSection, detailBadgesSection, rowFieldsSection, caveatSection]
+    .filter((s): s is Exclude<typeof s, false> => s !== false)
 
   return (
     <div className="space-y-4">
-      {/* ── Status + signal badges ───────────────────────────────────────── */}
-      {(showOpenChip || visibleSignalBadges.length > 0) && (
-        <div className="flex flex-wrap gap-1.5">
-          {showOpenChip && (closing?.closesSoon ? (
-            <span className="relative group/tip">
-              <Chip tone="greenSolid" onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}>
-                Closes Soon
-              </Chip>
-              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                Closes at {closing.closeLabel}
-              </span>
-            </span>
-          ) : (
-            <Chip
-              tone="green"
-              onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}
-              title={onFilterOpen ? 'Filter to places open now' : undefined}
-            >
-              Open
-            </Chip>
-          ))}
-          {visibleSignalBadges.flatMap((f) => {
-            const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
-            const note = caveatNote(f)
-            const amber = note !== null
-            return texts.map((text) => {
-              const onClick =
-                f.filterable && f.type === 'boolean' && onFilterBool
-                  ? (e: MouseEvent) => { e.stopPropagation(); onFilterBool(f.key) }
-                  : f.filterable && f.type === 'select' && onFilterSelect
-                  ? (e: MouseEvent) => { e.stopPropagation(); onFilterSelect(f.key, text) }
-                  : onTagClick
-                  ? (e: MouseEvent) => { e.stopPropagation(); onTagClick(text) }
-                  : undefined
-              const btn = (
-                <Chip tone={amber ? 'amber' : 'slate'} onClick={onClick} title={amber ? undefined : (onClick ? `Filter by ${text}` : undefined)}>
-                  {text}
-                </Chip>
-              )
-              if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
-              return (
-                <span key={`${f.key}:${text}`} className="relative group/tip">
-                  {btn}
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                    {note || 'Not everything here is kosher — please verify.'}
-                  </span>
-                </span>
-              )
-            })
-          })}
-        </div>
-      )}
-
-      {/* ── Quick actions: Directions / Call / every url field ───────────── */}
-      {(showAddress || showPhone || urlButtons.length > 0) && (
-        <div className="flex flex-wrap gap-x-6 gap-y-4 border-y border-slate-100 py-3">
-          {showAddress && (
-            <ActionButton
-              href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
-              icon={<DirectionsIcon className="h-5 w-5" />}
-              label="Directions"
-            />
-          )}
-          {showPhone && (
-            <ActionButton
-              href={`tel:${item.phone!.replace(/\D/g, '')}`}
-              icon={<PhoneIcon className="h-5 w-5" />}
-              label="Call"
-            />
-          )}
-          {urlButtons.map(({ f, href }) => (
-            <ActionButton key={f.key} href={href} icon={<ExternalIcon className="h-5 w-5" />} label={f.linkLabel ?? f.label} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Address / phone / davening / hours ───────────────────────────── */}
-      <div className="space-y-3">
-        {showAddress && (
-          <div className="flex items-start gap-3">
-            <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-            <p className="text-sm text-slate-800">{item.address}</p>
-          </div>
-        )}
-
-        {showPhone && (
-          <div className="flex items-center gap-3">
-            <PhoneIcon className="h-4 w-4 shrink-0 text-slate-400" />
-            <a href={`tel:${item.phone!.replace(/\D/g, '')}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary hover:underline">
-              {item.phone}
-            </a>
-            {item.placeId && !anyHoursVal && (
-              <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
-                via Google
-              </span>
-            )}
-          </div>
-        )}
-
-        {showDavening && (
-          <div>
-            <p className="text-xs text-muted mb-1">Davening Times</p>
-            <DaveningTimes minyanim={minyanimValue} legacyText={legacyDavening} />
-          </div>
-        )}
-
-        {hoursFields.map((f, i) => {
-          const val = item[f.key]
-          if (val === undefined && !(i === 0 && item.businessStatus)) return null
-          return (
-            <div key={f.key} className="flex items-start gap-3">
-              <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-              <div className="min-w-0 flex-1">
-                {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
-                <HoursDisplay
-                  value={val}
-                  businessStatus={i === 0 ? item.businessStatus : undefined}
-                  syncedAt={i === 0 ? item.googleSyncedAt : undefined}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ── Tags ──────────────────────────────────────────────────────────── */}
-      {(tags.length > 0 || tagsSometimes.length > 0) && (
-        <div className="space-y-2">
-          <ClampedChipRow>
-            {[
-              ...tags.map((t) => (
-                <Chip key={t} tone="slate" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
-                  {t}
-                </Chip>
-              )),
-              ...tagsSometimes.map((t) => (
-                <span key={`sometimes:${t}`} className="relative group/tip">
-                  <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
-                    ~{t}
-                  </Chip>
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                    not always in stock
-                  </span>
-                </span>
-              )),
-            ]}
-          </ClampedChipRow>
-          {tagsSometimes.length > 0 && (
-            <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
-          )}
-          <hr className="border-slate-200" />
-        </div>
-      )}
-
-      {/* ── Other detail fields ──────────────────────────────────────────── */}
-      {detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
-        <div className="flex flex-wrap gap-1.5">
-          {detailBadges.map((f) => {
-            const v = item[f.key]
-            if (f.type === 'boolean' ? !v : !display(v)) return null
-            const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
-            return <Chip key={f.key} tone="slate" size="expanded">{text}</Chip>
-          })}
-        </div>
-      )}
-
-      {rowFields.map((f) => {
-        const v = display(item[f.key])
-        if (!v) return null
-        return (
-          <p key={f.key} className="text-sm text-slate-700">
-            {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
-            {v}
-          </p>
-        )
-      })}
-
-      {/* Not-fully-kosher caveat note — placed under the menu/details so it
-          reads in context; the amber cert badge above is the at-a-glance flag. */}
-      {signalBadges.map((f) => {
-        const note = caveatNote(f)
-        if (note === null) return null
-        return (
-          <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
-            {note || 'Not everything here is kosher — please verify.'}
-          </p>
-        )
-      })}
+      {sections.map((section, i) => (
+        <Fragment key={i}>
+          {i > 0 && <hr className="border-slate-200" />}
+          {section}
+        </Fragment>
+      ))}
     </div>
   )
 }
