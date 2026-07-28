@@ -94,6 +94,24 @@ export function hoursClosing(
 }
 
 /**
+ * A listing's "Open"/"Closes Soon" status, from whichever of its hours
+ * fields (there can be more than one — e.g. Mikvah's separate men's/women's/
+ * keilim hours) says it's open right now. Shared by the collapsed listing
+ * card's Open badge and the full detail body's status row, so the two can
+ * never disagree about whether a place is open.
+ */
+export function getOpenStatus(
+  item: Record<string, unknown>,
+  hoursFieldKeys: string[],
+): { isOpen: boolean; closing: { closesSoon: boolean; closeLabel: string } | null } {
+  const openVal = hoursFieldKeys
+    .map((k) => item[k])
+    .find((v) => v !== undefined && hoursOpenNow(v) === true && isStructuredHours(v))
+  const isOpen = openVal !== undefined
+  return { isOpen, closing: isOpen ? hoursClosing(openVal) : null }
+}
+
+/**
  * One-line label for today's hours shown on a directory card.
  *  - Structured hours → "Today: 9:00 AM – 5:00 PM" or "Closed today"
  *  - Legacy text string → the raw string (unchanged)
