@@ -1176,17 +1176,26 @@ function CategoryEditor({
     setGroupForm(null)
   }
 
-  // "Every listing also has" toggles for Hours/Website (see JSX below) don't
-  // add their own boolean flags like hasAddress/hasPhone — they just manage
-  // one plain (non-audience) field of the right type for you, so the rest of
+  // "Every listing also has" toggles for Hours/Website (see JSX below) work
+  // like hasAddress/hasPhone from the admin's point of view — check the box
+  // and it's just on, no separate detail to configure — but under the hood
+  // there's no separate hasHours/hasWebsite flag or reserved column; toggling
+  // just adds/removes one plain (non-audience) field of the right type, the
+  // same as a manually-added Hours or Website field, so every other part of
   // the app (card rendering, the intake form's Google-autofill lookup by
-  // type/label) needs no special-casing beyond what a manually-added Hours
-  // or Website field already gets.
-  function hasPlainHoursField(fields: CategoryField[]): boolean {
-    return fields.some((f) => f.type === 'hours' && !f.audienceKey)
+  // type/label) needs no special-casing. The one thing that DOES need
+  // special-casing is the Details list below: these two fields are filtered
+  // out of it (see the `isCheckboxManagedField` guard in the render loop)
+  // so checking the box doesn't spawn a visible, editable detail row —
+  // matching how hasAddress/hasPhone don't either.
+  function isPlainHoursField(f: CategoryField): boolean {
+    return f.type === 'hours' && !f.audienceKey
   }
-  function hasWebsiteField(fields: CategoryField[]): boolean {
-    return fields.some((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')
+  function isWebsiteField(f: CategoryField): boolean {
+    return f.type === 'url' && f.label.trim().toLowerCase() === 'website'
+  }
+  function isCheckboxManagedField(f: CategoryField): boolean {
+    return isPlainHoursField(f) || isWebsiteField(f)
   }
   function nextFieldKey(fields: CategoryField[], hidden: CategoryField[], base: string): string {
     const used = new Set([...fields, ...hidden].map((f) => f.key))
@@ -1202,12 +1211,12 @@ function CategoryEditor({
   function toggleHoursField(on: boolean) {
     setDraft((d) => {
       if (on) {
-        if (hasPlainHoursField(d.fields)) return d
+        if (d.fields.some(isPlainHoursField)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'hours')
         const field: CategoryField = { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }
         return { ...d, fields: [field, ...d.fields] }
       }
-      return { ...d, fields: d.fields.filter((f) => !(f.type === 'hours' && !f.audienceKey)) }
+      return { ...d, fields: d.fields.filter((f) => !isPlainHoursField(f)) }
     })
   }
 
@@ -1217,15 +1226,15 @@ function CategoryEditor({
   function toggleWebsiteField(on: boolean) {
     setDraft((d) => {
       if (on) {
-        if (hasWebsiteField(d.fields)) return d
+        if (d.fields.some(isWebsiteField)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'website')
         const field: CategoryField = { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row' }
-        const hoursIndex = d.fields.findIndex((f) => f.type === 'hours' && !f.audienceKey)
+        const hoursIndex = d.fields.findIndex(isPlainHoursField)
         const fields = [...d.fields]
         fields.splice(hoursIndex === -1 ? 0 : hoursIndex + 1, 0, field)
         return { ...d, fields }
       }
-      return { ...d, fields: d.fields.filter((f) => !(f.type === 'url' && f.label.trim().toLowerCase() === 'website')) }
+      return { ...d, fields: d.fields.filter((f) => !isWebsiteField(f)) }
     })
   }
 
@@ -1575,7 +1584,7 @@ function CategoryEditor({
             <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
-                checked={hasPlainHoursField(draft.fields)}
+                checked={draft.fields.some(isPlainHoursField)}
                 onChange={(e) => toggleHoursField(e.target.checked)}
                 className="rounded border-slate-300"
               />
@@ -1584,7 +1593,7 @@ function CategoryEditor({
             <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
-                checked={hasWebsiteField(draft.fields)}
+                checked={draft.fields.some(isWebsiteField)}
                 onChange={(e) => toggleWebsiteField(e.target.checked)}
                 className="rounded border-slate-300"
               />
@@ -1661,11 +1670,16 @@ function CategoryEditor({
             </div>
           )}
 
-          {draft.fields.length === 0 ? (
+          {draft.fields.filter((f) => !isCheckboxManagedField(f)).length === 0 ? (
             <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
             <div className="space-y-3">
-              {draft.fields.map((f, i) => (
+              {draft.fields.map((f, i) => {
+                // Hours/Website managed by the checkboxes above don't get a
+                // row here — same as address/phone, checking the box is the
+                // whole interaction, nothing left to configure per-listing.
+                if (isCheckboxManagedField(f)) return null
+                return (
                 <FieldEditor
                   key={i}
                   field={f}
@@ -1689,7 +1703,8 @@ function CategoryEditor({
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
                 />
-              ))}
+                )
+              })}
             </div>
           )}
         </section>
