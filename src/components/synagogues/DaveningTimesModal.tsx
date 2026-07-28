@@ -207,10 +207,10 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                             {row.denomination && (
                               <span className="ml-2 text-xs text-muted">({row.denomination})</span>
                             )}
-                            {row.notes && (
-                              <span className="ml-2 text-xs text-slate-500 italic">{row.notes}</span>
-                            )}
                           </div>
+                          {row.notes && (
+                            <p className="text-xs text-slate-500 italic">{row.notes}</p>
+                          )}
                           <TravelLine driveMinutes={row.driveMinutes} walkMinutes={row.walkMinutes} />
                         </div>
                         {/* Right: days + time. `time` sometimes carries a long
