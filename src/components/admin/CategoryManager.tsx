@@ -1184,18 +1184,17 @@ function CategoryEditor({
   // same as a manually-added Hours or Website field, so every other part of
   // the app (card rendering, the intake form's Google-autofill lookup by
   // type/label) needs no special-casing. The one thing that DOES need
-  // special-casing is the Details list below: these two fields are filtered
-  // out of it (see the `isCheckboxManagedField` guard in the render loop)
-  // so checking the box doesn't spawn a visible, editable detail row —
+  // special-casing is the Details list below: the one field each checkbox
+  // actually owns (managedHoursIndex/managedWebsiteIndex, computed once near
+  // the bottom of this component right before the JSX that uses them) is
+  // filtered out of it so checking the box doesn't spawn a visible, editable
+  // detail row —
   // matching how hasAddress/hasPhone don't either.
   function isPlainHoursField(f: CategoryField): boolean {
     return f.type === 'hours' && !f.audienceKey
   }
   function isWebsiteField(f: CategoryField): boolean {
     return f.type === 'url' && f.label.trim().toLowerCase() === 'website'
-  }
-  function isCheckboxManagedField(f: CategoryField): boolean {
-    return isPlainHoursField(f) || isWebsiteField(f)
   }
   function nextFieldKey(fields: CategoryField[], hidden: CategoryField[], base: string): string {
     const used = new Set([...fields, ...hidden].map((f) => f.key))
@@ -1216,7 +1215,14 @@ function CategoryEditor({
         const field: CategoryField = { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }
         return { ...d, fields: [field, ...d.fields] }
       }
-      return { ...d, fields: d.fields.filter((f) => !isPlainHoursField(f)) }
+      // Only the first match — if a second plain Hours field somehow exists
+      // (e.g. one added by hand alongside this checkbox), unchecking the box
+      // shouldn't silently delete both; the surplus one stays put, visible
+      // and removable in the Details list below (see the render loop's own
+      // first-match-only guard).
+      const idx = d.fields.findIndex(isPlainHoursField)
+      if (idx === -1) return d
+      return { ...d, fields: d.fields.filter((_, i) => i !== idx) }
     })
   }
 
@@ -1234,7 +1240,14 @@ function CategoryEditor({
         fields.splice(hoursIndex === -1 ? 0 : hoursIndex + 1, 0, field)
         return { ...d, fields }
       }
-      return { ...d, fields: d.fields.filter((f) => !isWebsiteField(f)) }
+      // Only the first match — see toggleHoursField's own comment. A second
+      // url field labeled "Website" (added by hand, separately from this
+      // checkbox) isn't this checkbox's to delete; it stays visible and
+      // removable in the Details list instead of vanishing along with the
+      // one the checkbox actually owns.
+      const idx = d.fields.findIndex(isWebsiteField)
+      if (idx === -1) return d
+      return { ...d, fields: d.fields.filter((_, i) => i !== idx) }
     })
   }
 
@@ -1442,6 +1455,15 @@ function CategoryEditor({
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
   }
+
+  // Only the FIRST field matching each shape is "owned" by its checkbox
+  // above (hidden from the Details list, and all toggleHoursField/
+  // toggleWebsiteField ever touch) — if a second one exists, whether from an
+  // old manual add or any other reason, it stays fully visible and editable
+  // in the Details list below instead of silently vanishing or being
+  // deleted alongside the one the checkbox actually manages.
+  const managedHoursIndex = draft.fields.findIndex(isPlainHoursField)
+  const managedWebsiteIndex = draft.fields.findIndex(isWebsiteField)
 
   return (
     <div>
@@ -1718,15 +1740,19 @@ function CategoryEditor({
             </div>
           )}
 
-          {draft.fields.filter((f) => !isCheckboxManagedField(f)).length === 0 ? (
+          {draft.fields.filter((_, i) => i !== managedHoursIndex && i !== managedWebsiteIndex).length === 0 ? (
             <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
             <div className="space-y-3">
               {draft.fields.map((f, i) => {
-                // Hours/Website managed by the checkboxes above don't get a
-                // row here — same as address/phone, checking the box is the
-                // whole interaction, nothing left to configure per-listing.
-                if (isCheckboxManagedField(f)) return null
+                // The one Hours/Website field each checkbox above actually
+                // owns doesn't get a row here — same as address/phone,
+                // checking the box is the whole interaction, nothing left to
+                // configure per-listing. A second field that happens to
+                // match the same shape (see managedHoursIndex/
+                // managedWebsiteIndex above) is NOT this checkbox's — it
+                // still gets a normal, editable row below.
+                if (i === managedHoursIndex || i === managedWebsiteIndex) return null
                 return (
                 <FieldEditor
                   key={i}
