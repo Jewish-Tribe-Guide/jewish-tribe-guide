@@ -23,9 +23,45 @@ type Props = {
    *  straight to browsing everything in just this one category. */
   onShowOnly: (id: string) => void
   boolFields: string[]
-  onToggleBool: (key: string) => void
+  /** Also turns the category on if it wasn't already (see ResourceMapView's
+   *  toggleBoolField) — setting a filter for a category implies wanting to
+   *  see it. */
+  onToggleBool: (categoryId: string, key: string) => void
   selectFilters: Record<string, string[]>
-  onToggleSelectValue: (key: string, value: string) => void
+  /** Same auto-select-the-category behavior as onToggleBool. */
+  onToggleSelectValue: (categoryId: string, key: string, value: string) => void
+}
+
+/** Whether a point's raw listing passes every currently-active bool/select
+ *  filter — except `excludeKey`, which is left out of the check entirely.
+ *  Used two ways: with no exclusion, to count how many of a category's
+ *  points would actually show if it were turned on right now; with a
+ *  field's own key excluded, to compute THAT field's own dropdown options
+ *  faceted against every OTHER active filter (so picking "Catering" narrows
+ *  Kosher Cert down to only certs that actually occur on caterers, and picking
+ *  a cert narrows Type down the same way) without a field ever filtering
+ *  itself down to just what's already chosen. A field absent on the listing
+ *  always passes — same lenient "doesn't apply to this listing" rule the
+ *  map's own filter chips use. */
+function passesFilters(
+  raw: Record<string, unknown> | undefined,
+  boolFields: string[],
+  selectFilters: Record<string, string[]>,
+  excludeKey?: string,
+): boolean {
+  if (!raw) return true
+  for (const key of boolFields) {
+    if (key === excludeKey) continue
+    if (raw[key] !== undefined && raw[key] !== true) return false
+  }
+  for (const [key, values] of Object.entries(selectFilters)) {
+    if (key === excludeKey || values.length === 0) continue
+    const v = raw[key]
+    if (v === undefined) continue
+    const vals = selectValues(v)
+    if (vals.length > 0 && !vals.some((x) => values.includes(x))) return false
+  }
+  return true
 }
 
 /**
@@ -40,6 +76,11 @@ type Props = {
  * they'd otherwise only be reachable from inside that category's own
  * directory page. "Open now" is deliberately not included — it's a search
  * term (see ResourceMapView's OPEN_NOW_WORDS), not tied to any one category.
+ *
+ * The count next to each category reflects the currently-chosen filters (for
+ * that category only — a Kosher Cert filter never affects Synagogues' count),
+ * and each field's own dropdown options are faceted against every OTHER
+ * active filter, so choosing one narrows what the others can still offer.
  */
 export default function CategoryPickerList({
   options,
@@ -65,6 +106,7 @@ export default function CategoryPickerList({
         const selectFieldsFor = cat?.detailFields.filter((f) => f.filterable && f.type === 'select') ?? []
         const on = selected.has(o.id)
         const catPoints = points.filter((p) => p.filterId === o.id)
+        const filteredCount = catPoints.filter((p) => passesFilters(p.raw, boolFields, selectFilters)).length
 
         return (
           <div key={o.id} className="py-2.5">
@@ -93,7 +135,7 @@ export default function CategoryPickerList({
                   </span>
                 )}
                 <span className="flex-1 text-[15px] font-medium text-slate-900">{o.label}</span>
-                <span className="text-sm text-slate-400">{o.count}</span>
+                <span className="text-sm text-slate-400">{filteredCount}</span>
                 <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
               </button>
             </div>
@@ -105,7 +147,7 @@ export default function CategoryPickerList({
                   return (
                     <button
                       key={f.key}
-                      onClick={() => onToggleBool(f.key)}
+                      onClick={() => onToggleBool(o.id, f.key)}
                       aria-pressed={active}
                       className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
                         active
@@ -118,8 +160,13 @@ export default function CategoryPickerList({
                   )
                 })}
                 {selectFieldsFor.map((f) => {
-                  const presentValues = Array.from(new Set(catPoints.flatMap((p) => selectValues(p.raw?.[f.key])))).sort()
-                  // Not worth a filter if every listing shares the same one value.
+                  // Faceted against every OTHER active filter (this field's own
+                  // current selection excluded) — so choosing a value elsewhere
+                  // narrows what this dropdown can still offer, but choosing a
+                  // value here never shrinks its own list out from under it.
+                  const facetedPoints = catPoints.filter((p) => passesFilters(p.raw, boolFields, selectFilters, f.key))
+                  const presentValues = Array.from(new Set(facetedPoints.flatMap((p) => selectValues(p.raw?.[f.key])))).sort()
+                  // Not worth a filter if every remaining listing shares one value.
                   if (presentValues.length < 2) return null
                   const chosen = selectFilters[f.key] ?? []
                   const dropdownKey = `${o.id}:${f.key}`
@@ -139,7 +186,7 @@ export default function CategoryPickerList({
                       onClose={() => setOpenDropdown(null)}
                       values={presentValues}
                       chosen={chosen}
-                      onToggle={(v) => onToggleSelectValue(f.key, v)}
+                      onToggle={(v) => onToggleSelectValue(o.id, f.key, v)}
                     />
                   )
                 })}

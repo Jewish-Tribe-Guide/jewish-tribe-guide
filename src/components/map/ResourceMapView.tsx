@@ -9,7 +9,7 @@ import NearbyList from './NearbyList'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON, resolveCapabilities } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -379,7 +379,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       chips.push({
         id: `s:${field}`,
         label: values.join(' / '),
-        test: (r) => r[field] === undefined || values.includes(r[field] as string),
+        // A multiSelect field stores an array (e.g. foodType: ["Restaurant",
+        // "Catering"]), not a plain string — selectValues() normalizes both
+        // shapes, so a listing tagged with several values still matches on
+        // any one of them instead of only an exact single-value match.
+        test: (r) => {
+          const vals = selectValues(r[field])
+          return vals.length === 0 || vals.some((v) => values.includes(v))
+        },
         remove: () => setSelectFilters((prev) => { const n = { ...prev }; delete n[field]; return n }),
       })
     }
@@ -485,6 +492,37 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     setSelected(new Set([id]))
     setCategoriesOpen(false)
     setIsolateSignal((n) => n + 1)
+  }
+
+  // Adds `id` to the current selection without touching anything else —
+  // including the `null` "everything shown" state, which stays `null` (not
+  // materialized into an explicit full Set) when `id` is already included,
+  // so this never turns an implicit "all" into a Set that then excludes a
+  // category added to the config later.
+  function ensureSelected(id: string) {
+    setSelected((prev) => {
+      const cur = prev ?? new Set(options.map((o) => o.id))
+      if (cur.has(id)) return prev
+      return new Set(cur).add(id)
+    })
+  }
+
+  // Turning a category's OWN filter on implies wanting to see that category —
+  // same logic in both: pick a Kosher Cert for Food Establishments and it
+  // switches on even if you hadn't checked it yet, instead of silently doing
+  // nothing until you separately remember to also check the box.
+  function toggleBoolField(categoryId: string, key: string) {
+    const adding = !boolFields.includes(key)
+    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
+    if (adding) ensureSelected(categoryId)
+  }
+  function toggleSelectValue(categoryId: string, key: string, value: string) {
+    const adding = !(selectFilters[key] ?? []).includes(value)
+    setSelectFilters((prev) => {
+      const cur = prev[key] ?? []
+      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
+    })
+    if (adding) ensureSelected(categoryId)
   }
 
   const loading = listings === null || categories === null
@@ -958,16 +996,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               onToggle={toggle}
               onShowOnly={showOnly}
               boolFields={boolFields}
-              onToggleBool={(key) =>
-                setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-              }
+              onToggleBool={toggleBoolField}
               selectFilters={selectFilters}
-              onToggleSelectValue={(key, value) =>
-                setSelectFilters((prev) => {
-                  const cur = prev[key] ?? []
-                  return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
-                })
-              }
+              onToggleSelectValue={toggleSelectValue}
             />
           </div>
         </div>
