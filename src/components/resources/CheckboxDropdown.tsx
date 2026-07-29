@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 // A multi-select filter dropdown used by the directory toolbar (e.g. choosing
 // several kosher certs at once). Renders its popup in a fixed-position layer so
@@ -23,6 +24,11 @@ export default function CheckboxDropdown({
   size?: 'sm' | 'md'
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  // The popup itself is portaled to document.body (see below), so it's no
+  // longer a DOM descendant of `ref` — needs its own ref for the outside-click
+  // check, or clicking a checkbox inside the popup would read as "outside"
+  // and close it before the click even registers.
+  const popupRef = useRef<HTMLDivElement>(null)
   // `top` (opens downward) unless there isn't room below the button (e.g. a
   // row near the bottom of a full-screen list, like the map's category
   // picker) — then `bottom` (opens upward) instead, hence the two being
@@ -34,7 +40,10 @@ export default function CheckboxDropdown({
   useEffect(() => {
     if (!isOpen) return
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      if (popupRef.current?.contains(target)) return
+      onClose()
     }
     // Close if the user scrolls so the popup doesn't float in the wrong spot.
     function handleScroll() { onClose() }
@@ -75,7 +84,9 @@ export default function CheckboxDropdown({
           size === 'sm'
             ? [
                 'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium cursor-pointer whitespace-nowrap transition-colors',
-                active
+                // Open reads the same as "has a value chosen" — one filled
+                // treatment for "this pill is currently engaged," not two.
+                active || isOpen
                   ? 'border-primary bg-primary text-white'
                   : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
               ].join(' ')
@@ -93,8 +104,9 @@ export default function CheckboxDropdown({
         </svg>
       </button>
 
-      {isOpen && popupPos && (
+      {isOpen && popupPos && createPortal(
         <div
+          ref={popupRef}
           style={{ position: 'fixed', top: popupPos.top, bottom: popupPos.bottom, left: popupPos.left }}
           className={`z-50 max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1 ${size === 'sm' ? 'w-[160px]' : 'w-[200px]'}`}
         >
@@ -112,7 +124,8 @@ export default function CheckboxDropdown({
               {v}
             </label>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
