@@ -1,5 +1,10 @@
 'use client'
 
+import { useState } from 'react'
+import type { CategoryConfig } from '@/lib/categories'
+import type { MapPoint } from './ResourceMap'
+import CategoryFilterControls from './CategoryFilterControls'
+
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
   id: string
@@ -12,7 +17,10 @@ export type FilterOption = {
   /** Active bool/select filter(s) scoped to this category, already formatted
    *  for display (e.g. "Keilim", or "Catering, Keystone-K") — folded right
    *  into the chip instead of showing as a separate row of removable pills
-   *  below it, so there's one thing to look at, not two. */
+   *  below it, so there's one thing to look at, not two. Doubles as its own
+   *  tap target: tapping this part of the chip (rather than the rest of it)
+   *  opens a small inline editor for that category's filters instead of
+   *  toggling the category on/off. */
   filterSuffix?: string
 }
 
@@ -33,62 +41,133 @@ type Props = {
    *  row — used by the full-screen category picker `onMore` opens, which has
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
+  /** Real category configs and points, plus the current bool/select filter
+   *  state and its setters — needed only to power the inline filter editor
+   *  a chip's `filterSuffix` opens. */
+  categories: CategoryConfig[]
+  points: MapPoint[]
+  boolFields: string[]
+  onToggleBool: (categoryId: string, key: string) => void
+  selectFilters: Record<string, string[]>
+  onToggleSelectValue: (categoryId: string, key: string, value: string) => void
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus "Show all" / "Hide all" shortcuts. A single horizontal-scroll
  *  row (native scrollbar, styled thin via the `chip-scroll` class in
  *  globals.css) rather than wrapping, so it stays compact over the map. */
-export default function CategoryFilter({ options, selected, onToggle, onAll, onNone, maxVisible, onMore, wrap }: Props) {
+export default function CategoryFilter({
+  options,
+  selected,
+  onToggle,
+  onAll,
+  onNone,
+  maxVisible,
+  onMore,
+  wrap,
+  categories,
+  points,
+  boolFields,
+  onToggleBool,
+  selectFilters,
+  onToggleSelectValue,
+}: Props) {
   const allOn = options.every((o) => selected.has(o.id))
   const visible = maxVisible != null ? options.slice(0, maxVisible) : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 
+  // Which category's inline filter editor is open — opened by tapping a
+  // chip's own filterSuffix (rather than the chip itself, which keeps
+  // toggling the category on/off). At most one at a time.
+  const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+
+  const openOption = openFilterFor ? options.find((o) => o.id === openFilterFor) : undefined
+  const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
+
   return (
-    <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
-      <button
-        onClick={allOn ? onNone : onAll}
-        className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
-      >
-        {allOn ? 'Hide all' : 'Show all'}
-      </button>
-      {visible.map((o) => {
-        const on = selected.has(o.id)
-        return (
-          <button
-            key={o.id}
-            onClick={() => onToggle(o.id)}
-            aria-pressed={on}
-            className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-              on
-                ? 'border-transparent text-white'
-                : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
-            }`}
-            style={on ? { backgroundColor: o.color } : undefined}
-          >
-            <span
-              className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
-              style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
-              aria-hidden="true"
-            />
-            {o.icon && <span aria-hidden="true">{o.icon}</span>}
-            <span>{o.label}</span>
-            <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
-            {o.filterSuffix && (
-              <span className={`border-l pl-1 ${on ? 'border-white/30 text-white/90' : 'border-slate-300 text-slate-500'}`}>
-                {o.filterSuffix}
-              </span>
-            )}
-          </button>
-        )
-      })}
-      {hiddenCount > 0 && (
+    <div>
+      <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
         <button
-          onClick={onMore}
-          className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          onClick={allOn ? onNone : onAll}
+          className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
         >
-          ⋯ More
+          {allOn ? 'Hide all' : 'Show all'}
         </button>
+        {visible.map((o) => {
+          const on = selected.has(o.id)
+          return (
+            <div
+              key={o.id}
+              className={`flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
+                on ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+              }`}
+              style={on ? { backgroundColor: o.color } : undefined}
+            >
+              <button
+                onClick={() => onToggle(o.id)}
+                aria-pressed={on}
+                className={`flex items-center gap-1 py-1 pl-2.5 ${o.filterSuffix ? 'pr-1.5' : 'pr-2.5'} ${
+                  on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
+                } cursor-pointer`}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
+                  style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
+                  aria-hidden="true"
+                />
+                {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                <span>{o.label}</span>
+                <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
+              </button>
+              {o.filterSuffix && (
+                <button
+                  onClick={() => setOpenFilterFor(openFilterFor === o.id ? null : o.id)}
+                  aria-expanded={openFilterFor === o.id}
+                  aria-label={`Edit ${o.label} filters`}
+                  className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
+                    on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {o.filterSuffix}
+                </button>
+              )}
+            </div>
+          )
+        })}
+        {hiddenCount > 0 && (
+          <button
+            onClick={onMore}
+            className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          >
+            ⋯ More
+          </button>
+        )}
+      </div>
+
+      {openOption && openCategory && (
+        <div className="mt-1.5 flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+          <div className="flex-1">
+            <CategoryFilterControls
+              category={openCategory}
+              categoryId={openOption.id}
+              points={points}
+              boolFields={boolFields}
+              onToggleBool={onToggleBool}
+              selectFilters={selectFilters}
+              onToggleSelectValue={onToggleSelectValue}
+              openDropdown={openDropdown}
+              onOpenDropdown={setOpenDropdown}
+            />
+          </div>
+          <button
+            onClick={() => setOpenFilterFor(null)}
+            aria-label="Close filter editor"
+            className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   )
