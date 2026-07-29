@@ -118,13 +118,6 @@ export type CategoryField = {
   /** For `type: 'url'`: show the link button in the collapsed card header so it's
    *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
   showInHeader?: boolean
-  /** For a `type: 'url'` field NOT shown in the header: place its button next
-   *  to the previous url button instead of on its own line (e.g. "Website"
-   *  and "Kosher Certification" side by side). Only takes effect when set on
-   *  the second (and later) button in a run — the first button in a group is
-   *  wherever it already was. Defaults off (stacked), matching how every
-   *  existing button field looks today. */
-  inlineButton?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
    *  explanation — on hover (desktop) and in the expanded card (mobile). Used
