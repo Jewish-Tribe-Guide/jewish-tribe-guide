@@ -120,10 +120,19 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // keyed off `snap`/`heights[snap]`, not the live `currentHeight`, so a
   // finger-drag doesn't spam the parent with a value mid-gesture; it only
   // updates once a drag actually settles on a new snap point.
+  //
+  // Capped at `half` even when the sheet is actually `full`: selecting a
+  // place while full only leaves the sliver above TOP_INSET_PX visible, so
+  // "centered in what's left" would cram the pin into a few dozen px at the
+  // very top of the map. In practice a visitor who picks a place while full
+  // drags the sheet back down to see it, landing at (or below) half anyway —
+  // so centering as if it were already at half gives a sane result for where
+  // they're about to end up, instead of an unusable one for where they are
+  // right now.
   const onHeightChangeRef = useRef(onHeightChange)
   useEffect(() => { onHeightChangeRef.current = onHeightChange }, [onHeightChange])
   useEffect(() => {
-    onHeightChangeRef.current?.(heights[snap])
+    onHeightChangeRef.current?.(snap === 'full' ? heights.half : heights[snap])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, containerHeight])
 
