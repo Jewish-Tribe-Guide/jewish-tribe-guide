@@ -39,7 +39,7 @@ export default function CheckboxDropdown({
 
   useEffect(() => {
     if (!isOpen) return
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       const target = e.target as Node
       if (ref.current?.contains(target)) return
       if (popupRef.current?.contains(target)) return
@@ -47,10 +47,18 @@ export default function CheckboxDropdown({
     }
     // Close if the user scrolls so the popup doesn't float in the wrong spot.
     function handleScroll() { onClose() }
-    document.addEventListener('mousedown', handleClick)
+    // Capture phase, and both mousedown and touchstart — something the
+    // trigger sits over (a draggable list, a map) may call
+    // stopPropagation()/preventDefault() on the touch that starts its own
+    // gesture, which both stops a bubble-phase listener from ever seeing it
+    // and can suppress the synthetic mousedown a touch would otherwise
+    // generate. A capture-phase document listener runs before any of that.
+    document.addEventListener('mousedown', handleClick, true)
+    document.addEventListener('touchstart', handleClick, true)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('mousedown', handleClick, true)
+      document.removeEventListener('touchstart', handleClick, true)
       window.removeEventListener('scroll', handleScroll)
     }
   }, [isOpen, onClose])
