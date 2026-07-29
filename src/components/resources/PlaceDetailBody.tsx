@@ -184,7 +184,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const caveatNotes = signalBadges
     .map((f) => ({ f, note: caveatNote(f) }))
     .filter((x): x is { f: CategoryField; note: string } => x.note !== null)
-  const hasAddressPhoneHours = showAddress || showPhone || showDavening || hoursFields.length > 0
 
   // ── Status + signal badges ─────────────────────────────────────────────
   const statusSection = (showOpenChip || visibleSignalBadges.length > 0) && (
@@ -262,8 +261,8 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     </div>
   )
 
-  // ── Address / phone / davening / hours ──────────────────────────────────
-  const addressSection = hasAddressPhoneHours && (
+  // ── Address / phone ──────────────────────────────────────────────────────
+  const addressSection = (showAddress || showPhone) && (
     <div className="space-y-3">
       {showAddress && (
         <div className="flex items-start gap-3">
@@ -285,7 +284,15 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           )}
         </div>
       )}
+    </div>
+  )
 
+  // ── Davening / hours ──────────────────────────────────────────────────────
+  // Its own section (not folded into addressSection above) so the divider
+  // logic below only draws a line between address/phone and davening/hours
+  // when both actually have content — never a line before an empty side.
+  const daveningHoursSection = (showDavening || hoursFields.length > 0) && (
+    <div className="space-y-3">
       {showDavening && (
         <div>
           <p className="text-xs text-muted mb-1">Davening Times</p>
@@ -380,7 +387,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // have content — never before the first or after the last — so a section
   // only ever gets a separating line when there's actually something on
   // both sides of it to separate.
-  const sections = [statusSection, actionsSection, addressSection, tagsSection, detailBadgesSection, rowFieldsSection, caveatSection]
+  const sections = [statusSection, actionsSection, addressSection, daveningHoursSection, tagsSection, detailBadgesSection, rowFieldsSection, caveatSection]
     .filter((s): s is Exclude<typeof s, false> => s !== false)
 
   return (

@@ -1238,6 +1238,54 @@ function CategoryEditor({
     })
   }
 
+  // Turns a Choice field's "flag exceptions" caveat on/off (see
+  // CategoryField.caveat — used today by the restaurant category's Kosher
+  // Certification field for "not everything here is kosher"). The pair of
+  // fields it needs (a hidden Yes/No flag + a hidden note explaining what's
+  // excepted) live in draft.hiddenFields, same as any other hidden field, so
+  // they're preserved-but-not-editable exactly like a caveat added by hand
+  // via a database edit — this just gives an admin a discoverable, safe way
+  // to add or remove that pairing instead of it only being possible outside
+  // the app.
+  function toggleFieldCaveat(i: number, on: boolean) {
+    setDraft((d) => {
+      const field = d.fields[i]
+      if (!field) return d
+      if (!on) {
+        if (!field.caveat) return d
+        const { flagField, noteField } = field.caveat
+        return {
+          ...d,
+          fields: d.fields.map((f, idx) => (idx === i ? { ...f, caveat: undefined } : f)),
+          hiddenFields: d.hiddenFields.filter((f) => f.key !== flagField && f.key !== noteField),
+        }
+      }
+      if (field.caveat) return d
+      const flagField = nextFieldKey(d.fields, d.hiddenFields, `${field.key}Partial`)
+      const noteField = nextFieldKey(d.fields, [...d.hiddenFields, { key: flagField } as CategoryField], `${field.key}Note`)
+      const flag: CategoryField = {
+        key: flagField,
+        label: `Not everything here is ${field.label.toLowerCase()}`,
+        type: 'boolean',
+        renderAs: 'hidden',
+        help: `Check this if the listing has a "${field.label}" value but there are exceptions to call out.`,
+      }
+      const note: CategoryField = {
+        key: noteField,
+        label: 'What is the exception?',
+        type: 'textarea',
+        renderAs: 'hidden',
+        showIf: { field: flagField, equals: true },
+        placeholder: 'Explain what the exception is so visitors know what to verify.',
+      }
+      return {
+        ...d,
+        fields: d.fields.map((f, idx) => (idx === i ? { ...f, caveat: { flagField, noteField } } : f)),
+        hiddenFields: [...d.hiddenFields, flag, note],
+      }
+    })
+  }
+
   function moveField(i: number, dir: -1 | 1) {
     setDraft((d) => {
       const j = i + dir
@@ -1702,6 +1750,8 @@ function CategoryEditor({
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}
+                  hasCaveat={!!f.caveat}
+                  onToggleCaveat={(on) => toggleFieldCaveat(i, on)}
                 />
                 )
               })}
@@ -1877,6 +1927,8 @@ function FieldEditor({
   onChange,
   onRemove,
   onMove,
+  hasCaveat,
+  onToggleCaveat,
 }: {
   field: CategoryField
   index: number
@@ -1893,6 +1945,11 @@ function FieldEditor({
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
+  /** Whether this Choice field has a "flag exceptions" caveat pair wired up
+   *  (see CategoryField.caveat) — e.g. Kosher Certification's "not
+   *  everything here is kosher" checkbox + note. */
+  hasCaveat: boolean
+  onToggleCaveat: (on: boolean) => void
 }) {
   // "Name" auto-fills the internal key only while it's still blank, then freezes,
   // so renaming a detail later never orphans its stored data.
@@ -1990,6 +2047,25 @@ function FieldEditor({
           />
           Allow more than one choice per listing (e.g. Restaurant + Catering)
         </label>
+      )}
+
+      {f.type === 'select' && showAs === 'badge' && (
+        <div>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hasCaveat}
+              onChange={(e) => onToggleCaveat(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Let a listing flag exceptions (e.g. &ldquo;not everything here is {f.label.toLowerCase() || 'this'}&rdquo;)
+          </label>
+          {hasCaveat && (
+            <p className="text-[11px] text-muted mt-0.5 ml-5">
+              Adds a Yes/No checkbox and a note field to each listing&rsquo;s edit form — when checked, the {f.label || 'this'} badge shows amber with the note as a caution.
+            </p>
+          )}
+        </div>
       )}
 
       {f.type === 'url' && (
