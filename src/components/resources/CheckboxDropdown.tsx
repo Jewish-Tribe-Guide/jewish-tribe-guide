@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 // several kosher certs at once). Renders its popup in a fixed-position layer so
 // it isn't clipped by the toolbar's horizontal scroll container.
 export default function CheckboxDropdown({
-  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle,
+  label, active, isOpen, onToggleOpen, onClose, values, chosen, onToggle, size = 'md',
 }: {
   label: string
   active: boolean
@@ -16,6 +16,11 @@ export default function CheckboxDropdown({
   values: string[]
   chosen: string[]
   onToggle: (v: string) => void
+  /** 'sm' matches the map filter controls' compact rounded-full pill sizing
+   *  (so a select dropdown trigger doesn't tower over the bool-field pills
+   *  sitting right next to it); default 'md' is the directory toolbar's own
+   *  size, unchanged. */
+  size?: 'sm' | 'md'
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // `top` (opens downward) unless there isn't room below the button (e.g. a
@@ -44,8 +49,8 @@ export default function CheckboxDropdown({
   // A rough estimate of the popup's height (each option row is ~36px, plus
   // the list's own vertical padding) — good enough to decide whether it fits
   // below the button without waiting a render to measure the real thing.
-  const ESTIMATED_ROW_PX = 36
-  const POPUP_WIDTH_PX = 200
+  const ESTIMATED_ROW_PX = size === 'sm' ? 30 : 36
+  const POPUP_WIDTH_PX = size === 'sm' ? 160 : 200
 
   function handleToggleOpen() {
     if (!isOpen && ref.current) {
@@ -66,15 +71,24 @@ export default function CheckboxDropdown({
     <div ref={ref} className="relative shrink-0">
       <button
         onClick={handleToggleOpen}
-        className={[
-          'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm cursor-pointer whitespace-nowrap transition-colors',
-          active
-            ? 'border-primary bg-primary/5 text-primary font-medium'
-            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-        ].join(' ')}
+        className={
+          size === 'sm'
+            ? [
+                'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium cursor-pointer whitespace-nowrap transition-colors',
+                active
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+              ].join(' ')
+            : [
+                'flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm cursor-pointer whitespace-nowrap transition-colors',
+                active
+                  ? 'border-primary bg-primary/5 text-primary font-medium'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+              ].join(' ')
+        }
       >
         {label}
-        <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+        <svg className={`${size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -82,10 +96,13 @@ export default function CheckboxDropdown({
       {isOpen && popupPos && (
         <div
           style={{ position: 'fixed', top: popupPos.top, bottom: popupPos.bottom, left: popupPos.left }}
-          className="z-50 w-[200px] max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1"
+          className={`z-50 max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1 ${size === 'sm' ? 'w-[160px]' : 'w-[200px]'}`}
         >
           {values.map((v) => (
-            <label key={v} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+            <label
+              key={v}
+              className={`flex items-center gap-2 text-slate-700 hover:bg-slate-50 cursor-pointer select-none ${size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+            >
               <input
                 type="checkbox"
                 checked={chosen.includes(v)}

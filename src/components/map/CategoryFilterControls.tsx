@@ -64,6 +64,11 @@ type Props = {
    *  owned by the caller so it can coexist with whatever else is expanded. */
   openDropdown: string | null
   onOpenDropdown: (key: string | null) => void
+  /** 'wrap' (default) lets controls flow onto multiple lines, side by side —
+   *  fine in the picker's full-width row. 'stack' puts one control per line —
+   *  used by the chip's own narrow inline editor, where a wrapped row would
+   *  read as a second, unrelated axis of layout right under a single chip. */
+  layout?: 'wrap' | 'stack'
 }
 
 /** One category's own bool/select filter controls — a row of "Open now"-style
@@ -80,6 +85,7 @@ export default function CategoryFilterControls({
   onToggleSelectValue,
   openDropdown,
   onOpenDropdown,
+  layout = 'wrap',
 }: Props) {
   const ownFieldKeys = new Set(category.detailFields.map((f) => f.key))
   const boolFieldsFor = category.detailFields.filter((f) => f.filterable && f.type === 'boolean')
@@ -89,7 +95,7 @@ export default function CategoryFilterControls({
   if (boolFieldsFor.length === 0 && selectFieldsFor.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className={layout === 'stack' ? 'flex flex-col items-start gap-1.5' : 'flex flex-wrap gap-1.5'}>
       {boolFieldsFor.map((f) => {
         const active = boolFields.includes(f.key)
         return (
@@ -144,6 +150,7 @@ export default function CategoryFilterControls({
             values={presentValues}
             chosen={chosen}
             onToggle={(v) => onToggleSelectValue(categoryId, f.key, v)}
+            size="sm"
           />
         )
       })}
