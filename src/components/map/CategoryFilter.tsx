@@ -201,7 +201,7 @@ export default function CategoryFilter({
                     {entries.map((entry) => (
                       <label
                         key={entry.kind === 'bool' ? entry.key : `${entry.key}:${entry.value}`}
-                        className="flex items-center gap-2 rounded px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+                        className="flex items-center gap-1.5 rounded px-1 py-1 text-xs whitespace-nowrap text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
                       >
                         <input
                           type="checkbox"
@@ -211,7 +211,7 @@ export default function CategoryFilter({
                               ? onToggleBool(openOption.id, entry.key)
                               : onToggleSelectValue(openOption.id, entry.key, entry.value)
                           }
-                          className="accent-primary h-4 w-4 cursor-pointer"
+                          className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
                         />
                         {entry.label}
                       </label>
