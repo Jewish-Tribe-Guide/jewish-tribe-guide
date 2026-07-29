@@ -114,6 +114,24 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // (Google-Maps-app-style) instead of opening the small info-window bubble
   // ResourceMap shows by default — desktop keeps that default.
   const isMobile = useIsMobile()
+  // Measured px height of the floating search+filter-chips overlay (mobile
+  // only) — it sits on top of the map, not the sheet, but blocks the same
+  // amount of the map visually. ResourceMap needs this too so it centers a
+  // selected pin in what's ACTUALLY visible: between the bottom of this
+  // overlay and the top of the sheet, not from the literal top of the map box
+  // (which is mostly hidden behind the search bar/category chips). A callback
+  // ref (not a plain useRef) so the observer re-attaches whenever the overlay
+  // div itself mounts/unmounts — it only exists once loading is done, tab is
+  // 'map', and isMobile is known, and juggling all of those as effect deps
+  // would be fragile.
+  const [topOverlayEl, setTopOverlayEl] = useState<HTMLDivElement | null>(null)
+  const [topOverlayHeight, setTopOverlayHeight] = useState(0)
+  useEffect(() => {
+    if (!topOverlayEl) return
+    const ro = new ResizeObserver(([entry]) => setTopOverlayHeight(entry.contentRect.height))
+    ro.observe(topOverlayEl)
+    return () => ro.disconnect()
+  }, [topOverlayEl])
   const nearbySheetRef = useRef<MobileNearbySheetHandle>(null)
   // The sheet's currently-selected place, reported up via onSelectionChange —
   // passed to ResourceMap as selectedId so it can highlight the matching
@@ -634,6 +652,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 searchActive={searchActive}
                 selectedId={selectedPointId}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
+                obscuredTopPx={isMobile ? topOverlayHeight : 0}
               />
 
               {/* ── Floating search + filters (mobile) — laid directly over the
@@ -643,6 +662,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       separate "Filters" button/sheet. ───────────────────────── */}
               {ui.search.map && isMobile && (
                 <div
+                  ref={setTopOverlayEl}
                   className="absolute inset-x-0 top-0 z-10 px-3 pb-2 sm:hidden"
                   style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
                 >
