@@ -350,7 +350,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         ]}
       </ClampedChipRow>
       {tagsSometimes.length > 0 && (
-        <p className="text-[11px] text-amber-700 sm:hidden">~ = not always in stock — call ahead</p>
+        <p className="text-[11px] text-amber-700 sm:hidden">~not always in stock — call ahead</p>
       )}
     </div>
   )
