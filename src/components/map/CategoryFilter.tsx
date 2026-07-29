@@ -41,6 +41,14 @@ type Props = {
    *  row — used by the full-screen category picker `onMore` opens, which has
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
+  /** Category ids explicitly turned on via the "More" picker's own checkbox
+   *  — these get priority for the compact row's limited slots (see the
+   *  `visible` sort below). Deliberately narrower than "currently selected":
+   *  a plain tap on a chip right here in this row doesn't add to it, so
+   *  toggling a chip directly never reorders the row out from under you —
+   *  only a pick made from the full-screen list does. Unused (no reordering
+   *  at all) when maxVisible is omitted, since every option renders anyway. */
+  pinnedIds?: Set<string>
   /** Real category configs, plus the current bool/select filter state and
    *  its setters — needed only to power the inline filter editor a chip's
    *  `filterSuffix` opens. */
@@ -64,6 +72,7 @@ export default function CategoryFilter({
   maxVisible,
   onMore,
   wrap,
+  pinnedIds,
   categories,
   boolFields,
   onToggleBool,
@@ -71,16 +80,17 @@ export default function CategoryFilter({
   onToggleSelectValue,
 }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
-  // Selected categories get priority for the compact row's limited slots —
-  // otherwise turning on a category from the full "More" picker that isn't
-  // one of the top-N by count would just silently do nothing visible here,
-  // still hidden behind "More" despite now actively filtering the map. A
-  // stable sort keeps each group (selected / not) in its original
-  // highest-count-first order, so this only reorders across the selected/
-  // unselected boundary, not within it.
+  // Categories pinned from the "More" picker get priority for the compact
+  // row's limited slots — otherwise turning one on from the full list that
+  // isn't already one of the top-N by count would just silently do nothing
+  // visible here, still hidden behind "More" despite now actively filtering
+  // the map. A stable sort keeps each group (pinned / not) in its original
+  // highest-count-first order, so this only reorders across the pinned/
+  // unpinned boundary, not within it — and a plain tap on a chip right here
+  // never pins it, so that stays a no-reorder interaction.
   const visible =
     maxVisible != null
-      ? [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).slice(0, maxVisible)
+      ? [...options].sort((a, b) => Number(!!pinnedIds?.has(b.id)) - Number(!!pinnedIds?.has(a.id))).slice(0, maxVisible)
       : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 

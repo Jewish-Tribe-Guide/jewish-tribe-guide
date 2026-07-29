@@ -517,6 +517,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     })
   }
 
+  // Categories turned on via the "More" picker's own checkbox — the compact
+  // chip row bumps these to the front of its limited visible slots (see
+  // CategoryFilter's own pinnedIds-based sort), so picking something from the
+  // full list that wasn't already one of the top-N by count doesn't stay
+  // invisible behind "More" despite now actively filtering the map. Tapping a
+  // chip directly in the compact row does NOT add to this — only remove from
+  // it on deselect — so a plain tap there never jumps the row around; that'd
+  // be disorienting for the one interaction that happens right on the row
+  // you're looking at, as opposed to a deliberate pick from a full-screen list.
+  const [pinnedFromPicker, setPinnedFromPicker] = useState<Set<string>>(new Set())
+  function unpin(id: string) {
+    setPinnedFromPicker((p) => {
+      if (!p.has(id)) return p
+      const next = new Set(p)
+      next.delete(id)
+      return next
+    })
+  }
+
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
     // straight down to just that category — same as Google Maps' filter
@@ -526,11 +545,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // stored filters ride along either way (see clearFiltersForCategories).
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
+      setPinnedFromPicker((p) => (p.has(id) ? new Set([id]) : new Set()))
       return
     }
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
       next.delete(id)
+      unpin(id)
     } else {
       next.add(id)
     }
@@ -540,6 +561,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const hideAll = () => {
     setSelected(new Set())
     clearFiltersForCategories(effectiveSelected)
+    setPinnedFromPicker(new Set())
   }
 
   // A plain, unconditional on/off toggle — unlike `toggle` above, this never
@@ -548,12 +570,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // tap target, not literally a checkbox), but a real <input type="checkbox">
   // in the picker needs to mean exactly what it shows: checked ⇄ unchecked,
   // full stop — nothing else is defensible for an actual checkbox control.
+  // Also the one place that adds to pinnedFromPicker — see its own comment.
   const toggleCategoryCheckbox = (id: string) => {
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
       next.delete(id)
+      unpin(id)
     } else {
       next.add(id)
+      setPinnedFromPicker((p) => (p.has(id) ? p : new Set(p).add(id)))
     }
     setSelected(next)
   }
@@ -696,6 +721,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             onToggle={toggle}
             onAll={showAll}
             onNone={hideAll}
+            pinnedIds={pinnedFromPicker}
             categories={categories ?? []}
             boolFields={boolFields}
             onToggleBool={toggleBoolField}
@@ -851,6 +877,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onNone={hideAll}
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
+                        pinnedIds={pinnedFromPicker}
                         categories={categories ?? []}
                         boolFields={boolFields}
                         onToggleBool={toggleBoolField}
