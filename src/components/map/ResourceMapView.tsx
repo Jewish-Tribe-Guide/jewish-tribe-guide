@@ -465,6 +465,30 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isolateSignal])
 
+  // Clears any active bool/select filter belonging to one of `ids` — called
+  // whenever a category goes from selected to not-selected, since a filter
+  // scoped to a category that's no longer shown shouldn't linger around
+  // (still silently narrowing results, or reappearing confusingly if the
+  // category gets re-checked later).
+  function clearFiltersForCategories(ids: Iterable<string>) {
+    const idSet = new Set(ids)
+    if (idSet.size === 0) return
+    const keys = new Set<string>()
+    for (const cat of categories ?? []) {
+      if (!idSet.has(cat.id)) continue
+      for (const f of cat.detailFields) {
+        if (f.filterable && (f.type === 'boolean' || f.type === 'select')) keys.add(f.key)
+      }
+    }
+    if (keys.size === 0) return
+    setBoolFields((prev) => prev.filter((k) => !keys.has(k)))
+    setSelectFilters((prev) => {
+      const next = { ...prev }
+      for (const k of keys) delete next[k]
+      return next
+    })
+  }
+
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
     // straight down to just that category — same as Google Maps' filter
@@ -473,15 +497,40 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // further taps add/remove from that subset as before.
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
+      clearFiltersForCategories(options.map((o) => o.id).filter((x) => x !== id))
       return
     }
     const next = new Set(effectiveSelected)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
+    if (next.has(id)) {
+      next.delete(id)
+      clearFiltersForCategories([id])
+    } else {
+      next.add(id)
+    }
     setSelected(next)
   }
   const showAll = () => setSelected(new Set(options.map((o) => o.id)))
-  const hideAll = () => setSelected(new Set())
+  const hideAll = () => {
+    setSelected(new Set())
+    clearFiltersForCategories(effectiveSelected)
+  }
+
+  // A plain, unconditional on/off toggle — unlike `toggle` above, this never
+  // "narrows to just this one" when everything's currently shown. That smart
+  // behavior makes sense for the compact chip row (each chip reads as its own
+  // tap target, not literally a checkbox), but a real <input type="checkbox">
+  // in the picker needs to mean exactly what it shows: checked ⇄ unchecked,
+  // full stop — nothing else is defensible for an actual checkbox control.
+  const toggleCategoryCheckbox = (id: string) => {
+    const next = new Set(effectiveSelected)
+    if (next.has(id)) {
+      next.delete(id)
+      clearFiltersForCategories([id])
+    } else {
+      next.add(id)
+    }
+    setSelected(next)
+  }
 
   // The category picker's "view this category" action — the picker's other
   // purpose besides toggling filters: jump straight to browsing everything in
@@ -490,6 +539,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // the map; isolateSignal (above) then surfaces however many results that is.
   const showOnly = (id: string) => {
     setSelected(new Set([id]))
+    clearFiltersForCategories(Array.from(effectiveSelected).filter((x) => x !== id))
     setCategoriesOpen(false)
     setIsolateSignal((n) => n + 1)
   }
@@ -844,11 +894,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     </div>
                   )}
                   {chipsRow}
-                  {(activeTerms.length > 0 || filterChips.length > 0) && (
-                    <p className="mt-1.5 inline-block rounded-full bg-white/90 px-2.5 py-1 text-xs text-muted shadow">
-                      {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown · filtered
-                    </p>
-                  )}
                   {ui.map.liveTracking && geoError && (
                     <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-lg">{geoError}</p>
                   )}
@@ -993,7 +1038,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               categories={categories ?? []}
               points={allPoints}
               selected={effectiveSelected}
-              onToggle={toggle}
+              onToggle={toggleCategoryCheckbox}
               onShowOnly={showOnly}
               boolFields={boolFields}
               onToggleBool={toggleBoolField}

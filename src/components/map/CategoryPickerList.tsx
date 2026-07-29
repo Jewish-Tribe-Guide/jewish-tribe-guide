@@ -160,15 +160,26 @@ export default function CategoryPickerList({
                   )
                 })}
                 {selectFieldsFor.map((f) => {
+                  // Whether this control shows at all is based on the WHOLE
+                  // category (unaffected by other active filters) — not the
+                  // live facet below — so it doesn't blink in and out of
+                  // existence as an unrelated filter changes elsewhere in the
+                  // same category (confusingly reading as "my other filter
+                  // just disappeared").
+                  const wholeValues = Array.from(new Set(catPoints.flatMap((p) => selectValues(p.raw?.[f.key])))).sort()
+                  if (wholeValues.length < 2) return null
+
+                  const chosen = selectFilters[f.key] ?? []
                   // Faceted against every OTHER active filter (this field's own
                   // current selection excluded) — so choosing a value elsewhere
-                  // narrows what this dropdown can still offer, but choosing a
-                  // value here never shrinks its own list out from under it.
+                  // narrows what this dropdown can still OFFER. Already-chosen
+                  // values stay in the list even if the current combination
+                  // makes them unreachable, so a selection can always be seen
+                  // and unchecked instead of silently vanishing while still
+                  // secretly filtering.
                   const facetedPoints = catPoints.filter((p) => passesFilters(p.raw, boolFields, selectFilters, f.key))
-                  const presentValues = Array.from(new Set(facetedPoints.flatMap((p) => selectValues(p.raw?.[f.key])))).sort()
-                  // Not worth a filter if every remaining listing shares one value.
-                  if (presentValues.length < 2) return null
-                  const chosen = selectFilters[f.key] ?? []
+                  const facetedValues = new Set(facetedPoints.flatMap((p) => selectValues(p.raw?.[f.key])))
+                  const presentValues = wholeValues.filter((v) => facetedValues.has(v) || chosen.includes(v))
                   const dropdownKey = `${o.id}:${f.key}`
                   const label =
                     chosen.length === 0
