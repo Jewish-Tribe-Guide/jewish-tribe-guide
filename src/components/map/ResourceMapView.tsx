@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
+import CategoryPickerList from './CategoryPickerList'
 import NearbyList from './NearbyList'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
@@ -222,7 +223,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (count === 0) continue
       opts.push({ id: c.id, label: c.pluralLabel, icon: c.icon, color: colorById.get(c.id) ?? '#64748b', count })
     }
-    return opts
+    // Highest listing count first — the assumption being a category with more
+    // listings is more likely to be the one a visitor's actually looking for.
+    // Hospitals gets no special pinning here; it sorts in with everyone else.
+    return opts.sort((a, b) => b.count - a.count)
   }, [allPoints, categories, colorById])
 
   // initialSelectedCategories (a full toggle set restored from history after
@@ -347,11 +351,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     return m
   }, [categories])
 
-  // A field's display label, resolved from the category the filters came from.
+  // A field's display label. Searches every category (not just the one the
+  // visitor arrived from) since a filter can now also be turned on directly
+  // from the map's own category picker, for any category shown there.
   const labelForField = (key: string): string => {
-    const cat = (categories ?? []).find((c) => c.id === initialCategory)
-    const f = cat?.detailFields.find((x) => x.key === key)
-    return f?.filterLabel ?? f?.label ?? key
+    for (const cat of categories ?? []) {
+      const f = cat.detailFields.find((x) => x.key === key)
+      if (f) return f.filterLabel ?? f.label
+    }
+    return key
   }
 
   // Active filter chips: label + predicate + remover. Each is an AND filter; a
@@ -436,6 +444,20 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filterChips])
 
+  // Bumped by showOnly (below) — same "surface the result" behavior as the
+  // effect above, but for jumping straight to one category from the picker
+  // rather than a text/field-filter commit. A plain category toggle (the
+  // compact chip row, or the picker's own checkbox) does NOT trigger this —
+  // only the picker's explicit "view this category" action does, so casually
+  // building up a multi-category selection doesn't fight the sheet's height.
+  const [isolateSignal, setIsolateSignal] = useState(0)
+  useEffect(() => {
+    if (isolateSignal === 0 || !isMobile) return
+    if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
+    else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isolateSignal])
+
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
     // straight down to just that category — same as Google Maps' filter
@@ -453,6 +475,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }
   const showAll = () => setSelected(new Set(options.map((o) => o.id)))
   const hideAll = () => setSelected(new Set())
+
+  // The category picker's "view this category" action — the picker's other
+  // purpose besides toggling filters: jump straight to browsing everything in
+  // one category, same as tapping its card from the home grid would, just
+  // without leaving the map. Narrows to just that category and closes back to
+  // the map; isolateSignal (above) then surfaces however many results that is.
+  const showOnly = (id: string) => {
+    setSelected(new Set([id]))
+    setCategoriesOpen(false)
+    setIsolateSignal((n) => n + 1)
+  }
 
   const loading = listings === null || categories === null
 
@@ -889,8 +922,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {/* ── Full-screen category picker (mobile) — the quick chip row's
               trailing "More" chip opens this, same as Google Maps expanding
-              its own filter row into a dedicated screen. Every category
-              wraps into a grid here since there's real vertical room. ────── */}
+              its own filter row into a dedicated screen. Serves two jobs: a
+              checkbox per category to build a multi-category browse (top-down
+              full-width rows — easier one-handed reach than the chip row's
+              pill cluster), and each category's own filterable fields right
+              there, plus a tap on the row itself to jump straight to browsing
+              just that one category (see CategoryPickerList). ────────────── */}
       {categoriesOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white sm:hidden">
           <div
@@ -904,16 +941,33 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
-            <h2 className="text-base font-semibold text-slate-900">Categories</h2>
+            <h2 className="flex-1 text-base font-semibold text-slate-900">Categories</h2>
+            <button
+              onClick={effectiveSelected.size === options.length ? hideAll : showAll}
+              className="shrink-0 text-sm font-medium text-primary cursor-pointer"
+            >
+              {effectiveSelected.size === options.length ? 'Hide all' : 'Show all'}
+            </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <CategoryFilter
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <CategoryPickerList
               options={options}
+              categories={categories ?? []}
+              points={allPoints}
               selected={effectiveSelected}
               onToggle={toggle}
-              onAll={showAll}
-              onNone={hideAll}
-              wrap
+              onShowOnly={showOnly}
+              boolFields={boolFields}
+              onToggleBool={(key) =>
+                setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
+              }
+              selectFilters={selectFilters}
+              onToggleSelectValue={(key, value) =>
+                setSelectFilters((prev) => {
+                  const cur = prev[key] ?? []
+                  return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
+                })
+              }
             />
           </div>
         </div>

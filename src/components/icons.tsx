@@ -134,6 +134,16 @@ export function ChevronLeftIcon({ className }: IconProps) {
   )
 }
 
+// Right chevron — a row that drills into/navigates to something, e.g. the
+// map category picker's "view this category" affordance.
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  )
+}
+
 // Handset — phone number rows on the map place-detail panel.
 export function PhoneIcon({ className }: IconProps) {
   return (
