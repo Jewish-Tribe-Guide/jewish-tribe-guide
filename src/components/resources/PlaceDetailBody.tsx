@@ -8,7 +8,7 @@ import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
 import { businessUrl } from '@/lib/googleMapsLinks'
-import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon } from '@/components/icons'
+import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon } from '@/components/icons'
 
 // ── Field helpers ────────────────────────────────────────────────────────────
 
@@ -256,7 +256,18 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         />
       )}
       {urlButtons.map(({ f, href }) => (
-        <ActionButton key={f.key} href={href} icon={<ExternalIcon className="h-5 w-5" />} label={f.linkLabel ?? f.label} />
+        <ActionButton
+          key={f.key}
+          href={href}
+          icon={
+            f.label.trim().toLowerCase() === 'website' ? (
+              <GlobeIcon className="h-5 w-5" />
+            ) : (
+              <ExternalIcon className="h-5 w-5" />
+            )
+          }
+          label={f.linkLabel ?? f.label}
+        />
       ))}
     </div>
   )
