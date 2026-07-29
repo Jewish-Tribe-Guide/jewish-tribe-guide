@@ -408,11 +408,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }, [boolFields, selectFilters, categories, initialCategory])
 
   // `options`, with each category's own active bool/select filters (if any)
-  // folded in as a display suffix — e.g. Mikvah's chip reads "Mikvah 4 ·
+  // folded in as a display suffix — e.g. Mikvah's chip reads "Mikvah 3 ·
   // Keilim" instead of the count alone, so an active filter shows up right on
   // the chip it belongs to rather than as a separate row of removable pills
   // underneath (which read as a disconnected, generically-colored "extra
-  // thing" rather than part of the category it was actually scoped to).
+  // thing" rather than part of the category it was actually scoped to). The
+  // count itself also switches from the category's raw total to however many
+  // of its points actually pass that filter — reusing filterChips' own tests
+  // (each already a no-op for a category that doesn't own the field) rather
+  // than re-deriving the same logic a second way.
   const optionsWithFilters = useMemo(() => {
     return options.map((o) => {
       const parts: string[] = []
@@ -422,10 +426,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       for (const [key, values] of Object.entries(selectFilters)) {
         if (values.length && categoryHasField(o.id, key)) parts.push(values.join('/'))
       }
-      return parts.length ? { ...o, filterSuffix: parts.join(', ') } : o
+      if (parts.length === 0) return o
+      const count = allPoints.filter(
+        (p) => p.filterId === o.id && (!p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource))),
+      ).length
+      return { ...o, count, filterSuffix: parts.join(', ') }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, boolFields, selectFilters, categories])
+  }, [options, boolFields, selectFilters, categories, allPoints, filterChips])
 
   // Keep the current history entry in sync with the committed query/filters/
   // selection, so returning via browser Back restores what was actually on
