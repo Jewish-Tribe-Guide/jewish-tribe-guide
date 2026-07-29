@@ -18,7 +18,13 @@ export default function CheckboxDropdown({
   onToggle: (v: string) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
+  // `top` (opens downward) unless there isn't room below the button (e.g. a
+  // row near the bottom of a full-screen list, like the map's category
+  // picker) — then `bottom` (opens upward) instead, hence the two being
+  // separate optional fields rather than one "y" — only one is ever set.
+  // `left` is clamped so the ~200px-wide popup can't run off the right edge
+  // of the viewport either.
+  const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
@@ -35,10 +41,23 @@ export default function CheckboxDropdown({
     }
   }, [isOpen, onClose])
 
+  // A rough estimate of the popup's height (each option row is ~36px, plus
+  // the list's own vertical padding) — good enough to decide whether it fits
+  // below the button without waiting a render to measure the real thing.
+  const ESTIMATED_ROW_PX = 36
+  const POPUP_WIDTH_PX = 200
+
   function handleToggleOpen() {
     if (!isOpen && ref.current) {
       const rect = ref.current.getBoundingClientRect()
-      setPopupPos({ top: rect.bottom + 4, left: rect.left })
+      const estimatedHeight = values.length * ESTIMATED_ROW_PX + 8
+      const left = Math.min(rect.left, window.innerWidth - POPUP_WIDTH_PX - 8)
+      const fitsBelow = rect.bottom + 4 + estimatedHeight <= window.innerHeight
+      setPopupPos(
+        fitsBelow
+          ? { top: rect.bottom + 4, left }
+          : { bottom: window.innerHeight - rect.top + 4, left },
+      )
     }
     onToggleOpen()
   }
@@ -62,8 +81,8 @@ export default function CheckboxDropdown({
 
       {isOpen && popupPos && (
         <div
-          style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
-          className="z-50 min-w-[160px] rounded-md border border-slate-200 bg-white shadow-lg py-1"
+          style={{ position: 'fixed', top: popupPos.top, bottom: popupPos.bottom, left: popupPos.left }}
+          className="z-50 w-[200px] max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1"
         >
           {values.map((v) => (
             <label key={v} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
