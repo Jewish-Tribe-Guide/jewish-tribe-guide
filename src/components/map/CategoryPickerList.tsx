@@ -40,26 +40,32 @@ type Props = {
  *  faceted against every OTHER active filter (so picking "Catering" narrows
  *  Kosher Cert down to only certs that actually occur on caterers, and picking
  *  a cert narrows Type down the same way) without a field ever filtering
- *  itself down to just what's already chosen. A field absent on the listing
- *  always passes — same lenient "doesn't apply to this listing" rule the
- *  map's own filter chips use. */
+ *  itself down to just what's already chosen.
+ *
+ *  `ownFieldKeys` are the keys the listing's OWN category actually declares —
+ *  every point passed in already belongs to one category (see `catPoints`
+ *  below), so a filter key that ISN'T one of that category's own fields is
+ *  simply irrelevant here and always passes (a Kosher Cert filter has no
+ *  opinion about Mikvah's count). But a key that IS one of the category's own
+ *  fields is checked strictly, undefined included — a Mikvah that's simply
+ *  never had "Keilim" toggled on doesn't quietly pass a Keilim filter just
+ *  because the field happens to be unset; unset means no for a field that's
+ *  actually its own. */
 function passesFilters(
   raw: Record<string, unknown> | undefined,
+  ownFieldKeys: Set<string>,
   boolFields: string[],
   selectFilters: Record<string, string[]>,
   excludeKey?: string,
 ): boolean {
   if (!raw) return true
   for (const key of boolFields) {
-    if (key === excludeKey) continue
-    if (raw[key] !== undefined && raw[key] !== true) return false
+    if (key === excludeKey || !ownFieldKeys.has(key)) continue
+    if (raw[key] !== true) return false
   }
   for (const [key, values] of Object.entries(selectFilters)) {
-    if (key === excludeKey || values.length === 0) continue
-    const v = raw[key]
-    if (v === undefined) continue
-    const vals = selectValues(v)
-    if (vals.length > 0 && !vals.some((x) => values.includes(x))) return false
+    if (key === excludeKey || values.length === 0 || !ownFieldKeys.has(key)) continue
+    if (!selectValues(raw[key]).some((x) => values.includes(x))) return false
   }
   return true
 }
@@ -102,11 +108,12 @@ export default function CategoryPickerList({
     <div className="divide-y divide-slate-100">
       {options.map((o) => {
         const cat = categories.find((c) => c.id === o.id)
+        const ownFieldKeys = new Set(cat?.detailFields.map((f) => f.key) ?? [])
         const boolFieldsFor = cat?.detailFields.filter((f) => f.filterable && f.type === 'boolean') ?? []
         const selectFieldsFor = cat?.detailFields.filter((f) => f.filterable && f.type === 'select') ?? []
         const on = selected.has(o.id)
         const catPoints = points.filter((p) => p.filterId === o.id)
-        const filteredCount = catPoints.filter((p) => passesFilters(p.raw, boolFields, selectFilters)).length
+        const filteredCount = catPoints.filter((p) => passesFilters(p.raw, ownFieldKeys, boolFields, selectFilters)).length
 
         return (
           <div key={o.id} className="py-2.5">
@@ -177,7 +184,7 @@ export default function CategoryPickerList({
                   // makes them unreachable, so a selection can always be seen
                   // and unchecked instead of silently vanishing while still
                   // secretly filtering.
-                  const facetedPoints = catPoints.filter((p) => passesFilters(p.raw, boolFields, selectFilters, f.key))
+                  const facetedPoints = catPoints.filter((p) => passesFilters(p.raw, ownFieldKeys, boolFields, selectFilters, f.key))
                   const facetedValues = new Set(facetedPoints.flatMap((p) => selectValues(p.raw?.[f.key])))
                   const presentValues = wholeValues.filter((v) => facetedValues.has(v) || chosen.includes(v))
                   const dropdownKey = `${o.id}:${f.key}`

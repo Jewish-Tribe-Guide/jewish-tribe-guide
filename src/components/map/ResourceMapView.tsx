@@ -362,37 +362,70 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     return key
   }
 
-  // Active filter chips: label + predicate + remover. Each is an AND filter; a
-  // listing that lacks the field passes (so "Kosher" ignores shuls, etc.).
+  // Whether `key` is actually one of `categoryId`'s own declared fields —
+  // distinguishes "this listing's category doesn't have this field at all"
+  // (a Synagogue has no `isKosher` — always let it pass, see below) from
+  // "this listing's category HAS this field, but this particular listing
+  // just never had it set" (a Mikvah with no `keilim` key at all, because
+  // it was never explicitly toggled — that means no, not "doesn't apply").
+  // Only the first case gets the lenient pass; a field a listing's own
+  // category declares is checked strictly, undefined included.
+  function categoryHasField(categoryId: string, key: string): boolean {
+    return (categories ?? []).some((c) => c.id === categoryId && c.detailFields.some((f) => f.key === key))
+  }
+
+  // Active field-level filters (bool/select), each an AND predicate — but
+  // only for listings whose own category actually has the field; a listing
+  // from an unrelated category always passes (so "Kosher" ignores shuls,
+  // etc. — see categoryHasField above). Shown on-screen not as their own
+  // removable chips but folded into the owning category's own chip (see
+  // optionsWithFilters) — this array is now purely the filtering logic, no
+  // display data.
   const filterChips = useMemo(() => {
-    const chips: { id: string; label: string; test: (r: DirectoryResource) => boolean; remove: () => void }[] = []
+    const chips: { id: string; test: (r: DirectoryResource) => boolean }[] = []
     for (const field of boolFields) {
       chips.push({
         id: `b:${field}`,
-        label: labelForField(field),
-        test: (r) => r[field] === undefined || r[field] === true,
-        remove: () => setBoolFields((prev) => prev.filter((f) => f !== field)),
+        test: (r) => !categoryHasField(r.category, field) || r[field] === true,
       })
     }
     for (const [field, values] of Object.entries(selectFilters)) {
       if (!values.length) continue
       chips.push({
         id: `s:${field}`,
-        label: values.join(' / '),
         // A multiSelect field stores an array (e.g. foodType: ["Restaurant",
         // "Catering"]), not a plain string — selectValues() normalizes both
         // shapes, so a listing tagged with several values still matches on
         // any one of them instead of only an exact single-value match.
         test: (r) => {
-          const vals = selectValues(r[field])
-          return vals.length === 0 || vals.some((v) => values.includes(v))
+          if (!categoryHasField(r.category, field)) return true
+          return selectValues(r[field]).some((v) => values.includes(v))
         },
-        remove: () => setSelectFilters((prev) => { const n = { ...prev }; delete n[field]; return n }),
       })
     }
     return chips
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boolFields, selectFilters, categories, initialCategory])
+
+  // `options`, with each category's own active bool/select filters (if any)
+  // folded in as a display suffix — e.g. Mikvah's chip reads "Mikvah 4 ·
+  // Keilim" instead of the count alone, so an active filter shows up right on
+  // the chip it belongs to rather than as a separate row of removable pills
+  // underneath (which read as a disconnected, generically-colored "extra
+  // thing" rather than part of the category it was actually scoped to).
+  const optionsWithFilters = useMemo(() => {
+    return options.map((o) => {
+      const parts: string[] = []
+      for (const key of boolFields) {
+        if (categoryHasField(o.id, key)) parts.push(labelForField(key))
+      }
+      for (const [key, values] of Object.entries(selectFilters)) {
+        if (values.length && categoryHasField(o.id, key)) parts.push(values.join('/'))
+      }
+      return parts.length ? { ...o, filterSuffix: parts.join(', ') } : o
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, boolFields, selectFilters, categories])
 
   // Keep the current history entry in sync with the committed query/filters/
   // selection, so returning via browser Back restores what was actually on
@@ -577,30 +610,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const loading = listings === null || categories === null
 
-  // Removable filter chips (open-now / kosher / type carried from the
-  // directory) — shared between the desktop search box and the mobile
-  // floating one. The free-text query itself lives in the search box, not as
-  // a separate chip — there's only ever one active query, Google-Maps-style.
-  const chipsRow = filterChips.length > 0 && (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      {filterChips.map((c) => (
-        <span
-          key={c.id}
-          className="inline-flex items-center gap-1 text-xs font-medium bg-primary/15 text-primary rounded-full pl-2.5 pr-1 py-1"
-        >
-          {c.label}
-          <button
-            onClick={c.remove}
-            aria-label={`Remove ${c.label} filter`}
-            className="hover:bg-primary/25 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer"
-          >
-            ×
-          </button>
-        </span>
-      ))}
-    </div>
-  )
-
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
@@ -701,7 +710,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       {!loading && options.length > 0 && (
         <div className="mb-4 hidden sm:block">
           <CategoryFilter
-            options={options}
+            options={optionsWithFilters}
             selected={effectiveSelected}
             onToggle={toggle}
             onAll={showAll}
@@ -736,7 +745,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </form>
-          {chipsRow}
           <p className="mt-1.5 text-xs text-muted">
             {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
             {(activeTerms.length > 0 || filterChips.length > 0) && ' · filtered'}
@@ -850,7 +858,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   {options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
                     <div className="mt-2">
                       <CategoryFilter
-                        options={options}
+                        options={optionsWithFilters}
                         selected={effectiveSelected}
                         onToggle={toggle}
                         onAll={showAll}
@@ -893,7 +901,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       ))}
                     </div>
                   )}
-                  {chipsRow}
                   {ui.map.liveTracking && geoError && (
                     <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-lg">{geoError}</p>
                   )}

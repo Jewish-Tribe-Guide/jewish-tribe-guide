@@ -9,6 +9,11 @@ export type FilterOption = {
   color: string
   /** How many points this filter currently contributes. */
   count: number
+  /** Active bool/select filter(s) scoped to this category, already formatted
+   *  for display (e.g. "Keilim", or "Catering, Keystone-K") — folded right
+   *  into the chip instead of showing as a separate row of removable pills
+   *  below it, so there's one thing to look at, not two. */
+  filterSuffix?: string
 }
 
 type Props = {
@@ -69,6 +74,11 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
             {o.icon && <span aria-hidden="true">{o.icon}</span>}
             <span>{o.label}</span>
             <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
+            {o.filterSuffix && (
+              <span className={`border-l pl-1 ${on ? 'border-white/30 text-white/90' : 'border-slate-300 text-slate-500'}`}>
+                {o.filterSuffix}
+              </span>
+            )}
           </button>
         )
       })}
