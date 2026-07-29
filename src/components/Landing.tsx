@@ -570,27 +570,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // match scrolls to the map and isolates that category's tab; a Zmanim
   // match scrolls to the widget at the bottom of the page.
   const mapSectionRef = useRef<HTMLDivElement>(null)
-  // Scroll target for the map screen's own "keep scrolling" arrow below.
-  const getConnectedSectionRef = useRef<HTMLDivElement>(null)
 
-  // Desktop's "storymap" scroll — Guide/search, Map, and Get Connected each
-  // fill one full screen and the page snaps from one to the next instead of
-  // scrolling continuously, like flipping through an ArcGIS StoryMap. Zmanim
-  // no longer has its own screen — it lives in the right-edge slide-out
-  // panel (ZmanimMenu) instead, mirroring HamburgerMenu on the left.
-  // `scroll-snap-type` has to live on the element that actually
-  // scrolls (the document itself, i.e. `<html>`, not `<main>` — giving
-  // `<main>` its own `overflow-y-auto` to host it directly would force its
-  // `overflow-x` to `auto` too per the CSS overflow spec, clipping the
-  // `w-screen` full-bleed bands these sections already use), so this toggles
-  // a class on `<html>` for as long as the home page is mounted rather than
-  // setting it globally in layout.tsx, which would snap every other route
-  // too. See the sm:-scoped `.home-snap-scroll` rule in globals.css — mobile
-  // keeps its normal from-the-top scroll untouched.
-  useEffect(() => {
-    document.documentElement.classList.add('home-snap-scroll')
-    return () => document.documentElement.classList.remove('home-snap-scroll')
-  }, [])
   // Mirrors ResourceMapView's own key — the Medical tab is keyed by
   // HOSPITALS_ID rather than the category's own db id, same as its pins.
   const mapIdForCategoryConfig = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITALS_ID : c.id)
@@ -739,37 +719,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         onQueryChange={setQuery}
       />
 
-      {/* ── Desktop "storymap" flow — Guide/search, Map, and Get Connected
-              each fill one full screen and the page snaps from one to the
-              next (`home-snap-scroll`, toggled on <html> above, plus the
-              sm:-scoped rule in globals.css) instead of scrolling
-              continuously — flipping through screens like an ArcGIS
-              StoryMap rather than a normal page. Each screen below is its
-              own `sm:snap-start` target. Zmanim isn't one of them anymore —
-              see ZmanimMenu, the right-edge slide-out mirroring
-              HamburgerMenu on the left. ──────────────────────────────────── */}
+      {/* ── Desktop flow — Guide/search, Map, and Get Connected, one
+              continuous scrolling page (no more scroll-snap "storymap"
+              screens). Each band still gets its own full-bleed background,
+              but sizes to its own content instead of forcing a full
+              viewport height — only the map stays that large, since it
+              genuinely benefits from the room the way a short search bar or
+              a tab strip doesn't. Zmanim lives in the right-edge slide-out
+              panel (ZmanimMenu), mirroring HamburgerMenu on the left. ───── */}
 
-      {/* ── Screen 1: condensed top bar (site name + tagline) + "What are you
-              looking for?" search bar + any "jump to" chips the search
-              produces, combined into ONE snapped screen — together they're
-              what used to be the page's whole top band. `settings.heroTitle`
-              (defaults to "What are you looking for?") is the search bar's
-              own placeholder text — same admin-editable copy mobile's
-              HeroHeading shows, so the two never drift apart. Used to also
-              carry a Volunteer/Support/Young Professionals quick-links row;
-              removed as duplicative once Get Connected (screen 3) covered
-              the same links with real lists under them. Desktop only. ───── */}
-      {/* `sm:h-[90vh]` (not `min-h-screen`) is deliberate — leaving it a
-              little short of the full screen means the map (screen 2) peeks
-              in at the very bottom of the viewport even while snapped here,
-              a visual cue that there's more to scroll to. */}
-      <div className="hidden sm:flex sm:h-[90vh] sm:snap-start sm:flex-col sm:justify-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB]">
-        {/* Full-bleed band (same breakout as the screens below it) — see
+      {/* ── Guide/search — condensed top bar (site name + tagline) + "What
+              are you looking for?" search bar + any "jump to" chips the
+              search produces. `settings.heroTitle` (defaults to "What are
+              you looking for?") is the search bar's own placeholder text —
+              same admin-editable copy mobile's HeroHeading shows, so the two
+              never drift apart. Used to also carry a Volunteer/Support/
+              Young Professionals quick-links row; removed as duplicative
+              once Get Connected further down covered the same links with
+              real lists under them. Desktop only. ─────────────────────── */}
+      <div className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB]">
+        {/* Full-bleed band (same breakout as the sections below it) — see
                 [[project_art_deco_home_redesign]]. `sm:relative` anchors
                 HamburgerMenu/ZmanimMenu, each vertically centered within
-                this screen along its own left/right edge — rendered again
-                (not shared/fixed) on the map and Get Connected screens too,
-                so they're reachable everywhere without needing one
+                this band along its own left/right edge — rendered again
+                (not shared/fixed) on the map and Get Connected sections
+                too, so they're reachable everywhere without needing one
                 continuous page-wide overlay. ───────────────────────────── */}
         <section className="hidden sm:relative sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:px-6 sm:py-6 sm:text-center">
           <HamburgerMenu resources={resources} onNavigate={onNavigate} />
@@ -817,25 +791,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     )}
                   </div>
                 </div>
-
-                {/* Scroll cue — the peek of the map at the bottom of this
-                        screen (see the wrapper's `h-[90vh]` comment above)
-                        already hints there's more below; this spells it out
-                        directly for anyone who doesn't notice the peek. Also
-                        a real button (not just decoration) — clicking it
-                        jumps straight to the map, same `scrollIntoView`
-                        target `jumpToMapCategory` already uses. */}
-                <button
-                  type="button"
-                  onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  aria-label="Scroll to the map"
-                  className="mt-2 flex flex-col items-center gap-1 text-[#fefefe]/70 hover:text-[#fefefe] cursor-pointer"
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide">Scroll to explore below</span>
-                  <svg className="h-5 w-5 animate-bounce" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
               </div>
             </div>
           </section>
@@ -864,27 +819,21 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         )}
       </div>
 
-      {/* ── Screen 2: the map — the real full map screen, right on the home
-              screen. Its own category tabs (down the map's left edge) cover
-              browsing by category directly on the map now, so there's no
-              separate "Browse by Category" list beside it anymore — the map
-              takes the full width. Desktop only: mobile now reaches the same
-              map via its own tab bar entry, so it's dropped from this scroll
-              to avoid showing it twice. Full-bleed band (same `w-screen` +
-              `margin-left: calc(50% - 50vw)` breakout as screen 1) — the map
-              itself runs edge-to-edge and is already exactly one screen tall
-              (`h-screen` inside ResourceMapView, gated on `embedded`), so
-              `sm:snap-start` just has to mark this as its own snap target.
-              Deliberately NO `scroll-mt-*` here — `scroll-margin-top` is
-              honored by mandatory scroll-snap too, not just `scrollIntoView`,
-              so it was leaving a gap at the top of the viewport when snapped
-              here, through which screen 1's navy showed — this needs to
-              snap flush against the true top so the whole map is visible.
-              `relative` so the "keep scrolling" arrow below can overlay its
-              bottom edge without taking up space of its own (the map still
-              gets the whole screen, per the last request). ─────────────── */}
+      {/* ── The map — the real full map, right on the home page. Its own
+              category tabs (down the map's left edge) cover browsing by
+              category directly on the map now, so there's no separate
+              "Browse by Category" list beside it anymore — the map takes
+              the full width. Desktop only: mobile now reaches the same map
+              via its own tab bar entry, so it's dropped from this scroll to
+              avoid showing it twice. Full-bleed band (same `w-screen` +
+              `margin-left: calc(50% - 50vw)` breakout as the section above)
+              — the map itself runs edge-to-edge and stays a full viewport
+              tall (`h-screen` inside ResourceMapView, gated on `embedded`)
+              even in the continuous-scroll layout, since it's the one area
+              that genuinely benefits from that much room. `relative`
+              anchors HamburgerMenu/ZmanimMenu. ───────────────────────────── */}
       {hasMap && (
-        <div ref={mapSectionRef} className="hidden sm:block sm:relative sm:snap-start sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
+        <div ref={mapSectionRef} className="hidden sm:block sm:relative sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
           <HamburgerMenu resources={resources} onNavigate={onNavigate} />
           <ZmanimMenu coords={coords} title={zmanimCategory?.pluralLabel} />
           <HomeMap
@@ -896,58 +845,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             onFocusCategoryChange={toggleCategory}
             categoryItemIdsByCategory={categoryItemIdsByCategory}
           />
-
-          {/* Bottom-center scroll cue — clicking it jumps straight to Get
-                  Connected, same target the search box's "jump to" chips use
-                  for Zmanim/categories elsewhere on this page. */}
-          <button
-            type="button"
-            onClick={() => getConnectedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            aria-label="Scroll to Get Connected"
-            className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 text-[#0C3D57] hover:text-[#3a86ff] cursor-pointer sm:block"
-          >
-            <svg className="h-7 w-7 animate-bounce drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
         </div>
       )}
 
-      {/* ── Screen 3: Get Connected — desktop only, the third and last
-              storymap screen, right after the map (the slot the app's
-              original "Get Connected" section held before it was replaced
-              by the top-bar quick-links row — see the history comment on
-              `quickLinksCards` above). A
-              single centered blue pill of category tabs (see
-              GetConnectedAccordion above for the moving/re-centering
-              behavior) — `sm:justify-center` (not `-start`) is what makes
-              that work: as the pill's own floating list panel opens/grows,
-              the group's total height changes and flexbox re-centers the
-              whole thing on screen automatically. Each list is pulled from
-              the real pages/flows those old quick-link buttons already
-              opened (not new/duplicated content) — Professional Networks
-              and Social Opportunities both draw from the same young-
+      {/* ── Get Connected — desktop only, right after the map (the slot the
+              app's original "Get Connected" section held before it was
+              replaced by the top-bar quick-links row — see the history
+              comment on `quickLinksCards` above). A single centered blue
+              pill of category tabs (see GetConnectedAccordion above); each
+              tab's own dropdown expands the section's height as needed
+              instead of forcing a fixed one. Each list is pulled from the
+              real pages/flows those old quick-link buttons already opened
+              (not new/duplicated content) — Professional Networks and
+              Social Opportunities both draw from the same young-
               professional listings, just split by which read as networking
               vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above). ───── */}
-      <div ref={getConnectedSectionRef} className="hidden sm:relative sm:flex sm:min-h-screen sm:snap-start sm:flex-col sm:items-center sm:justify-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:py-8">
+      <div className="hidden sm:relative sm:flex sm:flex-col sm:items-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:py-16">
         <HamburgerMenu resources={resources} onNavigate={onNavigate} />
         <ZmanimMenu coords={coords} title={zmanimCategory?.pluralLabel} />
-        {/* Top-center scroll cue, mirroring the map screen's own bottom-
-                center one — clicking it jumps back up to the map. */}
-        <button
-          type="button"
-          onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          aria-label="Scroll to the map"
-          className="absolute top-4 left-1/2 z-10 hidden -translate-x-1/2 text-white hover:text-[#0C3D57] cursor-pointer sm:block"
-        >
-          <svg className="h-7 w-7 animate-bounce drop-shadow-[0_1px_3px_rgba(0,0,0,0.25)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-        </button>
         <h2 className="mb-5 text-2xl font-extrabold tracking-tight text-white">Get Connected</h2>
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
       </div>
-
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
               sections — untouched, since mobile has no map to be redundant

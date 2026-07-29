@@ -105,16 +105,6 @@ body {
   background-color: #94a3b8; /* slate-400 */
 }
 
-/* Desktop home page "storymap" section snapping — Landing.tsx toggles this
-   class on <html> only while it's mounted (see its own comment), so every
-   other route keeps normal scrolling. Scoped to sm: and up so mobile's own
-   from-the-top flow is never affected. */
-@media (min-width: 640px) {
-  html.home-snap-scroll {
-    scroll-snap-type: y mandatory;
-  }
-}
-
 /* Subtle screen-to-screen fade for the step wizard. */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
