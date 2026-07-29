@@ -58,44 +58,42 @@ type GetConnectedItem = {
 type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem[] }
 
 /** "Get Connected" — same width as the map above it (both sit in the same
- *  `max-w-6xl` container). Matches the MAP's own graphic language: each tab
- *  colored from the same `ACCENT_PALETTE` the map's category buttons cycle
- *  through — filled solid + white text when active, white + that color's
- *  own border/text when it isn't, exactly like a map key button toggling
- *  on — instead of one flat navy/gold scheme, which reads punchier (five
- *  distinct colors instead of one repeated pair) and ties the section back
- *  to the map visually. Square corners throughout, each tab flush against
- *  its neighbors (no gaps) so the row still reads as one continuous
- *  divided bar.
+ *  `max-w-6xl` container). Matches the MAP's own graphic language: each
+ *  category's header colored from the same `ACCENT_PALETTE` the map's
+ *  category buttons cycle through, exactly like a map key button — instead
+ *  of one flat navy/gold scheme, which reads punchier (five distinct colors
+ *  instead of one repeated pair) and ties the section back to the map
+ *  visually.
  *
- *  Each tab's dropdown renders directly under THAT tab and exactly as wide
- *  as it is — a real "drops down from the item you clicked" read, not one
- *  shared box that always starts at the row's left edge regardless of
- *  which tab (over on the right, say) actually opened it. It's positioned
- *  with a normal-flow CSS grid below the tab strip (`repeat(N, 1fr)`,
- *  matching the tab row's own equal division) rather than
- *  `position: absolute`, specifically so it takes up real space and grows
- *  the section — pushing the Zmanim block further down the page — instead
- *  of floating over whatever's below. Only one open at a time; clicking
- *  the same tab again closes it.
+ *  Every category's list is shown at once, side by side as four columns
+ *  (`grid-cols-4`) — there's no tab-switching/accordion here (there used
+ *  to be, gated on a single `activeId`; that's gone, so all lists are
+ *  visible without the user needing to click anything first). Each
+ *  category's own header is a static colored bar, not a button.
  *
- *  Some items don't navigate at all when clicked — a SECOND bordered box
- *  opens beside that tab's dropdown, in an adjacent grid column (not
- *  replacing the dropdown, so the list stays visible and clickable),
- *  showing either:
+ *  The four columns read as ONE connected card, not four separate boxes:
+ *  a single shared border/shadow wraps the whole grid (`overflow-hidden`
+ *  so its `rounded-b-2xl` actually clips the corners), gaps between
+ *  columns are gone in favor of `divide-x` hairlines, and columns are
+ *  left at the grid's default stretch (not `items-start`) so they all
+ *  share one flat, evenly-rounded bottom edge — including while one
+ *  category's second box below is open, which grows the whole row's
+ *  height (and therefore every column, blank space and all) instead of
+ *  poking that one column out past the rest.
+ *
+ *  Some items don't navigate at all when clicked — a SECOND box opens
+ *  BELOW that category's own list, inside the same column (not beside it,
+ *  which would spill into the next category's column), showing either:
  *  - `embed` (Support/Volunteer's "Interest Form" entries): the real
  *    SupportWizard/VolunteerWizard, `variant="inline"`.
  *  - `detail` (Professional Networks/Social Opportunities/WhatsApp Groups'
  *    real listings): that listing's own GenericListingCard, same as its
  *    full directory page shows, instead of navigating there.
- *  Professional Networks (and Support & Volunteering) open their second
- *  box in the column to the RIGHT of the dropdown; Social Opportunities
- *  and WhatsApp Groups (the last/rightmost tab, where a right-side box
- *  would run off the grid's own edge) open it in the column to the LEFT
- *  instead — same box, same visual treatment, just anchored to whichever
- *  side actually has room. Switching tabs (or re-clicking the
- *  same one to close it) always resets both `embeddedFlow` and
- *  `detailItemId`, so neither can linger under a different tab. */
+ *  `embeddedFlow`/`detailItemId` stay single top-level state (not one per
+ *  category) since item ids are unique across every category's list, so at
+ *  most one category's second box can ever match and open at a time —
+ *  clicking an item in a different category's list still just closes
+ *  whichever other one was open, same as before. */
 function GetConnectedAccordion({
   categories,
   categoryConfigs,
@@ -103,198 +101,119 @@ function GetConnectedAccordion({
   categories: GetConnectedCategory[]
   categoryConfigs: CategoryConfig[] | null
 }) {
-  const [activeId, setActiveId] = useState<string | null>(null)
   const [embeddedFlow, setEmbeddedFlow] = useState<'support' | 'volunteer' | null>(null)
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
-  const activeIndex = categories.findIndex((c) => c.id === activeId)
-  const active = activeIndex >= 0 ? categories[activeIndex] : undefined
-  const activeColor = activeIndex >= 0 ? ACCENT_PALETTE[activeIndex % ACCENT_PALETTE.length] : undefined
-  const embedItem = active?.items.find((it) => it.embed && it.embed === embeddedFlow)
-  const detailItem = active?.items.find((it) => it.detail && it.id === detailItemId)
-  const detailCategory = detailItem?.detail ? categoryConfigs?.find((c) => c.id === detailItem.detail!.category) : undefined
-  const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
-
-  const selectTab = (id: string) => {
-    setActiveId((prev) => (prev === id ? null : id))
-    setEmbeddedFlow(null)
-    setDetailItemId(null)
-  }
 
   return (
-    <div className="w-full bg-[#fefefe]">
-      <div className="flex" role="tablist">
-        {categories.map((cat, i) => {
-          const color = ACCENT_PALETTE[i % ACCENT_PALETTE.length]
-          const isActive = cat.id === activeId
-          // The palette's paler steps (pale aqua, light blue) wash out under
-          // white text — `needsDarkText` (shared with the map's own contrast
-          // logic, see Collapsible.tsx) checks actual luminance instead of
-          // hardcoding which hex that is, so it keeps working automatically
-          // if the palette's exact colors ever shift again.
-          const activeTextClass = needsDarkText(color) ? 'text-[#0C3D57]' : 'text-white'
-          // The raw palette color is fine as a solid FILL (the active tab
-          // background above), but several of its paler steps are too light
-          // to read as TEXT directly on white — `readableTextOnWhite` darkens
-          // just enough to stay legible while still keeping each tab's own
-          // distinct hue when inactive.
-          const inactiveTextColor = readableTextOnWhite(color)
-          return (
-            <button
-              key={cat.id}
-              onClick={() => selectTab(cat.id)}
-              role="tab"
-              aria-selected={isActive}
-              style={isActive ? { backgroundColor: color } : { color: inactiveTextColor }}
-              className={`flex-1 border-r border-b-2 border-slate-200 px-3 py-3.5 text-center text-xs font-bold transition-colors cursor-pointer last:border-r-0 sm:text-sm ${
-                isActive ? activeTextClass : 'bg-white hover:brightness-95'
-              }`}
-            >
+    <div className="grid w-full grid-cols-4 divide-x divide-slate-200 overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-lg">
+      {categories.map((cat, i) => {
+        const color = ACCENT_PALETTE[i % ACCENT_PALETTE.length]
+        // The palette's paler steps (pale aqua, light blue) wash out under
+        // white text — `needsDarkText` (shared with the map's own contrast
+        // logic, see Collapsible.tsx) checks actual luminance instead of
+        // hardcoding which hex that is, so it keeps working automatically
+        // if the palette's exact colors ever shift again.
+        const headerTextClass = needsDarkText(color) ? 'text-[#0C3D57]' : 'text-white'
+        // Raw palette colors are fine as borders/fills, but a couple of
+        // this palette's paler steps are too light to read as TEXT on the
+        // near-white `bg-slate-50` these hover/open states use.
+        const readableColor = readableTextOnWhite(color)
+
+        const embedItem = cat.items.find((it) => it.embed && it.embed === embeddedFlow)
+        const detailItem = cat.items.find((it) => it.detail && it.id === detailItemId)
+        const detailCategory = detailItem?.detail ? categoryConfigs?.find((c) => c.id === detailItem.detail!.category) : undefined
+        const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
+
+        return (
+          <div key={cat.id} className="min-w-0">
+            <div style={{ backgroundColor: color }} className={`px-3 py-3.5 text-center text-xs font-bold sm:text-sm ${headerTextClass}`}>
               {cat.title}
-            </button>
-          )
-        })}
-      </div>
+            </div>
+            <div>
+              {cat.items.length > 0 ? (
+                <ul className="divide-y divide-slate-100">
+                  {cat.items.map((item) => {
+                    const isOpenEmbed = item.embed && item.embed === embeddedFlow
+                    const isOpenDetail = item.detail && item.id === detailItemId
+                    const isOpen = isOpenEmbed || isOpenDetail
+                    return (
+                      <li key={item.id}>
+                        <button
+                          onClick={() => {
+                            if (item.embed) setEmbeddedFlow((prev) => (prev === item.embed ? null : item.embed!))
+                            else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
+                            else item.go()
+                          }}
+                          style={{ '--hover-color': readableColor } as React.CSSProperties}
+                          className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
+                            isOpen
+                              ? 'bg-slate-50 text-[var(--hover-color)]'
+                              : // Once something in this list is open, every OTHER
+                                // item dims — the same "one item stands out, the
+                                // rest recede" read the two-item Support &
+                                // Volunteering list already had by virtue of only
+                                // having one alternative to compare against.
+                                hasSecondBox
+                                ? 'text-slate-300 hover:text-slate-500'
+                                : 'text-slate-700'
+                          }`}
+                        >
+                          {item.icon && <span aria-hidden="true" className="mr-1.5">{item.icon}</span>}
+                          {item.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="px-4 py-3 text-sm italic text-slate-400">Coming soon</p>
+              )}
+            </div>
 
-      <div className="grid transition-[grid-template-rows] duration-300 ease-in-out" style={{ gridTemplateRows: active ? '1fr' : '0fr' }}>
-        <div className="overflow-hidden">
-          {active && (() => {
-            // Both boxes anchor to the LEFT (second box before the list)
-            // for Social Opportunities and WhatsApp Groups (the last/
-            // rightmost tab, where a right-side box would run off the
-            // grid's own edge); everywhere else the second box trails the
-            // list on the right. Anchoring left shifts the whole pair's
-            // grid-column span earlier instead of moving the list itself —
-            // the list's OWN track never changes, only which side of it
-            // the pair's shared box starts from. The second box gets TWO
-            // tracks' worth of room (vs. the list's one, via the flex-[2]
-            // below) so it can actually breathe instead of being squeezed
-            // to exactly one tab's width.
-            const anchorLeft = active.id === 'social' || active.id === 'whatsapp'
-            const listTrack = activeIndex + 1
-            const spanStart = anchorLeft ? listTrack - 2 : listTrack
-            const spanEnd = spanStart + 3
-
-            // Raw palette colors are fine as borders/fills, but a couple of
-            // this palette's paler steps are too light to read as TEXT on
-            // the near-white `bg-slate-50` these hover/open states use —
-            // same fix as the tab labels above.
-            const readableActiveColor = readableTextOnWhite(activeColor ?? '#0C3D57')
-            const listBox = (
-              <div style={{ borderColor: activeColor }} className="min-w-0 flex-1 border border-t-0 bg-white shadow-lg">
-                {active.items.length > 0 ? (
-                  <ul className="divide-y divide-slate-100">
-                    {active.items.map((item) => {
-                      const isOpenEmbed = item.embed && item.embed === embeddedFlow
-                      const isOpenDetail = item.detail && item.id === detailItemId
-                      const isOpen = isOpenEmbed || isOpenDetail
-                      return (
-                        <li key={item.id}>
-                          <button
-                            onClick={() => {
-                              if (item.embed) setEmbeddedFlow(item.embed)
-                              else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
-                              else item.go()
-                            }}
-                            style={{ '--hover-color': readableActiveColor } as React.CSSProperties}
-                            className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
-                              isOpen
-                                ? 'bg-slate-50 text-[var(--hover-color)]'
-                                : // Once something in this list is open, every OTHER
-                                  // item dims — the same "one item stands out, the
-                                  // rest recede" read the two-item Support &
-                                  // Volunteering list already had by virtue of only
-                                  // having one alternative to compare against.
-                                  hasSecondBox
-                                  ? 'text-slate-300 hover:text-slate-500'
-                                  : 'text-slate-700'
-                            }`}
-                          >
-                            {item.icon && <span aria-hidden="true" className="mr-1.5">{item.icon}</span>}
-                            {item.label}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-3 text-sm italic text-slate-400">Coming soon</p>
-                )}
-              </div>
-            )
-
-            // Always rendered (even while closed) so it can animate open —
-            // `flex-[2]` (vs. the list's `flex-1`) gives it twice the
-            // list's width, since the shared span above now reserves three
-            // tracks total (one for the list, two for this), and the
-            // grid-template-rows 0fr/1fr trick collapses/reveals its
-            // HEIGHT only, so its WIDTH (and therefore the list's own
-            // width) never jumps when it opens or closes.
-            const secondBox = (
-              <div
-                style={{ gridTemplateRows: hasSecondBox ? '1fr' : '0fr' }}
-                className="grid min-w-0 flex-[2] transition-[grid-template-rows] duration-300 ease-in-out"
-              >
-                <div className="overflow-hidden">
-                  <div style={{ borderColor: activeColor }} className="border border-t-0 bg-white shadow-lg">
-                    {embedItem ? (
-                      embedItem.embed === 'support' ? (
-                        <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                      ) : (
-                        <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                      )
-                    ) : detailItem?.detail && detailCategory ? (
-                      <div className="p-3">
-                        <GenericListingCard
-                          item={detailItem.detail}
-                          category={detailCategory}
-                          upvotes={!!detailCategory.upvotesEnabled}
-                          count={detailItem.detail.upvotes ?? 0}
-                          expanded
-                          dense
-                          hideBorder
-                          highlightColor={activeColor}
-                          onVote={() => {}}
-                          onTagClick={() => {}}
-                          onFilterOpen={() => {}}
-                          onFilterBool={() => {}}
-                          onFilterSelect={() => {}}
-                          onEdit={() => detailItem.go()}
-                          onReport={() => detailItem.go()}
-                          onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
+            {/* Always rendered (even while closed) so it can animate open —
+                the grid-template-rows 0fr/1fr trick collapses/reveals its
+                HEIGHT only, staying inside this category's own column
+                rather than spilling into the next one. */}
+            <div
+              style={{ gridTemplateRows: hasSecondBox ? '1fr' : '0fr' }}
+              className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+            >
+              <div className="overflow-hidden">
+                <div className="border-t border-slate-200">
+                  {embedItem ? (
+                    embedItem.embed === 'support' ? (
+                      <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                    ) : (
+                      <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                    )
+                  ) : detailItem?.detail && detailCategory ? (
+                    <div className="p-3">
+                      <GenericListingCard
+                        item={detailItem.detail}
+                        category={detailCategory}
+                        upvotes={!!detailCategory.upvotesEnabled}
+                        count={detailItem.detail.upvotes ?? 0}
+                        expanded
+                        dense
+                        hideBorder
+                        highlightColor={color}
+                        onVote={() => {}}
+                        onTagClick={() => {}}
+                        onFilterOpen={() => {}}
+                        onFilterBool={() => {}}
+                        onFilterSelect={() => {}}
+                        onEdit={() => detailItem.go()}
+                        onReport={() => detailItem.go()}
+                        onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            )
-
-            return (
-              <div className="grid" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
-                {/* One shared flex row holding BOTH boxes, spanning the two
-                    columns they together occupy — keeping them as flex
-                    siblings of a single container (rather than two
-                    independently-positioned grid items) is what makes them
-                    share a flush top/bottom edge and a shared border
-                    regardless of which side the second box is anchored to. */}
-                <div style={{ gridColumn: `${spanStart} / ${spanEnd}` }} className="flex items-stretch">
-                  {anchorLeft ? (
-                    <>
-                      {secondBox}
-                      {listBox}
-                    </>
-                  ) : (
-                    <>
-                      {listBox}
-                      {secondBox}
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
-        </div>
-      </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -612,7 +531,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               category's full page) pinned to its top-left corner. ────────── */}
       <section className="hidden sm:block sm:relative sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6 sm:text-center">
         <HamburgerMenu resources={resources} />
-        <h1 className="text-3xl font-extrabold tracking-tight text-[#fefefe]">
+        <h1 className="text-4xl font-extrabold tracking-tight text-[#fefefe]">
           {settings.name}
         </h1>
         {/* Fixed copy per explicit request, not `settings.tagline` — this
