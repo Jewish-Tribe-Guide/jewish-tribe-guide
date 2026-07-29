@@ -519,21 +519,28 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   // Categories turned on via the "More" picker's own checkbox — the compact
   // chip row bumps these to the front of its limited visible slots (see
-  // CategoryFilter's own pinnedIds-based sort), so picking something from the
-  // full list that wasn't already one of the top-N by count doesn't stay
+  // CategoryFilter's own pinnedOrder-based sort), so picking something from
+  // the full list that wasn't already one of the top-N by count doesn't stay
   // invisible behind "More" despite now actively filtering the map. Tapping a
   // chip directly in the compact row does NOT add to this — only remove from
   // it on deselect — so a plain tap there never jumps the row around; that'd
   // be disorienting for the one interaction that happens right on the row
   // you're looking at, as opposed to a deliberate pick from a full-screen list.
-  const [pinnedFromPicker, setPinnedFromPicker] = useState<Set<string>>(new Set())
+  //
+  // An ARRAY, most-recently-pinned first — not a Set — because ties need to
+  // break by "which one did you just pick," not by raw listing count. A Set
+  // has no order of its own to fall back on beyond insertion order, which a
+  // re-pin doesn't bump; with a category like Food Establishments miles ahead
+  // of everything else by count, any tie-break that isn't recency-based just
+  // reduces to "whichever pinned category has the most listings wins,"
+  // permanently, regardless of what's picked afterward — which is the bug
+  // this replaced.
+  const [pinnedOrder, setPinnedOrder] = useState<string[]>([])
+  function pin(id: string) {
+    setPinnedOrder((p) => [id, ...p.filter((x) => x !== id)])
+  }
   function unpin(id: string) {
-    setPinnedFromPicker((p) => {
-      if (!p.has(id)) return p
-      const next = new Set(p)
-      next.delete(id)
-      return next
-    })
+    setPinnedOrder((p) => (p.includes(id) ? p.filter((x) => x !== id) : p))
   }
 
   const toggle = (id: string) => {
@@ -545,7 +552,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // stored filters ride along either way (see clearFiltersForCategories).
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
-      setPinnedFromPicker((p) => (p.has(id) ? new Set([id]) : new Set()))
+      setPinnedOrder((p) => (p.includes(id) ? [id] : []))
       return
     }
     const next = new Set(effectiveSelected)
@@ -561,7 +568,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const hideAll = () => {
     setSelected(new Set())
     clearFiltersForCategories(effectiveSelected)
-    setPinnedFromPicker(new Set())
+    setPinnedOrder([])
   }
 
   // A plain, unconditional on/off toggle — unlike `toggle` above, this never
@@ -570,7 +577,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // tap target, not literally a checkbox), but a real <input type="checkbox">
   // in the picker needs to mean exactly what it shows: checked ⇄ unchecked,
   // full stop — nothing else is defensible for an actual checkbox control.
-  // Also the one place that adds to pinnedFromPicker — see its own comment.
+  // Also the one place that adds to pinnedOrder — see its own comment.
   const toggleCategoryCheckbox = (id: string) => {
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
@@ -578,7 +585,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       unpin(id)
     } else {
       next.add(id)
-      setPinnedFromPicker((p) => (p.has(id) ? p : new Set(p).add(id)))
+      pin(id)
     }
     setSelected(next)
   }
@@ -721,7 +728,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             onToggle={toggle}
             onAll={showAll}
             onNone={hideAll}
-            pinnedIds={pinnedFromPicker}
+            pinnedOrder={pinnedOrder}
             categories={categories ?? []}
             boolFields={boolFields}
             onToggleBool={toggleBoolField}
@@ -877,7 +884,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onNone={hideAll}
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
-                        pinnedIds={pinnedFromPicker}
+                        pinnedOrder={pinnedOrder}
                         categories={categories ?? []}
                         boolFields={boolFields}
                         onToggleBool={toggleBoolField}
