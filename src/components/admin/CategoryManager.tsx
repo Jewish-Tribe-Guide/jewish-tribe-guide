@@ -1389,7 +1389,7 @@ function CategoryEditor({
         cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
         // Apply the implied filter/tag rules, then re-merge the preserved hidden
         // fields so editing never drops them.
-        fields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
+        fields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
         ...(pendingCleanup && {
           clearFields: {
             address: pendingCleanup.addressOff,
@@ -1427,7 +1427,7 @@ function CategoryEditor({
       pluralLabel: draft.pluralLabel || draft.label || 'Preview',
       icon: draft.icon.trim() || DEFAULT_CATEGORY_ICON,
       description: draft.description,
-      detailFields: [...draft.fields.map(normalizeField), ...draft.hiddenFields],
+      detailFields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
       kind: 'listing',
       hasAddress: draft.hasAddress,
       hasPhone: draft.hasPhone,
@@ -1896,6 +1896,33 @@ function normalizeField(f: CategoryField): CategoryField {
     out.multiSelect = undefined
   }
   return out
+}
+
+// Re-merges a category's editable fields with its preserved hidden ones for
+// saving/previewing. A caveat's flag/note pair (see CategoryField.caveat) is
+// inserted right after the field it belongs to — not appended at the very
+// end — so it renders next to Kosher Certification (etc.) in the actual
+// intake/edit form instead of trailing behind unrelated details like Dietary
+// options or Menu. Any hidden field not claimed by a caveat (shouldn't
+// happen today, but keeps this total) falls back to the end.
+function mergeFieldsWithHidden(fields: CategoryField[], hiddenFields: CategoryField[]): CategoryField[] {
+  const claimed = new Set<string>()
+  const merged: CategoryField[] = []
+  for (const f of fields) {
+    merged.push(f)
+    if (!f.caveat) continue
+    for (const key of [f.caveat.flagField, f.caveat.noteField]) {
+      const hidden = hiddenFields.find((h) => h.key === key)
+      if (hidden) {
+        merged.push(hidden)
+        claimed.add(key)
+      }
+    }
+  }
+  for (const h of hiddenFields) {
+    if (!claimed.has(h.key)) merged.push(h)
+  }
+  return merged
 }
 
 function serializeOptions(options?: { value: string; label: string }[]): string {
