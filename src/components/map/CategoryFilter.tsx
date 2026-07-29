@@ -51,11 +51,6 @@ type Props = {
   onToggleSelectValue: (categoryId: string, key: string, value: string) => void
 }
 
-// A rough estimate used only to keep the popup from running off the right
-// edge of the screen — the box itself hugs its actual content width (it's
-// not fixed), so this just needs to be a sane upper bound, not exact.
-const POPUP_WIDTH_ESTIMATE_PX = 240
-
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus "Show all" / "Hide all" shortcuts. A single horizontal-scroll
  *  row (native scrollbar, styled thin via the `chip-scroll` class in
@@ -87,7 +82,10 @@ export default function CategoryFilter({
   // positioning (not absolute) so it isn't clipped by the chip row's own
   // horizontal scroll container. At most one open at a time.
   const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
-  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
+  // Sized and positioned to exactly match the tapped filterSuffix segment —
+  // same left edge, same width, so the box reads as "this chip's own filters,
+  // dropped down" rather than a free-floating panel of its own.
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const containerRefs = useRef(new Map<string, HTMLDivElement>())
   // The popup itself is portaled to document.body (so it can't be knocked
   // out of place by an ancestor's CSS transform — see CategoryFilterControls'
@@ -124,10 +122,7 @@ export default function CategoryFilter({
       return
     }
     const rect = trigger.getBoundingClientRect()
-    setPopupPos({
-      top: rect.bottom + 4,
-      left: Math.min(rect.left, window.innerWidth - POPUP_WIDTH_ESTIMATE_PX - 8),
-    })
+    setPopupPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
     setOpenFilterFor(id)
   }
 
@@ -199,14 +194,14 @@ export default function CategoryFilter({
               return createPortal(
                 <div
                   ref={popupRef}
-                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
-                  className="z-50 max-w-[260px] rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, width: popupPos.width }}
+                  className="z-50 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
                 >
                   <div className="flex flex-col gap-1">
                     {entries.map((entry) => (
                       <label
                         key={entry.kind === 'bool' ? entry.key : `${entry.key}:${entry.value}`}
-                        className="flex items-center gap-2 rounded px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+                        className="flex items-center gap-1.5 rounded px-1 py-1 text-xs whitespace-nowrap text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
                       >
                         <input
                           type="checkbox"
@@ -216,7 +211,7 @@ export default function CategoryFilter({
                               ? onToggleBool(openOption.id, entry.key)
                               : onToggleSelectValue(openOption.id, entry.key, entry.value)
                           }
-                          className="accent-primary h-4 w-4 cursor-pointer"
+                          className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
                         />
                         {entry.label}
                       </label>
