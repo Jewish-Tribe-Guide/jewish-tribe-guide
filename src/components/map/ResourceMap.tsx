@@ -71,6 +71,12 @@ type Props = {
    *  strip above it instead of the whole container's center (which the sheet
    *  would otherwise mostly hide it behind). 0 on desktop (no sheet). */
   obscuredBottomPx?: number
+  /** Current px height of the floating search bar + category filter chips
+   *  covering the top of the map on mobile, if any — narrows the same
+   *  "visible strip" a selected pin centers within, since that overlay hides
+   *  the top of the map just as surely as the sheet hides the bottom. 0 on
+   *  desktop (no floating overlay). */
+  obscuredTopPx?: number
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -164,15 +170,29 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
 }
 
 // Pans so `point` lands in the vertical middle of the map's visible strip —
-// the part not covered by the mobile bottom sheet — rather than the whole
-// container's center, which the sheet would otherwise mostly hide it behind.
-// Shifts the map's actual center southward by half the obscured height (in
-// world-plane units at the current zoom) so the point itself, unmoved, ends
-// up that same distance north of center — i.e. higher on screen, centered in
-// what's left visible above the sheet. Falls back to a plain center (no
-// offset) if the projection isn't ready yet, rather than not moving at all.
-function panToVisibleCenter(map: google.maps.Map, point: { lat: number; lng: number }, obscuredBottomPx: number) {
-  const projection = obscuredBottomPx > 0 ? map.getProjection() : null
+// the part not covered by the mobile bottom sheet OR the floating search
+// bar/category chips overlay at the top — rather than the whole container's
+// center, which those would otherwise mostly hide it behind.
+//
+// panTo(point) alone would put the point at the container's literal center.
+// To land it at the middle of [obscuredTopPx, containerHeight - obscuredBottomPx]
+// instead, the point needs to move up on screen by
+// (obscuredBottomPx - obscuredTopPx) / 2 px from that literal center — shift
+// the map's actual center DOWN (south) by that many world-plane units (at the
+// current zoom) so the point itself, unmoved, ends up that same distance
+// north of the new center, i.e. higher on screen. A bottom-heavy obscurement
+// (sheet taller than the top overlay) pushes the point up; a top-heavy one
+// (rare — the overlay alone is normally much shorter than the sheet) would
+// push it down instead. Falls back to a plain center (no offset) if the
+// projection isn't ready yet, rather than not moving at all.
+function panToVisibleCenter(
+  map: google.maps.Map,
+  point: { lat: number; lng: number },
+  obscuredBottomPx: number,
+  obscuredTopPx: number,
+) {
+  const netObscuredPx = obscuredBottomPx - obscuredTopPx
+  const projection = netObscuredPx !== 0 ? map.getProjection() : null
   const zoom = map.getZoom()
   if (!projection || zoom == null) {
     map.panTo(point)
@@ -184,7 +204,7 @@ function panToVisibleCenter(map: google.maps.Map, point: { lat: number; lng: num
     return
   }
   const scale = 2 ** zoom
-  const shifted = new google.maps.Point(worldPoint.x, worldPoint.y + (obscuredBottomPx / 2) / scale)
+  const shifted = new google.maps.Point(worldPoint.x, worldPoint.y + (netObscuredPx / 2) / scale)
   const shiftedLatLng = projection.fromPointToLatLng(shifted)
   map.panTo(shiftedLatLng ?? point)
 }
@@ -215,7 +235,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0 }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -242,6 +262,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const searchActiveRef = useRef(searchActive)
   const selectedIdRef = useRef(selectedId)
   const obscuredBottomPxRef = useRef(obscuredBottomPx)
+  const obscuredTopPxRef = useRef(obscuredTopPx)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -250,6 +271,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   useEffect(() => { obscuredBottomPxRef.current = obscuredBottomPx }, [obscuredBottomPx])
+  useEffect(() => { obscuredTopPxRef.current = obscuredTopPx }, [obscuredTopPx])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -404,25 +426,26 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
       if (current) {
         current.marker.content = buildPin(current.point, true)
         const obscured = obscuredBottomPxRef.current
+        const obscuredTop = obscuredTopPxRef.current
         // Frame the selected place alongside the visitor's own location, same
         // as a search result — so picking a listing from the sheet (or a pin
         // that wasn't already selected) shows how far it is from "you are
         // here" instead of just centering on the pin alone. The mobile sheet
-        // covers the bottom of the map, so its height is reserved as extra
-        // bottom padding — otherwise "centered" bounds would land the pin
-        // behind (or right at the edge of) the sheet instead of the visible
-        // strip above it.
+        // covers the bottom of the map (and the floating search bar/category
+        // chips cover the top), so both are reserved as extra padding —
+        // otherwise "centered" bounds would land the pin behind (or right at
+        // the edge of) one of them instead of the visible strip between.
         if (userLocationRef.current) {
           const bounds = new google.maps.LatLngBounds()
           bounds.extend(userLocationRef.current)
           bounds.extend({ lat: current.point.lat, lng: current.point.lng })
-          map.fitBounds(bounds, { top: 64, left: 64, right: 64, bottom: 64 + obscured })
+          map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
         } else {
           // No location set to frame alongside it — just center the pin
-          // itself, but still account for the sheet: instead of the whole
-          // container's center (which sheet mostly covers), aim for the
-          // middle of the strip still visible above it.
-          panToVisibleCenter(map, current.point, obscured)
+          // itself, but still account for the sheet and the top overlay:
+          // instead of the whole container's center (which they mostly
+          // cover), aim for the middle of the strip still visible between them.
+          panToVisibleCenter(map, current.point, obscured, obscuredTop)
         }
         // The above gets the map roughly right, but a pin's geographic anchor
         // is its bottom TIP, not its visual middle — the balloon shape (plus
@@ -438,7 +461,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
           if (!markerEl?.getBoundingClientRect || !mapEl) return
           const markerRect = markerEl.getBoundingClientRect()
           const mapRect = mapEl.getBoundingClientRect()
-          const targetCenterY = mapRect.top + (mapRect.height - obscured) / 2
+          const targetCenterY = mapRect.top + obscuredTop + (mapRect.height - obscured - obscuredTop) / 2
           const actualCenterY = markerRect.top + markerRect.height / 2
           const deltaY = actualCenterY - targetCenterY
           if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
