@@ -152,3 +152,16 @@ export function DirectionsIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Globe (meridians on a circle) — the place-detail panel's "Website" action
+// button, matching Google Maps' own icon for that button instead of a
+// generic outbound-link arrow.
+export function GlobeIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+    </svg>
+  )
+}
