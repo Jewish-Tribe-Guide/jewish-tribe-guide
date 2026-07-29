@@ -550,7 +550,18 @@ function DetailFieldInput({
       <input
         type={field.type === 'number' ? 'number' : field.type === 'tel' ? 'tel' : 'text'}
         value={(value as string) ?? ''}
-        onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
+        onChange={(e) =>
+          onChange(
+            field.type === 'number'
+              ? Number(e.target.value)
+              // Same live formatting as the main Phone field (see formatPhone)
+              // — a category's own "Women's Phone"-style field shouldn't look
+              // different just because it isn't the built-in one.
+              : field.type === 'tel'
+                ? formatPhone(e.target.value)
+                : e.target.value,
+          )
+        }
         placeholder={field.placeholder}
         className={inputClass}
       />

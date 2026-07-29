@@ -8,6 +8,7 @@ import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
 import { businessUrl } from '@/lib/googleMapsLinks'
+import { formatPhone } from '@/lib/validation'
 import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon } from '@/components/icons'
 
 // ── Field helpers ────────────────────────────────────────────────────────────
@@ -372,7 +373,20 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       {visibleRowFields.map((f) => (
         <p key={f.key} className="text-sm text-slate-700">
           {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
-          {display(item[f.key])}
+          {f.type === 'tel' ? (
+            // Same treatment as the main Phone field — a tappable tel: link,
+            // reformatted defensively in case the stored value predates
+            // formatPhone being applied to fields other than the built-in one.
+            <a
+              href={`tel:${display(item[f.key]).replace(/\D/g, '')}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline"
+            >
+              {formatPhone(display(item[f.key]))}
+            </a>
+          ) : (
+            display(item[f.key])
+          )}
         </p>
       ))}
     </div>
