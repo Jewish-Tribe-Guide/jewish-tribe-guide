@@ -82,6 +82,13 @@ input[type='date'].date-empty {
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  /* Chrome/Android treats a horizontal overscroll (rubber-banding past a
+     scrollable edge) as "swipe to go back/forward" — hijacking, e.g., the
+     mobile map sheet's own swipe-left-to-deselect gesture (MobileNearbySheet)
+     into a real history navigation instead. `none` opts the whole app out of
+     that chaining; vertical scroll/pull-to-refresh (overscroll-behavior-y)
+     is untouched. */
+  overscroll-behavior-x: none;
 }
 
 /* Horizontally-scrolling chip row (map category filter) — a thin, styled
