@@ -1014,7 +1014,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       {categoriesOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white sm:hidden">
           <div
-            className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-4 pb-3"
+            className="flex shrink-0 items-center gap-3 px-4 pb-3"
             style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
           >
             <button
@@ -1025,11 +1025,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
             <h2 className="flex-1 text-base font-semibold text-slate-900">Categories</h2>
+          </div>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 pb-3">
             <button
               onClick={effectiveSelected.size === options.length ? hideAll : showAll}
-              className="shrink-0 text-sm font-medium text-primary cursor-pointer"
+              className="text-sm font-medium text-primary cursor-pointer"
             >
               {effectiveSelected.size === options.length ? 'Hide all' : 'Show all'}
+            </button>
+            <button
+              onClick={() => setCategoriesOpen(false)}
+              className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white cursor-pointer"
+            >
+              Apply
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">

@@ -116,7 +116,13 @@ export default function CategoryPickerList({
                   />
                 </button>
               ) : (
-                <div className="flex flex-1 items-center gap-2.5 py-1.5">{rowContent}</div>
+                <div className="flex flex-1 items-center gap-2.5 py-1.5">
+                  {rowContent}
+                  {/* Same footprint as the chevron the filterable rows get,
+                      just invisible — keeps every row's count in one
+                      vertical column whether or not it has a chevron. */}
+                  <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </div>
               )}
             </div>
 
