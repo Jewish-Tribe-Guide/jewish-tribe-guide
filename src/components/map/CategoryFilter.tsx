@@ -71,7 +71,17 @@ export default function CategoryFilter({
   onToggleSelectValue,
 }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
-  const visible = maxVisible != null ? options.slice(0, maxVisible) : options
+  // Selected categories get priority for the compact row's limited slots —
+  // otherwise turning on a category from the full "More" picker that isn't
+  // one of the top-N by count would just silently do nothing visible here,
+  // still hidden behind "More" despite now actively filtering the map. A
+  // stable sort keeps each group (selected / not) in its original
+  // highest-count-first order, so this only reorders across the selected/
+  // unselected boundary, not within it.
+  const visible =
+    maxVisible != null
+      ? [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).slice(0, maxVisible)
+      : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 
   // Which category's inline filter editor is open — opened by tapping a
@@ -96,7 +106,7 @@ export default function CategoryFilter({
 
   useEffect(() => {
     if (!openFilterFor) return
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       const target = e.target as Node
       const chipEl = openFilterFor ? containerRefs.current.get(openFilterFor) : null
       if (chipEl?.contains(target)) return
@@ -108,15 +118,34 @@ export default function CategoryFilter({
     function handleScroll() {
       setOpenFilterFor(null)
     }
-    document.addEventListener('mousedown', handleClick)
+    // Capture phase, and both mousedown and touchstart — the map underneath
+    // (Google Maps' own drag/pan handling) and the nearby-list sheet's own
+    // drag-to-resize gesture both call stopPropagation()/preventDefault() on
+    // the touch that starts a drag, which (a) stops a bubble-phase listener
+    // from ever seeing it and (b) can suppress the synthetic mousedown a
+    // touch would otherwise generate entirely. A capture-phase listener on
+    // document fires before any of that — nothing can run early enough to
+    // pre-empt it — and listening to touchstart too means there's no
+    // synthetic-mousedown step to lose in the first place.
+    document.addEventListener('mousedown', handleClick, true)
+    document.addEventListener('touchstart', handleClick, true)
     window.addEventListener('scroll', handleScroll, { passive: true, capture: true })
     return () => {
-      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('mousedown', handleClick, true)
+      document.removeEventListener('touchstart', handleClick, true)
       window.removeEventListener('scroll', handleScroll, true)
     }
   }, [openFilterFor])
 
-  function openEditor(id: string, trigger: HTMLElement) {
+  // Tapping a category's filter suffix while the category itself is off
+  // re-checks it instead of opening the editor — reviewing/removing filters
+  // for a category that isn't even shown on the map doesn't mean anything,
+  // so the tap does the one thing that's actually useful here.
+  function openEditor(id: string, on: boolean, trigger: HTMLElement) {
+    if (!on) {
+      onToggle(id)
+      return
+    }
     if (openFilterFor === id) {
       setOpenFilterFor(null)
       return
@@ -173,7 +202,7 @@ export default function CategoryFilter({
               </button>
               {o.filterSuffix && (
                 <button
-                  onClick={(e) => openEditor(o.id, e.currentTarget)}
+                  onClick={(e) => openEditor(o.id, on, e.currentTarget)}
                   aria-expanded={editorOpen}
                   aria-label={`Edit ${o.label} filters`}
                   className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
@@ -194,7 +223,11 @@ export default function CategoryFilter({
               return createPortal(
                 <div
                   ref={popupRef}
-                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, width: popupPos.width }}
+                  // A floor, not a fixed size — never narrower than the chip
+                  // segment it dropped down from, but free to grow wider if
+                  // a single entry needs more room, rather than wrapping
+                  // that entry onto a second line to stay within it.
+                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, minWidth: popupPos.width }}
                   className="z-50 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
                 >
                   <div className="flex flex-col gap-1">
