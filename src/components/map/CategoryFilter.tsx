@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
-import type { MapPoint } from './ResourceMap'
-import CategoryFilterControls from './CategoryFilterControls'
+import { activeFilterEntries } from './CategoryFilterControls'
 
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
@@ -41,18 +41,20 @@ type Props = {
    *  row — used by the full-screen category picker `onMore` opens, which has
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
-  /** Real category configs and points, plus the current bool/select filter
-   *  state and its setters — needed only to power the inline filter editor
-   *  a chip's `filterSuffix` opens. */
+  /** Real category configs, plus the current bool/select filter state and
+   *  its setters — needed only to power the inline filter editor a chip's
+   *  `filterSuffix` opens. */
   categories: CategoryConfig[]
-  points: MapPoint[]
   boolFields: string[]
   onToggleBool: (categoryId: string, key: string) => void
   selectFilters: Record<string, string[]>
   onToggleSelectValue: (categoryId: string, key: string, value: string) => void
 }
 
-const POPUP_WIDTH_PX = 190
+// A rough estimate used only to keep the popup from running off the right
+// edge of the screen — the box itself hugs its actual content width (it's
+// not fixed), so this just needs to be a sane upper bound, not exact.
+const POPUP_WIDTH_ESTIMATE_PX = 240
 
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus "Show all" / "Hide all" shortcuts. A single horizontal-scroll
@@ -68,7 +70,6 @@ export default function CategoryFilter({
   onMore,
   wrap,
   categories,
-  points,
   boolFields,
   onToggleBool,
   selectFilters,
@@ -87,23 +88,27 @@ export default function CategoryFilter({
   // horizontal scroll container. At most one open at a time.
   const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const containerRefs = useRef(new Map<string, HTMLDivElement>())
+  // The popup itself is portaled to document.body (so it can't be knocked
+  // out of place by an ancestor's CSS transform — see CategoryFilterControls'
+  // own nested CheckboxDropdown for the same fix) — it's no longer a DOM
+  // descendant of the chip's own container, so it needs its own ref for the
+  // outside-click check below.
+  const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!openFilterFor) return
     function handleClick(e: MouseEvent) {
-      const el = openFilterFor ? containerRefs.current.get(openFilterFor) : null
-      if (el && !el.contains(e.target as Node)) {
-        setOpenFilterFor(null)
-        setOpenDropdown(null)
-      }
+      const target = e.target as Node
+      const chipEl = openFilterFor ? containerRefs.current.get(openFilterFor) : null
+      if (chipEl?.contains(target)) return
+      if (popupRef.current?.contains(target)) return
+      setOpenFilterFor(null)
     }
     // Close if the user scrolls the chip row (or the page) so the popup
     // doesn't float in the wrong spot, detached from the chip it came from.
     function handleScroll() {
       setOpenFilterFor(null)
-      setOpenDropdown(null)
     }
     document.addEventListener('mousedown', handleClick)
     window.addEventListener('scroll', handleScroll, { passive: true, capture: true })
@@ -116,16 +121,14 @@ export default function CategoryFilter({
   function openEditor(id: string, trigger: HTMLElement) {
     if (openFilterFor === id) {
       setOpenFilterFor(null)
-      setOpenDropdown(null)
       return
     }
     const rect = trigger.getBoundingClientRect()
     setPopupPos({
       top: rect.bottom + 4,
-      left: Math.min(rect.left, window.innerWidth - POPUP_WIDTH_PX - 8),
+      left: Math.min(rect.left, window.innerWidth - POPUP_WIDTH_ESTIMATE_PX - 8),
     })
     setOpenFilterFor(id)
-    setOpenDropdown(null)
   }
 
   const openOption = openFilterFor ? options.find((o) => o.id === openFilterFor) : undefined
@@ -187,25 +190,42 @@ export default function CategoryFilter({
               )}
             </div>
 
-            {editorOpen && popupPos && openOption && openCategory && (
-              <div
-                style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
-                className="z-50 w-[190px] rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
-              >
-                <CategoryFilterControls
-                  category={openCategory}
-                  categoryId={openOption.id}
-                  points={points}
-                  boolFields={boolFields}
-                  onToggleBool={onToggleBool}
-                  selectFilters={selectFilters}
-                  onToggleSelectValue={onToggleSelectValue}
-                  openDropdown={openDropdown}
-                  onOpenDropdown={setOpenDropdown}
-                  layout="stack"
-                />
-              </div>
-            )}
+            {editorOpen && popupPos && openOption && openCategory && (() => {
+              const entries = activeFilterEntries(openCategory, boolFields, selectFilters)
+              // Nothing left to review — rather than leave an empty box
+              // hanging open, disappear along with the last unchecked entry
+              // (the chip's own filterSuffix vanishes at the same moment).
+              if (entries.length === 0) return null
+              return createPortal(
+                <div
+                  ref={popupRef}
+                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+                  className="z-50 max-w-[260px] rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+                >
+                  <div className="flex flex-col gap-1">
+                    {entries.map((entry) => (
+                      <label
+                        key={entry.kind === 'bool' ? entry.key : `${entry.key}:${entry.value}`}
+                        className="flex items-center gap-2 rounded px-1 py-1 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked
+                          onChange={() =>
+                            entry.kind === 'bool'
+                              ? onToggleBool(openOption.id, entry.key)
+                              : onToggleSelectValue(openOption.id, entry.key, entry.value)
+                          }
+                          className="accent-primary h-4 w-4 cursor-pointer"
+                        />
+                        {entry.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>,
+                document.body,
+              )
+            })()}
           </div>
         )
       })}

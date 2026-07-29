@@ -52,6 +52,40 @@ export function categoryHasFilterableFields(cat: CategoryConfig | undefined): bo
   return cat.detailFields.some((f) => f.filterable && (f.type === 'boolean' || f.type === 'select'))
 }
 
+/** One currently-active bool field, or one currently-chosen value of a
+ *  select field — the unit the chip's own filter editor lists (see
+ *  activeFilterEntries below), as opposed to every possible value a field
+ *  could take (what the "More" picker's own controls offer). */
+export type ActiveFilterEntry =
+  | { kind: 'bool'; key: string; label: string }
+  | { kind: 'select'; key: string; value: string; label: string }
+
+/** Every bool/select filter currently applied to `category`, flattened into
+ *  one list — a category with "Keystone-K" and "Restaurant" active (Kosher
+ *  Cert and Type respectively) yields two entries, one per value, regardless
+ *  of which field each came from. Used by the chip's own filter editor, which
+ *  is a "review and remove what's on" panel, not a "pick any of these" one —
+ *  it has nothing to show for a field with no active value, and no affordance
+ *  to add one. */
+export function activeFilterEntries(
+  category: CategoryConfig,
+  boolFields: string[],
+  selectFilters: Record<string, string[]>,
+): ActiveFilterEntry[] {
+  const entries: ActiveFilterEntry[] = []
+  for (const f of category.detailFields) {
+    if (!f.filterable) continue
+    if (f.type === 'boolean') {
+      if (boolFields.includes(f.key)) entries.push({ kind: 'bool', key: f.key, label: f.filterLabel ?? f.label })
+    } else if (f.type === 'select') {
+      for (const value of selectFilters[f.key] ?? []) {
+        entries.push({ kind: 'select', key: f.key, value, label: value })
+      }
+    }
+  }
+  return entries
+}
+
 type Props = {
   category: CategoryConfig
   categoryId: string
@@ -64,11 +98,6 @@ type Props = {
    *  owned by the caller so it can coexist with whatever else is expanded. */
   openDropdown: string | null
   onOpenDropdown: (key: string | null) => void
-  /** 'wrap' (default) lets controls flow onto multiple lines, side by side —
-   *  fine in the picker's full-width row. 'stack' puts one control per line —
-   *  used by the chip's own narrow inline editor, where a wrapped row would
-   *  read as a second, unrelated axis of layout right under a single chip. */
-  layout?: 'wrap' | 'stack'
 }
 
 /** One category's own bool/select filter controls — a row of "Open now"-style
@@ -85,7 +114,6 @@ export default function CategoryFilterControls({
   onToggleSelectValue,
   openDropdown,
   onOpenDropdown,
-  layout = 'wrap',
 }: Props) {
   const ownFieldKeys = new Set(category.detailFields.map((f) => f.key))
   const boolFieldsFor = category.detailFields.filter((f) => f.filterable && f.type === 'boolean')
@@ -95,7 +123,7 @@ export default function CategoryFilterControls({
   if (boolFieldsFor.length === 0 && selectFieldsFor.length === 0) return null
 
   return (
-    <div className={layout === 'stack' ? 'flex flex-col items-start gap-1.5' : 'flex flex-wrap gap-1.5'}>
+    <div className="flex flex-wrap gap-1.5">
       {boolFieldsFor.map((f) => {
         const active = boolFields.includes(f.key)
         return (
