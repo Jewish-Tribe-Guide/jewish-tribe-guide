@@ -492,25 +492,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filterChips])
 
-  // Bumped by showOnly (below) — same "surface the result" behavior as the
-  // effect above, but for jumping straight to one category from the picker
-  // rather than a text/field-filter commit. A plain category toggle (the
-  // compact chip row, or the picker's own checkbox) does NOT trigger this —
-  // only the picker's explicit "view this category" action does, so casually
-  // building up a multi-category selection doesn't fight the sheet's height.
-  const [isolateSignal, setIsolateSignal] = useState(0)
-  useEffect(() => {
-    if (isolateSignal === 0 || !isMobile) return
-    if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
-    else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isolateSignal])
-
-  // Clears any active bool/select filter belonging to one of `ids` — called
-  // whenever a category goes from selected to not-selected, since a filter
-  // scoped to a category that's no longer shown shouldn't linger around
-  // (still silently narrowing results, or reappearing confusingly if the
-  // category gets re-checked later).
+  // Clears any active bool/select filter belonging to one of `ids` — an
+  // explicit reset (Hide all, or narrowing down via "Show all" → one chip),
+  // not something that happens just from toggling a category off: a filter
+  // stays put across an off/on cycle so it's there again when the category
+  // comes back, and the only way to actually clear it is to unset it directly
+  // (the picker's per-field controls, or the chip's own inline editor).
   function clearFiltersForCategories(ids: Iterable<string>) {
     const idSet = new Set(ids)
     if (idSet.size === 0) return
@@ -535,16 +522,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // straight down to just that category — same as Google Maps' filter
     // chips — rather than requiring "Hide all" first and then re-enabling
     // the one category you actually wanted. Once you've narrowed down,
-    // further taps add/remove from that subset as before.
+    // further taps add/remove from that subset as before. Any category's
+    // stored filters ride along either way (see clearFiltersForCategories).
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
-      clearFiltersForCategories(options.map((o) => o.id).filter((x) => x !== id))
       return
     }
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
       next.delete(id)
-      clearFiltersForCategories([id])
     } else {
       next.add(id)
     }
@@ -566,23 +552,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
       next.delete(id)
-      clearFiltersForCategories([id])
     } else {
       next.add(id)
     }
     setSelected(next)
-  }
-
-  // The category picker's "view this category" action — the picker's other
-  // purpose besides toggling filters: jump straight to browsing everything in
-  // one category, same as tapping its card from the home grid would, just
-  // without leaving the map. Narrows to just that category and closes back to
-  // the map; isolateSignal (above) then surfaces however many results that is.
-  const showOnly = (id: string) => {
-    setSelected(new Set([id]))
-    clearFiltersForCategories(Array.from(effectiveSelected).filter((x) => x !== id))
-    setCategoriesOpen(false)
-    setIsolateSignal((n) => n + 1)
   }
 
   // Adds `id` to the current selection without touching anything else —
@@ -723,6 +696,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             onToggle={toggle}
             onAll={showAll}
             onNone={hideAll}
+            categories={categories ?? []}
+            points={allPoints}
+            boolFields={boolFields}
+            onToggleBool={toggleBoolField}
+            selectFilters={selectFilters}
+            onToggleSelectValue={toggleSelectValue}
           />
         </div>
       )}
@@ -873,6 +852,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onNone={hideAll}
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
+                        categories={categories ?? []}
+                        points={allPoints}
+                        boolFields={boolFields}
+                        onToggleBool={toggleBoolField}
+                        selectFilters={selectFilters}
+                        onToggleSelectValue={toggleSelectValue}
                       />
                     </div>
                   )}
@@ -1020,12 +1005,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {/* ── Full-screen category picker (mobile) — the quick chip row's
               trailing "More" chip opens this, same as Google Maps expanding
-              its own filter row into a dedicated screen. Serves two jobs: a
-              checkbox per category to build a multi-category browse (top-down
-              full-width rows — easier one-handed reach than the chip row's
-              pill cluster), and each category's own filterable fields right
-              there, plus a tap on the row itself to jump straight to browsing
-              just that one category (see CategoryPickerList). ────────────── */}
+              its own filter row into a dedicated screen. A checkbox per
+              category builds a multi-category browse (top-down full-width
+              rows — easier one-handed reach than the chip row's pill
+              cluster), and each category with its own filterable fields gets
+              a chevron that expands the row in place to reveal them (see
+              CategoryPickerList). ────────────────────────────────────────── */}
       {categoriesOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white sm:hidden">
           <div
@@ -1054,7 +1039,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               points={allPoints}
               selected={effectiveSelected}
               onToggle={toggleCategoryCheckbox}
-              onShowOnly={showOnly}
               boolFields={boolFields}
               onToggleBool={toggleBoolField}
               selectFilters={selectFilters}

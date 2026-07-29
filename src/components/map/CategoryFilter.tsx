@@ -1,5 +1,10 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import type { CategoryConfig } from '@/lib/categories'
+import type { MapPoint } from './ResourceMap'
+import CategoryFilterControls from './CategoryFilterControls'
+
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
   id: string
@@ -12,7 +17,10 @@ export type FilterOption = {
   /** Active bool/select filter(s) scoped to this category, already formatted
    *  for display (e.g. "Keilim", or "Catering, Keystone-K") — folded right
    *  into the chip instead of showing as a separate row of removable pills
-   *  below it, so there's one thing to look at, not two. */
+   *  below it, so there's one thing to look at, not two. Doubles as its own
+   *  tap target: tapping this part of the chip (rather than the rest of it)
+   *  opens a small inline editor for that category's filters instead of
+   *  toggling the category on/off. */
   filterSuffix?: string
 }
 
@@ -33,16 +41,95 @@ type Props = {
    *  row — used by the full-screen category picker `onMore` opens, which has
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
+  /** Real category configs and points, plus the current bool/select filter
+   *  state and its setters — needed only to power the inline filter editor
+   *  a chip's `filterSuffix` opens. */
+  categories: CategoryConfig[]
+  points: MapPoint[]
+  boolFields: string[]
+  onToggleBool: (categoryId: string, key: string) => void
+  selectFilters: Record<string, string[]>
+  onToggleSelectValue: (categoryId: string, key: string, value: string) => void
 }
+
+const POPUP_WIDTH_PX = 190
 
 /** The filter bar above the map: a chip per category that doubles as the color
  *  legend, plus "Show all" / "Hide all" shortcuts. A single horizontal-scroll
  *  row (native scrollbar, styled thin via the `chip-scroll` class in
  *  globals.css) rather than wrapping, so it stays compact over the map. */
-export default function CategoryFilter({ options, selected, onToggle, onAll, onNone, maxVisible, onMore, wrap }: Props) {
+export default function CategoryFilter({
+  options,
+  selected,
+  onToggle,
+  onAll,
+  onNone,
+  maxVisible,
+  onMore,
+  wrap,
+  categories,
+  points,
+  boolFields,
+  onToggleBool,
+  selectFilters,
+  onToggleSelectValue,
+}: Props) {
   const allOn = options.every((o) => selected.has(o.id))
   const visible = maxVisible != null ? options.slice(0, maxVisible) : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
+
+  // Which category's inline filter editor is open — opened by tapping a
+  // chip's own filterSuffix (rather than the chip itself, which keeps
+  // toggling the category on/off) — and where it's anchored: computed from
+  // that button's own position so the popup drops down attached right below
+  // whichever chip was actually tapped, not the row as a whole. Fixed
+  // positioning (not absolute) so it isn't clipped by the chip row's own
+  // horizontal scroll container. At most one open at a time.
+  const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const containerRefs = useRef(new Map<string, HTMLDivElement>())
+
+  useEffect(() => {
+    if (!openFilterFor) return
+    function handleClick(e: MouseEvent) {
+      const el = openFilterFor ? containerRefs.current.get(openFilterFor) : null
+      if (el && !el.contains(e.target as Node)) {
+        setOpenFilterFor(null)
+        setOpenDropdown(null)
+      }
+    }
+    // Close if the user scrolls the chip row (or the page) so the popup
+    // doesn't float in the wrong spot, detached from the chip it came from.
+    function handleScroll() {
+      setOpenFilterFor(null)
+      setOpenDropdown(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true })
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [openFilterFor])
+
+  function openEditor(id: string, trigger: HTMLElement) {
+    if (openFilterFor === id) {
+      setOpenFilterFor(null)
+      setOpenDropdown(null)
+      return
+    }
+    const rect = trigger.getBoundingClientRect()
+    setPopupPos({
+      top: rect.bottom + 4,
+      left: Math.min(rect.left, window.innerWidth - POPUP_WIDTH_PX - 8),
+    })
+    setOpenFilterFor(id)
+    setOpenDropdown(null)
+  }
+
+  const openOption = openFilterFor ? options.find((o) => o.id === openFilterFor) : undefined
+  const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
 
   return (
     <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
@@ -54,32 +141,72 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
       </button>
       {visible.map((o) => {
         const on = selected.has(o.id)
+        const editorOpen = openFilterFor === o.id
         return (
-          <button
+          <div
             key={o.id}
-            onClick={() => onToggle(o.id)}
-            aria-pressed={on}
-            className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-              on
-                ? 'border-transparent text-white'
-                : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
-            }`}
-            style={on ? { backgroundColor: o.color } : undefined}
+            ref={(el) => {
+              if (el) containerRefs.current.set(o.id, el)
+              else containerRefs.current.delete(o.id)
+            }}
+            className="relative shrink-0"
           >
-            <span
-              className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
-              style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
-              aria-hidden="true"
-            />
-            {o.icon && <span aria-hidden="true">{o.icon}</span>}
-            <span>{o.label}</span>
-            <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
-            {o.filterSuffix && (
-              <span className={`border-l pl-1 ${on ? 'border-white/30 text-white/90' : 'border-slate-300 text-slate-500'}`}>
-                {o.filterSuffix}
-              </span>
+            <div
+              className={`flex items-stretch rounded-full border text-xs font-medium transition-colors ${
+                on ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+              }`}
+              style={on ? { backgroundColor: o.color } : undefined}
+            >
+              <button
+                onClick={() => onToggle(o.id)}
+                aria-pressed={on}
+                className={`flex items-center gap-1 py-1 pl-2.5 ${o.filterSuffix ? 'pr-1.5' : 'pr-2.5'} ${
+                  on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
+                } cursor-pointer`}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
+                  style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
+                  aria-hidden="true"
+                />
+                {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                <span>{o.label}</span>
+                <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
+              </button>
+              {o.filterSuffix && (
+                <button
+                  onClick={(e) => openEditor(o.id, e.currentTarget)}
+                  aria-expanded={editorOpen}
+                  aria-label={`Edit ${o.label} filters`}
+                  className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
+                    on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {o.filterSuffix}
+                </button>
+              )}
+            </div>
+
+            {editorOpen && popupPos && openOption && openCategory && (
+              <div
+                style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+                className="z-50 w-[190px] rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+              >
+                <CategoryFilterControls
+                  category={openCategory}
+                  categoryId={openOption.id}
+                  points={points}
+                  boolFields={boolFields}
+                  onToggleBool={onToggleBool}
+                  selectFilters={selectFilters}
+                  onToggleSelectValue={onToggleSelectValue}
+                  openDropdown={openDropdown}
+                  onOpenDropdown={setOpenDropdown}
+                  layout="stack"
+                />
+              </div>
             )}
-          </button>
+          </div>
         )
       })}
       {hiddenCount > 0 && (
