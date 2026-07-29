@@ -31,6 +31,11 @@ type Props = {
   reopenItemId?: string | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
+  /** Mount with the "All Davening Times" modal already open (the hamburger
+   *  menu's "Davening Times" link navigates straight here). Only has any
+   *  effect on a category with structured minyanim data (see `hasMinyanim`
+   *  below) — harmless no-op otherwise. */
+  initialDaveningModalOpen?: boolean
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -42,7 +47,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialDaveningModalOpen, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -52,7 +57,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [sortByPopular, setSortByPopular] = useState(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [daveningModalOpen, setDaveningModalOpen] = useState(false)
+  const [daveningModalOpen, setDaveningModalOpen] = useState(!!initialDaveningModalOpen)
   const isMobile = useIsMobile()
   const categories = useCategories()
   const hasMapCategory = !!categories?.some((c) => c.kind === 'map')

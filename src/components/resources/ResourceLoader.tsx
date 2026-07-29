@@ -14,6 +14,9 @@ type Props = {
   reopenItemId?: string | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
+  /** Open the "All Davening Times" modal on arrival (the hamburger menu's
+   *  "Davening Times" link). */
+  initialDaveningModalOpen?: boolean
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
@@ -25,7 +28,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, anchor, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function ResourceLoader({ category, anchor, reopenItemId, initialSearch, initialDaveningModalOpen, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
   const [items, setItems] = useState<DirectoryResource[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const title = category.pluralLabel
@@ -96,6 +99,6 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialDaveningModalOpen={initialDaveningModalOpen} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
   )
 }

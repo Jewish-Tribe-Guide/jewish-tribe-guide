@@ -6,7 +6,7 @@ import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import ZmanimWidget from '@/components/home/ZmanimWidget'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import { needsDarkText, readableTextOnWhite } from '@/components/Collapsible'
+import { readableTextOnWhite } from '@/components/Collapsible'
 import { ACCENT_PALETTE, HOSPITALS_ID, rankMapId } from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
@@ -50,52 +50,45 @@ type GetConnectedItem = {
    *  list instead of calling `go()` — see GetConnectedAccordion's
    *  `embeddedFlow` state. */
   embed?: 'support' | 'volunteer'
-  /** When set, clicking this item shows ITS full listing detail (a
-   *  GenericListingCard) beside the list instead of calling `go()` — see
-   *  GetConnectedAccordion's `detailItemId` state. */
+  /** When set, clicking this item reveals its full listing detail inline
+   *  (description, fields, website link, everything — just without a
+   *  repeated title) instead of calling `go()` — see GetConnectedAccordion's
+   *  `detailItemId` state. */
   detail?: DirectoryResource
 }
 type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem[] }
 
-/** "Get Connected" — same width as the map above it (both sit in the same
- *  `max-w-6xl` container). Matches the MAP's own graphic language: each tab
- *  colored from the same `ACCENT_PALETTE` the map's category buttons cycle
- *  through — filled solid + white text when active, white + that color's
- *  own border/text when it isn't, exactly like a map key button toggling
- *  on — instead of one flat navy/gold scheme, which reads punchier (five
- *  distinct colors instead of one repeated pair) and ties the section back
- *  to the map visually. Square corners throughout, each tab flush against
- *  its neighbors (no gaps) so the row still reads as one continuous
- *  divided bar.
+/** "Get Connected" — ONE solid-blue, fully rounded pill holding the category
+ *  tabs (not a divided rectangular strip), centered on the screen rather
+ *  than pinned to the top of it. The pill's own shape/size never changes —
+ *  what moves is the whole {pill + list panel} GROUP's total height, and
+ *  since the screen wrapping this component keeps it vertically centered
+ *  (`sm:justify-center`, see the call site), the pill visually glides to a
+ *  new position on screen every time the panel below it opens, closes, or
+ *  grows to show an embedded form/detail card — "the bar moves around the
+ *  screen" is really just a side effect of plain flexbox re-centering a
+ *  group whose height keeps changing, animated smoothly because the panel's
+ *  own reveal uses the grid-template-rows 0fr/1fr trick (so the browser has
+ *  an actual height to transition, not an abrupt mount/unmount).
  *
- *  Each tab's dropdown renders directly under THAT tab and exactly as wide
- *  as it is — a real "drops down from the item you clicked" read, not one
- *  shared box that always starts at the row's left edge regardless of
- *  which tab (over on the right, say) actually opened it. It's positioned
- *  with a normal-flow CSS grid below the tab strip (`repeat(N, 1fr)`,
- *  matching the tab row's own equal division) rather than
- *  `position: absolute`, specifically so it takes up real space and grows
- *  the section — pushing the Zmanim block further down the page — instead
- *  of floating over whatever's below. Only one open at a time; clicking
- *  the same tab again closes it.
- *
- *  Some items don't navigate at all when clicked — a SECOND bordered box
- *  opens beside that tab's dropdown, in an adjacent grid column (not
- *  replacing the dropdown, so the list stays visible and clickable),
- *  showing either:
+ *  Clicking a tab reveals a SEPARATE floating panel below the pill (not
+ *  nested inside the pill's own shape) listing that category's items —
+ *  still tinted with that category's own `ACCENT_PALETTE` color for a
+ *  border/hover accent, even though the pill itself is uniformly blue.
+ *  Some items don't navigate at all when clicked — instead, right under
+ *  THAT item (not the bottom of the whole list), either:
  *  - `embed` (Support/Volunteer's "Interest Form" entries): the real
  *    SupportWizard/VolunteerWizard, `variant="inline"`.
  *  - `detail` (Professional Networks/Social Opportunities/WhatsApp Groups'
- *    real listings): that listing's own GenericListingCard, same as its
- *    full directory page shows, instead of navigating there.
- *  Professional Networks (and Support & Volunteering) open their second
- *  box in the column to the RIGHT of the dropdown; Social Opportunities
- *  and WhatsApp Groups (the last/rightmost tab, where a right-side box
- *  would run off the grid's own edge) open it in the column to the LEFT
- *  instead — same box, same visual treatment, just anchored to whichever
- *  side actually has room. Switching tabs (or re-clicking the
- *  same one to close it) always resets both `embeddedFlow` and
- *  `detailItemId`, so neither can linger under a different tab. */
+ *    real listings): that listing's own GenericListingCard with its header
+ *    hidden (`hideHeader`) — description, fields, tags, hours, website
+ *    link, everything it normally shows, just without repeating the name
+ *    the item's own label above already gives.
+ *  Both kinds get the same open/closed chevron on the right of their own
+ *  list button.
+ *  Switching tabs (or re-clicking the same one to close it) always resets
+ *  both `embeddedFlow` and `detailItemId`, so neither can linger under a
+ *  different tab. */
 function GetConnectedAccordion({
   categories,
   categoryConfigs,
@@ -113,6 +106,10 @@ function GetConnectedAccordion({
   const detailItem = active?.items.find((it) => it.detail && it.id === detailItemId)
   const detailCategory = detailItem?.detail ? categoryConfigs?.find((c) => c.id === detailItem.detail!.category) : undefined
   const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
+  // Paler palette steps are too light to read as text on white — same fix
+  // used everywhere else this palette gets used as a hover/accent text
+  // color (see Collapsible.tsx).
+  const readableActiveColor = readableTextOnWhite(activeColor ?? '#1d3557')
 
   const selectTab = (id: string) => {
     setActiveId((prev) => (prev === id ? null : id))
@@ -120,33 +117,33 @@ function GetConnectedAccordion({
     setDetailItemId(null)
   }
 
+  // The pill and its panel share one shrink-wrapped column sized to the
+  // WIDER of the two (the panel, since it's usually wider than the pill) —
+  // `items-start`/`items-end` snaps both to that column's left/right edge,
+  // which is the same thing as saying the panel's edge lines up with the
+  // pill's edge, without needing to measure either element's actual pixel
+  // width in JS. Support & Volunteering aligns left, WhatsApp Groups aligns
+  // right (its own explicit request); everything else stays centered, the
+  // original behavior.
+  const panelAlign = active?.id === 'support-volunteering' ? 'items-start' : active?.id === 'whatsapp' ? 'items-end' : 'items-center'
+
   return (
-    <div className="w-full bg-[#fefefe]">
-      <div className="flex" role="tablist">
-        {categories.map((cat, i) => {
-          const color = ACCENT_PALETTE[i % ACCENT_PALETTE.length]
+    <div className="flex w-full justify-center">
+      <div className={`flex flex-col ${panelAlign}`}>
+      <div className="flex gap-1 rounded-full bg-white p-1.5 shadow-lg" role="tablist">
+        {categories.map((cat) => {
           const isActive = cat.id === activeId
-          // The palette's paler steps (pale aqua, light blue) wash out under
-          // white text — `needsDarkText` (shared with the map's own contrast
-          // logic, see Collapsible.tsx) checks actual luminance instead of
-          // hardcoding which hex that is, so it keeps working automatically
-          // if the palette's exact colors ever shift again.
-          const activeTextClass = needsDarkText(color) ? 'text-[#0C3D57]' : 'text-white'
-          // The raw palette color is fine as a solid FILL (the active tab
-          // background above), but several of its paler steps are too light
-          // to read as TEXT directly on white — `readableTextOnWhite` darkens
-          // just enough to stay legible while still keeping each tab's own
-          // distinct hue when inactive.
-          const inactiveTextColor = readableTextOnWhite(color)
           return (
             <button
               key={cat.id}
               onClick={() => selectTab(cat.id)}
               role="tab"
               aria-selected={isActive}
-              style={isActive ? { backgroundColor: color } : { color: inactiveTextColor }}
-              className={`flex-1 border-r border-b-2 border-slate-200 px-3 py-3.5 text-center text-xs font-bold transition-colors cursor-pointer last:border-r-0 sm:text-sm ${
-                isActive ? activeTextClass : 'bg-white hover:brightness-95'
+              className={`rounded-full px-5 py-2.5 text-xs font-bold whitespace-nowrap transition-colors cursor-pointer sm:text-sm ${
+                // Active tab swaps to the inverse of the pill's own base
+                // colors (fill instead of text) instead of just changing
+                // text color, so clicking a tab visibly flips it.
+                isActive ? 'bg-[#569DF0] text-white' : 'text-slate-600 hover:bg-[#569DF0]/10'
               }`}
             >
               {cat.title}
@@ -155,145 +152,133 @@ function GetConnectedAccordion({
         })}
       </div>
 
-      <div className="grid transition-[grid-template-rows] duration-300 ease-in-out" style={{ gridTemplateRows: active ? '1fr' : '0fr' }}>
+      {/* The floating panel — a separate element from the pill above (its
+          shape/size is untouched by this), revealed via the same
+          grid-template-rows 0fr/1fr trick used elsewhere so its HEIGHT
+          animates opening/closing instead of popping in. Its horizontal
+          alignment relative to the pill (centered/left/right) comes from
+          `panelAlign` on the shared wrapper above, not from anything set
+          here. */}
+      <div
+        className="grid w-full max-w-md transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: active ? '1fr' : '0fr' }}
+      >
         <div className="overflow-hidden">
-          {active && (() => {
-            // Both boxes anchor to the LEFT (second box before the list)
-            // for Social Opportunities and WhatsApp Groups (the last/
-            // rightmost tab, where a right-side box would run off the
-            // grid's own edge); everywhere else the second box trails the
-            // list on the right. Anchoring left shifts the whole pair's
-            // grid-column span earlier instead of moving the list itself —
-            // the list's OWN track never changes, only which side of it
-            // the pair's shared box starts from. The second box gets TWO
-            // tracks' worth of room (vs. the list's one, via the flex-[2]
-            // below) so it can actually breathe instead of being squeezed
-            // to exactly one tab's width.
-            const anchorLeft = active.id === 'social' || active.id === 'whatsapp'
-            const listTrack = activeIndex + 1
-            const spanStart = anchorLeft ? listTrack - 2 : listTrack
-            const spanEnd = spanStart + 3
-
-            // Raw palette colors are fine as borders/fills, but a couple of
-            // this palette's paler steps are too light to read as TEXT on
-            // the near-white `bg-slate-50` these hover/open states use —
-            // same fix as the tab labels above.
-            const readableActiveColor = readableTextOnWhite(activeColor ?? '#0C3D57')
-            const listBox = (
-              <div style={{ borderColor: activeColor }} className="min-w-0 flex-1 border border-t-0 bg-white shadow-lg">
-                {active.items.length > 0 ? (
-                  <ul className="divide-y divide-slate-100">
-                    {active.items.map((item) => {
-                      const isOpenEmbed = item.embed && item.embed === embeddedFlow
-                      const isOpenDetail = item.detail && item.id === detailItemId
-                      const isOpen = isOpenEmbed || isOpenDetail
-                      return (
-                        <li key={item.id}>
-                          <button
-                            onClick={() => {
-                              if (item.embed) setEmbeddedFlow(item.embed)
-                              else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
-                              else item.go()
-                            }}
-                            style={{ '--hover-color': readableActiveColor } as React.CSSProperties}
-                            className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
-                              isOpen
-                                ? 'bg-slate-50 text-[var(--hover-color)]'
-                                : // Once something in this list is open, every OTHER
-                                  // item dims — the same "one item stands out, the
-                                  // rest recede" read the two-item Support &
-                                  // Volunteering list already had by virtue of only
-                                  // having one alternative to compare against.
-                                  hasSecondBox
-                                  ? 'text-slate-300 hover:text-slate-500'
-                                  : 'text-slate-700'
-                            }`}
-                          >
+          {active && (
+            <div style={{ borderColor: activeColor }} className="mt-3 overflow-hidden rounded-2xl border-2 bg-white shadow-lg">
+              {active.items.length > 0 ? (
+                <ul className="divide-y divide-slate-100">
+                  {active.items.map((item) => {
+                    const isOpenEmbed = item.embed && item.embed === embeddedFlow
+                    const isOpenDetail = item.detail && item.id === detailItemId
+                    const isOpen = isOpenEmbed || isOpenDetail
+                    return (
+                      <li key={item.id}>
+                        <button
+                          onClick={() => {
+                            const embed = item.embed
+                            if (embed) setEmbeddedFlow((prev) => (prev === embed ? null : embed))
+                            else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
+                            else item.go()
+                          }}
+                          style={{ '--hover-color': readableActiveColor } as React.CSSProperties}
+                          className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
+                            isOpen
+                              ? 'bg-slate-50 text-[var(--hover-color)]'
+                              : // Once something in this list is open, every OTHER
+                                // item dims — the same "one item stands out, the
+                                // rest recede" read the two-item Support &
+                                // Volunteering list already had by virtue of only
+                                // having one alternative to compare against.
+                                hasSecondBox
+                                ? 'text-slate-300 hover:text-slate-500'
+                                : 'text-slate-700'
+                          }`}
+                        >
+                          <span>
                             {item.icon && <span aria-hidden="true" className="mr-1.5">{item.icon}</span>}
                             {item.label}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                ) : (
-                  <p className="px-4 py-3 text-sm italic text-slate-400">Coming soon</p>
-                )}
-              </div>
-            )
+                          </span>
+                          {/* Every expandable item gets a chevron (both
+                              `embed`, the wizards, and `detail`, the
+                              listing-detail cards) — only plain `go()`
+                              items (which just navigate) skip it. */}
+                          {(item.embed || item.detail) && (
+                            <svg
+                              className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                            </svg>
+                          )}
+                        </button>
 
-            // Always rendered (even while closed) so it can animate open —
-            // `flex-[2]` (vs. the list's `flex-1`) gives it twice the
-            // list's width, since the shared span above now reserves three
-            // tracks total (one for the list, two for this), and the
-            // grid-template-rows 0fr/1fr trick collapses/reveals its
-            // HEIGHT only, so its WIDTH (and therefore the list's own
-            // width) never jumps when it opens or closes.
-            const secondBox = (
-              <div
-                style={{ gridTemplateRows: hasSecondBox ? '1fr' : '0fr' }}
-                className="grid min-w-0 flex-[2] transition-[grid-template-rows] duration-300 ease-in-out"
-              >
-                <div className="overflow-hidden">
-                  <div style={{ borderColor: activeColor }} className="border border-t-0 bg-white shadow-lg">
-                    {embedItem ? (
-                      embedItem.embed === 'support' ? (
-                        <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                      ) : (
-                        <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                      )
-                    ) : detailItem?.detail && detailCategory ? (
-                      <div className="p-3">
-                        <GenericListingCard
-                          item={detailItem.detail}
-                          category={detailCategory}
-                          upvotes={!!detailCategory.upvotesEnabled}
-                          count={detailItem.detail.upvotes ?? 0}
-                          expanded
-                          dense
-                          hideBorder
-                          highlightColor={activeColor}
-                          onVote={() => {}}
-                          onTagClick={() => {}}
-                          onFilterOpen={() => {}}
-                          onFilterBool={() => {}}
-                          onFilterSelect={() => {}}
-                          onEdit={() => detailItem.go()}
-                          onReport={() => detailItem.go()}
-                          onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )
-
-            return (
-              <div className="grid" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
-                {/* One shared flex row holding BOTH boxes, spanning the two
-                    columns they together occupy — keeping them as flex
-                    siblings of a single container (rather than two
-                    independently-positioned grid items) is what makes them
-                    share a flush top/bottom edge and a shared border
-                    regardless of which side the second box is anchored to. */}
-                <div style={{ gridColumn: `${spanStart} / ${spanEnd}` }} className="flex items-stretch">
-                  {anchorLeft ? (
-                    <>
-                      {secondBox}
-                      {listBox}
-                    </>
-                  ) : (
-                    <>
-                      {listBox}
-                      {secondBox}
-                    </>
-                  )}
-                </div>
-              </div>
-            )
-          })()}
+                        {/* The embedded form / listing detail — right under
+                            THIS item (not the bottom of the whole list),
+                            via its own nested grid-rows reveal so it grows
+                            open in place instead of popping in wherever the
+                            list happens to end. */}
+                        <div
+                          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                          style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="border-t border-slate-200">
+                              {isOpenEmbed ? (
+                                item.embed === 'support' ? (
+                                  <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                                ) : (
+                                  <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                                )
+                              ) : isOpenDetail && item.detail && detailCategory ? (
+                                <div className="p-3">
+                                  {/* The item's own label (on the button
+                                      above) already says its name — `hideHeader`
+                                      skips GenericListingCard's own header
+                                      row (which would just repeat it) while
+                                      keeping the full expanded body:
+                                      description, fields, tags, hours,
+                                      website link, everything else it
+                                      normally shows. */}
+                                  <GenericListingCard
+                                    item={item.detail}
+                                    category={detailCategory}
+                                    upvotes={!!detailCategory.upvotesEnabled}
+                                    count={item.detail.upvotes ?? 0}
+                                    expanded
+                                    dense
+                                    hideBorder
+                                    hideHeader
+                                    highlightColor={activeColor}
+                                    onVote={() => {}}
+                                    onTagClick={() => {}}
+                                    onFilterOpen={() => {}}
+                                    onFilterBool={() => {}}
+                                    onFilterSelect={() => {}}
+                                    onEdit={() => item.go()}
+                                    onReport={() => item.go()}
+                                    onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="px-4 py-3 text-sm italic text-slate-400">Coming soon</p>
+              )}
+            </div>
+          )}
         </div>
+      </div>
       </div>
     </div>
   )
@@ -312,7 +297,7 @@ function GetConnectedAccordion({
  *  page (fixed positioning, so it isn't confined to the top bar it's
  *  triggered from) with a dimmed backdrop behind it, rather than a small
  *  popout anchored under the button. */
-function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
+function HamburgerMenu({ resources, onNavigate }: { resources: CardDef[] | null; onNavigate: NavigateFn }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -325,16 +310,31 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
   }, [open])
 
   return (
-    <div className="absolute left-6 inset-y-0 flex items-center text-left">
+    <div className="absolute left-1.5 inset-y-0 z-30 flex items-center text-left">
+      {/* An inward-pointing arrow tucked right at the page edge (subtle —
+          low-opacity until hovered) reads as "there's more this way" rather
+          than the standard hamburger glyph. The "Browse resources" label
+          stays hidden until hover, then reveals sideways (`writing-mode:
+          vertical-rl`) next to the arrow like a book-spine label, instead of
+          permanently taking up horizontal space. Rendered once per screen
+          (see call sites in the desktop storymap flow) rather than one
+          fixed overlay, each vertically centered within its own screen. */}
       <button
         onClick={() => setOpen(true)}
-        aria-label="Open menu"
+        aria-label="Browse resources"
         aria-expanded={open}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-[#fefefe] hover:bg-white/10 cursor-pointer"
+        className="group flex items-center gap-1 rounded-full p-1.5 text-[#fefefe]/40 transition-colors hover:text-[#fefefe] cursor-pointer"
       >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 12h12m0 0l-5-5m5 5l-5 5" />
         </svg>
+        <span
+          aria-hidden="true"
+          style={{ writingMode: 'vertical-rl' }}
+          className="pointer-events-none text-[10px] font-semibold uppercase tracking-widest opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        >
+          Browse resources
+        </span>
       </button>
 
       {/* Dimmed backdrop — click to close, fades with the panel instead of
@@ -374,22 +374,126 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
             </svg>
           </button>
         </div>
-        {resources && (
-          <nav className="min-h-0 flex-1 overflow-y-auto py-2">
-            {resources.map((card) => (
-              <button
-                key={card.id}
-                onClick={() => {
-                  card.go()
-                  setOpen(false)
-                }}
-                className="block w-full px-5 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
-              >
-                {card.title}
-              </button>
-            ))}
-          </nav>
-        )}
+        <nav className="min-h-0 flex-1 overflow-y-auto py-2">
+          {/* Curated addition, not part of the auto-generated category list
+              below — opens the Synagogues directory with its existing "All
+              Davening Times" modal (see GenericDirectory) already expanded,
+              instead of a separate page of its own. */}
+          <button
+            onClick={() => {
+              onNavigate('patient', 'find', { findView: 'synagogue', findOpenDavening: true })
+              setOpen(false)
+            }}
+            className="block w-full px-5 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+          >
+            All Davening Times
+          </button>
+          {resources && resources.map((card) => (
+            <button
+              key={card.id}
+              onClick={() => {
+                card.go()
+                setOpen(false)
+              }}
+              className="block w-full px-5 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              {card.title}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </div>
+  )
+}
+
+/** Top-right Zmanim menu on the desktop top bar — mirrors HamburgerMenu on
+ *  the left exactly (same inward-pointing-arrow trigger, same full-height
+ *  slide-out panel with a dimmed backdrop), just flipped to the right edge
+ *  and holding the live Zmanim widget instead of the resource list. Used to
+ *  be its own full-screen storymap section (screen 4); folded into this
+ *  side panel instead so the desktop flow is three screens (Guide/search,
+ *  Map, Get Connected) with Zmanim reachable from any of them rather than
+ *  only at the very bottom. Also opens on the `jpc:open-zmanim` custom
+ *  event (same pattern as SiteHeader's `jpc:open-location`), which is how
+ *  the search box's "jump to Zmanim" result opens this from outside. */
+function ZmanimMenu({ coords, title }: { coords: { lat: number; lng: number } | null; title?: string }) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
+  useEffect(() => {
+    const onOpenEvent = () => setOpen(true)
+    document.addEventListener('jpc:open-zmanim', onOpenEvent)
+    return () => document.removeEventListener('jpc:open-zmanim', onOpenEvent)
+  }, [])
+
+  return (
+    <div className="absolute right-1.5 inset-y-0 z-30 flex items-center text-right">
+      {/* Same subtle inward-pointing-arrow treatment as HamburgerMenu,
+          mirrored: arrow points LEFT (into the page) since this sits on the
+          right edge, and the label reveals to its left on hover instead of
+          its right — DOM order is [label, icon] rather than
+          HamburgerMenu's [icon, label] so the icon still ends up nearest
+          the true page edge. */}
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Zmanim"
+        aria-expanded={open}
+        className="group flex items-center gap-1 rounded-full p-1.5 text-[#fefefe]/40 transition-colors hover:text-[#fefefe] cursor-pointer"
+      >
+        <span
+          aria-hidden="true"
+          style={{ writingMode: 'vertical-rl' }}
+          className="pointer-events-none text-[10px] font-semibold uppercase tracking-widest opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        >
+          Zmanim
+        </span>
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H8m0 0l5-5m-5 5l5 5" />
+        </svg>
+      </button>
+
+      <div
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-slate-900/40 transition-opacity duration-300 ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+
+      {/* The panel — same motion as HamburgerMenu's, anchored to the RIGHT
+          edge (`right-0`, and sliding via `translate-x-full` instead of
+          `-translate-x-full`) instead of the left. ~1.5x HamburgerMenu's own
+          width (`w-1/4`/`min-w-[390px]` vs. its `w-1/6`/`min-w-[260px]`) —
+          Zmanim's own content (times in two columns) needs more breathing
+          room than the resource-links list does. */}
+      <div
+        className={`fixed inset-y-0 right-0 z-50 flex w-1/4 min-w-[390px] max-w-[85vw] flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-bold text-slate-900">Zmanim</h2>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <ZmanimWidget coords={coords} locationLabel="Your location" title={title} />
+        </div>
       </div>
     </div>
   )
@@ -466,7 +570,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // match scrolls to the map and isolates that category's tab; a Zmanim
   // match scrolls to the widget at the bottom of the page.
   const mapSectionRef = useRef<HTMLDivElement>(null)
-  const zmanimSectionRef = useRef<HTMLDivElement>(null)
+  // Scroll target for the map screen's own "keep scrolling" arrow below.
+  const getConnectedSectionRef = useRef<HTMLDivElement>(null)
+
+  // Desktop's "storymap" scroll — Guide/search, Map, and Get Connected each
+  // fill one full screen and the page snaps from one to the next instead of
+  // scrolling continuously, like flipping through an ArcGIS StoryMap. Zmanim
+  // no longer has its own screen — it lives in the right-edge slide-out
+  // panel (ZmanimMenu) instead, mirroring HamburgerMenu on the left.
+  // `scroll-snap-type` has to live on the element that actually
+  // scrolls (the document itself, i.e. `<html>`, not `<main>` — giving
+  // `<main>` its own `overflow-y-auto` to host it directly would force its
+  // `overflow-x` to `auto` too per the CSS overflow spec, clipping the
+  // `w-screen` full-bleed bands these sections already use), so this toggles
+  // a class on `<html>` for as long as the home page is mounted rather than
+  // setting it globally in layout.tsx, which would snap every other route
+  // too. See the sm:-scoped `.home-snap-scroll` rule in globals.css — mobile
+  // keeps its normal from-the-top scroll untouched.
+  useEffect(() => {
+    document.documentElement.classList.add('home-snap-scroll')
+    return () => document.documentElement.classList.remove('home-snap-scroll')
+  }, [])
   // Mirrors ResourceMapView's own key — the Medical tab is keyed by
   // HOSPITALS_ID rather than the category's own db id, same as its pins.
   const mapIdForCategoryConfig = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITALS_ID : c.id)
@@ -479,8 +603,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     if (!focusedCategoryIds.has(mapId)) toggleCategory(mapId)
     mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+  // Zmanim lives in the right-edge slide-out panel now (ZmanimMenu), not its
+  // own scroll-to screen — same custom-event pattern SiteHeader's mobile
+  // location strip already uses (`jpc:open-location`) to open something
+  // owned by a sibling component instead of threading state through props.
   const jumpToZmanim = () => {
-    zmanimSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document.dispatchEvent(new Event('jpc:open-zmanim'))
   }
 
   const resources = resourceCards(onNavigate, categories)
@@ -541,8 +669,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // WhatsApp used to be its own standalone button above these columns —
   // now just another one of them, listing the real groups the same way
   // Professional Networks/Social Opportunities list real listings, with
-  // `detail` so clicking one pops its GenericListingCard open beside the
-  // list (see GetConnectedAccordion) instead of navigating away.
+  // `detail` so clicking one reveals its website link inline (see
+  // GetConnectedAccordion) instead of navigating away.
   const whatsappItems: GetConnectedItem[] = (listings ?? [])
     .filter((item) => item.category === 'whatsapp')
     .map((item) => ({
@@ -599,119 +727,166 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 sm:pb-0">
-      {/* ── Condensed top bar — site name + tagline only now (the search box
-              moved into its own "What are you looking for?" section right
-              below). Used to also carry a Volunteer/Support/Young
-              Professionals quick-links row here; removed as duplicative once
-              the "Get Connected" section further down covered the same links
-              with real lists under them. Desktop only: mobile keeps its
-              existing compact top (with its own separate title/search in
-              HeroHeading), untouched. Full-bleed band (same breakout as the
-              sections below it) — see [[project_art_deco_home_redesign]].
-              `sm:relative` anchors the hamburger menu (quick links to every
-              category's full page) pinned to its top-left corner. ────────── */}
-      <section className="hidden sm:block sm:relative sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6 sm:text-center">
-        <HamburgerMenu resources={resources} />
-        <h1 className="text-3xl font-extrabold tracking-tight text-[#fefefe]">
-          {settings.name}
-        </h1>
-        {/* Fixed copy per explicit request, not `settings.tagline` — this
-                exact sentence replaces whatever the admin-configured tagline
-                would otherwise show here. */}
-        <p className="text-sm text-[#fefefe]">
-          Community resources for residents, visitors, and hospital patients
-        </p>
-      </section>
-
-      {/* ── "What are you looking for?" search section — its own band between
-              the top bar and the map, centered. `settings.heroTitle`
-              (defaults to "What are you looking for?") is now the search
-              bar's own placeholder text instead of a separate heading above
-              it — same admin-editable copy mobile's HeroHeading shows, so
-              the two never drift apart. Full-bleed-outer + `mx-auto
-              max-w-6xl px-6`-inner wrapper, same pattern as the map/Get
-              Connected/Zmanim bands below. Same navy `#0C3D57` fill as the
-              top bar directly above it (no border/seam between them), so
-              the two read as one continuous band — the search pill itself
-              is a solid white pill regardless, so it stays legible either
-              way. ─────────────────────────────────────────────────────── */}
-      {ui.search.landing && (
-        <section className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:py-8">
-          <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="w-full max-w-xl">
-                <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
-                  <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-                  </svg>
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={settings.heroTitle}
-                    aria-label="Filter resources"
-                    className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-500 focus:outline-none"
-                  />
-                  {query && (
-                    <button
-                      onClick={() => setQuery('')}
-                      aria-label="Clear filter"
-                      className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* ── Mobile-only now: "What are you looking for?" heading + filter —
               desktop hides this whole band since its title was removed and
-              its search box moved into the dedicated search section above. ─ */}
+              its search box moved into the dedicated search section below.
+              Kept OUTSIDE the desktop storymap screens below (rather than
+              nested inside one of them) since it has to actually render on
+              mobile, where every one of those screens is `hidden`. ──────── */}
       <HeroHeading
         settings={settings}
         query={query}
         onQueryChange={setQuery}
       />
 
-      {/* ── Desktop: "jump to" results — categories/Zmanim that match the search
-              box's query but no longer have a tile of their own (they moved into
-              the map list or the widget below), so this is how the search box
-              still reaches them. ──────────────────────────────────────────── */}
-      {hiddenFeatureMatches.length > 0 && (
-        <div className="mt-6 hidden sm:flex flex-wrap gap-2">
-          {hiddenFeatureMatches.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => (card.id === 'zmanim' ? jumpToZmanim() : jumpToMapCategory(card.id!))}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-[#3a86ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[#3a86ff] hover:text-white cursor-pointer"
-            >
-              {card.icon && <span aria-hidden="true">{card.icon}</span>}
-              {card.title}
-              <span aria-hidden="true" className="text-slate-400">↓</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* ── Desktop "storymap" flow — Guide/search, Map, and Get Connected
+              each fill one full screen and the page snaps from one to the
+              next (`home-snap-scroll`, toggled on <html> above, plus the
+              sm:-scoped rule in globals.css) instead of scrolling
+              continuously — flipping through screens like an ArcGIS
+              StoryMap rather than a normal page. Each screen below is its
+              own `sm:snap-start` target. Zmanim isn't one of them anymore —
+              see ZmanimMenu, the right-edge slide-out mirroring
+              HamburgerMenu on the left. ──────────────────────────────────── */}
 
-      {/* ── The map — the real full map screen, right on the home screen. Its
-              own category tabs (down the map's left edge) cover browsing by
-              category directly on the map now, so there's no separate
-              "Browse by Category" list beside it anymore — the map takes the
-              full width. Desktop only: mobile now reaches the same map via
-              its own tab bar entry, so it's dropped from this scroll to
-              avoid showing it twice. ─────────────────────────────────────── */}
-      {/* Full-bleed band (same `w-screen` + `margin-left: calc(50% - 50vw)`
-              breakout as the hero above) — the map itself now runs edge-to-
-              edge and fills the full viewport height too (`h-screen` inside
-              ResourceMapView, gated on `embedded`), so this stretch of the
-              page reads as a full-screen map while it's in view instead of
-              a bordered card inset within the normal max-w-6xl column. ─── */}
+      {/* ── Screen 1: condensed top bar (site name + tagline) + "What are you
+              looking for?" search bar + any "jump to" chips the search
+              produces, combined into ONE snapped screen — together they're
+              what used to be the page's whole top band. `settings.heroTitle`
+              (defaults to "What are you looking for?") is the search bar's
+              own placeholder text — same admin-editable copy mobile's
+              HeroHeading shows, so the two never drift apart. Used to also
+              carry a Volunteer/Support/Young Professionals quick-links row;
+              removed as duplicative once Get Connected (screen 3) covered
+              the same links with real lists under them. Desktop only. ───── */}
+      {/* `sm:h-[90vh]` (not `min-h-screen`) is deliberate — leaving it a
+              little short of the full screen means the map (screen 2) peeks
+              in at the very bottom of the viewport even while snapped here,
+              a visual cue that there's more to scroll to. */}
+      <div className="hidden sm:flex sm:h-[90vh] sm:snap-start sm:flex-col sm:justify-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB]">
+        {/* Full-bleed band (same breakout as the screens below it) — see
+                [[project_art_deco_home_redesign]]. `sm:relative` anchors
+                HamburgerMenu/ZmanimMenu, each vertically centered within
+                this screen along its own left/right edge — rendered again
+                (not shared/fixed) on the map and Get Connected screens too,
+                so they're reachable everywhere without needing one
+                continuous page-wide overlay. ───────────────────────────── */}
+        <section className="hidden sm:relative sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:px-6 sm:py-6 sm:text-center">
+          <HamburgerMenu resources={resources} onNavigate={onNavigate} />
+          <ZmanimMenu coords={coords} title={zmanimCategory?.pluralLabel} />
+          {/* `font-variant: small-caps` (not `uppercase`, a text-transform
+                  that would flatten every letter to the same size) — with
+                  `settings.name` already in normal Title Case, this renders
+                  each word's real capital first letter at full size and
+                  lowercases the rest as smaller caps, instead of an
+                  all-same-size uppercase run. */}
+          <h1 className="text-6xl font-semibold tracking-widest text-[#fefefe] [font-variant:small-caps]">
+            {settings.name}
+          </h1>
+        </section>
+
+        {/* Same fill `#508BEB` as the top bar directly above it (no
+                border/seam between them), so the two read as one continuous
+                band — the search pill itself is a solid white pill
+                regardless, so it stays legible either way. */}
+        {ui.search.landing && (
+          <section className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:py-8">
+            <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="w-full max-w-xl">
+                  <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                    <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={settings.heroTitle}
+                      aria-label="Filter resources"
+                      className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-500 placeholder:font-semibold placeholder:tracking-widest focus:outline-none"
+                    />
+                    {query && (
+                      <button
+                        onClick={() => setQuery('')}
+                        aria-label="Clear filter"
+                        className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Scroll cue — the peek of the map at the bottom of this
+                        screen (see the wrapper's `h-[90vh]` comment above)
+                        already hints there's more below; this spells it out
+                        directly for anyone who doesn't notice the peek. Also
+                        a real button (not just decoration) — clicking it
+                        jumps straight to the map, same `scrollIntoView`
+                        target `jumpToMapCategory` already uses. */}
+                <button
+                  type="button"
+                  onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  aria-label="Scroll to the map"
+                  className="mt-2 flex flex-col items-center gap-1 text-[#fefefe]/70 hover:text-[#fefefe] cursor-pointer"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide">Scroll to explore below</span>
+                  <svg className="h-5 w-5 animate-bounce" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Desktop: "jump to" results — categories/Zmanim that match the
+                search box's query but no longer have a tile of their own
+                (they moved into the map list or the widget below), so this
+                is how the search box still reaches them. ────────────────── */}
+        {hiddenFeatureMatches.length > 0 && (
+          <div className="mt-6 hidden sm:flex flex-wrap justify-center gap-2">
+            {hiddenFeatureMatches.map((card) => (
+              <button
+                key={card.id}
+                onClick={() => (card.id === 'zmanim' ? jumpToZmanim() : jumpToMapCategory(card.id!))}
+                className="inline-flex items-center gap-2 rounded-full border-2 border-[#3a86ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[#3a86ff] hover:text-white cursor-pointer"
+              >
+                {card.icon && <span aria-hidden="true">{card.icon}</span>}
+                {card.title}
+                {/* Zmanim opens the right-edge panel now, not a scroll — "↓"
+                        would be misleading there, so it gets "→" instead. */}
+                <span aria-hidden="true" className="text-slate-400">{card.id === 'zmanim' ? '→' : '↓'}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Screen 2: the map — the real full map screen, right on the home
+              screen. Its own category tabs (down the map's left edge) cover
+              browsing by category directly on the map now, so there's no
+              separate "Browse by Category" list beside it anymore — the map
+              takes the full width. Desktop only: mobile now reaches the same
+              map via its own tab bar entry, so it's dropped from this scroll
+              to avoid showing it twice. Full-bleed band (same `w-screen` +
+              `margin-left: calc(50% - 50vw)` breakout as screen 1) — the map
+              itself runs edge-to-edge and is already exactly one screen tall
+              (`h-screen` inside ResourceMapView, gated on `embedded`), so
+              `sm:snap-start` just has to mark this as its own snap target.
+              Deliberately NO `scroll-mt-*` here — `scroll-margin-top` is
+              honored by mandatory scroll-snap too, not just `scrollIntoView`,
+              so it was leaving a gap at the top of the viewport when snapped
+              here, through which screen 1's navy showed — this needs to
+              snap flush against the true top so the whole map is visible.
+              `relative` so the "keep scrolling" arrow below can overlay its
+              bottom edge without taking up space of its own (the map still
+              gets the whole screen, per the last request). ─────────────── */}
       {hasMap && (
-        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
+        <div ref={mapSectionRef} className="hidden sm:block sm:relative sm:snap-start sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
+          <HamburgerMenu resources={resources} onNavigate={onNavigate} />
+          <ZmanimMenu coords={coords} title={zmanimCategory?.pluralLabel} />
           <HomeMap
             onNavigate={onNavigate}
             coords={coords}
@@ -721,36 +896,58 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             onFocusCategoryChange={toggleCategory}
             categoryItemIdsByCategory={categoryItemIdsByCategory}
           />
+
+          {/* Bottom-center scroll cue — clicking it jumps straight to Get
+                  Connected, same target the search box's "jump to" chips use
+                  for Zmanim/categories elsewhere on this page. */}
+          <button
+            type="button"
+            onClick={() => getConnectedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            aria-label="Scroll to Get Connected"
+            className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 text-[#0C3D57] hover:text-[#3a86ff] cursor-pointer sm:block"
+          >
+            <svg className="h-7 w-7 animate-bounce drop-shadow-[0_1px_3px_rgba(255,255,255,0.9)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
       )}
 
-      {/* ── Get Connected — desktop only, full-bleed band between the map and
-              the Zmanim widget (the slot the app's original "Get Connected"
-              section held before it was replaced by the top-bar quick-links
-              row — see the history comment on `quickLinksCards` above). One
-              big navy panel with the five categories as tabs across the
-              top instead of five separate white cards in a grid — click one
-              to switch which list shows in the rectangle beneath it (see
-              GetConnectedAccordion above). Each list is pulled from the
-              real pages/flows those old quick-link buttons already opened
-              (not new/duplicated content) — Professional Networks and
-              Social Opportunities both draw from the same young-
+      {/* ── Screen 3: Get Connected — desktop only, the third and last
+              storymap screen, right after the map (the slot the app's
+              original "Get Connected" section held before it was replaced
+              by the top-bar quick-links row — see the history comment on
+              `quickLinksCards` above). A
+              single centered blue pill of category tabs (see
+              GetConnectedAccordion above for the moving/re-centering
+              behavior) — `sm:justify-center` (not `-start`) is what makes
+              that work: as the pill's own floating list panel opens/grows,
+              the group's total height changes and flexbox re-centers the
+              whole thing on screen automatically. Each list is pulled from
+              the real pages/flows those old quick-link buttons already
+              opened (not new/duplicated content) — Professional Networks
+              and Social Opportunities both draw from the same young-
               professional listings, just split by which read as networking
-              vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above). No
-              divider line above it anymore — the "Get Connected" heading is
-              its own solid navy rectangle sitting flush on top of the tab
-              strip (no gap between them), same width as it, so the two read
-              as one connected unit — a title bar capping the tabs beneath
-              it — instead of a plain centered heading floating above a
-              separate line. ─────────────────────────────────────────────── */}
-      <div className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-8">
-        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <div className="w-full bg-[#0C3D57] py-2.5 text-center">
-            <h2 className="text-2xl font-extrabold tracking-tight text-[#fefefe]">Get Connected</h2>
-          </div>
-          <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
-        </div>
+              vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above). ───── */}
+      <div ref={getConnectedSectionRef} className="hidden sm:relative sm:flex sm:min-h-screen sm:snap-start sm:flex-col sm:items-center sm:justify-center sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#508BEB] sm:py-8">
+        <HamburgerMenu resources={resources} onNavigate={onNavigate} />
+        <ZmanimMenu coords={coords} title={zmanimCategory?.pluralLabel} />
+        {/* Top-center scroll cue, mirroring the map screen's own bottom-
+                center one — clicking it jumps back up to the map. */}
+        <button
+          type="button"
+          onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          aria-label="Scroll to the map"
+          className="absolute top-4 left-1/2 z-10 hidden -translate-x-1/2 text-white hover:text-[#0C3D57] cursor-pointer sm:block"
+        >
+          <svg className="h-7 w-7 animate-bounce drop-shadow-[0_1px_3px_rgba(0,0,0,0.25)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+        <h2 className="mb-5 text-2xl font-extrabold tracking-tight text-white">Get Connected</h2>
+        <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
       </div>
+
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
               sections — untouched, since mobile has no map to be redundant
@@ -773,28 +970,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         )}
       </section>
 
-      {/* ── Matching places (individual listings within the cards) ───────────── */}
+      {/* ── Matching places (individual listings within the cards) — shows on
+              both mobile (right after its grid, as before) and desktop
+              (after the whole four-screen storymap flow above, so an active
+              search's results don't interrupt it). ─────────────────────── */}
       {placeHits.length > 0 && (
         <PlacesResults hits={placeHits} onOpen={openPlace} />
       )}
-
-      {/* ── Zmanim widget — live candle-lighting/Havdalah times, replacing the
-              plain Zmanim tile that used to sit in the grid above. Desktop
-              only: mobile keeps its Zmanim tile in the combined grid. Same
-              full-bleed white band treatment as the map section, separated
-              from the Get Connected band above it by a plain divider line
-              (same treatment as Get Connected's own top divider) rather than
-              a border boxing it in — its content stays re-inset to the
-              normal max-w-6xl column (like the hero/Get Connected bands),
-              since a two-column list of zman times shouldn't stretch across
-              the whole browser width the way the map benefits from. ────── */}
-      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
-        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <div className="border-t border-slate-200 pt-10">
-            <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
-          </div>
-        </div>
-      </div>
     </main>
   )
 }

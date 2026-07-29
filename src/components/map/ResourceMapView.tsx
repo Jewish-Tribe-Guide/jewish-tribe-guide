@@ -44,7 +44,7 @@ export const ACCENT_PALETTE = ['#a8dadc', '#457b9d', '#1d3557', '#5390d9', '#84c
 
 // Exported so callers coloring external UI to match the map's legend (e.g.
 // the home page's category list) use the exact same colors.
-export const HOSPITAL_COLOR = '#6E91A4'
+export const HOSPITAL_COLOR = '#1163C0'
 // The letter "H" (a fixed pin glyph, not the admin-configurable category
 // icon — see CATEGORY_GLYPHS below) — same "H for Hospital" convention as
 // hospital signage generally.
@@ -66,26 +66,24 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
 // A direct, stable color per category (rather than a cycled palette index) —
 // each specific category gets an intentional, permanent color regardless of
-// display order. A single-hue tint/shade ramp anchored to `#0C3D57` (darkest,
-// unchanged) lightening to `#D0E5F1` (lightest — pushed noticeably paler than
-// before to widen the spread between steps), linearly interpolated in RGB
-// across the 7 steps of MAP_CATEGORY_ORDER. The lightest three steps
-// (hotel/mikvah/eruv) now cross the `needsDarkText` contrast threshold in
-// Collapsible.tsx, which already handles that per-accentColor. Keyed by
-// category id for regular listing categories; kind:
-// 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified by a
-// fixed id the way listing categories are, so eruv is matched by kind instead
-// below (hospitals use HOSPITAL_COLOR directly, not this dict — see
-// allPoints below).
+// display order. Drawn from the client's own named 9-step ramp (100 lightest
+// through 900 darkest: #BDD9F9/#93C1F6/#69A9F2/#3F91EE/#1478EB/#1163C0/
+// #0D4D96/#09376C/#062242), using its 7 darkest steps (900 down to 300) in
+// MAP_CATEGORY_ORDER order — the two palest steps (100/200) were left out to
+// avoid overly washed-out pins. Keyed by category id for regular listing
+// categories; kind: 'medical'/'zmanim'/'eruv'/'map' categories aren't
+// uniquely identified by a fixed id the way listing categories are, so eruv
+// is matched by kind instead below (hospitals use HOSPITAL_COLOR directly,
+// not this dict — see allPoints below).
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#0C3D57',
-  restaurant: '#2D5971',
-  grocery: '#4D758A',
-  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#6E91A4' itself.)
-  hotel: '#8FADBE',
-  mikvah: '#AFC9D7',
+  synagogue: '#062242', // 900
+  restaurant: '#09376C', // 800
+  grocery: '#0D4D96', // 700
+  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#1163C0' — 600 — itself.)
+  hotel: '#1478EB', // 500
+  mikvah: '#3F91EE', // 400
 }
-const ERUV_COLOR = '#D0E5F1'
+const ERUV_COLOR = '#69A9F2' // 300
 
 // Exported so external UI (the home page's category list) computes the exact
 // same color as the map's pins for a given category.
@@ -230,6 +228,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // only right after Unselect all, reset the moment any category becomes
   // selected again through any path (a button, Select all, or tapping a pin).
   const [categoriesExplicitlyCleared, setCategoriesExplicitlyCleared] = useState(false)
+  // Bumped by "Select all" to tell ResourceMap to pan/zoom back to its
+  // default view (see the prop's own comment there) — Select all doesn't
+  // isolate/frame anything (see `canIsolateCategories` above), so nothing
+  // else would otherwise move the map back from wherever it was.
+  const [resetViewSignal, setResetViewSignal] = useState(0)
 
   // Whether the search bar's merged dropdown list sorts by distance from
   // `activeLocation` — off falls back to alphabetical. Starts OFF, not on:
@@ -510,10 +513,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // exactly as it was, its intended "opening this changes nothing on the
   // map" behavior. `categoriesExplicitlyCleared` overrides that guard —
   // Unselect all SHOULD blank the map, even though the resulting empty set
-  // looks identical to the untouched-Eruv-only case otherwise.
+  // looks identical to the untouched-Eruv-only case otherwise. Also skipped
+  // when EVERY category is selected on the EMBEDDED home map (Select all) —
+  // that's the full, unfiltered picture there, not a narrowed-down one, so
+  // there's nothing to frame; `selectAll` resets that view to the default
+  // instead (see `resetViewSignal`). The standalone /map page already opens
+  // fit to every visible pin (no `skipAutoFit`), so its own Select all
+  // fitting bounds too is already consistent with its own default — left
+  // alone here.
+  const allSelectedEmbedded = embedded && !!focusedCategoryIds && options.length > 0 && focusedCategoryIds.size >= options.length
   const canIsolateCategories =
     !focusedPoint &&
     focusedCategoryIds &&
+    !allSelectedEmbedded &&
     (categoriesExplicitlyCleared || [...focusedCategoryIds].some((id) => allPoints.some((p) => p.filterId === id)))
   const focusedCategoryPoints = canIsolateCategories
     ? allPoints.filter((p) => {
@@ -578,6 +590,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (!focusedCategoryIds?.has(o.id)) onFocusCategoryChange?.(o.id)
     }
     setCategoriesExplicitlyCleared(false)
+    // Only the embedded home map skips isolating on all-selected (see
+    // `allSelectedEmbedded` above) — bumping this on the standalone /map
+    // page would fight its own (unmodified) fit-to-bounds effect, which
+    // still fires there since `canIsolateCategories` isn't skipped for it.
+    if (embedded) setResetViewSignal((n) => n + 1)
   }
   const unselectAll = () => {
     onFocusListingChange?.(null)
@@ -918,16 +935,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         own separate border/shadow doing the rest of the
                         framing. Fixed `h-8` (rather than letting padding +
                         the input's line-height decide it) so the dropdown
-                        directly below always starts at exactly `top-2 + h-8`
-                        = `top-10` — the detail panel over on the right is
-                        pinned to that same `top-10`, so the two dropdowns'
+                        directly below always starts at exactly `top-4 + h-8`
+                        = `top-12` — the detail panel over on the right is
+                        pinned to that same `top-12`, so the two dropdowns'
                         own top edges always land in the same place instead
                         of drifting apart by whatever the pill's content
                         height happened to be. ─────────────────────────── */}
                 {!loading && embedded && (
-                  <div className="absolute left-2 top-2 z-20 flex w-64 flex-col">
-                    <div className="flex h-8 items-center gap-1.5 rounded-full border-2 border-slate-300 bg-white px-3 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
-                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                  <div className="absolute left-2 top-4 z-20 flex w-64 flex-col">
+                    <div className="flex h-8 items-center gap-1.5 rounded-full border-2 border-slate-500 bg-white px-3 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-600" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                       </svg>
                       <input
@@ -943,7 +960,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             removeTerm(terms[terms.length - 1])
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-600 focus:outline-none"
                       />
                       {/* Collapses the dropdown list below without touching
                           which categories are selected — a plain visual
@@ -1116,7 +1133,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               every category at once regardless of whether a
                               single category's own filters are currently
                               showing here instead of the category buttons. */}
-                      <div className="absolute left-72 right-12 top-2 z-20 flex items-center gap-1">
+                      <div className="absolute left-72 right-12 top-4 z-20 flex items-center gap-1">
                         <button
                           onClick={selectAll}
                           disabled={options.every((o) => focusedCategoryIds?.has(o.id))}
@@ -1286,11 +1303,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               card shifting right underneath it too. */}
                       {onNavigate && focusedItemConfig && (
                         <div
-                          className={`absolute left-[16.5rem] top-10 bottom-3 z-10 overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
+                          className={`absolute left-[16.5rem] top-12 z-10 max-h-[calc(100%-3.75rem)] overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
                             focusedItem ? 'w-64' : 'w-0 border-0'
                           }`}
                         >
-                          <div className="h-full w-64 overflow-y-auto p-3 text-[10px] [&_*]:text-[10px]">
+                          <div className="max-h-full w-64 overflow-y-auto p-3 text-[10px] [&_*]:text-[10px]">
                             {focusedItem && focusedItemOption && (
                               <GenericListingCard
                                 item={focusedItem}
@@ -1342,6 +1359,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     skipAutoFit={embedded}
                     fallbackCenter={embedded ? HOME_MAP_CENTER : undefined}
                     leftInsetPx={mapKeyLeftInsetPx}
+                    resetViewSignal={resetViewSignal}
                     onMarkerClick={(p) => {
                       // Always opens this facility's card in the map key's
                       // flyout too, not just the map's own info window —

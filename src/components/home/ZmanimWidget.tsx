@@ -54,8 +54,8 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
     // that existing bar instead of floating a separate box on top of it.
     <div>
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
-        <span className="text-xs text-muted">{coords ? locationLabel : community.region}</span>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+        <span className="text-[11px] text-muted">{coords ? locationLabel : community.region}</span>
       </div>
 
       {status === 'loading' && (
@@ -83,23 +83,23 @@ function ReadyState({ data }: { data: ZmanimData }) {
     <div className="space-y-4">
       {/* Hebrew date */}
       <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <span className="text-2xl" aria-hidden="true">🕯️</span>
-        <p className="text-base font-semibold text-slate-900">{hebrewDate}</p>
+        <span className="text-lg" aria-hidden="true">🕯️</span>
+        <p className="text-sm font-semibold text-slate-900">{hebrewDate}</p>
       </div>
 
       {/* Daily zmanim — every entry, same as the full Zmanim page. */}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
         {dailyZmanim.map((z) => (
           <div key={z.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-sm text-muted">{z.label}</dt>
-            <dd className="text-sm font-medium text-slate-900 tabular-nums">{z.time}</dd>
+            <dt className="text-xs text-muted">{z.label}</dt>
+            <dd className="text-xs font-medium text-slate-900 tabular-nums">{z.time}</dd>
           </div>
         ))}
       </dl>
 
       {/* Upcoming Shabbos */}
       <div className="pt-3 border-t border-slate-100">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-2">
           Upcoming Shabbos
         </h4>
         <div className="space-y-1.5">
@@ -108,7 +108,7 @@ function ReadyState({ data }: { data: ZmanimData }) {
         </div>
       </div>
 
-      <p className="pt-1 text-[11px] text-muted">
+      <p className="pt-1 text-[10px] text-muted">
         Zmanim from{' '}
         <a
           href="https://www.hebcal.com"
@@ -139,16 +139,16 @@ function ShabbosRow({
   if (emphasized) {
     return (
       <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#3a86ff] px-3 py-1.5 -mx-1">
-        <span className="text-sm font-semibold text-[#fefefe]">{label}</span>
-        <span className="text-sm font-semibold text-[#fefefe] tabular-nums">{value}</span>
+        <span className="text-xs font-semibold text-[#fefefe]">{label}</span>
+        <span className="text-xs font-semibold text-[#fefefe] tabular-nums">{value}</span>
       </div>
     )
   }
 
   return (
     <div className="flex items-baseline justify-between gap-3 px-3 -mx-1">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm font-medium text-slate-900 tabular-nums">{value}</span>
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-xs font-medium text-slate-900 tabular-nums">{value}</span>
     </div>
   )
 }

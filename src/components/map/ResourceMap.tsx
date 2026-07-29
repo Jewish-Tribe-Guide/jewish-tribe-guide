@@ -94,6 +94,13 @@ type Props = {
    *  in the space actually still visible to the right of that overlay
    *  instead of dead-center under it. 0/omitted centers normally. */
   leftInsetPx?: number
+  /** Bump this (e.g. a counter) to pan/zoom back to `fallbackCenter` at the
+   *  same fixed zoom the map opens at — "Select all" wants the view to
+   *  return to exactly what first loaded, not zoom out to fit every pin
+   *  the way isolating a narrower set normally would. Ignored on first
+   *  mount (only fires on a later CHANGE), so it doesn't fight the map's
+   *  own initial placement. */
+  resetViewSignal?: number
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -179,7 +186,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx }: Props) {
+export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx, resetViewSignal }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -401,6 +408,24 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
       userMarkerRef.current.position = userLocation
     }
   }, [userLocation, ready])
+
+  // ── Reset to the default view (see `resetViewSignal`) ────────────────────
+  // Skips the very first render (`isFirstRun` guard) so passing an initial
+  // value of 0 doesn't fire a pan/zoom before the map has even settled at
+  // its own starting position.
+  const isFirstResetRun = useRef(true)
+  useEffect(() => {
+    if (isFirstResetRun.current) {
+      isFirstResetRun.current = false
+      return
+    }
+    const map = mapRef.current
+    if (!ready || !map || resetViewSignal === undefined) return
+    const startZoom = map.getZoom() ?? 14
+    map.panTo(fallbackCenter)
+    smoothZoomTo(map, 14, startZoom)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetViewSignal, ready])
 
   const centerOnMe = () => {
     const map = mapRef.current

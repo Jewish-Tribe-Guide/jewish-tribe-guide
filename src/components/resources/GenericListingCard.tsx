@@ -53,6 +53,7 @@ export function GenericListingCard({
   highlightColor,
   dense = false,
   hideBorder = false,
+  hideHeader = false,
   leadingIcon,
   onVote,
   onTagClick,
@@ -89,6 +90,14 @@ export function GenericListingCard({
    *  caller's own (the map key's detail panel), so none of those would
    *  paint over that container's own matching border/background. */
   hideBorder?: boolean
+  /** Skips the collapsed header row entirely (name, badges, subtitle,
+   *  collapse chevron) — used where the caller already shows the listing's
+   *  name elsewhere (Get Connected's own list button) and the header would
+   *  just repeat it. Only makes sense combined with `expanded` forced true,
+   *  since there'd be no header left to toggle it open. The expanded body
+   *  (description/fields/address/phone/website/etc.) renders exactly as it
+   *  always does — this only removes the header above it. */
+  hideHeader?: boolean
   /** Rendered beside the name, in the same row — only that row shifts right
    *  to make room for it; everything else in the card keeps starting flush
    *  at the card's own left padding (used by the map key's detail panel for
@@ -230,6 +239,7 @@ export function GenericListingCard({
         hideBorder ? '' : highlighted ? 'border-2' : 'border border-slate-200 sm:border-2 sm:border-slate-300'
       }`}
     >
+      {!hideHeader && (
       <div
         role="button"
         tabIndex={0}
@@ -376,9 +386,31 @@ export function GenericListingCard({
           </svg>
         </div>
       </div>
+      )}
 
       {expanded && (
         <div className={`border-t border-slate-100 space-y-3 rounded-b-lg ${hideBorder ? '' : 'bg-slate-50'} ${dense ? 'px-2.5 py-2.5' : 'px-4 py-4'}`}>
+          {/* `headerUrlFields` (e.g. WhatsApp's "Join group" link) normally
+              render in the header above — with `hideHeader` skipping that
+              whole row, they'd otherwise vanish rather than just fall back
+              to the body's own `urlFields` (which explicitly exclude
+              anything marked `showInHeader`), so this re-shows them here
+              instead, right at the top. */}
+          {hideHeader && headerUrlFields.map((f) => {
+            const href = display(item[f.key])
+            if (!href) return null
+            return (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-fit text-xs font-medium text-primary border border-primary rounded px-2 py-1 hover:bg-primary hover:text-white transition-colors"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            )
+          })}
           {/* Full tag list — only when the collapsed header capped it (mobile). */}
           {capTags && allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

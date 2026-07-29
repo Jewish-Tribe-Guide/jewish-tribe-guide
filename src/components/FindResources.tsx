@@ -28,6 +28,10 @@ type FindNavState = {
   findQuery?: string
   /** Expand this listing on arrival (the place tapped on the landing page). */
   findItemId?: string
+  /** Open the "All Davening Times" modal on arrival (the hamburger menu's
+   *  "Davening Times" link) — only meaningful when findView is a synagogue-
+   *  kind category. */
+  findOpenDavening?: boolean
 }
 
 // A pending add/edit/report action on a listing within the current category.
@@ -77,6 +81,12 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     if (typeof window === 'undefined') return null
     return (window.history.state as FindNavState | null)?.findQuery ?? null
   })
+  // Open the "All Davening Times" modal on arrival — set when the hamburger
+  // menu's "Davening Times" link navigates straight here.
+  const [openDaveningModal, setOpenDaveningModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return !!(window.history.state as FindNavState | null)?.findOpenDavening
+  })
   // Which hospital's About page is showing (chosen from the Hospitals list).
   const [hospitalDetailId, setHospitalDetailId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
@@ -93,6 +103,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
       setHospitalDetailId(s.findHospitalId ?? null)
       setReopenItemId(s.findItemId ?? null)
       setInitialSearch(s.findQuery ?? null)
+      setOpenDaveningModal(!!s.findOpenDavening)
       setAction(null) // edit/report listings can't be serialized into history
     }
     window.addEventListener('popstate', onPop)
@@ -183,6 +194,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
         anchor={anchor}
         reopenItemId={reopenItemId}
         initialSearch={initialSearch ?? undefined}
+        initialDaveningModalOpen={openDaveningModal}
         onUp={onUp}
         onAdd={() => openAction({ mode: 'create' })}
         onEdit={(listing) => openAction({ mode: 'edit', listing })}
