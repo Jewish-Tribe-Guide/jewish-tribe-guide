@@ -839,13 +839,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           // square corners — since the map key's tab/column assembly now
           // sits flush against its edges (see below) instead of floating as
           // a separate card with its own border; a border on the map itself
-          // would just be a redundant, disconnected-looking line. It's also
-          // sized to the FULL viewport height (`h-screen`) rather than a
-          // fraction of it, so the home page's map section fills the whole
-          // screen while it's scrolled into view.
+          // would just be a redundant, disconnected-looking line. It's
+          // `h-[90vh]` (just a little short of the FULL viewport height)
+          // rather than a small fraction of it, so the home page's map
+          // section still fills nearly the whole screen while it's
+          // scrolled into view.
           <div
             className={`w-full overflow-hidden flex flex-col ${
-              embedded ? 'h-screen' : 'h-[70vh] min-h-[420px] rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]'
+              embedded ? 'h-[90vh]' : 'h-[70vh] min-h-[420px] rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]'
             }`}
           >
               <div className="relative min-h-0 flex-1">
