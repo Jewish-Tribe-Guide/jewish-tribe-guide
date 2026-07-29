@@ -697,7 +697,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             onAll={showAll}
             onNone={hideAll}
             categories={categories ?? []}
-            points={allPoints}
             boolFields={boolFields}
             onToggleBool={toggleBoolField}
             selectFilters={selectFilters}
@@ -853,7 +852,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
                         categories={categories ?? []}
-                        points={allPoints}
                         boolFields={boolFields}
                         onToggleBool={toggleBoolField}
                         selectFilters={selectFilters}
