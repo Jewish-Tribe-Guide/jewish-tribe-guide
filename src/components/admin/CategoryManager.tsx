@@ -1669,6 +1669,21 @@ function CategoryEditor({
               />
               A website
             </label>
+            {managedWebsiteIndex !== -1 && (
+              // The website field this checkbox owns doesn't get its own row
+              // in the Details list below (see managedWebsiteIndex), so its
+              // "show as a button" setting — otherwise only reachable from
+              // that row's own FieldEditor — needs a way in from here instead.
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer ml-6">
+                <input
+                  type="checkbox"
+                  checked={draft.fields[managedWebsiteIndex].showInHeader !== false}
+                  onChange={(e) => updateField(managedWebsiteIndex, { showInHeader: e.target.checked })}
+                  className="rounded border-slate-300"
+                />
+                Show it as a button on the card, not inside the details
+              </label>
+            )}
             <span className="block text-[11px] text-muted">
               Address and phone are on by default; turn either off for listings that aren’t a physical
               place — like WhatsApp groups — and it disappears from the form and the card. With no
@@ -2135,7 +2150,7 @@ function FieldEditor({
           <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
             <input
               type="checkbox"
-              checked={!!f.showInHeader}
+              checked={f.showInHeader !== false}
               onChange={(e) => onChange({ showInHeader: e.target.checked })}
               className="rounded border-slate-300"
             />

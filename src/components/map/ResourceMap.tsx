@@ -392,6 +392,15 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
     // doesn't leave you looking at a result with no idea how far it is from
     // where you are.
     if (userLocationRef.current && searchActiveRef.current) {
+      if (points.length === 0) {
+        // No results to frame — bounds would contain only the user's own
+        // location, a zero-area box fitBounds snaps to max zoom for (same
+        // quirk the points.length === 1 case below already works around).
+        // Just recenter on the user's own location at a sane zoom instead.
+        map.setCenter(userLocationRef.current)
+        map.setZoom(15)
+        return
+      }
       bounds.extend(userLocationRef.current)
       map.fitBounds(bounds, 64)
       return
