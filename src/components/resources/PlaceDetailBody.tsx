@@ -140,7 +140,10 @@ type Props = {
 export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
-  const urlFields = fields.filter((f) => f.type === 'url')
+  // A url field already shown up top on the collapsed card (showInHeader —
+  // see GenericListingCard) doesn't also get an expanded action button here;
+  // one link, one place, not both.
+  const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const minyanimField = fields.find((f) => f.type === 'minyanim')
   const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim'
