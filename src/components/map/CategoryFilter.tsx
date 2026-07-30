@@ -41,17 +41,6 @@ type Props = {
    *  row — used by the full-screen category picker `onMore` opens, which has
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
-  /** Category ids explicitly turned on via the "More" picker's own checkbox,
-   *  most-recently-picked FIRST — these get priority for the compact row's
-   *  limited slots (see the `visible` sort below), in pick order rather than
-   *  by count, or a category with a much higher listing count would always
-   *  win the tie-break and permanently sit ahead of whatever's picked
-   *  afterward. Deliberately narrower than "currently selected": a plain tap
-   *  on a chip right here in this row doesn't add to it, so toggling a chip
-   *  directly never reorders the row out from under you — only a pick made
-   *  from the full-screen list does. Unused (no reordering at all) when
-   *  maxVisible is omitted, since every option renders anyway. */
-  pinnedOrder?: string[]
   /** Real category configs, plus the current bool/select filter state and
    *  its setters — needed only to power the inline filter editor a chip's
    *  `filterSuffix` opens. */
@@ -75,7 +64,6 @@ export default function CategoryFilter({
   maxVisible,
   onMore,
   wrap,
-  pinnedOrder,
   categories,
   boolFields,
   onToggleBool,
@@ -83,24 +71,17 @@ export default function CategoryFilter({
   onToggleSelectValue,
 }: Props) {
   const allOn = options.every((o) => selected.has(o.id))
-  // Categories pinned from the "More" picker get priority for the compact
-  // row's limited slots, ordered by pick recency (pinnedOrder's own order) —
-  // otherwise turning one on from the full list that isn't already one of
-  // the top-N by count would just silently do nothing visible here, still
-  // hidden behind "More" despite now actively filtering the map. Every
-  // unpinned option shares one tied rank below all pinned ones, so a stable
-  // sort keeps THEM in their original highest-count-first order — a plain
-  // tap on a chip right here never pins it, so that stays a no-reorder
-  // interaction.
+  // Selected categories always take priority for the compact row's limited
+  // slots over unselected ones — otherwise turning one on from the full
+  // "More" list that isn't already one of the top-N by count would just
+  // silently do nothing visible here, still hidden behind "More" despite now
+  // actively filtering the map. `options` already comes in highest-count-
+  // first order, and this sort is stable, so within each group (selected /
+  // not) that count order is untouched — this only reorders across the
+  // selected/unselected boundary itself.
   const visible =
     maxVisible != null
-      ? [...options]
-          .sort((a, b) => {
-            const ra = pinnedOrder?.indexOf(a.id) ?? -1
-            const rb = pinnedOrder?.indexOf(b.id) ?? -1
-            return (ra === -1 ? Infinity : ra) - (rb === -1 ? Infinity : rb)
-          })
-          .slice(0, maxVisible)
+      ? [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).slice(0, maxVisible)
       : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 
