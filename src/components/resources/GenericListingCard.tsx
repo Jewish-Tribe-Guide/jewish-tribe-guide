@@ -10,7 +10,7 @@ import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import Chip from './Chip'
-import { PencilIcon, FlagIcon } from '@/components/icons'
+import { PencilIcon, FlagIcon, GlobeIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 
@@ -85,6 +85,16 @@ export function GenericListingCard({
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
   const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key))
   const travel = travelParts(item)
+
+  // url fields explicitly opted into the collapsed row (showInHeader) — a
+  // quick way to reach something like a WhatsApp "Join group" link without
+  // expanding the card first. Unchecked (the default) leaves a url field
+  // exactly where it's always been: an action button inside PlaceDetailBody,
+  // reachable only once expanded.
+  const headerUrlFields = fields
+    .filter((f) => f.type === 'url' && f.showInHeader)
+    .map((f) => ({ f, href: item[f.key] as string | undefined }))
+    .filter((x): x is { f: CategoryField; href: string } => !!x.href)
 
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
@@ -196,6 +206,20 @@ export function GenericListingCard({
               )}
             </div>
           )}
+          {headerUrlFields.map(({ f, href }) => (
+            <a
+              key={f.key}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={f.linkLabel ?? f.label}
+              aria-label={f.linkLabel ?? f.label}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+            >
+              <GlobeIcon className="h-3.5 w-3.5" />
+            </a>
+          ))}
           <svg
             className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
