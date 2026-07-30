@@ -213,11 +213,10 @@ export function GenericListingCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              title={f.linkLabel ?? f.label}
-              aria-label={f.linkLabel ?? f.label}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-colors"
+              className="flex shrink-0 items-center gap-1 rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
             >
               <GlobeIcon className="h-3.5 w-3.5" />
+              {f.linkLabel ?? f.label}
             </a>
           ))}
           <svg
