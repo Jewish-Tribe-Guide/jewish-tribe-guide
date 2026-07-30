@@ -1677,11 +1677,11 @@ function CategoryEditor({
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer ml-6">
                 <input
                   type="checkbox"
-                  checked={draft.fields[managedWebsiteIndex].showInHeader !== false}
+                  checked={!!draft.fields[managedWebsiteIndex].showInHeader}
                   onChange={(e) => updateField(managedWebsiteIndex, { showInHeader: e.target.checked })}
                   className="rounded border-slate-300"
                 />
-                Show it as a button on the card, not inside the details
+                Also show it as a button on the collapsed card, before the arrow
               </label>
             )}
             <span className="block text-[11px] text-muted">
@@ -2150,11 +2150,11 @@ function FieldEditor({
           <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
             <input
               type="checkbox"
-              checked={f.showInHeader !== false}
+              checked={!!f.showInHeader}
               onChange={(e) => onChange({ showInHeader: e.target.checked })}
               className="rounded border-slate-300"
             />
-            Show as a button on the card itself, not inside the details
+            Also show as a button on the collapsed card, before the arrow
           </label>
         </>
       )}

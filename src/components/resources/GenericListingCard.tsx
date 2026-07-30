@@ -86,6 +86,16 @@ export function GenericListingCard({
   const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key))
   const travel = travelParts(item)
 
+  // url fields explicitly opted into the collapsed row (showInHeader) — a
+  // quick way to reach something like a WhatsApp "Join group" link without
+  // expanding the card first. Unchecked (the default) leaves a url field
+  // exactly where it's always been: an action button inside PlaceDetailBody,
+  // reachable only once expanded.
+  const headerUrlFields = fields
+    .filter((f) => f.type === 'url' && f.showInHeader)
+    .map((f) => ({ f, href: item[f.key] as string | undefined }))
+    .filter((x): x is { f: CategoryField; href: string } => !!x.href)
+
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
   // badges without a filter, all tags) only shows once expanded, inside
@@ -196,6 +206,18 @@ export function GenericListingCard({
               )}
             </div>
           )}
+          {headerUrlFields.map(({ f, href }) => (
+            <a
+              key={f.key}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+            >
+              {f.linkLabel ?? f.label}
+            </a>
+          ))}
           <svg
             className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
