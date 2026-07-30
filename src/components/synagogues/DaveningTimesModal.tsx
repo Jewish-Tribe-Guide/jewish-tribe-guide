@@ -265,7 +265,13 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                         <div
                           className={[
                             'ml-auto flex max-w-full gap-x-2 gap-y-0.5',
-                            isClockTime(row.time) || calc ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
+                            // A calculated row's TimeValue stacks two lines
+                            // (calculated time + rule text underneath) — centering
+                            // the days label against that whole two-line block
+                            // shifts it down off the top line, so it no longer
+                            // lines up with a plain row's single-line days label.
+                            // items-start keeps it flush with the top (bold) line.
+                            calc ? 'flex-wrap items-start justify-end' : isClockTime(row.time) ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
                           ].join(' ')}
                         >
                           {row.daysLabel && (
