@@ -31,7 +31,7 @@ const isClockTime = (time: string) => Number.isFinite(parseTimeToMinutes(time))
 // Sunset") is otherwise long enough to widen its column and shove the days
 // label further left than on a plain clock-time row. Fixed width means the
 // rule text wraps onto its own second (or third) line instead.
-const TIME_COL = 'w-20 shrink-0'
+const TIME_COL = 'w-16 shrink-0'
 
 // A row anchored to a zman (sunset/candle-lighting/havdalah) with a resolved
 // calculated time gets that time in the normal bold/right-aligned clock slot
@@ -273,7 +273,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                             inline next to them. */}
                         <div
                           className={[
-                            'ml-auto flex max-w-full gap-x-2 gap-y-0.5',
+                            'ml-auto flex max-w-full gap-x-1 gap-y-0.5',
                             // A calculated row's TimeValue stacks two lines
                             // (calculated time + rule text underneath) — centering
                             // the days label against that whole two-line block
