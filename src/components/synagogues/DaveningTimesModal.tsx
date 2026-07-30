@@ -11,6 +11,7 @@ import {
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
 } from '@/lib/davening'
+import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import DenominationFilter from './DenominationFilter'
 
 type GroupMode = 'tefillah' | 'day'
@@ -23,7 +24,20 @@ type GroupMode = 'tefillah' | 'day'
 // anchored as a block, so it doesn't jump around relative to other rows).
 const isClockTime = (time: string) => Number.isFinite(parseTimeToMinutes(time))
 
-function TimeValue({ time }: { time: string }) {
+// A row anchored to a zman (sunset/candle-lighting/havdalah) with a resolved
+// calculated time gets that time in the normal bold/right-aligned clock slot
+// (it IS today's real time, just derived) — the official rule text drops into
+// the secondary/italic slot beneath it, prefixed "≈" so it never reads as an
+// exact, shul-confirmed time.
+function TimeValue({ time, calculated }: { time: string; calculated?: string | null }) {
+  if (calculated) {
+    return (
+      <span className="flex flex-col items-end max-w-[220px] sm:max-w-xs">
+        <span className="text-sm font-semibold text-slate-800 min-w-[3.5rem] text-right">{calculated}</span>
+        <span className="text-[11px] text-muted italic text-right">≈ {time}</span>
+      </span>
+    )
+  }
   return (
     <span
       className={[
@@ -52,6 +66,7 @@ function shulsFromItems(items: DirectoryResource[]) {
       denomination: item.denomination as string | undefined,
       driveMinutes: item.driveMinutes as number | null | undefined,
       walkMinutes: item.walkMinutes as number | null | undefined,
+      geo: item.geo,
       minyanim: item.minyanim as Minyan[],
     }))
 }
@@ -104,9 +119,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
-
-  const allShuls = shulsFromItems(items)
+  const allShuls = isOpen ? shulsFromItems(items) : []
   const denominations = Array.from(
     new Set(allShuls.map((s) => s.denomination).filter((d): d is string => !!d)),
   ).sort()
@@ -115,6 +128,26 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   const byTefillah = groupMode === 'tefillah' ? groupByTefillah(filtered) : []
   const byDay = groupMode === 'day' ? groupByDay(filtered) : []
   const hasData = filtered.some((s) => s.minyanim.length > 0)
+
+  // Only shuls with at least one anchor-based minyan need a location resolved
+  // — most shuls are plain clock times and shouldn't trigger a fetch at all.
+  const shulGeo = new Map(
+    filtered
+      .filter((s) => s.minyanim.some((m) => m.anchor))
+      .map((s) => [s.name, geoOrCommunityDefault(s.geo)] as const),
+  )
+  const anchorMap = useZmanAnchors(Array.from(shulGeo.values()))
+  const calcFor = (row: { shul: string; anchor?: Minyan['anchor']; offsetMinutes?: number }) => {
+    const geo = shulGeo.get(row.shul)
+    if (!geo) return null
+    return resolveAnchorTime(row, anchorMap[geoKey(geo)])
+  }
+  const hasCalculatedRows =
+    groupMode === 'tefillah'
+      ? byTefillah.some((g) => g.rows.some((r) => calcFor(r)))
+      : byDay.some((g) => g.rows.some((r) => calcFor(r)))
+
+  if (!isOpen) return null
 
   return (
     <div
@@ -180,6 +213,14 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
           )}
         </div>
 
+        {/* One-time disclaimer, not per-row — only shown when at least one
+            visible row is a calculated (not shul-confirmed) time. */}
+        {hasCalculatedRows && (
+          <p className="px-5 py-1.5 text-[11px] text-muted bg-slate-50 border-b border-slate-100 shrink-0">
+            Times marked ≈ are calculated from today&apos;s sunset/candle-lighting and may not exactly match the shul&apos;s posted time.
+          </p>
+        )}
+
         {/* ── Content ─────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!hasData ? (
@@ -194,7 +235,9 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                     {group.label}
                   </h3>
                   <div className="divide-y divide-slate-50">
-                    {group.rows.map((row, i) => (
+                    {group.rows.map((row, i) => {
+                      const calc = calcFor(row)
+                      return (
                       // flex-wrap + the right block's ml-auto: a long shul name or day
                       // label wraps the times onto their own line instead of forcing
                       // the row (and the modal) wider than the viewport — that overflow
@@ -222,16 +265,17 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                         <div
                           className={[
                             'ml-auto flex max-w-full gap-x-2 gap-y-0.5',
-                            isClockTime(row.time) ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
+                            isClockTime(row.time) || calc ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
                           ].join(' ')}
                         >
                           {row.daysLabel && (
                             <span className="text-xs text-muted whitespace-nowrap">{row.daysLabel}</span>
                           )}
-                          <TimeValue time={row.time} />
+                          <TimeValue time={row.time} calculated={calc} />
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </section>
               ))}
@@ -289,7 +333,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                                     No nowrap/shrink-0 — `time` sometimes carries a long
                                     freeform note instead of a short time (see TimeValue). */}
                                 <div className="ml-auto max-w-full">
-                                  <TimeValue time={row.time} />
+                                  <TimeValue time={row.time} calculated={calcFor(row)} />
                                 </div>
                               </div>
                             ))}

@@ -14,6 +14,10 @@ export type Landmark = {
 export type ZmanEntry = {
   label: string
   time: string
+  /** Raw Hebcal instant backing `time`, when available — lets callers do
+   *  offset math (davening times anchored to sunset/candle-lighting/havdalah)
+   *  instead of re-deriving it from the already-formatted display string. */
+  iso?: string
 }
 
 /**
