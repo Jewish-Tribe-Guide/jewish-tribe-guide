@@ -140,10 +140,16 @@ type Props = {
 export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
-  const urlFields = fields.filter((f) => f.type === 'url')
+  // Only a url field NOT opted out of the header (showInHeader !== false,
+  // i.e. on by default) renders as its own action button next to Directions/
+  // Call — one explicitly turned off falls through to a plain row instead
+  // (see rowFields/special below), which is what the admin's own "Show as a
+  // button on the card itself, not inside the details" checkbox controls.
+  const urlFields = fields.filter((f) => f.type === 'url' && f.showInHeader !== false)
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const minyanimField = fields.find((f) => f.type === 'minyanim')
-  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim'
+  const special = (f: CategoryField) =>
+    f.type === 'tags' || f.type === 'hours' || f.type === 'minyanim' || (f.type === 'url' && f.showInHeader !== false)
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
 
@@ -383,6 +389,18 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
               className="text-primary hover:underline"
             >
               {formatPhone(display(item[f.key]))}
+            </a>
+          ) : f.type === 'url' ? (
+            // Opted out of the header action-button row (showInHeader ===
+            // false) — still a real link, just inline here instead.
+            <a
+              href={display(item[f.key])}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline"
+            >
+              {display(item[f.key])}
             </a>
           ) : (
             display(item[f.key])
