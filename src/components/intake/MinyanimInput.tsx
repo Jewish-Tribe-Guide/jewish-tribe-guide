@@ -16,6 +16,24 @@ import {
 
 const ZMAN_ANCHOR_ORDER: ZmanAnchor[] = ['sunset', 'candle_lighting', 'havdalah']
 
+// The relative (sunset/candle-lighting/havdalah) mode only makes sense for
+// tefillos whose time actually moves with the zman day to day — Shacharis,
+// Kabbalas Shabbos, etc. are always clock times in practice.
+const RELATIVE_ELIGIBLE: Tefillah[] = ['mincha', 'maariv', 'mincha_maariv']
+
+type Direction = 'before' | 'after'
+
+/** What a row's OTHER mode last held, so switching Clock ↔ Relative and back
+ *  restores it instead of losing it (a misclick shouldn't cost your data).
+ *  `magnitudeText` is a raw string, not a number, so the offset input can be
+ *  emptied out to type a fresh value instead of being stuck showing "0". */
+type Draft = {
+  clockTime?: string
+  anchor?: ZmanAnchor
+  direction?: Direction
+  magnitudeText?: string
+}
+
 const DAY_SHORT: Record<DayKey, string> = {
   sun: 'Sun',
   mon: 'Mon',
@@ -67,10 +85,16 @@ type Props = {
  */
 export default function MinyanimInput({ label, value, onChange }: Props) {
   const [rows, setRows] = useState<Minyan[]>(() => initMinyanim(value))
+  // Keyed by row id — not part of Minyan, never saved. See Draft above.
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
 
   function update(next: Minyan[]) {
     setRows(next)
     onChange(next)
+  }
+
+  function mergeDraft(id: string, patch: Draft) {
+    setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }))
   }
 
   function addRow() {
@@ -99,12 +123,35 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   // formatAnchorRule) rather than hand-typed — see davening.ts for why: every
   // existing display/sort call site reads `time` as plain text, so this is
   // what lets a calculated clock time be layered on top without touching them.
-  function setRelative(id: string, anchor: ZmanAnchor, offsetMinutes: number) {
+  function setRelative(id: string, anchor: ZmanAnchor, direction: Direction, magnitudeText: string) {
+    mergeDraft(id, { anchor, direction, magnitudeText })
+    const offsetMinutes = (direction === 'before' ? -1 : 1) * (Number(magnitudeText) || 0)
     updateRow(id, { anchor, offsetMinutes, time: formatAnchorRule(anchor, offsetMinutes) })
   }
 
-  function setClockMode(id: string) {
-    updateRow(id, { anchor: undefined, offsetMinutes: undefined, time: '' })
+  function setClockTime(id: string, time: string) {
+    mergeDraft(id, { clockTime: time })
+    updateRow(id, { time })
+  }
+
+  // Switching modes stashes the row's current values as that mode's draft
+  // first, then restores whatever the OTHER mode last held (or a sensible
+  // default for a row that's never been in it) — so toggling back and forth
+  // never loses what was typed.
+  function switchToRelative(row: Minyan) {
+    mergeDraft(row.id, { clockTime: row.time })
+    const draft = drafts[row.id]
+    setRelative(row.id, draft?.anchor ?? 'sunset', draft?.direction ?? 'before', draft?.magnitudeText ?? '0')
+  }
+
+  function switchToClock(row: Minyan) {
+    mergeDraft(row.id, {
+      anchor: row.anchor,
+      direction: (row.offsetMinutes ?? 0) < 0 ? 'before' : (row.offsetMinutes ?? 0) > 0 ? 'after' : drafts[row.id]?.direction,
+      magnitudeText: row.anchor ? String(Math.abs(row.offsetMinutes ?? 0)) : drafts[row.id]?.magnitudeText,
+    })
+    const clockTime = drafts[row.id]?.clockTime ?? ''
+    updateRow(row.id, { anchor: undefined, offsetMinutes: undefined, time: clockTime })
   }
 
   const inputClass =
@@ -119,8 +166,17 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
       <div className="space-y-2">
         {rows.map((row) => {
           const isRelative = !!row.anchor
-          const magnitude = Math.abs(row.offsetMinutes ?? 0)
-          const direction = (row.offsetMinutes ?? 0) < 0 ? 'before' : 'after'
+          const canBeRelative = RELATIVE_ELIGIBLE.includes(row.tefillah)
+          const draft = drafts[row.id]
+          // The draft (once anything's been typed this session) is the raw
+          // source of truth for these three — NOT re-derived from the row's
+          // committed offsetMinutes, or clearing the offset input to type a
+          // fresh value would immediately snap back to "0" every render (see
+          // setRelative — it keeps the draft in sync with every keystroke,
+          // including a transient empty string, right alongside the row).
+          const direction: Direction = draft?.direction ?? ((row.offsetMinutes ?? 0) <= 0 ? 'before' : 'after')
+          const magnitudeText = draft?.magnitudeText ?? String(Math.abs(row.offsetMinutes ?? 0))
+          const anchor = draft?.anchor ?? row.anchor ?? 'sunset'
 
           return (
           <div
@@ -131,9 +187,16 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={row.tefillah}
-                onChange={(e) =>
-                  updateRow(row.id, { tefillah: e.target.value as Tefillah })
-                }
+                onChange={(e) => {
+                  const tefillah = e.target.value as Tefillah
+                  updateRow(row.id, { tefillah })
+                  // Relative mode only makes sense for a handful of tefillos
+                  // (see RELATIVE_ELIGIBLE) — picking one that isn't among
+                  // them drops a currently-relative row back to clock mode.
+                  if (isRelative && !RELATIVE_ELIGIBLE.includes(tefillah)) {
+                    switchToClock({ ...row, tefillah })
+                  }
+                }}
                 className={inputClass}
               >
                 {TEFILLAH_ORDER.filter((t) => t !== 'shabbos_mussaf' || t === row.tefillah).map((t) => (
@@ -143,21 +206,23 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 ))}
               </select>
 
-              <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
-                {([[false, 'Clock time'], [true, 'Sunset/Havdalah…']] as const).map(([relative, lbl]) => (
-                  <button
-                    key={lbl}
-                    type="button"
-                    onClick={() => (relative ? setRelative(row.id, 'sunset', 0) : setClockMode(row.id))}
-                    className={[
-                      'px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
-                      isRelative === relative ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                    ].join(' ')}
-                  >
-                    {lbl}
-                  </button>
-                ))}
-              </div>
+              {(canBeRelative || isRelative) && (
+                <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
+                  {([[false, 'Clock time'], [true, 'Sunset/Havdalah…']] as const).map(([relative, lbl]) => (
+                    <button
+                      key={lbl}
+                      type="button"
+                      onClick={() => (relative ? switchToRelative(row) : switchToClock(row))}
+                      className={[
+                        'px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                        isRelative === relative ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                      ].join(' ')}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <button
                 type="button"
@@ -177,7 +242,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 <input
                   type="text"
                   value={row.time}
-                  onChange={(e) => updateRow(row.id, { time: e.target.value })}
+                  onChange={(e) => setClockTime(row.id, e.target.value)}
                   placeholder="e.g. 7:00am"
                   className={`${inputClass} w-28`}
                 />
@@ -186,27 +251,23 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                   <input
                     type="number"
                     min={0}
-                    value={magnitude}
-                    onChange={(e) =>
-                      setRelative(row.id, row.anchor!, direction === 'before' ? -Number(e.target.value) : Number(e.target.value))
-                    }
+                    value={magnitudeText}
+                    onChange={(e) => setRelative(row.id, anchor, direction, e.target.value)}
                     className={`${inputClass} w-16`}
                     aria-label="Offset in minutes"
                   />
                   <span className="text-xs text-muted">min</span>
                   <select
                     value={direction}
-                    onChange={(e) =>
-                      setRelative(row.id, row.anchor!, e.target.value === 'before' ? -magnitude : magnitude)
-                    }
+                    onChange={(e) => setRelative(row.id, anchor, e.target.value as Direction, magnitudeText)}
                     className={inputClass}
                   >
                     <option value="before">before</option>
                     <option value="after">after</option>
                   </select>
                   <select
-                    value={row.anchor}
-                    onChange={(e) => setRelative(row.id, e.target.value as ZmanAnchor, row.offsetMinutes ?? 0)}
+                    value={anchor}
+                    onChange={(e) => setRelative(row.id, e.target.value as ZmanAnchor, direction, magnitudeText)}
                     className={inputClass}
                   >
                     {ZMAN_ANCHOR_ORDER.map((a) => (

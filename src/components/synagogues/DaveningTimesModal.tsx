@@ -24,6 +24,15 @@ type GroupMode = 'tefillah' | 'day'
 // anchored as a block, so it doesn't jump around relative to other rows).
 const isClockTime = (time: string) => Number.isFinite(parseTimeToMinutes(time))
 
+// Both a plain clock time and a calculated time share this same FIXED width
+// (not just a minimum) so the days label beside it lands at the same x
+// position on every row in a section, whether or not that particular row
+// happens to be calculated — a calculated row's rule text ("20 min before
+// Sunset") is otherwise long enough to widen its column and shove the days
+// label further left than on a plain clock-time row. Fixed width means the
+// rule text wraps onto its own second (or third) line instead.
+const TIME_COL = 'w-20 shrink-0'
+
 // A row anchored to a zman (sunset/candle-lighting/havdalah) with a resolved
 // calculated time gets that time in the normal bold/right-aligned clock slot
 // (it IS today's real time, just derived) — the official rule text drops into
@@ -32,17 +41,17 @@ const isClockTime = (time: string) => Number.isFinite(parseTimeToMinutes(time))
 function TimeValue({ time, calculated }: { time: string; calculated?: string | null }) {
   if (calculated) {
     return (
-      <span className="flex flex-col items-end max-w-[220px] sm:max-w-xs">
-        <span className="text-sm font-semibold text-slate-800 min-w-[3.5rem] text-right">{calculated}</span>
-        <span className="text-[11px] text-muted italic text-right">≈ {time}</span>
+      <span className={`flex flex-col items-end ${TIME_COL}`}>
+        <span className="text-sm font-semibold text-slate-800 text-right">{calculated}</span>
+        <span className="text-[11px] text-muted italic text-right leading-snug">≈ {time}</span>
       </span>
     )
   }
   return (
     <span
       className={[
-        'text-sm font-semibold text-slate-800 max-w-[220px] sm:max-w-xs',
-        isClockTime(time) ? 'min-w-[3.5rem] text-right' : 'text-left',
+        'text-sm font-semibold text-slate-800',
+        isClockTime(time) ? `${TIME_COL} text-right` : 'max-w-[220px] sm:max-w-xs text-left',
       ].join(' ')}
     >
       {time}
@@ -265,7 +274,13 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                         <div
                           className={[
                             'ml-auto flex max-w-full gap-x-2 gap-y-0.5',
-                            isClockTime(row.time) || calc ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
+                            // A calculated row's TimeValue stacks two lines
+                            // (calculated time + rule text underneath) — centering
+                            // the days label against that whole two-line block
+                            // shifts it down off the top line, so it no longer
+                            // lines up with a plain row's single-line days label.
+                            // items-start keeps it flush with the top (bold) line.
+                            calc ? 'flex-wrap items-start justify-end' : isClockTime(row.time) ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
                           ].join(' ')}
                         >
                           {row.daysLabel && (
