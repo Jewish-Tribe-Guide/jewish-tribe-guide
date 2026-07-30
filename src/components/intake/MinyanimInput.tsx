@@ -114,7 +114,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 }
                 className={inputClass}
               >
-                {TEFILLAH_ORDER.map((t) => (
+                {TEFILLAH_ORDER.filter((t) => t !== 'shabbos_mussaf' || t === row.tefillah).map((t) => (
                   <option key={t} value={t}>
                     {TEFILLAH_LABELS[t]}
                   </option>

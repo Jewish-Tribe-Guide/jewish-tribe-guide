@@ -33,3 +33,40 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
 
   return Response.json({ ok: true, confirmedAt })
 }
+
+// DELETE /api/resource/:id/confirm
+// Undoes a confirmation made by mistake, restoring whatever confirmedAt (or
+// none) was in place before it — body: { previousConfirmedAt?: string }.
+export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/[id]/confirm'>) {
+  const limited = await enforceRateLimit(request, 'confirm', { limit: 20, windowSec: 60 })
+  if (limited) return limited
+
+  const { id } = await ctx.params
+  const body = (await request.json().catch(() => ({}))) as { previousConfirmedAt?: string }
+
+  const db = getAdminClient()
+  const { data: row, error: fetchErr } = await db
+    .from('resource')
+    .select('details')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchErr || !row) {
+    return Response.json({ ok: false, error: 'Not found.' }, { status: 404 })
+  }
+
+  const newDetails = { ...(row.details as Record<string, unknown>) }
+  if (body.previousConfirmedAt) {
+    newDetails.confirmedAt = body.previousConfirmedAt
+  } else {
+    delete newDetails.confirmedAt
+  }
+
+  const { error } = await db.from('resource').update({ details: newDetails }).eq('id', id)
+  if (error) {
+    console.error('[confirm] undo failed:', error)
+    return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })
+  }
+
+  return Response.json({ ok: true, confirmedAt: body.previousConfirmedAt ?? null })
+}
