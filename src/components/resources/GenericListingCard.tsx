@@ -10,7 +10,7 @@ import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import Chip from './Chip'
-import { PencilIcon, FlagIcon, GlobeIcon } from '@/components/icons'
+import { PencilIcon, FlagIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 
@@ -213,9 +213,8 @@ export function GenericListingCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+              className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
             >
-              <GlobeIcon className="h-3.5 w-3.5" />
               {f.linkLabel ?? f.label}
             </a>
           ))}
