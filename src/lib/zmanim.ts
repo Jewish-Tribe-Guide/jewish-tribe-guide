@@ -100,10 +100,17 @@ async function fetchJson<T>(url: string): Promise<T> {
 export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   const { latitude, longitude, timezone } = coords
   const { dateStr, dayOfWeek } = todayInTimezone(timezone)
+  // Y-M-D as plain integers (no leading zeros) — gy/gm/gd, not `date=`. The
+  // /shabbat endpoint silently ignores a `date=YYYY-MM-DD` param and always
+  // falls back to Hebcal's own server clock; gy/gm/gd is the param set it
+  // actually reads to pick "the Shabbos ahead" relative to a given day. That
+  // distinction is what previously made candle-lighting/havdalah return last
+  // week's Shabbos instead of the upcoming one for most of the week.
+  const [gy, gm, gd] = dateStr.split('-').map(Number)
 
   const geo = `latitude=${latitude}&longitude=${longitude}&tzid=${encodeURIComponent(timezone)}`
   const zmanimUrl = `${HEBCAL_BASE}/zmanim?cfg=json&${geo}&date=${dateStr}`
-  const shabbatUrl = `${HEBCAL_BASE}/shabbat?cfg=json&${geo}&b=18&M=on`
+  const shabbatUrl = `${HEBCAL_BASE}/shabbat?cfg=json&${geo}&b=18&M=on&gy=${gy}&gm=${gm}&gd=${gd}`
   const converterUrl = `${HEBCAL_BASE}/converter?cfg=json&date=${dateStr}&g2h=1`
 
   const [zmanim, shabbat, converter] = await Promise.all([
