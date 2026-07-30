@@ -35,8 +35,8 @@ type Props = {
  * one-handed mobile reach. The checkbox toggles a category in/out of the
  * current multi-category browse; a category that has its own filterable
  * fields (Kosher Cert, Denomination, …) also gets a chevron that expands the
- * row in place to reveal them — collapsed (pointing right) by default so the
- * top-down list stays scannable, rotating down once opened. Categories with
+ * row in place to reveal them — collapsed (pointing down) by default so the
+ * top-down list stays scannable, rotating to point up once opened. Categories with
  * nothing to filter get no chevron at all, since there'd be nothing to expand
  * into. "Open now" is deliberately not included — it's a search term (see
  * ResourceMapView's OPEN_NOW_WORDS), not tied to any one category.
@@ -112,7 +112,7 @@ export default function CategoryPickerList({
                 >
                   {rowContent}
                   <ChevronRightIcon
-                    className={`h-4 w-4 shrink-0 text-slate-300 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                    className={`h-4 w-4 shrink-0 text-slate-300 transition-transform ${expanded ? '-rotate-90' : 'rotate-90'}`}
                   />
                 </button>
               ) : (

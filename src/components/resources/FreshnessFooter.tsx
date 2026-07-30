@@ -27,6 +27,10 @@ type Props = {
 // separate from the "via Google" synced fields which don't need this.
 export default function FreshnessFooter({ resourceId, confirmedAt: initialConfirmedAt }: Props) {
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
+  // What confirmedAt was right before the most recent confirm — lets a
+  // misclick be undone back to the prior state instead of just cleared.
+  const [previousConfirmedAt, setPreviousConfirmedAt] = useState<string | undefined>(undefined)
+  const [justConfirmedNow, setJustConfirmedNow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
 
@@ -37,7 +41,9 @@ export default function FreshnessFooter({ resourceId, confirmedAt: initialConfir
       const res = await fetch(`/api/resource/${resourceId}/confirm`, { method: 'POST' })
       const json = (await res.json()) as { ok: boolean; confirmedAt?: string }
       if (json.ok && json.confirmedAt) {
+        setPreviousConfirmedAt(confirmedAt)
         setConfirmedAt(json.confirmedAt)
+        setJustConfirmedNow(true)
       } else {
         setError(true)
       }
@@ -48,14 +54,41 @@ export default function FreshnessFooter({ resourceId, confirmedAt: initialConfir
     }
   }
 
-  // "Just confirmed" state — confirmed within the last 30 seconds
-  const justConfirmed =
-    confirmedAt && Date.now() - new Date(confirmedAt).getTime() < 30_000
+  async function undo() {
+    setLoading(true)
+    setError(false)
+    try {
+      const res = await fetch(`/api/resource/${resourceId}/confirm`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ previousConfirmedAt }),
+      })
+      const json = (await res.json()) as { ok: boolean; confirmedAt?: string | null }
+      if (json.ok) {
+        setConfirmedAt(json.confirmedAt ?? undefined)
+        setJustConfirmedNow(false)
+      } else {
+        setError(true)
+      }
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  if (justConfirmed) {
+  if (justConfirmedNow) {
     return (
       <span className="text-xs text-green-600 font-medium">
-        ✓ Confirmed — thanks!
+        ✓ Confirmed — thanks!{' '}
+        <button
+          onClick={undo}
+          disabled={loading}
+          className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer disabled:opacity-50 font-normal"
+        >
+          {loading ? 'Undoing…' : 'Undo'}
+        </button>
+        {error && <span className="ml-1 text-red-500">Failed — try again</span>}
       </span>
     )
   }
