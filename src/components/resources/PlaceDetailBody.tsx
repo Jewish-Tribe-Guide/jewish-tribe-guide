@@ -327,7 +327,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const daveningSection = showDavening && (
     <div>
       <p className="text-xs text-muted mb-1">Davening Times</p>
-      <DaveningTimes minyanim={minyanimValue} legacyText={legacyDavening} />
+      <DaveningTimes minyanim={minyanimValue} legacyText={legacyDavening} geo={item.geo} />
     </div>
   )
 

@@ -6,10 +6,15 @@ import type { DayKey } from '@/lib/hours'
 import {
   type Tefillah,
   type Minyan,
+  type ZmanAnchor,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
+  ZMAN_ANCHOR_LABELS,
+  formatAnchorRule,
   isMinyanim,
 } from '@/lib/davening'
+
+const ZMAN_ANCHOR_ORDER: ZmanAnchor[] = ['sunset', 'candle_lighting', 'havdalah']
 
 const DAY_SHORT: Record<DayKey, string> = {
   sun: 'Sun',
@@ -90,6 +95,18 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
     updateRow(id, { days })
   }
 
+  // Relative rows keep `time` auto-generated from anchor + offsetMinutes (via
+  // formatAnchorRule) rather than hand-typed — see davening.ts for why: every
+  // existing display/sort call site reads `time` as plain text, so this is
+  // what lets a calculated clock time be layered on top without touching them.
+  function setRelative(id: string, anchor: ZmanAnchor, offsetMinutes: number) {
+    updateRow(id, { anchor, offsetMinutes, time: formatAnchorRule(anchor, offsetMinutes) })
+  }
+
+  function setClockMode(id: string) {
+    updateRow(id, { anchor: undefined, offsetMinutes: undefined, time: '' })
+  }
+
   const inputClass =
     'rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary bg-white'
 
@@ -100,12 +117,17 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
       )}
 
       <div className="space-y-2">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const isRelative = !!row.anchor
+          const magnitude = Math.abs(row.offsetMinutes ?? 0)
+          const direction = (row.offsetMinutes ?? 0) < 0 ? 'before' : 'after'
+
+          return (
           <div
             key={row.id}
             className="border border-slate-200 rounded-lg p-3 bg-slate-50 space-y-2.5"
           >
-            {/* Line 1: tefillah + time + notes + remove */}
+            {/* Line 1: tefillah + clock/relative mode toggle + remove */}
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={row.tefillah}
@@ -121,13 +143,81 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 ))}
               </select>
 
-              <input
-                type="text"
-                value={row.time}
-                onChange={(e) => updateRow(row.id, { time: e.target.value })}
-                placeholder="e.g. 7:00am"
-                className={`${inputClass} w-28`}
-              />
+              <div className="flex rounded-md border border-slate-300 overflow-hidden shrink-0">
+                {([[false, 'Clock time'], [true, 'Sunset/Havdalah…']] as const).map(([relative, lbl]) => (
+                  <button
+                    key={lbl}
+                    type="button"
+                    onClick={() => (relative ? setRelative(row.id, 'sunset', 0) : setClockMode(row.id))}
+                    className={[
+                      'px-2 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                      isRelative === relative ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => removeRow(row.id)}
+                className="text-red-400 hover:text-red-600 transition-colors cursor-pointer shrink-0 text-sm leading-none ml-auto"
+                aria-label="Remove minyan"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Line 2: the actual time — clock text input, or a compact
+                anchor + offset control cluster instead of prose crammed into
+                a time box (see davening.ts's ZmanAnchor for why). */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isRelative ? (
+                <input
+                  type="text"
+                  value={row.time}
+                  onChange={(e) => updateRow(row.id, { time: e.target.value })}
+                  placeholder="e.g. 7:00am"
+                  className={`${inputClass} w-28`}
+                />
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min={0}
+                    value={magnitude}
+                    onChange={(e) =>
+                      setRelative(row.id, row.anchor!, direction === 'before' ? -Number(e.target.value) : Number(e.target.value))
+                    }
+                    className={`${inputClass} w-16`}
+                    aria-label="Offset in minutes"
+                  />
+                  <span className="text-xs text-muted">min</span>
+                  <select
+                    value={direction}
+                    onChange={(e) =>
+                      setRelative(row.id, row.anchor!, e.target.value === 'before' ? -magnitude : magnitude)
+                    }
+                    className={inputClass}
+                  >
+                    <option value="before">before</option>
+                    <option value="after">after</option>
+                  </select>
+                  <select
+                    value={row.anchor}
+                    onChange={(e) => setRelative(row.id, e.target.value as ZmanAnchor, row.offsetMinutes ?? 0)}
+                    className={inputClass}
+                  >
+                    {ZMAN_ANCHOR_ORDER.map((a) => (
+                      <option key={a} value={a}>
+                        {ZMAN_ANCHOR_LABELS[a]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-muted italic">→ {row.time}</span>
+                </>
+              )}
 
               <input
                 type="text"
@@ -138,18 +228,9 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 placeholder="Notes (optional)"
                 className={`${inputClass} flex-1 min-w-[8rem]`}
               />
-
-              <button
-                type="button"
-                onClick={() => removeRow(row.id)}
-                className="text-red-400 hover:text-red-600 transition-colors cursor-pointer shrink-0 text-sm leading-none"
-                aria-label="Remove minyan"
-              >
-                ✕
-              </button>
             </div>
 
-            {/* Line 2: day chips */}
+            {/* Line 3: day chips */}
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-xs text-muted shrink-0 mr-1">Days:</span>
               {DAY_KEYS.map((day) => {
@@ -176,7 +257,8 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
               })}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       <button

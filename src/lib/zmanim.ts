@@ -78,6 +78,15 @@ function todayInTimezone(tz: string): { dateStr: string; dayOfWeek: number } {
   return { dateStr, dayOfWeek: WEEKDAY_INDEX.indexOf(shortDow) }
 }
 
+/** Adds `offsetMinutes` to a Hebcal instant and formats the result the same
+ *  way `formatTime` does — used to turn an anchor (sunset/candle-lighting/
+ *  havdalah) plus a signed offset into a real clock time for a minyan defined
+ *  relative to that zman (e.g. "20 min before sunset"). */
+export function applyOffsetMinutes(iso: string, offsetMinutes: number, timezone: string): string {
+  const shifted = new Date(new Date(iso).getTime() + offsetMinutes * 60_000)
+  return formatTime(shifted.toISOString(), timezone)
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, FETCH_OPTS)
   if (!res.ok) throw new Error(`Hebcal request failed (${res.status}): ${url}`)
@@ -108,7 +117,7 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     { label: 'Sunrise', time: formatTime(t.sunrise, timezone) },
     { label: 'Latest Shema', time: formatTime(t.sofZmanShma, timezone) },
     { label: 'Latest Shacharis', time: formatTime(t.sofZmanTfilla, timezone) },
-    { label: 'Sunset', time: formatTime(t.sunset, timezone) },
+    { label: 'Sunset', time: formatTime(t.sunset, timezone), iso: t.sunset },
     { label: 'Nightfall', time: formatTime(t.tzeit7083deg, timezone) },
   ]
 
@@ -119,7 +128,7 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
 
   const toEntry = (item: HebcalShabbatItem | undefined): ZmanEntry | null =>
     item
-      ? { label: weekdayName(item.date, timezone), time: formatTime(item.date, timezone) }
+      ? { label: weekdayName(item.date, timezone), time: formatTime(item.date, timezone), iso: item.date }
       : null
 
   return {
