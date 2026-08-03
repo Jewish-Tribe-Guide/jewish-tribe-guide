@@ -138,9 +138,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // passed to ResourceMap as selectedId so it can highlight the matching
   // marker, making it clear which listing on the map the sheet is showing.
   const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
-  // follow = map pans with every GPS tick. Turns off automatically when the
-  // user manually drags the map (we detect this via the Re-center button press,
-  // which flips it back on).
+  // follow = map pans with every GPS tick. Turns off the moment the user
+  // manually drags the map (see ResourceMap's dragstart listener), and only
+  // resumes once they tap the re-center pill — matching Google Maps' own
+  // blue-dot behavior instead of yanking the view back on every GPS tick.
   const [follow, setFollow] = useState(true)
 
   // When tracking starts, flip into follow mode and show the map.
@@ -764,6 +765,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 userLocation={activeLocation}
                 follow={follow}
                 onResumeFollow={() => setFollow(true)}
+                onManualDrag={() => setFollow(false)}
                 onViewListing={onViewListing}
                 onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
                 onDeselectPoint={isMobile ? () => nearbySheetRef.current?.deselectPoint() : undefined}
