@@ -41,7 +41,9 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
       miles: userLocation ? haversineMiles(userLocation, { lat: p.lat, lng: p.lng }) : null,
     }))
     return scored.sort((a, b) => {
-      if (a.miles === null && b.miles === null) return a.name.localeCompare(b.name)
+      if (a.miles === null && b.miles === null) {
+        return (b.raw?.upvotes ?? 0) - (a.raw?.upvotes ?? 0) || a.name.localeCompare(b.name)
+      }
       if (a.miles === null) return 1
       if (b.miles === null) return -1
       return a.miles - b.miles
@@ -81,7 +83,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
                 {p.glyph ?? '📍'}
               </span>
               <span className="min-w-0 flex-1">
-                <p className={`truncate text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
+                <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
                   {p.name}
                   {canViewListing && (
                     <span className="ml-1 text-slate-300 group-hover:text-blue-400 transition-colors text-xs">›</span>

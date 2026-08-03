@@ -6,6 +6,7 @@ import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
+import { travelCompare } from '@/lib/listingTravel'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
@@ -218,9 +219,15 @@ export function searchListings(
       matchedTags,
       term: matchedTags[0] ?? query.trim(),
     })
-    if (hits.length >= limit) break
   }
-  return hits
+  // Closest first when the visitor has a location; otherwise most-upvoted first,
+  // so the landing search doesn't fall back to arbitrary storage order.
+  hits.sort((a, b) =>
+    a.item.milesFromAddress != null || b.item.milesFromAddress != null
+      ? travelCompare(a.item, b.item)
+      : (b.item.upvotes ?? 0) - (a.item.upvotes ?? 0) || a.item.name.localeCompare(b.item.name),
+  )
+  return hits.slice(0, limit)
 }
 
 /** The "Places" results list: each hit rendered as the same card its category
@@ -250,6 +257,7 @@ export function PlacesResults({
             count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
             onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
             onTagClick={(tag) => onOpen({ ...hit, term: tag })}
+            onNameClick={() => onOpen(hit)}
             onFilterOpen={() => onOpen(hit)}
             onFilterBool={() => onOpen(hit)}
             onFilterSelect={() => onOpen(hit)}
