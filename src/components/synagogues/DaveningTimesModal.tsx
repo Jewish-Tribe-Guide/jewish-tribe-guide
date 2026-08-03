@@ -4,21 +4,21 @@ import { useEffect, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import {
   type Minyan,
-  type DayKey,
+  type MinyanDayKey,
   isMinyanim,
   groupByTefillah,
   groupByDay,
   parseTimeToMinutes,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
-  ALL_DAYS,
+  ALL_MINYAN_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import DenominationFilter from './DenominationFilter'
 
 type GroupMode = 'tefillah' | 'day'
 
-const DAY_PILL_LABELS: Record<DayKey, string> = {
+const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
   sun: 'Sun',
   mon: 'Mon',
   tue: 'Tue',
@@ -26,6 +26,8 @@ const DAY_PILL_LABELS: Record<DayKey, string> = {
   thu: 'Thu',
   fri: 'Fri',
   sat: 'Sat',
+  rosh_chodesh: 'Rosh Chodesh',
+  holiday: 'Holiday',
 }
 
 // Most `time` values are a clock time ("7:30am"), which reads fine bold and
@@ -122,7 +124,7 @@ function TravelLine({
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [groupMode, setGroupMode] = useState<GroupMode>('tefillah')
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
-  const [dayFilter, setDayFilter] = useState<DayKey | 'all'>('all')
+  const [dayFilter, setDayFilter] = useState<MinyanDayKey | 'all'>('all')
 
   // Sync denomination each time the modal opens so it mirrors the parent's filter
   // (seeds the multi-select with just that one value — the visitor can add more
@@ -160,7 +162,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // days, e.g. "Mon–Fri"), so a day filter drops rows that don't include it
   // rather than dropping whole tefillah sections. "By Day" groups are already
   // one bucket per day, so the filter just keeps the matching bucket.
-  const visibleByTefillah = ((day: DayKey | 'all') =>
+  const visibleByTefillah = ((day: MinyanDayKey | 'all') =>
     day === 'all'
       ? byTefillah
       : byTefillah
@@ -259,7 +261,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
         {/* ── Day-of-week pills — narrow to one day (or "All") independent of
             the tefillah/day grouping above. ─────────────────────────────── */}
         <div className="flex items-center gap-1.5 px-5 py-2 border-b border-slate-100 shrink-0 flex-wrap">
-          {(['all', ...ALL_DAYS] as const).map((d) => (
+          {(['all', ...ALL_MINYAN_DAYS] as const).map((d) => (
             <button
               key={d}
               onClick={() => setDayFilter(d)}

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { DAY_KEYS } from '@/lib/hours'
-import type { DayKey } from '@/lib/hours'
 import {
   type Tefillah,
   type Minyan,
   type ZmanAnchor,
+  type MinyanDayKey,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
   ZMAN_ANCHOR_LABELS,
+  ALL_MINYAN_DAYS,
   formatAnchorRule,
   isMinyanim,
 } from '@/lib/davening'
@@ -34,7 +34,7 @@ type Draft = {
   magnitudeText?: string
 }
 
-const DAY_SHORT: Record<DayKey, string> = {
+const DAY_SHORT: Record<MinyanDayKey, string> = {
   sun: 'Sun',
   mon: 'Mon',
   tue: 'Tue',
@@ -42,6 +42,8 @@ const DAY_SHORT: Record<DayKey, string> = {
   thu: 'Thu',
   fri: 'Fri',
   sat: 'Sat',
+  rosh_chodesh: 'Rosh Chodesh',
+  holiday: 'Holiday',
 }
 
 // crypto.randomUUID(), not a sequential counter — a counter restarts at 1 on
@@ -112,7 +114,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
     update(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   }
 
-  function toggleDay(id: string, day: DayKey, checked: boolean) {
+  function toggleDay(id: string, day: MinyanDayKey, checked: boolean) {
     const row = rows.find((r) => r.id === id)
     if (!row) return
     const days = checked ? [...row.days, day] : row.days.filter((d) => d !== day)
@@ -294,7 +296,7 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
             {/* Line 3: day chips */}
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-xs text-muted shrink-0 mr-1">Days:</span>
-              {DAY_KEYS.map((day) => {
+              {ALL_MINYAN_DAYS.map((day) => {
                 const active = row.days.includes(day)
                 return (
                   <label
