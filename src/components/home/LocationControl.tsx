@@ -8,18 +8,23 @@ export type LocationControls = {
   address: string
   onAddressChange: (address: string) => void
   onCoords: (coords: { lat: number; lng: number } | null) => void
+  /** Whether the site-wide live GPS watch is currently running (see
+   *  useLiveLocation) — updating `address`/coords continuously as the visitor
+   *  moves, the same watch the map page's "live tracking" uses. */
+  tracking: boolean
+  geoError: string | null
+  onStartTracking: () => void
+  onStopTracking: () => void
 }
 
 type Props = {
   controls: LocationControls
 }
 
-// Header pill that anchors all distance sorting: the visitor types an address or
-// taps "use my current location", which powers the directory's proximity sorting.
+// Header pill that anchors all distance sorting: the visitor shares their live
+// location or types an address, which powers the directory's proximity sorting.
 export default function LocationControl({ controls }: Props) {
   const [open, setOpen] = useState(false)
-  const [locating, setLocating] = useState(false)
-  const [geoError, setGeoError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Close when tapping/clicking anywhere outside the popover. Listens during
@@ -44,46 +49,19 @@ export default function LocationControl({ controls }: Props) {
     return () => document.removeEventListener('jpc:open-location', onOpen)
   }, [])
 
-  const label = controls.address || 'Set location'
+  const label = controls.tracking ? 'Live' : controls.address || 'Set location'
 
-  // Picking a real address yields coordinates — apply them and close (no Done
-  // button needed). Free typing passes null coords, so the popover stays open.
+  // Picking a real address (or typing one) means the visitor wants a fixed
+  // point, not a moving one — stop live tracking first, or the very next GPS
+  // tick would silently overwrite what they just typed.
   const handleCoords = (coords: { lat: number; lng: number } | null) => {
+    if (controls.tracking) controls.onStopTracking()
     controls.onCoords(coords)
     if (coords) setOpen(false)
   }
-
-  const useCurrentLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGeoError('Location isn’t available on this device.')
-      return
-    }
-    setLocating(true)
-    setGeoError(null)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        controls.onCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        controls.onAddressChange('Current location')
-        setLocating(false)
-        setOpen(false)
-      },
-      (err) => {
-        setLocating(false)
-        // Surface the actual failure: a denied permission and a hardware/timeout
-        // failure need different fixes, so a single generic message hides the cause.
-        console.warn('[geolocation] error', err.code, err.message)
-        if (err.code === err.PERMISSION_DENIED) {
-          setGeoError('Location permission is blocked. Allow location for this site in your browser settings (and check iOS Settings → Privacy → Location Services → Safari), then try again — or type an address below.')
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setGeoError('Your location is currently unavailable. Please type an address below.')
-        } else if (err.code === err.TIMEOUT) {
-          setGeoError('Locating timed out. Try again, or type an address below.')
-        } else {
-          setGeoError('Couldn’t get your location. Please type an address below.')
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    )
+  const handleAddressChange = (address: string) => {
+    if (controls.tracking) controls.onStopTracking()
+    controls.onAddressChange(address)
   }
 
   return (
@@ -95,8 +73,16 @@ export default function LocationControl({ controls }: Props) {
       >
         {/* Filled once an address is set — on mobile the label text collapses
             away below (leaving just this icon), so the fill is the only
-            confirmation that the address actually stuck. */}
-        <PinIcon filled={!!controls.address} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+            confirmation that the address actually stuck. A pulsing dot takes
+            over instead while live tracking, echoing the map's own indicator. */}
+        {controls.tracking ? (
+          <span className="relative flex h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 items-center justify-center" aria-hidden="true">
+            <span className="absolute inline-flex h-2.5 w-2.5 animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+          </span>
+        ) : (
+          <PinIcon filled={!!controls.address} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+        )}
         {/* Show the "Set location" prompt on every size so first-time mobile
             visitors discover it; once an address is set, collapse to just the
             pin on mobile to save header space. */}
@@ -109,14 +95,31 @@ export default function LocationControl({ controls }: Props) {
             Where should distances be measured from?
           </p>
 
-          <button
-            onClick={useCurrentLocation}
-            disabled={locating}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
-          >
-            <PinIcon className="h-4 w-4 shrink-0" />
-            {locating ? 'Locating…' : 'Use my current location'}
-          </button>
+          {controls.tracking ? (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+                Live — updating as you move
+              </span>
+              <button
+                onClick={controls.onStopTracking}
+                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Stop
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={controls.onStartTracking}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20 cursor-pointer"
+            >
+              <PinIcon className="h-4 w-4 shrink-0" />
+              Share my live location
+            </button>
+          )}
 
           <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
             <span className="h-px flex-1 bg-slate-100" />
@@ -125,13 +128,13 @@ export default function LocationControl({ controls }: Props) {
           </div>
 
           <AddressInput
-            value={controls.address}
-            onChange={controls.onAddressChange}
+            value={controls.tracking ? '' : controls.address}
+            onChange={handleAddressChange}
             onCoords={handleCoords}
             placeholder="Enter your address"
           />
 
-          {geoError && <p className="mt-2 text-xs text-red-600">{geoError}</p>}
+          {controls.geoError && <p className="mt-2 text-xs text-red-600">{controls.geoError}</p>}
         </div>
       )}
     </div>

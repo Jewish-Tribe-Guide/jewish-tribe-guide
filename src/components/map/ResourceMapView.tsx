@@ -10,7 +10,6 @@ import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbyS
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
-import { useWatchPosition } from '@/lib/useWatchPosition'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -58,33 +57,33 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
-  /** Called once with the first GPS fix after the map's own "start live
-   *  tracking" pin is pressed, so the header's site-wide "Set location" pill
-   *  (and everything that anchors on it — directory distance sorting on other
-   *  pages) picks up the same location, not just the map. */
-  onSetLocation?: (coords: LatLng) => void
+  /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
+   *  starting it here also updates `userLocation` everywhere else the same
+   *  live coords are read (search sorting, directory distances) — not just
+   *  this screen. Optional (defaults to an inert no-op) for callers that don't
+   *  wire up real tracking, e.g. the admin category-preview map. */
+  liveTracking?: {
+    tracking: boolean
+    error: string | null
+    start: () => void
+    stop: () => void
+  }
 }
+
+const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, onSetLocation }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, liveTracking }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
-  const { position: livePosition, tracking, error: geoError, start, stop } = useWatchPosition()
+  const { tracking, error: geoError, start, stop } = liveTracking ?? NOOP_LIVE_TRACKING
 
-  // Live GPS takes priority over the one-shot header location.
-  const activeLocation: LatLng | null = livePosition ?? userLocation ?? null
-
-  // Report the first fix of each tracking session up to the header's location
-  // pill — reset on every fresh "start" press so pressing it again re-syncs
-  // even if the visitor has since typed a different address up there.
-  const syncedThisSessionRef = useRef(false)
-  useEffect(() => {
-    if (!livePosition || syncedThisSessionRef.current) return
-    syncedThisSessionRef.current = true
-    onSetLocation?.({ lat: livePosition.lat, lng: livePosition.lng })
-  }, [livePosition, onSetLocation])
+  // `userLocation` (page.tsx's global coords) already updates continuously
+  // once tracking is on — see useLiveLocation — so this screen just reads it
+  // directly rather than keeping its own separate live position.
+  const activeLocation: LatLng | null = userLocation ?? null
 
   const [tab, setTab] = useState<Tab>('map')
   // Mobile only — the quick chip row over the map shows a handful of
@@ -148,7 +147,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const handleStart = () => {
     setFollow(true)
     setTab('map')
-    syncedThisSessionRef.current = false
     start()
   }
 

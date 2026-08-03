@@ -12,14 +12,17 @@ import type { NavigateFn } from '@/types'
 export default function HomeMap({
   onNavigate,
   coords,
+  liveTracking,
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
+  liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
 }) {
   return (
     <ResourceMapView
       onUp={() => {}}
       userLocation={coords}
+      liveTracking={liveTracking}
       onViewListing={(categoryId, listingId) =>
         onNavigate('patient', 'find', { findView: categoryId, findItemId: listingId })
       }

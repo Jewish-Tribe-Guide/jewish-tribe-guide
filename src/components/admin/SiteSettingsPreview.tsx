@@ -40,7 +40,11 @@ export default function SiteSettingsPreview({
 
   return (
     <DevicePreviewFrame onClose={onClose}>
-      <SiteHeader onGoHome={() => {}} location={{ address: '', onAddressChange: () => {}, onCoords: () => {} }} previewSettings={settings} />
+      <SiteHeader
+        onGoHome={() => {}}
+        location={{ address: '', onAddressChange: () => {}, onCoords: () => {}, tracking: false, geoError: null, onStartTracking: () => {}, onStopTracking: () => {} }}
+        previewSettings={settings}
+      />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 w-full flex-1">
         <HeroHeading
