@@ -141,8 +141,19 @@ function DistanceDirections({
 
   return (
     <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+      {dest && (
+        <a
+          href={directionsUrl(dest)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
+        >
+          Directions
+        </a>
+      )}
       {hasDistance ? (
-        <span className="text-xs text-slate-600">
+        <span className="ml-auto text-xs text-slate-600">
           {milesFromAddress != null ? (
             `📍 ${milesFromAddress} mi away`
           ) : (
@@ -156,21 +167,10 @@ function DistanceDirections({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('jpc:open-location')) }}
-          className="text-xs text-primary hover:underline cursor-pointer"
+          className="ml-auto text-xs text-primary hover:underline cursor-pointer"
         >
           Set your location to see distance
         </button>
-      )}
-      {dest && (
-        <a
-          href={directionsUrl(dest)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="ml-auto shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
-        >
-          Directions
-        </a>
       )}
     </div>
   )
@@ -234,6 +234,14 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // same pattern as shulGeo below (a row only carries tefillah/time fields,
   // not the shul's own address or milesFromAddress).
   const shulInfoByName = new Map(filtered.map((s) => [s.name, s]))
+  // Lower = closer. Prefers straight-line miles (address mode); falls back to
+  // drive/walk minutes (hospital mode) when that's the active anchor instead.
+  // Used only to break ties between rows at the same time — see below.
+  const distanceScore = (shulName: string): number => {
+    const info = shulInfoByName.get(shulName)
+    if (!info) return Infinity
+    return info.milesFromAddress ?? info.driveMinutes ?? info.walkMinutes ?? Infinity
+  }
 
   // Only shuls with at least one anchor-based minyan need a location resolved
   // — most shuls are plain clock times and shouldn't trigger a fetch at all.
@@ -353,7 +361,14 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                       .map((t) => ({
                         tefillah: t,
                         label: TEFILLAH_LABELS[t],
-                        rows: group.rows.filter((r) => r.tefillah === t),
+                        // Same time (or both non-clock, e.g. two "call to
+                        // confirm" rows) → closer shul first.
+                        rows: group.rows
+                          .filter((r) => r.tefillah === t)
+                          .sort((a, b) =>
+                            parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time) ||
+                            distanceScore(a.shul) - distanceScore(b.shul),
+                          ),
                       }))
                       .filter((sub) => sub.rows.length > 0)
                       .map((sub) => (
