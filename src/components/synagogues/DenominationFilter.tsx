@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 
 type Props = {
-  value: string
+  value: string[]
   options: string[]
-  onChange: (v: string) => void
+  onChange: (v: string[]) => void
   /** Label for the "no filter" choice (e.g. "All Denominations"). */
   allLabel?: string
 }
 
-// A custom single-select dropdown styled like the toggle buttons beside it.
+// A custom multi-select dropdown styled like the toggle buttons beside it.
 // Native <select> can't be used here: a global rule forces selects to 16px on
 // mobile (to stop iOS zoom-on-focus), which makes the text bigger than the
 // adjacent toggle and overflows tight rows. A button-based control isn't subject
@@ -28,7 +28,12 @@ export default function DenominationFilter({ value, options, onChange, allLabel 
     return () => document.removeEventListener('mousedown', onClick)
   }, [open])
 
-  const label = value || allLabel
+  const label =
+    value.length === 0 ? allLabel : value.length === 1 ? value[0] : `${value.length} denominations`
+
+  const toggle = (opt: string) => {
+    onChange(value.includes(opt) ? value.filter((v) => v !== opt) : [...value, opt])
+  }
 
   return (
     <div ref={ref} className="relative shrink-0">
@@ -45,19 +50,48 @@ export default function DenominationFilter({ value, options, onChange, allLabel 
 
       {open && (
         <div className="absolute left-0 top-full z-30 mt-1 min-w-[10rem] max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1">
-          {['', ...options].map((opt) => (
-            <button
-              key={opt || '__all__'}
-              type="button"
-              onClick={() => { onChange(opt); setOpen(false) }}
-              className={[
-                'block w-full whitespace-nowrap px-3 py-1.5 text-left text-sm hover:bg-slate-50 cursor-pointer',
-                opt === value ? 'font-medium text-primary' : 'text-slate-700',
-              ].join(' ')}
-            >
-              {opt || allLabel}
-            </button>
-          ))}
+          {/* "All" clears every selection and closes the dropdown — the rest
+              stay open on click so several can be picked in one go. */}
+          <button
+            type="button"
+            onClick={() => { onChange([]); setOpen(false) }}
+            className={[
+              'block w-full whitespace-nowrap px-3 py-1.5 text-left text-sm hover:bg-slate-50 cursor-pointer',
+              value.length === 0 ? 'font-medium text-primary' : 'text-slate-700',
+            ].join(' ')}
+          >
+            {allLabel}
+          </button>
+          <div className="my-1 border-t border-slate-100" />
+          {options.map((opt) => {
+            const checked = value.includes(opt)
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => toggle(opt)}
+                className={[
+                  'flex w-full items-center gap-2 whitespace-nowrap px-3 py-1.5 text-left text-sm hover:bg-slate-50 cursor-pointer',
+                  checked ? 'font-medium text-primary' : 'text-slate-700',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border',
+                    checked ? 'border-primary bg-primary' : 'border-slate-300 bg-white',
+                  ].join(' ')}
+                  aria-hidden="true"
+                >
+                  {checked && (
+                    <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+                {opt}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
