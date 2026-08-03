@@ -13,6 +13,7 @@ import {
   ALL_MINYAN_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
+import { directionsUrl } from '@/lib/googleMapsLinks'
 import DenominationFilter from './DenominationFilter'
 
 const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
@@ -86,6 +87,11 @@ function shulsFromItems(items: DirectoryResource[]) {
       denomination: item.denomination as string | undefined,
       driveMinutes: item.driveMinutes as number | null | undefined,
       walkMinutes: item.walkMinutes as number | null | undefined,
+      /** Straight-line miles from the visitor's set address (address-anchor
+       *  mode) — see ResourceLoader. Distinct from driveMinutes/walkMinutes,
+       *  which only exist in hospital-anchor mode. */
+      milesFromAddress: item.milesFromAddress as number | undefined,
+      address: item.address as string | undefined,
       geo: item.geo,
       minyanim: item.minyanim as Minyan[],
     }))
@@ -112,6 +118,64 @@ function TravelLine({
   )
 }
 
+/** Expandable per-row panel — "how far is it and how do I get there" — shown
+ *  when a row is tapped. Prefers straight-line miles from the visitor's set
+ *  address; falls back to hospital-anchor drive/walk minutes when that's the
+ *  active mode instead. Directions still shows even with no location set at
+ *  all — Google Maps can route from the device's own GPS at that point. */
+function DistanceDirections({
+  address,
+  geo,
+  milesFromAddress,
+  driveMinutes,
+  walkMinutes,
+}: {
+  address?: string
+  geo?: { lat: number; lng: number } | null
+  milesFromAddress?: number
+  driveMinutes?: number | null
+  walkMinutes?: number | null
+}) {
+  const dest = address || geo || null
+  const hasDistance = milesFromAddress != null || driveMinutes != null || walkMinutes != null
+
+  return (
+    <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+      {hasDistance ? (
+        <span className="text-xs text-slate-600">
+          {milesFromAddress != null ? (
+            `📍 ${milesFromAddress} mi away`
+          ) : (
+            <span className="flex items-center gap-2">
+              {driveMinutes != null && <span>🚗 {driveMinutes} min</span>}
+              {walkMinutes != null && <span>🚶 {walkMinutes} min</span>}
+            </span>
+          )}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('jpc:open-location')) }}
+          className="text-xs text-primary hover:underline cursor-pointer"
+        >
+          Set your location to see distance
+        </button>
+      )}
+      {dest && (
+        <a
+          href={directionsUrl(dest)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="ml-auto shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
+        >
+          Directions
+        </a>
+      )}
+    </div>
+  )
+}
+
 /**
  * Bordered-card modal showing all minyanim from every synagogue, grouped by
  * day (each day's rows further sub-grouped by tefillah with a banner, so
@@ -123,12 +187,17 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // Empty = no day filter (show every day). Multiple days can be selected at
   // once; clicking an already-selected chip deselects just that one.
   const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>([])
+  // Which row's "how far / directions" panel is open — accordion-style, one
+  // at a time. Keyed by day+tefillah+index since the same shul can appear in
+  // more than one row across the modal.
+  const [openRowKey, setOpenRowKey] = useState<string | null>(null)
 
   // Sync denomination each time the modal opens so it mirrors the parent's filter
   // (seeds the multi-select with just that one value — the visitor can add more
   // from there without it getting stomped, since this only fires on open).
   useEffect(() => {
     if (isOpen) setSelectedDenominations(initialDenomination ? [initialDenomination] : [])
+    else setOpenRowKey(null)
   }, [isOpen, initialDenomination])
 
   useEffect(() => {
@@ -160,6 +229,11 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
 
   const visibleByDay = selectedDays.length === 0 ? byDay : byDay.filter((g) => selectedDays.includes(g.day))
   const noDayMatches = hasData && selectedDays.length > 0 && visibleByDay.length === 0
+
+  // Address/geo for the "how far / directions" panel — keyed by shul name,
+  // same pattern as shulGeo below (a row only carries tefillah/time fields,
+  // not the shul's own address or milesFromAddress).
+  const shulInfoByName = new Map(filtered.map((s) => [s.name, s]))
 
   // Only shuls with at least one anchor-based minyan need a location resolved
   // — most shuls are plain clock times and shouldn't trigger a fetch at all.
@@ -293,30 +367,62 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                             <div className="flex-1 border-b border-slate-100" />
                           </div>
 
-                          {/* Rows — no tefillah label needed on each row */}
+                          {/* Rows — no tefillah label needed on each row. Each
+                              row is a button: tap to reveal distance +
+                              directions, so "how far / how do I get there"
+                              isn't cluttering every row by default. */}
                           <div className="divide-y divide-slate-50">
-                            {sub.rows.map((row, i) => (
-                              <div key={i} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 py-1.5 first:pt-0">
-                                {/* Left: name, then denomination, then notes — each
-                                    on its own line rather than crammed inline. */}
-                                <div className="min-w-0 flex-1">
-                                  <span className="font-medium text-sm text-slate-900">{row.shul}</span>
-                                  {row.denomination && (
-                                    <p className="text-xs text-muted">{row.denomination}</p>
-                                  )}
-                                  {row.notes && (
-                                    <p className="text-xs text-slate-500 italic">{row.notes}</p>
-                                  )}
-                                  <TravelLine driveMinutes={row.driveMinutes} walkMinutes={row.walkMinutes} />
-                                </div>
-                                {/* Right: time only (day is already the section header).
-                                    No nowrap/shrink-0 — `time` sometimes carries a long
-                                    freeform note instead of a short time (see TimeValue). */}
-                                <div className="ml-auto max-w-full">
-                                  <TimeValue time={row.time} calculated={calcFor(row)} />
-                                </div>
+                            {sub.rows.map((row, i) => {
+                              const rowKey = `${group.day}|${sub.tefillah}|${i}`
+                              const rowOpen = openRowKey === rowKey
+                              const info = shulInfoByName.get(row.shul)
+                              return (
+                              <div key={i} className="py-1.5 first:pt-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenRowKey((k) => (k === rowKey ? null : rowKey))}
+                                  aria-expanded={rowOpen}
+                                  className="flex w-full flex-wrap items-start justify-between gap-x-3 gap-y-1 text-left cursor-pointer"
+                                >
+                                  {/* Left: name, then denomination, then notes — each
+                                      on its own line rather than crammed inline. */}
+                                  <div className="min-w-0 flex-1">
+                                    <span className="font-medium text-sm text-slate-900">{row.shul}</span>
+                                    {row.denomination && (
+                                      <p className="text-xs text-muted">{row.denomination}</p>
+                                    )}
+                                    {row.notes && (
+                                      <p className="text-xs text-slate-500 italic">{row.notes}</p>
+                                    )}
+                                    <TravelLine driveMinutes={row.driveMinutes} walkMinutes={row.walkMinutes} />
+                                  </div>
+                                  {/* Right: time, then a chevron hinting the row expands.
+                                      No nowrap/shrink-0 on the wrapper — `time` sometimes
+                                      carries a long freeform note instead of a short time
+                                      (see TimeValue). */}
+                                  <div className="ml-auto flex max-w-full items-center gap-1.5">
+                                    <TimeValue time={row.time} calculated={calcFor(row)} />
+                                    <svg
+                                      className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${rowOpen ? 'rotate-180' : ''}`}
+                                      fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                </button>
+
+                                {rowOpen && (
+                                  <DistanceDirections
+                                    address={info?.address}
+                                    geo={info?.geo}
+                                    milesFromAddress={info?.milesFromAddress}
+                                    driveMinutes={row.driveMinutes}
+                                    walkMinutes={row.walkMinutes}
+                                  />
+                                )}
                               </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       ))}
