@@ -4,17 +4,31 @@ import { useEffect, useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import {
   type Minyan,
+  type MinyanDayKey,
   isMinyanim,
   groupByTefillah,
   groupByDay,
   parseTimeToMinutes,
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
+  ALL_MINYAN_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import DenominationFilter from './DenominationFilter'
 
 type GroupMode = 'tefillah' | 'day'
+
+const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
+  sun: 'Sun',
+  mon: 'Mon',
+  tue: 'Tue',
+  wed: 'Wed',
+  thu: 'Thu',
+  fri: 'Fri',
+  sat: 'Sat',
+  rosh_chodesh: 'Rosh Chodesh',
+  holiday: 'Holiday',
+}
 
 // Most `time` values are a clock time ("7:30am"), which reads fine bold and
 // right-aligned next to the days. Some are relative/freeform text instead
@@ -109,11 +123,14 @@ function TravelLine({
  */
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [groupMode, setGroupMode] = useState<GroupMode>('tefillah')
-  const [denomination, setDenomination] = useState(initialDenomination)
+  const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
+  const [dayFilter, setDayFilter] = useState<MinyanDayKey | 'all'>('all')
 
-  // Sync denomination each time the modal opens so it mirrors the parent's filter.
+  // Sync denomination each time the modal opens so it mirrors the parent's filter
+  // (seeds the multi-select with just that one value — the visitor can add more
+  // from there without it getting stomped, since this only fires on open).
   useEffect(() => {
-    if (isOpen) setDenomination(initialDenomination)
+    if (isOpen) setSelectedDenominations(initialDenomination ? [initialDenomination] : [])
   }, [isOpen, initialDenomination])
 
   useEffect(() => {
@@ -133,10 +150,29 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     new Set(allShuls.map((s) => s.denomination).filter((d): d is string => !!d)),
   ).sort()
 
-  const filtered = denomination ? allShuls.filter((s) => s.denomination === denomination) : allShuls
+  const filtered = selectedDenominations.length
+    ? allShuls.filter((s) => s.denomination && selectedDenominations.includes(s.denomination))
+    : allShuls
   const byTefillah = groupMode === 'tefillah' ? groupByTefillah(filtered) : []
   const byDay = groupMode === 'day' ? groupByDay(filtered) : []
   const hasData = filtered.some((s) => s.minyanim.length > 0)
+
+  // Day-of-week pills narrow the rows further, independent of grouping mode.
+  // "By Tefillah" rows carry their own `days` array (a row can span several
+  // days, e.g. "Mon–Fri"), so a day filter drops rows that don't include it
+  // rather than dropping whole tefillah sections. "By Day" groups are already
+  // one bucket per day, so the filter just keeps the matching bucket.
+  const visibleByTefillah = ((day: MinyanDayKey | 'all') =>
+    day === 'all'
+      ? byTefillah
+      : byTefillah
+          .map((g) => ({ ...g, rows: g.rows.filter((r) => r.days.length === 0 || r.days.includes(day)) }))
+          .filter((g) => g.rows.length > 0))(dayFilter)
+  const visibleByDay = dayFilter === 'all' ? byDay : byDay.filter((g) => g.day === dayFilter)
+  const noDayMatches =
+    hasData &&
+    dayFilter !== 'all' &&
+    (groupMode === 'tefillah' ? visibleByTefillah.length === 0 : visibleByDay.length === 0)
 
   // Only shuls with at least one anchor-based minyan need a location resolved
   // — most shuls are plain clock times and shouldn't trigger a fetch at all.
@@ -153,8 +189,8 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   }
   const hasCalculatedRows =
     groupMode === 'tefillah'
-      ? byTefillah.some((g) => g.rows.some((r) => calcFor(r)))
-      : byDay.some((g) => g.rows.some((r) => calcFor(r)))
+      ? visibleByTefillah.some((g) => g.rows.some((r) => calcFor(r)))
+      : visibleByDay.some((g) => g.rows.some((r) => calcFor(r)))
 
   if (!isOpen) return null
 
@@ -208,9 +244,9 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
 
             {denominations.length > 1 && (
               <DenominationFilter
-                value={denomination}
+                value={selectedDenominations}
                 options={denominations}
-                onChange={setDenomination}
+                onChange={setSelectedDenominations}
               />
             )}
           </div>
@@ -220,6 +256,23 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
               {filtered.length} shul{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
+        </div>
+
+        {/* ── Day-of-week pills — narrow to one day (or "All") independent of
+            the tefillah/day grouping above. ─────────────────────────────── */}
+        <div className="flex items-center gap-1.5 px-5 py-2 border-b border-slate-100 shrink-0 flex-wrap">
+          {(['all', ...ALL_MINYAN_DAYS] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDayFilter(d)}
+              className={[
+                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                dayFilter === d ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+              ].join(' ')}
+            >
+              {d === 'all' ? 'All' : DAY_PILL_LABELS[d]}
+            </button>
+          ))}
         </div>
 
         {/* One-time disclaimer, not per-row — only shown when at least one
@@ -234,11 +287,15 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!hasData ? (
             <p className="text-sm text-muted text-center py-16">No structured davening data available yet.</p>
+          ) : noDayMatches ? (
+            <p className="text-sm text-muted text-center py-16">
+              No davening times on {DAY_PILL_LABELS[dayFilter]}.
+            </p>
           ) : groupMode === 'tefillah' ? (
 
             /* ── By Tefillah ─────────────────────────────────────────────── */
             <div className="space-y-6">
-              {byTefillah.map((group) => (
+              {visibleByTefillah.map((group) => (
                 <section key={group.tefillah}>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 pb-1.5 border-b border-slate-100">
                     {group.label}
@@ -299,10 +356,13 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
 
             /* ── By Day (sub-grouped by tefillah with banners) ───────────── */
             <div className="space-y-6">
-              {byDay.map((group) => (
+              {visibleByDay.map((group) => (
                 <section key={group.day}>
-                  {/* Day header */}
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3 pb-1.5 border-b border-slate-100">
+                  {/* Day header — deliberately louder than the tefillah
+                      sub-banners below it (bigger, bolder, darker, thicker
+                      rule) so the day reads as the primary heading and
+                      tefillah as the secondary one, matching their roles. */}
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800 mb-3 pb-1.5 border-b-2 border-slate-200">
                     {group.label}
                   </h3>
 
