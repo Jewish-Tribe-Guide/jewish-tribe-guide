@@ -80,7 +80,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
           <h2 className="text-base font-semibold text-slate-900">Share your live location?</h2>
         </div>
         <p className="mt-3 text-sm text-slate-600">
-          See distances, directions, and nearby places that update automatically as you walk — like Google Maps. You can turn this off anytime from the location pill.
+          See distances, directions, and nearby places that update automatically as you walk. You can turn this off anytime from the location pill.
         </p>
         <div className="mt-4 flex flex-col gap-2">
           <button
