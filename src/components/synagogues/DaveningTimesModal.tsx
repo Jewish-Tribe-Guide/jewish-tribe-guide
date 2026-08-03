@@ -6,7 +6,6 @@ import {
   type Minyan,
   type MinyanDayKey,
   isMinyanim,
-  groupByTefillah,
   groupByDay,
   parseTimeToMinutes,
   TEFILLAH_ORDER,
@@ -15,8 +14,6 @@ import {
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import DenominationFilter from './DenominationFilter'
-
-type GroupMode = 'tefillah' | 'day'
 
 const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
   sun: 'Sun',
@@ -116,15 +113,16 @@ function TravelLine({
 }
 
 /**
- * Bordered-card modal showing all minyanim from every synagogue.
- * Default: group by tefillah. Toggle: group by day (rows further sub-grouped
- * by tefillah with a banner, so shacharis / mincha / maariv never appear inline).
- * Drive + walk time sit under the shul name.
+ * Bordered-card modal showing all minyanim from every synagogue, grouped by
+ * day (each day's rows further sub-grouped by tefillah with a banner, so
+ * shacharis / mincha / maariv never appear inline). Drive + walk time sit
+ * under the shul name.
  */
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
-  const [groupMode, setGroupMode] = useState<GroupMode>('tefillah')
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
-  const [dayFilter, setDayFilter] = useState<MinyanDayKey | 'all'>('all')
+  // Empty = no day filter (show every day). Multiple days can be selected at
+  // once; clicking an already-selected chip deselects just that one.
+  const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>([])
 
   // Sync denomination each time the modal opens so it mirrors the parent's filter
   // (seeds the multi-select with just that one value — the visitor can add more
@@ -145,6 +143,10 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
+  const toggleDay = (d: MinyanDayKey) => {
+    setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+  }
+
   const allShuls = isOpen ? shulsFromItems(items) : []
   const denominations = Array.from(
     new Set(allShuls.map((s) => s.denomination).filter((d): d is string => !!d)),
@@ -153,26 +155,11 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   const filtered = selectedDenominations.length
     ? allShuls.filter((s) => s.denomination && selectedDenominations.includes(s.denomination))
     : allShuls
-  const byTefillah = groupMode === 'tefillah' ? groupByTefillah(filtered) : []
-  const byDay = groupMode === 'day' ? groupByDay(filtered) : []
+  const byDay = groupByDay(filtered)
   const hasData = filtered.some((s) => s.minyanim.length > 0)
 
-  // Day-of-week pills narrow the rows further, independent of grouping mode.
-  // "By Tefillah" rows carry their own `days` array (a row can span several
-  // days, e.g. "Mon–Fri"), so a day filter drops rows that don't include it
-  // rather than dropping whole tefillah sections. "By Day" groups are already
-  // one bucket per day, so the filter just keeps the matching bucket.
-  const visibleByTefillah = ((day: MinyanDayKey | 'all') =>
-    day === 'all'
-      ? byTefillah
-      : byTefillah
-          .map((g) => ({ ...g, rows: g.rows.filter((r) => r.days.length === 0 || r.days.includes(day)) }))
-          .filter((g) => g.rows.length > 0))(dayFilter)
-  const visibleByDay = dayFilter === 'all' ? byDay : byDay.filter((g) => g.day === dayFilter)
-  const noDayMatches =
-    hasData &&
-    dayFilter !== 'all' &&
-    (groupMode === 'tefillah' ? visibleByTefillah.length === 0 : visibleByDay.length === 0)
+  const visibleByDay = selectedDays.length === 0 ? byDay : byDay.filter((g) => selectedDays.includes(g.day))
+  const noDayMatches = hasData && selectedDays.length > 0 && visibleByDay.length === 0
 
   // Only shuls with at least one anchor-based minyan need a location resolved
   // — most shuls are plain clock times and shouldn't trigger a fetch at all.
@@ -187,10 +174,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     if (!geo) return null
     return resolveAnchorTime(row, anchorMap[geoKey(geo)])
   }
-  const hasCalculatedRows =
-    groupMode === 'tefillah'
-      ? visibleByTefillah.some((g) => g.rows.some((r) => calcFor(r)))
-      : visibleByDay.some((g) => g.rows.some((r) => calcFor(r)))
+  const hasCalculatedRows = visibleByDay.some((g) => g.rows.some((r) => calcFor(r)))
 
   if (!isOpen) return null
 
@@ -223,33 +207,13 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
         {/* ── Controls ────────────────────────────────────────────────────── */}
         {/* relative + z so the denomination dropdown overlays the scrolling list. */}
         <div className="relative z-20 flex items-center gap-2 px-5 py-3 border-b border-slate-100 shrink-0 flex-wrap">
-          {/* Toggle + denomination filter stay on one line together; on mobile the
-              toggle labels drop "By " so the denomination control fits beside them. */}
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-md border border-slate-300 overflow-hidden">
-              {([['tefillah', 'By Tefillah', 'Tefillah'], ['day', 'By Day', 'Day']] as [GroupMode, string, string][]).map(([mode, lbl, shortLbl]) => (
-                <button
-                  key={mode}
-                  onClick={() => setGroupMode(mode)}
-                  className={[
-                    'px-2.5 sm:px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
-                    groupMode === mode ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
-                  ].join(' ')}
-                >
-                  <span className="sm:hidden">{shortLbl}</span>
-                  <span className="hidden sm:inline">{lbl}</span>
-                </button>
-              ))}
-            </div>
-
-            {denominations.length > 1 && (
-              <DenominationFilter
-                value={selectedDenominations}
-                options={denominations}
-                onChange={setSelectedDenominations}
-              />
-            )}
-          </div>
+          {denominations.length > 1 && (
+            <DenominationFilter
+              value={selectedDenominations}
+              options={denominations}
+              onChange={setSelectedDenominations}
+            />
+          )}
 
           {filtered.length > 0 && (
             <span className="text-xs text-muted ml-auto">
@@ -258,21 +222,27 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
           )}
         </div>
 
-        {/* ── Day-of-week pills — narrow to one day (or "All") independent of
-            the tefillah/day grouping above. ─────────────────────────────── */}
-        <div className="flex items-center gap-1.5 px-5 py-2 border-b border-slate-100 shrink-0 flex-wrap">
-          {(['all', ...ALL_MINYAN_DAYS] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDayFilter(d)}
-              className={[
-                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
-                dayFilter === d ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-              ].join(' ')}
-            >
-              {d === 'all' ? 'All' : DAY_PILL_LABELS[d]}
-            </button>
-          ))}
+        {/* ── Day-of-week pills — one horizontally-scrolling row (no wrap) so
+            it stays a single line even with Rosh Chodesh/Holiday added; no
+            "All" chip — zero selected means "show every day", clicking a
+            selected chip again clears just that one, and any number can be
+            active at once. ──────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 px-5 py-2 border-b border-slate-100 shrink-0 overflow-x-auto">
+          {ALL_MINYAN_DAYS.map((d) => {
+            const active = selectedDays.includes(d)
+            return (
+              <button
+                key={d}
+                onClick={() => toggleDay(d)}
+                className={[
+                  'shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                  active ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                ].join(' ')}
+              >
+                {DAY_PILL_LABELS[d]}
+              </button>
+            )
+          })}
         </div>
 
         {/* One-time disclaimer, not per-row — only shown when at least one
@@ -283,78 +253,15 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
           </p>
         )}
 
-        {/* ── Content ─────────────────────────────────────────────────────── */}
+        {/* ── Content — grouped by day, each day sub-grouped by tefillah ──── */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {!hasData ? (
             <p className="text-sm text-muted text-center py-16">No structured davening data available yet.</p>
           ) : noDayMatches ? (
             <p className="text-sm text-muted text-center py-16">
-              No davening times on {DAY_PILL_LABELS[dayFilter]}.
+              No davening times on {selectedDays.map((d) => DAY_PILL_LABELS[d]).join(', ')}.
             </p>
-          ) : groupMode === 'tefillah' ? (
-
-            /* ── By Tefillah ─────────────────────────────────────────────── */
-            <div className="space-y-6">
-              {visibleByTefillah.map((group) => (
-                <section key={group.tefillah}>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 pb-1.5 border-b border-slate-100">
-                    {group.label}
-                  </h3>
-                  <div className="divide-y divide-slate-50">
-                    {group.rows.map((row, i) => {
-                      const calc = calcFor(row)
-                      return (
-                      // flex-wrap + the right block's ml-auto: a long shul name or day
-                      // label wraps the times onto their own line instead of forcing
-                      // the row (and the modal) wider than the viewport — that overflow
-                      // was what let the whole modal be dragged left/right on mobile.
-                      <div key={i} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 py-2 first:pt-0">
-                        {/* Left: name, then denomination, then notes — each
-                            on its own line rather than crammed inline. */}
-                        <div className="min-w-0 flex-1">
-                          <span className="font-medium text-sm text-slate-900">{row.shul}</span>
-                          {row.denomination && (
-                            <p className="text-xs text-muted">{row.denomination}</p>
-                          )}
-                          {row.notes && (
-                            <p className="text-xs text-slate-500 italic">{row.notes}</p>
-                          )}
-                          <TravelLine driveMinutes={row.driveMinutes} walkMinutes={row.walkMinutes} />
-                        </div>
-                        {/* Right: days + time. `time` sometimes carries a long
-                            freeform note instead of a short time — no nowrap/shrink-0
-                            here, or that note alone forces the row (and the whole
-                            modal) wider than the screen. A freeform note drops to its
-                            own line below the days (see TimeValue) instead of jamming
-                            inline next to them. */}
-                        <div
-                          className={[
-                            'ml-auto flex max-w-full gap-x-1 gap-y-0.5',
-                            // A calculated row's TimeValue stacks two lines
-                            // (calculated time + rule text underneath) — centering
-                            // the days label against that whole two-line block
-                            // shifts it down off the top line, so it no longer
-                            // lines up with a plain row's single-line days label.
-                            // items-start keeps it flush with the top (bold) line.
-                            calc ? 'flex-wrap items-start justify-end' : isClockTime(row.time) ? 'flex-wrap items-center justify-end' : 'flex-col items-end',
-                          ].join(' ')}
-                        >
-                          {row.daysLabel && (
-                            <span className="text-xs text-muted whitespace-nowrap">{row.daysLabel}</span>
-                          )}
-                          <TimeValue time={row.time} calculated={calc} />
-                        </div>
-                      </div>
-                      )
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
-
           ) : (
-
-            /* ── By Day (sub-grouped by tefillah with banners) ───────────── */
             <div className="space-y-6">
               {visibleByDay.map((group) => (
                 <section key={group.day}>
@@ -417,7 +324,6 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                 </section>
               ))}
             </div>
-
           )}
         </div>
       </div>
