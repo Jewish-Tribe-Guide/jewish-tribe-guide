@@ -11,6 +11,7 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
+import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
@@ -285,8 +286,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (name.startsWith(q)) starts.push(p)
       else if (name.includes(q)) contains.push(p)
     }
-    return [...starts, ...contains].slice(0, 6)
-  }, [allPoints, input])
+    // Within each match-quality bucket, closest first when we have a location;
+    // otherwise most-upvoted first, so ties don't fall back to storage order.
+    const rank = (p: (typeof allPoints)[number]) =>
+      activeLocation ? haversineMiles(activeLocation, { lat: p.lat, lng: p.lng }) : -(p.raw?.upvotes ?? 0)
+    const byRank = (a: (typeof allPoints)[number], b: (typeof allPoints)[number]) => rank(a) - rank(b)
+    return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
+  }, [allPoints, input, activeLocation])
 
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
   // — instead of just adding it as a narrowing text filter.
@@ -882,7 +888,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             {p.glyph ?? '📍'}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
+                            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
                             <p className="truncate text-xs text-slate-400">
                               {p.categoryLabel}
                               {p.address ? ` · ${p.address}` : ''}

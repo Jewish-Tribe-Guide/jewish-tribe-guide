@@ -44,6 +44,7 @@ export function GenericListingCard({
   onEdit,
   onReport,
   showCategoryLabel = true,
+  onNameClick,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -57,6 +58,13 @@ export function GenericListingCard({
   showCategoryLabel?: boolean
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
+  /** When provided, clicking the listing's name navigates to that item's own
+   *  category directory instead of expanding the card in place — used by
+   *  cross-category lists (landing search) where "this row" and "its home
+   *  page" are different places. Single-category directories leave this
+   *  unset so a name click still just expands, matching every other tap on
+   *  the row. */
+  onNameClick?: () => void
   /** Click the "Open" badge → turn on the "Open now" filter. */
   onFilterOpen: () => void
   /** Click a boolean badge (e.g. "Kosher") → enable that boolean filter. */
@@ -142,7 +150,12 @@ export function GenericListingCard({
         {/* Name + subtitle + the only chips that survive collapsed: Open and
             any badge tied to an actual filter control. */}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-slate-900">{item.name}</p>
+          <p
+            className={`font-semibold text-slate-900 ${onNameClick ? 'hover:underline hover:text-blue-600 transition-colors' : ''}`}
+            onClick={onNameClick ? (e) => { e.stopPropagation(); onNameClick() } : undefined}
+          >
+            {item.name}
+          </p>
           {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
           {(isOpen || headerBadges.length > 0) && (
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
