@@ -41,6 +41,11 @@ type Props = {
   /** Called when the user manually taps "Re-center" so the parent can flip
    *  follow back on. */
   onResumeFollow?: () => void
+  /** Called the moment the user manually drags the map — the parent flips
+   *  `follow` off so their live position stops yanking the view back while
+   *  they're trying to look around, same as Google Maps' own blue-dot
+   *  behavior (it only resumes centering once they tap the re-center pill). */
+  onManualDrag?: () => void
   /** Fallback center when there are no points to fit (e.g. Center City Philly). */
   fallbackCenter?: { lat: number; lng: number }
   /** Called when the user taps "View listing" in an info window. */
@@ -235,7 +240,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -263,6 +268,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const selectedIdRef = useRef(selectedId)
   const obscuredBottomPxRef = useRef(obscuredBottomPx)
   const obscuredTopPxRef = useRef(obscuredTopPx)
+  const onManualDragRef = useRef(onManualDrag)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -272,6 +278,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   useEffect(() => { obscuredBottomPxRef.current = obscuredBottomPx }, [obscuredBottomPx])
   useEffect(() => { obscuredTopPxRef.current = obscuredTopPx }, [obscuredTopPx])
+  useEffect(() => { onManualDragRef.current = onManualDrag }, [onManualDrag])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -298,6 +305,14 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         mapRef.current.addListener('click', () => {
           infoWindowRef.current?.close()
           onBackgroundClickRef.current?.()
+        })
+        // Fires only on a genuine user-initiated pan (mouse/touch drag), never
+        // from our own programmatic panTo/setCenter calls below — so this is
+        // safe to treat as "the user is looking around, stop yanking them
+        // back to their live position" without a race against the follow
+        // effect's own panning.
+        mapRef.current.addListener('dragstart', () => {
+          onManualDragRef.current?.()
         })
         setReady(true)
       })

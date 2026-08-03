@@ -73,12 +73,13 @@ export default function LocationControl({ controls }: Props) {
       >
         {/* Filled once an address is set — on mobile the label text collapses
             away below (leaving just this icon), so the fill is the only
-            confirmation that the address actually stuck. A pulsing dot takes
-            over instead while live tracking, echoing the map's own indicator. */}
+            confirmation that the address actually stuck. A solid dot takes
+            over instead while live tracking — static, not pulsing, since this
+            sits in the header at all times and a constant blink there was
+            distracting rather than informative. */}
         {controls.tracking ? (
-          <span className="relative flex h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 items-center justify-center" aria-hidden="true">
-            <span className="absolute inline-flex h-2.5 w-2.5 animate-ping rounded-full bg-primary opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+          <span className="flex h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 items-center justify-center" aria-hidden="true">
+            <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
         ) : (
           <PinIcon filled={!!controls.address} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
