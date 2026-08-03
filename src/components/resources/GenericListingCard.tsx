@@ -150,11 +150,22 @@ export function GenericListingCard({
         {/* Name + subtitle + the only chips that survive collapsed: Open and
             any badge tied to an actual filter control. */}
         <div className="min-w-0 flex-1">
-          <p
-            className={`font-semibold text-slate-900 ${onNameClick ? 'hover:underline hover:text-blue-600 transition-colors' : ''}`}
-            onClick={onNameClick ? (e) => { e.stopPropagation(); onNameClick() } : undefined}
-          >
-            {item.name}
+          <p className="font-semibold text-slate-900">
+            {onNameClick ? (
+              // A span, not the whole <p>, carries the click/hover — the <p>
+              // is block-level and stretches to fill the row, which would
+              // make clicking empty space to the right of a short name (e.g.
+              // "Giant") count as clicking the name. The span sizes to just
+              // the text itself.
+              <span
+                className="cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                onClick={(e) => { e.stopPropagation(); onNameClick() }}
+              >
+                {item.name}
+              </span>
+            ) : (
+              item.name
+            )}
           </p>
           {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
           {(isOpen || headerBadges.length > 0) && (
