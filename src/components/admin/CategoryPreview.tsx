@@ -143,7 +143,7 @@ export default function CategoryPreview({
     <DevicePreviewFrame onClose={onClose}>
       <SiteHeader
         onGoHome={onClose}
-        location={{ address, onAddressChange: setAddress, onCoords: setCoords }}
+        location={{ address, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, onStartTracking: () => {}, onStopTracking: () => {} }}
       />
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
       <SiteFooter />

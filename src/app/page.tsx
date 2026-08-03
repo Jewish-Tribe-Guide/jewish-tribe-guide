@@ -12,9 +12,11 @@ import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar'
 import FeedbackForm from '@/components/FeedbackForm'
-import { useStoredLocation } from '@/lib/useStoredLocation'
+import LiveLocationPrompt from '@/components/LiveLocationPrompt'
+import { useLiveLocation } from '@/lib/useLiveLocation'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { ui } from '@/lib/uiConfig'
 
 // Which guided form is open as a full-screen overlay, and any need
 // pre-checked from the card or a search result. `kind` is 'support'/
@@ -44,8 +46,11 @@ type NavState = {
 
 export default function Page() {
   const [mode, setMode] = useState<AppMode>('home')
-  // Location persists across reloads/return visits — it drives all distance sorting.
-  const { address, coords, setAddress, setCoords } = useStoredLocation()
+  // Location persists across reloads/return visits — it drives all distance
+  // sorting. `tracking`/`start`/`stop` are the site-wide live GPS watch (see
+  // useLiveLocation): once started, coords/address update continuously as the
+  // visitor moves, everywhere — not just on the map screen.
+  const { address, coords, setAddress, setCoords, tracking, geoError, start: startLiveTracking, stop: stopLiveTracking } = useLiveLocation()
   const categories = useCategories()
   const settings = useSiteSettings()
   const [flow, setFlow] = useState<Flow | null>(null)
@@ -75,11 +80,17 @@ export default function Page() {
   const [mapResetToken, setMapResetToken] = useState(0)
 
   // The address anchor, editable from the header's location pill on every screen
-  // — it drives all proximity sorting in the directory.
+  // — it drives all proximity sorting in the directory. Also carries the
+  // site-wide live-tracking controls so the pill can start/stop the same GPS
+  // watch the map page uses, rather than a separate one-shot fix.
   const locationControls = {
     address,
     onAddressChange: setAddress,
     onCoords: setCoords,
+    tracking,
+    geoError,
+    onStartTracking: startLiveTracking,
+    onStopTracking: stopLiveTracking,
   }
 
   // ── History API — keeps browser back/forward in sync with React state ──────
@@ -218,7 +229,12 @@ export default function Page() {
       {/* ── Landing — the single home screen (search + one card grid) ────────── */}
       {(mode === 'home' || mode === 'community-home') && (
         <div className="flex-1">
-          <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
+          <Landing
+            onNavigate={navigate}
+            onOpenFlow={openFlow}
+            coords={coords}
+            liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
+          />
         </div>
       )}
 
@@ -263,10 +279,7 @@ export default function Page() {
             initialSelectedCategories={mapSelectedCategories || undefined}
             initialFilters={mapFilters || undefined}
             onViewListing={viewListing}
-            onSetLocation={(c) => {
-              setCoords(c)
-              setAddress('Current location')
-            }}
+            liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </main>
       )}
@@ -276,6 +289,7 @@ export default function Page() {
       </div>
       {tabBar}
       {overlay}
+      <LiveLocationPrompt enabled={ui.map.liveTracking && !tracking} onShare={startLiveTracking} />
     </>
   )
 }

@@ -19,12 +19,16 @@ type Props = {
   /** The visitor's location (from the header pill) — lets "Places" results show
    *  distance, exactly like the category directory does. */
   coords: { lat: number; lng: number } | null
+  /** The site-wide live GPS watch (see useLiveLocation) — passed through to the
+   *  embedded home-screen map so its tracking controls act on the same shared
+   *  watch as the full map page and the header pill. */
+  liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
 }
 
 // The whole site is one screen: a filter box, then a grid of cards. Typing
 // filters the grid live against each card's hidden keywords (so "shul" surfaces
 // Synagogues), with no dropdown to click through.
-export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
@@ -84,7 +88,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               twice. ──────────────────────────────────────────────────────── */}
       {hasMap && (
         <div className="mt-8 hidden sm:block">
-          <HomeMap onNavigate={onNavigate} coords={coords} />
+          <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
         </div>
       )}
 
