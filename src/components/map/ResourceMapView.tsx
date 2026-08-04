@@ -677,6 +677,108 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // reason to show one.
   const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0
 
+  // ── Desktop search box + its autocomplete dropdown — shared between the
+  // two places it can render: floating directly on the map (the default
+  // browsing state, Google-Maps-style) or embedded at the top of the
+  // sidebar (once something's actually been searched/picked). Only one of
+  // these ever actually mounts at a time (the two call sites are mutually
+  // exclusive on desktopNarrowed/desktopSelected), so this still respects
+  // "only one desktop <input> in the DOM at once" — see the mobile input's
+  // own comment about why that matters. ─────────────────────────────────
+  const desktopSearchForm = ui.search.map && !isMobile && (
+    <div className="relative w-full">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          submitSearch()
+        }}
+        className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary"
+      >
+        <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+        </svg>
+        <input
+          ref={desktopSearchInputRef}
+          type="text"
+          autoComplete="off"
+          placeholder="Search name, address, or 'open now'…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSearchFocused(false)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        />
+        {input && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            aria-label="Clear search"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </form>
+
+      {/* ── Autocomplete dropdown — same Google-Maps-style behavior as
+              mobile's: matching places while typing, click one to jump
+              straight to its card. ─────────────────────────────────────── */}
+      {searchFocused && searchSuggestions.length > 0 && (
+        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+          {searchSuggestions.map((p) => (
+            <button
+              key={p.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => selectSuggestion(p)}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+            >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
+                style={{ backgroundColor: p.color + '22' }}
+                aria-hidden="true"
+              >
+                {p.glyph ?? '📍'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+                <p className="truncate text-xs text-slate-400">
+                  {p.categoryLabel}
+                  {p.address ? ` · ${p.address}` : ''}
+                </p>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // The category chips — also shared between the floating and embedded
+  // placements. Ducks out of the way while the dropdown above is open, same
+  // as mobile's own floating chip row.
+  const desktopCategoryChips = options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
+    <CategoryFilter
+      options={optionsWithFilters}
+      selected={effectiveSelected}
+      onToggle={toggle}
+      onAll={showAll}
+      onNone={hideAll}
+      categories={categories ?? []}
+      boolFields={boolFields}
+      onToggleBool={toggleBoolField}
+      selectFilters={selectFilters}
+      onToggleSelectValue={toggleSelectValue}
+    />
+  )
+
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
@@ -698,156 +800,53 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       ) : (
         <>
-          {/* ── Desktop sidebar — search, category chips, and either the
-                  results list or a selected place's full detail (Google
-                  Maps' left panel). The map (below) fills everything to its
-                  right, full height, edge to edge. Hidden on mobile, which
-                  uses the floating overlay + bottom sheet instead. ─────── */}
-          <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
-            <div className="flex shrink-0 items-center border-b border-slate-100 px-4 py-3">
-              <UpButton label="Home" onClick={onUp} className="mb-0" />
-            </div>
+          {/* ── Desktop sidebar — only once the visitor has actually asked
+                  for something (a search, a narrowed category, or a
+                  selected place). Google Maps' own panel doesn't exist
+                  until then either; before that, search + chips just float
+                  on the map (see below) and the map stays full width. ──── */}
+          {!isMobile && (desktopNarrowed || !!desktopSelected) && (
+            <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
+              <div className="flex shrink-0 items-center border-b border-slate-100 px-4 py-3">
+                <UpButton label="Home" onClick={onUp} className="mb-0" />
+              </div>
 
-            {/* ── Search + category chips — one visual block, chips sitting
-                    right under the search box with no divider between them
-                    (Google Maps' explore panel puts its quick-filter chips
-                    directly under the search bar, not in a separate section
-                    further down). ─────────────────────────────────────────── */}
-            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
-              {/* Real conditional mount (not just CSS hidden) — mobile browsers'
-                  virtual keyboard "next/previous field" navigation bar is driven
-                  by how many actual <input> elements exist in the DOM, so
-                  leaving a CSS-hidden duplicate around still triggers it. Only
-                  one of desktop/mobile search inputs is ever actually mounted. */}
-              {ui.search.map && !isMobile && (
-                <div className="relative">
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      submitSearch()
-                    }}
-                    className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 focus-within:ring-2 focus-within:ring-primary"
-                  >
-                    <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
-                    </svg>
-                    <input
-                      ref={desktopSearchInputRef}
-                      type="text"
-                      autoComplete="off"
-                      placeholder="Search name, address, or 'open now'…"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onFocus={() => setSearchFocused(true)}
-                      onBlur={() => setSearchFocused(false)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setSearchFocused(false)
-                          ;(e.target as HTMLInputElement).blur()
-                        }
-                      }}
-                      className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+              {/* ── Search + category chips — one visual block, chips sitting
+                      right under the search box with no divider between them. ── */}
+              <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+                {desktopSearchForm}
+                {desktopCategoryChips && <div className="mt-2.5">{desktopCategoryChips}</div>}
+              </div>
+
+              {ui.map.nearbyList && (
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                  {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+                    <MapPlaceDetail
+                      item={desktopSelected.raw}
+                      category={desktopSelectedCategory}
+                      glyph={desktopSelected.glyph}
+                      color={desktopSelected.color}
+                      onBack={() => setDesktopSelected(null)}
                     />
-                    {input && (
-                      <button
-                        type="button"
-                        onClick={clearSearch}
-                        aria-label="Clear search"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </form>
-
-                  {/* ── Autocomplete dropdown — same Google-Maps-style behavior
-                          as mobile's: matching places while typing, click one to
-                          jump straight to its card. ───────────────────────── */}
-                  {searchFocused && searchSuggestions.length > 0 && (
-                    <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
-                      {searchSuggestions.map((p) => (
-                        <button
-                          key={p.id}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectSuggestion(p)}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                            style={{ backgroundColor: p.color + '22' }}
-                            aria-hidden="true"
-                          >
-                            {p.glyph ?? '📍'}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                            <p className="truncate text-xs text-slate-400">
-                              {p.categoryLabel}
-                              {p.address ? ` · ${p.address}` : ''}
-                            </p>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                  ) : (
+                    <>
+                      {activeLocation && (
+                        <p className="mb-2 px-1 text-xs text-slate-400">
+                          Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
+                        </p>
+                      )}
+                      <NearbyList
+                        points={visiblePoints}
+                        userLocation={activeLocation}
+                        onViewListing={onViewListing}
+                        onSelectPlace={selectPlace}
+                      />
+                    </>
                   )}
                 </div>
               )}
-
-              {options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
-                <div className="mt-2.5">
-                  <CategoryFilter
-                    options={optionsWithFilters}
-                    selected={effectiveSelected}
-                    onToggle={toggle}
-                    onAll={showAll}
-                    onNone={hideAll}
-                    categories={categories ?? []}
-                    boolFields={boolFields}
-                    onToggleBool={toggleBoolField}
-                    selectFilters={selectFilters}
-                    onToggleSelectValue={toggleSelectValue}
-                  />
-                </div>
-              )}
-            </div>
-
-            {ui.map.nearbyList && (
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-                {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
-                  <MapPlaceDetail
-                    item={desktopSelected.raw}
-                    category={desktopSelectedCategory}
-                    glyph={desktopSelected.glyph}
-                    color={desktopSelected.color}
-                    onBack={() => setDesktopSelected(null)}
-                  />
-                ) : desktopNarrowed ? (
-                  <>
-                    {activeLocation && (
-                      <p className="mb-2 px-1 text-xs text-slate-400">
-                        Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
-                      </p>
-                    )}
-                    <NearbyList
-                      points={visiblePoints}
-                      userLocation={activeLocation}
-                      onViewListing={onViewListing}
-                      onSelectPlace={selectPlace}
-                    />
-                  </>
-                ) : (
-                  // Nothing searched or picked yet — Google Maps' own explore
-                  // panel starts just as bare, not with every place already
-                  // listed. The map itself still shows every pin.
-                  <p className="px-2 py-8 text-center text-sm text-slate-400">
-                    Search for a place, or choose a category above, to see what&apos;s nearby.
-                  </p>
-                )}
-              </div>
-            )}
-          </aside>
+            </aside>
+          )}
 
           {/* ── Map. Mobile: full-bleed (breaks out of the page's max-width/
                   padding) and fills the rest of the flex column (flex-1) —
@@ -910,6 +909,23 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 <p className="absolute bottom-14 left-3 z-10 hidden max-w-[220px] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md sm:block">
                   {geoError}
                 </p>
+              )}
+
+              {/* ── Floating search + chips (desktop, default browsing state)
+                      — laid directly on the map, chips right next to the search
+                      box in the same row, exactly like Google Maps' own explore
+                      controls. Replaced by the sidebar (above) the moment
+                      there's an actual search/selection to show. ───────────── */}
+              {!isMobile && !desktopNarrowed && !desktopSelected && (
+                <div className="absolute left-3 top-3 z-10 hidden sm:block">
+                  <div className="mb-2 inline-flex rounded-full bg-white shadow-md ring-1 ring-slate-900/10">
+                    <UpButton label="Home" onClick={onUp} className="mb-0 px-3 py-1.5 text-xs" />
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-72 shrink-0">{desktopSearchForm}</div>
+                    {desktopCategoryChips && <div className="min-w-0 max-w-xs pt-0.5">{desktopCategoryChips}</div>}
+                  </div>
+                </div>
               )}
 
               {/* ── Floating search + filters (mobile) — laid directly over the
