@@ -775,9 +775,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   )
 
   // The category chips — also shared between the floating and embedded
-  // placements. Ducks out of the way while the dropdown above is open, same
-  // as mobile's own floating chip row.
-  const desktopCategoryChips = options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
+  // placements. In the floating placement they sit beside the search box
+  // (not below it), so they stay put next to it even while the dropdown is
+  // open — same as Google Maps' own chip row. The embedded sidebar
+  // placement stacks them below the search box instead, which the dropdown
+  // would otherwise cover, so that call site hides them itself while the
+  // dropdown's open (see below) rather than baking that in here.
+  const desktopCategoryChips = options.length > 0 && (
     <CategoryFilter
       options={optionsWithFilters}
       selected={effectiveSelected}
@@ -824,7 +828,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       right under the search box with no divider between them. ── */}
               <div className="shrink-0 border-b border-slate-100 px-4 py-3">
                 {desktopSearchForm}
-                {desktopCategoryChips && <div className="mt-2.5">{desktopCategoryChips}</div>}
+                {/* Stacked below the search box here (unlike the floating
+                    placement), so the dropdown — which opens in the same
+                    spot — would otherwise sit right on top of these; duck
+                    out of the way while it's open instead. */}
+                {desktopCategoryChips && !(searchFocused && searchSuggestions.length > 0) && (
+                  <div className="mt-2.5">{desktopCategoryChips}</div>
+                )}
               </div>
 
               {ui.map.nearbyList && (
