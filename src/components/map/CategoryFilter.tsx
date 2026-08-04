@@ -209,6 +209,7 @@ export default function CategoryFilter({
               <button
                 onClick={() => onToggle(o.id)}
                 aria-pressed={on}
+                title={o.filterSuffix ? `Filtered: ${o.filterSuffix}` : undefined}
                 className={`flex items-center gap-1 py-1 pl-2.5 ${hasFilters ? 'pr-1.5' : 'pr-2.5'} ${
                   on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
                 } cursor-pointer`}
@@ -220,12 +221,18 @@ export default function CategoryFilter({
                 />
                 {o.icon && <span aria-hidden="true">{o.icon}</span>}
                 <span>{o.label}</span>
+                {/* The count already reflects the active filter (e.g. 71 →
+                    5), same as the full-screen picker's own row — a
+                    dot next to it just flags THAT a filter narrowed it,
+                    without spelling out which one (see the title attribute
+                    above for that, on hover) — much more compact than
+                    printing the filter's own name/value on every chip. */}
                 <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
-                {/* Active-filter badge — purely informational (e.g. "Kosher");
-                    the chevron below is what actually opens the editor, so
-                    this doesn't need to be its own tap target anymore. */}
                 {o.filterSuffix && (
-                  <span className={`truncate ${on ? 'text-white/80' : 'text-slate-400'}`}>· {o.filterSuffix}</span>
+                  <span
+                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${on ? 'bg-white' : 'bg-primary'}`}
+                    aria-hidden="true"
+                  />
                 )}
               </button>
               {/* Always present for any category with filterable fields —
