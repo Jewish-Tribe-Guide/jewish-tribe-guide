@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -348,8 +347,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   }, [allPoints, input, activeLocation])
 
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
-  // — instead of just adding it as a narrowing text filter.
+  // — instead of just adding it as a narrowing text filter. Setting
+  // committedQuery to the place's own name (below) still broadens the
+  // committed search to every place that name matches (e.g. every "GIANT"
+  // location) — necessary so the map/list have a sensible fallback if the
+  // visitor backs out of this one place — which would otherwise re-trigger
+  // the commit effect further down and immediately clear this exact
+  // selection again (multiple matches → that effect shows the LIST, not one
+  // card). suppressNextCommitEffectRef tells that effect to skip its one
+  // upcoming run so the specific place picked here actually sticks.
+  const suppressNextCommitEffectRef = useRef(false)
   const selectSuggestion = (p: (typeof allPoints)[number]) => {
+    suppressNextCommitEffectRef.current = true
     setInput(p.name)
     setCommittedQuery(p.name)
     setSearchFocused(false)
@@ -551,6 +560,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // dropping any previously-selected place on desktop so the sidebar's list
   // is what's visible).
   useEffect(() => {
+    if (suppressNextCommitEffectRef.current) {
+      suppressNextCommitEffectRef.current = false
+      return
+    }
     if (!searchActive) return
     if (isMobile) {
       if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
@@ -807,10 +820,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   on the map (see below) and the map stays full width. ──── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected) && (
             <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
-              <div className="flex shrink-0 items-center border-b border-slate-100 px-4 py-3">
-                <UpButton label="Home" onClick={onUp} className="mb-0" />
-              </div>
-
               {/* ── Search + category chips — one visual block, chips sitting
                       right under the search box with no divider between them. ── */}
               <div className="shrink-0 border-b border-slate-100 px-4 py-3">
@@ -917,14 +926,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       controls. Replaced by the sidebar (above) the moment
                       there's an actual search/selection to show. ───────────── */}
               {!isMobile && !desktopNarrowed && !desktopSelected && (
-                <div className="absolute left-3 top-3 z-10 hidden sm:block">
-                  <div className="mb-2 inline-flex rounded-full bg-white shadow-md ring-1 ring-slate-900/10">
-                    <UpButton label="Home" onClick={onUp} className="mb-0 px-3 py-1.5 text-xs" />
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-72 shrink-0">{desktopSearchForm}</div>
-                    {desktopCategoryChips && <div className="min-w-0 max-w-xs pt-0.5">{desktopCategoryChips}</div>}
-                  </div>
+                // right-16 (not right-3): leaves clearance so the chip row's
+                // scroll area doesn't run under the fullscreen button, which
+                // shares this same top-right corner.
+                <div className="absolute left-3 right-16 top-3 z-10 hidden items-start gap-2 sm:flex">
+                  <div className="w-72 shrink-0">{desktopSearchForm}</div>
+                  {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
                 </div>
               )}
 
