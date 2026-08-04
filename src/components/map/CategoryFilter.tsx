@@ -98,10 +98,13 @@ export default function CategoryFilter({
   // positioning (not absolute) so it isn't clipped by the chip row's own
   // horizontal scroll container. At most one open at a time.
   const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
-  // Sized and positioned to exactly match the tapped chip — same left edge,
-  // same width, so the box reads as "this chip's own filters, dropped down"
-  // rather than a free-floating panel of its own.
-  const [popupPos, setPopupPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  // Anchored by its RIGHT edge to the tapped chip's own right edge (not its
+  // left) — the popup usually needs more width than the chip itself (Kosher
+  // Cert, Type, …), so growing it rightward from the chip's left edge would
+  // push it out past the chip and read as belonging to whatever's next in
+  // the row instead. Growing left from the chip's own right edge keeps it
+  // visually anchored under the chip that actually opened it.
+  const [popupPos, setPopupPos] = useState<{ top: number; right: number; minWidth: number } | null>(null)
   // Which of the open editor's own select-field dropdowns (Kosher Cert,
   // Denomination, …) is expanded — same pattern the full-screen picker's
   // own expanded row uses (see CategoryFilterControls), just scoped to
@@ -154,7 +157,7 @@ export default function CategoryFilter({
   // one thing that's actually useful here (same as turning its own filter
   // on used to do, back when the only way in was a field that already had
   // one active).
-  function openEditor(id: string, on: boolean, trigger: HTMLElement) {
+  function openEditor(id: string, on: boolean) {
     if (!on) {
       onToggle(id)
       return
@@ -163,8 +166,12 @@ export default function CategoryFilter({
       setOpenFilterFor(null)
       return
     }
-    const rect = trigger.getBoundingClientRect()
-    setPopupPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    // The whole chip's own rect (not just the chevron segment) — see
+    // popupPos above for why this anchors by its right edge.
+    const chipEl = containerRefs.current.get(id)
+    if (!chipEl) return
+    const rect = chipEl.getBoundingClientRect()
+    setPopupPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right, minWidth: rect.width })
     setOpenSelectDropdown(null)
     setOpenFilterFor(id)
   }
@@ -228,7 +235,7 @@ export default function CategoryFilter({
                   (the full-screen picker). */}
               {hasFilters && (
                 <button
-                  onClick={(e) => openEditor(o.id, on, e.currentTarget)}
+                  onClick={() => openEditor(o.id, on)}
                   aria-expanded={editorOpen}
                   aria-label={`${o.label} filters`}
                   className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
@@ -248,7 +255,7 @@ export default function CategoryFilter({
                   // it dropped down from, but free to grow wider if the
                   // filter controls need more room, rather than wrapping
                   // them awkwardly to stay within it.
-                  style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, minWidth: popupPos.width }}
+                  style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, minWidth: popupPos.minWidth }}
                   className="z-50 max-w-xs rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
                 >
                   <CategoryFilterControls
