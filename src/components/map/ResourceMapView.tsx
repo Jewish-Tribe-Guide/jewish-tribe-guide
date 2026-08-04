@@ -834,18 +834,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   on the map (see below) and the map stays full width. ──── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected) && (
             <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
-              {/* ── Search + category chips — same side-by-side arrangement
-                      as the floating placement (see below), just narrower, so
-                      the chips stay put in the same spot the whole time
-                      instead of the layout rearranging itself once a search
-                      narrows things down. ─────────────────────────────────── */}
-              <div className="flex shrink-0 items-start gap-2 border-b border-slate-100 px-4 py-3">
-                <div className="w-36 shrink-0">{desktopSearchForm}</div>
-                {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
-              </div>
-
+              {/* No search/chips header here anymore — the floating bar
+                  (rendered once, below, positioned relative to the whole
+                  row) sits on top of this panel instead, so it never has to
+                  resize or relocate when this panel appears. pt-16 on the
+                  scroll area below just clears the space that bar occupies. ── */}
               {ui.map.nearbyList && (
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-16">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
                       item={desktopSelected.raw}
@@ -872,6 +867,24 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </div>
               )}
             </aside>
+          )}
+
+          {/* ── Floating search + chips (desktop) — positioned relative to
+                  the whole row (not the map div, and not inside the sidebar
+                  above), so it sits in the exact same spot whether or not
+                  the sidebar is showing. It floats on top of the sidebar
+                  when the sidebar's present (see that panel's own pt-16,
+                  which clears space for this) or directly on the map when
+                  it's not — never resizing or relocating either way, unlike
+                  having two separate copies. ─────────────────────────────── */}
+          {!isMobile && (
+            // right-16 (not right-3): leaves clearance so the chip row's
+            // scroll area doesn't run under the fullscreen button, which
+            // shares this same top-right corner of the map.
+            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 sm:flex">
+              <div className="w-72 shrink-0">{desktopSearchForm}</div>
+              {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
+            </div>
           )}
 
           {/* ── Map. Mobile: full-bleed (breaks out of the page's max-width/
@@ -935,21 +948,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 <p className="absolute bottom-14 left-3 z-10 hidden max-w-[220px] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md sm:block">
                   {geoError}
                 </p>
-              )}
-
-              {/* ── Floating search + chips (desktop, default browsing state)
-                      — laid directly on the map, chips right next to the search
-                      box in the same row, exactly like Google Maps' own explore
-                      controls. Replaced by the sidebar (above) the moment
-                      there's an actual search/selection to show. ───────────── */}
-              {!isMobile && !desktopNarrowed && !desktopSelected && (
-                // right-16 (not right-3): leaves clearance so the chip row's
-                // scroll area doesn't run under the fullscreen button, which
-                // shares this same top-right corner.
-                <div className="absolute left-3 right-16 top-3 z-10 hidden items-start gap-2 sm:flex">
-                  <div className="w-72 shrink-0">{desktopSearchForm}</div>
-                  {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
-                </div>
               )}
 
               {/* ── Floating search + filters (mobile) — laid directly over the
