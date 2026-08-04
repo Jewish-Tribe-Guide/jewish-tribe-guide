@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
-import { activeFilterEntries } from './CategoryFilterControls'
+import type { MapPoint } from './ResourceMap'
+import CategoryFilterControls, { categoryHasFilterableFields } from './CategoryFilterControls'
+import { ChevronRightIcon } from '@/components/icons'
 
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
@@ -15,12 +17,10 @@ export type FilterOption = {
   /** How many points this filter currently contributes. */
   count: number
   /** Active bool/select filter(s) scoped to this category, already formatted
-   *  for display (e.g. "Keilim", or "Catering, Keystone-K") — folded right
-   *  into the chip instead of showing as a separate row of removable pills
-   *  below it, so there's one thing to look at, not two. Doubles as its own
-   *  tap target: tapping this part of the chip (rather than the rest of it)
-   *  opens a small inline editor for that category's filters instead of
-   *  toggling the category on/off. */
+   *  for display (e.g. "Keilim", or "Catering, Keystone-K") — shown as a
+   *  small badge inside the chip so an active filter is visible at a
+   *  glance. Purely informational now; the chevron (see below) is what
+   *  actually opens the editor, so this doesn't need its own tap target. */
   filterSuffix?: string
 }
 
@@ -42,9 +42,13 @@ type Props = {
    *  the vertical room a single row over the map doesn't. */
   wrap?: boolean
   /** Real category configs, plus the current bool/select filter state and
-   *  its setters — needed only to power the inline filter editor a chip's
-   *  `filterSuffix` opens. */
+   *  its setters — needed to power the inline filter editor a chip's own
+   *  chevron opens. */
   categories: CategoryConfig[]
+  /** Every plottable point — needed by the inline filter editor to compute
+   *  which select-field values actually occur within a category (same as
+   *  the full-screen picker's own expanded row uses). */
+  points: MapPoint[]
   boolFields: string[]
   onToggleBool: (categoryId: string, key: string) => void
   selectFilters: Record<string, string[]>
@@ -65,6 +69,7 @@ export default function CategoryFilter({
   onMore,
   wrap,
   categories,
+  points,
   boolFields,
   onToggleBool,
   selectFilters,
@@ -86,17 +91,22 @@ export default function CategoryFilter({
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 
   // Which category's inline filter editor is open — opened by tapping a
-  // chip's own filterSuffix (rather than the chip itself, which keeps
-  // toggling the category on/off) — and where it's anchored: computed from
-  // that button's own position so the popup drops down attached right below
+  // chip's own chevron (rather than the chip itself, which keeps toggling
+  // the category on/off) — and where it's anchored: computed from that
+  // button's own position so the popup drops down attached right below
   // whichever chip was actually tapped, not the row as a whole. Fixed
   // positioning (not absolute) so it isn't clipped by the chip row's own
   // horizontal scroll container. At most one open at a time.
   const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
-  // Sized and positioned to exactly match the tapped filterSuffix segment —
-  // same left edge, same width, so the box reads as "this chip's own filters,
-  // dropped down" rather than a free-floating panel of its own.
+  // Sized and positioned to exactly match the tapped chip — same left edge,
+  // same width, so the box reads as "this chip's own filters, dropped down"
+  // rather than a free-floating panel of its own.
   const [popupPos, setPopupPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  // Which of the open editor's own select-field dropdowns (Kosher Cert,
+  // Denomination, …) is expanded — same pattern the full-screen picker's
+  // own expanded row uses (see CategoryFilterControls), just scoped to
+  // whichever chip's editor is currently open.
+  const [openSelectDropdown, setOpenSelectDropdown] = useState<string | null>(null)
   const containerRefs = useRef(new Map<string, HTMLDivElement>())
   // The popup itself is portaled to document.body (so it can't be knocked
   // out of place by an ancestor's CSS transform — see CategoryFilterControls'
@@ -138,10 +148,12 @@ export default function CategoryFilter({
     }
   }, [openFilterFor])
 
-  // Tapping a category's filter suffix while the category itself is off
-  // re-checks it instead of opening the editor — reviewing/removing filters
-  // for a category that isn't even shown on the map doesn't mean anything,
-  // so the tap does the one thing that's actually useful here.
+  // Tapping a category's chevron while the category itself is off re-checks
+  // it instead of opening the editor — picking filters for a category that
+  // isn't even shown on the map doesn't mean anything, so the tap does the
+  // one thing that's actually useful here (same as turning its own filter
+  // on used to do, back when the only way in was a field that already had
+  // one active).
   function openEditor(id: string, on: boolean, trigger: HTMLElement) {
     if (!on) {
       onToggle(id)
@@ -153,10 +165,10 @@ export default function CategoryFilter({
     }
     const rect = trigger.getBoundingClientRect()
     setPopupPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    setOpenSelectDropdown(null)
     setOpenFilterFor(id)
   }
 
-  const openOption = openFilterFor ? options.find((o) => o.id === openFilterFor) : undefined
   const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
 
   return (
@@ -170,6 +182,8 @@ export default function CategoryFilter({
       {visible.map((o) => {
         const on = selected.has(o.id)
         const editorOpen = openFilterFor === o.id
+        const cat = categories.find((c) => c.id === o.id)
+        const hasFilters = categoryHasFilterableFields(cat)
         return (
           <div
             key={o.id}
@@ -188,7 +202,7 @@ export default function CategoryFilter({
               <button
                 onClick={() => onToggle(o.id)}
                 aria-pressed={on}
-                className={`flex items-center gap-1 py-1 pl-2.5 ${o.filterSuffix ? 'pr-1.5' : 'pr-2.5'} ${
+                className={`flex items-center gap-1 py-1 pl-2.5 ${hasFilters ? 'pr-1.5' : 'pr-2.5'} ${
                   on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
                 } cursor-pointer`}
               >
@@ -200,61 +214,58 @@ export default function CategoryFilter({
                 {o.icon && <span aria-hidden="true">{o.icon}</span>}
                 <span>{o.label}</span>
                 <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
+                {/* Active-filter badge — purely informational (e.g. "Kosher");
+                    the chevron below is what actually opens the editor, so
+                    this doesn't need to be its own tap target anymore. */}
+                {o.filterSuffix && (
+                  <span className={`truncate ${on ? 'text-white/80' : 'text-slate-400'}`}>· {o.filterSuffix}</span>
+                )}
               </button>
-              {o.filterSuffix && (
+              {/* Always present for any category with filterable fields —
+                  not just once one's already active — so there's a visible
+                  way to discover and turn one on in the first place, not
+                  only to review/remove one you already set some other way
+                  (the full-screen picker). */}
+              {hasFilters && (
                 <button
                   onClick={(e) => openEditor(o.id, on, e.currentTarget)}
                   aria-expanded={editorOpen}
-                  aria-label={`Edit ${o.label} filters`}
-                  className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
+                  aria-label={`${o.label} filters`}
+                  className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
                     on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
                   }`}
                 >
-                  {o.filterSuffix}
+                  <ChevronRightIcon className={`h-3.5 w-3.5 transition-transform ${editorOpen ? '-rotate-90' : 'rotate-90'}`} />
                 </button>
               )}
             </div>
 
-            {editorOpen && popupPos && openOption && openCategory && (() => {
-              const entries = activeFilterEntries(openCategory, boolFields, selectFilters)
-              // Nothing left to review — rather than leave an empty box
-              // hanging open, disappear along with the last unchecked entry
-              // (the chip's own filterSuffix vanishes at the same moment).
-              if (entries.length === 0) return null
-              return createPortal(
+            {editorOpen && popupPos && openCategory && (
+              createPortal(
                 <div
                   ref={popupRef}
                   // A floor, not a fixed size — never narrower than the chip
-                  // segment it dropped down from, but free to grow wider if
-                  // a single entry needs more room, rather than wrapping
-                  // that entry onto a second line to stay within it.
+                  // it dropped down from, but free to grow wider if the
+                  // filter controls need more room, rather than wrapping
+                  // them awkwardly to stay within it.
                   style={{ position: 'fixed', top: popupPos.top, left: popupPos.left, minWidth: popupPos.width }}
-                  className="z-50 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+                  className="z-50 max-w-xs rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
                 >
-                  <div className="flex flex-col gap-1">
-                    {entries.map((entry) => (
-                      <label
-                        key={entry.kind === 'bool' ? entry.key : `${entry.key}:${entry.value}`}
-                        className="flex items-center gap-1.5 rounded px-1 py-1 text-xs whitespace-nowrap text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
-                      >
-                        <input
-                          type="checkbox"
-                          checked
-                          onChange={() =>
-                            entry.kind === 'bool'
-                              ? onToggleBool(openOption.id, entry.key)
-                              : onToggleSelectValue(openOption.id, entry.key, entry.value)
-                          }
-                          className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
-                        />
-                        {entry.label}
-                      </label>
-                    ))}
-                  </div>
+                  <CategoryFilterControls
+                    category={openCategory}
+                    categoryId={openCategory.id}
+                    points={points}
+                    boolFields={boolFields}
+                    onToggleBool={onToggleBool}
+                    selectFilters={selectFilters}
+                    onToggleSelectValue={onToggleSelectValue}
+                    openDropdown={openSelectDropdown}
+                    onOpenDropdown={setOpenSelectDropdown}
+                  />
                 </div>,
                 document.body,
               )
-            })()}
+            )}
           </div>
         )
       })}

@@ -803,13 +803,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     </div>
   )
 
-  // The category chips — also shared between the floating and embedded
-  // placements. In the floating placement they sit beside the search box
-  // (not below it), so they stay put next to it even while the dropdown is
-  // open — same as Google Maps' own chip row. The embedded sidebar
-  // placement stacks them below the search box instead, which the dropdown
-  // would otherwise cover, so that call site hides them itself while the
-  // dropdown's open (see below) rather than baking that in here.
+  // The category chips — sit beside the search box (not below it), so they
+  // stay put next to it even while the dropdown is open, same as Google
+  // Maps' own chip row.
   const desktopCategoryChips = options.length > 0 && (
     <CategoryFilter
       options={optionsWithFilters}
@@ -818,6 +814,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       onAll={showAll}
       onNone={hideAll}
       categories={categories ?? []}
+      points={allPoints}
       boolFields={boolFields}
       onToggleBool={toggleBoolField}
       selectFilters={selectFilters}
@@ -1084,6 +1081,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
                                     categories={categories ?? []}
+                        points={allPoints}
                         boolFields={boolFields}
                         onToggleBool={toggleBoolField}
                         selectFilters={selectFilters}
