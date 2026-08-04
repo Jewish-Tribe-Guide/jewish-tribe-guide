@@ -860,10 +860,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               {/* No search/chips header here anymore — the floating bar
                   (rendered once, below, positioned relative to the whole
                   row) sits on top of this panel instead, so it never has to
-                  resize or relocate when this panel appears. pt-16 on the
-                  scroll area below just clears the space that bar occupies. ── */}
+                  resize or relocate when this panel appears. This spacer is
+                  a real layout sibling (not just padding on the scroll area
+                  below) so it reserves that space permanently — padding
+                  alone would only clear it on first paint; once scrolled,
+                  list rows would slide up underneath the floating bar since
+                  padding is part of the same scrolling content. ────────── */}
+              <div className="h-16 shrink-0" />
               {ui.map.nearbyList && (
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-16">
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
                       item={desktopSelected.raw}
@@ -892,20 +897,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             </aside>
           )}
 
-          {/* ── Sidebar collapse toggle (desktop) — sits right on the
-                  sidebar's edge, same as Google Maps' own panel-collapse
+          {/* ── Sidebar collapse toggle (desktop) — sits just outside the
+                  sidebar's edge, same idea as Google Maps' own panel-collapse
                   arrow, so the map can take over the full width without
                   losing whatever search/selection the sidebar was showing.
-                  Its own left position tracks the sidebar's width (380px
-                  open, 0 collapsed), so it slides along with the edge
-                  instead of jumping straight to the other position. ────── */}
+                  Fully on the map side (not straddling the border) rather
+                  than centered on it — centering it on the edge meant, once
+                  collapsed, half the button sat past x=0 and got clipped by
+                  this row's own overflow-hidden (unreachable to click), and
+                  even expanded it sat exactly where the results list's own
+                  scrollbar renders, fighting with it. Its left offset still
+                  tracks the sidebar's width (380px open, 0 collapsed) so it
+                  slides along with the edge instead of jumping. ─────────── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected) && (
             <button
               onClick={() => setSidebarCollapsed((c) => !c)}
               aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
               aria-pressed={sidebarCollapsed}
-              style={{ left: sidebarCollapsed ? 0 : 380 }}
-              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
+              style={{ left: (sidebarCollapsed ? 0 : 380) + 8 }}
+              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
             >
               <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
             </button>
