@@ -254,9 +254,12 @@ export default function CategoryFilter({
                   // A floor, not a fixed size — never narrower than the chip
                   // it dropped down from, but free to grow wider if the
                   // filter controls need more room, rather than wrapping
-                  // them awkwardly to stay within it.
+                  // them awkwardly to stay within it. No card background of
+                  // its own — the pills/dropdowns inside (CategoryFilterControls)
+                  // already carry their own white/bordered look, so a second
+                  // white box behind them just read as visual clutter.
                   style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, minWidth: popupPos.minWidth }}
-                  className="z-50 max-w-xs rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+                  className="z-50 max-w-xs"
                 >
                   <CategoryFilterControls
                     category={openCategory}

@@ -719,6 +719,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // reason to show one.
   const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0
 
+  // Auto-collapse the sidebar once whatever it was showing disappears —
+  // e.g. unchecking the last matching filter leaves zero results. A panel
+  // left open with nothing but a "no places" message isn't worth the
+  // width; tucking it away automatically matches what the collapse arrow
+  // already does on request. Only applies to the results-list case, not a
+  // specific selected place (desktopSelected) — that one only goes away
+  // when the visitor explicitly backs out of it.
+  useEffect(() => {
+    if (isMobile || desktopSelected || !desktopNarrowed) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (visiblePoints.length === 0) setSidebarCollapsed(true)
+  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile])
+
   // ── Desktop search box + its autocomplete dropdown — shared between the
   // two places it can render: floating directly on the map (the default
   // browsing state, Google-Maps-style) or embedded at the top of the
