@@ -175,3 +175,29 @@ export function GlobeIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Four outward-pointing corner arrows — the desktop map's "expand to
+// fullscreen" control.
+export function ExpandIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M9 4H4v5" />
+      <path d="M15 4h5v5" />
+      <path d="M9 20H4v-5" />
+      <path d="M15 20h5v-5" />
+    </svg>
+  )
+}
+
+// Four inward-pointing corner arrows — the desktop map's "exit fullscreen"
+// control, shown in the same spot once expanded.
+export function CollapseIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 9h5V4" />
+      <path d="M20 9h-5V4" />
+      <path d="M4 15h5v5" />
+      <path d="M20 15h-5v5" />
+    </svg>
+  )
+}
