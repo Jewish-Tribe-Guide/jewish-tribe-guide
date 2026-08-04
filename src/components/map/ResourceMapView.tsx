@@ -177,6 +177,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
   }, [fullscreen])
 
+  // Desktop-only — collapses the results sidebar down to just its edge
+  // toggle, same as Google Maps' own panel-collapse arrow, so a visitor who
+  // wants to see more of the map without losing their search/selection can
+  // tuck the panel away without clearing it. Reset to false at the points
+  // below where the panel would otherwise reopen with new content anyway
+  // (a fresh search, a newly toggled category, a newly selected place) —
+  // collapsing should hide what's already there, not swallow the next
+  // thing the visitor explicitly asks to see.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
   // resumes once they tap the re-center pill — matching Google Maps' own
@@ -195,7 +205,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // desktop's sidebar detail panel.
   const selectPlace = (p: SelectablePoint) => {
     if (isMobile) nearbySheetRef.current?.selectPoint(p)
-    else setDesktopSelected(p)
+    else {
+      setDesktopSelected(p)
+      setSidebarCollapsed(false)
+    }
   }
   const deselectPlace = () => {
     if (isMobile) nearbySheetRef.current?.deselectPoint()
@@ -584,6 +597,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       // different handlers (submitSearch, toggleBoolField, toggleSelectValue, ...).
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
+      setSidebarCollapsed(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filterChips])
@@ -620,6 +634,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // the one category you actually wanted. Once you've narrowed down,
     // further taps add/remove from that subset as before. Any category's
     // stored filters ride along either way (see clearFiltersForCategories).
+    setSidebarCollapsed(false)
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
       return
@@ -632,10 +647,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
     setSelected(next)
   }
-  const showAll = () => setSelected(new Set(options.map((o) => o.id)))
+  const showAll = () => {
+    setSelected(new Set(options.map((o) => o.id)))
+    setSidebarCollapsed(false)
+  }
   const hideAll = () => {
     setSelected(new Set())
     clearFiltersForCategories(effectiveSelected)
+    setSidebarCollapsed(false)
   }
 
   // A plain, unconditional on/off toggle — unlike `toggle` above, this never
@@ -833,7 +852,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   until then either; before that, search + chips just float
                   on the map (see below) and the map stays full width. ──── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected) && (
-            <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
+            <aside
+              className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out sm:flex sm:min-h-0 ${
+                sidebarCollapsed ? 'sm:w-0' : 'sm:w-[380px] sm:border-r sm:border-slate-200'
+              }`}
+            >
               {/* No search/chips header here anymore — the floating bar
                   (rendered once, below, positioned relative to the whole
                   row) sits on top of this panel instead, so it never has to
@@ -867,6 +890,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </div>
               )}
             </aside>
+          )}
+
+          {/* ── Sidebar collapse toggle (desktop) — sits right on the
+                  sidebar's edge, same as Google Maps' own panel-collapse
+                  arrow, so the map can take over the full width without
+                  losing whatever search/selection the sidebar was showing.
+                  Its own left position tracks the sidebar's width (380px
+                  open, 0 collapsed), so it slides along with the edge
+                  instead of jumping straight to the other position. ────── */}
+          {!isMobile && (desktopNarrowed || !!desktopSelected) && (
+            <button
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+              aria-pressed={sidebarCollapsed}
+              style={{ left: sidebarCollapsed ? 0 : 380 }}
+              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
+            >
+              <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
+            </button>
           )}
 
           {/* ── Floating search + chips (desktop) — positioned relative to
