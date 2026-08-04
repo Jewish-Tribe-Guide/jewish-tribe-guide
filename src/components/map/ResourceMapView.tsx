@@ -330,7 +330,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
   const searchSuggestions = useMemo(() => {
     const q = stripApostrophes(input.trim().toLowerCase())
-    if (q.length < 2 || isOpenNowWord(q)) return []
+    if (isOpenNowWord(q)) return []
+    // Within each match-quality bucket, closest first when we have a location;
+    // otherwise most-upvoted first, so ties don't fall back to storage order.
+    const rank = (p: (typeof allPoints)[number]) =>
+      activeLocation ? haversineMiles(activeLocation, { lat: p.lat, lng: p.lng }) : -(p.raw?.upvotes ?? 0)
+    const byRank = (a: (typeof allPoints)[number], b: (typeof allPoints)[number]) => rank(a) - rank(b)
+    // Nothing typed yet — list what's currently on the map given the active
+    // category chips, same as Google Maps' own "nearby" suggestions on an
+    // empty, focused search box, instead of showing nothing until you type.
+    if (q.length === 0) {
+      return allPoints
+        .filter((p) => effectiveSelected.has(p.filterId))
+        .sort(byRank)
+        .slice(0, 6)
+    }
+    if (q.length < 2) return []
     const starts: typeof allPoints = []
     const contains: typeof allPoints = []
     for (const p of allPoints) {
@@ -338,13 +353,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (name.startsWith(q)) starts.push(p)
       else if (name.includes(q)) contains.push(p)
     }
-    // Within each match-quality bucket, closest first when we have a location;
-    // otherwise most-upvoted first, so ties don't fall back to storage order.
-    const rank = (p: (typeof allPoints)[number]) =>
-      activeLocation ? haversineMiles(activeLocation, { lat: p.lat, lng: p.lng }) : -(p.raw?.upvotes ?? 0)
-    const byRank = (a: (typeof allPoints)[number], b: (typeof allPoints)[number]) => rank(a) - rank(b)
     return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
-  }, [allPoints, input, activeLocation])
+  }, [allPoints, input, activeLocation, effectiveSelected])
 
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
   // — instead of just adding it as a narrowing text filter. Setting
@@ -824,17 +834,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   on the map (see below) and the map stays full width. ──── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected) && (
             <aside className="hidden shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white sm:flex sm:w-[380px] sm:min-h-0">
-              {/* ── Search + category chips — one visual block, chips sitting
-                      right under the search box with no divider between them. ── */}
-              <div className="shrink-0 border-b border-slate-100 px-4 py-3">
-                {desktopSearchForm}
-                {/* Stacked below the search box here (unlike the floating
-                    placement), so the dropdown — which opens in the same
-                    spot — would otherwise sit right on top of these; duck
-                    out of the way while it's open instead. */}
-                {desktopCategoryChips && !(searchFocused && searchSuggestions.length > 0) && (
-                  <div className="mt-2.5">{desktopCategoryChips}</div>
-                )}
+              {/* ── Search + category chips — same side-by-side arrangement
+                      as the floating placement (see below), just narrower, so
+                      the chips stay put in the same spot the whole time
+                      instead of the layout rearranging itself once a search
+                      narrows things down. ─────────────────────────────────── */}
+              <div className="flex shrink-0 items-start gap-2 border-b border-slate-100 px-4 py-3">
+                <div className="w-36 shrink-0">{desktopSearchForm}</div>
+                {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
               </div>
 
               {ui.map.nearbyList && (
