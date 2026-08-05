@@ -42,6 +42,9 @@ type NavState = {
   /** Field filters (open-now / kosher / type) carried from the directory, kept
    *  in sync with the live map state. */
   mapFilters?: MapFilters
+  /** True when this map entry came from a category directory's own "Map"
+   *  button rather than the general Map tab — see mapEnteredFromListing. */
+  mapFromListing?: boolean
 }
 
 export default function Page() {
@@ -63,6 +66,12 @@ export default function Page() {
   const [mapSelectedCategories, setMapSelectedCategories] = useState<string[] | null>(null)
   // Field filters carried from a directory onto the map — see NavState.mapFilters.
   const [mapFilters, setMapFilters] = useState<MapFilters | null>(null)
+  // Whether the current map entry came from a category directory's own "Map"
+  // button (vs. the general Map tab) — on desktop this both starts
+  // ResourceMapView already fullscreen and makes its fullscreen-exit control
+  // navigate straight back to that directory instead of collapsing to a
+  // boxed map screen (see ResourceMapView's onExitFullscreenToListing).
+  const [mapEnteredFromListing, setMapEnteredFromListing] = useState(false)
   // Whether ResourceMapView has ever been mounted — once true it stays mounted
   // forever (see the render below), so switching tabs away and back hides it
   // via CSS instead of unmounting/remounting, preserving pan/zoom, the
@@ -106,6 +115,7 @@ export default function Page() {
       setMapQuery(s?.mapQuery ?? null)
       setMapSelectedCategories(s?.mapSelected ?? null)
       setMapFilters(s?.mapFilters ?? null)
+      setMapEnteredFromListing(!!s?.mapFromListing)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -125,6 +135,7 @@ export default function Page() {
     if (s?.mapQuery) setMapQuery(s.mapQuery)
     if (s?.mapSelected) setMapSelectedCategories(s.mapSelected)
     if (s?.mapFilters) setMapFilters(s.mapFilters)
+    if (s?.mapFromListing) setMapEnteredFromListing(true)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -167,7 +178,13 @@ export default function Page() {
   const hasMap = !!categories?.some((c) => c.kind === 'map')
   const selectTab = (tab: MobileTab) => {
     if (tab === 'categories') navigate(null, 'home')
-    else if (tab === 'map') navigate(null, 'map')
+    else if (tab === 'map') {
+      // A plain tab switch, not a listing's "Map" button — the map should
+      // show its normal (possibly boxed, on desktop) state, not re-enter
+      // fullscreen or wire its exit control back to a stale listing.
+      setMapEnteredFromListing(false)
+      navigate(null, 'map')
+    }
     else navigate(null, 'feedback')
   }
   const tabBar = (
@@ -217,9 +234,27 @@ export default function Page() {
     setMapQuery(query ?? null)
     setMapSelectedCategories(null)
     setMapFilters(filters ?? null)
+    setMapEnteredFromListing(true)
     setFlow(null)
     setMapResetToken((t) => t + 1)
-    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters } as NavState, '')
+    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters, mapFromListing: true } as NavState, '')
+  }
+
+  // Desktop's map-fullscreen exit control, when the map was entered via a
+  // listing's own "Map" button (see mapEnteredFromListing) — takes the
+  // visitor straight back to that category's directory instead of leaving a
+  // boxed, non-fullscreen map behind (there's no such intermediate screen for
+  // this entry point).
+  const exitMapToListing = () => {
+    const categoryId = mapCategory
+    setMode('find')
+    setMapCategory(null)
+    setMapQuery(null)
+    setMapSelectedCategories(null)
+    setMapFilters(null)
+    setMapEnteredFromListing(false)
+    setFlow(null)
+    history.pushState({ mode: 'find', findView: categoryId ?? undefined }, '')
   }
 
   return (
@@ -279,6 +314,7 @@ export default function Page() {
             initialSelectedCategories={mapSelectedCategories || undefined}
             initialFilters={mapFilters || undefined}
             onViewListing={viewListing}
+            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : undefined}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </main>

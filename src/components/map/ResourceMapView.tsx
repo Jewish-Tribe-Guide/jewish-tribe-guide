@@ -63,6 +63,12 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** Desktop only — when set, this map was opened via a category directory's
+   *  own "Map" button rather than the general Map tab: the map starts
+   *  already fullscreen (there's no boxed intermediate for this entry point),
+   *  and exiting fullscreen calls this instead of just collapsing back to
+   *  the boxed view, taking the visitor straight back to that directory. */
+  onExitFullscreenToListing?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
    *  live coords are read (search sorting, directory distances) — not just
@@ -78,7 +84,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, liveTracking }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, onExitFullscreenToListing, liveTracking }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -157,14 +163,23 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // Desktop-only — the map starts as a contained card (like an embedded
   // widget, not the whole page); this expands it to cover the viewport, and
   // collapses it back. Mobile is already effectively full-bleed within its
-  // own tab, so it has no separate fullscreen toggle. Resets to false on
-  // every mount rather than persisting, same as the rest of this screen's
-  // local UI state.
-  const [fullscreen, setFullscreen] = useState(false)
+  // own tab, so it has no separate fullscreen toggle. Starts true when
+  // arriving via a listing's own "Map" button (initialCategory set together
+  // with onExitFullscreenToListing — see page.tsx's viewMapForCategory) so
+  // that entry point never shows the boxed intermediate at all; otherwise
+  // resets to false on every mount, same as the rest of this screen's local
+  // UI state.
+  const [fullscreen, setFullscreen] = useState(!!initialCategory)
+  // Exiting fullscreen: back to the originating listing when this map was
+  // opened from one, otherwise just collapse to the boxed view as before.
+  const exitFullscreen = () => {
+    setFullscreen(false)
+    onExitFullscreenToListing?.()
+  }
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFullscreen(false)
+      if (e.key === 'Escape') exitFullscreen()
     }
     document.addEventListener('keydown', onKeyDown)
     // Fullscreen is a fixed overlay covering the viewport — nothing behind
@@ -175,6 +190,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = prevOverflow
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen])
 
   // Desktop-only — collapses the results sidebar down to just its edge
@@ -186,6 +202,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // collapsing should hide what's already there, not swallow the next
   // thing the visitor explicitly asks to see.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Lets the sidebar be opened even before anything's narrowed — without
+  // this, first-time visitors land on a bare map with no visible way to
+  // browse the (already-loaded) directory at all, since the sidebar
+  // otherwise only appears once a search/category narrows things down.
+  // Independent of sidebarCollapsed (which hides a sidebar that DOES have a
+  // narrowing reason to show); see sidebarVisible/toggleSidebar below for
+  // how the two combine.
+  const [sidebarOpenedManually, setSidebarOpenedManually] = useState(false)
 
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
@@ -719,6 +743,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // reason to show one.
   const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0
 
+  // Whether the sidebar is actually on screen right now — either because
+  // something narrowed the map down (a search, a category, a selected
+  // place) or because the visitor opened it manually via the edge toggle —
+  // and it hasn't been collapsed. The toggle button always renders (see the
+  // JSX below), so there's always a way to pull the panel out, even on a
+  // freshly-loaded map with nothing narrowed yet.
+  const sidebarVisible = (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && !sidebarCollapsed
+  function toggleSidebar() {
+    if (desktopNarrowed || desktopSelected) setSidebarCollapsed((c) => !c)
+    else setSidebarOpenedManually((o) => !o)
+  }
+
   // Auto-collapse the sidebar once whatever it was showing disappears —
   // e.g. unchecking the last matching filter leaves zero results. A panel
   // left open with nothing but a "no places" message isn't worth the
@@ -856,15 +892,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         </div>
       ) : (
         <>
-          {/* ── Desktop sidebar — only once the visitor has actually asked
-                  for something (a search, a narrowed category, or a
-                  selected place). Google Maps' own panel doesn't exist
-                  until then either; before that, search + chips just float
-                  on the map (see below) and the map stays full width. ──── */}
-          {!isMobile && (desktopNarrowed || !!desktopSelected) && (
+          {/* ── Desktop sidebar — mounts once there's ANY reason to (a
+                  search, a narrowed category, a selected place, or the
+                  visitor manually pulling it out via the edge toggle below);
+                  its actual on-screen width is governed by sidebarVisible,
+                  which also accounts for sidebarCollapsed. Kept as a
+                  separate mount condition from sidebarVisible (which also
+                  requires !sidebarCollapsed) so the width transition has
+                  something to animate FROM/TO — unmounting it outright
+                  wouldn't animate, it'd just vanish. ────────────────────── */}
+          {!isMobile && (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && (
             <aside
               className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out sm:flex sm:min-h-0 ${
-                sidebarCollapsed ? 'sm:w-0' : 'sm:w-[380px] sm:border-r sm:border-slate-200'
+                sidebarVisible ? 'sm:w-[380px] sm:border-r sm:border-slate-200' : 'sm:w-0'
               }`}
             >
               {/* No search/chips header here anymore — the floating bar
@@ -918,16 +958,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   even expanded it sat exactly where the results list's own
                   scrollbar renders, fighting with it. Its left offset still
                   tracks the sidebar's width (380px open, 0 collapsed) so it
-                  slides along with the edge instead of jumping. ─────────── */}
-          {!isMobile && (desktopNarrowed || !!desktopSelected) && (
+                  slides along with the edge instead of jumping.
+                  Always rendered (not just once something's narrowed) — a
+                  freshly-loaded map with nothing searched/selected yet
+                  otherwise has no visible way to browse the directory at
+                  all beyond the map's own pins. Clicking it here pulls the
+                  sidebar out to show everything currently on the map (see
+                  sidebarOpenedManually above). ─────────────────────────── */}
+          {!isMobile && (
             <button
-              onClick={() => setSidebarCollapsed((c) => !c)}
-              aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-              aria-pressed={sidebarCollapsed}
-              style={{ left: (sidebarCollapsed ? 0 : 380) + 8 }}
+              onClick={toggleSidebar}
+              aria-label={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
+              aria-pressed={!sidebarVisible}
+              style={{ left: (sidebarVisible ? 380 : 0) + 8 }}
               className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
             >
-              <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
+              <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarVisible ? '' : 'rotate-180'}`} />
             </button>
           )}
 
@@ -978,9 +1024,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
               {/* ── Fullscreen toggle (desktop only) — the map starts as a
                       contained card; this expands it to cover the viewport
-                      (Escape, or tapping it again, collapses it back). ──── */}
+                      (Escape, or tapping it again, collapses it back — or,
+                      arriving from a listing's Map button, exits straight
+                      back to that listing; see exitFullscreen). ─────────── */}
               <button
-                onClick={() => setFullscreen((f) => !f)}
+                onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
                 aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
                 aria-pressed={fullscreen}
                 className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer sm:flex"
