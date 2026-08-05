@@ -115,6 +115,13 @@ export default function CheckboxDropdown({
       {isOpen && popupPos && createPortal(
         <div
           ref={popupRef}
+          // Marks this portaled popup so an ANCESTOR component's own
+          // outside-click handler (e.g. the map's per-chip filter editor,
+          // which nests this dropdown but can't see it in the DOM tree once
+          // portaled) can recognize a click landing in here as "still
+          // inside," rather than closing itself before the click/onChange
+          // on a checkbox below even gets to fire.
+          data-checkbox-dropdown-popup=""
           style={{ position: 'fixed', top: popupPos.top, bottom: popupPos.bottom, left: popupPos.left }}
           className={`z-50 max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg py-1 ${size === 'sm' ? 'w-[160px]' : 'w-[200px]'}`}
         >

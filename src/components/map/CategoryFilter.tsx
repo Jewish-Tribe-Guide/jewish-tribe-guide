@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
 import type { MapPoint } from './ResourceMap'
-import CategoryFilterControls, { categoryHasFilterableFields } from './CategoryFilterControls'
+import CategoryFilterControls, { activeFilterEntries, categoryHasFilterableFields } from './CategoryFilterControls'
 import { ChevronRightIcon } from '@/components/icons'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
@@ -75,6 +76,15 @@ export default function CategoryFilter({
   selectFilters,
   onToggleSelectValue,
 }: Props) {
+  // Mobile keeps the original, simpler chip: a filter segment only shows up
+  // once something's already active (spelled out, e.g. "IKC"), and tapping
+  // it just reviews/unchecks what's set — no way to discover a NEW filter
+  // from the chip itself (that's still the full-screen category picker's
+  // job). Desktop gets the newer discover-anywhere chevron, always present
+  // on any category with filterable fields, opening the full editor. Same
+  // shared component either way — this is the one thing that still tells
+  // the two apart, everything else below branches off it.
+  const isMobile = useIsMobile()
   const allOn = options.every((o) => selected.has(o.id))
   // Selected categories always take priority for the compact row's limited
   // slots over unselected ones — otherwise turning one on from the full
@@ -98,13 +108,18 @@ export default function CategoryFilter({
   // positioning (not absolute) so it isn't clipped by the chip row's own
   // horizontal scroll container. At most one open at a time.
   const [openFilterFor, setOpenFilterFor] = useState<string | null>(null)
-  // Anchored by its RIGHT edge to the tapped chip's own right edge (not its
-  // left) — the popup usually needs more width than the chip itself (Kosher
-  // Cert, Type, …), so growing it rightward from the chip's left edge would
-  // push it out past the chip and read as belonging to whatever's next in
-  // the row instead. Growing left from the chip's own right edge keeps it
-  // visually anchored under the chip that actually opened it.
-  const [popupPos, setPopupPos] = useState<{ top: number; right: number; minWidth: number } | null>(null)
+  // Desktop anchors by its RIGHT edge to the tapped chip's own right edge
+  // (not its left) — the popup usually needs more width than the chip
+  // itself (Kosher Cert, Type, …), so growing it rightward from the chip's
+  // left edge would push it out past the chip and read as belonging to
+  // whatever's next in the row instead. Growing left from the chip's own
+  // right edge keeps it visually anchored under the chip that opened it.
+  // Mobile's review-only popup is small enough that this doesn't come up —
+  // it anchors by its LEFT edge to the tapped filter segment itself, same as
+  // main always did.
+  const [popupPos, setPopupPos] = useState<
+    { top: number; right: number; minWidth: number } | { top: number; left: number; width: number } | null
+  >(null)
   // Which of the open editor's own select-field dropdowns (Kosher Cert,
   // Denomination, …) is expanded — same pattern the full-screen picker's
   // own expanded row uses (see CategoryFilterControls), just scoped to
@@ -125,6 +140,13 @@ export default function CategoryFilter({
       const chipEl = openFilterFor ? containerRefs.current.get(openFilterFor) : null
       if (chipEl?.contains(target)) return
       if (popupRef.current?.contains(target)) return
+      // A select field's own checkbox list (e.g. Kosher Cert's values) is a
+      // SEPARATE portal nested inside this one (see CheckboxDropdown) — not
+      // a DOM descendant of popupRef once portaled — so without this check
+      // a click on one of its checkboxes reads as "outside" and closes this
+      // whole editor via mousedown before the checkbox's own click/onChange
+      // ever fires, making filter selection silently do nothing.
+      if (target instanceof Element && target.closest('[data-checkbox-dropdown-popup]')) return
       setOpenFilterFor(null)
     }
     // Close if the user scrolls the chip row (or the page) so the popup
@@ -151,13 +173,11 @@ export default function CategoryFilter({
     }
   }, [openFilterFor])
 
-  // Tapping a category's chevron while the category itself is off re-checks
-  // it instead of opening the editor — picking filters for a category that
-  // isn't even shown on the map doesn't mean anything, so the tap does the
-  // one thing that's actually useful here (same as turning its own filter
-  // on used to do, back when the only way in was a field that already had
-  // one active).
-  function openEditor(id: string, on: boolean) {
+  // Tapping a category's filter segment while the category itself is off
+  // re-checks it instead of opening the editor — reviewing/discovering
+  // filters for a category that isn't even shown on the map doesn't mean
+  // anything, so the tap does the one thing that's actually useful here.
+  function openEditor(id: string, on: boolean, trigger: HTMLElement) {
     if (!on) {
       onToggle(id)
       return
@@ -166,12 +186,18 @@ export default function CategoryFilter({
       setOpenFilterFor(null)
       return
     }
-    // The whole chip's own rect (not just the chevron segment) — see
-    // popupPos above for why this anchors by its right edge.
-    const chipEl = containerRefs.current.get(id)
-    if (!chipEl) return
-    const rect = chipEl.getBoundingClientRect()
-    setPopupPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right, minWidth: rect.width })
+    if (isMobile) {
+      // The tapped segment's own rect — main always anchored here.
+      const rect = trigger.getBoundingClientRect()
+      setPopupPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    } else {
+      // The whole chip's own rect (not just the chevron segment) — see
+      // popupPos above for why this anchors by its right edge.
+      const chipEl = containerRefs.current.get(id)
+      if (!chipEl) return
+      const rect = chipEl.getBoundingClientRect()
+      setPopupPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right, minWidth: rect.width })
+    }
     setOpenSelectDropdown(null)
     setOpenFilterFor(id)
   }
@@ -190,7 +216,11 @@ export default function CategoryFilter({
         const on = selected.has(o.id)
         const editorOpen = openFilterFor === o.id
         const cat = categories.find((c) => c.id === o.id)
-        const hasFilters = categoryHasFilterableFields(cat)
+        // Desktop: any category with filterable fields, so there's a way to
+        // discover a filter that isn't set yet. Mobile: only once a filter's
+        // already active, spelled out on the segment itself — see the note
+        // above `isMobile`.
+        const hasFilters = isMobile ? !!o.filterSuffix : categoryHasFilterableFields(cat)
         return (
           <div
             key={o.id}
@@ -228,59 +258,130 @@ export default function CategoryFilter({
                     above for that, on hover) — much more compact than
                     printing the filter's own name/value on every chip. */}
                 <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
-                {o.filterSuffix && (
+                {/* Desktop only — the count already reflects the active
+                    filter (e.g. 71 → 5); the dot just flags THAT one narrowed
+                    it (see the title attribute above, on hover), more
+                    compact than spelling it out on every chip. Mobile spells
+                    it out directly on the segment instead (below), same as
+                    main always did, so no dot needed here too. */}
+                {!isMobile && o.filterSuffix && (
                   <span
                     className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${on ? 'bg-white' : 'bg-primary'}`}
                     aria-hidden="true"
                   />
                 )}
               </button>
-              {/* Always present for any category with filterable fields —
-                  not just once one's already active — so there's a visible
-                  way to discover and turn one on in the first place, not
-                  only to review/remove one you already set some other way
-                  (the full-screen picker). */}
               {hasFilters && (
-                <button
-                  onClick={() => openEditor(o.id, on)}
-                  aria-expanded={editorOpen}
-                  aria-label={`${o.label} filters`}
-                  className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
-                    on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <ChevronRightIcon className={`h-3.5 w-3.5 transition-transform ${editorOpen ? '-rotate-90' : 'rotate-90'}`} />
-                </button>
+                isMobile ? (
+                  // Mobile: the segment IS the active filter's own label —
+                  // tapping it reviews/unchecks what's set. No standing
+                  // affordance to discover a filter that isn't active yet;
+                  // that's still the full-screen category picker's job.
+                  <button
+                    onClick={(e) => openEditor(o.id, on, e.currentTarget)}
+                    aria-expanded={editorOpen}
+                    aria-label={`Edit ${o.label} filters`}
+                    className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
+                      on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    {o.filterSuffix}
+                  </button>
+                ) : (
+                  // Desktop: always present for any category with filterable
+                  // fields — not just once one's already active — so there's
+                  // a visible way to discover and turn one on in the first
+                  // place, not only to review/remove one already set some
+                  // other way (the full-screen picker).
+                  <button
+                    onClick={(e) => openEditor(o.id, on, e.currentTarget)}
+                    aria-expanded={editorOpen}
+                    aria-label={`${o.label} filters`}
+                    className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
+                      on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <ChevronRightIcon className={`h-3.5 w-3.5 transition-transform ${editorOpen ? '-rotate-90' : 'rotate-90'}`} />
+                  </button>
+                )
               )}
             </div>
 
             {editorOpen && popupPos && openCategory && (
-              createPortal(
-                <div
-                  ref={popupRef}
-                  // A floor, not a fixed size — never narrower than the chip
-                  // it dropped down from, but free to grow wider if the
-                  // filter controls need more room, rather than wrapping
-                  // them awkwardly to stay within it. No card background of
-                  // its own — the pills/dropdowns inside (CategoryFilterControls)
-                  // already carry their own white/bordered look, so a second
-                  // white box behind them just read as visual clutter.
-                  style={{ position: 'fixed', top: popupPos.top, right: popupPos.right, minWidth: popupPos.minWidth }}
-                  className="z-50 max-w-xs"
-                >
-                  <CategoryFilterControls
-                    category={openCategory}
-                    categoryId={openCategory.id}
-                    points={points}
-                    boolFields={boolFields}
-                    onToggleBool={onToggleBool}
-                    selectFilters={selectFilters}
-                    onToggleSelectValue={onToggleSelectValue}
-                    openDropdown={openSelectDropdown}
-                    onOpenDropdown={setOpenSelectDropdown}
-                  />
-                </div>,
-                document.body,
+              isMobile ? (() => {
+                // Review-only: just the entries already active, each a
+                // checkbox to remove it — same as main. Nothing left to
+                // review — rather than leave an empty box hanging open,
+                // disappear along with the last unchecked entry (the chip's
+                // own filterSuffix vanishes at the same moment).
+                const entries = activeFilterEntries(openCategory, boolFields, selectFilters)
+                if (entries.length === 0) return null
+                return createPortal(
+                  <div
+                    ref={popupRef}
+                    style={
+                      'left' in popupPos
+                        ? { position: 'fixed', top: popupPos.top, left: popupPos.left, minWidth: popupPos.width }
+                        : undefined
+                    }
+                    className="z-50 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg"
+                  >
+                    <div className="flex flex-col gap-1">
+                      {entries.map((entry) => (
+                        <label
+                          key={entry.kind === 'bool' ? entry.key : `${entry.key}:${entry.value}`}
+                          className="flex items-center gap-1.5 rounded px-1 py-1 text-xs whitespace-nowrap text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+                        >
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={() =>
+                              entry.kind === 'bool'
+                                ? onToggleBool(openCategory.id, entry.key)
+                                : onToggleSelectValue(openCategory.id, entry.key, entry.value)
+                            }
+                            className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
+                          />
+                          {entry.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>,
+                  document.body,
+                )
+              })() : (
+                createPortal(
+                  <div
+                    ref={popupRef}
+                    // A floor, not a fixed size — never narrower than the
+                    // chip it dropped down from, but free to grow wider if
+                    // the filter controls need more room, rather than
+                    // wrapping them awkwardly to stay within it. No card
+                    // background of its own — the pills/dropdowns inside
+                    // (CategoryFilterControls) already carry their own
+                    // white/bordered look, so a second white box behind them
+                    // just read as visual clutter.
+                    style={
+                      'right' in popupPos
+                        ? { position: 'fixed', top: popupPos.top, right: popupPos.right, minWidth: popupPos.minWidth }
+                        : undefined
+                    }
+                    className="z-50 max-w-xs"
+                  >
+                    <CategoryFilterControls
+                      category={openCategory}
+                      categoryId={openCategory.id}
+                      points={points}
+                      boolFields={boolFields}
+                      onToggleBool={onToggleBool}
+                      selectFilters={selectFilters}
+                      onToggleSelectValue={onToggleSelectValue}
+                      openDropdown={openSelectDropdown}
+                      onOpenDropdown={setOpenSelectDropdown}
+                    />
+                  </div>,
+                  document.body,
+                )
               )
             )}
           </div>
