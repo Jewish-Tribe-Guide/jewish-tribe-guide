@@ -110,17 +110,19 @@ export default function SectionTabs({
               </button>
 
               {/* ── Mega-menu ────────────────────────────────────────────────
-                      Anchored to this tab and centered under it, but clamped
-                      by max-width so an edge tab's panel doesn't run off the
-                      viewport. Sits above the map (z-30) — the map's own
-                      floating search bar is z-20 and would otherwise punch
-                      through it. ─────────────────────────────────────────── */}
+                      A single column straight down, not a wide multi-column
+                      spread — reads as a dropdown menu (Google/Apple-nav
+                      style) rather than its own little grid. Anchored to this
+                      tab and centered under it; max-h + scroll rather than
+                      widening for a section with a lot of categories. Sits
+                      above the map (z-30) — the map's own floating search bar
+                      is z-20 and would otherwise punch through it. ───────── */}
               {open && (
                 <div
                   onMouseEnter={cancelClose}
-                  className="absolute left-1/2 top-full z-30 w-max max-w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"
+                  className="absolute left-1/2 top-full z-30 w-60 max-h-80 -translate-x-1/2 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"
                 >
-                  <ul className="grid grid-cols-2 gap-0.5">
+                  <ul className="flex flex-col gap-0.5">
                     {section.cards.map((card) => {
                       const count = card.id ? counts.get(card.id) : undefined
                       return (

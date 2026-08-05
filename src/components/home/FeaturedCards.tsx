@@ -28,7 +28,8 @@ export default function FeaturedCards({
   if (!loading && cards.length === 0) return null
 
   return (
-    <section className="mt-10">
+    <section className="mt-14">
+      <h2 className="mb-4 text-lg font-semibold text-slate-900">Popular right now</h2>
       <div className="grid grid-cols-3 gap-5">
         {loading
           ? Array.from({ length: FEATURED_CARD_COUNT }, (_, i) => <CardSkeleton key={i} />)

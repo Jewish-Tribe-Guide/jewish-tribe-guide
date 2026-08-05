@@ -37,10 +37,11 @@ type Props = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — a short gateway: section tabs → hero + search → three featured
-//   cards → map → this week's zmanim → footer. The full card index lives on
-//   its own page (AllCategories), reachable from the tabs or the "Browse all
-//   categories" button.
+//   Desktop — a short gateway: section tabs → hero + search → "Popular right
+//   now" (three featured cards) → "Explore the map" → Zmanim & Shabbos →
+//   footer, each labeled so the page reads as distinct sections rather than
+//   one long blur. The full card index lives on its own page (AllCategories),
+//   reachable from the tabs or the "Browse all categories" button.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that). A phone has no tab bar to reach an
@@ -61,7 +62,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const isMobile = useIsMobile()
   // The Map pseudo-category still gates whether the map shows at all.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
-  const hasZmanim = !!categories?.some((c) => c.kind === 'zmanim')
+  const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -136,7 +137,8 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 twice. Hidden while searching so results aren't pushed below
                 a full-height map. ──────────────────────────────────────────── */}
         {hasMap && !q && (
-          <div className="mt-8 hidden sm:block">
+          <div className="mt-14 hidden sm:block">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
             <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
           </div>
         )}
@@ -167,18 +169,23 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {placeHits.length > 0 && (
           <PlacesResults hits={placeHits} onOpen={openPlace} />
         )}
-
-        {/* ── This week (desktop) — loose under the map, not a card. Falls back
-                to the community center so it renders something real before the
-                visitor has set an address. ─────────────────────────────────── */}
-        {!isMobile && !q && hasZmanim && (
-          <ZmanimStrip
-            coords={coords ?? community.mapCenter}
-            locationLabel={settings.name}
-            onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
-          />
-        )}
       </main>
+
+      {/* ── Zmanim & Shabbos (desktop) — the full card's content (not a
+              trimmed preview), rendered loose as a full-bleed band matching
+              the footer right below it rather than another boxed card in the
+              stack above. A sibling of <main>, not inside it, so its
+              background can run edge to edge. Falls back to the community
+              center so it renders something real before the visitor has set
+              an address. ──────────────────────────────────────────────────── */}
+      {!isMobile && !q && zmanimCategory && (
+        <ZmanimStrip
+          coords={coords ?? community.mapCenter}
+          locationLabel={settings.name}
+          title={zmanimCategory.pluralLabel}
+          onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
+        />
+      )}
     </>
   )
 }
