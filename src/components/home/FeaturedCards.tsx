@@ -29,22 +29,24 @@ export default function FeaturedCards({
 
   return (
     <section className="mt-14">
-      <h2 className="mb-4 text-lg font-semibold text-slate-900">Popular right now</h2>
+      {/* "Browse all" sits inline with the heading (a standard section
+          "see all" link) rather than centered on its own line below the
+          cards, which read as an unrelated, oddly-placed extra button. */}
+      <div className="mb-4 flex items-baseline justify-between gap-4">
+        <h2 className="text-lg font-semibold text-slate-900">Popular right now</h2>
+        <button
+          onClick={onShowAll}
+          className="shrink-0 text-sm font-medium text-primary underline-offset-2 hover:underline cursor-pointer"
+        >
+          Browse all categories →
+        </button>
+      </div>
       <div className="grid grid-cols-3 gap-5">
         {loading
           ? Array.from({ length: FEATURED_CARD_COUNT }, (_, i) => <CardSkeleton key={i} />)
           : cards.map((card, i) => (
               <Card key={card.id ?? card.title} card={card} tint={TINTS[i % TINTS.length]} />
             ))}
-      </div>
-      <div className="mt-5 text-center">
-        <button
-          onClick={onShowAll}
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-        >
-          Browse all categories
-          <span aria-hidden="true">→</span>
-        </button>
       </div>
     </section>
   )

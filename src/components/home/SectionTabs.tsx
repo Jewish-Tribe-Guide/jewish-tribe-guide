@@ -84,7 +84,7 @@ export default function SectionTabs({
       className="relative hidden border-b border-slate-200 sm:block"
       onMouseLeave={scheduleClose}
     >
-      <ul className="mx-auto flex max-w-6xl items-stretch justify-center gap-1 px-4 sm:px-6">
+      <ul className="mx-auto flex max-w-6xl items-stretch gap-1 px-4 sm:px-6">
         {sections.map((section) => {
           const open = openTitle === section.title
           return (
