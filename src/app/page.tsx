@@ -16,6 +16,7 @@ import FeedbackForm from '@/components/FeedbackForm'
 import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import { useLiveLocation } from '@/lib/useLiveLocation'
 import { useCategories } from '@/lib/useCategories'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { ui } from '@/lib/uiConfig'
 
@@ -60,6 +61,16 @@ export default function Page() {
   const { address, coords, setAddress, setCoords, tracking, geoError, start: startLiveTracking, stop: stopLiveTracking } = useLiveLocation()
   const categories = useCategories()
   const settings = useSiteSettings()
+  // Mobile's Feedback tab is a real full-page screen (mode 'feedback'); on
+  // desktop there's no such tab, so the same mode instead means "show the
+  // footer's own feedback modal on top of home" — same idea as the map's
+  // standalone-fullscreen fix: however mode became 'feedback' (a real mobile
+  // tab tap, or a resize back up to desktop after one, or history restore),
+  // landing on it at desktop width means the modal, not a bare inline page.
+  // Derived, not its own state — closing it is just goToHome(), which this
+  // recomputes to false on its own; nothing to desync.
+  const isMobile = useIsMobile()
+  const feedbackModalOpen = mode === 'feedback' && !isMobile
   const [flow, setFlow] = useState<Flow | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)
@@ -280,8 +291,9 @@ export default function Page() {
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
 
-      {/* ── Landing — the single home screen (search + one card grid) ────────── */}
-      {(mode === 'home' || mode === 'community-home') && (
+      {/* ── Landing — the single home screen (search + one card grid). Also
+              the backdrop for the desktop feedback-modal recovery above. ── */}
+      {(mode === 'home' || mode === 'community-home' || feedbackModalOpen) && (
         <div className="flex-1">
           <Landing
             onNavigate={navigate}
@@ -293,14 +305,22 @@ export default function Page() {
         </div>
       )}
 
-      {/* ── Find/Feedback — ordinary mount-on-demand screens ──────────────────── */}
-      {(mode === 'find' || mode === 'feedback') && (
+      {/* ── Find/Feedback — ordinary mount-on-demand screens. Feedback only
+              renders here as its own full page on mobile — see
+              feedbackModalOpen above for its desktop counterpart. ────────── */}
+      {(mode === 'find' || (mode === 'feedback' && isMobile)) && (
         <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
-          {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+          {mode === 'find' && (
+            <FindResources anchor={anchor} onUp={goToHome} onViewAllCategories={() => viewAllCategories()} onViewMap={viewMapForCategory} />
+          )}
           {mode === 'feedback' && (
             <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
           )}
         </main>
+      )}
+
+      {feedbackModalOpen && (
+        <FeedbackForm heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} onClose={goToHome} />
       )}
 
       {/* ── All categories — the full card index, moved off the desktop home
@@ -350,7 +370,15 @@ export default function Page() {
             initialSelectedCategories={mapSelectedCategories || undefined}
             initialFilters={mapFilters || undefined}
             onViewListing={viewListing}
-            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : undefined}
+            standalone
+            visible={mode === 'map'}
+            // Always provided (never undefined) — this is the one page-level
+            // map screen, so its fullscreen exit always has somewhere to go:
+            // back to the listing it was opened from, or home otherwise.
+            // However the visitor actually got here (a listing's own "Map"
+            // button, the mobile tab bar, browser back/forward into a 'map'
+            // history entry), landing on this screen means fullscreen.
+            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : goToHome}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </main>

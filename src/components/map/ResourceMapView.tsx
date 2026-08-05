@@ -63,11 +63,28 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
-  /** Desktop only — when set, this map was opened via a category directory's
-   *  own "Map" button rather than the general Map tab: the map starts
-   *  already fullscreen (there's no boxed intermediate for this entry point),
-   *  and exiting fullscreen calls this instead of just collapsing back to
-   *  the boxed view, taking the visitor straight back to that directory. */
+  /** True for the one page-level map screen (mode 'map' in page.tsx) — as
+   *  opposed to the small contained map embedded directly on the home screen
+   *  (see HomeMap), which is a separate mounted instance of this same
+   *  component and never sets this. Desktop only in effect: a standalone map
+   *  always opens (and stays) fullscreen — there's no boxed state for it —
+   *  and its exit control always navigates away via onExitFullscreenToListing
+   *  rather than collapsing in place, however the visitor got here (a
+   *  listing's own "Map" button, the mobile tab bar, browser back/forward).
+   *  The embedded home-screen map keeps its own boxed-by-default, expand-in-
+   *  place behavior untouched. */
+  standalone?: boolean
+  /** Whether the standalone map screen is the one currently on screen (mode
+   *  === 'map') — since it stays mounted across tab switches (see page.tsx),
+   *  this is how it knows to re-force fullscreen on every return visit, not
+   *  just its first mount (e.g. after exiting once already reset it false).
+   *  Ignored (and unnecessary) when `standalone` isn't set. */
+  visible?: boolean
+  /** Called whenever the standalone map's fullscreen exits — always
+   *  provided when `standalone` is set (either back to the listing it was
+   *  opened from, or home otherwise), since a standalone map never just
+   *  collapses to a boxed view in place. Unused by the embedded home-screen
+   *  map, whose own toggle collapses in place instead. */
   onExitFullscreenToListing?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
@@ -84,7 +101,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, onExitFullscreenToListing, liveTracking }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -160,22 +177,33 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     setDesktopSelectedRaw(p)
     setSelectedPointId(p?.id)
   }
-  // Desktop-only — the map starts as a contained card (like an embedded
-  // widget, not the whole page); this expands it to cover the viewport, and
-  // collapses it back. Mobile is already effectively full-bleed within its
-  // own tab, so it has no separate fullscreen toggle. Starts true when
-  // arriving via a listing's own "Map" button (initialCategory set together
-  // with onExitFullscreenToListing — see page.tsx's viewMapForCategory) so
-  // that entry point never shows the boxed intermediate at all; otherwise
-  // resets to false on every mount, same as the rest of this screen's local
-  // UI state.
-  const [fullscreen, setFullscreen] = useState(!!initialCategory)
-  // Exiting fullscreen: back to the originating listing when this map was
-  // opened from one, otherwise just collapse to the boxed view as before.
+  // Desktop-only — the embedded home-screen map starts as a contained card
+  // (like a widget, not the whole page); this expands it to cover the
+  // viewport, and collapses it back in place. The standalone page-level map
+  // screen has no such boxed state at all — it's always fullscreen — see the
+  // effect below. Mobile is already effectively full-bleed either way, so it
+  // has no separate fullscreen toggle.
+  const [fullscreen, setFullscreen] = useState(!!standalone)
+  // Exiting fullscreen: a standalone map always navigates away (back to the
+  // listing it was opened from, or home — see onExitFullscreenToListing);
+  // the embedded home-screen map just collapses back to its boxed card.
   const exitFullscreen = () => {
     setFullscreen(false)
     onExitFullscreenToListing?.()
   }
+  // Re-forces fullscreen every time the standalone map screen becomes the
+  // one on screen — not just its first mount. It stays mounted across tab
+  // switches (see page.tsx), so without this, returning to it after a
+  // previous visit's exit (which always resets fullscreen false) would show
+  // the visitor a state that's supposed to not exist for this screen: a
+  // standalone map sitting there NOT fullscreen. Covers every entry path —
+  // a listing's "Map" button, the mobile tab bar, browser back/forward —
+  // uniformly, instead of only the one that happened to trigger the mount.
+  useEffect(() => {
+    if (!standalone || !visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFullscreen(true)
+  }, [standalone, visible])
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {

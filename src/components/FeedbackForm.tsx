@@ -49,7 +49,15 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
 
   const wrap = (children: React.ReactNode) =>
     variant === 'modal' ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      // onClick on the backdrop itself (not bubbled up from the card) closes
+      // it, same as the ✕ — checking e.target === e.currentTarget rather than
+      // stopPropagation on the card below, so a click anywhere inside the
+      // card (including future children that don't know to stop it) can
+      // never accidentally fall through and close the whole thing.
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+      >
         <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
       </div>
     ) : (
