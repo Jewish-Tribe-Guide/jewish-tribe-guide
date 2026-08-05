@@ -219,7 +219,9 @@ export function GenericListingCard({
 
         <div className="flex items-center gap-3 shrink-0">
           {(upvotes || travel.length > 0) && (
-            <div className="flex flex-col items-end gap-0.5">
+            // Stacked on mobile to save horizontal space; side by side from
+            // sm up, where there's room for upvote and distance to sit level.
+            <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-2">
               {upvotes && (
                 <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
               )}
