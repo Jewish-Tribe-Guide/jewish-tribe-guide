@@ -23,7 +23,7 @@ type FindNavState = {
   findAction?: string
   /** Which hospital's About page to show (set when tapping one in the list). */
   findHospitalId?: string
-  /** Pre-fill the category's search box (set when arriving from a landing "Places"
+  /** Pre-fill the category's search box (set when arriving from a landing "Search results"
    *  result, e.g. "cheese"). */
   findQuery?: string
   /** Expand this listing on arrival (the place tapped on the landing page). */
@@ -72,7 +72,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
     return (window.history.state as FindNavState | null)?.findItemId ?? null
   })
   // Pre-filled search for the category list, set when arriving from a landing
-  // "Places" result so the tapped place is already filtered in.
+  // "Search results" result so the tapped place is already filtered in.
   const [initialSearch, setInitialSearch] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return (window.history.state as FindNavState | null)?.findQuery ?? null

@@ -55,6 +55,11 @@ export type MapPoint = {
   categoryLabel?: string
   /** Category id used to deep-link into the directory. Absent for hospitals. */
   filterId?: string
+  /** Marks this pin as a search match (see ResourceMapView's
+   *  `highlightedListingIds`) — rendered bigger with a gold border instead
+   *  of the plain white one every other pin gets, so it stands out among
+   *  same-colored neighbors rather than just blending in. */
+  highlighted?: boolean
 }
 
 const HOSPITALS_FILTER_ID = '__hospitals__'
@@ -261,9 +266,9 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
     for (const p of points) {
       const pin = new google.maps.marker.PinElement({
         background: p.color,
-        borderColor: '#ffffff',
+        borderColor: p.highlighted ? '#ffc145' : '#ffffff',
         glyph: p.glyph ? monoGlyphElement(p.glyph) : null,
-        scale: 1,
+        scale: p.highlighted ? 1.3 : 1,
       })
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map,

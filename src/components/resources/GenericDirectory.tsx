@@ -29,7 +29,7 @@ type Props = {
   addressPrompt?: boolean
   /** A listing to mount already expanded (restored after returning from a form). */
   reopenItemId?: string | null
-  /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
+  /** Seed the search box (e.g. "cheese" from a landing "Search results" result). */
   initialSearch?: string
   onUp: () => void
   onAdd: () => void

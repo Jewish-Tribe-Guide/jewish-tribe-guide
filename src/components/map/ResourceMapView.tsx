@@ -184,11 +184,19 @@ type Props = {
    *  alone only opens one specific listing; the flyout also needs "View
    *  full page" links). */
   onNavigate?: NavigateFn
+  /** Listing ids to visually mark (distinct pin border/scale — see
+   *  ResourceMap's `highlighted`) without otherwise touching which pins
+   *  show — driven by the home page's own top search bar, so a match
+   *  there stands out on the map instead of only surfacing in the
+   *  separate search-results list below. Only affects pins already
+   *  visible under whatever category selection is active; it doesn't
+   *  force-reveal a category that's currently filtered out. */
+  highlightedListingIds?: Set<string>
 }
 
 type Tab = 'map' | 'nearby'
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, embedded, focusedListingId, onFocusListingChange, focusedCategoryIds, onFocusCategoryChange, categoryItemIdsByCategory, onNavigate }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, embedded, focusedListingId, onFocusListingChange, focusedCategoryIds, onFocusCategoryChange, categoryItemIdsByCategory, onNavigate, highlightedListingIds }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -531,6 +539,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       .filter((p) => activeTerms.every((t) => p.searchText.includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
   }, [allPoints, effectiveSelected, activeTerms, filterChips, focusedPoint, focusedCategoryPoints])
+  // Marks the home page's own top-search matches distinctly on the map
+  // (see ResourceMap's `highlighted`) without touching which pins are
+  // actually visible — a separate concern from `activeTerms`, which is
+  // the map's OWN internal search/filter, not the home page's.
+  // `highlightedKey` (a sorted, joined fingerprint of the id set) — not
+  // `highlightedListingIds` itself — drives the memo: the parent rebuilds
+  // that Set on every render regardless of whether the actual matches
+  // changed, and depending on the Set object directly would rebuild every
+  // marker on the map (an expensive Google Maps operation) on every
+  // unrelated keystroke/render instead of only when matches actually do.
+  const highlightedKey = highlightedListingIds ? [...highlightedListingIds].sort().join(',') : ''
+  const highlightedVisiblePoints = useMemo(
+    () =>
+      highlightedListingIds && highlightedListingIds.size > 0
+        ? visiblePoints.map((p) => (highlightedListingIds.has(p.id) ? { ...p, highlighted: true } : p))
+        : visiblePoints,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- highlightedKey is highlightedListingIds' stable fingerprint, see comment above
+    [visiblePoints, highlightedKey],
+  )
 
   const toggle = (id: string) => {
     onFocusListingChange?.(null)
@@ -834,19 +861,21 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         {/* ── Map view ──────────────────────────────────────────────────── */}
         {tab === 'map' && (
           // The standalone /map screen keeps its own bordered/rounded card
-          // look, sized to a comfortable chunk of the page. The home page's
-          // embedded map (`embedded`) has neither — no visible border,
-          // square corners — since the map key's tab/column assembly now
-          // sits flush against its edges (see below) instead of floating as
-          // a separate card with its own border; a border on the map itself
-          // would just be a redundant, disconnected-looking line. It's
-          // `h-[60vh]` (about two-thirds of the previous `h-[90vh]`) so the
-          // home page's map section takes up a large but no longer
-          // near-full-screen chunk of the viewport while it's scrolled into
-          // view.
+          // look, sized to a comfortable chunk of the page. The home
+          // page's embedded map (`embedded`) is square-cornered instead —
+          // it extends flush to the edges of its own section (see the
+          // call site in Landing.tsx), which already supplies the square
+          // black border framing the page, so a separate rounded card
+          // here would just be a redundant, disconnected-looking shape
+          // inside it. It's `h-[60vh]` (about two-thirds of the previous
+          // `h-[90vh]`) so the home page's map section takes up a large
+          // but no longer near-full-screen chunk of the viewport while
+          // it's scrolled into view.
           <div
             className={`w-full overflow-hidden flex flex-col ${
-              embedded ? 'h-[60vh]' : 'h-[70vh] min-h-[420px] rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]'
+              embedded
+                ? 'h-[60vh]'
+                : 'h-[70vh] min-h-[420px] rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]'
             }`}
           >
               <div className="relative min-h-0 flex-1">
@@ -1148,9 +1177,20 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                           >
                             ‹
                           </button>
-                          <span
+                          {/* Was a plain `<span>` — not clickable, so once
+                              this filter bar took over there was no way to
+                              turn the sole category back off without first
+                              tapping "‹" back to the full category list and
+                              re-finding its button there. A `<button>` that
+                              calls the exact same `selectTab` every other
+                              category pill uses lets it double as its own
+                              "unselect" control, same as clicking any
+                              other active category chip does. */}
+                          <button
+                            onClick={() => selectTab(soleOption.id)}
+                            aria-label={`Unselect ${soleOption.label}`}
                             style={{ backgroundColor: soleOption.color }}
-                            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium shadow-md ${
+                            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium shadow-md cursor-pointer ${
                               soleOption.id === 'mikvah' ? 'text-black' : 'text-white'
                             }`}
                           >
@@ -1158,7 +1198,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               <span aria-hidden="true" style={{ filter: 'brightness(0) invert(1)' }}>{soleOption.icon}</span>
                             )}
                             {soleOption.label}
-                          </span>
+                          </button>
                           {soleChips.map((chip) => {
                             const currentFilters = getCategoryFilters(soleOption.id)
                             const active = isChipActive(chip, currentFilters)
@@ -1337,7 +1377,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   </div>
                 ) : (
                   <ResourceMap
-                    points={visiblePoints}
+                    points={highlightedVisiblePoints}
                     userLocation={activeLocation}
                     onViewListing={onViewListing}
                     skipAutoFit={embedded}

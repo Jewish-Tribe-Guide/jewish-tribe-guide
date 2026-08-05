@@ -53,6 +53,7 @@ export function GenericListingCard({
   highlightColor,
   dense = false,
   hideBorder = false,
+  hideName = false,
   leadingIcon,
   onVote,
   onTagClick,
@@ -89,6 +90,11 @@ export function GenericListingCard({
    *  caller's own (the map key's detail panel), so none of those would
    *  paint over that container's own matching border/background. */
   hideBorder?: boolean
+  /** Skips the item's own name in the collapsed header row (badges/upvote/
+   *  chevron still show) — used where the caller already showed the name
+   *  right above this card (Get Connected's own list button), so repeating
+   *  it here would just be a duplicate. */
+  hideName?: boolean
   /** Rendered beside the name, in the same row — only that row shifts right
    *  to make room for it; everything else in the card keeps starting flush
    *  at the card's own left padding (used by the map key's detail panel for
@@ -237,7 +243,15 @@ export function GenericListingCard({
         onClick={toggleExpanded}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpanded() } }}
         style={highlighted ? { backgroundColor: `color-mix(in srgb, ${highlightHex} 6%, white)` } : undefined}
-        className={`w-full flex items-center justify-between gap-3 transition-colors cursor-pointer ${dense ? 'px-2.5 py-2' : 'px-4 py-4'} ${
+        className={`w-full flex items-center gap-3 transition-colors cursor-pointer ${
+          // `justify-between` pins the upvote/website-link/chevron block to
+          // the row's far right, playing off the name on the far left —
+          // with the name hidden there's nothing on the left to play off
+          // of, so that block would float alone at the right edge. Left-
+          // justify instead so it sits right after the (now name-less)
+          // badges, not stranded across an empty row.
+          hideName ? 'justify-start' : 'justify-between'
+        } ${dense ? 'px-2.5 py-2' : 'px-4 py-4'} ${
           highlighted ? '' : 'hover:bg-slate-50 active:bg-slate-100'
         } ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
@@ -253,7 +267,9 @@ export function GenericListingCard({
           {leadingIcon}
           <div className="min-w-0 flex flex-col gap-1">
           <div className="flex flex-col gap-y-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
-          <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-xs' : ''}`}>{item.name}</span>
+          {!hideName && (
+            <span className={`min-w-0 font-semibold text-slate-900 ${dense ? 'text-xs' : ''}`}>{item.name}</span>
+          )}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-y-1">
           {isOpen && (closing?.closesSoon ? (
             <span className="relative group/tip">

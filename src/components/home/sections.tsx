@@ -307,7 +307,7 @@ export function searchListings(
   return hits
 }
 
-/** The "Places" results list: each hit rendered as the same card its category
+/** The "Search results" list: each hit rendered as the same card its category
  *  directory uses, so a searched place is the full listing (davening times,
  *  upvotes, filters, and all). */
 export function PlacesResults({
@@ -322,7 +322,7 @@ export function PlacesResults({
   return (
     <section className="mt-10 sm:mt-12">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Places
+        Search results
       </h2>
       <div className="space-y-2">
         {hits.map((hit) => (

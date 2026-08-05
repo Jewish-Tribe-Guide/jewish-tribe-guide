@@ -6,8 +6,7 @@ import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import ZmanimWidget from '@/components/home/ZmanimWidget'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import { needsDarkText, readableTextOnWhite } from '@/components/Collapsible'
-import { ACCENT_PALETTE, HOSPITALS_ID, rankMapId } from '@/components/map/ResourceMapView'
+import { HOSPITALS_ID, rankMapId } from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -25,7 +24,7 @@ type Props = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
-  /** The visitor's location (from the header pill) — lets "Places" results show
+  /** The visitor's location (from the header pill) — lets "Search results" show
    *  distance, exactly like the category directory does. */
   coords: { lat: number; lng: number } | null
 }
@@ -58,84 +57,84 @@ type GetConnectedItem = {
 type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem[] }
 
 /** "Get Connected" — same width as the map above it (both sit in the same
- *  `max-w-6xl` container). Matches the MAP's own graphic language: each
- *  category's header colored from the same `ACCENT_PALETTE` the map's
- *  category buttons cycle through, exactly like a map key button — instead
- *  of one flat navy/gold scheme, which reads punchier (five distinct colors
- *  instead of one repeated pair) and ties the section back to the map
- *  visually.
+ *  `max-w-6xl` container). A bento grid: the four categories are
+ *  individual bordered, rounded tiles with real gaps between them,
+ *  instead of one flush edge-to-edge card — a deliberate break from the
+ *  rest of the page's square/flush "shelf" sections (map, Zmanim, etc.),
+ *  taken on explicit request rather than for consistency with them.
+ *  Uncolored — no more per-category (or even one shared) fill color;
+ *  every tile is plain black-on-white, like the rest of the page.
  *
- *  Every category's list is shown at once, side by side as four columns
+ *  Every category's list is shown at once, side by side as four tiles
  *  (`grid-cols-4`) — there's no tab-switching/accordion here (there used
  *  to be, gated on a single `activeId`; that's gone, so all lists are
  *  visible without the user needing to click anything first). Each
- *  category's own header is a static colored bar, not a button.
+ *  category's own header is a static heading, not a button.
  *
- *  The four columns read as ONE connected card, not four separate boxes:
- *  a single shared border/shadow wraps the whole grid (`overflow-hidden`
- *  so its `rounded-b-2xl` actually clips the corners), gaps between
- *  columns are gone in favor of `divide-x` hairlines, and columns are
- *  left at the grid's default stretch (not `items-start`) so they all
- *  share one flat, evenly-rounded bottom edge — including while one
- *  category's second box below is open, which grows the whole row's
- *  height (and therefore every column, blank space and all) instead of
- *  poking that one column out past the rest.
+ *  Tiles are left at the grid's default stretch (not `items-start`) so
+ *  they all share one flat bottom edge — including while one category's
+ *  second box below is open, which grows the whole row's height (and
+ *  therefore every tile, blank space and all) instead of poking that one
+ *  tile out past the rest.
  *
  *  Some items don't navigate at all when clicked — a SECOND box opens
- *  BELOW that category's own list, inside the same column (not beside it,
- *  which would spill into the next category's column), showing either:
+ *  directly under THAT item (not at the bottom of the whole list), pushing
+ *  the rest of the list below it down rather than appearing disconnected
+ *  from whichever button actually opened it. Shows either:
  *  - `embed` (Support/Volunteer's "Interest Form" entries): the real
  *    SupportWizard/VolunteerWizard, `variant="inline"`.
  *  - `detail` (Professional Networks/Social Opportunities/WhatsApp Groups'
  *    real listings): that listing's own GenericListingCard, same as its
  *    full directory page shows, instead of navigating there.
  *  `embeddedFlow`/`detailItemId` stay single top-level state (not one per
- *  category) since item ids are unique across every category's list, so at
- *  most one category's second box can ever match and open at a time —
- *  clicking an item in a different category's list still just closes
+ *  item) since item ids are unique across every category's list, so at
+ *  most one item's box can ever match and open at a time — clicking a
+ *  different item (in this list or another category's) still just closes
  *  whichever other one was open, same as before. */
 function GetConnectedAccordion({
   categories,
   categoryConfigs,
+  searchQuery,
 }: {
   categories: GetConnectedCategory[]
   categoryConfigs: CategoryConfig[] | null
+  /** The home page's own top search bar query — matched item rows get a
+   *  gold highlight (see `isMatch` below), the same accent color used to
+   *  mark matching pins on the map, so a search result stands out
+   *  wherever it already lives on the page. */
+  searchQuery?: string
 }) {
   const [embeddedFlow, setEmbeddedFlow] = useState<'support' | 'volunteer' | null>(null)
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
+  const matchQuery = searchQuery?.trim().toLowerCase() ?? ''
 
   return (
-    <div className="grid w-full grid-cols-4 divide-x divide-slate-200 overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-lg">
-      {categories.map((cat, i) => {
-        const color = ACCENT_PALETTE[i % ACCENT_PALETTE.length]
-        // The palette's paler steps (pale aqua, light blue) wash out under
-        // white text — `needsDarkText` (shared with the map's own contrast
-        // logic, see Collapsible.tsx) checks actual luminance instead of
-        // hardcoding which hex that is, so it keeps working automatically
-        // if the palette's exact colors ever shift again.
-        const headerTextClass = needsDarkText(color) ? 'text-[#0C3D57]' : 'text-white'
-        // Raw palette colors are fine as borders/fills, but a couple of
-        // this palette's paler steps are too light to read as TEXT on the
-        // near-white `bg-slate-50` these hover/open states use.
-        const readableColor = readableTextOnWhite(color)
-
+    <div className="grid w-full grid-cols-4 gap-4 bg-[#fefefe] p-4">
+      {categories.map((cat) => {
         const embedItem = cat.items.find((it) => it.embed && it.embed === embeddedFlow)
         const detailItem = cat.items.find((it) => it.detail && it.id === detailItemId)
         const detailCategory = detailItem?.detail ? categoryConfigs?.find((c) => c.id === detailItem.detail!.category) : undefined
         const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
 
         return (
-          <div key={cat.id} className="min-w-0">
-            <div style={{ backgroundColor: color }} className={`px-3 py-3.5 text-center text-xs font-bold sm:text-sm ${headerTextClass}`}>
+          // Each category is its OWN bordered, rounded tile (the bento
+          // cell) — `border-2 border-black` matches the page's own
+          // (recently thickened) section borders, `rounded-xl` is the one
+          // deliberately-not-square-corner exception on the page, and
+          // `overflow-hidden` clips the header's flat top corners to it.
+          <div key={cat.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border-2 border-black bg-white">
+            <div className="border-b-2 border-black px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-black sm:text-xs">
               {cat.title}
             </div>
             <div>
               {cat.items.length > 0 ? (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-black/10">
                   {cat.items.map((item) => {
                     const isOpenEmbed = item.embed && item.embed === embeddedFlow
                     const isOpenDetail = item.detail && item.id === detailItemId
                     const isOpen = isOpenEmbed || isOpenDetail
+                    const isMatch = matchQuery.length > 0 && item.label.toLowerCase().includes(matchQuery)
+                    const itemDetailCategory = item.detail ? categoryConfigs?.find((c) => c.id === item.detail!.category) : undefined
                     return (
                       <li key={item.id}>
                         <button
@@ -144,23 +143,80 @@ function GetConnectedAccordion({
                             else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
                             else item.go()
                           }}
-                          style={{ '--hover-color': readableColor } as React.CSSProperties}
-                          className={`block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-slate-50 hover:text-[var(--hover-color)] cursor-pointer ${
+                          // A thin left accent bar (rather than a flat gray
+                          // fill) marks the open/hovered row — black now
+                          // (was the brand navy) since this section carries
+                          // no color of its own anymore. A search match
+                          // keeps the same gold accent the map's matching
+                          // pins do (see ResourceMap's `highlighted`) — the
+                          // one deliberate spot of color left, since it's a
+                          // functional indicator shared with the rest of
+                          // the page's search-highlight system, not
+                          // decorative branding. One level below "open"
+                          // (which still wins if a matched row is also the
+                          // one expanded) but above the "every other item
+                          // dims" treatment, so a match never dims out.
+                          className={`block w-full border-l-[3px] px-4 py-3 text-left text-sm font-medium transition-colors cursor-pointer ${
                             isOpen
-                              ? 'bg-slate-50 text-[var(--hover-color)]'
-                              : // Once something in this list is open, every OTHER
-                                // item dims — the same "one item stands out, the
-                                // rest recede" read the two-item Support &
-                                // Volunteering list already had by virtue of only
-                                // having one alternative to compare against.
-                                hasSecondBox
-                                ? 'text-slate-300 hover:text-slate-500'
-                                : 'text-slate-700'
+                              ? 'border-l-black bg-slate-50 text-black'
+                              : isMatch
+                                ? 'border-l-[#ffc145] bg-amber-50 text-slate-900'
+                                : // Once something in this list is open, every OTHER
+                                  // item dims — the same "one item stands out, the
+                                  // rest recede" read the two-item Support &
+                                  // Volunteering list already had by virtue of only
+                                  // having one alternative to compare against.
+                                  hasSecondBox
+                                  ? 'border-l-transparent text-slate-300 hover:text-slate-500'
+                                  : 'border-l-transparent text-slate-700 hover:border-l-black/30 hover:bg-slate-50 hover:text-black'
                           }`}
                         >
                           {item.icon && <span aria-hidden="true" className="mr-1.5">{item.icon}</span>}
                           {item.label}
                         </button>
+
+                        {/* Opens directly under THIS item's own button
+                            (not at the bottom of the whole list) — always
+                            rendered (even while closed) so it can animate
+                            open via the grid-template-rows 0fr/1fr trick. */}
+                        <div
+                          style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+                          className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                        >
+                          <div className="overflow-hidden">
+                            <div className="border-t border-black/10">
+                              {isOpenEmbed ? (
+                                item.embed === 'support' ? (
+                                  <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                                ) : (
+                                  <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                                )
+                              ) : isOpenDetail && item.detail && itemDetailCategory ? (
+                                <div className="p-3">
+                                  <GenericListingCard
+                                    item={item.detail}
+                                    category={itemDetailCategory}
+                                    upvotes={!!itemDetailCategory.upvotesEnabled}
+                                    count={item.detail.upvotes ?? 0}
+                                    expanded
+                                    dense
+                                    hideBorder
+                                    hideName
+                                    highlightColor="#000000"
+                                    onVote={() => {}}
+                                    onTagClick={() => {}}
+                                    onFilterOpen={() => {}}
+                                    onFilterBool={() => {}}
+                                    onFilterSelect={() => {}}
+                                    onEdit={() => item.go()}
+                                    onReport={() => item.go()}
+                                    onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
                       </li>
                     )
                   })}
@@ -168,48 +224,6 @@ function GetConnectedAccordion({
               ) : (
                 <p className="px-4 py-3 text-sm italic text-slate-400">Coming soon</p>
               )}
-            </div>
-
-            {/* Always rendered (even while closed) so it can animate open —
-                the grid-template-rows 0fr/1fr trick collapses/reveals its
-                HEIGHT only, staying inside this category's own column
-                rather than spilling into the next one. */}
-            <div
-              style={{ gridTemplateRows: hasSecondBox ? '1fr' : '0fr' }}
-              className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-            >
-              <div className="overflow-hidden">
-                <div className="border-t border-slate-200">
-                  {embedItem ? (
-                    embedItem.embed === 'support' ? (
-                      <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                    ) : (
-                      <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-                    )
-                  ) : detailItem?.detail && detailCategory ? (
-                    <div className="p-3">
-                      <GenericListingCard
-                        item={detailItem.detail}
-                        category={detailCategory}
-                        upvotes={!!detailCategory.upvotesEnabled}
-                        count={detailItem.detail.upvotes ?? 0}
-                        expanded
-                        dense
-                        hideBorder
-                        highlightColor={color}
-                        onVote={() => {}}
-                        onTagClick={() => {}}
-                        onFilterOpen={() => {}}
-                        onFilterBool={() => {}}
-                        onFilterSelect={() => {}}
-                        onEdit={() => detailItem.go()}
-                        onReport={() => detailItem.go()}
-                        onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              </div>
             </div>
           </div>
         )
@@ -249,7 +263,7 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="flex h-9 w-9 items-center justify-center rounded-full text-[#fefefe] hover:bg-white/10 cursor-pointer"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 cursor-pointer"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -383,9 +397,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   // Scroll targets for the search box's "jump to" results below — a category
   // match scrolls to the map and isolates that category's tab; a Zmanim
-  // match scrolls to the widget at the bottom of the page.
+  // match scrolls to the widget at the bottom of the page; a Get Connected
+  // match scrolls to that section (already showing every category's list at
+  // once, so there's no tab to isolate the way the map has).
   const mapSectionRef = useRef<HTMLDivElement>(null)
   const zmanimSectionRef = useRef<HTMLDivElement>(null)
+  const getConnectedSectionRef = useRef<HTMLDivElement>(null)
   // Mirrors ResourceMapView's own key — the Medical tab is keyed by
   // HOSPITALS_ID rather than the category's own db id, same as its pins.
   const mapIdForCategoryConfig = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITALS_ID : c.id)
@@ -400,6 +417,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   }
   const jumpToZmanim = () => {
     zmanimSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const jumpToGetConnected = () => {
+    getConnectedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const resources = resourceCards(onNavigate, categories)
@@ -476,6 +496,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     { id: 'social', title: 'Social Opportunities', items: socialOpportunityItems },
     { id: 'whatsapp', title: 'WhatsApp Groups', items: whatsappItems },
   ]
+  // Stand-ins for the search box's "jump to" row below — Get Connected's
+  // four categories aren't real `resources` cards (they were dropped as
+  // duplicative once Get Connected covered the same links, see the
+  // history comment on `quickLinksCards` above), so there's nothing in
+  // `resources` a query like "volunteer" could match against. `gc:`-
+  // prefixed ids keep them from ever colliding with a real category id.
+  const getConnectedJumpCards: CardDef[] = [
+    { id: 'gc:support-volunteering', title: 'Support & Volunteering', icon: '🤝', keywords: ['support', 'volunteer', 'volunteering'], go: () => {} },
+    { id: 'gc:professional', title: 'Professional Networks', icon: '💼', keywords: ['professional', 'networking', 'network', 'career'], go: () => {} },
+    { id: 'gc:social', title: 'Social Opportunities', icon: '🎉', keywords: ['social', 'meetup', 'young professional'], go: () => {} },
+    { id: 'gc:whatsapp', title: 'WhatsApp Groups', icon: '💬', keywords: ['whatsapp', 'group chat'], go: () => {} },
+  ]
 
   const q = query.trim()
   const loading = !q && allCards === null
@@ -484,6 +516,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
   const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
+  // Same matches, as an id set — marks their pins on the map (see HomeMap/
+  // ResourceMapView's `highlightedListingIds`) so a search result stands
+  // out where it already lives on the page, not just in the separate
+  // "Search results" list below.
+  const highlightedListingIds = new Set(placeHits.map((h) => h.item.id))
 
   // Desktop only: categories/Zmanim that used to be plain tiles (searchable via
   // resourceCards' own rich keywords, e.g. "shul" -> Synagogues) now live in the
@@ -492,6 +529,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const hiddenFeatureMatches = q && resources
     ? resources.filter((card) => card.id != null && (onMapCardIds.has(card.id) || card.id === 'zmanim') && cardMatches(card, q))
     : []
+  // Same idea, for Get Connected's four categories (see `getConnectedJumpCards`
+  // above) — merged into one combined "jump to" row below rather than a
+  // second, separate one.
+  const getConnectedMatches = q ? getConnectedJumpCards.filter((card) => cardMatches(card, q)) : []
+  const jumpMatches = [...hiddenFeatureMatches, ...getConnectedMatches]
 
   // Tapping a place opens its category directory, pre-filtered to the matched term
   // (so it survives that page's own search) with the place itself expanded.
@@ -517,48 +559,75 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 sm:pb-0">
-      {/* ── Condensed top bar — site name + tagline only now (the search box
-              moved into its own "What are you looking for?" section right
-              below). Used to also carry a Volunteer/Support/Young
-              Professionals quick-links row here; removed as duplicative once
-              the "Get Connected" section further down covered the same links
-              with real lists under them. Desktop only: mobile keeps its
-              existing compact top (with its own separate title/search in
-              HeroHeading), untouched. Full-bleed band (same breakout as the
-              sections below it) — see [[project_art_deco_home_redesign]].
-              `sm:relative` anchors the hamburger menu (quick links to every
-              category's full page) pinned to its top-left corner. ────────── */}
-      <section className="hidden sm:block sm:relative sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:px-6 sm:py-6 sm:text-center">
-        <HamburgerMenu resources={resources} />
-        <h1 className="text-4xl font-extrabold tracking-tight text-[#fefefe]">
-          {settings.name}
-        </h1>
-        {/* Fixed copy per explicit request, not `settings.tagline` — this
-                exact sentence replaces whatever the admin-configured tagline
-                would otherwise show here. */}
-        <p className="text-sm text-[#fefefe]">
-          Community resources for residents, visitors, and hospital patients
-        </p>
-      </section>
+    // Desktop's side gutter (`sm:px-12`) is what holds every bordered
+    // section's black border off the true page edge now that they're
+    // boxed instead of full-bleed. Mobile's `px-4` is untouched.
+    <main className="max-w-6xl mx-auto px-4 sm:px-12 pb-24 sm:pb-0">
+      {/* ── Top bar, SIDE BY SIDE with (search bar + map) (used to each be
+              their own full-width stacked bands). Title takes 1/3 of the
+              row, the map's own column 2/3 (`sm:grid-cols-[1fr_2fr]`) —
+              the search bar used to live in the title cell too; it's now
+              its own band stacked ABOVE the map, spanning that same 2/3
+              column instead of the title's narrower one, all on explicit
+              request. `sm:divide-x-2 sm:divide-black` draws the ONE
+              shared vertical line between the title and the (search+map)
+              column (not each side drawing its own — that would double up
+              at the seam), while `sm:border-x-2`/`sm:border-t-2` on this
+              wrapper frame the row's own outer edges, same black/
+              thickness as every other section. Falls back to a single
+              column (just the title) when there's no map (`hasMap` false)
+              rather than leaving an empty second cell.
+              `sm:rounded-t-2xl`+`sm:overflow-hidden` on the wrapper (not
+              any piece individually) rounds the row's combined top
+              corners as one shape — the same "curved edges belong to the
+              group, not each piece" rule the rest of the page's borders
+              follow (see Zmanim's matching bottom corners below).
+              `sm:mt-8` holds the whole row off the very top of the page,
+              same as before. ─────────────────────────────────────────── */}
+      <div className={`hidden sm:grid sm:mt-8 sm:overflow-hidden sm:rounded-t-2xl sm:border-x-2 sm:border-t-2 sm:border-black ${hasMap || ui.search.landing ? 'sm:grid-cols-[1fr_2fr] sm:divide-x-2 sm:divide-black' : 'sm:grid-cols-1'}`}>
+        {/* Used to also carry a Volunteer/Support/Young Professionals
+                quick-links row here; removed as duplicative once the "Get
+                Connected" section further down covered the same links
+                with real lists under them. `sm:relative` anchors the
+                hamburger menu (quick links to every category's full
+                page) pinned to its top-left corner. Left-justified (was
+                centered) — same `px-6`/`py-8` gap between the text and
+                this cell's own border as before, just aligned to it
+                instead of floating in the middle. `sm:flex sm:flex-col
+                sm:justify-center` — this cell is usually much shorter
+                than the (search bar + map) column beside it (they share
+                ONE row height, stretched to the taller side), so its
+                content centers vertically in that extra room instead of
+                sitting flush at the top with a dead gap below. ───────── */}
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:bg-[#fefefe] sm:px-6 sm:py-8 sm:text-left">
+          <HamburgerMenu resources={resources} />
+          <h1 className="text-4xl font-extrabold tracking-tight text-[#0C3D57] [font-variant:small-caps]">
+            {settings.name}
+          </h1>
+          {/* Fixed copy per explicit request, not `settings.tagline` — this
+                  exact sentence replaces whatever the admin-configured tagline
+                  would otherwise show here. */}
+          <p className="text-sm text-slate-600">
+            Community resources for residents, visitors, and hospital patients
+          </p>
+        </section>
 
-      {/* ── "What are you looking for?" search section — its own band between
-              the top bar and the map, centered. `settings.heroTitle`
-              (defaults to "What are you looking for?") is now the search
-              bar's own placeholder text instead of a separate heading above
-              it — same admin-editable copy mobile's HeroHeading shows, so
-              the two never drift apart. Full-bleed-outer + `mx-auto
-              max-w-6xl px-6`-inner wrapper, same pattern as the map/Get
-              Connected/Zmanim bands below. Same navy `#0C3D57` fill as the
-              top bar directly above it (no border/seam between them), so
-              the two read as one continuous band — the search pill itself
-              is a solid white pill regardless, so it stays legible either
-              way. ─────────────────────────────────────────────────────── */}
-      {ui.search.landing && (
-        <section className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#0C3D57] sm:py-8">
-          <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="w-full max-w-xl">
+        {/* Right column — search bar band stacked above the map, both
+                spanning the same 2/3-width column instead of the title's
+                narrower one. `sm:flex sm:flex-col` just stacks the two;
+                the search band's own `border-b-2` is the divider between
+                them (map has no matching `border-t`, same "only one side
+                draws the shared line" rule as everywhere else). ──────── */}
+        <div className="sm:flex sm:flex-col">
+          {/* ── "What are you looking for?" search bar — used to live in
+                  the title cell; now its own band above the map.
+                  `settings.heroTitle` (defaults to "What are you looking
+                  for?") is the search bar's own placeholder text — same
+                  admin-editable copy mobile's HeroHeading shows, so the
+                  two never drift apart. ─────────────────────────────── */}
+          {ui.search.landing && (
+            <section className="sm:border-b-2 sm:border-black sm:bg-[#fefefe] sm:px-6 sm:py-8">
+              <div className="mx-auto w-full max-w-xl">
                 <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
                   <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
@@ -582,10 +651,35 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   )}
                 </div>
               </div>
+            </section>
+          )}
+
+          {/* ── The map — the real full map screen, right on the home screen.
+                  Its own category tabs (down the map's left edge) cover
+                  browsing by category directly on the map now, so there's no
+                  separate "Browse by Category" list beside it anymore.
+                  Desktop only: mobile now reaches the same map via its own
+                  tab bar entry, so it's dropped from this scroll to avoid
+                  showing it twice. The map itself additionally gets its own
+                  rounded corners (see ResourceMapView's `embedded` styling)
+                  so it doesn't square off flush with this cell's own edges
+                  either. ──────────────────────────────────────────────── */}
+          {hasMap && (
+            <div ref={mapSectionRef} className="scroll-mt-24 sm:bg-[#fefefe]">
+              <HomeMap
+                onNavigate={onNavigate}
+                coords={coords}
+                focusedListingId={focusedListingId}
+                onFocusListingChange={setFocusedListingId}
+                focusedCategoryIds={focusedCategoryIds}
+                onFocusCategoryChange={toggleCategory}
+                categoryItemIdsByCategory={categoryItemIdsByCategory}
+                highlightedListingIds={highlightedListingIds}
+              />
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </div>
 
       {/* ── Mobile-only now: "What are you looking for?" heading + filter —
               desktop hides this whole band since its title was removed and
@@ -596,16 +690,23 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         onQueryChange={setQuery}
       />
 
-      {/* ── Desktop: "jump to" results — categories/Zmanim that match the search
-              box's query but no longer have a tile of their own (they moved into
-              the map list or the widget below), so this is how the search box
-              still reaches them. ──────────────────────────────────────────── */}
-      {hiddenFeatureMatches.length > 0 && (
+      {/* ── Desktop: "jump to" results — categories/Zmanim/Get Connected
+              entries that match the search box's query but no longer have a
+              tile of their own (they moved into the map list, the Zmanim
+              widget, or Get Connected instead), so this is how the search
+              box still reaches them. Now sits BELOW the title/search + map
+              row (used to sit between them, back when they were stacked
+              instead of side by side). ───────────────────────────────── */}
+      {jumpMatches.length > 0 && (
         <div className="mt-6 hidden sm:flex flex-wrap gap-2">
-          {hiddenFeatureMatches.map((card) => (
+          {jumpMatches.map((card) => (
             <button
               key={card.id}
-              onClick={() => (card.id === 'zmanim' ? jumpToZmanim() : jumpToMapCategory(card.id!))}
+              onClick={() => {
+                if (card.id === 'zmanim') jumpToZmanim()
+                else if (card.id!.startsWith('gc:')) jumpToGetConnected()
+                else jumpToMapCategory(card.id!)
+              }}
               className="inline-flex items-center gap-2 rounded-full border-2 border-[#3a86ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-[#3a86ff] hover:text-white cursor-pointer"
             >
               {card.icon && <span aria-hidden="true">{card.icon}</span>}
@@ -616,59 +717,36 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         </div>
       )}
 
-      {/* ── The map — the real full map screen, right on the home screen. Its
-              own category tabs (down the map's left edge) cover browsing by
-              category directly on the map now, so there's no separate
-              "Browse by Category" list beside it anymore — the map takes the
-              full width. Desktop only: mobile now reaches the same map via
-              its own tab bar entry, so it's dropped from this scroll to
-              avoid showing it twice. ─────────────────────────────────────── */}
-      {/* Full-bleed band (same `w-screen` + `margin-left: calc(50% - 50vw)`
-              breakout as the hero above) — the map itself now runs edge-to-
-              edge and fills the full viewport height too (`h-screen` inside
-              ResourceMapView, gated on `embedded`), so this stretch of the
-              page reads as a full-screen map while it's in view instead of
-              a bordered card inset within the normal max-w-6xl column. ─── */}
-      {hasMap && (
-        <div ref={mapSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe]">
-          <HomeMap
-            onNavigate={onNavigate}
-            coords={coords}
-            focusedListingId={focusedListingId}
-            onFocusListingChange={setFocusedListingId}
-            focusedCategoryIds={focusedCategoryIds}
-            onFocusCategoryChange={toggleCategory}
-            categoryItemIdsByCategory={categoryItemIdsByCategory}
-          />
-        </div>
-      )}
+      {/* ── Placeholder — empty for now, reserving a slot between the map
+              and Get Connected for whatever comes next. Short (`h-16`)
+              since it has no content yet; same black `border-x`/`border-t`
+              + `#fefefe` fill as every other desktop section, so it
+              already reads as part of the shelf stack rather than a gap. ── */}
+      <div className="hidden sm:block sm:h-16 sm:border-x-2 sm:border-t-2 sm:border-black sm:bg-[#fefefe]" />
 
-      {/* ── Get Connected — desktop only, full-bleed band between the map and
+      {/* ── Get Connected — desktop only, boxed band (same `max-w-6xl`
+              column every other desktop section uses, not a full-bleed
+              `w-screen` breakout — the border is this section's own
+              boundary, not a line out at the browser edge with a gap in
+              between) between the map and
               the Zmanim widget (the slot the app's original "Get Connected"
               section held before it was replaced by the top-bar quick-links
-              row — see the history comment on `quickLinksCards` above). One
-              big navy panel with the five categories as tabs across the
-              top instead of five separate white cards in a grid — click one
-              to switch which list shows in the rectangle beneath it (see
-              GetConnectedAccordion above). Each list is pulled from the
-              real pages/flows those old quick-link buttons already opened
-              (not new/duplicated content) — Professional Networks and
-              Social Opportunities both draw from the same young-
-              professional listings, just split by which read as networking
-              vs. purely social (see SOCIAL_OPPORTUNITY_NAMES above). No
-              divider line above it anymore — the "Get Connected" heading is
-              its own solid navy rectangle sitting flush on top of the tab
-              strip (no gap between them), same width as it, so the two read
-              as one connected unit — a title bar capping the tabs beneath
-              it — instead of a plain centered heading floating above a
-              separate line. ─────────────────────────────────────────────── */}
-      <div className="hidden sm:block sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-8">
-        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <div className="w-full bg-[#0C3D57] py-2.5 text-center">
-            <h2 className="text-2xl font-extrabold tracking-tight text-[#fefefe]">Get Connected</h2>
-          </div>
-          <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} />
-        </div>
+              row — see the history comment on `quickLinksCards` above).
+              Uncolored now (used to be a solid navy panel) — plain black
+              text on the section's own white, matching the rest of the
+              page's black-on-white "shelf" language instead of carrying
+              its own separate brand-color block. The four categories below
+              (see GetConnectedAccordion) read as a bento grid: individual
+              bordered, rounded tiles with real gaps between them, a
+              deliberate break from every OTHER section's flush/square
+              treatment — intentional per explicit request, not an
+              oversight. No `py` on this outer wrapper — black
+              `border-x`/`border-t`, same as every other desktop section,
+              are the only separation from its neighbors; the bento grid's
+              own padding supplies its content's breathing room instead. ─ */}
+      <div ref={getConnectedSectionRef} className="hidden sm:block scroll-mt-24 sm:border-x-2 sm:border-t-2 sm:border-black sm:bg-[#fefefe]">
+        <h2 className="px-6 pt-6 text-center text-2xl font-extrabold tracking-tight text-black">Get Connected</h2>
+        <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} />
       </div>
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
@@ -700,19 +778,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       {/* ── Zmanim widget — live candle-lighting/Havdalah times, replacing the
               plain Zmanim tile that used to sit in the grid above. Desktop
               only: mobile keeps its Zmanim tile in the combined grid. Same
-              full-bleed white band treatment as the map section, separated
-              from the Get Connected band above it by a plain divider line
-              (same treatment as Get Connected's own top divider) rather than
-              a border boxing it in — its content stays re-inset to the
-              normal max-w-6xl column (like the hero/Get Connected bands),
-              since a two-column list of zman times shouldn't stretch across
-              the whole browser width the way the map benefits from. ────── */}
-      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#fefefe] sm:py-10">
-        <div className="sm:mx-auto sm:max-w-6xl sm:px-6">
-          <div className="border-t border-slate-200 pt-10">
-            <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
-          </div>
-        </div>
+              boxed-within-`max-w-6xl` treatment as the map section (not a
+              full-bleed `w-screen` breakout — the border is this
+              section's own boundary, not a line out at the browser edge
+              with a gap in between), black `border-x`/`border-t` (no
+              `py`) the only separation from the Get Connected band above
+              it. `ZmanimWidget` itself assumes a light background (dark
+              text, no card of its own), which matches this section's own
+              `#fefefe` fill, so it doesn't need its own separate white
+              card wrapper. THIS is the last section in the group, so it
+              alone also closes the frame with its own `border-b` +
+              `rounded-b-2xl` — the curved corners belong to the whole
+              shelf unit's bottom edge, not to this section individually
+              (see the matching `rounded-t-2xl` on the first one, the top
+              bar, above). Pale warm gold — candle-light-ish, closing the
+              stack on the same warm note the top bar's ivory opened it
+              on. ──────────────────────────────────────────────────────── */}
+      <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:overflow-hidden sm:rounded-b-2xl sm:border-x-2 sm:border-t-2 sm:border-b-2 sm:border-black sm:bg-[#fefefe] sm:px-6">
+        <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
       </div>
     </main>
   )

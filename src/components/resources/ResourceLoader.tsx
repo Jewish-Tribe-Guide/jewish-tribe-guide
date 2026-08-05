@@ -12,7 +12,7 @@ type Props = {
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
-  /** Pre-fill the directory's search box (from a landing "Places" result). */
+  /** Pre-fill the directory's search box (from a landing "Search results" result). */
   initialSearch?: string
   onUp: () => void
   onAdd: () => void

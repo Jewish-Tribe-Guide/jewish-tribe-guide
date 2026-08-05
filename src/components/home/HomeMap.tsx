@@ -17,6 +17,7 @@ export default function HomeMap({
   focusedCategoryIds,
   onFocusCategoryChange,
   categoryItemIdsByCategory,
+  highlightedListingIds,
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
@@ -33,6 +34,8 @@ export default function HomeMap({
    *  keyed by category — narrows each one's isolation further than the
    *  whole category. */
   categoryItemIdsByCategory?: Record<string, string[]>
+  /** Listing ids to mark with a distinct pin style — see ResourceMapView. */
+  highlightedListingIds?: Set<string>
 }) {
   return (
     <ResourceMapView
@@ -48,6 +51,7 @@ export default function HomeMap({
       focusedCategoryIds={focusedCategoryIds}
       onFocusCategoryChange={onFocusCategoryChange}
       categoryItemIdsByCategory={categoryItemIdsByCategory}
+      highlightedListingIds={highlightedListingIds}
     />
   )
 }
