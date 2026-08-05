@@ -415,8 +415,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               )}
               {upvotes && (
                 <div
+                  // sm:mr-11 pulls the toggle in from the container's bare right
+                  // edge to match the listing rows' own right inset (px-4 card
+                  // padding + gap-3 + the chevron icon) — so "Popular" and
+                  // "Distance" sit directly above each row's upvote and mileage
+                  // columns instead of flush against the page edge.
                   className={[
-                    'hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
+                    'hidden sm:flex sm:mr-11 rounded-md border border-slate-300 overflow-hidden shrink-0',
                     !hasMinyanim && !category.externalLink ? 'sm:ml-auto' : '',
                   ].join(' ')}
                 >
