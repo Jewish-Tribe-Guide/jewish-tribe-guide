@@ -42,8 +42,11 @@ export type ZmanimData = {
     /** label = weekday (e.g. "Saturday"), time = havdalah time. */
     havdalah: ZmanEntry | null
   }
-  // ── Future-friendly slots (not yet populated) ──
+  // ── Optional slots ──
+  /** The week's parsha, e.g. "Parashat Shelach" — populated by lib/zmanim.ts
+   *  from Hebcal's `parashat` item; absent on weeks it doesn't return one. */
   parsha?: string
+  // ── Future-friendly slots (not yet populated) ──
   holidays?: string[]
   fastDay?: { label: string; start: string; end: string } | null
 }
@@ -283,7 +286,7 @@ export type MapFilters = {
   select?: Record<string, string[]>
 }
 
-export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback' | 'all-categories'
 
 /** page.tsx's central navigation function, passed down to every screen that
  *  deep-links. `extra` is merged into the history state so the target screen

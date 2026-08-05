@@ -7,6 +7,9 @@ import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import HeroHeading from '@/components/home/HeroHeading'
 import { CardGrid, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import FeaturedCards from '@/components/home/FeaturedCards'
+import { pickFeaturedCards } from '@/lib/featuredCards'
+import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
 import DevicePreviewFrame from './DevicePreviewFrame'
 
@@ -37,6 +40,10 @@ export default function SiteSettingsPreview({
   const resources = resourceCards(noopNavigate, categories)
   const allCards = resources ? [...entryCards, ...resources] : null
   const sections = allCards ? groupCardsIntoSections(allCards, draftSections) : []
+  // Mirrors the live desktop home screen's featured row, so the trio picked
+  // just above this preview's own button can actually be seen before saving.
+  const listings = useAllListings()
+  const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   return (
     <DevicePreviewFrame onClose={onClose}>
@@ -55,6 +62,10 @@ export default function SiteSettingsPreview({
           mapIcon={mapCategory?.icon}
           onViewMap={noopViewMap}
         />
+
+        <div className="pointer-events-none">
+          <FeaturedCards cards={featured} loading={allCards === null} onShowAll={() => {}} />
+        </div>
 
         <section className="mt-12 sm:mt-14 space-y-10 pointer-events-none">
           {allCards === null ? (

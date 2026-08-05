@@ -36,7 +36,17 @@ export type SiteSettings = {
   feedbackHeading: string
   /** Shown after a successful feedback submission. */
   feedbackSuccessMessage: string
+  /** Desktop home screen only — the three cards shown between the search box
+   *  and the map, as ordered CardDef ids (category slugs, or fixed ids like
+   *  'support'). Empty falls back to the first three cards the home sections
+   *  list, so this never has to be configured for the row to look right.
+   *  Mobile's home screen shows the full grid and ignores this. */
+  featuredCardIds: string[]
 }
+
+/** How many cards the desktop home screen features above the map. Shared by
+ *  the fallback logic and the admin picker so the two can't drift. */
+export const FEATURED_CARD_COUNT = 3
 
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
 
@@ -56,4 +66,5 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   feedbackButtonLabel: DEFAULT_FEEDBACK_BUTTON_LABEL,
   feedbackHeading: DEFAULT_FEEDBACK_HEADING,
   feedbackSuccessMessage: DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
+  featuredCardIds: [],
 }

@@ -14,6 +14,7 @@ type Row = {
   feedback_button_label: string
   feedback_heading: string
   feedback_success_message: string
+  featured_card_ids: string[] | null
 }
 
 function toSettings(row: Row | null): SiteSettings {
@@ -28,6 +29,9 @@ function toSettings(row: Row | null): SiteSettings {
     feedbackButtonLabel: row.feedback_button_label,
     feedbackHeading: row.feedback_heading,
     feedbackSuccessMessage: row.feedback_success_message,
+    // Null until the column's migration has been run (or before the first
+    // save) — normalized to [] so callers never have to null-check it.
+    featuredCardIds: row.featured_card_ids ?? [],
   }
 }
 
@@ -64,6 +68,7 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
         feedback_button_label: merged.feedbackButtonLabel,
         feedback_heading: merged.feedbackHeading,
         feedback_success_message: merged.feedbackSuccessMessage,
+        featured_card_ids: merged.featuredCardIds,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },

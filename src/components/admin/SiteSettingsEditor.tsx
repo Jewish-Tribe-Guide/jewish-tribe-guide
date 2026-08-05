@@ -5,7 +5,8 @@ import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import SiteSettingsPreview from './SiteSettingsPreview'
-import HomeSectionManager from './HomeSectionManager'
+import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
+import { FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 
 // ── The Home page tab: the header/hero/footer branding text (name, tagline,
 // heading, mission, logo), the home-screen section grouping, and the footer's
@@ -251,6 +252,14 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       </div>
 
       <div className="mt-6 max-w-2xl">
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
+        <FeaturedCardsPicker
+          value={draft.featuredCardIds}
+          onChange={(ids) => set('featuredCardIds', ids)}
+        />
+      </div>
+
+      <div className="mt-6 max-w-2xl">
         <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
         <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
       </div>
@@ -338,6 +347,67 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         These also drive the browser tab title, search-engine description, and “Add to Home Screen”
         app name.
       </p>
+    </div>
+  )
+}
+
+// ── Featured cards picker ─────────────────────────────────────────────────────
+// The three cards the desktop home screen shows between the search box and the
+// map. One dropdown per slot, each offering the same card set the section
+// editor uses (see useCardOptions).
+//
+// Every slot can be left on "Auto", including all three — that's the default,
+// and it fills the row with the categories that have the most listings. So
+// this never has to be touched for the home screen to look deliberate, and a
+// half-configured row (one pick, two auto) still renders three cards.
+
+function FeaturedCardsPicker({
+  value,
+  onChange,
+}: {
+  value: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const cardOptions = useCardOptions()
+
+  // Slots are positional, but `value` is a compact list (no holes) — an "Auto"
+  // slot simply isn't in it. Setting slot 2 while slot 1 is Auto therefore
+  // appends rather than writing to index 1; the home screen fills the rest
+  // from the same most-listings fallback either way.
+  const setSlot = (slot: number, id: string) => {
+    const next = [...value]
+    if (id === '') next.splice(slot, 1)
+    else if (slot < next.length) next[slot] = id
+    else next.push(id)
+    // A card picked twice would render the same tile twice — keep the first.
+    onChange([...new Set(next)].slice(0, FEATURED_CARD_COUNT))
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+      <p className="text-[11px] text-muted">
+        Shown on desktop between the search box and the map. Leave a slot on
+        &ldquo;Auto&rdquo; to fill it with the category that has the most listings.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {Array.from({ length: FEATURED_CARD_COUNT }, (_, slot) => (
+          <label key={slot} className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-1">Slot {slot + 1}</span>
+            <select
+              value={value[slot] ?? ''}
+              onChange={(e) => setSlot(slot, e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Auto (most listings)</option>
+              {cardOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }

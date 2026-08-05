@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { AppMode, DirectoryAnchor, MapFilters, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
+import AllCategories from '@/components/AllCategories'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import FindResources from '@/components/FindResources'
@@ -45,6 +46,9 @@ type NavState = {
   /** True when this map entry came from a category directory's own "Map"
    *  button rather than the general Map tab — see mapEnteredFromListing. */
   mapFromListing?: boolean
+  /** Which section the All Categories page should scroll to on arrival (set
+   *  when the visitor clicked a section tab rather than "Browse all"). */
+  allCategoriesSection?: string
 }
 
 export default function Page() {
@@ -72,6 +76,9 @@ export default function Page() {
   // navigate straight back to that directory instead of collapsing to a
   // boxed map screen (see ResourceMapView's onExitFullscreenToListing).
   const [mapEnteredFromListing, setMapEnteredFromListing] = useState(false)
+  // Which section the All Categories page should scroll to — see
+  // NavState.allCategoriesSection.
+  const [allCategoriesSection, setAllCategoriesSection] = useState<string | null>(null)
   // Whether ResourceMapView has ever been mounted — once true it stays mounted
   // forever (see the render below), so switching tabs away and back hides it
   // via CSS instead of unmounting/remounting, preserving pan/zoom, the
@@ -116,6 +123,7 @@ export default function Page() {
       setMapSelectedCategories(s?.mapSelected ?? null)
       setMapFilters(s?.mapFilters ?? null)
       setMapEnteredFromListing(!!s?.mapFromListing)
+      setAllCategoriesSection(s?.allCategoriesSection ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -136,6 +144,7 @@ export default function Page() {
     if (s?.mapSelected) setMapSelectedCategories(s.mapSelected)
     if (s?.mapFilters) setMapFilters(s.mapFilters)
     if (s?.mapFromListing) setMapEnteredFromListing(true)
+    if (s?.allCategoriesSection) setAllCategoriesSection(s.allCategoriesSection)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -208,6 +217,16 @@ export default function Page() {
   // Up buttons lead back to the single home screen.
   const goToHome = () => navigate(null, 'home')
 
+  // Desktop's "Browse all categories" button and its section tabs — the tabs
+  // pass the section they want scrolled into view, the button passes nothing
+  // and lands at the top.
+  const viewAllCategories = (section?: string) => {
+    setMode('all-categories')
+    setAllCategoriesSection(section ?? null)
+    setFlow(null)
+    history.pushState({ mode: 'all-categories', allCategoriesSection: section } as NavState, '')
+  }
+
   // Called from the Nearby list — switches to the Find screen with the chosen
   // listing's category open and that card expanded/scrolled into view.
   const viewListing = (categoryId: string, listingId: string) => {
@@ -267,6 +286,7 @@ export default function Page() {
           <Landing
             onNavigate={navigate}
             onOpenFlow={openFlow}
+            onViewAllCategories={viewAllCategories}
             coords={coords}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
@@ -281,6 +301,22 @@ export default function Page() {
             <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
           )}
         </main>
+      )}
+
+      {/* ── All categories — the full card index, moved off the desktop home
+              screen so that screen can stay short. Desktop-only in practice
+              (mobile's home screen still renders this same grid inline), but
+              not gated here: a phone that lands on this history entry should
+              still get a working page rather than a blank one. ───────────── */}
+      {mode === 'all-categories' && (
+        <div className="flex-1 pt-8">
+          <AllCategories
+            onNavigate={navigate}
+            onOpenFlow={openFlow}
+            onUp={goToHome}
+            scrollToSection={allCategoriesSection}
+          />
+        </div>
       )}
 
       {/* ── Map — mounted once (on first visit) and never unmounted again;

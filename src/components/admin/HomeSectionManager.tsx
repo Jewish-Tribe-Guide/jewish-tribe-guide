@@ -15,13 +15,17 @@ import { community } from '@/community.config'
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-type CardOption = { id: string; label: string }
+export type CardOption = { id: string; label: string }
 
 /** Every card that could be placed in a section — mirrors the entry + resource
  *  cards Landing.tsx builds, reduced to just id/label for the picker. Kept in
  *  sync with Landing.tsx's own card list; if a new fixed card type is added
- *  there, add it here too so it can be assigned to a section. */
-function useCardOptions(): CardOption[] {
+ *  there, add it here too so it can be assigned to a section.
+ *
+ *  Also drives the featured-trio picker in SiteSettingsEditor, which chooses
+ *  from this same set — so both pickers offer exactly what the home screen
+ *  can actually render. */
+export function useCardOptions(): CardOption[] {
   const categories = useCategories()
   const forms = useForms()
 

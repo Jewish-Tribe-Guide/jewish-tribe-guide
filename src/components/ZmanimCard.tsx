@@ -1,11 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { ZmanimData, ZmanEntry } from '@/types'
-import { community } from '@/community.config'
 import UpButton from '@/components/UpButton'
-
-type Status = 'loading' | 'no-location' | 'error' | 'ready'
+import { useZmanim } from '@/lib/useZmanim'
 
 type Props = {
   /** Coordinates to compute zmanim for — the visitor's typed address, or the
@@ -20,38 +17,9 @@ type Props = {
 }
 
 export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos' }: Props) {
-  const [data, setData] = useState<ZmanimData | null>(null)
-  const [status, setStatus] = useState<Status>('loading')
-
-  useEffect(() => {
-    let cancelled = false
-
-    if (coords?.lat == null || coords?.lng == null) {
-      // No location provided — show a clear explanation rather than a generic error.
-      setStatus('no-location')
-      return
-    }
-    const url = `/api/zmanim?lat=${coords.lat}&lng=${coords.lng}&tzid=${encodeURIComponent(community.timezone)}`
-
-    fetch(url)
-      .then((res) => res.json())
-      .then((json: { ok: boolean; data?: ZmanimData }) => {
-        if (cancelled) return
-        if (json.ok && json.data) {
-          setData(json.data)
-          setStatus('ready')
-        } else {
-          setStatus('error')
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setStatus('error')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [coords?.lat, coords?.lng])
+  // 'no-location' gets its own explanatory state below rather than a generic
+  // error — the fix is entering an address, not retrying.
+  const { data, status } = useZmanim(coords)
 
   return (
     <div>
