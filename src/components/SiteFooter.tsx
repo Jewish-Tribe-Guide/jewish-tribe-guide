@@ -4,7 +4,15 @@ import FeedbackButton from './FeedbackButton'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { SiteSettings } from '@/lib/siteSettings'
 
-export default function SiteFooter({ previewSettings }: { previewSettings?: SiteSettings } = {}) {
+export default function SiteFooter({
+  previewSettings,
+  onPromoteFeedbackToPage,
+}: {
+  previewSettings?: SiteSettings
+  /** Forwarded to FeedbackButton — see its own note. Omitted by the admin
+   *  category preview, which has no page-level feedback screen to hand off to. */
+  onPromoteFeedbackToPage?: () => void
+} = {}) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const year = new Date().getFullYear()
@@ -45,6 +53,7 @@ export default function SiteFooter({ previewSettings }: { previewSettings?: Site
               buttonLabel={settings.feedbackButtonLabel}
               heading={settings.feedbackHeading}
               successMessage={settings.feedbackSuccessMessage}
+              onPromoteToPage={onPromoteFeedbackToPage}
             />
           )}
         </div>

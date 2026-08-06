@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
@@ -32,6 +32,11 @@ type Props = {
    *  embedded home-screen map so its tracking controls act on the same shared
    *  watch as the full map page and the header pill. */
   liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
+  /** 'map' when the visitor arrived by collapsing the fullscreen map — scrolls
+   *  the embedded map band into view so the collapse reads as zooming out of
+   *  the map rather than being dropped at the top of an unrelated page.
+   *  Desktop only in practice; mobile's home screen has no map band. */
+  scrollTo?: 'map' | null
 }
 
 // ── The home screen ───────────────────────────────────────────────────────────
@@ -52,11 +57,12 @@ type Props = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, scrollTo }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
+  const mapBandRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
@@ -108,6 +114,16 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   // results (see the component note above).
   const showInlineGrid = isMobile || !!q
 
+  // Jump to the map band when arriving from a collapsed fullscreen map. Waits
+  // for the band to actually exist — on the first paint after navigating home
+  // it may not be rendered yet (categories still loading, so `hasMap` is false).
+  useEffect(() => {
+    if (scrollTo !== 'map') return
+    const el = mapBandRef.current
+    if (!el) return
+    el.scrollIntoView({ block: 'start' })
+  }, [scrollTo, hasMap])
+
   return (
     <>
       {/* ── Section tabs (desktop) — the primary way to reach a category now
@@ -135,9 +151,11 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 Desktop only: mobile reaches the same map via its own tab bar
                 entry, so it's dropped from this scroll to avoid showing it
                 twice. Hidden while searching so results aren't pushed below
-                a full-height map. ──────────────────────────────────────────── */}
+                a full-height map. `scroll-mt` clears the sticky site header, so
+                scrolling this band into view (arriving from a collapsed
+                fullscreen map) doesn't tuck its heading underneath it. ─────── */}
         {hasMap && !q && (
-          <div className="mt-14 hidden sm:block">
+          <div ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
             <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
           </div>

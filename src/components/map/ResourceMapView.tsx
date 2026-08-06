@@ -86,6 +86,14 @@ type Props = {
    *  collapses to a boxed view in place. Unused by the embedded home-screen
    *  map, whose own toggle collapses in place instead. */
   onExitFullscreenToListing?: () => void
+  /** Embedded home-screen map only — called when it's sitting expanded and the
+   *  viewport narrows to phone width. There's no expanded state to narrow INTO
+   *  on mobile (the whole embedded map is `hidden sm:block` on the home screen,
+   *  and mobile reaches the map through its own tab instead), so without this
+   *  the visitor's fullscreen map would just silently vanish behind the card
+   *  grid. Hands off to the real map screen, which is where a full-viewport map
+   *  lives on mobile. */
+  onPromoteToMapScreen?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
    *  live coords are read (search sorting, directory distances) — not just
@@ -101,7 +109,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -204,6 +212,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFullscreen(true)
   }, [standalone, visible])
+  // The mirror of the above, for the embedded home-screen map: expanded on
+  // desktop, then narrowed to phone width. `sm:fixed` stops applying and the
+  // whole embedded map is `hidden sm:block` on the home screen, so the visitor's
+  // full-viewport map would simply disappear behind the card grid. Hand it to
+  // the real map screen instead — the same map, on the screen mobile keeps it.
+  useEffect(() => {
+    if (standalone || !fullscreen || !isMobile || !onPromoteToMapScreen) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFullscreen(false)
+    onPromoteToMapScreen()
+  }, [standalone, fullscreen, isMobile, onPromoteToMapScreen])
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
