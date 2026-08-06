@@ -41,9 +41,9 @@ function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: num
 // `brightness(0)` turns every non-transparent pixel pure black regardless
 // of its original color, then an optional `invert(1)` flips that black to
 // white — the glyph's own alpha shape survives, just recolored flat
-// black-or-white. `dark` picks which: the pastel pin palette (see
-// ResourceMapView's CATEGORY_COLORS) is too light for a white glyph to read
-// against, so callers pass `needsDarkText(pin color)` through to decide.
+// black-or-white. `dark` picks which: some pin colors (see `getCategoryColor`
+// in ResourceMapView) are too light for a white glyph to read against, so
+// callers pass `needsDarkText(pin color)` through to decide.
 function monoGlyphElement(glyph: string, dark: boolean): HTMLElement {
   const span = document.createElement('span')
   span.textContent = glyph
@@ -69,14 +69,14 @@ function coloredTextGlyphElement(text: string, color: string): HTMLElement {
   return span
 }
 
-// Every pastel pin category (see ResourceMapView's CATEGORY_COLORS) needs its
-// glyph tinted a legible "darker version of the same hue" — not black, per
-// the pastel palette brief. Converting toward black (as `readableTextOnWhite`
-// in Collapsible.tsx does) desaturates a pale color into a muddy gray instead
-// of a deeper version of its own hue, so this extracts just the hue and
-// re-renders it at a fixed, clearly-saturated, low-lightness (S55/L30)
-// tone — vivid enough to read as "the same color, darker" against its own
-// pastel pin and against the warm-neutral map base alike.
+// Every line-icon pin gets its glyph tinted a legible "darker version of the
+// same hue" instead of plain black. Converting toward black (as
+// `readableTextOnWhite` in Collapsible.tsx does) desaturates a color into a
+// muddy gray instead of a deeper version of its own hue, so this extracts
+// just the hue and re-renders it at a fixed, clearly-saturated, low-lightness
+// (S55/L30) tone — vivid enough to read as "the same color, darker" against
+// its own pin and the map base alike, whatever that pin's own color is (see
+// `getCategoryColor` in ResourceMapView.tsx).
 function darkenForGlyph(hex: string): string {
   const n = parseInt(hex.replace('#', ''), 16)
   const r = ((n >> 16) & 255) / 255

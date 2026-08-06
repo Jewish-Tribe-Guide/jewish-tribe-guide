@@ -19,6 +19,7 @@ import { needsDarkText, readableTextOnWhite } from '@/components/Collapsible'
 import { eruvim } from '@/data/resources'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import { useWatchPosition } from '@/lib/useWatchPosition'
 import { useHospitals } from '@/lib/useHospitals'
@@ -57,11 +58,13 @@ export const ACCENT_PALETTE = ['#a8dadc', '#457b9d', '#1d3557', '#5390d9', '#84c
 const FILTER_PILL_ACTIVE = '#3E6E6E'
 
 // Exported so callers coloring external UI to match the map's legend (e.g.
-// the home page's category list) use the exact same colors. Reserved
+// the home page's category list) use the exact same colors. `#dc2626` —
+// matches `main`'s (and mobile's, which is still on that same value —
+// mobile was never touched by this branch's redesign) hardcoded hospital
+// red, on request, replacing this branch's own pastel terracotta. Reserved
 // exclusively for hospitals/urgent care — not reused anywhere else on the
-// map or site. See CATEGORY_COLORS' own doc comment for the pastel palette
-// this belongs to.
-export const HOSPITAL_COLOR = '#E1BFB7'
+// map or site.
+export const HOSPITAL_COLOR = '#dc2626'
 // The letter "H" (a fixed pin glyph, not the admin-configurable category
 // icon — see CATEGORY_GLYPHS below) — same "H for Hospital" convention as
 // hospital signage generally.
@@ -81,52 +84,101 @@ export function rankMapId(id: string): number {
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
-// A cohesive pastel palette (was a 3-tier warm-neutral system where several
-// categories shared one color) — every category now gets its own distinct
-// hue, but all of them sit in the same soft, light range so the map reads as
-// airy/calm rather than a mix of alarm-toned or dominant colors, on request.
-// The request's own example hex values didn't actually hold to its own
-// consistency rule though — checked their HSL and found saturation ranging
-// S20%-S70%/lightness L66%-L75% across the set (the amber pin in particular,
-// S70%, would visually dominate the S20% ones next to it) — so each hue below
-// is normalized to a shared S42%/L80% instead of using those examples
-// literally, satisfying the "no pin should visually dominate" requirement
-// the brief itself asked to check for. Hue mapping: teal (synagogue),
-// terracotta (hospitals, see HOSPITAL_COLOR above), amber (restaurant),
-// olive-green (grocery), slate-blue (hotel), mauve (mikvah — this app has no
-// "museums/cultural sites" category, mikvah fills that slot), tan (childcare
-// — fills "family/kids resources"), sage (eruv — fills "parks/recreation";
-// eruv has no pins of its own today, see ERUV_COLOR below, kept for parity).
-// Every glyph drawn on top of these gets a darker version of the SAME hue,
-// not black — see `darkenForGlyph` in ResourceMap.tsx, which derives that
-// tint straight from each color below rather than a separate hardcoded dict,
-// so the two can never drift out of sync.
-// Keyed by category id for regular listing categories; kind:
-// 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified
-// by a fixed id the way listing categories are, so eruv is matched by
-// kind instead below (hospitals use HOSPITAL_COLOR directly, not this
-// dict — see allPoints below).
-const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#B7E1DE', // pastel teal
-  restaurant: '#E1D3B7', // pastel amber
-  grocery: '#D2E1B7', // pastel olive-green
-  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR itself — exclusive to this category.)
-  hotel: '#B7D7E1', // pastel slate-blue
-  mikvah: '#E1B7D0', // pastel mauve
-  childcare: '#E1CBB7', // pastel tan
-}
-const ERUV_COLOR = '#BCE1B7' // pastel sage
-
-// Exported so external UI (the home page's category list) computes the exact
-// same color as the map's pins for a given category.
+// Map filter/pin colors now come straight from `getCategoryColor`
+// (src/lib/categoryColor.ts) — the same position-in-the-category-list
+// algorithm `main` (and mobile, untouched by this branch) already uses, on
+// request, replacing this branch's own from-scratch color systems (a 3-tier
+// warm-neutral scheme, then a cohesive pastel palette) so the map reads
+// identically to mobile instead of drifting into a desktop-only palette.
+// No per-category dict to maintain here anymore — `getCategoryColor` derives
+// each category's color live from its position in the real category list
+// (cycling a fixed 10-color palette, falling back to a neutral slate past
+// that), so it can never drift out of sync with what mobile shows.
+// `category?.kind === 'eruv'` used to need special-casing here (eruv isn't
+// identified by a stable listing-category id the way "eruv-information"
+// itself is uniquely) — no longer needed: `getCategoryColor` just indexes by
+// whatever id is passed in, and `category.id` (found via `categoryId`) is
+// already that same id, so the two calls are identical.
 export function colorForListingCategory(categories: CategoryConfig[], categoryId: string): string {
-  const category = categories.find((c) => c.id === categoryId)
-  if (category?.kind === 'eruv') return ERUV_COLOR
-  // `#D4CFC4` — a low-saturation, L80 neutral in the same pastel family as
-  // CATEGORY_COLORS, for any category outside the fixed set above (e.g. a
-  // future admin-added one) rather than falling back to a plain gray that'd
-  // clash with the rest of the palette.
-  return CATEGORY_COLORS[categoryId] ?? '#D4CFC4'
+  return getCategoryColor(categories, categoryId)
+}
+
+// Desktop-only pin/filter palette — every category (hospitals included) gets
+// a color along ONE gradient instead of `getCategoryColor`'s varied-hue
+// palette, on request, so the map ties into the site's own `#91D7E6`
+// cyan-blue color story instead of a generic multi-hue scheme. `#C5EAF2`
+// (light) and `#0D323A` (dark) share the exact same hue/saturation as
+// `#91D7E6` itself (~191°/63%, confirmed via HSL — only lightness differs
+// between the three), so this is a straight lightness interpolation between
+// those two endpoints at that fixed hue/saturation, not an arbitrary color
+// ramp. Deliberately NOT applied to `getCategoryColor`/`colorForListingCategory`
+// themselves (see their own doc comments) — those stay exact `main`/mobile
+// parity; this is a separate function, only wired into `colorById` below
+// when `embedded` (the desktop home page's map). Every category gets its
+// own step (index / (count-1) along the gradient) rather than cycling a
+// fixed-length palette, so — unlike `getCategoryColor`'s 10-color palette
+// wrapping past 10 categories — no two categories can ever land on the same
+// color here, regardless of how many categories exist.
+const MAP_GRADIENT_LIGHT = '#C5EAF2'
+const MAP_GRADIENT_DARK = '#0D323A'
+
+function hexToHsl(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  let h = 0
+  let s = 0
+  const d = max - min
+  if (d !== 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === r) h = ((g - b) / d) % 6
+    else if (max === g) h = (b - r) / d + 2
+    else h = (r - g) / d + 4
+    h *= 60
+    if (h < 0) h += 360
+  }
+  return [h, s, l]
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  let [r, g, b] = [0, 0, 0]
+  if (h < 60) [r, g, b] = [c, x, 0]
+  else if (h < 120) [r, g, b] = [x, c, 0]
+  else if (h < 180) [r, g, b] = [0, c, x]
+  else if (h < 240) [r, g, b] = [0, x, c]
+  else if (h < 300) [r, g, b] = [x, 0, c]
+  else [r, g, b] = [c, 0, x]
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+// One color per category, evenly spaced along the `#C5EAF2` -> `#0D323A`
+// gradient by that category's position in `categories` (same list/order
+// `getCategoryColor` indexes by) — includes the medical-kind category
+// itself (see where hospitals' color is looked up from this map below), so
+// hospitals fall in line with everything else instead of keeping their own
+// exclusive hardcoded red on this desktop map.
+function gradientColorMap(categories: CategoryConfig[]): Map<string, string> {
+  const [h, s, lLight] = hexToHsl(MAP_GRADIENT_LIGHT)
+  const [, , lDark] = hexToHsl(MAP_GRADIENT_DARK)
+  const map = new Map<string, string>()
+  const n = categories.length
+  categories.forEach((c, i) => {
+    const t = n <= 1 ? 0 : i / (n - 1)
+    const l = lLight + (lDark - lLight) * t
+    map.set(c.id, hslToHex(h, s, l))
+  })
+  return map
 }
 
 // Fixed pin glyphs, one per category — deliberately NOT the admin-configurable
@@ -134,9 +186,9 @@ export function colorForListingCategory(categories: CategoryConfig[], categoryId
 // icons elsewhere; this only overrides what renders inside the map PIN
 // itself). Each renders through `monoGlyphElement` in ResourceMap.tsx, which
 // flattens it to a solid white silhouette regardless of source color, so a
-// plain letter ("H") and an emoji are handled identically. Mirrors
-// CATEGORY_COLORS' structure exactly (hospitals/eruv pulled out of the dict
-// for the same "not identified by a fixed listing-category id" reason).
+// plain letter ("H") and an emoji are handled identically. Colors moved to
+// `getCategoryColor` (see above), but this branch's own custom pin-glyph
+// shapes are a separate, unrelated concern (glyphs, not colors) — untouched.
 const CATEGORY_GLYPHS: Record<string, string> = {
   synagogue: '✡', // Jewish star
   restaurant: '🍴', // fork
@@ -146,16 +198,17 @@ const CATEGORY_GLYPHS: Record<string, string> = {
   mikvah: '💧', // drop of water
 }
 // Eruv never has pins of its own (see MAP_CATEGORY_ORDER above) — this is
-// unused by any pin today, kept only for parity with ERUV_COLOR in case Eruv
-// ever gains a pin presence, or another caller wants its fixed glyph.
+// unused by any pin today, kept only in case Eruv ever gains a pin
+// presence, or another caller wants its fixed glyph.
 const ERUV_GLYPH = '🧵' // a string/thread
 
 // Every fixed category's pin now draws through a line-art icon (see
 // LINE_ICON_PATHS in ResourceMap.tsx) instead of CATEGORY_GLYPHS' emoji —
 // those crush to pure black/white at pin size, which can't produce the
-// pastel palette's "darker version of the same hue" glyph tint. CATEGORY_GLYPHS
-// itself stays populated as a fallback (see `allPoints` below) for any
-// category outside this fixed set.
+// "darker version of the same hue" glyph tint every pin color gets (see
+// `darkenForGlyph` in ResourceMap.tsx). CATEGORY_GLYPHS itself stays
+// populated as a fallback (see `allPoints` below) for any category outside
+// this fixed set.
 const LINE_ICON_BY_CATEGORY: Partial<Record<string, 'star' | 'fork' | 'cart' | 'drop' | 'toy' | 'bed'>> = {
   synagogue: 'star',
   restaurant: 'fork',
@@ -278,22 +331,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     if (document.fullscreenElement) document.exitFullscreen()
     else mapAreaRef.current?.requestFullscreen()
   }
-  // The map key's own button row (see below) — tracked so its edge arrows
-  // know which direction still has more to reveal, and so clicking one can
-  // actually scroll the row instead of just decorating it.
-  const keyRowRef = useRef<HTMLDivElement>(null)
-  const [keyRowScroll, setKeyRowScroll] = useState({ atStart: true, atEnd: true })
-  const updateKeyRowScroll = () => {
-    const el = keyRowRef.current
-    if (!el) return
-    setKeyRowScroll({
-      atStart: el.scrollLeft <= 1,
-      atEnd: el.scrollLeft >= el.scrollWidth - el.clientWidth - 1,
-    })
-  }
-  const scrollKeyRow = (dir: 1 | -1) => {
-    keyRowRef.current?.scrollBy({ left: dir * 160, behavior: 'smooth' })
-  }
+  // The map key's own category picker (see below) — a single "Filter
+  // categories" dropdown/multi-select (was a horizontal row of pills with
+  // scroll chevrons, on request: that overflowed off-screen past a handful
+  // of categories, this scales to any number without consuming permanent
+  // horizontal space). `categoryPickerRef` + the effect below close it on
+  // any click outside, same pattern LocationControl.tsx's popover uses.
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
+  const categoryPickerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!categoryPickerOpen) return
+    function onDown(e: MouseEvent) {
+      if (categoryPickerRef.current && !categoryPickerRef.current.contains(e.target as Node)) setCategoryPickerOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [categoryPickerOpen])
 
   // Each category's own search/sort/filter state (see CategoryRow), keyed by
   // category id so a category not currently in "filter mode" up top (see
@@ -325,32 +378,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // losing their selection.
   const [listCollapsed, setListCollapsed] = useState(false)
 
-  // The map key's top row shows one category's own filter buttons in place
-  // of the category list whenever exactly one category is selected — this
-  // lets the user force it back to the category list (e.g. to pick a
-  // second category) without deselecting the one they're filtering. Reset
-  // whenever the selection itself changes, so a fresh click always lands on
-  // that category's filters rather than staying stuck on the list — done
-  // during render (React's "adjusting state on a prop change" pattern),
-  // not an effect, since it needs to happen before this same render paints.
-  const [forceCategoryList, setForceCategoryList] = useState(false)
-  const [lastFocusedCategoryIds, setLastFocusedCategoryIds] = useState(focusedCategoryIds)
-  if (focusedCategoryIds !== lastFocusedCategoryIds) {
-    setLastFocusedCategoryIds(focusedCategoryIds)
-    setForceCategoryList(false)
-  }
-
   // When tracking starts, flip into follow mode and show the map.
   const handleStart = () => {
     setTab('map')
     start()
   }
 
+  // `embedded` (the desktop home page's map) uses the `#C5EAF2`->`#0D323A`
+  // gradient palette instead of `getCategoryColor`'s varied-hue one, on
+  // request — the standalone/mobile map screen (`!embedded`) keeps exact
+  // `main`/mobile parity via `colorForListingCategory`, untouched.
   const colorById = useMemo(() => {
+    if (embedded) return gradientColorMap(categories ?? [])
     const map = new Map<string, string>()
     ;(categories ?? []).forEach((c) => map.set(c.id, colorForListingCategory(categories ?? [], c.id)))
     return map
-  }, [categories])
+  }, [categories, embedded])
 
   // Looked up by the map key's flyout (below) to know which kind of content
   // to render for a given tab.
@@ -366,7 +409,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     const out: (MapPoint & { filterId: string; searchText: string; raw?: DirectoryResource })[] = []
 
     // Hospital pins are a patient-oriented overlay — only when that module is on.
-    if ((categories ?? []).some((c) => c.kind === 'medical')) {
+    const medicalCategory = (categories ?? []).find((c) => c.kind === 'medical')
+    if (medicalCategory) {
+      // On the desktop/embedded map, hospitals take their color from the
+      // same gradient palette every other category uses (see
+      // `gradientColorMap`) instead of the exclusive hardcoded red — on
+      // request. Falls back to `HOSPITAL_COLOR` if the medical category
+      // somehow isn't in `colorById` yet (e.g. mid-load).
+      const hospitalColor = embedded ? (colorById.get(medicalCategory.id) ?? HOSPITAL_COLOR) : HOSPITAL_COLOR
       for (const h of hospitals) {
         out.push({
           filterId: HOSPITALS_ID,
@@ -374,7 +424,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           lat: h.latitude,
           lng: h.longitude,
           name: h.name,
-          color: HOSPITAL_COLOR,
+          color: hospitalColor,
           // Plain letter, not emoji — gets its exact "darker version of the
           // same hue" tint directly (see `coloredTextGlyphElement` in
           // ResourceMap.tsx) instead of a black/white filter crush.
@@ -403,7 +453,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         name: r.name,
         address: r.address || undefined,
         phone: r.phone,
-        color: colorById.get(r.category) ?? '#D4CFC4',
+        color: colorById.get(r.category) ?? '#64748b',
         glyph: CATEGORY_GLYPHS[r.category] ?? cat?.icon ?? DEFAULT_CATEGORY_ICON,
         // Every fixed category's pin draws through LINE_ICON_BY_CATEGORY
         // (see its doc comment above) — `glyph` above still carries the
@@ -419,7 +469,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       })
     }
     return out
-  }, [listings, categories, colorById, hospitals])
+  }, [listings, categories, colorById, hospitals, embedded])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()
@@ -427,7 +477,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
     const opts: FilterOption[] = []
     if (counts.get(HOSPITALS_ID)) {
-      opts.push({ id: HOSPITALS_ID, label: 'Hospitals', icon: HOSPITAL_ICON, color: HOSPITAL_COLOR, count: counts.get(HOSPITALS_ID)! })
+      // Reads straight off an actual hospital pin (already computed with the
+      // right embedded-aware color, see `allPoints`) rather than duplicating
+      // that lookup here — keeps the filter pill and the pins it filters
+      // perfectly in sync by construction.
+      const hospitalColor = allPoints.find((p) => p.filterId === HOSPITALS_ID)?.color ?? HOSPITAL_COLOR
+      opts.push({ id: HOSPITALS_ID, label: 'Hospitals', icon: HOSPITAL_ICON, color: hospitalColor, count: counts.get(HOSPITALS_ID)! })
     }
     for (const c of categories ?? []) {
       const count = counts.get(c.id) ?? 0
@@ -452,17 +507,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         ) : (
           (CATEGORY_GLYPHS[c.id] ?? c.icon)
         )
-      opts.push({ id: c.id, label: c.pluralLabel, icon, color: colorById.get(c.id) ?? '#D4CFC4', count })
+      opts.push({ id: c.id, label: c.pluralLabel, icon, color: colorById.get(c.id) ?? '#64748b', count })
     }
     return opts.sort((a, b) => rankMapId(a.id) - rankMapId(b.id))
   }, [allPoints, categories, colorById])
-
-  // Re-check the map key's scroll-arrow visibility whenever the button set
-  // itself changes — the row's scrollWidth can only be read after it
-  // re-renders with the new buttons, not from the click/scroll handler alone.
-  useEffect(() => {
-    updateKeyRowScroll()
-  }, [options])
 
   // initialSelectedCategories (a full toggle set restored from history after
   // browser back) takes precedence over initialCategory (the single-category
@@ -712,17 +760,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     setCategoriesExplicitlyCleared(true)
   }
 
-  // Exactly one category selected — and not forced back to the category
-  // list (see `forceCategoryList`) — swaps the top row over to THAT
-  // category's own filter buttons (Open Now, boolean/select fields) instead
-  // of the category list, so filtering it doesn't require digging into the
-  // dropdown. Categories with nothing filterable (hospitals, Eruv) simply
-  // have no chips, so this quietly falls back to the category list for them.
+  // Exactly one category selected shows THAT category's own filter buttons
+  // (Open Now, boolean/select fields) ALONGSIDE the "Filter categories"
+  // dropdown (not swapped in place of it, on request — that used to hide
+  // the dropdown entirely the moment a selection narrowed to one category,
+  // so there was no way to add a second one without an escape-hatch "‹"
+  // button; now the dropdown always stays put). Categories with nothing
+  // filterable (hospitals, Eruv) simply have no chips, so this quietly
+  // renders nothing extra for them.
   const soleOption = openOptions.length === 1 ? openOptions[0] : undefined
   const soleConfig = soleOption ? categoryConfigById.get(soleOption.id) : undefined
   const soleItems = soleOption ? (listings ?? []).filter((item) => item.category === soleOption.id) : []
   const soleChips = soleConfig ? buildFilterChips(soleConfig, soleItems) : []
-  const showFilterBar = !!soleOption && !!soleConfig && !forceCategoryList && soleChips.length > 0
+  const showFilterBar = !!soleOption && !!soleConfig && soleChips.length > 0
 
   // The dropdown never groups by category — one flat list regardless of
   // whether one or several categories are selected — sorted by distance
@@ -1058,28 +1108,36 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         Maps' search box staying a whole pill above a
                         filter panel dropped below it), with the dropdown's
                         own separate border/shadow doing the rest of the
-                        framing. Fixed `h-6` (rather than letting padding +
+                        framing. Fixed `h-8` (rather than letting padding +
                         the input's line-height decide it) — matches the
                         Select all/category buttons' own height (see
                         below) — so the dropdown directly below always
-                        starts at exactly `top-2 + h-6` = `top-8` — the
+                        starts at exactly `top-2 + h-8` = `top-10` — the
                         detail panel over on the right is pinned to that
-                        same `top-8`, so the two dropdowns' own top edges
+                        same `top-10`, so the two dropdowns' own top edges
                         always land in the same place instead of drifting
                         apart by whatever the pill's content height
-                        happened to be. ──────────────────────────────── */}
+                        happened to be. `top-2` becomes `top-8` while
+                        `isFullscreen` (true Fullscreen API mode, see
+                        `mapAreaRef`/`onToggleFullscreen`) — on request,
+                        since `top-2` sat flush against the actual screen
+                        edge there with no browser chrome above it to
+                        provide breathing room the way there normally is.
+                        The detail panel's own `top-10`/`top-16` (below)
+                        moves by that same delta so the two stay aligned. ─ */}
                 {!loading && embedded && (
-                  <div className="absolute left-2 top-2 z-20 flex w-64 flex-col">
-                    {/* `h-6` (was `h-8`) — matches the Select all/Unselect
-                        all/category buttons' own explicit `h-6` below, so
+                  <div className={`absolute left-2 z-20 flex w-64 flex-col ${isFullscreen ? 'top-8' : 'top-2'}`}>
+                    {/* `h-8` (was `h-6`) — matches the Select all/Unselect
+                        all/category buttons' own explicit `h-8` below, so
                         the two rows share one exact, deterministic height
                         instead of hoping their independently-computed
-                        auto-heights happen to line up. Every dependent
-                        offset below (`top-8` on the detail panel) is
-                        `top-2 + h-6` = 8px + 24px = 32px, recomputed for
-                        this new height. */}
-                    <div className="flex h-6 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
-                      <svg className="h-3 w-3 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                        auto-heights happen to line up. Bumped from `h-6` on
+                        request (every map control here was "really small").
+                        Every dependent offset below (`top-10` on the detail
+                        panel) is `top-2 + h-8` = 8px + 32px = 40px,
+                        recomputed for this new height. */}
+                    <div className="flex h-8 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                       </svg>
                       <input
@@ -1095,7 +1153,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             removeTerm(terms[terms.length - 1])
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent text-[11px] text-slate-900 placeholder:text-slate-500 focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none"
                       />
                       {/* Collapses the dropdown list below without touching
                           which categories are selected — a plain visual
@@ -1105,10 +1163,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={() => setListCollapsed((v) => !v)}
                           aria-label={listCollapsed ? 'Show list' : 'Hide list'}
-                          className="flex shrink-0 h-3.5 w-3.5 items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer"
+                          className="flex shrink-0 h-4 w-4 items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer"
                         >
                           <svg
-                            className={`h-2.5 w-2.5 transition-transform duration-200 ${listCollapsed ? '-rotate-90' : ''}`}
+                            className={`h-3 w-3 transition-transform duration-200 ${listCollapsed ? '-rotate-90' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2.5}
@@ -1155,7 +1213,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               return next
                             })
                           }}
-                          className={`mb-1 rounded-full border-2 px-2 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+                          className={`mb-1 rounded-full border-2 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                             sortByDistance ? 'border-[#df4c73] bg-[#df4c73] text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
                           }`}
                         >
@@ -1189,9 +1247,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                     isFocused ? 'bg-slate-100' : 'text-slate-700 hover:bg-slate-50'
                                   }`}
                                 >
-                                  <span className="block truncate text-[10px] font-medium">{row.name}</span>
+                                  <span className="block truncate text-xs font-medium">{row.name}</span>
                                   {subtitle && (
-                                    <span className="block truncate text-[9px] font-normal text-slate-400 group-hover:text-[var(--accent)]">
+                                    <span className="block truncate text-[11px] font-normal text-slate-400 group-hover:text-[var(--accent)]">
                                       {subtitle}
                                     </span>
                                   )}
@@ -1205,7 +1263,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             <button
                               onClick={() => onNavigate('patient', 'find', { findView: 'eruv' })}
                               style={{ color: mergedEruvOption.color }}
-                              className="truncate text-[10px] font-semibold hover:underline cursor-pointer"
+                              className="truncate text-xs font-semibold hover:underline cursor-pointer"
                             >
                               {mergedEruvOption.label}
                             </button>
@@ -1231,34 +1289,33 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     )}
                   </div>
                 )}
-                {/* ── Map key — a row of category buttons running along the
-                        map's own top edge instead of down its left side, top
-                        -aligned with the search bar right beside it (`top-2`
-                        on both) rather than starting at the very left edge —
-                        `left-72` leaves the search bar (`left-2 w-64`) its
-                        own room instead of the button row running underneath
-                        it. `right-12` reaches close to the map's own right
-                        edge — live tracking lives down at the bottom-left
-                        now, so there's nothing over there left to clear.
-                        Horizontally scrollable
-                        (`overflow-x-auto`) when they don't all fit, rather
-                        than wrapping to a second row — stays one clean strip
-                        regardless of category count. A chevron fades in on
-                        whichever edge still has more buttons hidden off-
-                        screen (`keyRowScroll`) instead of just truncating a
-                        button mid-cutoff — clicking one scrolls the row
-                        that direction (`scrollKeyRow`) rather than requiring
-                        a drag/wheel gesture to discover it's scrollable at
-                        all. Clicking a button TOGGLES that category into
-                        `focusedCategoryIds` — the same set that isolates
-                        pins on the map — so multiple buttons can be active
-                        together, filtering the map to their union. Every
-                        active category's items merge into ONE flat list
-                        hanging off the search bar (see below), regardless
-                        of how many categories are selected. Clicking a
-                        listing inside it opens a detail panel flush beside
-                        IT. Only shown when `embedded` (the home page) — the
-                        standalone map screen keeps its own chip row above
+                {/* ── Map key — a "Filter categories" dropdown running along
+                        the map's own top edge instead of down its left side,
+                        top-aligned with the search bar right beside it
+                        (`top-2` on both) rather than starting at the very
+                        left edge — `left-72` leaves the search bar
+                        (`left-2 w-64`) its own room instead of the trigger
+                        button running underneath it. Was a horizontal row of
+                        pill buttons with scroll chevrons on either edge —
+                        replaced with a single compact trigger that expands a
+                        checkbox-list panel below it on click (closes on any
+                        click outside — see `categoryPickerOpen` above,
+                        matching LocationControl.tsx's own popover), on
+                        request: the old row overflowed off-screen past a
+                        handful of categories and needed a permanent scroll
+                        affordance to reach the rest, where this scales to any
+                        number of categories without consuming permanent
+                        horizontal space. Checking a box TOGGLES that category
+                        into `focusedCategoryIds` — the same set that isolates
+                        pins on the map — so multiple can be checked at once,
+                        filtering the map to their union, same as the old
+                        pills did. Every active category's items merge into
+                        ONE flat list hanging off the search bar (see below),
+                        regardless of how many categories are selected.
+                        Clicking a listing inside it opens a detail panel
+                        flush beside IT. Only shown when `embedded` (the home
+                        page) — the standalone map screen keeps its own chip
+                        row above
                         instead. ─────────────────────────────────────────── */}
                 {!loading && embedded && options.length > 0 && (
                     <>
@@ -1267,52 +1324,116 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               category list), so they stay visible and act on
                               every category at once regardless of whether a
                               single category's own filters are currently
-                              showing here instead of the category buttons. */}
-                      <div className="absolute left-72 right-12 top-2 z-20 flex items-center gap-1">
+                              showing here instead of the category buttons.
+                              `top-2` becomes `top-8` in true Fullscreen API
+                              mode (see the search bar wrapper's own doc
+                              comment above) — same reasoning, on request. ── */}
+                      <div className={`absolute left-72 right-12 z-20 flex items-center gap-1 ${isFullscreen ? 'top-8' : 'top-2'}`}>
                         <button
                           onClick={selectAll}
                           disabled={options.every((o) => focusedCategoryIds?.has(o.id))}
-                          className="inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Select all
                         </button>
                         <button
                           onClick={unselectAll}
                           disabled={!focusedCategoryIds || focusedCategoryIds.size === 0}
-                          className="inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Unselect all
                         </button>
-                      {showFilterBar && soleOption && soleConfig ? (
-                        /* ── Filter-button bar — replaces the category list
-                                while exactly one category is selected, so
-                                clicking e.g. "Synagogues" repopulates this
-                                same top strip with ITS filters (denomination,
-                                Open Now, etc.) instead of leaving the
-                                category buttons in place. Same position/
-                                sizing as the category row it swaps with. ── */
-                        <div className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                          <button
-                            onClick={() => setForceCategoryList(true)}
-                            aria-label="Back to categories"
-                            className="flex shrink-0 h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 shadow-md hover:text-slate-800 cursor-pointer"
+                      {/* ── "Filter categories" dropdown — a compact trigger
+                              button (same `h-8` row as Select all/Unselect
+                              all beside it) that expands a checkbox-list
+                              panel below it on click, styled like the search
+                              bar's own merged-list dropdown (`rounded-2xl
+                              border border-slate-200 bg-[#fefefe]` + the same
+                              box shadow) — was a horizontal row of
+                              individually-colored pill buttons with scroll
+                              chevrons, on request: replacing it with one
+                              small control that doesn't grow with the
+                              category count. Always rendered now, regardless
+                              of selection count (used to get swapped out
+                              entirely by the sole-category filter-chip bar
+                              below the moment exactly one category was
+                              selected, on request — that left no way to add a
+                              second category without an escape-hatch "‹"
+                              button; removed that swap so both can show at
+                              once instead). `relative` on this wrapper
+                              anchors the panel's `absolute` position;
+                              `categoryPickerRef` is what the click-outside
+                              effect above checks against. ───────────────── */}
+                      <div className="relative" ref={categoryPickerRef}>
+                        <button
+                          onClick={() => setCategoryPickerOpen((v) => !v)}
+                          aria-expanded={categoryPickerOpen}
+                          className="inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+                        >
+                          Filter categories{focusedCategoryIds?.size ? ` (${focusedCategoryIds.size})` : ''}
+                          <svg
+                            className={`h-3 w-3 shrink-0 transition-transform duration-200 ${categoryPickerOpen ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
                           >
-                            ‹
-                          </button>
-                          {/* Was a plain `<span>` — not clickable, so once
-                              this filter bar took over there was no way to
-                              turn the sole category back off without first
-                              tapping "‹" back to the full category list and
-                              re-finding its button there. A `<button>` that
-                              calls the exact same `selectTab` every other
-                              category pill uses lets it double as its own
-                              "unselect" control, same as clicking any
-                              other active category chip does. */}
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {categoryPickerOpen && (
+                          <div className="absolute left-0 top-10 z-30 max-h-72 w-64 overflow-y-auto rounded-2xl border border-slate-200 bg-[#fefefe] p-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)]">
+                            <ul className="space-y-1">
+                              {options.map((o) => {
+                                const checked = focusedCategoryIds?.has(o.id) ?? false
+                                return (
+                                  <li key={o.id}>
+                                    {/* Checking/unchecking calls the exact same
+                                        `selectTab` the old pill buttons did —
+                                        multiple can be checked at once, unioning
+                                        the map filter, same behavior as before. */}
+                                    <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => selectTab(o.id)}
+                                        className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[var(--accent)] cursor-pointer"
+                                        style={{ '--accent': o.color } as React.CSSProperties}
+                                      />
+                                      {/* Small color swatch — the same per-category
+                                          color the pin/checkbox accent use, so this
+                                          list still reads as color-coded like the
+                                          old pill row did, without needing every
+                                          row filled solid to show it. */}
+                                      <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: o.color }} />
+                                      {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                                      <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                                    </label>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                      {showFilterBar && soleOption && soleConfig && (
+                        /* ── Sole-category filter-chip bar — additionally
+                                shown (not swapped in, see above) whenever
+                                exactly one category is selected, so filtering
+                                it (denomination, Open Now, etc.) doesn't
+                                require digging into the dropdown above. ── */
+                        <div className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          {/* Was paired with a "‹ Back to categories" button
+                              — no longer needed now that the dropdown above
+                              is always visible on its own. Clicking this
+                              still doubles as an "unselect" control, same as
+                              unchecking it in the dropdown does. */}
                           <button
                             onClick={() => selectTab(soleOption.id)}
                             aria-label={`Unselect ${soleOption.label}`}
                             style={{ backgroundColor: soleOption.color }}
-                            className={`inline-flex shrink-0 h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-medium shadow-md cursor-pointer ${
+                            className={`inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium shadow-md cursor-pointer ${
                               needsDarkText(soleOption.color) ? 'text-black' : 'text-white'
                             }`}
                           >
@@ -1344,7 +1465,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                     ? { backgroundColor: soleOption.color }
                                     : { borderColor: soleOption.color, color: readableTextOnWhite(soleOption.color) }
                                 }
-                                className={`inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border-2 px-2 text-[11px] font-medium shadow-sm transition-colors cursor-pointer ${
+                                className={`inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border-2 px-3 text-sm font-medium shadow-sm transition-colors cursor-pointer ${
                                   active ? (needsDarkText(soleOption.color) ? 'text-black' : 'text-white') : 'bg-white hover:bg-slate-50'
                                 }`}
                               >
@@ -1353,100 +1474,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             )
                           })}
                         </div>
-                      ) : (
-                        /* ── Category buttons — individual pill buttons
-                                (rounded, own shadow, gap between them), one
-                                horizontal row that scrolls sideways instead of
-                                wrapping. Flanked by chevron buttons (only
-                                rendered on the edge(s) that still have more to
-                                reveal) rather than just letting a button get
-                                cut off mid-way with no hint there's more. ── */
-                        <>
-                          {!keyRowScroll.atStart && (
-                            <button
-                              onClick={() => scrollKeyRow(-1)}
-                              aria-label="Scroll categories left"
-                              className="flex shrink-0 h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 shadow-md hover:text-slate-800 cursor-pointer"
-                            >
-                              ‹
-                            </button>
-                          )}
-                          <div
-                            ref={keyRowRef}
-                            onScroll={updateKeyRowScroll}
-                            className="flex min-w-0 items-center gap-1 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                          >
-                            {options.map((o) => {
-                              const isOpen = focusedCategoryIds?.has(o.id) ?? false
-                              return (
-                                <button
-                                  key={o.id}
-                                  onClick={() => selectTab(o.id)}
-                                  // Selected: filled solid with this category's
-                                  // own pin color — like a mini pin — same as
-                                  // before. Unselected: white instead, with a
-                                  // colored border so the category is still
-                                  // identifiable at a glance without every
-                                  // button competing as a solid block of
-                                  // color. The pastel palette (see
-                                  // CATEGORY_COLORS) is pale across the
-                                  // board now, not just mikvah —
-                                  // `needsDarkText` decides per-category
-                                  // whether filled text/icon needs to go
-                                  // black instead of white, same check the
-                                  // pin glyph itself makes. Unselected
-                                  // text/icon color is
-                                  // `readableTextOnWhite(o.color)` (see
-                                  // Collapsible.tsx), not the raw pastel —
-                                  // several of these colors are too pale to
-                                  // read as plain text at full strength;
-                                  // this darkens just enough to clear
-                                  // contrast while the border stays the
-                                  // category's true color.
-                                  style={
-                                    isOpen
-                                      ? { backgroundColor: o.color, borderColor: o.color }
-                                      : { borderColor: o.color, color: readableTextOnWhite(o.color) }
-                                  }
-                                  className={`inline-flex shrink-0 h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full border-2 px-2 text-[11px] font-medium shadow-md transition-colors cursor-pointer ${
-                                    isOpen
-                                      ? `${needsDarkText(o.color) ? 'text-black' : 'text-white'} font-semibold ring-2 ring-white`
-                                      : 'bg-white hover:bg-slate-50'
-                                  }`}
-                                >
-                                  {o.icon && (
-                                    // Same flat monochrome-silhouette treatment
-                                    // as the pin glyph itself (see
-                                    // monoGlyphElement in ResourceMap.tsx) only
-                                    // while selected/filled — crushes it to
-                                    // whichever of black/white reads against
-                                    // this category's own fill color (same
-                                    // `needsDarkText` check as the pin).
-                                    // Unselected, the icon keeps its own color
-                                    // instead, since a white button has no
-                                    // fill for a crushed icon to contrast with.
-                                    <span
-                                      aria-hidden="true"
-                                      style={isOpen ? { filter: needsDarkText(o.color) ? 'brightness(0)' : 'brightness(0) invert(1)' } : undefined}
-                                    >
-                                      {o.icon}
-                                    </span>
-                                  )}
-                                  {o.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                          {!keyRowScroll.atEnd && (
-                            <button
-                              onClick={() => scrollKeyRow(1)}
-                              aria-label="Scroll categories right"
-                              className="flex shrink-0 h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 shadow-md hover:text-slate-800 cursor-pointer"
-                            >
-                              ›
-                            </button>
-                          )}
-                        </>
                       )}
                       </div>
 
@@ -1464,11 +1491,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               no gap/border on that shared edge
                               (`left-[16.5rem]` = the dropdown's `left-2` +
                               `w-64`, exactly its right edge), so the two
-                              read as one connected shape. `[&_*]:text-[10px]`
-                              forces every text node inside the card down to
-                              the dropdown's own small size — `dense` alone
-                              (GenericListingCard's smallest built-in mode)
-                              still isn't as small, and Tailwind's own
+                              read as one connected shape. `[&_*]:text-xs`
+                              forces every text node inside the card up to
+                              match the dropdown's own row-name size (was
+                              `text-[10px]`, on request — this panel read
+                              noticeably smaller than the dropdown feeding
+                              it) — `dense` alone (GenericListingCard's
+                              smallest built-in mode) doesn't hit any
+                              specific size on its own, and Tailwind's own
                               text-size classes don't inherit from an
                               ancestor's font-size the way plain CSS would,
                               so overriding every descendant directly is the
@@ -1483,14 +1513,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               everything else in the card keeps starting
                               flush at the card's own left edge, same as the
                               button's own left edge, instead of the whole
-                              card shifting right underneath it too. */}
+                              card shifting right underneath it too.
+                              `top-10` becomes `top-16` in true Fullscreen
+                              API mode, moving by the same delta as the
+                              search bar wrapper above (`top-2`->`top-8`)
+                              so the two stay aligned — on request. */}
                       {onNavigate && focusedItemConfig && (
                         <div
-                          className={`absolute left-[16.5rem] top-8 bottom-3 z-10 overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
+                          className={`absolute left-[16.5rem] ${isFullscreen ? 'top-16' : 'top-10'} bottom-3 z-10 overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
                             focusedItem ? 'w-64' : 'w-0 border-0'
                           }`}
                         >
-                          <div className="h-full w-64 overflow-y-auto p-3 text-[10px] [&_*]:text-[10px]">
+                          <div className="h-full w-64 overflow-y-auto p-3 text-xs [&_*]:text-xs">
                             {focusedItem && focusedItemOption && (
                               <GenericListingCard
                                 item={focusedItem}
