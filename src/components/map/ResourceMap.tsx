@@ -420,6 +420,17 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           zoomControl: true,
           zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
           clickableIcons: false,
+          // `'greedy'` (was unset, i.e. Google's own default `'auto'`) — on
+          // request, map navigation read as choppy/unresponsive. `'auto'`
+          // treats this as an embedded-in-a-scrollable-page map: a single
+          // mouse-wheel tick over it scrolls the PAGE instead of zooming
+          // the map (it shows a "use ctrl+scroll to zoom" overlay and eats
+          // the first gesture instead of acting on it), and single-finger
+          // touch-drag pans the page too. `'greedy'` makes the map claim
+          // every scroll/drag gesture over it immediately, no modifier key
+          // or hint overlay first — panning/zooming responds right away
+          // instead of feeling like it's fighting the page.
+          gestureHandling: 'greedy',
         })
         infoWindowRef.current = new google.maps.InfoWindow()
         // Click-away to dismiss: tapping empty map closes the open info window
