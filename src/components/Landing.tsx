@@ -269,18 +269,21 @@ function GetConnectedAccordion({
                             item.go()
                           }
                         }}
-                        // White card, no border, subtle floating shadow
-                        // (`shadow-[0_4px_14px_rgb(0,0,0,0.06)]`, the same
-                        // recipe the search dropdown's own box shadow uses)
-                        // plus a hairline `ring-1 ring-slate-900/5` for just
-                        // enough definition at rest — replacing the old
-                        // `border`+`shadow-sm` bordered-chip look, on
-                        // request. A search match keeps the same gold accent
-                        // the map's matching pins do (see ResourceMap's
-                        // `highlighted`) — the one deliberate spot of
-                        // color left, since it's a functional indicator
-                        // shared with the rest of the page's
-                        // search-highlight system, not decorative
+                        // White card, no border, subtle floating shadow —
+                        // `shadow-[0_1px_3px_rgb(0,0,0,0.1)]` (was a softer,
+                        // more diffuse `0_4px_14px_rgb(0,0,0,0.06)`) reads as
+                        // a tighter, crisper "tiny shadow" at rest, on
+                        // request ("make the buttons look more clickable"),
+                        // still growing to the bigger `hover:shadow-lg` on
+                        // hover exactly as before. Plus a hairline `ring-1
+                        // ring-slate-900/5` for just enough definition at
+                        // rest — replacing the old `border`+`shadow-sm`
+                        // bordered-chip look, on request. A search match
+                        // keeps the same gold accent the map's matching pins
+                        // do (see ResourceMap's `highlighted`) — the one
+                        // deliberate spot of color left, since it's a
+                        // functional indicator shared with the rest of the
+                        // page's search-highlight system, not decorative
                         // branding. One level below "open" (which still
                         // wins if a matched row is also the one expanded)
                         // but above the "every other item dims" treatment,
@@ -292,8 +295,11 @@ function GetConnectedAccordion({
                         // state's hover is brand-teal — ring shifts to
                         // `#8FC6CF`, background tints to a very faint teal
                         // `#F4F8F8`. `duration-150 ease-out` — within the
-                        // requested 150-200ms "ease" range.
-                        className={`flex w-full flex-col items-stretch gap-0.5 rounded-lg px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
+                        // requested 150-200ms "ease" range. `group` — lets
+                        // the arrow glyph below react to hover on this
+                        // whole button (see its own `group-hover` below),
+                        // not just its own individual hover.
+                        className={`group flex w-full flex-col items-stretch gap-0.5 rounded-lg px-3 py-2 text-left shadow-[0_1px_3px_rgb(0,0,0,0.1)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
                           isOpen
                             ? 'ring-2 ring-black bg-slate-100 text-[#2D3636]'
                             : isMatch
@@ -317,9 +323,13 @@ function GetConnectedAccordion({
                               that every one of these rows leads somewhere
                               (a wizard, a listing's detail, or a full page)
                               instead of just being static text. `shrink-0`
-                              so it never gets squeezed by a long label. */}
+                              so it never gets squeezed by a long label.
+                              `group-hover:translate-x-1` — slides a few
+                              pixels right on hover (the button's own
+                              `group`, see above), another small "this is
+                              clickable" cue on top of the lift/shadow. */}
                           <svg
-                            className="ml-1.5 h-3 w-3 shrink-0 opacity-60"
+                            className="ml-1.5 h-3 w-3 shrink-0 opacity-60 transition-transform duration-150 group-hover:translate-x-1"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2.2}
@@ -906,25 +916,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               `sm:border-l-2` now (see its own doc comment; was
               `sm:divide-x-2` here on the wrapper, moved once the drag
               handle below became a 3rd DOM child and broke that utility's
-              "every child but the first" assumption), colored `#2D3636`
-              (the same dark charcoal as the page's own outer margin — see
-              the `sm:bg-[#2D3636]` wrapper above) — the drag handle
-              (below) renders right on top of that same line. Every border
-              across the whole shelf (interior dividers and the outer frame
-              alike) is a uniform 2px now, on request — while
-              `sm:border-x-2`/`sm:border-t-2` on this wrapper frame the
-              row's own outer edges at that same 2px. Falls back to
-              a single column (just the title) when there's no map
-              (`hasMap` false) rather than leaving an empty second cell.
-              `sm:rounded-t-2xl`+`sm:overflow-hidden` on the wrapper (not
-              any piece individually) rounds the row's combined top
-              corners as one shape — the same "curved edges belong to the
-              group, not each piece" rule the rest of the page's borders
-              follow (see Get Connected's matching bottom corners below).
-              The gap holding it off the very top of the page now comes
-              from the outer wrapper's own `sm:py-8` (see above), not a
-              margin here. `border-x-2`/`border-t-2` at `#2D3636` (2px,
-              charcoal) — every other section's own border below matches.
+              "every child but the first" assumption), colored `#E8E8E8`
+              (a light neutral gray, was the dark charcoal `#2D3636` — the
+              page's own outer margin background, unaffected, is still that
+              same charcoal via the `sm:bg-[#2D3636]` wrapper above; only
+              the borders themselves lightened) — the drag handle (below)
+              renders right on top of that same line. Every border across
+              the whole shelf (interior dividers and the outer frame alike)
+              is a uniform 1.5px now, on request — while `sm:border-x-[1.5px]`/
+              `sm:border-t-[1.5px]` on this wrapper frame the row's own outer
+              edges at that same weight. Falls back to a single column (just
+              the title) when there's no map (`hasMap` false) rather than
+              leaving an empty second cell. `sm:rounded-t-2xl`+
+              `sm:overflow-hidden` on the wrapper (not any piece
+              individually) rounds the row's combined top corners as one
+              shape — the same "curved edges belong to the group, not each
+              piece" rule the rest of the page's borders follow (see Get
+              Connected's matching bottom corners below). The gap holding
+              it off the very top of the page now comes from the outer
+              wrapper's own `sm:py-8` (see above), not a margin here.
+              `border-x-[1.5px]`/`border-t-[1.5px]` at `#E8E8E8` (light
+              gray) — every other section's own border below matches.
               This whole row is now nested one level deeper than before —
               a new `sm:relative` OUTER wrapper (below) that does NOT clip
               its own contents (unlike the `sm:overflow-hidden` grid div
@@ -937,7 +949,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               for a second drag. ──────────────────────────────────────── */}
       <div className="hidden sm:relative sm:block">
       <div
-        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x sm:border-t sm:border-[#2D3636] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
+        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-[1.5px] sm:border-t-[1.5px] sm:border-[#E8E8E8] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
         style={hasMap || ui.search.landing ? { gridTemplateColumns: `${titleColWidth}px 1fr` } : undefined}
       >
         {/* Used to also carry a Volunteer/Support/Young Professionals
@@ -1001,7 +1013,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               it (the "Browse Resources" snippet bug). `100` puts the
               handle at `84` by the time the hamburger hides, comfortably
               past its collapsed edge. */}
-          <HamburgerMenu resources={resources} collapsed={titleColWidth < 100} />
+          {/* Zmanim dropped from this list specifically, on request — it
+              already has its own always-visible section further down the
+              page (see `zmanimSectionRef`), so a second entry here was
+              redundant. `resources` itself stays untouched — the mobile
+              grid (`allCards`, built from this same `resources`) still
+              shows its Zmanim tile as before; only what's passed into the
+              hamburger changes. */}
+          <HamburgerMenu resources={resources?.filter((r) => r.id !== 'zmanim') ?? null} collapsed={titleColWidth < 100} />
           {/* "Premium panel" spacing structure, on request — Title -> Tagline
               (was Emblem -> Title -> Tagline; the emblem was removed again
               on request), left-justified (was briefly centered, reverted
@@ -1085,7 +1104,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 px apart instead of one. An explicit border on just this
                 element is unaffected by how many other children exist in
                 between. ─────────────────────────────────────────────────── */}
-        <div className="sm:flex sm:flex-col sm:border-l sm:border-[#2D3636]">
+        <div className="sm:flex sm:flex-col sm:border-l-[1.5px] sm:border-[#E8E8E8]">
           {/* ── Search bar — used to live in the title cell; now its own
                   band above the map. Placeholder/aria-label is a fixed
                   "Search website…" now (was `settings.heroTitle`, the
@@ -1102,7 +1121,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            <section className="sm:border-b sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:py-6">
+            <section className="sm:border-b-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:px-6 sm:py-6">
               {/* Section header, on request — matches "Get Connected"'s own
                   treatment (same weight/size/color) so the two read as
                   siblings; mobile keeps its own `settings.heroTitle` copy
@@ -1110,7 +1129,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   looking for?" text, but admin-editable there — this one's
                   a fixed string to match Get Connected/Zmanim, which aren't
                   editable either). */}
-              <h2 className="mb-2 text-center text-[26px] font-semibold tracking-[-0.75px] text-[#2D3636]">
+              <h2 className="mb-2 text-center text-[20px] font-bold tracking-[-1px] text-[#2D3636]">
                 What are you looking for?
               </h2>
               <div className="mx-auto w-full max-w-xl">
@@ -1367,7 +1386,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
       {/* ── "Get Connected" heading — merged with the blank spacer band that
               used to sit above it as its own separate div (on request), so
-              the charcoal `border-t` boundary line now sits right at the
+              the `border-t` boundary line now sits right at the
               top of this section (directly under the map/title row) instead
               of partway down, right above the heading text — a border can
               only ever be a div's own edge, not sit inside padding, so
@@ -1376,25 +1395,25 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               `sm:pt-[52px]` reproduces the old spacer's `h-10` (40px) plus
               the heading's own `py-3` top padding (12px) as one number,
               instead of two stacked elements adding up to it. `sm:pb-3`
-              keeps that same bottom padding on its own. Same charcoal
-              `border-x` (2px, `#2D3636` — the page's own outer-margin
-              color, was 1px bright cyan — continuing the shelf's frame, on
+              keeps that same bottom padding on its own. Same light gray
+              `border-x` (2px, `#E8E8E8` — was `#2D3636` charcoal, before
+              that 1px bright cyan — continuing the shelf's frame, on
               request) as every other desktop section, `#FFFFFF` fill —
               matching the search bar's own section background, tying the
               two together.
-              `text-3xl` (was `text-2xl`, then `text-xl`) — bumped back up
-              and past its original size so this heading reads clearly more
-              prominent than the category tiles/item buttons under it
-              (`text-sm`), on request. Manrope Semibold (600, was
-              Medium/500) for section headers specifically, on request, at
-              `text-3xl` (30px, within the specified ~28-32px section-
-              header range). ─────────────────────────────────────────── */}
-      <div className="hidden sm:block sm:border-x sm:border-t sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
+              Bumped back up and past its original size so this heading
+              reads clearly more prominent than the category tiles/item
+              buttons under it (`text-sm`), on request. `text-[29px]
+              font-bold tracking-[-1px]` (was `text-[26px] font-semibold
+              tracking-[-0.75px]`) — a touch bigger, heavier, and tighter,
+              on request ("make the headings feel a little richer"), same
+              treatment as "What are you looking for?" above. ──────────── */}
+      <div className="hidden sm:block sm:border-x-[1.5px] sm:border-t-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
             itself on both sides (was flush with the letters), on request. */}
-        <h2 className="inline-block border-b border-[#2D3636]/20 px-10 pb-2 text-[26px] font-semibold tracking-[-0.75px] text-[#2D3636]">
+        <h2 className="inline-block border-b-[1.5px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-bold tracking-[-1px] text-[#2D3636]">
           Get Connected
         </h2>
       </div>
@@ -1424,13 +1443,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           section (Zmanim moved out below, into the dark margin — see its
           own doc comment further down), so it closes the frame's bottom
           corners instead of Zmanim. `border-x-2`/`border-b-2` at
-          `#2D3636` (the page's own outer-margin charcoal, 2px — was 1px
-          bright cyan, on request) closes the shelf's left/right/bottom
+          `#E8E8E8` (light gray, 2px — was `#2D3636` charcoal, before that
+          1px bright cyan, on request) closes the shelf's left/right/bottom
           outer frame here — `border-t` stays 0, the seam to the heading
-          above. `sm:pb-4` — buffer between the lowest button (or the
-          shared detail panel, if one's open) and this section's own bottom
-          border, on request (was flush against it before). */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x sm:border-t-0 sm:border-b sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-4">
+          above. `sm:pb-6` (was `sm:pb-4`) — buffer between the lowest
+          button (or the shared detail panel, if one's open) and this
+          section's own bottom border, bumped up a bit further on request. */}
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[1.5px] sm:border-t-0 sm:border-b-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-6">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 
