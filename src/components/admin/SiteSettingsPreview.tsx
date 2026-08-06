@@ -7,6 +7,7 @@ import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import HeroHeading from '@/components/home/HeroHeading'
 import SectionTabs from '@/components/home/SectionTabs'
+import HomeMap from '@/components/home/HomeMap'
 import ZmanimStrip from '@/components/home/ZmanimStrip'
 import { CardGrid, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import FeaturedCards from '@/components/home/FeaturedCards'
@@ -19,7 +20,11 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 
 const noopNavigate = () => {}
 const noopOpenFlow = () => {}
-const noopViewMap = () => {}
+
+// The site-wide live GPS watch, stubbed off. The preview's map gets a real
+// tracking UI this way without the admin's browser actually being asked for
+// location permission just to look at the home page.
+const inertTracking = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
 // A preview of the whole home page — the exact same components a visitor sees,
 // fed by the admin's in-progress (unsaved) draft for the name/tagline/logo text
@@ -39,11 +44,11 @@ const noopViewMap = () => {}
 // one the admin wasn't looking at — which is exactly what it used to do, by
 // always rendering the grid and never rendering the tabs, map, or zmanim.
 //
-// The one deliberate departure from Landing is the map: it's a real, live
-// ResourceMapView there, and booting a second interactive Google map inside the
-// preview iframe costs an API load and a pile of measurement work to show a
-// band this screen can't edit anyway. It stands in as a labeled placeholder of
-// the same shape, so the page's proportions stay honest.
+// The map band is the real live ResourceMapView, not a stand-in — it's the
+// largest thing on the desktop home screen, and a placeholder there left the
+// preview's whole lower half a guess. It's fed inert location/navigation
+// props so looking at the home page can't trigger a location permission
+// prompt or navigate the admin out of the preview.
 
 export default function SiteSettingsPreview({
   settings,
@@ -105,13 +110,16 @@ function PreviewBody({
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 w-full flex-1">
+        {/* mapIcon/onViewMap are deliberately not passed: Landing doesn't pass
+            them either, so the live home screen has no "View Map" button under
+            the search box — the desktop redesign replaced it with the "Explore
+            the map" band below. Passing them here rendered a button that
+            exists on no real page. */}
         <HeroHeading
           settings={settings}
           query={query}
           onQueryChange={setQuery}
           interactive={false}
-          mapIcon={mapCategory?.icon}
-          onViewMap={noopViewMap}
         />
 
         {/* Featured row — desktop only, matching Landing. */}
@@ -121,18 +129,13 @@ function PreviewBody({
           </div>
         )}
 
-        {/* The map band — desktop only. See the note above on why this is a
-            placeholder rather than a live map. */}
+        {/* The map band — desktop only, and the real live map, same as Landing.
+            It sizes itself (sm:h-[70vh]) off the frame's viewport, so it fills
+            the preview the way it fills a real desktop window. */}
         {mapCategory && !isMobile && (
           <div className="mt-14">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
-            <div className="flex h-[420px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50">
-              <p className="px-6 text-center text-sm text-slate-400">
-                The live map renders here.
-                <br />
-                Not editable from this screen.
-              </p>
-            </div>
+            <HomeMap onNavigate={noopNavigate} coords={null} liveTracking={inertTracking} />
           </div>
         )}
 
