@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
-import SiteSettingsPreview from './SiteSettingsPreview'
-import HomeSectionManager from './HomeSectionManager'
+import DevicePreviewFrame from './DevicePreviewFrame'
+import { PREVIEW_URL, writePreviewDraft } from '@/lib/previewDraft'
+import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
+import MobileTabsEditor from './MobileTabsEditor'
+import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 
 // ── The Home page tab: the header/hero/footer branding text (name, tagline,
 // heading, mission, logo), the home-screen section grouping, and the footer's
@@ -21,7 +24,20 @@ function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 
-export default function SiteSettingsEditor({ token }: { token: string }) {
+export default function SiteSettingsEditor({
+  token,
+  section,
+}: {
+  token: string
+  /** Which admin tab is rendering this. Both tabs share one component instance
+   *  (see AdminTabs) so the draft and the single Save button survive switching
+   *  between them — a half-finished home screen edit isn't silently dropped
+   *  because you stepped over to fix the tagline. */
+  section: 'site' | 'home'
+}) {
+  // Which device's home screen is being edited. Not persisted — it's a lens on
+  // the same draft, not a setting.
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -33,24 +49,24 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
 
-  // Preview gets its own history entry so browser/trackpad Back (and the
-  // preview's own Back button, which calls closePreview) land back on this
-  // editor instead of skipping past it to the categories list.
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
+  // The preview is plain component state, deliberately NOT a history entry.
+  // It used to push one so browser Back would close it, but the preview is now
+  // a navigable iframe: every navigation inside it adds an entry to the tab's
+  // joint session history, so a single history.back() steps the *frame* back
+  // rather than closing the overlay — which made the "Back to editor" button
+  // do nothing visible once you'd clicked past the home screen. Back now means
+  // "back inside the preview", which is what it should mean in something you
+  // can navigate, and the button closes it outright.
   function openPreview() {
+    // Snapshot the draft BEFORE the frame mounts — the page inside reads it on
+    // load, so writing it afterwards would race the iframe and show saved
+    // settings instead. See previewDraft.ts.
+    if (draft && sectionsDraft) writePreviewDraft({ settings: draft, sections: sectionsDraft })
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
   function closePreview() {
-    history.back()
+    setPreviewing(false)
   }
 
   const load = useCallback(async () => {
@@ -160,24 +176,59 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   }
 
   if (previewing) {
-    return <SiteSettingsPreview settings={draft} sections={sectionsDraft} onClose={closePreview} />
+    return (
+      <DevicePreviewFrame
+        src={PREVIEW_URL}
+        onClose={closePreview}
+        // Open on whichever device is being edited, so Preview answers the
+        // question actually being asked. Still switchable inside the preview.
+        initialDevice={section === 'home' ? device : 'desktop'}
+      />
+    )
   }
 
   const dirty =
     !settings || JSON.stringify(settings) !== JSON.stringify(draft) || !sections || !sectionsEqual(sections, sectionsDraft)
 
+  const isSite = section === 'site'
+
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        The site name, tagline, logo, home screen heading and mission, the sections on the home
-        screen, and the feedback form — laid out in the order they appear on the page. Nothing here
-        goes live until you click Save changes below.
-      </p>
+      {isSite ? (
+        <p className="text-sm text-muted mb-4">
+          Everything that feeds both desktop and mobile — the branding, the home screen heading and
+          mission, the section groups, and the feedback form. The pieces that exist on only one of
+          the two are on the Desktop &amp; mobile tab. Nothing goes live until you click Save
+          changes below.
+        </p>
+      ) : (
+        <p className="text-sm text-muted mb-4">
+          The parts that exist on only one device. Everything shared by both — headings, sections,
+          branding — is on the Site tab. Nothing goes live until you click Save changes below.
+        </p>
+      )}
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
+      {!isSite && (
+        <div className="mb-5 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
+          {(['desktop', 'mobile'] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDevice(d)}
+              className={`px-3.5 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer ${
+                device === d ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {d === 'desktop' ? '🖥️ Desktop' : '📱 Mobile'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isSite && (
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
@@ -249,12 +300,51 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           </span>
         </div>
       </div>
+      )}
 
-      <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
-        <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
-      </div>
+      {/* Sections are one set of groups rendered two different ways, so they
+          live here with the rest of the settings that feed both devices. */}
+      {isSite && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
+          <p className="text-[11px] text-muted mb-2">
+            One set of groups, shown differently per device: on desktop they’re the nav tabs across
+            the top and the All categories page they open; on mobile they’re the labelled card grid
+            running down the home screen. Renaming or regrouping changes both.
+          </p>
+          <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+        </div>
+      )}
 
+      {!isSite && device === 'desktop' && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
+          <p className="text-[11px] text-muted mb-2">
+            The “Popular right now” row between the search box and the map. Phones don’t show this
+            row at all — they get the full card grid instead.
+          </p>
+          <FeaturedCardsPicker
+            value={draft.featuredCardIds}
+            onChange={(ids) => set('featuredCardIds', ids)}
+          />
+        </div>
+      )}
+
+      {!isSite && device === 'mobile' && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Mobile tab bar</h3>
+          <p className="text-[11px] text-muted mb-2">
+            Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no
+            tab bar — it navigates by the section tabs above instead.
+          </p>
+          <MobileTabsEditor
+            tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
+            onChange={(tabs) => set('mobileTabs', tabs)}
+          />
+        </div>
+      )}
+
+      {isSite && (
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl mt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -309,6 +399,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           </>
         )}
       </div>
+      )}
 
       <div className="flex items-center gap-3 mt-4">
         <button
@@ -334,10 +425,73 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
       </div>
 
-      <p className="text-[11px] text-muted mt-5 max-w-xl">
-        These also drive the browser tab title, search-engine description, and “Add to Home Screen”
-        app name.
+      {isSite && (
+        <p className="text-[11px] text-muted mt-5 max-w-xl">
+          These also drive the browser tab title, search-engine description, and “Add to Home
+          Screen” app name.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Featured cards picker ─────────────────────────────────────────────────────
+// The three cards the desktop home screen shows between the search box and the
+// map. One dropdown per slot, each offering the same card set the section
+// editor uses (see useCardOptions).
+//
+// Every slot can be left on "Auto", including all three — that's the default,
+// and it fills the row with the categories that have the most listings. So
+// this never has to be touched for the home screen to look deliberate, and a
+// half-configured row (one pick, two auto) still renders three cards.
+
+function FeaturedCardsPicker({
+  value,
+  onChange,
+}: {
+  value: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const cardOptions = useCardOptions()
+
+  // Slots are positional, but `value` is a compact list (no holes) — an "Auto"
+  // slot simply isn't in it. Setting slot 2 while slot 1 is Auto therefore
+  // appends rather than writing to index 1; the home screen fills the rest
+  // from the same most-listings fallback either way.
+  const setSlot = (slot: number, id: string) => {
+    const next = [...value]
+    if (id === '') next.splice(slot, 1)
+    else if (slot < next.length) next[slot] = id
+    else next.push(id)
+    // A card picked twice would render the same tile twice — keep the first.
+    onChange([...new Set(next)].slice(0, FEATURED_CARD_COUNT))
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+      <p className="text-[11px] text-muted">
+        Shown on desktop between the search box and the map. Leave a slot on
+        &ldquo;Auto&rdquo; to fill it with the category that has the most listings.
       </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {Array.from({ length: FEATURED_CARD_COUNT }, (_, slot) => (
+          <label key={slot} className="block">
+            <span className="block text-[11px] font-medium text-slate-600 mb-1">Slot {slot + 1}</span>
+            <select
+              value={value[slot] ?? ''}
+              onChange={(e) => setSlot(slot, e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Auto (most listings)</option>
+              {cardOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }

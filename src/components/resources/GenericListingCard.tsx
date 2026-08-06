@@ -219,12 +219,19 @@ export function GenericListingCard({
 
         <div className="flex items-center gap-3 shrink-0">
           {(upvotes || travel.length > 0) && (
-            <div className="flex flex-col items-end gap-0.5">
+            // Stacked on mobile to save horizontal space; side by side from sm
+            // up, each in its own fixed-width column so every row's upvote
+            // count lands in the same spot, and the distance column is
+            // left-aligned so the 📍/🚗/🚶 glyphs all line up under each
+            // other instead of drifting with how long the mileage text is.
+            <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-4">
               {upvotes && (
-                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+                <div className="sm:flex sm:w-10 sm:justify-end">
+                  <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+                </div>
               )}
               {travel.length > 0 && (
-                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:items-start sm:w-14">
                   {travel.map((t) => <span key={t}>{t}</span>)}
                 </div>
               )}

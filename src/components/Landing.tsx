@@ -4,10 +4,16 @@ import { useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
+import SectionTabs from '@/components/home/SectionTabs'
+import FeaturedCards from '@/components/home/FeaturedCards'
+import ZmanimStrip from '@/components/home/ZmanimStrip'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { useAllListings } from '@/lib/useAllListings'
+import { useIsMobile } from '@/lib/useIsMobile'
+import { pickFeaturedCards } from '@/lib/featuredCards'
+import { community } from '@/community.config'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/app/page'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -16,6 +22,9 @@ type Props = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
+  /** Desktop only — opens the All Categories page, optionally scrolled to one
+   *  section (passed when a section tab was clicked). */
+  onViewAllCategories: (section?: string) => void
   /** The visitor's location (from the header pill) — lets "Places" results show
    *  distance, exactly like the category directory does. */
   coords: { lat: number; lng: number } | null
@@ -25,21 +34,35 @@ type Props = {
   liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
 }
 
-// The whole site is one screen: a filter box, then a grid of cards. Typing
-// filters the grid live against each card's hidden keywords (so "shul" surfaces
-// Synagogues), with no dropdown to click through.
-export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking }: Props) {
+// ── The home screen ───────────────────────────────────────────────────────────
+// Desktop and mobile deliberately differ here (see the desktop-redesign notes):
+//
+//   Desktop — a short gateway: section tabs → hero + search → "Popular right
+//   now" (three featured cards) → "Explore the map" → Zmanim & Shabbos →
+//   footer, each labeled so the page reads as distinct sections rather than
+//   one long blur. The full card index lives on its own page (AllCategories),
+//   reachable from the tabs or the "Browse all categories" button.
+//
+//   Mobile — unchanged: hero + search, then the full grouped card grid inline,
+//   no map (it has its own tab for that). A phone has no tab bar to reach an
+//   All Categories page from, and its screen is a practical tool rather than a
+//   gateway, so the grid stays where it is.
+//
+// Typing filters the grid live against each card's hidden keywords (so "shul"
+// surfaces Synagogues). On desktop, where the grid isn't on screen, typing
+// reveals it inline as a results list — a search that appeared to do nothing
+// would be worse than a slightly longer page.
+export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
-  // The Map pseudo-category still gates whether the map shows at all —
-  // experimenting with rendering it directly on the home screen (below)
-  // instead of behind a button; still just as easy to turn back into a card
-  // or a button later if this doesn't stick.
+  const isMobile = useIsMobile()
+  // The Map pseudo-category still gates whether the map shows at all.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
+  const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -76,46 +99,93 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking }
   // Sections only exist once loading is done and there's something to group;
   // while loading, a single flat grid of entry cards + skeletons stands in.
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
+  // The tabs list every section regardless of the current search — they're
+  // site navigation, not search results, and shouldn't empty out mid-type.
+  const navSections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
+  const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
+
+  // The card grid shows inline on mobile always, and on desktop only as search
+  // results (see the component note above).
+  const showInlineGrid = isMobile || !!q
 
   return (
-    <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
-      {/* ── Heading + filter ─────────────────────────────────────────────────── */}
-      <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+    <>
+      {/* ── Section tabs (desktop) — the primary way to reach a category now
+              that the grid lives on its own page. Full-bleed so the bar spans
+              the window while its contents stay aligned to the page. ─────── */}
+      <SectionTabs
+        sections={navSections}
+        listings={listings}
+        onOpenCard={(card) => card.go()}
+        onOpenSection={(title) => onViewAllCategories(title)}
+      />
 
-      {/* ── The map — the real full map screen, right on the home screen.
-              Desktop only: mobile now reaches the same map via its own tab
-              bar entry, so it's dropped from this scroll to avoid showing it
-              twice. ──────────────────────────────────────────────────────── */}
-      {hasMap && (
-        <div className="mt-8 hidden sm:block">
-          <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
-        </div>
-      )}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
+        {/* ── Heading + filter ───────────────────────────────────────────────── */}
+        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-      {/* ── The grid — grouped into labeled sections; a search narrows each
-              section's cards and hides any section left empty. ────────────── */}
-      <section className="mt-12 sm:mt-14 space-y-10">
-        {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-          <p className="text-center text-sm text-slate-500">
-            Nothing matches “{q}”. Try a different word or clear the filter.
-          </p>
+        {/* ── The three featured cards (desktop) — between the search box and
+                the map. Hidden while searching, when the grid below takes
+                over as the answer to what was typed. ───────────────────────── */}
+        {!isMobile && !q && (
+          <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
         )}
-        {loading ? (
-          <CardGrid cards={entryCards} loadingCount={6} />
-        ) : (
-          sections.map((s) => (
-            <div key={s.title}>
-              <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-              <CardGrid cards={s.cards} />
-            </div>
-          ))
-        )}
-      </section>
 
-      {/* ── Matching places (individual listings within the cards) ───────────── */}
-      {placeHits.length > 0 && (
-        <PlacesResults hits={placeHits} onOpen={openPlace} />
+        {/* ── The map — the real full map screen, right on the home screen.
+                Desktop only: mobile reaches the same map via its own tab bar
+                entry, so it's dropped from this scroll to avoid showing it
+                twice. Hidden while searching so results aren't pushed below
+                a full-height map. ──────────────────────────────────────────── */}
+        {hasMap && !q && (
+          <div className="mt-14 hidden sm:block">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
+            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
+          </div>
+        )}
+
+        {/* ── The grid — grouped into labeled sections; a search narrows each
+                section's cards and hides any section left empty. ──────────── */}
+        {showInlineGrid && (
+          <section className="mt-12 sm:mt-14 space-y-10">
+            {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
+              <p className="text-center text-sm text-slate-500">
+                Nothing matches “{q}”. Try a different word or clear the filter.
+              </p>
+            )}
+            {loading ? (
+              <CardGrid cards={entryCards} loadingCount={6} />
+            ) : (
+              sections.map((s) => (
+                <div key={s.title}>
+                  <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
+                  <CardGrid cards={s.cards} />
+                </div>
+              ))
+            )}
+          </section>
+        )}
+
+        {/* ── Matching places (individual listings within the cards) ─────────── */}
+        {placeHits.length > 0 && (
+          <PlacesResults hits={placeHits} onOpen={openPlace} />
+        )}
+      </main>
+
+      {/* ── Zmanim & Shabbos (desktop) — the full card's content (not a
+              trimmed preview), rendered loose as a full-bleed band matching
+              the footer right below it rather than another boxed card in the
+              stack above. A sibling of <main>, not inside it, so its
+              background can run edge to edge. Falls back to the community
+              center so it renders something real before the visitor has set
+              an address. ──────────────────────────────────────────────────── */}
+      {!isMobile && !q && zmanimCategory && (
+        <ZmanimStrip
+          coords={coords ?? community.mapCenter}
+          locationLabel={settings.name}
+          title={zmanimCategory.pluralLabel}
+          onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
+        />
       )}
-    </main>
+    </>
   )
 }

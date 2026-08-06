@@ -1,5 +1,11 @@
 import { getAdminClient } from './supabase/admin'
-import { SITE_SETTINGS_DEFAULTS, type SiteSettings } from './siteSettings'
+import {
+  DEFAULT_MOBILE_TABS,
+  MAX_MOBILE_TABS,
+  SITE_SETTINGS_DEFAULTS,
+  type MobileTabConfig,
+  type SiteSettings,
+} from './siteSettings'
 
 const ROW_ID = 'default'
 
@@ -14,6 +20,24 @@ type Row = {
   feedback_button_label: string
   feedback_heading: string
   feedback_success_message: string
+  featured_card_ids: string[] | null
+  mobile_tabs: unknown
+}
+
+// jsonb comes back as whatever was written, and this column predates nothing —
+// it can legitimately be null (migration not yet run, or never configured).
+// Anything that isn't a usable array of tabs falls back to the built-in trio
+// rather than rendering an empty or half-broken bar on every phone.
+function toMobileTabs(raw: unknown): MobileTabConfig[] {
+  if (!Array.isArray(raw)) return DEFAULT_MOBILE_TABS
+  const tabs = raw.flatMap((entry): MobileTabConfig[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const { id, label, target } = entry as Record<string, unknown>
+    if (typeof id !== 'string' || typeof label !== 'string' || typeof target !== 'string') return []
+    if (!id.trim() || !label.trim() || !target.trim()) return []
+    return [{ id, label, target }]
+  })
+  return tabs.length ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
 }
 
 function toSettings(row: Row | null): SiteSettings {
@@ -28,6 +52,10 @@ function toSettings(row: Row | null): SiteSettings {
     feedbackButtonLabel: row.feedback_button_label,
     feedbackHeading: row.feedback_heading,
     feedbackSuccessMessage: row.feedback_success_message,
+    // Null until the column's migration has been run (or before the first
+    // save) — normalized to [] so callers never have to null-check it.
+    featuredCardIds: row.featured_card_ids ?? [],
+    mobileTabs: toMobileTabs(row.mobile_tabs),
   }
 }
 
@@ -64,6 +92,8 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
         feedback_button_label: merged.feedbackButtonLabel,
         feedback_heading: merged.feedbackHeading,
         feedback_success_message: merged.feedbackSuccessMessage,
+        featured_card_ids: merged.featuredCardIds,
+        mobile_tabs: merged.mobileTabs,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },

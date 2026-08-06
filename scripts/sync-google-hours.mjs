@@ -13,6 +13,13 @@
 // Requires GOOGLE_MAPS_SERVER_KEY (Places API enabled, NOT referrer-restricted).
 //
 //   node --env-file=.env.local scripts/sync-google-hours.mjs
+//
+// Pass --dry-run to see exactly what a real run would change without writing
+// anything. It still makes the same (paid) Places calls — the only difference
+// is that nothing is saved. Worth doing before the first run against a live
+// directory, since phone numbers are overwritten and there's no undo:
+//
+//   node --env-file=.env.local scripts/sync-google-hours.mjs --dry-run
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -28,6 +35,34 @@ if (!url || !serviceRoleKey || !mapsKey) {
 }
 const s = createClient(url, serviceRoleKey, { auth: { persistSession: false } })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+const DRY_RUN = process.argv.includes('--dry-run')
+
+// Field ownership — the canonical (commented) version lives in
+// src/lib/googlePlaces.ts; this mirrors it so the script and the cron route
+// behave identically. In short: Google may write a field it filled itself
+// (recorded in details.googleFields) or one that's still empty. A value with
+// no ownership record was typed by a person — leave it alone.
+const OWNABLE_SYNC_FIELDS = ['hours', 'phone', 'address']
+
+function isEmptyValue(v) {
+  if (v === null || v === undefined) return true
+  if (typeof v === 'string') return v.trim() === ''
+  if (typeof v === 'object') return Object.keys(v).length === 0
+  return false
+}
+
+function syncMayWrite(details, field, currentValue) {
+  if (isEmptyValue(currentValue)) return true
+  const owned = details?.googleFields
+  return Array.isArray(owned) && owned.includes(field)
+}
+
+function nextGoogleFields(details, written) {
+  const prior = Array.isArray(details?.googleFields) ? details.googleFields : []
+  const merged = new Set([...prior, ...written])
+  return OWNABLE_SYNC_FIELDS.filter((f) => merged.has(f))
+}
 
 const hhmm = (t) => `${t.slice(0, 2)}:${t.slice(2, 4)}`
 
@@ -67,6 +102,20 @@ async function fetchDetails(placeId) {
   return data.result
 }
 
+/** One line per day that differs, so a dry run shows the actual change rather
+ *  than two blobs of JSON to diff by eye. */
+function describeHoursChange(before, after) {
+  if (!after) return []
+  const lines = []
+  for (const k of DAY_KEYS) {
+    const b = before?.[k]
+    const a = after[k]
+    const fmt = (v) => (v ? `${v.open}–${v.close}` : 'closed')
+    if (fmt(b) !== fmt(a)) lines.push(`      ${k}: ${before ? fmt(b) : '(unset)'} → ${fmt(a)}`)
+  }
+  return lines
+}
+
 const { data: rows, error } = await s
   .from('resource')
   .select('id,name,phone,address,details')
@@ -74,8 +123,14 @@ const { data: rows, error } = await s
   .not('details->>placeId', 'is', null)
 if (error) throw new Error(error.message)
 
+if (DRY_RUN) {
+  console.log(`DRY RUN — ${rows.length} listings, nothing will be written.\n`)
+}
+
 let done = 0
 let failed = 0
+let unchanged = 0
+const closures = []
 for (const r of rows) {
   const result = await fetchDetails(r.details.placeId)
   if (!result) {
@@ -87,12 +142,55 @@ for (const r of rows) {
 
   const hours = mapHours(result.opening_hours)
   const details = { ...r.details, googleSyncedAt: new Date().toISOString() }
-  if (hours) details.hours = hours
+  // Google-only concept, no curated counterpart — always refreshed.
   if (result.business_status) details.businessStatus = result.business_status
 
+  const wrote = []
   const update = { details }
-  if (result.formatted_phone_number) update.phone = result.formatted_phone_number
-  if (!r.address && result.formatted_address) update.address = result.formatted_address
+  if (hours && syncMayWrite(r.details, 'hours', r.details?.hours)) {
+    details.hours = hours
+    wrote.push('hours')
+  }
+  if (result.formatted_phone_number && syncMayWrite(r.details, 'phone', r.phone)) {
+    update.phone = result.formatted_phone_number
+    wrote.push('phone')
+  }
+  if (result.formatted_address && syncMayWrite(r.details, 'address', r.address)) {
+    update.address = result.formatted_address
+    wrote.push('address')
+  }
+  details.googleFields = nextGoogleFields(r.details, wrote)
+
+  if (result.business_status === 'CLOSED_PERMANENTLY') closures.push(r.name)
+
+  if (DRY_RUN) {
+    // Report only what a real run would actually write — fields Google doesn't
+    // own are skipped above, so they never show up here. A list of 111 "no
+    // change" entries would bury the handful that matter.
+    const changes = wrote.includes('hours') ? describeHoursChange(r.details.hours, hours) : []
+    if (update.phone && update.phone !== r.phone) {
+      changes.push(`      phone: ${r.phone ?? '(none)'} → ${update.phone}`)
+    }
+    if (update.address) changes.push(`      address: (none) → ${update.address}`)
+    const statusBefore = r.details.businessStatus
+    if (result.business_status && result.business_status !== statusBefore) {
+      changes.push(`      status: ${statusBefore ?? '(unset)'} → ${result.business_status}`)
+    }
+    // Say what was protected, so "why didn't my hours update" has an answer.
+    const held = OWNABLE_SYNC_FIELDS.filter(
+      (f) => !wrote.includes(f) && !isEmptyValue(f === 'phone' ? r.phone : f === 'address' ? r.address : r.details?.hours),
+    )
+    if (changes.length === 0) {
+      unchanged++
+    } else {
+      done++
+      console.log(`~ ${r.name}`)
+      for (const line of changes) console.log(line)
+      if (held.length) console.log(`      (kept manual: ${held.join(', ')})`)
+    }
+    await sleep(200)
+    continue
+  }
 
   await s.from('resource').update(update).eq('id', r.id)
   done++
@@ -100,4 +198,14 @@ for (const r of rows) {
   await sleep(200)
 }
 
-console.log(`\nDone. synced ${done}, failed ${failed}.`)
+if (DRY_RUN) {
+  console.log(`\nDRY RUN complete. ${done} would change, ${unchanged} already match, ${failed} failed.`)
+  if (closures.length) {
+    console.log(`\n⚠️  ${closures.length} reported CLOSED_PERMANENTLY by Google:`)
+    for (const n of closures) console.log(`   • ${n}`)
+    console.log('   A real run files these to the moderation queue — it does not delete them.')
+  }
+  console.log('\nRe-run without --dry-run to apply.')
+} else {
+  console.log(`\nDone. synced ${done}, failed ${failed}.`)
+}

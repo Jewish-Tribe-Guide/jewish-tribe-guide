@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { AppMode, DirectoryAnchor, MapFilters, NavigateFn } from '@/types'
 import Landing from '@/components/Landing'
+import AllCategories from '@/components/AllCategories'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import FindResources from '@/components/FindResources'
@@ -10,12 +11,14 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
-import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar'
+import MobileTabBar from '@/components/MobileTabBar'
 import FeedbackForm from '@/components/FeedbackForm'
 import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import { useLiveLocation } from '@/lib/useLiveLocation'
 import { useCategories } from '@/lib/useCategories'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { DEFAULT_MOBILE_TABS, type MobileTabConfig } from '@/lib/siteSettings'
 import { ui } from '@/lib/uiConfig'
 
 // Which guided form is open as a full-screen overlay, and any need
@@ -42,6 +45,16 @@ type NavState = {
   /** Field filters (open-now / kosher / type) carried from the directory, kept
    *  in sync with the live map state. */
   mapFilters?: MapFilters
+  /** True when this map entry came from a category directory's own "Map"
+   *  button rather than the general Map tab — see mapEnteredFromListing. */
+  mapFromListing?: boolean
+  /** Which section the All Categories page should scroll to on arrival (set
+   *  when the visitor clicked a section tab rather than "Browse all"). */
+  allCategoriesSection?: string
+  /** Which category directory is open. Owned by FindResources (which reads and
+   *  writes it for its own sub-views); page.tsx only mirrors it, to highlight a
+   *  matching mobile tab. */
+  findView?: string
 }
 
 export default function Page() {
@@ -53,7 +66,25 @@ export default function Page() {
   const { address, coords, setAddress, setCoords, tracking, geoError, start: startLiveTracking, stop: stopLiveTracking } = useLiveLocation()
   const categories = useCategories()
   const settings = useSiteSettings()
+  // Mobile's Feedback tab is a real full-page screen (mode 'feedback'); on
+  // desktop there's no such tab, so the same mode instead means "show the
+  // footer's own feedback modal on top of home" — same idea as the map's
+  // standalone-fullscreen fix: however mode became 'feedback' (a real mobile
+  // tab tap, or a resize back up to desktop after one, or history restore),
+  // landing on it at desktop width means the modal, not a bare inline page.
+  // Derived, not its own state — closing it is just goToHome(), which this
+  // recomputes to false on its own; nothing to desync.
+  const isMobile = useIsMobile()
+  const feedbackModalOpen = mode === 'feedback' && !isMobile
   const [flow, setFlow] = useState<Flow | null>(null)
+  // Which category directory is open, mirrored from history state purely so the
+  // mobile tab bar can light up a card tab pointing at it. FindResources owns
+  // the real `view` — this is a read-only shadow of the same history field, kept
+  // in sync at every transition that can change which *category* is open (they
+  // all go through navigate/viewListing or a popstate). Its own internal moves
+  // — opening a listing's edit form, a hospital's About page — don't change the
+  // category, so not seeing those is fine.
+  const [findView, setFindView] = useState<string | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)
   // When arriving from a directory with an active search, pre-fill the map's
@@ -63,6 +94,15 @@ export default function Page() {
   const [mapSelectedCategories, setMapSelectedCategories] = useState<string[] | null>(null)
   // Field filters carried from a directory onto the map — see NavState.mapFilters.
   const [mapFilters, setMapFilters] = useState<MapFilters | null>(null)
+  // Whether the current map entry came from a category directory's own "Map"
+  // button (vs. the general Map tab) — on desktop this both starts
+  // ResourceMapView already fullscreen and makes its fullscreen-exit control
+  // navigate straight back to that directory instead of collapsing to a
+  // boxed map screen (see ResourceMapView's onExitFullscreenToListing).
+  const [mapEnteredFromListing, setMapEnteredFromListing] = useState(false)
+  // Which section the All Categories page should scroll to — see
+  // NavState.allCategoriesSection.
+  const [allCategoriesSection, setAllCategoriesSection] = useState<string | null>(null)
   // Whether ResourceMapView has ever been mounted — once true it stays mounted
   // forever (see the render below), so switching tabs away and back hides it
   // via CSS instead of unmounting/remounting, preserving pan/zoom, the
@@ -106,6 +146,9 @@ export default function Page() {
       setMapQuery(s?.mapQuery ?? null)
       setMapSelectedCategories(s?.mapSelected ?? null)
       setMapFilters(s?.mapFilters ?? null)
+      setMapEnteredFromListing(!!s?.mapFromListing)
+      setAllCategoriesSection(s?.allCategoriesSection ?? null)
+      setFindView(s?.findView ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -125,6 +168,9 @@ export default function Page() {
     if (s?.mapQuery) setMapQuery(s.mapQuery)
     if (s?.mapSelected) setMapSelectedCategories(s.mapSelected)
     if (s?.mapFilters) setMapFilters(s.mapFilters)
+    if (s?.mapFromListing) setMapEnteredFromListing(true)
+    if (s?.allCategoriesSection) setAllCategoriesSection(s.allCategoriesSection)
+    if (s?.findView) setFindView(s.findView)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -134,6 +180,7 @@ export default function Page() {
   const navigate: NavigateFn = (_audience, nextMode, extra) => {
     setMode(nextMode)
     setFlow(null)
+    setFindView(typeof extra?.findView === 'string' ? extra.findView : null)
     history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
@@ -162,16 +209,46 @@ export default function Page() {
   }
 
   // Mobile tab bar — Categories/Find both read as the "Categories" tab (see
-  // MobileTabBar's `modes` map), and re-tapping it always resets to the root
+  // MobileTabBar's BUILT_IN_MODES), and re-tapping it always resets to the root
   // Landing grid rather than staying wherever the visitor drilled into.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
-  const selectTab = (tab: MobileTab) => {
-    if (tab === 'categories') navigate(null, 'home')
-    else if (tab === 'map') navigate(null, 'map')
-    else navigate(null, 'feedback')
+  const selectTab = (tab: MobileTabConfig) => {
+    if (tab.target === 'categories') navigate(null, 'home')
+    else if (tab.target === 'map') {
+      // A plain tab switch, not a listing's "Map" button — the map should
+      // show its normal (possibly boxed, on desktop) state, not re-enter
+      // fullscreen or wire its exit control back to a stale listing.
+      setMapEnteredFromListing(false)
+      navigate(null, 'map')
+    } else if (tab.target === 'feedback') navigate(null, 'feedback')
+    // Anything else is a card id. A category opens its directory; everything
+    // else is a form (the built-in support/volunteer, or an admin-made one)
+    // and opens as a full-screen wizard, exactly as its home-screen tile does.
+    else if (categories?.some((c) => c.id === tab.target)) {
+      navigate(null, 'find', { findView: tab.target })
+    } else openFlow(tab.target)
   }
+
+  // The two built-in gates that have always applied. Card tabs are left alone:
+  // a target is either a category or a form, and telling a deleted category
+  // apart from a perfectly valid form id would mean fetching the forms list on
+  // every page load to guard against something the admin editor already
+  // prevents — and getting it wrong would silently hide a working tab.
+  // `?? DEFAULT_MOBILE_TABS` guards a response from a deployment older than the
+  // mobileTabs field (or a stale cached one): the bar is on every mobile screen,
+  // so an undefined here would be a crash on load rather than a missing tab.
+  const visibleTabs = (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).filter((t) =>
+    t.target === 'map' ? hasMap : t.target === 'feedback' ? settings.feedbackEnabled : true,
+  )
+
   const tabBar = (
-    <MobileTabBar mode={mode} onSelect={selectTab} showMapTab={hasMap} showFeedbackTab={settings.feedbackEnabled} />
+    <MobileTabBar
+      mode={mode}
+      tabs={visibleTabs}
+      onSelect={selectTab}
+      activeCardId={findView}
+      iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
+    />
   )
 
   const overlay = flow && (
@@ -191,6 +268,16 @@ export default function Page() {
   // Up buttons lead back to the single home screen.
   const goToHome = () => navigate(null, 'home')
 
+  // Desktop's "Browse all categories" button and its section tabs — the tabs
+  // pass the section they want scrolled into view, the button passes nothing
+  // and lands at the top.
+  const viewAllCategories = (section?: string) => {
+    setMode('all-categories')
+    setAllCategoriesSection(section ?? null)
+    setFlow(null)
+    history.pushState({ mode: 'all-categories', allCategoriesSection: section } as NavState, '')
+  }
+
   // Called from the Nearby list — switches to the Find screen with the chosen
   // listing's category open and that card expanded/scrolled into view.
   const viewListing = (categoryId: string, listingId: string) => {
@@ -200,6 +287,7 @@ export default function Page() {
     setMapSelectedCategories(null)
     setMapFilters(null)
     setFlow(null)
+    setFindView(categoryId)
     history.pushState({ mode: 'find', findView: categoryId, findItemId: listingId }, '')
   }
 
@@ -217,35 +305,80 @@ export default function Page() {
     setMapQuery(query ?? null)
     setMapSelectedCategories(null)
     setMapFilters(filters ?? null)
+    setMapEnteredFromListing(true)
     setFlow(null)
     setMapResetToken((t) => t + 1)
-    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters } as NavState, '')
+    history.pushState({ mode: 'map', mapCategory: categoryId, mapQuery: query, mapFilters: filters, mapFromListing: true } as NavState, '')
+  }
+
+  // Desktop's map-fullscreen exit control, when the map was entered via a
+  // listing's own "Map" button (see mapEnteredFromListing) — takes the
+  // visitor straight back to that category's directory instead of leaving a
+  // boxed, non-fullscreen map behind (there's no such intermediate screen for
+  // this entry point).
+  const exitMapToListing = () => {
+    const categoryId = mapCategory
+    setMode('find')
+    setMapCategory(null)
+    setMapQuery(null)
+    setMapSelectedCategories(null)
+    setMapFilters(null)
+    setMapEnteredFromListing(false)
+    setFlow(null)
+    setFindView(categoryId)
+    history.pushState({ mode: 'find', findView: categoryId ?? undefined }, '')
   }
 
   return (
     <>
       <SiteHeader onGoHome={goToLanding} location={locationControls} />
 
-      {/* ── Landing — the single home screen (search + one card grid) ────────── */}
-      {(mode === 'home' || mode === 'community-home') && (
+      {/* ── Landing — the single home screen (search + one card grid). Also
+              the backdrop for the desktop feedback-modal recovery above. ── */}
+      {(mode === 'home' || mode === 'community-home' || feedbackModalOpen) && (
         <div className="flex-1">
           <Landing
             onNavigate={navigate}
             onOpenFlow={openFlow}
+            onViewAllCategories={viewAllCategories}
             coords={coords}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </div>
       )}
 
-      {/* ── Find/Feedback — ordinary mount-on-demand screens ──────────────────── */}
-      {(mode === 'find' || mode === 'feedback') && (
+      {/* ── Find/Feedback — ordinary mount-on-demand screens. Feedback only
+              renders here as its own full page on mobile — see
+              feedbackModalOpen above for its desktop counterpart. ────────── */}
+      {(mode === 'find' || (mode === 'feedback' && isMobile)) && (
         <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
-          {mode === 'find' && <FindResources anchor={anchor} onUp={goToHome} onViewMap={viewMapForCategory} />}
+          {mode === 'find' && (
+            <FindResources anchor={anchor} onUp={goToHome} onViewAllCategories={() => viewAllCategories()} onViewMap={viewMapForCategory} />
+          )}
           {mode === 'feedback' && (
             <FeedbackForm variant="inline" heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} />
           )}
         </main>
+      )}
+
+      {feedbackModalOpen && (
+        <FeedbackForm heading={settings.feedbackHeading} successMessage={settings.feedbackSuccessMessage} onClose={goToHome} />
+      )}
+
+      {/* ── All categories — the full card index, moved off the desktop home
+              screen so that screen can stay short. Desktop-only in practice
+              (mobile's home screen still renders this same grid inline), but
+              not gated here: a phone that lands on this history entry should
+              still get a working page rather than a blank one. ───────────── */}
+      {mode === 'all-categories' && (
+        <div className="flex-1 pt-8">
+          <AllCategories
+            onNavigate={navigate}
+            onOpenFlow={openFlow}
+            onUp={goToHome}
+            scrollToSection={allCategoriesSection}
+          />
+        </div>
       )}
 
       {/* ── Map — mounted once (on first visit) and never unmounted again;
@@ -279,6 +412,15 @@ export default function Page() {
             initialSelectedCategories={mapSelectedCategories || undefined}
             initialFilters={mapFilters || undefined}
             onViewListing={viewListing}
+            standalone
+            visible={mode === 'map'}
+            // Always provided (never undefined) — this is the one page-level
+            // map screen, so its fullscreen exit always has somewhere to go:
+            // back to the listing it was opened from, or home otherwise.
+            // However the visitor actually got here (a listing's own "Map"
+            // button, the mobile tab bar, browser back/forward into a 'map'
+            // history entry), landing on this screen means fullscreen.
+            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : goToHome}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </main>

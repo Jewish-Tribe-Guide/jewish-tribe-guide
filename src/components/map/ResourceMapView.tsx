@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import UpButton from '@/components/UpButton'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
 import NearbyList from './NearbyList'
+import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
@@ -17,7 +17,7 @@ import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon } from '@/components/icons'
+import { ChevronLeftIcon, ExpandIcon, CollapseIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
 
@@ -38,6 +38,12 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 // non-issue.
 const stripApostrophes = (s: string) => s.replace(/['’‘ʼʻ]/g, '')
 
+// The shape both selection surfaces (mobile's MobileNearbySheet, desktop's
+// own sidebar detail panel) need for a "show this place" action — a subset
+// of the richer point type this screen's own points carry (which also has
+// searchText, used only for filtering).
+type SelectablePoint = MapPoint & { filterId: string; raw?: DirectoryResource }
+
 type Props = {
   onUp: () => void
   /** Initial location from the header's "Set location" control, if already set. */
@@ -57,6 +63,29 @@ type Props = {
   initialFilters?: MapFilters
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
+  /** True for the one page-level map screen (mode 'map' in page.tsx) — as
+   *  opposed to the small contained map embedded directly on the home screen
+   *  (see HomeMap), which is a separate mounted instance of this same
+   *  component and never sets this. Desktop only in effect: a standalone map
+   *  always opens (and stays) fullscreen — there's no boxed state for it —
+   *  and its exit control always navigates away via onExitFullscreenToListing
+   *  rather than collapsing in place, however the visitor got here (a
+   *  listing's own "Map" button, the mobile tab bar, browser back/forward).
+   *  The embedded home-screen map keeps its own boxed-by-default, expand-in-
+   *  place behavior untouched. */
+  standalone?: boolean
+  /** Whether the standalone map screen is the one currently on screen (mode
+   *  === 'map') — since it stays mounted across tab switches (see page.tsx),
+   *  this is how it knows to re-force fullscreen on every return visit, not
+   *  just its first mount (e.g. after exiting once already reset it false).
+   *  Ignored (and unnecessary) when `standalone` isn't set. */
+  visible?: boolean
+  /** Called whenever the standalone map's fullscreen exits — always
+   *  provided when `standalone` is set (either back to the listing it was
+   *  opened from, or home otherwise), since a standalone map never just
+   *  collapses to a boxed view in place. Unused by the embedded home-screen
+   *  map, whose own toggle collapses in place instead. */
+  onExitFullscreenToListing?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
    *  live coords are read (search sorting, directory distances) — not just
@@ -72,9 +101,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-type Tab = 'map' | 'nearby'
-
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, liveTracking }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -85,7 +112,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // directly rather than keeping its own separate live position.
   const activeLocation: LatLng | null = userLocation ?? null
 
-  const [tab, setTab] = useState<Tab>('map')
   // Mobile only — the quick chip row over the map shows a handful of
   // categories plus a trailing "More" chip; tapping it opens this full-screen
   // picker with every category, Google-Maps-style.
@@ -138,17 +164,107 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // passed to ResourceMap as selectedId so it can highlight the matching
   // marker, making it clear which listing on the map the sheet is showing.
   const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
+  // Desktop's equivalent of MobileNearbySheet's own `selected` state — the
+  // place currently shown in the sidebar's detail panel (MapPlaceDetail)
+  // instead of its results list. Mobile keeps its own copy of this inside
+  // MobileNearbySheet; desktop has no such child component (the sidebar is
+  // built directly in this file) so it's tracked here instead.
+  const [desktopSelected, setDesktopSelectedRaw] = useState<SelectablePoint | null>(null)
+  // Also keeps selectedPointId (the marker-highlight id ResourceMap reads,
+  // shared with mobile's own selection) in sync — set together, right where
+  // the selection itself changes, rather than via a separate effect.
+  const setDesktopSelected = (p: SelectablePoint | null) => {
+    setDesktopSelectedRaw(p)
+    setSelectedPointId(p?.id)
+  }
+  // Desktop-only — the embedded home-screen map starts as a contained card
+  // (like a widget, not the whole page); this expands it to cover the
+  // viewport, and collapses it back in place. The standalone page-level map
+  // screen has no such boxed state at all — it's always fullscreen — see the
+  // effect below. Mobile is already effectively full-bleed either way, so it
+  // has no separate fullscreen toggle.
+  const [fullscreen, setFullscreen] = useState(!!standalone)
+  // Exiting fullscreen: a standalone map always navigates away (back to the
+  // listing it was opened from, or home — see onExitFullscreenToListing);
+  // the embedded home-screen map just collapses back to its boxed card.
+  const exitFullscreen = () => {
+    setFullscreen(false)
+    onExitFullscreenToListing?.()
+  }
+  // Re-forces fullscreen every time the standalone map screen becomes the
+  // one on screen — not just its first mount. It stays mounted across tab
+  // switches (see page.tsx), so without this, returning to it after a
+  // previous visit's exit (which always resets fullscreen false) would show
+  // the visitor a state that's supposed to not exist for this screen: a
+  // standalone map sitting there NOT fullscreen. Covers every entry path —
+  // a listing's "Map" button, the mobile tab bar, browser back/forward —
+  // uniformly, instead of only the one that happened to trigger the mount.
+  useEffect(() => {
+    if (!standalone || !visible) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFullscreen(true)
+  }, [standalone, visible])
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitFullscreen()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    // Fullscreen is a fixed overlay covering the viewport — nothing behind
+    // it should scroll while it's open.
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen])
+
+  // Desktop-only — collapses the results sidebar down to just its edge
+  // toggle, same as Google Maps' own panel-collapse arrow, so a visitor who
+  // wants to see more of the map without losing their search/selection can
+  // tuck the panel away without clearing it. Reset to false at the points
+  // below where the panel would otherwise reopen with new content anyway
+  // (a fresh search, a newly toggled category, a newly selected place) —
+  // collapsing should hide what's already there, not swallow the next
+  // thing the visitor explicitly asks to see.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Lets the sidebar be opened even before anything's narrowed — without
+  // this, first-time visitors land on a bare map with no visible way to
+  // browse the (already-loaded) directory at all, since the sidebar
+  // otherwise only appears once a search/category narrows things down.
+  // Independent of sidebarCollapsed (which hides a sidebar that DOES have a
+  // narrowing reason to show); see sidebarVisible/toggleSidebar below for
+  // how the two combine.
+  const [sidebarOpenedManually, setSidebarOpenedManually] = useState(false)
+
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
   // resumes once they tap the re-center pill — matching Google Maps' own
   // blue-dot behavior instead of yanking the view back on every GPS tick.
   const [follow, setFollow] = useState(true)
 
-  // When tracking starts, flip into follow mode and show the map.
+  // When tracking starts, flip into follow mode.
   const handleStart = () => {
     setFollow(true)
-    setTab('map')
     start()
+  }
+
+  // Selecting a place — from a marker tap, the sidebar's results list, or a
+  // search suggestion — routes to whichever "show this place's details"
+  // surface the current platform actually has: mobile's bottom sheet, or
+  // desktop's sidebar detail panel.
+  const selectPlace = (p: SelectablePoint) => {
+    if (isMobile) nearbySheetRef.current?.selectPoint(p)
+    else {
+      setDesktopSelected(p)
+      setSidebarCollapsed(false)
+    }
+  }
+  const deselectPlace = () => {
+    if (isMobile) nearbySheetRef.current?.deselectPoint()
+    else setDesktopSelected(null)
   }
 
   const colorById = useMemo(() => {
@@ -269,15 +385,32 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // literal text match — applied as its own predicate in visiblePoints below.
   const openNowActive = isOpenNowWord(committedQuery)
 
-  // ── Mobile search autocomplete — Google-Maps-style dropdown of matching
-  // places while typing, independent of the live text-filter above (which
-  // narrows the map/list) and of category toggles (a name match should surface
-  // even if that category's chip happens to be off). ───────────────────────
+  // ── Search autocomplete — Google-Maps-style dropdown of matching places
+  // while typing, independent of the live text-filter above (which narrows
+  // the map/list) and of category toggles (a name match should surface even
+  // if that category's chip happens to be off). Shared logic; mobile and
+  // desktop each mount their own actual <input> (see the render below). ────
   const [searchFocused, setSearchFocused] = useState(false)
   const mobileSearchInputRef = useRef<HTMLInputElement>(null)
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null)
   const searchSuggestions = useMemo(() => {
     const q = stripApostrophes(input.trim().toLowerCase())
-    if (q.length < 2 || isOpenNowWord(q)) return []
+    if (isOpenNowWord(q)) return []
+    // Within each match-quality bucket, closest first when we have a location;
+    // otherwise most-upvoted first, so ties don't fall back to storage order.
+    const rank = (p: (typeof allPoints)[number]) =>
+      activeLocation ? haversineMiles(activeLocation, { lat: p.lat, lng: p.lng }) : -(p.raw?.upvotes ?? 0)
+    const byRank = (a: (typeof allPoints)[number], b: (typeof allPoints)[number]) => rank(a) - rank(b)
+    // Nothing typed yet — list what's currently on the map given the active
+    // category chips, same as Google Maps' own "nearby" suggestions on an
+    // empty, focused search box, instead of showing nothing until you type.
+    if (q.length === 0) {
+      return allPoints
+        .filter((p) => effectiveSelected.has(p.filterId))
+        .sort(byRank)
+        .slice(0, 6)
+    }
+    if (q.length < 2) return []
     const starts: typeof allPoints = []
     const contains: typeof allPoints = []
     for (const p of allPoints) {
@@ -285,22 +418,28 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (name.startsWith(q)) starts.push(p)
       else if (name.includes(q)) contains.push(p)
     }
-    // Within each match-quality bucket, closest first when we have a location;
-    // otherwise most-upvoted first, so ties don't fall back to storage order.
-    const rank = (p: (typeof allPoints)[number]) =>
-      activeLocation ? haversineMiles(activeLocation, { lat: p.lat, lng: p.lng }) : -(p.raw?.upvotes ?? 0)
-    const byRank = (a: (typeof allPoints)[number], b: (typeof allPoints)[number]) => rank(a) - rank(b)
     return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
-  }, [allPoints, input, activeLocation])
+  }, [allPoints, input, activeLocation, effectiveSelected])
 
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
-  // — instead of just adding it as a narrowing text filter.
+  // — instead of just adding it as a narrowing text filter. Setting
+  // committedQuery to the place's own name (below) still broadens the
+  // committed search to every place that name matches (e.g. every "GIANT"
+  // location) — necessary so the map/list have a sensible fallback if the
+  // visitor backs out of this one place — which would otherwise re-trigger
+  // the commit effect further down and immediately clear this exact
+  // selection again (multiple matches → that effect shows the LIST, not one
+  // card). suppressNextCommitEffectRef tells that effect to skip its one
+  // upcoming run so the specific place picked here actually sticks.
+  const suppressNextCommitEffectRef = useRef(false)
   const selectSuggestion = (p: (typeof allPoints)[number]) => {
+    suppressNextCommitEffectRef.current = true
     setInput(p.name)
     setCommittedQuery(p.name)
     setSearchFocused(false)
     mobileSearchInputRef.current?.blur()
-    nearbySheetRef.current?.selectPoint(p)
+    desktopSearchInputRef.current?.blur()
+    selectPlace(p)
   }
 
   // Submitting the search (the mobile keyboard's "Search" action key, via the
@@ -314,18 +453,21 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     else commitQuery(input)
     setSearchFocused(false)
     mobileSearchInputRef.current?.blur()
+    desktopSearchInputRef.current?.blur()
   }
 
-  // Clearing the search (the × button) resets the sheet back to its normal
-  // browsing state — same as Google Maps: the selected place/result list
-  // disappears and the sheet collapses — and does NOT refocus the input, so
-  // the keyboard stays down until the visitor deliberately taps the search
-  // box again.
+  // Clearing the search (the × button) resets the sheet/sidebar back to its
+  // normal browsing state — same as Google Maps: the selected place/result
+  // list disappears and the sheet collapses — and does NOT refocus the
+  // input, so the keyboard stays down until the visitor deliberately taps
+  // the search box again.
   const clearSearch = () => {
     clearQuery()
     setSearchFocused(false)
     mobileSearchInputRef.current?.blur()
-    nearbySheetRef.current?.collapse()
+    desktopSearchInputRef.current?.blur()
+    if (isMobile) nearbySheetRef.current?.collapse()
+    else setDesktopSelected(null)
   }
 
   // The committed query filters as one phrase (not per-word AND terms) —
@@ -489,11 +631,26 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // committedQuery/filterChips only change at commit points, unlike
   // activeTerms/visiblePoints which also track the live-typed text) surfaces
   // the result the way Google Maps does: exactly one match opens straight to
-  // its card, more than one raises the sheet enough to show the list.
+  // its card; more than one shows the list (raising the sheet on mobile,
+  // dropping any previously-selected place on desktop so the sidebar's list
+  // is what's visible).
   useEffect(() => {
-    if (!isMobile || !searchActive) return
-    if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
-    else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
+    if (suppressNextCommitEffectRef.current) {
+      suppressNextCommitEffectRef.current = false
+      return
+    }
+    if (!searchActive) return
+    if (isMobile) {
+      if (visiblePoints.length === 1) nearbySheetRef.current?.selectPoint(visiblePoints[0])
+      else if (visiblePoints.length > 1) nearbySheetRef.current?.raise()
+    } else {
+      // Reacting to a commit (query/filter), not a render value — there's no
+      // single non-effect call site for this, since commits land via several
+      // different handlers (submitSearch, toggleBoolField, toggleSelectValue, ...).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDesktopSelected(visiblePoints.length === 1 ? visiblePoints[0] : null)
+      setSidebarCollapsed(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filterChips])
 
@@ -529,6 +686,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // the one category you actually wanted. Once you've narrowed down,
     // further taps add/remove from that subset as before. Any category's
     // stored filters ride along either way (see clearFiltersForCategories).
+    setSidebarCollapsed(false)
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
       return
@@ -541,10 +699,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
     setSelected(next)
   }
-  const showAll = () => setSelected(new Set(options.map((o) => o.id)))
+  const showAll = () => {
+    setSelected(new Set(options.map((o) => o.id)))
+    setSidebarCollapsed(false)
+  }
   const hideAll = () => {
     setSelected(new Set())
     clearFiltersForCategories(effectiveSelected)
+    setSidebarCollapsed(false)
   }
 
   // A plain, unconditional on/off toggle — unlike `toggle` above, this never
@@ -596,170 +758,282 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const loading = listings === null || categories === null
 
+  // The place currently shown in the desktop sidebar's detail panel, if
+  // any — mirrors MobileNearbySheet's own `selected` lookup pattern.
+  const desktopSelectedCategory = desktopSelected
+    ? (categories ?? []).find((c) => c.id === desktopSelected.filterId)
+    : undefined
+
+  // Whether the visitor has actually asked for something (a search, a
+  // narrowed category selection, or a field filter) — Google Maps' own
+  // sidebar starts bare (just the search box + quick chips), not with every
+  // place already listed; the results list only appears once there's a
+  // reason to show one.
+  const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0
+
+  // Whether the sidebar is actually on screen right now — either because
+  // something narrowed the map down (a search, a category, a selected
+  // place) or because the visitor opened it manually via the edge toggle —
+  // and it hasn't been collapsed. The toggle button always renders (see the
+  // JSX below), so there's always a way to pull the panel out, even on a
+  // freshly-loaded map with nothing narrowed yet.
+  const sidebarVisible = (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && !sidebarCollapsed
+  function toggleSidebar() {
+    if (desktopNarrowed || desktopSelected) setSidebarCollapsed((c) => !c)
+    else setSidebarOpenedManually((o) => !o)
+  }
+
+  // Auto-collapse the sidebar once whatever it was showing disappears —
+  // e.g. unchecking the last matching filter leaves zero results. A panel
+  // left open with nothing but a "no places" message isn't worth the
+  // width; tucking it away automatically matches what the collapse arrow
+  // already does on request. Only applies to the results-list case, not a
+  // specific selected place (desktopSelected) — that one only goes away
+  // when the visitor explicitly backs out of it.
+  useEffect(() => {
+    if (isMobile || desktopSelected || !desktopNarrowed) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (visiblePoints.length === 0) setSidebarCollapsed(true)
+  }, [visiblePoints.length, desktopSelected, desktopNarrowed, isMobile])
+
+  // ── Desktop search box + its autocomplete dropdown — shared between the
+  // two places it can render: floating directly on the map (the default
+  // browsing state, Google-Maps-style) or embedded at the top of the
+  // sidebar (once something's actually been searched/picked). Only one of
+  // these ever actually mounts at a time (the two call sites are mutually
+  // exclusive on desktopNarrowed/desktopSelected), so this still respects
+  // "only one desktop <input> in the DOM at once" — see the mobile input's
+  // own comment about why that matters. ─────────────────────────────────
+  const desktopSearchForm = ui.search.map && !isMobile && (
+    <div className="relative w-full">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          submitSearch()
+        }}
+        className="flex items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary"
+      >
+        <svg className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+        </svg>
+        <input
+          ref={desktopSearchInputRef}
+          type="text"
+          autoComplete="off"
+          placeholder="Search name, address, or 'open now'…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setSearchFocused(false)
+              ;(e.target as HTMLInputElement).blur()
+            }
+          }}
+          className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        />
+        {input && (
+          <button
+            type="button"
+            onClick={clearSearch}
+            aria-label="Clear search"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </form>
+
+      {/* ── Autocomplete dropdown — same Google-Maps-style behavior as
+              mobile's: matching places while typing, click one to jump
+              straight to its card. ─────────────────────────────────────── */}
+      {searchFocused && searchSuggestions.length > 0 && (
+        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+          {searchSuggestions.map((p) => (
+            <button
+              key={p.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => selectSuggestion(p)}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+            >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
+                style={{ backgroundColor: p.color + '22' }}
+                aria-hidden="true"
+              >
+                {p.glyph ?? '📍'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+                <p className="truncate text-xs text-slate-400">
+                  {p.categoryLabel}
+                  {p.address ? ` · ${p.address}` : ''}
+                </p>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // The category chips — sit beside the search box (not below it), so they
+  // stay put next to it even while the dropdown is open, same as Google
+  // Maps' own chip row.
+  const desktopCategoryChips = options.length > 0 && (
+    <CategoryFilter
+      options={optionsWithFilters}
+      selected={effectiveSelected}
+      onToggle={toggle}
+      onAll={showAll}
+      onNone={hideAll}
+      categories={categories ?? []}
+      points={allPoints}
+      boolFields={boolFields}
+      onToggleBool={toggleBoolField}
+      selectFilters={selectFilters}
+      onToggleSelectValue={toggleSelectValue}
+    />
+  )
+
   return (
     // Mobile: a flex column that grows to fill <main> (itself a flex column —
     // see page.tsx) via flex-1/min-h-0, so the map below can flex-1 to fill
     // everything between the site header and the tab bar with no guessed
-    // pixel height. Desktop cancels all of this back to plain block flow,
-    // unaffected. ─────────────────────────────────────────────────────────
-    <div className="flex flex-1 min-h-0 flex-col sm:flex-none sm:block">
-      <div className="hidden sm:block">
-        <UpButton label="Home" onClick={onUp} />
-      </div>
-
-      {/* ── Header — desktop only. Google Maps doesn't caption its own map,
-              and the mobile tab bar already says "Map" — this text just ate
-              space better spent on the map. ────────────────────────────── */}
-      <div className="mb-4 hidden sm:block">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource map</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Filter by category, then tap any pin or listing for directions.
-        </p>
-      </div>
-
-      {/* ── Live tracking bar + Map/Nearby toggle (same row) — desktop only.
-              On mobile: live-tracking is a FAB on the map itself (see the map
-              box below), and the Nearby list — which Google Maps doesn't
-              surface as its own toggle either — is off the table for now,
-              pending the bottom-sheet redesign that'll bring it back. ────── */}
-      {!loading && (ui.map.liveTracking || ui.map.nearbyList) && (
-        <div className="mb-4 hidden sm:block">
-          <div className="flex items-center justify-between gap-3">
-            {ui.map.liveTracking && (
-              <div className="hidden sm:block">
-              {tracking ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Pulsing indicator */}
-                  <span className="inline-flex items-center gap-2 rounded-full bg-blue-600 pl-2.5 pr-3 py-1.5 text-sm font-semibold text-white shadow-sm">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-                    </span>
-                    Live — updating as you move
-                  </span>
-                  <button
-                    onClick={stop}
-                    className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-                  >
-                    Stop tracking
-                  </button>
+    // pixel height. Desktop: a flex ROW filling <main> the same way — a
+    // sidebar (search/filters/results, Google-Maps-desktop-style) plus the
+    // map filling the rest, both full height, instead of the old stacked/
+    // boxed layout. ──────────────────────────────────────────────────────
+    <div
+      className={`flex flex-1 min-h-0 flex-col sm:flex-row sm:overflow-hidden ${
+        fullscreen
+          ? 'sm:fixed sm:inset-0 sm:z-50 sm:rounded-none sm:ring-0'
+          : 'sm:relative sm:h-[70vh] sm:min-h-[420px] sm:flex-none sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5'
+      }`}
+    >
+      {loading ? (
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
+          Loading map…
+        </div>
+      ) : (
+        <>
+          {/* ── Desktop sidebar — mounts once there's ANY reason to (a
+                  search, a narrowed category, a selected place, or the
+                  visitor manually pulling it out via the edge toggle below);
+                  its actual on-screen width is governed by sidebarVisible,
+                  which also accounts for sidebarCollapsed. Kept as a
+                  separate mount condition from sidebarVisible (which also
+                  requires !sidebarCollapsed) so the width transition has
+                  something to animate FROM/TO — unmounting it outright
+                  wouldn't animate, it'd just vanish. ────────────────────── */}
+          {!isMobile && (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && (
+            <aside
+              className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out sm:flex sm:min-h-0 ${
+                sidebarVisible ? 'sm:w-[380px] sm:border-r sm:border-slate-200' : 'sm:w-0'
+              }`}
+            >
+              {/* No search/chips header here anymore — the floating bar
+                  (rendered once, below, positioned relative to the whole
+                  row) sits on top of this panel instead, so it never has to
+                  resize or relocate when this panel appears. This spacer is
+                  a real layout sibling (not just padding on the scroll area
+                  below) so it reserves that space permanently — padding
+                  alone would only clear it on first paint; once scrolled,
+                  list rows would slide up underneath the floating bar since
+                  padding is part of the same scrolling content. ────────── */}
+              <div className="h-16 shrink-0" />
+              {ui.map.nearbyList && (
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+                  {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
+                    <MapPlaceDetail
+                      item={desktopSelected.raw}
+                      category={desktopSelectedCategory}
+                      glyph={desktopSelected.glyph}
+                      color={desktopSelected.color}
+                      onBack={() => setDesktopSelected(null)}
+                    />
+                  ) : (
+                    <>
+                      {activeLocation && (
+                        <p className="mb-2 px-1 text-xs text-slate-400">
+                          Sorted by distance from your location{tracking ? ', updating live as you move.' : '.'}
+                        </p>
+                      )}
+                      <NearbyList
+                        points={visiblePoints}
+                        userLocation={activeLocation}
+                        onViewListing={onViewListing}
+                        onSelectPlace={selectPlace}
+                      />
+                    </>
+                  )}
                 </div>
-              ) : (
-                <button
-                  onClick={handleStart}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 cursor-pointer"
-                >
-                  <span aria-hidden="true">📍</span>
-                  Start live tracking
-                </button>
               )}
-              </div>
-            )}
-
-            {/* Map / Nearby tab toggle */}
-            {ui.map.nearbyList && (
-              <div className="flex shrink-0 rounded-xl bg-slate-100 p-1">
-                <button
-                  onClick={() => setTab('map')}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                    tab === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Map
-                </button>
-                <button
-                  onClick={() => setTab('nearby')}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                    tab === 'nearby' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Nearby
-                </button>
-              </div>
-            )}
-          </div>
-          {ui.map.liveTracking && !tracking && (
-            <p className="mt-2 hidden text-xs text-slate-400 sm:block">
-              Track your position as you walk — the nearest places update in real time.
-            </p>
+            </aside>
           )}
-          {ui.map.liveTracking && geoError && (
-            <p className="mt-2 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 sm:block">{geoError}</p>
+
+          {/* ── Sidebar collapse toggle (desktop) — sits just outside the
+                  sidebar's edge, same idea as Google Maps' own panel-collapse
+                  arrow, so the map can take over the full width without
+                  losing whatever search/selection the sidebar was showing.
+                  Fully on the map side (not straddling the border) rather
+                  than centered on it — centering it on the edge meant, once
+                  collapsed, half the button sat past x=0 and got clipped by
+                  this row's own overflow-hidden (unreachable to click), and
+                  even expanded it sat exactly where the results list's own
+                  scrollbar renders, fighting with it. Its left offset still
+                  tracks the sidebar's width (380px open, 0 collapsed) so it
+                  slides along with the edge instead of jumping.
+                  Always rendered (not just once something's narrowed) — a
+                  freshly-loaded map with nothing searched/selected yet
+                  otherwise has no visible way to browse the directory at
+                  all beyond the map's own pins. Clicking it here pulls the
+                  sidebar out to show everything currently on the map (see
+                  sidebarOpenedManually above). ─────────────────────────── */}
+          {!isMobile && (
+            <button
+              onClick={toggleSidebar}
+              aria-label={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
+              aria-pressed={!sidebarVisible}
+              style={{ left: (sidebarVisible ? 380 : 0) + 8 }}
+              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
+            >
+              <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarVisible ? '' : 'rotate-180'}`} />
+            </button>
           )}
-        </div>
-      )}
 
-      {/* ── Category filter chips (broad filter, above search's narrower text
-              filter — a single scroll row so they stay compact). Desktop only —
-              on mobile the same CategoryFilter renders inline under the
-              floating search bar instead (see below). ────────────────────── */}
-      {!loading && options.length > 0 && (
-        <div className="mb-4 hidden sm:block">
-          <CategoryFilter
-            options={optionsWithFilters}
-            selected={effectiveSelected}
-            onToggle={toggle}
-            onAll={showAll}
-            onNone={hideAll}
-            categories={categories ?? []}
-            boolFields={boolFields}
-            onToggleBool={toggleBoolField}
-            selectFilters={selectFilters}
-            onToggleSelectValue={toggleSelectValue}
-          />
-        </div>
-      )}
-
-      {/* ── Search + filters (desktop) — type a term (Enter to pin it as a
-              chip); typing "open now" pins the open-now filter. Filters carried
-              from a category show as chips too. Every chip narrows the
-              results. ─────────────────────────────────────────────────────── */}
-      {/* Real conditional mount (not just CSS hidden) — mobile browsers' virtual
-              keyboard "next/previous field" navigation bar is driven by how many
-              actual <input> elements exist in the DOM, so leaving a
-              CSS-hidden duplicate around still triggers it. Only one of
-              desktop/mobile search inputs is ever actually mounted. */}
-      {!loading && ui.search.map && !isMobile && (
-        <div className="mb-4 hidden sm:block">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              commitQuery(input)
-            }}
-          >
-            <input
-              type="text"
-              autoComplete="off"
-              placeholder="Search name, address, or 'open now'…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </form>
-          <p className="mt-1.5 text-xs text-muted">
-            {visiblePoints.length} place{visiblePoints.length !== 1 ? 's' : ''} shown
-            {(activeTerms.length > 0 || filterChips.length > 0) && ' · filtered'}
-          </p>
-        </div>
-      )}
-
-      {/* ── Map view. Mobile: full-bleed (breaks out of the page's max-width/
-              padding) and fills the rest of the flex column (flex-1) —
-              genuinely edge to edge, right up to the header, since search/
-              filters now float ON the map instead of pushing it down (see
-              below), same as Google Maps. Desktop keeps the boxed 70vh card
-              with search/filters above it in normal flow. ────────────────── */}
-      {tab === 'map' && (
-        <div
-          ref={mapBoxRef}
-          className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:h-[70vh] sm:min-h-[420px] sm:w-full sm:flex-none sm:translate-x-0 sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5"
-        >
-          {loading ? (
-            <div className="flex min-h-0 w-full flex-1 items-center justify-center bg-slate-100 text-sm text-slate-500">
-              Loading map…
+          {/* ── Floating search + chips (desktop) — positioned relative to
+                  the whole row (not the map div, and not inside the sidebar
+                  above), so it sits in the exact same spot whether or not
+                  the sidebar is showing. It floats on top of the sidebar
+                  when the sidebar's present (see that panel's own pt-16,
+                  which clears space for this) or directly on the map when
+                  it's not — never resizing or relocating either way, unlike
+                  having two separate copies. ─────────────────────────────── */}
+          {!isMobile && (
+            // right-16 (not right-3): leaves clearance so the chip row's
+            // scroll area doesn't run under the fullscreen button, which
+            // shares this same top-right corner of the map.
+            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 sm:flex">
+              <div className="w-72 shrink-0">{desktopSearchForm}</div>
+              {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
             </div>
-          ) : (
-            <>
+          )}
+
+          {/* ── Map. Mobile: full-bleed (breaks out of the page's max-width/
+                  padding) and fills the rest of the flex column (flex-1) —
+                  genuinely edge to edge, right up to the header, since
+                  search/filters float ON the map itself instead of pushing it
+                  down. Desktop: fills everything to the right of the sidebar,
+                  same edge-to-edge treatment, no boxed card — same as Google
+                  Maps. ────────────────────────────────────────────────────── */}
+          <div
+            ref={mapBoxRef}
+            className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:min-h-0 sm:w-auto sm:translate-x-0"
+          >
               <ResourceMap
                 points={visiblePoints}
                 userLocation={activeLocation}
@@ -767,14 +1041,52 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 onResumeFollow={() => setFollow(true)}
                 onManualDrag={() => setFollow(false)}
                 onViewListing={onViewListing}
-                onSelectPoint={isMobile ? (p) => nearbySheetRef.current?.selectPoint(p as typeof visiblePoints[number]) : undefined}
-                onDeselectPoint={isMobile ? () => nearbySheetRef.current?.deselectPoint() : undefined}
-                onBackgroundClick={isMobile ? () => nearbySheetRef.current?.lower() : undefined}
+                onSelectPoint={(p) => selectPlace(p as SelectablePoint)}
+                onDeselectPoint={deselectPlace}
+                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.lower() : setDesktopSelected(null))}
                 searchActive={searchActive}
                 selectedId={selectedPointId}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
                 obscuredTopPx={isMobile ? topOverlayHeight : 0}
               />
+
+              {/* ── Fullscreen toggle (desktop only) — the map starts as a
+                      contained card; this expands it to cover the viewport
+                      (Escape, or tapping it again, collapses it back — or,
+                      arriving from a listing's Map button, exits straight
+                      back to that listing; see exitFullscreen). ─────────── */}
+              <button
+                onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
+                aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
+                aria-pressed={fullscreen}
+                className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer sm:flex"
+              >
+                {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
+              </button>
+
+              {/* ── Live-tracking toggle (desktop only) — a map control, not a
+                      sidebar row, same as Google Maps' own "my location" button.
+                      Bottom-left so it never collides with the re-center pill
+                      ResourceMap draws bottom-right once a location is set. ── */}
+              {ui.map.liveTracking && (
+                <button
+                  onClick={() => (tracking ? stop() : handleStart())}
+                  aria-label={tracking ? 'Stop tracking my location' : 'Track my location'}
+                  aria-pressed={tracking}
+                  className={`absolute bottom-3 left-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer sm:flex ${
+                    tracking
+                      ? 'bg-blue-600 text-white ring-blue-600 hover:bg-blue-700'
+                      : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
+                  }`}
+                >
+                  <span aria-hidden="true">📍</span>
+                </button>
+              )}
+              {ui.map.liveTracking && geoError && (
+                <p className="absolute bottom-14 left-3 z-10 hidden max-w-[220px] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md sm:block">
+                  {geoError}
+                </p>
+              )}
 
               {/* ── Floating search + filters (mobile) — laid directly over the
                       map, Google-Maps-style, instead of pushing it down. Category
@@ -858,6 +1170,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
                                     categories={categories ?? []}
+                        points={allPoints}
                         boolFields={boolFields}
                         onToggleBool={toggleBoolField}
                         selectFilters={selectFilters}
@@ -977,29 +1290,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   onHeightChange={setSheetHeightPx}
                 />
               )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Nearby list view ─────────────────────────────────────────────────── */}
-      {tab === 'nearby' && !loading && ui.map.nearbyList && (
-        <>
-          {activeLocation ? (
-            <p className="mb-3 text-xs text-slate-400">
-              Sorted by distance from your location
-              {tracking ? ', updating live as you move.' : '.'}
-            </p>
-          ) : (
-            <p className="mb-3 text-xs text-slate-400">
-              Start live tracking above to sort by distance.
-            </p>
-          )}
-          <NearbyList points={visiblePoints} userLocation={activeLocation} onViewListing={onViewListing} />
+          </div>
         </>
       )}
 
-      {!loading && visiblePoints.length === 0 && (
+      {/* ── "No results" fallback — only needed when the results list itself
+              is turned off (ui.map.nearbyList), since NearbyList otherwise
+              already shows this same message inline (mobile sheet / desktop
+              sidebar). ───────────────────────────────────────────────────── */}
+      {!loading && !ui.map.nearbyList && visiblePoints.length === 0 && (
         <p className="mt-3 text-center text-sm text-slate-500">
           {activeTerms.length > 0 || filterChips.length > 0
             ? 'No places match every filter. Try removing one.'

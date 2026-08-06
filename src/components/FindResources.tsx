@@ -14,6 +14,7 @@ import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWid
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { resolveCapabilities } from '@/lib/categories'
 import { community } from '@/community.config'
 
@@ -40,8 +41,19 @@ type ListingAction =
 
 type Props = {
   anchor: DirectoryAnchor
-  /** Up from any resource view → back to the home grid (the directory itself). */
+  /** Up from any resource view. On mobile this is the only "up" there is —
+   *  the home grid IS the index. On desktop it's the fallback for views that
+   *  aren't a category's own "All resources" (the unknown/loading states
+   *  below, which already say "Home") — see upToAllResources for the one
+   *  that matters more, a category's own listings/hospitals/eruv/zmanim. */
   onUp: () => void
+  /** Desktop only — opens the All Categories page. A category's own
+   *  "All resources" back button goes here instead of `onUp` (home) on
+   *  desktop, since desktop split what used to be one screen (the home grid
+   *  doubling as the index) into two: a short home gateway, and this
+   *  separate full index — see upToAllResources. Mobile has no such split
+   *  (its home screen still IS the full index), so it's simply unused there. */
+  onViewAllCategories?: () => void
   /** Navigate to the map screen pre-filtered to this category, carrying the
    *  directory's active search query and field filters. */
   onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
@@ -49,9 +61,19 @@ type Props = {
 
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
-// Hospital, Eruv, Zmanim), or the "suggest a category" form. The home grid IS
-// the index now, so every Up here goes straight home.
-export default function FindResources({ anchor, onUp, onViewMap }: Props) {
+// Hospital, Eruv, Zmanim), or the "suggest a category" form.
+export default function FindResources({ anchor, onUp, onViewAllCategories, onViewMap }: Props) {
+  // Every "All resources" button below means what it says — the actual list
+  // of every resource. On mobile that's still the home grid (onUp). On
+  // desktop, home is now a short gateway with just three featured cards, not
+  // the index, so "All resources" instead means the dedicated All Categories
+  // page (see onViewAllCategories) — going to onUp there would silently
+  // relabel "All resources" onto a screen that isn't one.
+  const isMobile = useIsMobile()
+  const upToAllResources = () => {
+    if (!isMobile && onViewAllCategories) onViewAllCategories()
+    else onUp()
+  }
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
   // works for any community, with or without hospitals.
@@ -139,7 +161,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals') {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'about-hospital') {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
@@ -158,7 +180,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
   }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
-    return <EruvInfo eruvim={eruvim} onUp={onUp} title={eruv?.pluralLabel} />
+    return <EruvInfo eruvim={eruvim} onUp={upToAllResources} title={eruv?.pluralLabel} />
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
@@ -169,7 +191,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
         key={locationLabel}
         coords={zmanimCoords}
         locationLabel={locationLabel}
-        onUp={onUp}
+        onUp={upToAllResources}
         title={zmanim?.pluralLabel}
       />
     )
@@ -215,7 +237,7 @@ export default function FindResources({ anchor, onUp, onViewMap }: Props) {
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
-          onUp={onUp}
+          onUp={upToAllResources}
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}
