@@ -9,6 +9,8 @@ import HeroHeading from '@/components/home/HeroHeading'
 import SectionTabs from '@/components/home/SectionTabs'
 import HomeMap from '@/components/home/HomeMap'
 import ZmanimStrip from '@/components/home/ZmanimStrip'
+import MobileTabBar from '@/components/MobileTabBar'
+import { DEFAULT_MOBILE_TABS } from '@/lib/siteSettings'
 import { CardGrid, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import FeaturedCards from '@/components/home/FeaturedCards'
 import { pickFeaturedCards } from '@/lib/featuredCards'
@@ -93,6 +95,13 @@ function PreviewBody({
   const sections = allCards ? groupCardsIntoSections(allCards, draftSections) : []
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
+  // Same visibility gates the live bar applies (see page.tsx) — a preview that
+  // showed a Map or Feedback tab the real site drops would be lying about the
+  // very thing this screen exists to check.
+  const visibleTabs = (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).filter((t) =>
+    t.target === 'map' ? !!mapCategory : t.target === 'feedback' ? settings.feedbackEnabled : true,
+  )
+
   return (
     <>
       <SiteHeader
@@ -176,6 +185,22 @@ function PreviewBody({
       )}
 
       <SiteFooter previewSettings={settings} />
+
+      {/* The bottom tab bar — mobile only, and fed by the same draft the Mobile
+          tab is editing, so renaming or adding a tab shows up here before it's
+          saved. `position: fixed` resolves against the iframe's own viewport,
+          so it pins to the bottom of the phone frame rather than the admin
+          window. Inert: tapping a tab in a preview has nowhere to go. */}
+      {isMobile && (
+        <div className="pointer-events-none">
+          <MobileTabBar
+            mode="home"
+            tabs={visibleTabs}
+            onSelect={() => {}}
+            iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
+          />
+        </div>
+      )}
     </>
   )
 }

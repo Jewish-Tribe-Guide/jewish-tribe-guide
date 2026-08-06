@@ -96,7 +96,10 @@ const TAB_LABELS: Record<AdminTab, string> = {
   responses: 'Responses',
   archived: 'Archived',
   site: 'Site',
-  home: 'Home page',
+  // Not "Home page" any more — what's left here is whatever exists on exactly
+  // one of the two devices, and the mobile tab bar shows on every phone screen,
+  // not just the home one.
+  home: 'Desktop & mobile',
 }
 
 // The history.state shape this screen stamps on every pushState call, mirroring

@@ -18,19 +18,6 @@ import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-// Marks a field that doesn't apply to every viewport. Desktop and mobile show
-// materially different home screens (see the note atop Landing.tsx), so a
-// setting labelled only "home page" can be misleading — the featured row, for
-// one, never appears on a phone at all. Use the Desktop/Mobile toggle in the
-// preview to see either.
-function Scope({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="ml-2 align-middle rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-slate-500 uppercase">
-      {children}
-    </span>
-  )
-}
-
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds }) => ({ id, title, cardIds }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
@@ -209,16 +196,15 @@ export default function SiteSettingsEditor({
     <div>
       {isSite ? (
         <p className="text-sm text-muted mb-4">
-          The name, tagline, and logo in the header and footer, and the feedback form — the chrome
-          that wraps every page, identical on desktop and mobile. The home screen itself is on the
-          Home page tab. Nothing goes live until you click Save changes below.
+          Everything that feeds both desktop and mobile — the branding, the home screen heading and
+          mission, the section groups, and the feedback form. The pieces that exist on only one of
+          the two are on the Desktop &amp; mobile tab. Nothing goes live until you click Save
+          changes below.
         </p>
       ) : (
         <p className="text-sm text-muted mb-4">
-          The home screen. Desktop and mobile show genuinely different ones, so pick a device below
-          to edit its own settings — the fields marked{' '}
-          <span className="font-medium text-slate-700">Shared</span> feed both, and editing one from
-          either device changes both. Nothing goes live until you click Save changes below.
+          The parts that exist on only one device. Everything shared by both — headings, sections,
+          branding — is on the Site tab. Nothing goes live until you click Save changes below.
         </p>
       )}
 
@@ -253,6 +239,18 @@ export default function SiteSettingsEditor({
           <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
           <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">Shown under the site name in the header.</span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
+          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
+          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">
+            Shown under the home screen heading, and reused as the footer blurb.
+          </span>
         </label>
         <div className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
@@ -304,29 +302,17 @@ export default function SiteSettingsEditor({
       </div>
       )}
 
-      {/* ── Home screen ─────────────────────────────────────────────────────
-              Heading and mission head both devices' home screens, so they show
-              whichever is selected — one draft field, edited from either. ── */}
-      {!isSite && (
-        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">
-              Home screen heading
-              <Scope>Shared</Scope>
-            </span>
-            <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-            <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
-          </label>
-          <label className="block">
-            <span className="block text-xs font-medium text-slate-700 mb-1">
-              Mission
-              <Scope>Shared</Scope>
-            </span>
-            <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
-            <span className="block text-[11px] text-muted mt-1">
-              Shown under the home screen heading, and reused as the footer blurb.
-            </span>
-          </label>
+      {/* Sections are one set of groups rendered two different ways, so they
+          live here with the rest of the settings that feed both devices. */}
+      {isSite && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
+          <p className="text-[11px] text-muted mb-2">
+            One set of groups, shown differently per device: on desktop they’re the nav tabs across
+            the top and the All categories page they open; on mobile they’re the labelled card grid
+            running down the home screen. Renaming or regrouping changes both.
+          </p>
+          <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
         </div>
       )}
 
@@ -341,23 +327,6 @@ export default function SiteSettingsEditor({
             value={draft.featuredCardIds}
             onChange={(ids) => set('featuredCardIds', ids)}
           />
-        </div>
-      )}
-
-      {!isSite && (
-        <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">
-            Home page sections
-            <Scope>Shared</Scope>
-          </h3>
-          <p className="text-[11px] text-muted mb-2">
-            {device === 'desktop'
-              ? 'On desktop these groups are the nav tabs across the top, and the All categories page they open.'
-              : 'On mobile these groups are the labelled card grid running down the home screen.'}{' '}
-            They’re one set of groups feeding both, so renaming or regrouping here changes the other
-            device too.
-          </p>
-          <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
         </div>
       )}
 
