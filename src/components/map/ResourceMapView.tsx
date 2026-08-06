@@ -320,6 +320,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // the natural place for it, but the actual fullscreen call targets
   // this ref instead of anything local to that component.
   const mapAreaRef = useRef<HTMLDivElement>(null)
+  // Scrolls the merged list (the dropdown hanging off the map's own search
+  // bar) to whichever row is focused — a marker click sets `focusedListingId`
+  // (see `onMarkerClick` below), and the row for that id should come into
+  // view instead of leaving the visitor to hunt for the highlighted item in
+  // a scrolled-off part of the list.
+  const listRowRefs = useRef(new Map<string, HTMLLIElement>())
+  useEffect(() => {
+    if (!focusedListingId) return
+    listRowRefs.current.get(focusedListingId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [focusedListingId])
   const [isFullscreen, setIsFullscreen] = useState(false)
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === mapAreaRef.current)
@@ -834,7 +844,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
       {!embedded && (
         <div className="mb-4">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-[#2D3636]">
             Resource map
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -882,7 +892,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 <button
                   onClick={() => setTab('map')}
                   className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                    tab === 'map' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    tab === 'map' ? 'bg-white text-[#2D3636] shadow-sm' : 'text-slate-500 hover:text-[#2D3636]'
                   }`}
                 >
                   Map
@@ -890,7 +900,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 <button
                   onClick={() => setTab('nearby')}
                   className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors cursor-pointer ${
-                    tab === 'nearby' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    tab === 'nearby' ? 'bg-white text-[#2D3636] shadow-sm' : 'text-slate-500 hover:text-[#2D3636]'
                   }`}
                 >
                   Nearby
@@ -989,7 +999,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               ))}
               <button
                 onClick={clearAllFilters}
-                className="ml-1 text-xs text-muted underline hover:text-slate-700 cursor-pointer"
+                className="ml-1 text-xs text-muted underline hover:text-[#2D3636] cursor-pointer"
               >
                 Clear all
               </button>
@@ -1150,7 +1160,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             removeTerm(terms[terms.length - 1])
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-sm text-[#2D3636] placeholder:text-slate-500 focus:outline-none"
                       />
                       {/* Collapses the dropdown list below without touching
                           which categories are selected — a plain visual
@@ -1160,7 +1170,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={() => setListCollapsed((v) => !v)}
                           aria-label={listCollapsed ? 'Show list' : 'Hide list'}
-                          className="flex shrink-0 h-4 w-4 items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer"
+                          className="flex shrink-0 h-4 w-4 items-center justify-center text-slate-500 hover:text-[#2D3636] cursor-pointer"
                         >
                           <svg
                             className={`h-3 w-3 transition-transform duration-200 ${listCollapsed ? '-rotate-90' : ''}`}
@@ -1236,12 +1246,28 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               .filter(Boolean)
                               .join(' · ')
                             return (
-                              <li key={row.id}>
+                              <li
+                                key={row.id}
+                                ref={(el) => {
+                                  if (el) listRowRefs.current.set(row.id, el)
+                                  else listRowRefs.current.delete(row.id)
+                                }}
+                              >
                                 <button
                                   onClick={() => onFocusListingChange?.(isFocused ? null : row.id)}
-                                  style={{ '--accent': row.categoryColor, ...(isFocused ? { color: 'var(--accent)' } : {}) } as React.CSSProperties}
+                                  style={
+                                    {
+                                      // Darkened toward black until it clears 4.5:1 against
+                                      // the white/slate-100 row background (same helper the
+                                      // sole-category filter bar already uses below) — the
+                                      // gradient palette's paler categories were rendering
+                                      // this raw, too light to read once selected, on report.
+                                      '--accent': readableTextOnWhite(row.categoryColor),
+                                      ...(isFocused ? { color: 'var(--accent)' } : {}),
+                                    } as React.CSSProperties
+                                  }
                                   className={`group block w-full rounded px-1 py-1 text-left transition-colors cursor-pointer hover:text-[var(--accent)] ${
-                                    isFocused ? 'bg-slate-100' : 'text-slate-700 hover:bg-slate-50'
+                                    isFocused ? 'bg-slate-100' : 'text-[#2D3636] hover:bg-slate-50'
                                   }`}
                                 >
                                   <span className="block truncate text-xs font-medium">{row.name}</span>
@@ -1267,7 +1293,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             <div className="space-y-2">
                               {eruvim.map((eruv) => (
                                 <div key={eruv.id} className="border-2 border-slate-300 bg-white px-2.5 py-2">
-                                  <p className="text-xs font-semibold text-slate-900">{eruv.name}</p>
+                                  <p className="text-xs font-semibold text-[#2D3636]">{eruv.name}</p>
                                   <p className="text-xs text-muted mb-1.5">{eruv.area}</p>
                                   <a
                                     href={eruv.statusLink}
@@ -1329,14 +1355,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={selectAll}
                           disabled={options.every((o) => focusedCategoryIds?.has(o.id))}
-                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Select all
                         </button>
                         <button
                           onClick={unselectAll}
                           disabled={!focusedCategoryIds || focusedCategoryIds.size === 0}
-                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Unselect all
                         </button>
@@ -1365,7 +1391,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={() => setCategoryPickerOpen((v) => !v)}
                           aria-expanded={categoryPickerOpen}
-                          className="inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+                          className="inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
                         >
                           Filter categories{focusedCategoryIds?.size ? ` (${focusedCategoryIds.size})` : ''}
                           <svg
@@ -1390,7 +1416,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                         `selectTab` the old pill buttons did —
                                         multiple can be checked at once, unioning
                                         the map filter, same behavior as before. */}
-                                    <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                    <label className="flex cursor-pointer items-center gap-2.5 rounded px-2 py-1.5 text-sm font-medium text-[#2D3636] hover:bg-slate-50">
                                       <input
                                         type="checkbox"
                                         checked={checked}
@@ -1594,6 +1620,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                       }
                       onFocusListingChange?.(p.id)
                     }}
+                    // Click-away to dismiss: tapping empty map space clears
+                    // whatever listing is currently expanded beside it, on
+                    // request — same idea as the map's own info window
+                    // already closing on this same click.
+                    onMapClick={() => onFocusListingChange?.(null)}
                     focusPoints={
                       focusedPoint
                         ? [{ lat: focusedPoint.lat, lng: focusedPoint.lng }]

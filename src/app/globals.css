@@ -15,8 +15,8 @@
 /* Desktop-only text-wrapping (see the explore-new-format home page redesign
    — mobile stays exactly as it was, no text-wrap changes; `min-width: 40rem`
    matches Tailwind's own `sm:` breakpoint exactly, see tailwindcss/theme.css).
-   Font is Figtree everywhere now (headings and body alike, no separate
-   heading face) — see `figtree` in layout.tsx. `antialiased` (smoother font
+   Font is Manrope everywhere now (headings and body alike, no separate
+   heading face) — see `manrope` in layout.tsx. `antialiased` (smoother font
    rendering) is already on <body> in layout.tsx and applies at every size —
    that one's not a visual change worth scoping. Headings balance their line
    breaks (avoids a lonely last word); paragraphs use the "pretty" wrap
@@ -109,6 +109,27 @@ input[type='date'].date-empty {
 body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  /* Elms Sans Regular as the site's base text weight ("all other text", on
+     request — everything except the title/section headers, which each set
+     their own weight explicitly, see Landing.tsx/ZmanimWidget.tsx). Any
+     element with its own `font-*` weight utility overrides this
+     automatically, since an element's own declared value always wins over
+     an inherited one regardless of specificity. */
+  font-weight: 400;
+}
+
+/* Buttons and the smallest text tier (`text-xs`) are covered by the `body`
+   default above for the common case (no explicit weight class of their
+   own), but this makes Regular unconditional for them — written here,
+   unlayered (not inside a Tailwind `@layer`), so it wins even over a
+   leftover `font-medium`/`font-semibold`/etc. utility from before this
+   weight system existed. Tailwind's own utilities all live inside
+   `@layer utilities`, and cascade layers resolve by layer order before
+   specificity, so plain unlayered CSS always beats a layered utility class
+   regardless of which is more specific. */
+button,
+.text-xs {
+  font-weight: 400;
 }
 
 /* Horizontally-scrolling chip row (map category filter) — a thin, styled

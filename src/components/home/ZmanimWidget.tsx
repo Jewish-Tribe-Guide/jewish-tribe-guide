@@ -91,7 +91,8 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
         {/* `text-xl` (was `text-3xl`, matching "Get Connected") — shrunk on
             request now that this reads as a plain header band in the dark
             margin rather than a boxed major-section heading. */}
-        <h3 className="text-xl font-semibold tracking-tight text-[#fefefe] [font-variant:small-caps]">
+        {/* Manrope Semibold (600) on request, matching "Get Connected". */}
+        <h3 className="text-xl font-semibold tracking-[-0.75px] text-[#fefefe]">
           {title}
         </h3>
         <p className="mt-0.5 text-xs text-[#fefefe]/70">{coords ? locationLabel : community.region}</p>

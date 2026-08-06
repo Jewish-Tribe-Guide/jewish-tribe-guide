@@ -293,11 +293,11 @@ function GetConnectedAccordion({
                         // `#8FC6CF`, background tints to a very faint teal
                         // `#F4F8F8`. `duration-150 ease-out` — within the
                         // requested 150-200ms "ease" range.
-                        className={`flex w-full flex-col items-stretch gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
+                        className={`flex w-full flex-col items-stretch gap-0.5 rounded-lg px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
                           isOpen
-                            ? 'ring-2 ring-black bg-slate-100 text-[#1C1B19]'
+                            ? 'ring-2 ring-black bg-slate-100 text-[#2D3636]'
                             : isMatch
-                              ? 'ring-2 ring-[#ffc145] bg-amber-50 text-[#1C1B19]'
+                              ? 'ring-2 ring-[#ffc145] bg-amber-50 text-[#2D3636]'
                               : // Once something in this list is open, every OTHER
                                 // item dims — the same "one item stands out, the
                                 // rest recede" read the two-item Support &
@@ -307,7 +307,7 @@ function GetConnectedAccordion({
                                 // is the whole point of this state.
                                 hasSecondBox
                                 ? 'ring-slate-900/5 bg-white text-slate-300 hover:text-slate-500'
-                                : 'ring-slate-900/5 bg-white text-[#1C1B19] hover:ring-[#8FC6CF] hover:bg-[#F4F8F8]'
+                                : 'ring-slate-900/5 bg-white text-[#2D3636] hover:ring-[#8FC6CF] hover:bg-[#F4F8F8]'
                         }`}
                       >
                         <span className="flex items-center">
@@ -366,7 +366,7 @@ function GetConnectedAccordion({
                               <div className="flex justify-end border-b border-slate-100 px-3 py-1.5">
                                 <button
                                   onClick={() => item.go()}
-                                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#1C1B19] cursor-pointer"
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#2D3636] cursor-pointer"
                                 >
                                   Expand on new page
                                   <span aria-hidden="true">↗</span>
@@ -443,7 +443,7 @@ function GetConnectedAccordion({
  *  "Philly Jewish Guide" box's own border rather than spilling into the
  *  margin outside it. The trigger is a faint right-pointing arrow tucked
  *  in the box's own top-left corner — low-opacity until hovered, when it
- *  darkens AND reveals a "Browse Resources." label beside it (grown open
+ *  darkens AND reveals a "Browse Resources" label beside it (grown open
  *  via `max-width`, not `display`, so the reveal actually animates
  *  instead of popping in) — completely invisible/inert otherwise; the
  *  menu itself only ever shows once that arrow is clicked. The panel
@@ -454,7 +454,7 @@ function GetConnectedAccordion({
  *  overlay) purely so clicking anywhere else on the page still closes
  *  it — visually dimming the whole page would fight with a reveal that's
  *  deliberately contained to one small box. */
-function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
+function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; collapsed?: boolean }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -466,26 +466,56 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open])
 
+  // Closes the panel (not just hides the trigger) once the title column
+  // collapses out from under it while dragging — on request ("that can
+  // also disappear as the slide expands"). During render, not an effect
+  // (React's own recommended pattern for "adjust state when a prop
+  // changes" — see the matching comment on GetConnectedAccordion's
+  // `focusItemId` handling above).
+  const [lastCollapsed, setLastCollapsed] = useState(collapsed)
+  if (collapsed !== lastCollapsed) {
+    setLastCollapsed(collapsed)
+    if (collapsed && open) setOpen(false)
+  }
+
   return (
     <>
       {/* The trigger — a faint right-pointing arrow in this box's own
           top-left corner (not a hamburger icon, not out in the margin).
           Low-opacity until hovered, when it darkens and reveals the
-          "Browse Resources." label beside it. */}
+          "Browse Resources." label beside it. Hidden entirely once
+          `collapsed` (the title column dragged too narrow for it to sit
+          in cleanly, see Landing's own `titleColWidth`) — on request,
+          rather than just letting the section's `overflow-hidden` clip it
+          part-way, which read as sticking out/getting cut off awkwardly
+          instead of cleanly disappearing the way the title text does. */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Browse resources"
         aria-expanded={open}
-        className="group absolute left-2 top-2 z-30 hidden items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 text-[#1C1B19]/50 transition-colors cursor-pointer hover:bg-slate-100 hover:text-[#1C1B19] sm:flex"
+        className={`group absolute left-2 top-2 z-30 hidden items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 text-[#2D3636]/50 transition-colors cursor-pointer hover:bg-slate-100 hover:text-[#2D3636] ${collapsed ? '' : 'sm:flex'}`}
       >
         <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
         <span className="pointer-events-none max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold uppercase tracking-widest opacity-0 transition-all duration-300 group-hover:max-w-[10rem] group-hover:opacity-100">
-          Browse Resources.
+          Browse Resources
         </span>
       </button>
 
+      {/* Neither the backdrop nor the panel itself renders at all once
+          `collapsed` — on request: the panel's own header row ("Browse" +
+          a close ✕) doesn't shrink below its own content's natural width,
+          so on a badly narrowed title column it could render wider than
+          the (nearly-zero-width) section actually meant to contain it —
+          visibly spilling out over the map/search area beside it instead
+          of staying clipped inside. `collapsed` already force-closes
+          `open` above, which handles this for any panel that was ALREADY
+          open before narrowing past the threshold; not rendering the
+          nodes at all here is the belt-and-suspenders version, in case
+          the panel could otherwise still flash open mid-narrow. */}
+      {!collapsed && (
+        <>
       {/* Transparent click-catcher — closes the menu on any click outside
           the box, without visually dimming the rest of the page (the
           panel itself doesn't cover the rest of the page, so darkening
@@ -506,11 +536,11 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
         }`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-bold text-[#1C1B19]">Browse</h2>
+          <h2 className="text-lg font-semibold text-[#2D3636]">Browse</h2>
           <button
             onClick={() => setOpen(false)}
             aria-label="Close menu"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#1C1B19] hover:bg-slate-100 cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#2D3636] hover:bg-slate-100 cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -526,7 +556,7 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
                   card.go()
                   setOpen(false)
                 }}
-                className="block w-full px-5 py-3 text-left text-sm font-medium text-[#1C1B19] hover:bg-slate-50 cursor-pointer"
+                className="block w-full px-5 py-3 text-left text-sm font-medium text-[#2D3636] hover:bg-slate-50 cursor-pointer"
               >
                 {card.title}
               </button>
@@ -534,6 +564,8 @@ function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
           </nav>
         )}
       </div>
+        </>
+      )}
     </>
   )
 }
@@ -593,6 +625,45 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // in Get Connected is tapped — `GetConnectedAccordion` watches this and
   // expands that exact item's own panel, on request.
   const [focusGetConnectedId, setFocusGetConnectedId] = useState<string | null>(null)
+  // Draggable divider between the title column and the (search+map) column
+  // — on request, so the title can be dragged toward the left edge to
+  // shrink/hide it and give the map/search area more room, instead of
+  // that column staying a permanently fixed width. `230` matches the
+  // column's original fixed `14.4rem` (14.4 * 16px); the handle can drag
+  // it anywhere from fully collapsed (`0`) up to that original width,
+  // never wider — this is a "give room to the map" control, not a general
+  // resize-wider one.
+  const TITLE_COL_MAX_WIDTH = 230
+  // How far left of the actual divider line the drag handle renders — on
+  // request, so its circular hit target sits beside the line instead of
+  // straddling/intersecting it. Purely a rendering offset (see the handle's
+  // own `style={{ left: ... }}` below); doesn't affect the drag math itself,
+  // which still tracks the real `titleColWidth`/divider position exactly.
+  const TITLE_COL_HANDLE_OFFSET = 6
+  const [titleColWidth, setTitleColWidth] = useState(TITLE_COL_MAX_WIDTH)
+  const titleColDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  const handleTitleColDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    titleColDragRef.current = { startX: e.clientX, startWidth: titleColWidth }
+    const onMove = (ev: MouseEvent) => {
+      if (!titleColDragRef.current) return
+      const delta = ev.clientX - titleColDragRef.current.startX
+      setTitleColWidth(Math.min(TITLE_COL_MAX_WIDTH, Math.max(0, titleColDragRef.current.startWidth + delta)))
+    }
+    const onUp = () => {
+      titleColDragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+  // True once there's no more room for the drag handle to sit to the LEFT
+  // of the divider at its usual `TITLE_COL_HANDLE_OFFSET` without going
+  // negative — past this point the handle flips to the right side of the
+  // line and its arrow points right instead of left, on request (see the
+  // handle's own doc comment further down for the full reasoning).
+  const titleColHandleCollapsed = titleColWidth <= TITLE_COL_HANDLE_OFFSET
   // The exact ids currently surviving each expanded category row's own
   // filters (search/open-now/kosher/etc.), keyed by that category's map id —
   // no entry yet until that row reports its first batch, in which case the
@@ -624,25 +695,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const mapSectionRef = useRef<HTMLDivElement>(null)
   const zmanimSectionRef = useRef<HTMLDivElement>(null)
   const getConnectedSectionRef = useRef<HTMLDivElement>(null)
-  // Mirrors ResourceMapView's own key — the Medical tab is keyed by
-  // HOSPITALS_ID rather than the category's own db id, same as its pins.
-  const mapIdForCategoryConfig = (c: CategoryConfig): string => (c.kind === 'medical' ? HOSPITALS_ID : c.id)
-  const jumpToMapCategory = (cardId: string) => {
-    const found = categoriesOnMap.find((c) => (c.kind === 'medical' ? 'medical' : c.kind === 'eruv' ? 'eruv' : c.id) === cardId)
-    if (!found) return
-    const mapId = mapIdForCategoryConfig(found)
-    // Only turn it on — a "jump to" result shouldn't toggle an already-open
-    // category back off.
-    if (!focusedCategoryIds.has(mapId)) toggleCategory(mapId)
-    mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-  const jumpToZmanim = () => {
-    zmanimSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
   const jumpToGetConnected = () => {
     getConnectedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
   // into the admin-configured labeled groups for the grid.
@@ -717,19 +772,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     { id: 'social', title: 'Social Opportunities', items: socialOpportunityItems },
     { id: 'whatsapp', title: 'WhatsApp Groups', items: whatsappItems },
   ]
-  // Stand-ins for the search box's "jump to" row below — Get Connected's
-  // four categories aren't real `resources` cards (they were dropped as
-  // duplicative once Get Connected covered the same links, see the
-  // history comment on `quickLinksCards` above), so there's nothing in
-  // `resources` a query like "volunteer" could match against. `gc:`-
-  // prefixed ids keep them from ever colliding with a real category id.
-  const getConnectedJumpCards: CardDef[] = [
-    { id: 'gc:support-volunteering', title: 'Support & Volunteering', icon: '🤝', keywords: ['support', 'volunteer', 'volunteering'], go: () => {} },
-    { id: 'gc:professional', title: 'Professional Networks', icon: '💼', keywords: ['professional', 'networking', 'network', 'career'], go: () => {} },
-    { id: 'gc:social', title: 'Social Opportunities', icon: '🎉', keywords: ['social', 'meetup', 'young professional'], go: () => {} },
-    { id: 'gc:whatsapp', title: 'WhatsApp Groups', icon: '💬', keywords: ['whatsapp', 'group chat'], go: () => {} },
-  ]
-
   const q = query.trim()
   const loading = !q && allCards === null
   const filtered = q && allCards ? allCards.filter((c) => cardMatches(c, q)) : allCards
@@ -761,19 +803,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const mapHits = placeHits.filter((h) => onMapCardIds.has(h.item.category))
   const getConnectedHits = placeHits.filter((h) => h.item.category === 'whatsapp' || h.item.category === 'young-professional')
   const otherHits = placeHits.filter((h) => !onMapCardIds.has(h.item.category) && h.item.category !== 'whatsapp' && h.item.category !== 'young-professional')
-
-  // Desktop only: categories/Zmanim that used to be plain tiles (searchable via
-  // resourceCards' own rich keywords, e.g. "shul" -> Synagogues) now live in the
-  // map list or the widget below instead of the grid — so a match here surfaces
-  // as a "jump to" result rather than a tile, using the exact same keywords.
-  const hiddenFeatureMatches = q && resources
-    ? resources.filter((card) => card.id != null && (onMapCardIds.has(card.id) || card.id === 'zmanim') && cardMatches(card, q))
-    : []
-  // Same idea, for Get Connected's four categories (see `getConnectedJumpCards`
-  // above) — merged into one combined "jump to" row below rather than a
-  // second, separate one.
-  const getConnectedMatches = q ? getConnectedJumpCards.filter((card) => cardMatches(card, q)) : []
-  const jumpMatches = [...hiddenFeatureMatches, ...getConnectedMatches]
 
   // Tapping a place opens its category directory, pre-filtered to the matched term
   // (so it survives that page's own search) with the place itself expanded.
@@ -843,45 +872,46 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     // around it, so the boundary area between the bordered sections and
     // the true edge of the page still reads as one continuous color no
     // matter how wide that margin ends up being.
-    // `sm:pt-14 sm:pb-8` extends that same fill along the top and bottom
+    // `sm:pt-7 sm:pb-8` extends that same fill along the top and bottom
     // too (the top row's own `mt-8` moved here so the two don't stack into
     // a double-size gap; the bottom used to have none at all, since
-    // `<main>` itself has `sm:pb-0`). Top bumped up from `8` to `14` on
-    // request — pushes the title/map row a little further down the page;
-    // bottom stays as it was, this wasn't about the whole shelf shifting,
-    // just more room above it.
-    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2D3636] sm:pt-14 sm:pb-8">
-    {/* `px-4 sm:px-12` is a FIXED margin now (not `max-w-6xl mx-auto`,
+    // `<main>` itself has `sm:pb-0`). Top was `14`, halved to `7` on
+    // request, to match the side margins' own halving (`sm:px-12` ->
+    // `sm:px-6` above) — bottom stays as it was, this wasn't about the
+    // whole shelf shifting, just the top margin specifically.
+    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2D3636] sm:pt-7 sm:pb-8">
+    {/* `px-4 sm:px-6` is a FIXED margin now (not `max-w-6xl mx-auto`,
             which let the page's max width stay capped while all the
             extra viewport width just piled up into bigger and bigger
             side margins) — on request, so expanding/shrinking the
             browser window keeps this margin exactly the same size and
             lets the bordered sections themselves grow into the freed-up
-            space instead. */}
-    <main className="px-4 sm:px-12 pb-24 sm:pb-0">
+            space instead. `sm:px-6` (was `sm:px-12`, half) — on request,
+            the desktop margin read too thick. */}
+    <main className="px-4 sm:px-6 pb-24 sm:pb-0">
       {/* ── Top bar, SIDE BY SIDE with (search bar + map) (used to each be
-              their own full-width stacked bands). Title column is now a
-              FIXED `14.4rem` (was `1fr` in a `1fr_3fr]` proportional
-              split; landed here via `24rem` — too wide — then `16rem`
-              — matched the original proportional width — then trimmed
-              to 0.9× that, `14.4rem`, on request) — it stays exactly
-              that width as the window resizes, while the map's own
-              `1fr` column absorbs 100% of whatever space expanding/
-              shrinking the browser frees up or removes. Still narrow
-              enough that "Philly Jewish Guide" wraps one word per line
-              rather than fitting two on a row. The search bar used to
-              live in the title cell too;
-              it's now its own band stacked ABOVE the map, spanning that
-              same flexible column instead of the title's fixed one.
-              `sm:divide-x-2 sm:divide-[#2D3636]` draws the ONE shared
-              vertical line between the title and the (search+map) column —
-              i.e. directly to the left of "What are you looking for" and
-              the map beneath it (not each side drawing its own — that would
-              double up at the seam), colored `#2D3636` (the same dark
-              charcoal as the page's own outer margin — see the
-              `sm:bg-[#2D3636]` wrapper above). Every border across the
-              whole shelf (interior dividers and the outer frame alike) is a
-              uniform 2px now, on request — while
+              their own full-width stacked bands). Title column WIDTH is now
+              draggable (`titleColWidth`, was a permanently fixed `14.4rem`)
+              — on request, so the divider between it and the map can be
+              dragged toward the left edge to shrink/hide the title and give
+              the map/search area more room, all the way down to fully
+              collapsed. `14.4rem` (`TITLE_COL_MAX_WIDTH` = 230px) is now
+              just the drag range's own upper bound, restored on load. The
+              search bar used to live in the title cell too; it's now its
+              own band stacked ABOVE the map, spanning that same flexible
+              column instead of the title's fixed one.
+              The vertical line between the title and the (search+map)
+              column — i.e. directly to the left of "What are you looking
+              for" and the map beneath it — is the right column's own
+              `sm:border-l-2` now (see its own doc comment; was
+              `sm:divide-x-2` here on the wrapper, moved once the drag
+              handle below became a 3rd DOM child and broke that utility's
+              "every child but the first" assumption), colored `#2D3636`
+              (the same dark charcoal as the page's own outer margin — see
+              the `sm:bg-[#2D3636]` wrapper above) — the drag handle
+              (below) renders right on top of that same line. Every border
+              across the whole shelf (interior dividers and the outer frame
+              alike) is a uniform 2px now, on request — while
               `sm:border-x-2`/`sm:border-t-2` on this wrapper frame the
               row's own outer edges at that same 2px. Falls back to
               a single column (just the title) when there's no map
@@ -894,8 +924,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               The gap holding it off the very top of the page now comes
               from the outer wrapper's own `sm:py-8` (see above), not a
               margin here. `border-x-2`/`border-t-2` at `#2D3636` (2px,
-              charcoal) — every other section's own border below matches. ─ */}
-      <div className={`hidden sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-2 sm:border-t-2 sm:border-[#2D3636] ${hasMap || ui.search.landing ? 'sm:grid-cols-[14.4rem_1fr] sm:divide-x-2 sm:divide-[#2D3636]' : 'sm:grid-cols-1'}`}>
+              charcoal) — every other section's own border below matches.
+              This whole row is now nested one level deeper than before —
+              a new `sm:relative` OUTER wrapper (below) that does NOT clip
+              its own contents (unlike the `sm:overflow-hidden` grid div
+              still directly below it, kept for the rounded-corner clip)
+              holds the drag handle as its own sibling, out from under that
+              clip — on request, the handle used to live INSIDE the
+              `overflow-hidden` grid div and rendered at a position that
+              went negative/near-zero once the title mostly collapsed,
+              getting clipped away and becoming impossible to grab again
+              for a second drag. ──────────────────────────────────────── */}
+      <div className="hidden sm:relative sm:block">
+      <div
+        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x sm:border-t sm:border-[#2D3636] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
+        style={hasMap || ui.search.landing ? { gridTemplateColumns: `${titleColWidth}px 1fr` } : undefined}
+      >
         {/* Used to also carry a Volunteer/Support/Young Professionals
                 quick-links row here; removed as duplicative once the "Get
                 Connected" section further down covered the same links
@@ -914,37 +958,116 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 the taller side), so its content centers vertically in
                 that extra room instead of sitting flush at the top with a
                 dead gap below. ─────────────────────────────────────────── */}
-        {/* Flat `#ABE4ED` (was flat `#C7F2D7`, before that flat `#FBFBFD`,
-            before that flat `#fefefe`, before that a left-to-right
-            white->cyan `linear-gradient`, before that flat `#fefefe`,
-            before that a teal `linear-gradient`), on request. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:bg-[#ABE4ED] sm:px-6 sm:py-8 sm:text-left">
-          <HamburgerMenu resources={resources} />
-          {/* Sans-serif (Figtree, the site's only face now — the serif
-              headline face was removed entirely on request, weight is
-              what carries hierarchy instead). `font-bold` (700, was
-              `font-extrabold`/800) at `text-5xl` (48px, within the
-              specified ~40-56px hero range). */}
-          <h1 className="text-5xl font-bold tracking-tight text-[#1C1B19] [font-variant:small-caps]">
-            {settings.name}
-          </h1>
-          {/* Fixed copy per explicit request, not `settings.tagline` — this
-                  exact sentence replaces whatever the admin-configured tagline
-                  would otherwise show here. `text-[#1C1B19]/70` — slightly
-                  fainter than the h1 above it. `mt-3` — a bit of buffer
-                  between the h1 and this line, on request (they used to
-                  sit flush). `leading-relaxed` (1.625) for the gap
-                  BETWEEN this paragraph's own wrapped rows — previously
-                  tried matching the h1's own line-height RATIO exactly
-                  (`leading-none`/`leading-[1.1111]`, tracking text-5xl/
-                  text-4xl's default ratio as it changed), but a ratio
-                  close to 1 on a small `text-sm` face barely moves the
-                  actual pixel gap, so it read as no visible change at
-                  all. This is a real, visibly looser gap between rows
-                  instead. */}
-          <p className="mt-3 text-sm leading-relaxed text-[#1C1B19]/70">
-            Community resources for residents, visitors, and hospital patients
-          </p>
+        {/* Left-to-right gradient, pale blue into soft teal (was flat
+            `#ABE4ED`, before that flat `#C7F2D7`, before that flat
+            `#FBFBFD`, before that flat `#fefefe`, before that a
+            left-to-right white->cyan `linear-gradient`, before that flat
+            `#fefefe`, before that a teal `linear-gradient`), on request. */}
+        {/* Found the actual "stops shrinking partway" bug via a real drag
+            (Playwright), not just reasoning about it: this section's own
+            `px-6`/`py-8` padding turned out to be a hard floor no CSS
+            `min-width` can override — a border-box element apparently
+            can't render narrower than its own padding sum (24px * 2 =
+            48px here) in this browser, regardless of `min-width: 0`
+            explicitly set (confirmed: forcing `min-width:0` directly had
+            zero effect; forcing `padding:0` directly dropped it straight
+            to the track's real 30px). So the section physically couldn't
+            render narrower than 48px no matter how far `titleColWidth`
+            (the grid TRACK) kept shrinking past that, and once the track
+            dropped below 48px the section started overflowing past its
+            own track boundary, bleeding into the search bar column beside
+            it — exactly the "stops expanding, leaves a strip of blue"
+            symptom. Fix: the padding moved OFF this grid-item section
+            entirely (down onto the fixed-width inner wrapper below,
+            which doesn't participate in grid track sizing) — this
+            section itself now has zero padding of its own, so it has
+            nothing preventing it from reaching a genuine 0. */}
+        {/* `sm:justify-center` (was briefly `sm:justify-start` for the
+            "premium panel" top-anchored look, reverted back on request —
+            "center those vertically") — the Title/Tagline block now floats
+            vertically centered again in whatever height the (much taller)
+            map/search column beside it leaves free, same as before that
+            experiment. */}
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#D6EFFA_0%,#ABD6E0_100%)]">
+          {/* `< 100` (was `< 60`) — the real constraint isn't just "does the
+              trigger itself still fit," it's "does the drag handle's own
+              position ever land inside the hamburger's hover-triggered
+              footprint" (its collapsed icon alone reaches ~48px from the
+              left edge; the handle sits at `titleColWidth - 16`). At the
+              old `60` threshold the handle was still at `44` right as the
+              hamburger became hidden — inside that footprint, not clear of
+              it — so hovering the handle could still trigger the
+              hamburger's OWN `group-hover` label reveal underneath/beside
+              it (the "Browse Resources" snippet bug). `100` puts the
+              handle at `84` by the time the hamburger hides, comfortably
+              past its collapsed edge. */}
+          <HamburgerMenu resources={resources} collapsed={titleColWidth < 100} />
+          {/* "Premium panel" spacing structure, on request — Title -> Tagline
+              (was Emblem -> Title -> Tagline; the emblem was removed again
+              on request), left-justified (was briefly centered, reverted
+              back on request), with generous padding above and below
+              (`sm:pt-16`/`sm:pb-16`, was `sm:py-8` shared top/bottom) —
+              the whole block sits vertically centered in the section
+              again now (see the section's own doc comment above; that
+              padding still gives the text itself room to breathe within
+              the centered block, on top of whatever extra space centering
+              adds around it). `(Optional) small nav` from the same brief
+              is the
+              existing HamburgerMenu trigger above (a corner icon,
+              deliberately left outside this stack rather than duplicated
+              into it — it already reads as exactly that "small nav" role
+              tucked unobtrusively out of the
+              way). Fixed-width (`TITLE_COL_MAX_WIDTH`, matching the
+              section's original full width) — on request (separately from
+              the spacing restructure), so dragging the resize handle
+              narrower makes this whole block CLIP away (disappear)
+              instead of reflowing/wrapping into the shrinking space.
+              Without this, "Philly Jewish Guide"/the tagline would rewrap
+              into more, shorter lines as the column narrowed ("condensing"
+              instead of disappearing) — and since this section's own
+              height is whatever its tallest content needs, that extra
+              wrapped height would grow the WHOLE row (both columns share
+              one height), shifting Get Connected/everything below it
+              while dragging. Pinning this to a constant width means the
+              text always wraps exactly the same way it does at full
+              width — this section's natural height never changes while
+              dragging, only how much of that fixed-size content is still
+              visible past the shrinking `overflow-hidden` edge on the
+              section above. `shrink-0` stops flexbox from compressing it
+              back down on its own. */}
+          <div className="shrink-0 flex flex-col items-start sm:px-6 sm:pt-16 sm:pb-16 sm:text-left" style={{ width: TITLE_COL_MAX_WIDTH }}>
+            {/* No emblem anymore (was the site's brand mark, then briefly
+                the admin-uploaded logo — both removed, on request) —
+                straight to Title -> Tagline now. */}
+            {/* Elms Sans (the whole site's font now, see layout.tsx's
+                `elmsSans`) at Extrabold (800) for the title specifically,
+                on request. `text-5xl` (48px, within the specified ~40-56px
+                hero range). `[font-kerning:normal]` explicitly opts into
+                kerning (glyph-pair spacing adjustments, e.g. tucking "o"
+                closer under a "T") on request — most browsers already
+                default to this, but it's not guaranteed across all of them
+                without stating it. */}
+            <h1 className="mt-4 text-[51px] font-extrabold leading-[1.3] tracking-[-0.75px] text-[#2D3636] [font-kerning:normal]">
+              {settings.name}
+            </h1>
+            {/* Fixed copy per explicit request, not `settings.tagline` — this
+                    exact sentence replaces whatever the admin-configured tagline
+                    would otherwise show here. `text-[#2D3636]/70` — slightly
+                    fainter than the h1 above it. `mt-3` — a bit of buffer
+                    between the h1 and this line, on request (they used to
+                    sit flush). `leading-relaxed` (1.625) for the gap
+                    BETWEEN this paragraph's own wrapped rows — previously
+                    tried matching the h1's own line-height RATIO exactly
+                    (`leading-none`/`leading-[1.1111]`, tracking text-5xl/
+                    text-4xl's default ratio as it changed), but a ratio
+                    close to 1 on a small `text-sm` face barely moves the
+                    actual pixel gap, so it read as no visible change at
+                    all. This is a real, visibly looser gap between rows
+                    instead. */}
+            <p className="mt-3 text-sm leading-relaxed text-[#2D3636]/70">
+              Community resources for residents, visitors, and hospital patients
+            </p>
+          </div>
         </section>
 
         {/* Right column — search bar band stacked above the map, both
@@ -953,8 +1076,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 the search band's own `border-b-2` is the divider between
                 them (map has no matching `border-t` — only one side draws
                 the shared line) — same uniform 2px as every other border on
-                the shelf. ──────────────────────────────────────────────── */}
-        <div className="sm:flex sm:flex-col">
+                the shelf. `sm:border-l-2` here (was `sm:divide-x-2` on the
+                grid wrapper instead) — on request: the drag handle above is
+                a 3rd DOM child sitting between this div and the title
+                section, and Tailwind's `divide-x` borders every child except
+                the first, so it was ALSO putting its own left border on the
+                handle itself — two nearly-coincident vertical lines a few
+                px apart instead of one. An explicit border on just this
+                element is unaffected by how many other children exist in
+                between. ─────────────────────────────────────────────────── */}
+        <div className="sm:flex sm:flex-col sm:border-l sm:border-[#2D3636]">
           {/* ── Search bar — used to live in the title cell; now its own
                   band above the map. Placeholder/aria-label is a fixed
                   "Search website…" now (was `settings.heroTitle`, the
@@ -971,7 +1102,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            <section className="sm:border-b-2 sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:py-6">
+            <section className="sm:border-b sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:py-6">
+              {/* Section header, on request — matches "Get Connected"'s own
+                  treatment (same weight/size/color) so the two read as
+                  siblings; mobile keeps its own `settings.heroTitle` copy
+                  via HeroHeading instead (usually this same "What are you
+                  looking for?" text, but admin-editable there — this one's
+                  a fixed string to match Get Connected/Zmanim, which aren't
+                  editable either). */}
+              <h2 className="mb-2 text-center text-[26px] font-semibold tracking-[-0.75px] text-[#2D3636]">
+                What are you looking for?
+              </h2>
               <div className="mx-auto w-full max-w-xl">
                 {/* `border-slate-300` — the pill had no border at all
                     before, relying only on its shadow to read against this
@@ -979,7 +1120,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     contrast for the pill itself to be visible. Icon/
                     placeholder/clear-button grays darkened a step too
                     (`slate-400` -> `slate-500`, hover `slate-600` ->
-                    `slate-700`) for the same reason — text-[#1C1B19] stays
+                    `slate-700`) for the same reason — text-[#2D3636] stays
                     untouched. */}
                 <div className="flex items-center rounded-full border border-slate-300 bg-white pl-4 pr-1.5 py-1.5 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
                   <svg className="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
@@ -992,7 +1133,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search website…"
                     aria-label="Search website…"
-                    className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-[#1C1B19] placeholder:text-slate-500 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-[#2D3636] placeholder:text-slate-500 focus:outline-none"
                   />
                   {/* Collapses the results below without touching the query
                       — ported from the map's own search bar chevron, on
@@ -1114,7 +1255,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                                 onClick={() => focusPlace(hit)}
                                 className="flex w-40 flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 ring-slate-900/5 bg-white transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#8FC6CF]"
                               >
-                                <span className="min-w-0 w-full truncate text-sm font-semibold text-[#1C1B19]">{hit.item.name}</span>
+                                <span className="min-w-0 w-full truncate text-sm font-semibold text-[#2D3636]">{hit.item.name}</span>
                                 {subtitle && <span className="min-w-0 w-full truncate text-xs font-normal text-slate-400">{subtitle}</span>}
                               </button>
                             )
@@ -1153,6 +1294,67 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           )}
         </div>
       </div>
+      {/* ── Drag handle — a thin strip sitting just to the LEFT of the
+              title/map divider (was centered directly on top of it, on
+              request — the circle was intersecting the line rather than
+              sitting clear of it). A sibling of the grid div above now,
+              not nested inside it (see that div's own doc comment for
+              why — its `overflow-hidden` was clipping this handle away
+              once it got close to the edge, making it impossible to grab
+              for a second drag once the title was mostly collapsed).
+              Dragging it left/right resizes `titleColWidth` (clamped
+              0..`TITLE_COL_MAX_WIDTH` in `handleTitleColDragStart`); a
+              double-click snaps it back to the original full width, an
+              escape hatch since dragging alone has no other way back once
+              the title's collapsed to nothing. `TITLE_COL_HANDLE_OFFSET`
+              (16px) shifts the whole handle's anchor point left of the
+              actual line by roughly the grip's own half-width, so it reads
+              as a control sitting beside the border rather than stamped
+              on it — `Math.max(0, ...)` keeps that offset from ever
+              pushing it to a negative (off-screen) position once
+              `titleColWidth` drops below the offset itself, on request —
+              it now stays pinned at the left edge, fully visible and
+              grabbable, instead of continuing past 0 and out of view.
+              Back to a chevron arrow (was a 3-dot grip bar for one pass, on
+              request that it read less like a button — now reverted, on
+              further request, to an arrow again) — but drawn as a small
+              solid `#2D3636` tab sitting snug against the line (offset
+              shrunk from `16` to `10`, roughly its own radius) so it reads
+              as growing out of the border itself, not a separate floating
+              control beside it. Points left and sits left of the line
+              normally — the direction dragging this collapses the title
+              toward — but flips to point right and hops to the RIGHT side
+              of the line instead once the title's collapsed to (or near)
+              nothing (`titleColHandleCollapsed`), same swap-sides logic as
+              before. Restyled to match HamburgerMenu's own trigger arrow
+              exactly, on request — a bare stroke chevron with no fill at
+              rest (was a solid `#2D3636` circle, which read as "surrounded
+              by black"), `/50` opacity darkening to full `#2D3636` with a
+              faint `slate-100` circular background ONLY on hover, same as
+              that trigger. `TITLE_COL_HANDLE_OFFSET` shrunk further (10 ->
+              6) so it sits right up against the line instead of clearly
+              floating beside it, on request ("more attached to the border
+              boundary it's near"). Only rendered when there's actually a
+              second column to negotiate space with. ───────────────────── */}
+      {(hasMap || ui.search.landing) && (
+        <div
+          onMouseDown={handleTitleColDragStart}
+          onDoubleClick={() => setTitleColWidth(TITLE_COL_MAX_WIDTH)}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to resize the title column"
+          title="Drag to resize — double-click to reset"
+          className="group absolute top-0 bottom-0 z-30 hidden w-3 -translate-x-1/2 cursor-col-resize items-center justify-center sm:flex"
+          style={{ left: titleColHandleCollapsed ? titleColWidth + TITLE_COL_HANDLE_OFFSET : titleColWidth - TITLE_COL_HANDLE_OFFSET }}
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[#2D3636]/50 transition-colors group-hover:bg-slate-100 group-hover:text-[#2D3636]">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d={titleColHandleCollapsed ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
+            </svg>
+          </span>
+        </div>
+      )}
+      </div>
 
       {/* ── Mobile-only now: "What are you looking for?" heading + filter —
               desktop hides this whole band since its title was removed and
@@ -1162,33 +1364,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         query={query}
         onQueryChange={setQuery}
       />
-
-      {/* ── Desktop: "jump to" results — categories/Zmanim/Get Connected
-              entries that match the search box's query but no longer have a
-              tile of their own (they moved into the map list, the Zmanim
-              widget, or Get Connected instead), so this is how the search
-              box still reaches them. Now sits BELOW the title/search + map
-              row (used to sit between them, back when they were stacked
-              instead of side by side). ───────────────────────────────── */}
-      {jumpMatches.length > 0 && (
-        <div className="mt-6 hidden sm:flex flex-wrap gap-2">
-          {jumpMatches.map((card) => (
-            <button
-              key={card.id}
-              onClick={() => {
-                if (card.id === 'zmanim') jumpToZmanim()
-                else if (card.id!.startsWith('gc:')) jumpToGetConnected()
-                else jumpToMapCategory(card.id!)
-              }}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-[#3a86ff] bg-white px-4 py-2 text-sm font-medium text-[#1C1B19] hover:bg-[#3a86ff] hover:text-white cursor-pointer"
-            >
-              {card.icon && <span aria-hidden="true">{card.icon}</span>}
-              {card.title}
-              <span aria-hidden="true" className="text-slate-400">↓</span>
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* ── "Get Connected" heading — merged with the blank spacer band that
               used to sit above it as its own separate div (on request), so
@@ -1210,13 +1385,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               `text-3xl` (was `text-2xl`, then `text-xl`) — bumped back up
               and past its original size so this heading reads clearly more
               prominent than the category tiles/item buttons under it
-              (`text-sm`), on request. Sans-serif now (the separate serif
-              headline face was removed entirely, weight carries hierarchy
-              instead) — `font-semibold` (600, was `font-extrabold`/800),
-              at `text-3xl` (30px, within the specified ~28-32px section-
+              (`text-sm`), on request. Manrope Semibold (600, was
+              Medium/500) for section headers specifically, on request, at
+              `text-3xl` (30px, within the specified ~28-32px section-
               header range). ─────────────────────────────────────────── */}
-      <div className="hidden sm:block sm:border-x-2 sm:border-t-2 sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
-        <h2 className="text-3xl font-semibold tracking-tight text-[#1C1B19] [font-variant:small-caps]">Get Connected</h2>
+      <div className="hidden sm:block sm:border-x sm:border-t sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
+        {/* `inline-block` so the border centers under the heading (the
+            parent's `text-center` still centers it) instead of spanning the
+            whole section — `px-10` extends the rule out past the text
+            itself on both sides (was flush with the letters), on request. */}
+        <h2 className="inline-block border-b border-[#2D3636]/20 px-10 pb-2 text-[26px] font-semibold tracking-[-0.75px] text-[#2D3636]">
+          Get Connected
+        </h2>
       </div>
 
       {/* ── Get Connected — desktop only, boxed band (same fluid-width
@@ -1250,7 +1430,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           above. `sm:pb-4` — buffer between the lowest button (or the
           shared detail panel, if one's open) and this section's own bottom
           border, on request (was flush against it before). */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-2 sm:border-t-0 sm:border-b-2 sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-4">
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x sm:border-t-0 sm:border-b sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-4">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 

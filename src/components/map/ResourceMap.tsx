@@ -242,6 +242,11 @@ type Props = {
    *  `sidebar` list when that point's category is already the one showing
    *  there, so the info surfaces in the list too, not just the info window. */
   onMarkerClick?: (point: MapPoint) => void
+  /** Called when the map itself (empty space, not a marker) is clicked —
+   *  lets the parent clear whatever listing/category is currently expanded
+   *  beside the map, same "click away to dismiss" idea as the info window
+   *  closing on this same click below. */
+  onMapClick?: () => void
   /** Forces the map to frame exactly these points — a close zoom centered on
    *  a single one, or a bounds-fit enveloping several (e.g. a facility or a
    *  whole category isolated in a list beside the map) — regardless of the
@@ -362,7 +367,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx, initialZoom = 14, isFullscreen = false, onToggleFullscreen }: Props) {
+export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, onMapClick, focusPoints, skipAutoFit, leftInsetPx, initialZoom = 14, isFullscreen = false, onToggleFullscreen }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -377,10 +382,12 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
   // the marker an open info window was anchored to, closing it mid-tap.
   const onViewListingRef = useRef(onViewListing)
   const onMarkerClickRef = useRef(onMarkerClick)
+  const onMapClickRef = useRef(onMapClick)
   const userLocationRef = useRef(userLocation)
   const leftInsetPxRef = useRef(leftInsetPx)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onMarkerClickRef.current = onMarkerClick }, [onMarkerClick])
+  useEffect(() => { onMapClickRef.current = onMapClick }, [onMapClick])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   useEffect(() => { leftInsetPxRef.current = leftInsetPx }, [leftInsetPx])
   // ── Initialize the map once ──────────────────────────────────────────────
@@ -435,7 +442,10 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
         infoWindowRef.current = new google.maps.InfoWindow()
         // Click-away to dismiss: tapping empty map closes the open info window
         // (marker taps fire 'gmp-click' and don't bubble here, so they still open).
-        mapRef.current.addListener('click', () => infoWindowRef.current?.close())
+        mapRef.current.addListener('click', () => {
+          infoWindowRef.current?.close()
+          onMapClickRef.current?.()
+        })
         setReady(true)
       })
       .catch(() => {
@@ -643,6 +653,38 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
     if (center) map.setCenter(center)
   }, [isFullscreen])
 
+  // Same "trigger resize, restore center" fix as the `isFullscreen` effect
+  // above, but general — watches this map's own container for ANY size
+  // change (a `ResizeObserver`, not tied to one specific cause) instead of
+  // just fullscreen toggling. On request: dragging the title column's width
+  // on the desktop home page (Landing.tsx) grows/shrinks this map's own
+  // container in real time, and without this the map stayed rendered at
+  // its stale pixel size while the search bar above it (a plain block
+  // element, not a Google Maps canvas) resized instantly — the two visibly
+  // fell out of sync during the drag. `requestAnimationFrame`-coalesced so
+  // a rapid drag (many resize notifications per second) only ever triggers
+  // one Google Maps resize per animation frame, not one per pixel moved.
+  useEffect(() => {
+    const map = mapRef.current
+    const container = containerRef.current
+    if (!ready || !map || !container) return
+    let raf = 0
+    const observer = new ResizeObserver(() => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const center = map.getCenter()
+        google.maps.event.trigger(map, 'resize')
+        if (center) map.setCenter(center)
+      })
+    })
+    observer.observe(container)
+    return () => {
+      observer.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [ready])
+
   if (!MAPS_API_KEY || authFailed) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
@@ -665,18 +707,20 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           elsewhere), and never triggered automatically — the map only ever
           pans on its own once, right when tracking first starts (see the
           "you are here" effect above); every tap here after that is a
-          deliberate, explicit re-center. `bottom-16` (was `bottom-3`) —
-          stacked above the fullscreen toggle below instead of sharing its
-          corner, since both can be visible at once. Solid `bg-blue-600`
-          fill + white text now (was white fill + blue text + a ring) — on
-          request, to read as the same visual family as "Start live
-          tracking" (ResourceMapView.tsx), which is a solid color pill too. */}
+          deliberate, explicit re-center. `right-14` — beside the fullscreen
+          toggle now (was stacked above it at `bottom-16`), on request, so
+          the two share one row along the bottom edge instead of stacking.
+          `#3E6E6E` fill (was `bg-blue-600`) — on request, to match
+          "Start live tracking"'s own teal (`FILTER_PILL_ACTIVE` in
+          ResourceMapView.tsx) instead of blue, so the two read as the same
+          visual family. */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className="absolute bottom-16 right-3 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-md cursor-pointer transition-colors hover:bg-blue-700"
+          className="absolute bottom-3 right-14 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
+          style={{ backgroundColor: '#3E6E6E' }}
         >
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-blue-300" aria-hidden="true" />
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-white/40" aria-hidden="true" />
           Re-center
         </button>
       )}
@@ -690,7 +734,7 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
         <button
           onClick={onToggleFullscreen}
           aria-label={isFullscreen ? 'Exit full screen' : 'View full screen'}
-          className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
+          className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#2D3636] shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
         >
           {isFullscreen ? (
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
