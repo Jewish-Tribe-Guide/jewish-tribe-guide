@@ -53,9 +53,10 @@ function isEmptyValue(v) {
 }
 
 function syncMayWrite(details, field, currentValue) {
-  if (isEmptyValue(currentValue)) return true
+  if (field === 'address') return isEmptyValue(currentValue)
   const owned = details?.googleFields
-  return Array.isArray(owned) && owned.includes(field)
+  if (Array.isArray(owned)) return owned.includes(field)
+  return isEmptyValue(currentValue)
 }
 
 function nextGoogleFields(details, written) {

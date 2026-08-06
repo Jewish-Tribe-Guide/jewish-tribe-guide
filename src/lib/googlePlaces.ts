@@ -83,9 +83,21 @@ export function syncMayWrite(
   field: OwnableSyncField,
   currentValue: unknown,
 ): boolean {
-  if (isEmptyValue(currentValue)) return true
+  // Address is special regardless of provenance: `geo` is derived from it, so
+  // replacing a curated address would silently move the pin. Only ever filled
+  // when there's nothing there.
+  if (field === 'address') return isEmptyValue(currentValue)
+
   const owned = details?.googleFields
-  return Array.isArray(owned) && owned.includes(field)
+  // Provenance on record (the submission form captured it, or a previous sync
+  // wrote it) — believe it exactly. A field that isn't listed is the
+  // submitter's, even when it's blank: someone who deliberately cleared a
+  // wrong autofilled phone number shouldn't get it put back.
+  if (Array.isArray(owned)) return owned.includes(field)
+
+  // No provenance recorded — a row that predates the form capturing it. Fill
+  // gaps only; anything with a value in it was put there by a person.
+  return isEmptyValue(currentValue)
 }
 
 /** The `googleFields` list to store after a sync wrote `written`. Additive —

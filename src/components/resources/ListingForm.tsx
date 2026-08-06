@@ -57,6 +57,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [placeId, setPlaceId] = useState<string | null>(
     typeof existing?.placeId === 'string' ? existing.placeId : null,
   )
+  // What picking an address autofilled into the syncable fields, this session.
+  // Compared against the submitted values so the recurring Google sync learns
+  // which fields the submitter accepted from Google and which they replaced —
+  // see googleFieldsForSubmit. Populated by handlePlaceSelect; a ref because
+  // nothing renders from it.
+  const autofilled = useRef<{ phone?: string; hours?: string }>({})
+  // Whatever provenance the listing already carries (edits only). A field stays
+  // Google's across an edit unless this edit actually changes it.
+  const priorGoogleFields: string[] = Array.isArray(existing?.googleFields)
+    ? (existing.googleFields as string[])
+    : []
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
   )
@@ -112,6 +123,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       const hoursField = config.detailFields.find((f) => f.type === 'hours')
       if (hoursField) setDetail(hoursField.key, result.hours)
     }
+    // Remember exactly what autofill put in the syncable fields. Whether these
+    // values survive to submit is what tells the recurring Google sync which
+    // fields it owns — see googleFieldsForSubmit below.
+    autofilled.current = {
+      phone: result.phone ? formatPhone(result.phone) : undefined,
+      hours: result.hours ? JSON.stringify(result.hours) : undefined,
+    }
     if (result.website) {
       // Matched by label, not key — existing categories' Website fields
       // predate a fixed key convention (e.g. keyed "w" or "whatsapp"), so
@@ -121,6 +139,40 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       )
       if (websiteField) setDetail(websiteField.key, result.website)
     }
+  }
+
+  // ── Which fields the Google sync is allowed to keep refreshing ─────────────
+  // The distinction that matters isn't "was this ever edited" — it's whether
+  // the value in the box came from Google or from a person. Picking an address
+  // autofills the phone and hours; most submitters keep them, and those should
+  // track Google forever. Some replace them deliberately — the kosher stand
+  // inside a stadium whose Google phone number is the stadium's switchboard —
+  // and those must never be reverted.
+  //
+  // Per field: if this session autofilled it, it's Google's only if the
+  // submitted value is still byte-identical to what autofill wrote. Otherwise,
+  // on an edit, it keeps whatever it had — unless this edit changed it, which
+  // hands it to the person. On a create with no autofill, it's the person's.
+  function googleFieldsForSubmit(): string[] {
+    const hoursKey = config.detailFields.find((f) => f.type === 'hours')?.key
+    const currentHours = hoursKey ? JSON.stringify(details[hoursKey] ?? null) : undefined
+    const priorHours = hoursKey ? JSON.stringify((existing?.[hoursKey] as unknown) ?? null) : undefined
+
+    const decide = (
+      field: 'phone' | 'hours',
+      autofilledValue: string | undefined,
+      current: string | undefined,
+      prior: string | undefined,
+    ) => {
+      if (autofilledValue !== undefined) return current === autofilledValue
+      if (mode === 'edit') return priorGoogleFields.includes(field) && current === prior
+      return false
+    }
+
+    const out: string[] = []
+    if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
+    if (hoursKey && decide('hours', autofilled.current.hours, currentHours, priorHours)) out.push('hours')
+    return out
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -170,6 +222,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // Carry the Google place id through so the sync job can pick it up as
         // soon as the listing is approved. Only set for sync-eligible categories.
         ...(syncEligible && placeId ? { placeId } : {}),
+        // Always written (even when empty) for sync-eligible categories: its
+        // presence is what tells the sync this listing has real provenance
+        // rather than being a pre-provenance row it has to guess about.
+        ...(syncEligible ? { googleFields: googleFieldsForSubmit() } : {}),
       },
       geo: hasAddress ? coords : null,
     }
