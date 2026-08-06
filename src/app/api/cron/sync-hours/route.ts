@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { fetchPlaceSync } from '@/lib/googlePlaces'
+import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 
@@ -88,14 +88,31 @@ async function runSync(): Promise<NextResponse> {
       ...row.details,
       googleSyncedAt: new Date().toISOString(),
     }
-    if (sync.hours) details.hours = sync.hours
+    // Google-only concepts with no curated counterpart — always refreshed.
     if (sync.businessStatus) details.businessStatus = sync.businessStatus
     if (sync.description && !details.googleDescription) details.googleDescription = sync.description
 
+    // Everything else is written only where Google owns the field: one it
+    // filled itself, or one still empty. See syncMayWrite in googlePlaces.ts.
+    const wrote: OwnableSyncField[] = []
     const update: { details: Record<string, unknown>; phone?: string; address?: string } = { details }
-    if (sync.phone) update.phone = sync.phone
-    // Only fill a missing address — never overwrite a curated one (keeps `geo` in sync).
-    if (!row.address && sync.address) update.address = sync.address
+
+    if (sync.hours && syncMayWrite(row.details, 'hours', row.details?.hours)) {
+      details.hours = sync.hours
+      wrote.push('hours')
+    }
+    if (sync.phone && syncMayWrite(row.details, 'phone', row.phone)) {
+      update.phone = sync.phone
+      wrote.push('phone')
+    }
+    // Filling an address also keeps `geo` honest, so it stays gated on being
+    // empty the same way it always was — now via the shared ownership rule.
+    if (sync.address && syncMayWrite(row.details, 'address', row.address)) {
+      update.address = sync.address
+      wrote.push('address')
+    }
+
+    details.googleFields = nextGoogleFields(row.details, wrote)
 
     await supabase.from('resource').update(update).eq('id', row.id)
     synced++

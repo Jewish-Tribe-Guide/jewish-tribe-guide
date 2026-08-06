@@ -35,6 +35,71 @@ function serverKey(): string | null {
   return process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_GEOCODING_API_KEY ?? null
 }
 
+// ── Field ownership ─────────────────────────────────────────────────────────
+//
+// Some listing data is curated by a person and some is whatever Google had.
+// The sync must only ever refresh the second kind: a local phone number an
+// editor typed in shouldn't be replaced by a chain's toll-free call centre, and
+// hours corrected by hand shouldn't be reverted by Google's (sometimes wrong)
+// posted hours.
+//
+// The rule is provenance, not a blanket policy: Google may write a field it
+// filled itself, or one that's still empty. A field that already has a value
+// with no record of Google having set it was put there by a person — leave it.
+//
+// Ownership is recorded as `details.googleFields`, the list of fields this job
+// filled. Two properties make that reliable rather than bookkeeping:
+//
+//   * No backfill is needed. The recurring sync had never run against this data
+//     when ownership was introduced, so every value that existed then was
+//     manual by definition — and absence of the marker means exactly that.
+//
+//   * A human edit releases ownership for free. Approving an edit REPLACES
+//     `details` with the submitted form's values (see listingColumns in
+//     submissionStore.ts), which drops the marker along with it. So the moment
+//     a person corrects a field, Google stops touching it, with no extra
+//     wiring in the edit path.
+
+/** Fields the sync will only write when it owns them. `businessStatus` and
+ *  `googleDescription` are deliberately absent — they're Google-only concepts
+ *  with no hand-curated counterpart, so they're always refreshed. */
+export const OWNABLE_SYNC_FIELDS = ['hours', 'phone', 'address'] as const
+export type OwnableSyncField = (typeof OWNABLE_SYNC_FIELDS)[number]
+
+/** Nothing there to protect: unset, blank, or an object with no keys. Note that
+ *  a fully-populated "closed every day" hours object is NOT empty — someone
+ *  chose that, and Google mustn't overwrite it. */
+function isEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (typeof value === 'object') return Object.keys(value as object).length === 0
+  return false
+}
+
+/** Whether the sync may write `field`, given the listing's current value for it
+ *  and its `details`. See the note above. */
+export function syncMayWrite(
+  details: Record<string, unknown> | null | undefined,
+  field: OwnableSyncField,
+  currentValue: unknown,
+): boolean {
+  if (isEmptyValue(currentValue)) return true
+  const owned = details?.googleFields
+  return Array.isArray(owned) && owned.includes(field)
+}
+
+/** The `googleFields` list to store after a sync wrote `written`. Additive —
+ *  a field Google owned before and simply had nothing new for this run stays
+ *  owned, so one blank response doesn't silently hand it back. */
+export function nextGoogleFields(
+  details: Record<string, unknown> | null | undefined,
+  written: readonly OwnableSyncField[],
+): OwnableSyncField[] {
+  const prior = Array.isArray(details?.googleFields) ? (details.googleFields as string[]) : []
+  const merged = new Set<string>([...prior, ...written])
+  return OWNABLE_SYNC_FIELDS.filter((f) => merged.has(f))
+}
+
 // ── Find Place id ───────────────────────────────────────────────────────────
 
 /**
