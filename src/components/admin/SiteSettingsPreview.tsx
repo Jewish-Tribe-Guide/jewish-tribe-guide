@@ -54,13 +54,17 @@ export default function SiteSettingsPreview({
   settings,
   sections: draftSections,
   onClose,
+  initialDevice,
 }: {
   settings: SiteSettings
   sections: DraftHomeSection[]
   onClose: () => void
+  /** Which device the frame opens on — the editor passes whichever one is
+   *  being edited. Defaults to desktop. */
+  initialDevice?: 'desktop' | 'mobile'
 }) {
   return (
-    <DevicePreviewFrame onClose={onClose}>
+    <DevicePreviewFrame onClose={onClose} initialDevice={initialDevice}>
       <PreviewBody settings={settings} sections={draftSections} />
     </DevicePreviewFrame>
   )

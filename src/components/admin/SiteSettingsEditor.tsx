@@ -36,7 +36,20 @@ function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 
-export default function SiteSettingsEditor({ token }: { token: string }) {
+export default function SiteSettingsEditor({
+  token,
+  section,
+}: {
+  token: string
+  /** Which admin tab is rendering this. Both tabs share one component instance
+   *  (see AdminTabs) so the draft and the single Save button survive switching
+   *  between them — a half-finished home screen edit isn't silently dropped
+   *  because you stepped over to fix the tagline. */
+  section: 'site' | 'home'
+}) {
+  // Which device's home screen is being edited. Not persisted — it's a lens on
+  // the same draft, not a setting.
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -175,29 +188,61 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
   }
 
   if (previewing) {
-    return <SiteSettingsPreview settings={draft} sections={sectionsDraft} onClose={closePreview} />
+    return (
+      <SiteSettingsPreview
+        settings={draft}
+        sections={sectionsDraft}
+        onClose={closePreview}
+        // Open on whichever device is being edited, so Preview answers the
+        // question actually being asked. Still switchable inside the preview.
+        initialDevice={section === 'home' ? device : 'desktop'}
+      />
+    )
   }
 
   const dirty =
     !settings || JSON.stringify(settings) !== JSON.stringify(draft) || !sections || !sectionsEqual(sections, sectionsDraft)
 
+  const isSite = section === 'site'
+
   return (
     <div>
-      <p className="text-sm text-muted mb-4">
-        The site name, tagline, logo, home screen heading and mission, the sections on the home
-        screen, and the feedback form — laid out in the order they appear on the page. Nothing here
-        goes live until you click Save changes below.
-      </p>
-      <p className="text-sm text-muted mb-4">
-        Desktop and mobile show different home screens, so some settings below only affect one of
-        them — each is labelled. Use <span className="font-medium text-slate-700">Preview</span> and
-        its Desktop/Mobile toggle to see both.
-      </p>
+      {isSite ? (
+        <p className="text-sm text-muted mb-4">
+          The name, tagline, and logo in the header and footer, and the feedback form — the chrome
+          that wraps every page, identical on desktop and mobile. The home screen itself is on the
+          Home page tab. Nothing goes live until you click Save changes below.
+        </p>
+      ) : (
+        <p className="text-sm text-muted mb-4">
+          The home screen. Desktop and mobile show genuinely different ones, so pick a device below
+          to edit its own settings — the fields marked{' '}
+          <span className="font-medium text-slate-700">Shared</span> feed both, and editing one from
+          either device changes both. Nothing goes live until you click Save changes below.
+        </p>
+      )}
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}
 
+      {!isSite && (
+        <div className="mb-5 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
+          {(['desktop', 'mobile'] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDevice(d)}
+              className={`px-3.5 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer ${
+                device === d ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {d === 'desktop' ? '🖥️ Desktop' : '📱 Mobile'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isSite && (
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
@@ -208,18 +253,6 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
           <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">Shown under the site name in the header.</span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
-          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
-          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            Shown under the home screen heading, and reused as the footer blurb.
-          </span>
         </label>
         <div className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
@@ -269,51 +302,80 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           </span>
         </div>
       </div>
+      )}
 
-      <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">
-          Featured cards
-          <Scope>Desktop only</Scope>
-        </h3>
-        <p className="text-[11px] text-muted mb-2">
-          The “Popular right now” row between the search box and the map. Phones don’t show this row
-          — they get the full card grid instead.
-        </p>
-        <FeaturedCardsPicker
-          value={draft.featuredCardIds}
-          onChange={(ids) => set('featuredCardIds', ids)}
-        />
-      </div>
+      {/* ── Home screen ─────────────────────────────────────────────────────
+              Heading and mission head both devices' home screens, so they show
+              whichever is selected — one draft field, edited from either. ── */}
+      {!isSite && (
+        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">
+              Home screen heading
+              <Scope>Shared</Scope>
+            </span>
+            <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
+            <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">
+              Mission
+              <Scope>Shared</Scope>
+            </span>
+            <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
+            <span className="block text-[11px] text-muted mt-1">
+              Shown under the home screen heading, and reused as the footer blurb.
+            </span>
+          </label>
+        </div>
+      )}
 
-      <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">
-          Home page sections
-          <Scope>Both, differently</Scope>
-        </h3>
-        <p className="text-[11px] text-muted mb-2">
-          These groups drive the nav tabs across the top on desktop (and the All categories page
-          they open), and the labelled card grid down the home screen on mobile. Renaming or
-          regrouping here changes both.
-        </p>
-        <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
-      </div>
+      {!isSite && device === 'desktop' && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
+          <p className="text-[11px] text-muted mb-2">
+            The “Popular right now” row between the search box and the map. Phones don’t show this
+            row at all — they get the full card grid instead.
+          </p>
+          <FeaturedCardsPicker
+            value={draft.featuredCardIds}
+            onChange={(ids) => set('featuredCardIds', ids)}
+          />
+        </div>
+      )}
 
-      <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">
-          Mobile tab bar
-          <Scope>Mobile only</Scope>
-        </h3>
-        <p className="text-[11px] text-muted mb-2">
-          Rename, reorder, add, or remove the tabs along the bottom of the screen on a phone.
-          Desktop navigates by the section tabs across the top instead, which come from the
-          groups above.
-        </p>
-        <MobileTabsEditor
-          tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
-          onChange={(tabs) => set('mobileTabs', tabs)}
-        />
-      </div>
+      {!isSite && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">
+            Home page sections
+            <Scope>Shared</Scope>
+          </h3>
+          <p className="text-[11px] text-muted mb-2">
+            {device === 'desktop'
+              ? 'On desktop these groups are the nav tabs across the top, and the All categories page they open.'
+              : 'On mobile these groups are the labelled card grid running down the home screen.'}{' '}
+            They’re one set of groups feeding both, so renaming or regrouping here changes the other
+            device too.
+          </p>
+          <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+        </div>
+      )}
 
+      {!isSite && device === 'mobile' && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Mobile tab bar</h3>
+          <p className="text-[11px] text-muted mb-2">
+            Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no
+            tab bar — it navigates by the section tabs above instead.
+          </p>
+          <MobileTabsEditor
+            tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
+            onChange={(tabs) => set('mobileTabs', tabs)}
+          />
+        </div>
+      )}
+
+      {isSite && (
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl mt-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -368,6 +430,7 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           </>
         )}
       </div>
+      )}
 
       <div className="flex items-center gap-3 mt-4">
         <button
@@ -393,10 +456,12 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         {savedNotice && !dirty && <span className="text-sm text-green-700">Saved.</span>}
       </div>
 
-      <p className="text-[11px] text-muted mt-5 max-w-xl">
-        These also drive the browser tab title, search-engine description, and “Add to Home Screen”
-        app name.
-      </p>
+      {isSite && (
+        <p className="text-[11px] text-muted mt-5 max-w-xl">
+          These also drive the browser tab title, search-engine description, and “Add to Home
+          Screen” app name.
+        </p>
+      )}
     </div>
   )
 }

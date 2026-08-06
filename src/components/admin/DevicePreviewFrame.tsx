@@ -90,11 +90,14 @@ function IframeViewport({
 export default function DevicePreviewFrame({
   onClose,
   children,
+  initialDevice = 'desktop',
 }: {
   onClose: () => void
   children: React.ReactNode
+  /** Which device to open on. The toggle still works from there. */
+  initialDevice?: Device
 }) {
-  const [device, setDevice] = useState<Device>('desktop')
+  const [device, setDevice] = useState<Device>(initialDevice)
   // If the admin is already viewing this from a phone-width browser, that IS
   // the mobile viewport — a Desktop/Mobile toggle has nothing useful to offer
   // (a 1280px desktop iframe can't fit either way, and a 390px mobile iframe
