@@ -58,7 +58,7 @@ type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem
 
 // One shared tint for every Get Connected category tile (Support &
 // Volunteering, Professional Networks, Social Opportunities, WhatsApp
-// Groups) — `#F5F5F7`, a near-white neutral gray (was `#91D7E6`, a light
+// Groups) — `#FBFBFD` (was `#F5F5F7`, before that `#91D7E6`, a light
 // cyan-blue, before that `#A2DAF2`, before that a bright cyan `#64D6E3` —
 // the shelf's own border color at the time — before that mustard yellow
 // `#D4A017`, before that mustard green `#BBC167`, before that `#F0F6F6`, on
@@ -67,7 +67,7 @@ type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem
 // band — the individual white item cards (see GetConnectedAccordion) sit on
 // top of it. The map area above keeps its own separate `#F0F6F6` — this
 // request was scoped to "What are you looking for" and "Get Connected" only.
-const CATEGORY_FILL = '#F5F5F7'
+const CATEGORY_FILL = '#FBFBFD'
 
 /** "Get Connected" — same width as the map above it (both sit inside the
  *  same fluid-width `<main>`, see its own doc comment). The four
@@ -638,12 +638,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // Draggable divider between the title column and the (search+map) column
   // — on request, so the title can be dragged toward the left edge to
   // shrink/hide it and give the map/search area more room, instead of
-  // that column staying a permanently fixed width. `230` matches the
-  // column's original fixed `14.4rem` (14.4 * 16px); the handle can drag
-  // it anywhere from fully collapsed (`0`) up to that original width,
-  // never wider — this is a "give room to the map" control, not a general
-  // resize-wider one.
-  const TITLE_COL_MAX_WIDTH = 230
+  // that column staying a permanently fixed width. The handle can drag it
+  // anywhere from fully collapsed (`0`) up to this max width, never wider
+  // — this is a "give room to the map" control, not a general
+  // resize-wider one. `210` (was `230`, matching the column's original
+  // fixed `14.4rem`) — narrowed slightly on request, to accommodate the
+  // title's own font-size shrinking from 51px to 40px.
+  const TITLE_COL_MAX_WIDTH = 210
   // How far left of the actual divider line the drag handle renders — on
   // request, so its circular hit target sits beside the line instead of
   // straddling/intersecting it. Purely a rendering offset (see the handle's
@@ -923,8 +924,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               the borders themselves lightened) — the drag handle (below)
               renders right on top of that same line. Every border across
               the whole shelf (interior dividers and the outer frame alike)
-              is a uniform 1.5px now, on request — while `sm:border-x-[1.5px]`/
-              `sm:border-t-[1.5px]` on this wrapper frame the row's own outer
+              is a uniform 2px now, on request — while `sm:border-x-[2px]`/
+              `sm:border-t-[2px]` on this wrapper frame the row's own outer
               edges at that same weight. Falls back to a single column (just
               the title) when there's no map (`hasMap` false) rather than
               leaving an empty second cell. `sm:rounded-t-2xl`+
@@ -935,7 +936,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               Connected's matching bottom corners below). The gap holding
               it off the very top of the page now comes from the outer
               wrapper's own `sm:py-8` (see above), not a margin here.
-              `border-x-[1.5px]`/`border-t-[1.5px]` at `#E8E8E8` (light
+              `border-x-[2px]`/`border-t-[2px]` at `#E8E8E8` (light
               gray) — every other section's own border below matches.
               This whole row is now nested one level deeper than before —
               a new `sm:relative` OUTER wrapper (below) that does NOT clip
@@ -949,7 +950,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               for a second drag. ──────────────────────────────────────── */}
       <div className="hidden sm:relative sm:block">
       <div
-        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-[1.5px] sm:border-t-[1.5px] sm:border-[#E8E8E8] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
+        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-[2px] sm:border-t-[2px] sm:border-[#E8E8E8] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
         style={hasMap || ui.search.landing ? { gridTemplateColumns: `${titleColWidth}px 1fr` } : undefined}
       >
         {/* Used to also carry a Volunteer/Support/Young Professionals
@@ -1066,7 +1067,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 closer under a "T") on request — most browsers already
                 default to this, but it's not guaranteed across all of them
                 without stating it. */}
-            <h1 className="mt-4 text-[51px] font-extrabold leading-[1.3] tracking-[-0.75px] text-[#2D3636] [font-kerning:normal]">
+            <h1 className="mt-4 text-[40px] font-extrabold leading-[1.3] tracking-[-0.75px] text-[#2D3636] [font-kerning:normal]">
               {settings.name}
             </h1>
             {/* Fixed copy per explicit request, not `settings.tagline` — this
@@ -1104,7 +1105,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 px apart instead of one. An explicit border on just this
                 element is unaffected by how many other children exist in
                 between. ─────────────────────────────────────────────────── */}
-        <div className="sm:flex sm:flex-col sm:border-l-[1.5px] sm:border-[#E8E8E8]">
+        <div className="sm:flex sm:flex-col sm:border-l-[2px] sm:border-[#E8E8E8]">
           {/* ── Search bar — used to live in the title cell; now its own
                   band above the map. Placeholder/aria-label is a fixed
                   "Search website…" now (was `settings.heroTitle`, the
@@ -1121,7 +1122,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            <section className="sm:border-b-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:px-6 sm:py-6">
+            <section className="sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:px-6 sm:py-6">
               {/* Section header, on request — matches "Get Connected"'s own
                   treatment (same weight/size/color) so the two read as
                   siblings; mobile keeps its own `settings.heroTitle` copy
@@ -1408,12 +1409,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               tracking-[-0.75px]`) — a touch bigger, heavier, and tighter,
               on request ("make the headings feel a little richer"), same
               treatment as "What are you looking for?" above. ──────────── */}
-      <div className="hidden sm:block sm:border-x-[1.5px] sm:border-t-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
+      <div className="hidden sm:block sm:border-x-[2px] sm:border-t-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
             itself on both sides (was flush with the letters), on request. */}
-        <h2 className="inline-block border-b-[1.5px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-bold tracking-[-1px] text-[#2D3636]">
+        <h2 className="inline-block border-b-[2px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-bold tracking-[-1px] text-[#2D3636]">
           Get Connected
         </h2>
       </div>
@@ -1449,7 +1450,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           above. `sm:pb-6` (was `sm:pb-4`) — buffer between the lowest
           button (or the shared detail panel, if one's open) and this
           section's own bottom border, bumped up a bit further on request. */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[1.5px] sm:border-t-0 sm:border-b-[1.5px] sm:border-[#E8E8E8] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-6">
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:pt-3 sm:pb-6">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 
