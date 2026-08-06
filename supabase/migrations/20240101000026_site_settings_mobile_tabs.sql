@@ -1,0 +1,23 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Adds the mobile bottom tab bar's configuration to site_settings (run in the
+-- Supabase SQL editor, after site_settings_featured_cards.sql). This is the
+-- phone-only bar pinned to the bottom of every screen — the mobile equivalent
+-- of the desktop featured-card row, in that it's a small curated set of
+-- shortcuts into the same categories/forms the home screen already lists.
+--
+-- Stored as an ordered jsonb array of { id, label, target }:
+--   * `id`     — stable key, so reordering/renaming doesn't remount the tab.
+--   * `label`  — the admin-editable text under the icon.
+--   * `target` — 'categories', 'map', or 'feedback' for the three built-in
+--                screens; anything else is a CardDef id (a category slug, or
+--                a form id like 'support'), opened the same way tapping that
+--                card on the home screen would.
+--
+-- Null (the default) falls back to the built-in Categories/Map/Feedback trio
+-- in code, so a fresh install behaves exactly as it did before this column
+-- existed and nobody has to configure anything. The Map and Feedback tabs
+-- stay subject to their existing visibility rules (no Map category
+-- configured, or feedback turned off, still drops them).
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table site_settings add column if not exists mobile_tabs jsonb;

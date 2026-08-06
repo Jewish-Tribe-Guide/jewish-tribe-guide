@@ -11,13 +11,14 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
-import MobileTabBar, { type MobileTab } from '@/components/MobileTabBar'
+import MobileTabBar from '@/components/MobileTabBar'
 import FeedbackForm from '@/components/FeedbackForm'
 import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import { useLiveLocation } from '@/lib/useLiveLocation'
 import { useCategories } from '@/lib/useCategories'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { DEFAULT_MOBILE_TABS, type MobileTabConfig } from '@/lib/siteSettings'
 import { ui } from '@/lib/uiConfig'
 
 // Which guided form is open as a full-screen overlay, and any need
@@ -50,6 +51,10 @@ type NavState = {
   /** Which section the All Categories page should scroll to on arrival (set
    *  when the visitor clicked a section tab rather than "Browse all"). */
   allCategoriesSection?: string
+  /** Which category directory is open. Owned by FindResources (which reads and
+   *  writes it for its own sub-views); page.tsx only mirrors it, to highlight a
+   *  matching mobile tab. */
+  findView?: string
 }
 
 export default function Page() {
@@ -72,6 +77,14 @@ export default function Page() {
   const isMobile = useIsMobile()
   const feedbackModalOpen = mode === 'feedback' && !isMobile
   const [flow, setFlow] = useState<Flow | null>(null)
+  // Which category directory is open, mirrored from history state purely so the
+  // mobile tab bar can light up a card tab pointing at it. FindResources owns
+  // the real `view` — this is a read-only shadow of the same history field, kept
+  // in sync at every transition that can change which *category* is open (they
+  // all go through navigate/viewListing or a popstate). Its own internal moves
+  // — opening a listing's edit form, a hospital's About page — don't change the
+  // category, so not seeing those is fine.
+  const [findView, setFindView] = useState<string | null>(null)
   // Which category to pre-select when opening the map from a category directory.
   const [mapCategory, setMapCategory] = useState<string | null>(null)
   // When arriving from a directory with an active search, pre-fill the map's
@@ -135,6 +148,7 @@ export default function Page() {
       setMapFilters(s?.mapFilters ?? null)
       setMapEnteredFromListing(!!s?.mapFromListing)
       setAllCategoriesSection(s?.allCategoriesSection ?? null)
+      setFindView(s?.findView ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -156,6 +170,7 @@ export default function Page() {
     if (s?.mapFilters) setMapFilters(s.mapFilters)
     if (s?.mapFromListing) setMapEnteredFromListing(true)
     if (s?.allCategoriesSection) setAllCategoriesSection(s.allCategoriesSection)
+    if (s?.findView) setFindView(s.findView)
   }, [])
 
   // Central navigation function — always call this instead of setMode directly so
@@ -165,6 +180,7 @@ export default function Page() {
   const navigate: NavigateFn = (_audience, nextMode, extra) => {
     setMode(nextMode)
     setFlow(null)
+    setFindView(typeof extra?.findView === 'string' ? extra.findView : null)
     history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
@@ -193,22 +209,46 @@ export default function Page() {
   }
 
   // Mobile tab bar — Categories/Find both read as the "Categories" tab (see
-  // MobileTabBar's `modes` map), and re-tapping it always resets to the root
+  // MobileTabBar's BUILT_IN_MODES), and re-tapping it always resets to the root
   // Landing grid rather than staying wherever the visitor drilled into.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
-  const selectTab = (tab: MobileTab) => {
-    if (tab === 'categories') navigate(null, 'home')
-    else if (tab === 'map') {
+  const selectTab = (tab: MobileTabConfig) => {
+    if (tab.target === 'categories') navigate(null, 'home')
+    else if (tab.target === 'map') {
       // A plain tab switch, not a listing's "Map" button — the map should
       // show its normal (possibly boxed, on desktop) state, not re-enter
       // fullscreen or wire its exit control back to a stale listing.
       setMapEnteredFromListing(false)
       navigate(null, 'map')
-    }
-    else navigate(null, 'feedback')
+    } else if (tab.target === 'feedback') navigate(null, 'feedback')
+    // Anything else is a card id. A category opens its directory; everything
+    // else is a form (the built-in support/volunteer, or an admin-made one)
+    // and opens as a full-screen wizard, exactly as its home-screen tile does.
+    else if (categories?.some((c) => c.id === tab.target)) {
+      navigate(null, 'find', { findView: tab.target })
+    } else openFlow(tab.target)
   }
+
+  // The two built-in gates that have always applied. Card tabs are left alone:
+  // a target is either a category or a form, and telling a deleted category
+  // apart from a perfectly valid form id would mean fetching the forms list on
+  // every page load to guard against something the admin editor already
+  // prevents — and getting it wrong would silently hide a working tab.
+  // `?? DEFAULT_MOBILE_TABS` guards a response from a deployment older than the
+  // mobileTabs field (or a stale cached one): the bar is on every mobile screen,
+  // so an undefined here would be a crash on load rather than a missing tab.
+  const visibleTabs = (settings.mobileTabs ?? DEFAULT_MOBILE_TABS).filter((t) =>
+    t.target === 'map' ? hasMap : t.target === 'feedback' ? settings.feedbackEnabled : true,
+  )
+
   const tabBar = (
-    <MobileTabBar mode={mode} onSelect={selectTab} showMapTab={hasMap} showFeedbackTab={settings.feedbackEnabled} />
+    <MobileTabBar
+      mode={mode}
+      tabs={visibleTabs}
+      onSelect={selectTab}
+      activeCardId={findView}
+      iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
+    />
   )
 
   const overlay = flow && (
@@ -247,6 +287,7 @@ export default function Page() {
     setMapSelectedCategories(null)
     setMapFilters(null)
     setFlow(null)
+    setFindView(categoryId)
     history.pushState({ mode: 'find', findView: categoryId, findItemId: listingId }, '')
   }
 
@@ -284,6 +325,7 @@ export default function Page() {
     setMapFilters(null)
     setMapEnteredFromListing(false)
     setFlow(null)
+    setFindView(categoryId)
     history.pushState({ mode: 'find', findView: categoryId ?? undefined }, '')
   }
 

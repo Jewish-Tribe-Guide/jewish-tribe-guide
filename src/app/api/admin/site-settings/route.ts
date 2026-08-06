@@ -1,6 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { getSiteSettings, updateSiteSettings } from '@/lib/siteSettingsStore'
-import type { SiteSettings } from '@/lib/siteSettings'
+import { MAX_MOBILE_TABS, type SiteSettings } from '@/lib/siteSettings'
 
 // GET /api/admin/site-settings — the current settings, for the admin editor.
 // Admin only (same data as the public route, just auth-gated for symmetry
@@ -46,6 +46,26 @@ export async function PATCH(request: Request) {
   }
   if (body.feedbackSuccessMessage !== undefined && !body.feedbackSuccessMessage.trim()) {
     return Response.json({ ok: false, errors: ['Feedback success message cannot be empty.'] }, { status: 400 })
+  }
+  if (body.mobileTabs !== undefined) {
+    const tabs = body.mobileTabs
+    if (!Array.isArray(tabs) || tabs.length === 0) {
+      return Response.json({ ok: false, errors: ['The mobile tab bar needs at least one tab.'] }, { status: 400 })
+    }
+    if (tabs.length > MAX_MOBILE_TABS) {
+      return Response.json(
+        { ok: false, errors: [`The mobile tab bar holds at most ${MAX_MOBILE_TABS} tabs.`] },
+        { status: 400 },
+      )
+    }
+    if (tabs.some((t) => !t?.id?.trim() || !t?.label?.trim() || !t?.target?.trim())) {
+      return Response.json({ ok: false, errors: ['Every mobile tab needs a label and a destination.'] }, { status: 400 })
+    }
+    // Two tabs pointing at the same screen would both light up as active — the
+    // bar would look broken rather than merely redundant.
+    if (new Set(tabs.map((t) => t.target)).size !== tabs.length) {
+      return Response.json({ ok: false, errors: ['Two mobile tabs cannot share a destination.'] }, { status: 400 })
+    }
   }
 
   try {

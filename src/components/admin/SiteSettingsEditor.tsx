@@ -6,7 +6,8 @@ import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import SiteSettingsPreview from './SiteSettingsPreview'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
-import { FEATURED_CARD_COUNT } from '@/lib/siteSettings'
+import MobileTabsEditor from './MobileTabsEditor'
+import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 
 // ── The Home page tab: the header/hero/footer branding text (name, tagline,
 // heading, mission, logo), the home-screen section grouping, and the footer's
@@ -295,6 +296,22 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
           regrouping here changes both.
         </p>
         <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+      </div>
+
+      <div className="mt-6 max-w-2xl">
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">
+          Mobile tab bar
+          <Scope>Mobile only</Scope>
+        </h3>
+        <p className="text-[11px] text-muted mb-2">
+          Rename, reorder, add, or remove the tabs along the bottom of the screen on a phone.
+          Desktop navigates by the section tabs across the top instead, which come from the
+          groups above.
+        </p>
+        <MobileTabsEditor
+          tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
+          onChange={(tabs) => set('mobileTabs', tabs)}
+        />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl mt-6">
