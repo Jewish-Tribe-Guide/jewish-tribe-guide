@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
-import SiteSettingsPreview from './SiteSettingsPreview'
+import DevicePreviewFrame from './DevicePreviewFrame'
+import { PREVIEW_URL, writePreviewDraft } from '@/lib/previewDraft'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
 import MobileTabsEditor from './MobileTabsEditor'
 import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
@@ -48,24 +49,24 @@ export default function SiteSettingsEditor({
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
 
-  // Preview gets its own history entry so browser/trackpad Back (and the
-  // preview's own Back button, which calls closePreview) land back on this
-  // editor instead of skipping past it to the categories list.
-  useEffect(() => {
-    function onPopState(e: PopStateEvent) {
-      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
+  // The preview is plain component state, deliberately NOT a history entry.
+  // It used to push one so browser Back would close it, but the preview is now
+  // a navigable iframe: every navigation inside it adds an entry to the tab's
+  // joint session history, so a single history.back() steps the *frame* back
+  // rather than closing the overlay — which made the "Back to editor" button
+  // do nothing visible once you'd clicked past the home screen. Back now means
+  // "back inside the preview", which is what it should mean in something you
+  // can navigate, and the button closes it outright.
   function openPreview() {
+    // Snapshot the draft BEFORE the frame mounts — the page inside reads it on
+    // load, so writing it afterwards would race the iframe and show saved
+    // settings instead. See previewDraft.ts.
+    if (draft && sectionsDraft) writePreviewDraft({ settings: draft, sections: sectionsDraft })
     setPreviewing(true)
-    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
   }
 
   function closePreview() {
-    history.back()
+    setPreviewing(false)
   }
 
   const load = useCallback(async () => {
@@ -176,9 +177,8 @@ export default function SiteSettingsEditor({
 
   if (previewing) {
     return (
-      <SiteSettingsPreview
-        settings={draft}
-        sections={sectionsDraft}
+      <DevicePreviewFrame
+        src={PREVIEW_URL}
         onClose={closePreview}
         // Open on whichever device is being edited, so Preview answers the
         // question actually being asked. Still switchable inside the preview.
