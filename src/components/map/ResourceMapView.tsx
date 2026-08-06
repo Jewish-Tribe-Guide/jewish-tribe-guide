@@ -14,7 +14,8 @@ import {
   type CategoryFilterState,
 } from '@/components/home/CategoryRow'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
-import { ExternalIcon } from '@/components/icons'
+import { ExternalIcon, ToyIcon, BedIcon, StarOfDavid, ForkIcon, CartIcon, DropIcon } from '@/components/icons'
+import { needsDarkText, readableTextOnWhite } from '@/components/Collapsible'
 import { eruvim } from '@/data/resources'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
@@ -42,9 +43,25 @@ export const HOSPITALS_ID = '__hospitals__'
 // of hardcoding a comparison against a specific hex.
 export const ACCENT_PALETTE = ['#a8dadc', '#457b9d', '#1d3557', '#5390d9', '#84c5f4', '#3a86ff']
 
+// Brand teal for the embedded (desktop home page) map's live-tracking
+// button/badges (see `handleStart`/`tracking` below) — was red, which
+// clashed with the rest of the page's teal palette. Independent of the pin
+// palette below (that's a live-tracking-only accent, not a category color,
+// so it didn't move when the pins went pastel) — was `#5C8A8C`, an earlier
+// approximation from before this value was pinned down. A brief unified
+// two-state redesign for the filter pills themselves (this same teal for
+// their active fill) was tried and then undone on request — those pills are
+// back to their per-category pin colors, which is also how they already
+// stay in sync with the map's own pin palette without needing anything
+// special here.
+const FILTER_PILL_ACTIVE = '#3E6E6E'
+
 // Exported so callers coloring external UI to match the map's legend (e.g.
-// the home page's category list) use the exact same colors.
-export const HOSPITAL_COLOR = '#6E91A4'
+// the home page's category list) use the exact same colors. Reserved
+// exclusively for hospitals/urgent care — not reused anywhere else on the
+// map or site. See CATEGORY_COLORS' own doc comment for the pastel palette
+// this belongs to.
+export const HOSPITAL_COLOR = '#E1BFB7'
 // The letter "H" (a fixed pin glyph, not the admin-configurable category
 // icon — see CATEGORY_GLYPHS below) — same "H for Hospital" convention as
 // hospital signage generally.
@@ -64,35 +81,52 @@ export function rankMapId(id: string): number {
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
-// A direct, stable color per category (rather than a cycled palette index) —
-// each specific category gets an intentional, permanent color regardless of
-// display order. A single-hue tint/shade ramp anchored to `#0C3D57` (darkest,
-// unchanged) lightening to `#D0E5F1` (lightest — pushed noticeably paler than
-// before to widen the spread between steps), linearly interpolated in RGB
-// across the 7 steps of MAP_CATEGORY_ORDER. The lightest three steps
-// (hotel/mikvah/eruv) now cross the `needsDarkText` contrast threshold in
-// Collapsible.tsx, which already handles that per-accentColor. Keyed by
-// category id for regular listing categories; kind:
-// 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified by a
-// fixed id the way listing categories are, so eruv is matched by kind instead
-// below (hospitals use HOSPITAL_COLOR directly, not this dict — see
-// allPoints below).
+// A cohesive pastel palette (was a 3-tier warm-neutral system where several
+// categories shared one color) — every category now gets its own distinct
+// hue, but all of them sit in the same soft, light range so the map reads as
+// airy/calm rather than a mix of alarm-toned or dominant colors, on request.
+// The request's own example hex values didn't actually hold to its own
+// consistency rule though — checked their HSL and found saturation ranging
+// S20%-S70%/lightness L66%-L75% across the set (the amber pin in particular,
+// S70%, would visually dominate the S20% ones next to it) — so each hue below
+// is normalized to a shared S42%/L80% instead of using those examples
+// literally, satisfying the "no pin should visually dominate" requirement
+// the brief itself asked to check for. Hue mapping: teal (synagogue),
+// terracotta (hospitals, see HOSPITAL_COLOR above), amber (restaurant),
+// olive-green (grocery), slate-blue (hotel), mauve (mikvah — this app has no
+// "museums/cultural sites" category, mikvah fills that slot), tan (childcare
+// — fills "family/kids resources"), sage (eruv — fills "parks/recreation";
+// eruv has no pins of its own today, see ERUV_COLOR below, kept for parity).
+// Every glyph drawn on top of these gets a darker version of the SAME hue,
+// not black — see `darkenForGlyph` in ResourceMap.tsx, which derives that
+// tint straight from each color below rather than a separate hardcoded dict,
+// so the two can never drift out of sync.
+// Keyed by category id for regular listing categories; kind:
+// 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified
+// by a fixed id the way listing categories are, so eruv is matched by
+// kind instead below (hospitals use HOSPITAL_COLOR directly, not this
+// dict — see allPoints below).
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#0C3D57',
-  restaurant: '#2D5971',
-  grocery: '#4D758A',
-  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR '#6E91A4' itself.)
-  hotel: '#8FADBE',
-  mikvah: '#AFC9D7',
+  synagogue: '#B7E1DE', // pastel teal
+  restaurant: '#E1D3B7', // pastel amber
+  grocery: '#D2E1B7', // pastel olive-green
+  // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR itself — exclusive to this category.)
+  hotel: '#B7D7E1', // pastel slate-blue
+  mikvah: '#E1B7D0', // pastel mauve
+  childcare: '#E1CBB7', // pastel tan
 }
-const ERUV_COLOR = '#D0E5F1'
+const ERUV_COLOR = '#BCE1B7' // pastel sage
 
 // Exported so external UI (the home page's category list) computes the exact
 // same color as the map's pins for a given category.
 export function colorForListingCategory(categories: CategoryConfig[], categoryId: string): string {
   const category = categories.find((c) => c.id === categoryId)
   if (category?.kind === 'eruv') return ERUV_COLOR
-  return CATEGORY_COLORS[categoryId] ?? '#64748b'
+  // `#D4CFC4` — a low-saturation, L80 neutral in the same pastel family as
+  // CATEGORY_COLORS, for any category outside the fixed set above (e.g. a
+  // future admin-added one) rather than falling back to a plain gray that'd
+  // clash with the rest of the palette.
+  return CATEGORY_COLORS[categoryId] ?? '#D4CFC4'
 }
 
 // Fixed pin glyphs, one per category — deliberately NOT the admin-configurable
@@ -115,6 +149,21 @@ const CATEGORY_GLYPHS: Record<string, string> = {
 // unused by any pin today, kept only for parity with ERUV_COLOR in case Eruv
 // ever gains a pin presence, or another caller wants its fixed glyph.
 const ERUV_GLYPH = '🧵' // a string/thread
+
+// Every fixed category's pin now draws through a line-art icon (see
+// LINE_ICON_PATHS in ResourceMap.tsx) instead of CATEGORY_GLYPHS' emoji —
+// those crush to pure black/white at pin size, which can't produce the
+// pastel palette's "darker version of the same hue" glyph tint. CATEGORY_GLYPHS
+// itself stays populated as a fallback (see `allPoints` below) for any
+// category outside this fixed set.
+const LINE_ICON_BY_CATEGORY: Partial<Record<string, 'star' | 'fork' | 'cart' | 'drop' | 'toy' | 'bed'>> = {
+  synagogue: 'star',
+  restaurant: 'fork',
+  grocery: 'cart',
+  mikvah: 'drop',
+  childcare: 'toy',
+  hotel: 'bed',
+}
 
 // The home page's embedded map opens centered here (Spruce Market, 1523
 // Spruce St, Rittenhouse Square/Center City) instead of `community.mapCenter`
@@ -206,6 +255,29 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const activeLocation: LatLng | null = livePosition ?? userLocation ?? null
 
   const [tab, setTab] = useState<Tab>('map')
+  // Fullscreen target — everything layered over the map (search bar,
+  // category key row, Select/Unselect all, live tracking, the detail
+  // panel) AND the map itself all live inside this one div, so
+  // fullscreening IT (not just `<ResourceMap>`'s own root, which is only
+  // the map canvas) is what keeps every one of those controls visible
+  // and usable once fullscreened — the Fullscreen API only shows the
+  // fullscreened element and its descendants, and those controls are
+  // siblings of `<ResourceMap>`, not children of it. The toggle button
+  // itself still renders inside ResourceMap (bottom-right of the map
+  // canvas, see `isFullscreen`/`onToggleFullscreen` below) since that's
+  // the natural place for it, but the actual fullscreen call targets
+  // this ref instead of anything local to that component.
+  const mapAreaRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(document.fullscreenElement === mapAreaRef.current)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else mapAreaRef.current?.requestFullscreen()
+  }
   // The map key's own button row (see below) — tracked so its edge arrows
   // know which direction still has more to reveal, and so clicking one can
   // actually scroll the row instead of just decorating it.
@@ -303,7 +375,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           lng: h.longitude,
           name: h.name,
           color: HOSPITAL_COLOR,
-          glyph: HOSPITAL_ICON,
+          // Plain letter, not emoji — gets its exact "darker version of the
+          // same hue" tint directly (see `coloredTextGlyphElement` in
+          // ResourceMap.tsx) instead of a black/white filter crush.
+          textGlyph: HOSPITAL_ICON,
           categoryLabel: 'Hospital',
           searchText: h.name.toLowerCase(),
         })
@@ -328,8 +403,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         name: r.name,
         address: r.address || undefined,
         phone: r.phone,
-        color: colorById.get(r.category) ?? '#64748b',
+        color: colorById.get(r.category) ?? '#D4CFC4',
         glyph: CATEGORY_GLYPHS[r.category] ?? cat?.icon ?? DEFAULT_CATEGORY_ICON,
+        // Every fixed category's pin draws through LINE_ICON_BY_CATEGORY
+        // (see its doc comment above) — `glyph` above still carries the
+        // emoji as a fallback for any category outside that set, and for
+        // any other consumer that only understands the plain glyph string.
+        lineIcon: LINE_ICON_BY_CATEGORY[r.category],
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,
         // tags, detail fields) — so a query that matches in the directory
@@ -352,7 +432,27 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     for (const c of categories ?? []) {
       const count = counts.get(c.id) ?? 0
       if (count === 0) continue
-      opts.push({ id: c.id, label: c.pluralLabel, icon: CATEGORY_GLYPHS[c.id] ?? c.icon, color: colorById.get(c.id) ?? '#64748b', count })
+      // Every fixed category uses the same line-art icon here as its map pin
+      // does (see LINE_ICON_BY_CATEGORY above / LINE_ICON_PATHS in
+      // ResourceMap.tsx) instead of a plain emoji — CATEGORY_GLYPHS/c.icon
+      // only remain as a fallback for a category outside that fixed set.
+      const icon =
+        c.id === 'synagogue' ? (
+          <StarOfDavid className="h-3.5 w-3.5" />
+        ) : c.id === 'restaurant' ? (
+          <ForkIcon className="h-3.5 w-3.5" />
+        ) : c.id === 'grocery' ? (
+          <CartIcon className="h-3.5 w-3.5" />
+        ) : c.id === 'mikvah' ? (
+          <DropIcon className="h-3.5 w-3.5" />
+        ) : c.id === 'childcare' ? (
+          <ToyIcon className="h-3.5 w-3.5" />
+        ) : c.id === 'hotel' ? (
+          <BedIcon className="h-3.5 w-3.5" />
+        ) : (
+          (CATEGORY_GLYPHS[c.id] ?? c.icon)
+        )
+      opts.push({ id: c.id, label: c.pluralLabel, icon, color: colorById.get(c.id) ?? '#D4CFC4', count })
     }
     return opts.sort((a, b) => rankMapId(a.id) - rankMapId(b.id))
   }, [allPoints, categories, colorById])
@@ -878,7 +978,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 : 'h-[70vh] min-h-[420px] rounded-2xl ring-1 ring-slate-900/5 sm:ring-0 sm:border-2 sm:border-[#ffc145]'
             }`}
           >
-              <div className="relative min-h-0 flex-1">
+              <div ref={mapAreaRef} className="relative min-h-0 flex-1 bg-white">
                 {/* ── Live tracking, floated over the map's own bottom-left
                         corner instead of a bar above it — home page's
                         embedded map only (see note near the old bar above).
@@ -889,9 +989,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         instead of its original full-size button. ───────── */}
                 {embedded && !loading && ui.map.liveTracking && (
                   <div className="absolute left-3 bottom-3 z-10 flex flex-col items-start">
+                    {/* Red used to signal "recording"/"live" the way it
+                        does elsewhere (video, broadcast) — but next to the
+                        rest of this page's teal palette it just read as
+                        clashing, not purposeful. `FILTER_PILL_ACTIVE`
+                        (same saturated teal the filter pills' active state
+                        uses) instead, on request — the pulsing dot still
+                        does the "this is live" signaling on its own. */}
                     {tracking ? (
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E85151] pl-2 pr-2.5 py-1 text-[10px] font-semibold text-white shadow-sm">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                          style={{ backgroundColor: FILTER_PILL_ACTIVE }}
+                        >
                           <span className="relative flex h-2 w-2">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white" />
                             <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
@@ -900,7 +1010,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         </span>
                         <button
                           onClick={stop}
-                          className="rounded-full bg-[#E85151] px-2.5 py-1 text-[10px] font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
+                          className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
+                          style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                         >
                           Stop tracking
                         </button>
@@ -908,7 +1019,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     ) : (
                       <button
                         onClick={handleStart}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#EB6969] px-2.5 py-1 text-[10px] font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
+                        style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                       >
                         <span aria-hidden="true">📍</span>
                         Start live tracking
@@ -946,23 +1058,33 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         Maps' search box staying a whole pill above a
                         filter panel dropped below it), with the dropdown's
                         own separate border/shadow doing the rest of the
-                        framing. Fixed `h-8` (rather than letting padding +
-                        the input's line-height decide it) so the dropdown
-                        directly below always starts at exactly `top-2 + h-8`
-                        = `top-10` — the detail panel over on the right is
-                        pinned to that same `top-10`, so the two dropdowns'
-                        own top edges always land in the same place instead
-                        of drifting apart by whatever the pill's content
-                        height happened to be. ─────────────────────────── */}
+                        framing. Fixed `h-6` (rather than letting padding +
+                        the input's line-height decide it) — matches the
+                        Select all/category buttons' own height (see
+                        below) — so the dropdown directly below always
+                        starts at exactly `top-2 + h-6` = `top-8` — the
+                        detail panel over on the right is pinned to that
+                        same `top-8`, so the two dropdowns' own top edges
+                        always land in the same place instead of drifting
+                        apart by whatever the pill's content height
+                        happened to be. ──────────────────────────────── */}
                 {!loading && embedded && (
                   <div className="absolute left-2 top-2 z-20 flex w-64 flex-col">
-                    <div className="flex h-8 items-center gap-1.5 rounded-full border-2 border-slate-300 bg-white px-3 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
-                      <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                    {/* `h-6` (was `h-8`) — matches the Select all/Unselect
+                        all/category buttons' own explicit `h-6` below, so
+                        the two rows share one exact, deterministic height
+                        instead of hoping their independently-computed
+                        auto-heights happen to line up. Every dependent
+                        offset below (`top-8` on the detail panel) is
+                        `top-2 + h-6` = 8px + 24px = 32px, recomputed for
+                        this new height. */}
+                    <div className="flex h-6 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                      <svg className="h-3 w-3 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                       </svg>
                       <input
                         type="text"
-                        placeholder={terms.length ? 'Add term…' : 'Search…'}
+                        placeholder={terms.length ? 'Add term…' : 'Search map…'}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -973,7 +1095,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             removeTerm(terms[terms.length - 1])
                           }
                         }}
-                        className="min-w-0 flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        className="min-w-0 flex-1 bg-transparent text-[11px] text-slate-900 placeholder:text-slate-500 focus:outline-none"
                       />
                       {/* Collapses the dropdown list below without touching
                           which categories are selected — a plain visual
@@ -983,10 +1105,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={() => setListCollapsed((v) => !v)}
                           aria-label={listCollapsed ? 'Show list' : 'Hide list'}
-                          className="flex shrink-0 h-4 w-4 items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer"
+                          className="flex shrink-0 h-3.5 w-3.5 items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer"
                         >
                           <svg
-                            className={`h-3 w-3 transition-transform duration-200 ${listCollapsed ? '-rotate-90' : ''}`}
+                            className={`h-2.5 w-2.5 transition-transform duration-200 ${listCollapsed ? '-rotate-90' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2.5}
@@ -1150,14 +1272,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={selectAll}
                           disabled={options.every((o) => focusedCategoryIds?.has(o.id))}
-                          className="shrink-0 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Select all
                         </button>
                         <button
                           onClick={unselectAll}
                           disabled={!focusedCategoryIds || focusedCategoryIds.size === 0}
-                          className="shrink-0 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 text-[11px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Unselect all
                         </button>
@@ -1169,7 +1291,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                 Open Now, etc.) instead of leaving the
                                 category buttons in place. Same position/
                                 sizing as the category row it swaps with. ── */
-                        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <div className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                           <button
                             onClick={() => setForceCategoryList(true)}
                             aria-label="Back to categories"
@@ -1190,12 +1312,23 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             onClick={() => selectTab(soleOption.id)}
                             aria-label={`Unselect ${soleOption.label}`}
                             style={{ backgroundColor: soleOption.color }}
-                            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium shadow-md cursor-pointer ${
-                              soleOption.id === 'mikvah' ? 'text-black' : 'text-white'
+                            className={`inline-flex shrink-0 h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] font-medium shadow-md cursor-pointer ${
+                              needsDarkText(soleOption.color) ? 'text-black' : 'text-white'
                             }`}
                           >
                             {soleOption.icon && (
-                              <span aria-hidden="true" style={{ filter: 'brightness(0) invert(1)' }}>{soleOption.icon}</span>
+                              // Same flat monochrome-silhouette treatment as the
+                              // pin glyph itself (see monoGlyphElement in
+                              // ResourceMap.tsx), crushed to whichever of
+                              // black/white actually reads against this
+                              // category's own fill color — same
+                              // `needsDarkText` check the pin makes.
+                              <span
+                                aria-hidden="true"
+                                style={{ filter: needsDarkText(soleOption.color) ? 'brightness(0)' : 'brightness(0) invert(1)' }}
+                              >
+                                {soleOption.icon}
+                              </span>
                             )}
                             {soleOption.label}
                           </button>
@@ -1206,9 +1339,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               <button
                                 key={chip.id}
                                 onClick={() => setCategoryFiltersFor(soleOption.id, toggleChip(chip, currentFilters, soleConfig))}
-                                style={active ? { backgroundColor: soleOption.color } : { borderColor: soleOption.color, color: soleOption.color }}
-                                className={`shrink-0 whitespace-nowrap rounded-full border-2 px-2.5 py-1 text-xs font-medium shadow-sm transition-colors cursor-pointer ${
-                                  active ? (soleOption.id === 'mikvah' ? 'text-black' : 'text-white') : 'bg-white hover:bg-slate-50'
+                                style={
+                                  active
+                                    ? { backgroundColor: soleOption.color }
+                                    : { borderColor: soleOption.color, color: readableTextOnWhite(soleOption.color) }
+                                }
+                                className={`inline-flex shrink-0 h-6 items-center justify-center whitespace-nowrap rounded-full border-2 px-2 text-[11px] font-medium shadow-sm transition-colors cursor-pointer ${
+                                  active ? (needsDarkText(soleOption.color) ? 'text-black' : 'text-white') : 'bg-white hover:bg-slate-50'
                                 }`}
                               >
                                 {chip.label}
@@ -1237,7 +1374,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                           <div
                             ref={keyRowRef}
                             onScroll={updateKeyRowScroll}
-                            className="flex min-w-0 items-center gap-1.5 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            className="flex min-w-0 items-center gap-1 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                           >
                             {options.map((o) => {
                               const isOpen = focusedCategoryIds?.has(o.id) ?? false
@@ -1248,30 +1385,52 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                   // Selected: filled solid with this category's
                                   // own pin color — like a mini pin — same as
                                   // before. Unselected: white instead, with a
-                                  // colored border/text/icon so the category is
-                                  // still identifiable at a glance without every
-                                  // button competing as a solid block of color.
-                                  // Mikvah's fill is the palest step in the ramp
-                                  // (see CATEGORY_COLORS) — white label text
-                                  // washes out on it, so it gets black text
-                                  // instead whenever it IS filled.
-                                  style={isOpen ? { backgroundColor: o.color, borderColor: o.color } : { borderColor: o.color, color: o.color }}
-                                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border-2 px-2.5 py-1 text-xs font-medium shadow-md transition-colors cursor-pointer ${
+                                  // colored border so the category is still
+                                  // identifiable at a glance without every
+                                  // button competing as a solid block of
+                                  // color. The pastel palette (see
+                                  // CATEGORY_COLORS) is pale across the
+                                  // board now, not just mikvah —
+                                  // `needsDarkText` decides per-category
+                                  // whether filled text/icon needs to go
+                                  // black instead of white, same check the
+                                  // pin glyph itself makes. Unselected
+                                  // text/icon color is
+                                  // `readableTextOnWhite(o.color)` (see
+                                  // Collapsible.tsx), not the raw pastel —
+                                  // several of these colors are too pale to
+                                  // read as plain text at full strength;
+                                  // this darkens just enough to clear
+                                  // contrast while the border stays the
+                                  // category's true color.
+                                  style={
                                     isOpen
-                                      ? `${o.id === 'mikvah' ? 'text-black' : 'text-white'} font-semibold ring-2 ring-white`
+                                      ? { backgroundColor: o.color, borderColor: o.color }
+                                      : { borderColor: o.color, color: readableTextOnWhite(o.color) }
+                                  }
+                                  className={`inline-flex shrink-0 h-6 items-center justify-center gap-1 whitespace-nowrap rounded-full border-2 px-2 text-[11px] font-medium shadow-md transition-colors cursor-pointer ${
+                                    isOpen
+                                      ? `${needsDarkText(o.color) ? 'text-black' : 'text-white'} font-semibold ring-2 ring-white`
                                       : 'bg-white hover:bg-slate-50'
                                   }`}
                                 >
                                   {o.icon && (
-                                    // Same flat white-silhouette treatment as the
-                                    // pin glyph itself (see monoGlyphElement in
-                                    // ResourceMap.tsx) only while selected/filled
-                                    // — crushes it to solid white so it reads
-                                    // against the colored fill. Unselected, the
-                                    // icon keeps its own color instead, since a
-                                    // white icon would vanish against the white
-                                    // button.
-                                    <span aria-hidden="true" style={isOpen ? { filter: 'brightness(0) invert(1)' } : undefined}>{o.icon}</span>
+                                    // Same flat monochrome-silhouette treatment
+                                    // as the pin glyph itself (see
+                                    // monoGlyphElement in ResourceMap.tsx) only
+                                    // while selected/filled — crushes it to
+                                    // whichever of black/white reads against
+                                    // this category's own fill color (same
+                                    // `needsDarkText` check as the pin).
+                                    // Unselected, the icon keeps its own color
+                                    // instead, since a white button has no
+                                    // fill for a crushed icon to contrast with.
+                                    <span
+                                      aria-hidden="true"
+                                      style={isOpen ? { filter: needsDarkText(o.color) ? 'brightness(0)' : 'brightness(0) invert(1)' } : undefined}
+                                    >
+                                      {o.icon}
+                                    </span>
                                   )}
                                   {o.label}
                                 </button>
@@ -1327,7 +1486,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               card shifting right underneath it too. */}
                       {onNavigate && focusedItemConfig && (
                         <div
-                          className={`absolute left-[16.5rem] top-10 bottom-3 z-10 overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
+                          className={`absolute left-[16.5rem] top-8 bottom-3 z-10 overflow-hidden rounded-2xl rounded-tl-none border border-l-0 border-slate-200 bg-[#fefefe] shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-[width] duration-300 ease-in-out ${
                             focusedItem ? 'w-64' : 'w-0 border-0'
                           }`}
                         >
@@ -1382,6 +1541,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     onViewListing={onViewListing}
                     skipAutoFit={embedded}
                     fallbackCenter={embedded ? HOME_MAP_CENTER : undefined}
+                    initialZoom={embedded ? 13 : undefined}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={toggleFullscreen}
                     leftInsetPx={mapKeyLeftInsetPx}
                     onMarkerClick={(p) => {
                       // Always opens this facility's card in the map key's

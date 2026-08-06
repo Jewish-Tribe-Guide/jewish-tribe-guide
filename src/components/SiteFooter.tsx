@@ -4,17 +4,29 @@ import FeedbackButton from './FeedbackButton'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { SiteSettings } from '@/lib/siteSettings'
 
-export default function SiteFooter({ previewSettings }: { previewSettings?: SiteSettings } = {}) {
+export default function SiteFooter({
+  previewSettings,
+  flush,
+}: {
+  previewSettings?: SiteSettings
+  /** Drops the default `mt-16` gap above the footer — for callers that
+   *  already sit flush against something with no white to show through
+   *  (e.g. the desktop home page's blue-bordered shelf, directly above).
+   *  Every other caller keeps the gap, since they sit on a plain white
+   *  background where it reads as normal breathing room, not a seam. */
+  flush?: boolean
+} = {}) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const year = new Date().getFullYear()
 
   return (
-    // Same solid navy (`#0C3D57`) as the condensed top bar (site name +
-    // tagline, see Landing.tsx) — the two now bookend the page in matching
-    // color, so text/borders below switch to white/light variants for
-    // contrast instead of the slate tones a white background needs.
-    <footer className="mt-16 border-t border-[#fefefe]/15 bg-[#0C3D57]">
+    // `#2D3636` — matches the desktop home page's own outer margin color
+    // (see Landing.tsx), on request, so the footer bookends the page in
+    // the same color the page already opens with instead of its own
+    // separate navy. Still dark enough that the white/light text variants
+    // below keep their contrast — no color changes needed there.
+    <footer className={`${flush ? '' : 'mt-16'} border-t border-[#fefefe]/15 bg-[#2D3636]`}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-md">

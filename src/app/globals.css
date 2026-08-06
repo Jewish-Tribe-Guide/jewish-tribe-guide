@@ -12,6 +12,33 @@
   --color-muted: #64748b;
 }
 
+/* Desktop-only text-wrapping (see the explore-new-format home page redesign
+   — mobile stays exactly as it was, no text-wrap changes; `min-width: 40rem`
+   matches Tailwind's own `sm:` breakpoint exactly, see tailwindcss/theme.css).
+   Font is Figtree everywhere now (headings and body alike, no separate
+   heading face) — see `figtree` in layout.tsx. `antialiased` (smoother font
+   rendering) is already on <body> in layout.tsx and applies at every size —
+   that one's not a visual change worth scoping. Headings balance their line
+   breaks (avoids a lonely last word); paragraphs use the "pretty" wrap
+   heuristic (avoids a lonely last word there too, without the heavier
+   balancing cost `balance` isn't well-suited to for longer runs of text)
+   and always break on overflow instead of letting a long unbroken word (a
+   URL, an email) push out of its container. Nesting order matters here:
+   `@layer base { @media (...) {...} }` (layer outer) silently dropped
+   rules on this project's build (Turbopack/Lightning CSS) — `@media (...)
+   { @layer base {...} }` (media outer, as below) is the form that survives. */
+@media (min-width: 40rem) {
+  @layer base {
+    h1, h2, h3, h4, h5, h6 {
+      text-wrap: balance;
+    }
+    p {
+      text-wrap: pretty;
+      overflow-wrap: break-word;
+    }
+  }
+}
+
 /* Google Places Autocomplete (PlaceAutocompleteElement) — style its internal
    input across the closed shadow DOM so it matches the app's regular text
    inputs (see FormControls `inputClass`). */

@@ -6,7 +6,13 @@ import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
 
-// One sans-serif everywhere — headings and body alike, no serif mixed in.
+// One sans-serif everywhere, headings included — no separate serif face
+// (Playfair Display briefly served as a "headline voice" for the hero/
+// section headers; removed entirely on request, including this loader
+// itself, so no @font-face for it gets generated at all). Hierarchy comes
+// from weight now, not typeface — see the `font-bold`/`font-semibold`/
+// `font-medium` scale on the hero h1, section headers, and category labels
+// respectively in Landing.tsx/ZmanimWidget.tsx.
 const figtree = Figtree({ subsets: ['latin'] })
 
 // Reads the admin-edited site name/mission for the tab title and meta

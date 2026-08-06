@@ -169,7 +169,7 @@ export default function Page() {
           <Landing onNavigate={navigate} onOpenFlow={openFlow} coords={coords} />
         </div>
         <div className="hidden sm:block">
-          <SiteFooter />
+          <SiteFooter flush />
         </div>
         {tabBar}
         {overlay}

@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { needsDarkText } from '@/components/Collapsible'
 
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
   id: string
   label: string
-  icon?: string
+  /** Usually an emoji string; childcare/hotel pass a line-art SVG icon
+   *  component instead (see ResourceMapView's `options`), matching the same
+   *  icon their map pins use. */
+  icon?: ReactNode
   /** The pin color, mirrored on the chip so the legend reads as a legend. */
   color: string
   /** How many points this filter currently contributes. */
@@ -113,7 +117,21 @@ export default function CategoryFilter({ options, selected, onToggle, onAll, onN
                 style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
                 aria-hidden="true"
               />
-              {o.icon && <span aria-hidden="true">{o.icon}</span>}
+              {o.icon && (
+                // Same flat monochrome-silhouette treatment as the map's own
+                // pin glyphs (see `monoGlyphElement` in ResourceMap.tsx) —
+                // `brightness(0)` crushes the emoji to solid black; `invert(1)`
+                // flips that to white when the fill needs it. Unselected chips
+                // sit on plain white, so the icon is always dark; selected/
+                // filled chips carry the category's own color, so it uses the
+                // same `needsDarkText` check the pin itself makes for that color.
+                <span
+                  aria-hidden="true"
+                  style={{ filter: on && !needsDarkText(o.color) ? 'brightness(0) invert(1)' : 'brightness(0)' }}
+                >
+                  {o.icon}
+                </span>
+              )}
               <span>{o.label}</span>
               <span className={on ? 'text-white/80' : 'text-slate-400'}>{o.count}</span>
             </button>

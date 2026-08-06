@@ -4,6 +4,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
+import { needsDarkText } from '@/components/Collapsible'
+import {
+  TOY_ICON_PATHS,
+  TOY_ICON_CIRCLES,
+  BED_ICON_PATHS,
+  STAR_ICON_PATHS,
+  FORK_ICON_PATHS,
+  CART_ICON_PATHS,
+  CART_ICON_CIRCLES,
+  DROP_ICON_PATHS,
+} from '@/components/icons'
 
 // Google Maps animates `panTo` smoothly on its own, but `setZoom` always
 // jumps straight to the target level — so a click that both re-centers AND
@@ -24,19 +35,131 @@ function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: num
 // Category glyphs are admin-configured emoji (🍽️, 🏨, 🕍, …), which render as
 // full-color OS emoji glyphs — `PinElement.glyphColor` has no effect on those
 // (it only tints monochrome vector glyphs, not color emoji). To get a flat
-// white icon look without maintaining a separate emoji→SVG-icon mapping, the
-// emoji is wrapped in a DOM element (PinElement's `glyph` accepts one) with a
-// CSS filter that crushes it to a solid white silhouette: `brightness(0)`
-// turns every non-transparent pixel pure black regardless of its original
-// color, then `invert(1)` flips that black to white — the glyph's own alpha
-// shape survives, just recolored flat white.
-function monoGlyphElement(glyph: string): HTMLElement {
+// monochrome icon look without maintaining a separate emoji→SVG-icon
+// mapping, the emoji is wrapped in a DOM element (PinElement's `glyph`
+// accepts one) with a CSS filter that crushes it to a solid silhouette:
+// `brightness(0)` turns every non-transparent pixel pure black regardless
+// of its original color, then an optional `invert(1)` flips that black to
+// white — the glyph's own alpha shape survives, just recolored flat
+// black-or-white. `dark` picks which: the pastel pin palette (see
+// ResourceMapView's CATEGORY_COLORS) is too light for a white glyph to read
+// against, so callers pass `needsDarkText(pin color)` through to decide.
+function monoGlyphElement(glyph: string, dark: boolean): HTMLElement {
   const span = document.createElement('span')
   span.textContent = glyph
   span.style.fontSize = '15px'
   span.style.lineHeight = '1'
-  span.style.filter = 'brightness(0) invert(1)'
+  span.style.filter = dark ? 'brightness(0)' : 'brightness(0) invert(1)'
   return span
+}
+
+// Plain-text pin glyph (currently just hospitals' "H") rendered at an exact
+// color instead of `monoGlyphElement`'s black/white filter crush — that
+// crush exists only to flatten full-color emoji, which ignore CSS `color`;
+// a literal text character has no such problem, so it can just take the
+// "darker version of the same hue" tint directly (see `darkenForGlyph`
+// below) the way `lineIconElement`'s stroke does.
+function coloredTextGlyphElement(text: string, color: string): HTMLElement {
+  const span = document.createElement('span')
+  span.textContent = text
+  span.style.fontSize = '13px'
+  span.style.lineHeight = '1'
+  span.style.fontWeight = '700'
+  span.style.color = color
+  return span
+}
+
+// Every pastel pin category (see ResourceMapView's CATEGORY_COLORS) needs its
+// glyph tinted a legible "darker version of the same hue" — not black, per
+// the pastel palette brief. Converting toward black (as `readableTextOnWhite`
+// in Collapsible.tsx does) desaturates a pale color into a muddy gray instead
+// of a deeper version of its own hue, so this extracts just the hue and
+// re-renders it at a fixed, clearly-saturated, low-lightness (S55/L30)
+// tone — vivid enough to read as "the same color, darker" against its own
+// pastel pin and against the warm-neutral map base alike.
+function darkenForGlyph(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = ((n >> 16) & 255) / 255
+  const g = ((n >> 8) & 255) / 255
+  const b = (n & 255) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  let hue = 0
+  if (d !== 0) {
+    if (max === r) hue = ((g - b) / d) % 6
+    else if (max === g) hue = (b - r) / d + 2
+    else hue = (r - g) / d + 4
+    hue *= 60
+    if (hue < 0) hue += 360
+  }
+  const s = 0.55
+  const l = 0.3
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
+  const m = l - c / 2
+  let [rr, gg, bb] = [0, 0, 0]
+  if (hue < 60) [rr, gg, bb] = [c, x, 0]
+  else if (hue < 120) [rr, gg, bb] = [x, c, 0]
+  else if (hue < 180) [rr, gg, bb] = [0, c, x]
+  else if (hue < 240) [rr, gg, bb] = [0, x, c]
+  else if (hue < 300) [rr, gg, bb] = [x, 0, c]
+  else [rr, gg, bb] = [c, 0, x]
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${toHex(rr)}${toHex(gg)}${toHex(bb)}`
+}
+
+// Line-art alternatives to every category's emoji glyph (✡ synagogue, 🍴
+// restaurant, 🛒 grocery, 🧸 childcare, 🛏️ hotel, 💧 mikvah) — those read as
+// chunky, overwhelming solid blobs once crushed to a silhouette at pin size,
+// and (more importantly for the pastel palette) a crushed emoji can only
+// ever go pure black or white, never the "darker version of the same hue"
+// the glyph now needs. Drawn as open hollow-stroke shapes from the start, so
+// there's nothing to crush — just a direct stroke color from
+// `darkenForGlyph`. Geometry shared with `icons.tsx`'s matching React
+// components (used for the map key's own category buttons) via the same
+// path/circle exports, so the pins and buttons can never draw different
+// shapes.
+type LineIconKey = 'toy' | 'bed' | 'star' | 'fork' | 'cart' | 'drop'
+const LINE_ICON_PATHS: Record<LineIconKey, string[]> = {
+  toy: TOY_ICON_PATHS,
+  bed: BED_ICON_PATHS,
+  star: STAR_ICON_PATHS,
+  fork: FORK_ICON_PATHS,
+  cart: CART_ICON_PATHS,
+  drop: DROP_ICON_PATHS,
+}
+const LINE_ICON_CIRCLES: Partial<Record<LineIconKey, { cx: number; cy: number; r: number }[]>> = {
+  toy: TOY_ICON_CIRCLES,
+  cart: CART_ICON_CIRCLES,
+}
+function lineIconElement(icon: LineIconKey, color: string): Element {
+  const NS = 'http://www.w3.org/2000/svg'
+  const svg = document.createElementNS(NS, 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('width', '15')
+  svg.setAttribute('height', '15')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', color)
+  svg.setAttribute('stroke-width', '2.2')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+  for (const d of LINE_ICON_PATHS[icon]) {
+    const path = document.createElementNS(NS, 'path')
+    path.setAttribute('d', d)
+    svg.appendChild(path)
+  }
+  for (const c of LINE_ICON_CIRCLES[icon] ?? []) {
+    const circle = document.createElementNS(NS, 'circle')
+    circle.setAttribute('cx', String(c.cx))
+    circle.setAttribute('cy', String(c.cy))
+    circle.setAttribute('r', String(c.r))
+    svg.appendChild(circle)
+  }
+  return svg
 }
 
 /** One plottable place on the map. */
@@ -47,8 +170,19 @@ export type MapPoint = {
   name: string
   address?: string
   phone?: string
-  /** Emoji/glyph shown inside the pin (e.g. a category icon). */
+  /** Emoji/glyph shown inside the pin (e.g. a category icon) — fallback path
+   *  for any category outside the fixed line-icon set below (e.g. a future
+   *  admin-added category). Ignored when `lineIcon` or `textGlyph` is set. */
   glyph?: string
+  /** Plain-text pin glyph (currently just hospitals' "H") rendered at an
+   *  exact color via `coloredTextGlyphElement`, not crushed to black/white
+   *  like `glyph` — see that function's doc comment. Takes priority over
+   *  `glyph`, ignored when `lineIcon` is set. */
+  textGlyph?: string
+  /** Line-art override — every fixed category now draws its glyph this way
+   *  instead of an emoji (see `LINE_ICON_PATHS` above); `glyph` only remains
+   *  as a fallback for categories outside this set. */
+  lineIcon?: LineIconKey
   /** Pin background color (hex). */
   color: string
   /** Subtitle shown in the info window (e.g. the category label). */
@@ -89,16 +223,32 @@ type Props = {
   /** Skips the "zoom out to fit every visible pin" behavior that otherwise
    *  runs whenever `points` changes with no user location set — used by the
    *  home page's embedded map, which wants to open at a fixed neighborhood
-   *  zoom (see the initial `zoom: 14` below) instead of zooming out to frame
+   *  zoom (see `initialZoom` below) instead of zooming out to frame
    *  the whole region's pins the moment they load. `focusPoints` still
    *  reframes deliberately (e.g. isolating a category) regardless of this. */
   skipAutoFit?: boolean
+  /** Starting zoom level, before any auto-fit/user-location reframing
+   *  takes over. Defaults to 14 (neighborhood-level). The home page's
+   *  embedded map passes 13 — one step out, so a bit more of the
+   *  surrounding area is visible in the same on-screen frame. */
+  initialZoom?: number
   /** Pixel width of whatever's currently floated over the map's own LEFT
    *  edge (the map key's dropdown/detail panels) — when framing a single
    *  focused point or a bounds-fit (see `focusPoints`), the map centers it
    *  in the space actually still visible to the right of that overlay
    *  instead of dead-center under it. 0/omitted centers normally. */
   leftInsetPx?: number
+  /** Whether the fullscreen toggle button (bottom-right) should show as
+   *  "currently fullscreen" — the fullscreen state itself is owned by
+   *  ResourceMapView, not this component: fullscreening THIS component's
+   *  own root would only show the map canvas + its own Re-center button,
+   *  hiding every other control (search bar, category key row, Select/
+   *  Unselect all, live tracking) that ResourceMapView layers on top as
+   *  this component's siblings, not its children. */
+  isFullscreen?: boolean
+  /** Toggles fullscreen on ResourceMapView's own map-area container (see
+   *  `isFullscreen` above) — this component only renders the button. */
+  onToggleFullscreen?: () => void
 }
 
 const DEFAULT_CENTER = community.mapCenter
@@ -184,7 +334,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx }: Props) {
+export default function ResourceMap({ points, userLocation, fallbackCenter = DEFAULT_CENTER, onViewListing, onMarkerClick, focusPoints, skipAutoFit, leftInsetPx, initialZoom = 14, isFullscreen = false, onToggleFullscreen }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -221,7 +371,7 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           // matches the zoom the map already settles at once a visitor's
           // location loads (see the "you are here" effect below), just
           // applied as the starting view too instead of only after that.
-          zoom: 14,
+          zoom: initialZoom,
           mapId: 'resource_map',
           mapTypeControl: false,
           streetViewControl: false,
@@ -235,6 +385,12 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           // only ever needs straight-down, north-up navigation.
           rotateControl: false,
           cameraControl: false,
+          // Explicit zoom +/- buttons, on request — `RIGHT_TOP` so they
+          // land clear of the "Re-center"/fullscreen buttons already
+          // anchored bottom-right and the map key's own panels along the
+          // left edge.
+          zoomControl: true,
+          zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
           clickableIcons: false,
         })
         infoWindowRef.current = new google.maps.InfoWindow()
@@ -267,7 +423,13 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
       const pin = new google.maps.marker.PinElement({
         background: p.color,
         borderColor: p.highlighted ? '#ffc145' : '#ffffff',
-        glyph: p.glyph ? monoGlyphElement(p.glyph) : null,
+        glyph: p.lineIcon
+          ? lineIconElement(p.lineIcon, darkenForGlyph(p.color))
+          : p.textGlyph
+            ? coloredTextGlyphElement(p.textGlyph, darkenForGlyph(p.color))
+            : p.glyph
+              ? monoGlyphElement(p.glyph, needsDarkText(p.color))
+              : null,
         scale: p.highlighted ? 1.3 : 1,
       })
       const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -423,6 +585,22 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
     })
   }
 
+  // `isFullscreen` is owned by ResourceMapView (see its own doc comment on
+  // `mapAreaRef`) — this just reacts to it changing to fix up the map
+  // itself, which doesn't detect its container's size changing on its own.
+  // Without this it stays rendered at its old (windowed) pixel size and
+  // just shows blank space around it once fullscreened. `resize` alone
+  // re-measures the container but leaves the visible center wherever it
+  // drifted to as the box grew/shrank around a fixed top-left corner, so
+  // the center is explicitly restored right after.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const center = map.getCenter()
+    google.maps.event.trigger(map, 'resize')
+    if (center) map.setCenter(center)
+  }, [isFullscreen])
+
   if (!MAPS_API_KEY || authFailed) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-100 p-6 text-center text-sm text-slate-500">
@@ -433,7 +611,7 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full bg-white">
       {/* No rounded-2xl here — this div paints nothing of its own (Google
           Maps fills it with tiles), so any rounding was already inert; the
           real corner shape comes entirely from the parent card's own
@@ -445,14 +623,39 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           elsewhere), and never triggered automatically — the map only ever
           pans on its own once, right when tracking first starts (see the
           "you are here" effect above); every tap here after that is a
-          deliberate, explicit re-center. */}
+          deliberate, explicit re-center. `bottom-16` (was `bottom-3`) —
+          stacked above the fullscreen toggle below instead of sharing its
+          corner, since both can be visible at once. */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-blue-50"
+          className="absolute bottom-16 right-3 flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-blue-50"
         >
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" aria-hidden="true" />
           Re-center
+        </button>
+      )}
+      {/* Fullscreen toggle — bottom-right corner, always available (not
+          gated on `userLocation` like Re-center above it can be). Fires
+          `onToggleFullscreen`, owned by ResourceMapView (see its
+          `mapAreaRef` doc comment for why fullscreen isn't handled
+          locally here) rather than the whole page, so everything outside
+          the map area stays exactly as it was once you exit again. */}
+      {ready && onToggleFullscreen && (
+        <button
+          onClick={onToggleFullscreen}
+          aria-label={isFullscreen ? 'Exit full screen' : 'View full screen'}
+          className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
+        >
+          {isFullscreen ? (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0v4m0-4h4m7 5l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m7-5l5 5m0 0v-4m0 4h-4" />
+            </svg>
+          ) : (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          )}
         </button>
       )}
     </div>

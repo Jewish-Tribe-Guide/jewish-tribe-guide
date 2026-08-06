@@ -6,6 +6,37 @@ import { community } from '@/community.config'
 
 type Status = 'loading' | 'error' | 'ready'
 
+// "5:32 AM" / "12:15 PM" (see `formatTime` in lib/zmanim.ts, which is what
+// produces every `ZmanEntry.time` string) -> minutes since midnight, so it
+// can be compared against the current wall-clock time. Returns `null` for
+// anything that doesn't match (defensive — callers should always skip
+// highlighting rather than guess on a malformed string).
+function parseTimeToMinutes(time: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(time.trim())
+  if (!match) return null
+  let hours = Number(match[1]) % 12
+  if (/pm/i.test(match[3])) hours += 12
+  return hours * 60 + Number(match[2])
+}
+
+// Re-render once a minute so the "next upcoming zman" highlight (see
+// `ReadyState` below) actually advances as the day goes on, instead of
+// freezing at whatever was true when the page first loaded.
+function useNowMinutes(): number {
+  const [minutes, setMinutes] = useState(() => {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  })
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = new Date()
+      setMinutes(now.getHours() * 60 + now.getMinutes())
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return minutes
+}
+
 type Props = {
   /** The visitor's address when set; falls back to the community's configured
    *  center so the widget always has something to show without requiring an
@@ -50,12 +81,26 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
   return (
     // No card chrome (border/background/padding) of its own anymore — the
     // Zmanim band it's rendered inside (see Landing.tsx) IS the widget's
-    // designated area now, `#fefefe` itself, so this just flows directly in
+    // designated area now, `#e4edfa` itself, so this just flows directly in
     // that existing bar instead of floating a separate box on top of it.
     <div>
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
-        <span className="text-xs text-muted">{coords ? locationLabel : community.region}</span>
+      {/* Centered now (was a `flex justify-between` row, title left/
+          location right) — on request, matching "Get Connected"'s own
+          centered heading treatment. Title and location stack instead of
+          sitting side by side. */}
+      <div className="mb-2 text-center">
+        {/* Bumped from a small `text-sm` uppercase eyebrow label up to a
+            real major-section heading (`text-3xl`, same as "Get Connected"
+            and the hero h1) — on request, so this reads as one of the
+            site's three main section titles instead of a compact widget
+            label. Sans-serif now (the separate serif headline face was
+            removed entirely, weight carries hierarchy instead) —
+            `font-semibold` (600, was `font-extrabold`/800), at `text-3xl`
+            (30px, within the specified ~28-32px section-header range). */}
+        <h3 className="text-3xl font-semibold tracking-tight text-[#1C1B19] [font-variant:small-caps]">
+          {title}
+        </h3>
+        <p className="mt-0.5 text-xs text-[#1C1B19]">{coords ? locationLabel : community.region}</p>
       </div>
 
       {status === 'loading' && (
@@ -69,7 +114,7 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
         </div>
       )}
       {status === 'error' && (
-        <p className="text-sm text-muted">Zmanim are unavailable right now.</p>
+        <p className="text-sm text-[#1C1B19]">Zmanim are unavailable right now.</p>
       )}
       {status === 'ready' && data && <ReadyState data={data} />}
     </div>
@@ -78,28 +123,47 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
 
 function ReadyState({ data }: { data: ZmanimData }) {
   const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos } = data
+  const nowMinutes = useNowMinutes()
+  // The first entry that hasn't happened yet today — "next upcoming zman".
+  // `-1` (nothing highlighted) once every zman for today has already
+  // passed, rather than guessing/wrapping to tomorrow's.
+  const nextIndex = dailyZmanim.findIndex((z) => {
+    const mins = parseTimeToMinutes(z.time)
+    return mins !== null && mins >= nowMinutes
+  })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Hebrew date */}
-      <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <span className="text-2xl" aria-hidden="true">🕯️</span>
-        <p className="text-base font-semibold text-slate-900">{hebrewDate}</p>
+      <div className="pb-2 border-b border-slate-100">
+        <p className="text-sm font-semibold text-[#1C1B19]">{hebrewDate}</p>
       </div>
 
-      {/* Daily zmanim — every entry, same as the full Zmanim page. */}
+      {/* Daily zmanim — every entry, same as the full Zmanim page. The next
+          upcoming one (see `nextIndex` above) gets a small teal dot, bolder
+          label weight, and a faint teal row tint — on request, so the
+          table reads as live/dynamic rather than a flat static list. */}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
-        {dailyZmanim.map((z) => (
-          <div key={z.label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-sm text-muted">{z.label}</dt>
-            <dd className="text-sm font-medium text-slate-900 tabular-nums">{z.time}</dd>
-          </div>
-        ))}
+        {dailyZmanim.map((z, i) => {
+          const isNext = i === nextIndex
+          return (
+            <div
+              key={z.label}
+              className={`flex items-baseline justify-between gap-3 rounded px-1.5 py-0.5 -mx-1.5 ${isNext ? 'bg-[#8FC6CF]/15' : ''}`}
+            >
+              <dt className={`flex items-center gap-1.5 text-sm ${isNext ? 'font-semibold text-[#1C1B19]' : 'text-[#1C1B19]'}`}>
+                {isNext && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5C8A8C]" />}
+                {z.label}
+              </dt>
+              <dd className={`text-sm tabular-nums ${isNext ? 'font-bold text-[#1C1B19]' : 'font-medium text-[#1C1B19]'}`}>{z.time}</dd>
+            </div>
+          )
+        })}
       </dl>
 
       {/* Upcoming Shabbos */}
-      <div className="pt-3 border-t border-slate-100">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+      <div className="pt-2 border-t border-slate-100">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[#1C1B19] mb-1.5">
           Upcoming Shabbos
         </h4>
         <div className="space-y-1.5">
@@ -108,7 +172,7 @@ function ReadyState({ data }: { data: ZmanimData }) {
         </div>
       </div>
 
-      <p className="pt-1 text-[11px] text-muted">
+      <p className="pt-1 text-[11px] text-[#1C1B19]">
         Zmanim from{' '}
         <a
           href="https://www.hebcal.com"
@@ -147,8 +211,8 @@ function ShabbosRow({
 
   return (
     <div className="flex items-baseline justify-between gap-3 px-3 -mx-1">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm font-medium text-slate-900 tabular-nums">{value}</span>
+      <span className="text-sm text-[#1C1B19]">{label}</span>
+      <span className="text-sm font-medium text-[#1C1B19] tabular-nums">{value}</span>
     </div>
   )
 }
