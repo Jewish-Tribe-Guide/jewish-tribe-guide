@@ -90,9 +90,9 @@ export default function AdminPage() {
 
 type AdminTab = 'queue' | 'categories' | 'responses' | 'archived' | 'site' | 'home'
 
+// Listed in the order they're rendered below.
 const TAB_LABELS: Record<AdminTab, string> = {
   queue: 'Moderation queue',
-  categories: 'Categories',
   responses: 'Responses',
   archived: 'Archived',
   site: 'Site',
@@ -100,6 +100,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   // one of the two devices, and the mobile tab bar shows on every phone screen,
   // not just the home one.
   home: 'Desktop & mobile',
+  categories: 'Categories',
 }
 
 // The history.state shape this screen stamps on every pushState call, mirroring
@@ -153,7 +154,7 @@ function AdminTabs({ session }: { session: Session }) {
   return (
     <div>
       <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
-        {(['queue', 'categories', 'responses', 'archived', 'site', 'home'] as const).map((t) => (
+        {(['queue', 'responses', 'archived', 'site', 'home', 'categories'] as const).map((t) => (
           <button
             key={t}
             onClick={() => goToTab(t)}
