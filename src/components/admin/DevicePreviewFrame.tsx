@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useIsMobile } from '@/lib/useIsMobile'
+import { ForcedViewport, useIsMobile } from '@/lib/useIsMobile'
 
 // Wraps a preview in a full-viewport overlay with a Desktop/Mobile toggle, so
 // "what does this look like" isn't stuck at the admin shell's ~768px content
@@ -22,6 +22,13 @@ import { useIsMobile } from '@/lib/useIsMobile'
 // createPortal) rather than pointed at a URL, so it stays the exact same
 // live React tree/state as everywhere else in the app — no separate route,
 // no serializing the draft across a navigation.
+//
+// That portal is also why the children are wrapped in <ForcedViewport>: the
+// markup lives in the iframe, but the components still *run* in this window's
+// JS realm, so any `useIsMobile()` inside them would measure the admin's
+// browser rather than the frame. CSS breakpoints and JS-measured breakpoints
+// would then disagree with each other inside one preview. ForcedViewport
+// pins the JS side to whichever device the toggle selected.
 
 type Device = 'desktop' | 'mobile'
 
@@ -108,7 +115,7 @@ export default function DevicePreviewFrame({
             ← Back to editor
           </button>
         </div>
-        {children}
+        <ForcedViewport isMobile>{children}</ForcedViewport>
       </div>
     )
   }
@@ -147,7 +154,7 @@ export default function DevicePreviewFrame({
           style={{ maxWidth: '100%', overflow: 'hidden' }}
         >
           <IframeViewport width={WIDTH[device]} height={HEIGHT[device]}>
-            {children}
+            <ForcedViewport isMobile={device === 'mobile'}>{children}</ForcedViewport>
           </IframeViewport>
         </div>
       </div>

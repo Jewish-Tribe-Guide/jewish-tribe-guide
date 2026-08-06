@@ -17,6 +17,19 @@ import { FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
+// Marks a field that doesn't apply to every viewport. Desktop and mobile show
+// materially different home screens (see the note atop Landing.tsx), so a
+// setting labelled only "home page" can be misleading — the featured row, for
+// one, never appears on a phone at all. Use the Desktop/Mobile toggle in the
+// preview to see either.
+function Scope({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="ml-2 align-middle rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium tracking-wide text-slate-500 uppercase">
+      {children}
+    </span>
+  )
+}
+
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
   const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds }) => ({ id, title, cardIds }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
@@ -174,6 +187,11 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
         screen, and the feedback form — laid out in the order they appear on the page. Nothing here
         goes live until you click Save changes below.
       </p>
+      <p className="text-sm text-muted mb-4">
+        Desktop and mobile show different home screens, so some settings below only affect one of
+        them — each is labelled. Use <span className="font-medium text-slate-700">Preview</span> and
+        its Desktop/Mobile toggle to see both.
+      </p>
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
@@ -252,7 +270,14 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       </div>
 
       <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">
+          Featured cards
+          <Scope>Desktop only</Scope>
+        </h3>
+        <p className="text-[11px] text-muted mb-2">
+          The “Popular right now” row between the search box and the map. Phones don’t show this row
+          — they get the full card grid instead.
+        </p>
         <FeaturedCardsPicker
           value={draft.featuredCardIds}
           onChange={(ids) => set('featuredCardIds', ids)}
@@ -260,7 +285,15 @@ export default function SiteSettingsEditor({ token }: { token: string }) {
       </div>
 
       <div className="mt-6 max-w-2xl">
-        <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
+        <h3 className="text-sm font-semibold text-slate-800 mb-1">
+          Home page sections
+          <Scope>Both, differently</Scope>
+        </h3>
+        <p className="text-[11px] text-muted mb-2">
+          These groups drive the nav tabs across the top on desktop (and the All categories page
+          they open), and the labelled card grid down the home screen on mobile. Renaming or
+          regrouping here changes both.
+        </p>
         <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
       </div>
 
