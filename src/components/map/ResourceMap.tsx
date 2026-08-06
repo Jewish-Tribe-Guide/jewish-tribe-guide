@@ -57,8 +57,8 @@ function monoGlyphElement(glyph: string, dark: boolean): HTMLElement {
 // color instead of `monoGlyphElement`'s black/white filter crush — that
 // crush exists only to flatten full-color emoji, which ignore CSS `color`;
 // a literal text character has no such problem, so it can just take the
-// "darker version of the same hue" tint directly (see `darkenForGlyph`
-// below) the way `lineIconElement`'s stroke does.
+// contrast-aware hue tint directly (see `glyphTintFor` below) the way
+// `lineIconElement`'s stroke does.
 function coloredTextGlyphElement(text: string, color: string): HTMLElement {
   const span = document.createElement('span')
   span.textContent = text
@@ -69,19 +69,23 @@ function coloredTextGlyphElement(text: string, color: string): HTMLElement {
   return span
 }
 
-// Every line-icon pin gets its glyph tinted a legible "darker version of the
-// same hue" instead of plain black. Converting toward black (as
-// `readableTextOnWhite` in Collapsible.tsx does) desaturates a color into a
-// muddy gray instead of a deeper version of its own hue, so this extracts
-// just the hue and re-renders it at a fixed, clearly-saturated, low-lightness
-// (S55/L30) tone — vivid enough to read as "the same color, darker" against
-// its own pin and the map base alike, whatever that pin's own color is (see
-// `getCategoryColor` in ResourceMapView.tsx).
-function darkenForGlyph(hex: string): string {
+function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.replace('#', ''), 16)
-  const r = ((n >> 16) & 255) / 255
-  const g = ((n >> 8) & 255) / 255
-  const b = (n & 255) / 255
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+}
+
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+function contrastRatio(a: number, b: number): number {
+  const lighter = Math.max(a, b)
+  const darker = Math.min(a, b)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function hueOf([r, g, b]: [number, number, number]): number {
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   const d = max - min
@@ -93,8 +97,10 @@ function darkenForGlyph(hex: string): string {
     hue *= 60
     if (hue < 0) hue += 360
   }
-  const s = 0.55
-  const l = 0.3
+  return hue
+}
+
+function hslToHex(hue: number, s: number, l: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s
   const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
   const m = l - c / 2
@@ -112,17 +118,39 @@ function darkenForGlyph(hex: string): string {
   return `#${toHex(rr)}${toHex(gg)}${toHex(bb)}`
 }
 
+// Every line-icon pin gets its glyph tinted a version of its own hue that
+// actually contrasts against ITS OWN pin color — not just always darker.
+// Originally always darkened to a fixed S55/L30 (fine against the old pale
+// pastel palette, where every pin was light), but the map's pin colors can
+// now span a full light-to-dark gradient (see `gradientColorMap` in
+// ResourceMapView.tsx) — darkening an already-dark pin (e.g. deep navy) to
+// ANOTHER dark tone left the glyph nearly invisible against it, on request.
+// This computes BOTH a dark (S55/L28) and a light (S45/L88) candidate at the
+// pin's own hue, measures each one's actual WCAG contrast ratio against the
+// pin's real background color, and returns whichever one wins — so a pale
+// pin still gets a deep-hue glyph (as before) and a dark pin gets a
+// pale-hue one instead, automatically, for any color the gradient produces.
+function glyphTintFor(hex: string): string {
+  const rgb = hexToRgb(hex)
+  const hue = hueOf(rgb)
+  const bgLum = relativeLuminance(rgb)
+  const dark = hslToHex(hue, 0.55, 0.28)
+  const light = hslToHex(hue, 0.45, 0.88)
+  const darkContrast = contrastRatio(bgLum, relativeLuminance(hexToRgb(dark)))
+  const lightContrast = contrastRatio(bgLum, relativeLuminance(hexToRgb(light)))
+  return darkContrast >= lightContrast ? dark : light
+}
+
 // Line-art alternatives to every category's emoji glyph (✡ synagogue, 🍴
 // restaurant, 🛒 grocery, 🧸 childcare, 🛏️ hotel, 💧 mikvah) — those read as
 // chunky, overwhelming solid blobs once crushed to a silhouette at pin size,
-// and (more importantly for the pastel palette) a crushed emoji can only
-// ever go pure black or white, never the "darker version of the same hue"
-// the glyph now needs. Drawn as open hollow-stroke shapes from the start, so
-// there's nothing to crush — just a direct stroke color from
-// `darkenForGlyph`. Geometry shared with `icons.tsx`'s matching React
-// components (used for the map key's own category buttons) via the same
-// path/circle exports, so the pins and buttons can never draw different
-// shapes.
+// and a crushed emoji can only ever go pure black or white, never the
+// contrast-aware hue tint the glyph now needs (see `glyphTintFor`). Drawn as
+// open hollow-stroke shapes from the start, so there's nothing to crush —
+// just a direct stroke color from `glyphTintFor`. Geometry shared with
+// `icons.tsx`'s matching React components (used for the map key's own
+// category buttons) via the same path/circle exports, so the pins and
+// buttons can never draw different shapes.
 type LineIconKey = 'toy' | 'bed' | 'star' | 'fork' | 'cart' | 'drop'
 const LINE_ICON_PATHS: Record<LineIconKey, string[]> = {
   toy: TOY_ICON_PATHS,
@@ -422,11 +450,14 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
     for (const p of points) {
       const pin = new google.maps.marker.PinElement({
         background: p.color,
-        borderColor: p.highlighted ? '#ffc145' : '#ffffff',
+        // Always white now — was a gold `#ffc145` ring for search-matched
+        // pins, on request ("remove that yellow highlight"). `scale` alone
+        // still marks a match (bigger pin), no border color change.
+        borderColor: '#ffffff',
         glyph: p.lineIcon
-          ? lineIconElement(p.lineIcon, darkenForGlyph(p.color))
+          ? lineIconElement(p.lineIcon, glyphTintFor(p.color))
           : p.textGlyph
-            ? coloredTextGlyphElement(p.textGlyph, darkenForGlyph(p.color))
+            ? coloredTextGlyphElement(p.textGlyph, glyphTintFor(p.color))
             : p.glyph
               ? monoGlyphElement(p.glyph, needsDarkText(p.color))
               : null,
@@ -625,13 +656,16 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           "you are here" effect above); every tap here after that is a
           deliberate, explicit re-center. `bottom-16` (was `bottom-3`) —
           stacked above the fullscreen toggle below instead of sharing its
-          corner, since both can be visible at once. */}
+          corner, since both can be visible at once. Solid `bg-blue-600`
+          fill + white text now (was white fill + blue text + a ring) — on
+          request, to read as the same visual family as "Start live
+          tracking" (ResourceMapView.tsx), which is a solid color pill too. */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className="absolute bottom-16 right-3 flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-blue-50"
+          className="absolute bottom-16 right-3 flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-md cursor-pointer transition-colors hover:bg-blue-700"
         >
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600 ring-2 ring-white" aria-hidden="true" />
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-blue-300" aria-hidden="true" />
           Re-center
         </button>
       )}

@@ -205,10 +205,9 @@ const ERUV_GLYPH = '🧵' // a string/thread
 // Every fixed category's pin now draws through a line-art icon (see
 // LINE_ICON_PATHS in ResourceMap.tsx) instead of CATEGORY_GLYPHS' emoji —
 // those crush to pure black/white at pin size, which can't produce the
-// "darker version of the same hue" glyph tint every pin color gets (see
-// `darkenForGlyph` in ResourceMap.tsx). CATEGORY_GLYPHS itself stays
-// populated as a fallback (see `allPoints` below) for any category outside
-// this fixed set.
+// contrast-aware hue tint every pin color gets (see `glyphTintFor` in
+// ResourceMap.tsx). CATEGORY_GLYPHS itself stays populated as a fallback
+// (see `allPoints` below) for any category outside this fixed set.
 const LINE_ICON_BY_CATEGORY: Partial<Record<string, 'star' | 'fork' | 'cart' | 'drop' | 'toy' | 'bed'>> = {
   synagogue: 'star',
   restaurant: 'fork',
@@ -872,7 +871,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   onClick={handleStart}
                   className="inline-flex shrink-0 items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 cursor-pointer"
                 >
-                  <span aria-hidden="true">📍</span>
                   Start live tracking
                 </button>
               )
@@ -1072,7 +1070,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
                         style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                       >
-                        <span aria-hidden="true">📍</span>
                         Start live tracking
                       </button>
                     )}

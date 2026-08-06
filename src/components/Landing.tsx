@@ -129,6 +129,7 @@ function GetConnectedAccordion({
   categories,
   categoryConfigs,
   searchQuery,
+  focusItemId,
 }: {
   categories: GetConnectedCategory[]
   categoryConfigs: CategoryConfig[] | null
@@ -137,44 +138,55 @@ function GetConnectedAccordion({
    *  mark matching pins on the map, so a search result stands out
    *  wherever it already lives on the page. */
   searchQuery?: string
+  /** Set (and immediately cleared by the caller) when a top-search-bar
+   *  result whose item lives in this section is tapped — on request,
+   *  expands that exact item's own panel in place instead of just
+   *  scrolling here and leaving the visitor to find it themselves. */
+  focusItemId?: string | null
 }) {
   const [embeddedFlow, setEmbeddedFlow] = useState<'support' | 'volunteer' | null>(null)
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
   const matchQuery = searchQuery?.trim().toLowerCase() ?? ''
 
-  // The four categories share one row grid (via `subgrid` below) so item N
-  // in every column lands on the same row regardless of which column has
-  // more/fewer items — `maxItems` sizes that shared row track list. `+ 1`
-  // for the header row. `Math.max(…, 1)` guards `repeat(0, auto)`, which
-  // is invalid CSS, for the edge case where every category is empty.
-  const maxItems = Math.max(1, ...categories.map((cat) => cat.items.length))
-
-  // The currently-open item, found across ALL categories (not scoped to
-  // one) — `embeddedFlow`/`detailItemId` are single top-level state, so at
-  // most one item across the whole grid can ever match. Used by the ONE
-  // shared detail panel below the grid (see its own comment) instead of
-  // each item rendering its own.
-  const allItems = categories.flatMap((cat) => cat.items)
-  const openItem = allItems.find((it) => (it.embed && it.embed === embeddedFlow) || (it.detail && it.id === detailItemId))
-  const openItemIsEmbed = !!openItem?.embed && openItem.embed === embeddedFlow
-  const openItemIsDetail = !!openItem?.detail && openItem.id === detailItemId
-  const openItemDetailCategory = openItemIsDetail && openItem?.detail ? categoryConfigs?.find((c) => c.id === openItem.detail!.category) : undefined
-  const isSectionOpen = openItemIsEmbed || (openItemIsDetail && !!openItemDetailCategory)
+  // Reacts to `focusItemId` changing by adjusting state DURING render
+  // (React's own recommended pattern for "derive/reset state from a prop
+  // change" — see react.dev/learn/you-might-not-need-an-effect) rather than
+  // in a `useEffect`, which would call setState synchronously mid-effect
+  // and trigger an extra cascading render.
+  const [lastFocusItemId, setLastFocusItemId] = useState(focusItemId)
+  if (focusItemId !== lastFocusItemId) {
+    setLastFocusItemId(focusItemId)
+    const item = focusItemId ? categories.flatMap((cat) => cat.items).find((it) => it.id === focusItemId) : undefined
+    if (item?.embed) {
+      setDetailItemId(null)
+      setEmbeddedFlow(item.embed)
+    } else if (item?.detail) {
+      setEmbeddedFlow(null)
+      setDetailItemId(item.id)
+    }
+  }
 
   return (
     <>
     {/* No more `divide-x`/`divide-black` column rule — border thickness
         across this whole redesign went to 0 on request, so that divider was
         already invisible; dropped the class entirely rather than keep a
-        dead one. `grid-template-rows` here is the shared row-track list
-        every category's own `subgrid` below inherits from, which is what
-        actually lines item N up across all four columns — a plain
-        `grid-cols-4` (auto rows) wouldn't do that on its own, since each
-        column's content would just stack independently of the others'. */}
-    <div
-      className="grid w-full grid-cols-4"
-      style={{ backgroundColor: CATEGORY_FILL, gridTemplateRows: `auto repeat(${maxItems}, auto)` }}
-    >
+        dead one. No `subgrid`/shared row-track list anymore either (was
+        used to line item N up across all four columns) — dropped on
+        request so each column's own height is fully independent: when one
+        item's expand panel grows, ONLY that column gets taller, instead of
+        subgrid forcing every column's same row index to grow together
+        (blank space in the others, even though nothing in them changed).
+        `items-start` on this grid keeps the shorter columns from
+        stretching to match the tallest one — same "blank space trails at
+        the bottom of a shorter column" look this section already had for
+        categories with fewer items than others, now also covering "a
+        column got taller because something in it expanded" the same way.
+        The trade-off: item N no longer strictly aligns row-for-row across
+        columns in the resting state the way subgrid guaranteed — a minor
+        one, since every item button is normally the same uniform height
+        anyway. */}
+    <div className="grid w-full grid-cols-4 items-start" style={{ backgroundColor: CATEGORY_FILL }}>
       {categories.map((cat) => {
         const embedItem = cat.items.find((it) => it.embed && it.embed === embeddedFlow)
         const detailItem = cat.items.find((it) => it.detail && it.id === detailItemId)
@@ -182,17 +194,7 @@ function GetConnectedAccordion({
         const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
 
         return (
-          // `[grid-row:1/-1]` + `[grid-template-rows:subgrid]` — this
-          // column spans every row track the parent defined above and
-          // shares that exact track list, rather than defining its own;
-          // its own children (the header below, then each item) fall one
-          // per row in DOM order, so they land in the same row positions
-          // every other category's children do. `content-start` — packs
-          // this column's rows against the TOP of its span explicitly
-          // (rather than relying on the default, which read as bottom-
-          // heavy once column heights started differing) so a category
-          // with fewer items ends in blank space at the bottom, not the top.
-          <div key={cat.id} className="grid min-w-0 content-start [grid-row:1/-1] [grid-template-rows:subgrid]">
+          <div key={cat.id} className="flex min-w-0 flex-col">
             {/* Same size as the item buttons below (`text-sm`) but bold +
                 uppercase + tracking-wider so it still reads as a heading,
                 and much smaller than the "Get Connected" heading above
@@ -220,26 +222,14 @@ function GetConnectedAccordion({
               ))}
             </div>
             {cat.items.length > 0 ? (
-              // `contents` — this `<ul>` still exists for real list
-              // semantics, but is invisible to layout: its `<li>`s become
-              // direct children of the `subgrid` div above, so each lands
-              // in its own row alongside the header instead of all of
-              // them stacking inside one shared row as a single unit.
-              <ul className="contents">
+              // Plain block list now — was `contents` (invisible to layout,
+              // so `<li>`s became direct subgrid children of the parent
+              // above); no longer needed now that this column just stacks
+              // its own items normally, independent of the other columns.
+              <ul>
                 {cat.items.map((item) => {
                   const isOpen = (item.embed && item.embed === embeddedFlow) || (item.detail && item.id === detailItemId)
                   const isMatch = matchQuery.length > 0 && item.label.toLowerCase().includes(matchQuery)
-                  // `flex flex-col` (no `justify-start` anymore) — the
-                  // button below is `flex-1` now, growing to fill whatever
-                  // height this row track actually is (shared across all 4
-                  // columns via `subgrid`, so it's not always this item's
-                  // own natural content height). Without that, a shorter
-                  // item sitting in a row a taller sibling column
-                  // stretched would leave blank space trailing INSIDE this
-                  // li instead of being absorbed into the button itself —
-                  // which made the gap before the next button look bigger
-                  // some rows than others, instead of the constant `py-1`
-                  // every row actually has.
                   // Same "bold name + muted gray subtitle underneath" card
                   // recipe as the map's own search dropdown rows (see
                   // ResourceMapView.tsx's `mergedListRows` list) — on
@@ -252,13 +242,32 @@ function GetConnectedAccordion({
                   // natural to put there, so they just render without one
                   // (same `subtitle && (...)` conditional the map list uses).
                   const subtitle = item.detail?.address
+                  // Only meaningful when `isOpen` and `item.detail` — the
+                  // category config the expand panel below needs to render
+                  // this item's own GenericListingCard.
+                  const itemDetailCategory = item.detail ? categoryConfigs?.find((c) => c.id === item.detail!.category) : undefined
                   return (
                     <li key={item.id} className="flex flex-col px-1.5 py-1">
                       <button
                         onClick={() => {
-                          if (item.embed) setEmbeddedFlow((prev) => (prev === item.embed ? null : item.embed!))
-                          else if (item.detail) setDetailItemId((prev) => (prev === item.id ? null : item.id))
-                          else item.go()
+                          // Clears the OTHER piece of state first — `embeddedFlow`
+                          // and `detailItemId` used to be independent, so clicking
+                          // e.g. a `detail` item while an `embed` item was open
+                          // left `embeddedFlow` still set too; `openItem`'s `.find()`
+                          // would then match whichever type happened to come first
+                          // in DOM order, not necessarily the one just clicked, so
+                          // the old panel sometimes didn't go away. Clearing the
+                          // other one here guarantees at most one is ever open,
+                          // and it's always the one just clicked, on request.
+                          if (item.embed) {
+                            setDetailItemId(null)
+                            setEmbeddedFlow((prev) => (prev === item.embed ? null : item.embed!))
+                          } else if (item.detail) {
+                            setEmbeddedFlow(null)
+                            setDetailItemId((prev) => (prev === item.id ? null : item.id))
+                          } else {
+                            item.go()
+                          }
                         }}
                         // White card, no border, subtle floating shadow
                         // (`shadow-[0_4px_14px_rgb(0,0,0,0.06)]`, the same
@@ -283,11 +292,8 @@ function GetConnectedAccordion({
                         // state's hover is brand-teal — ring shifts to
                         // `#8FC6CF`, background tints to a very faint teal
                         // `#F4F8F8`. `duration-150 ease-out` — within the
-                        // requested 150-200ms "ease" range. `flex-1` (was
-                        // `block w-full`) — grows to fill this row's full
-                        // height (see the `<li>` comment above) instead of
-                        // just wrapping its own content.
-                        className={`flex flex-1 w-full flex-col items-stretch gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
+                        // requested 150-200ms "ease" range.
+                        className={`flex w-full flex-col items-stretch gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
                           isOpen
                             ? 'ring-2 ring-black bg-slate-100 text-[#1C1B19]'
                             : isMatch
@@ -329,6 +335,76 @@ function GetConnectedAccordion({
                           </span>
                         )}
                       </button>
+                      {/* Expand panel — populates right under THIS item,
+                          inside its own column, in normal flow (was
+                          `position: absolute` briefly) — now that this
+                          column is no longer subgrid-locked to the others
+                          (see the grid wrapper's own comment above), growing
+                          it in-flow only makes THIS column taller; the other
+                          three are completely unaffected, on request. That
+                          also means the section around it grows to fit
+                          naturally, no bounded `max-h`/scroll needed
+                          anymore — on request, so a tall form or listing
+                          card isn't awkwardly capped. `grid-template-rows`
+                          `0fr`/`1fr` is a CSS-only smooth open/close
+                          animation trick (animating `height: auto` directly
+                          isn't possible) — safe to use in-flow again since
+                          it no longer touches any shared subgrid track. */}
+                      <div
+                        style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+                        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                      >
+                        <div className="overflow-hidden">
+                          <div className="mt-1.5 rounded-md border border-slate-200 bg-white">
+                            {/* "Expand on new page" — on request, for BOTH
+                                kinds of panel (was embed-only). `item.go()`
+                                is the exact full-screen navigation every
+                                non-embed/non-detail item already falls back
+                                to on click; surfaced here as an explicit
+                                escape hatch out of the inline version too. */}
+                            {isOpen && (
+                              <div className="flex justify-end border-b border-slate-100 px-3 py-1.5">
+                                <button
+                                  onClick={() => item.go()}
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-[#1C1B19] cursor-pointer"
+                                >
+                                  Expand on new page
+                                  <span aria-hidden="true">↗</span>
+                                </button>
+                              </div>
+                            )}
+                            {isOpen && item.embed ? (
+                              item.embed === 'support' ? (
+                                <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                              ) : (
+                                <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
+                              )
+                            ) : isOpen && item.detail && itemDetailCategory ? (
+                              <div className="p-3">
+                                <GenericListingCard
+                                  item={item.detail}
+                                  category={itemDetailCategory}
+                                  upvotes={!!itemDetailCategory.upvotesEnabled}
+                                  count={item.detail.upvotes ?? 0}
+                                  expanded
+                                  dense
+                                  hideBorder
+                                  hideName
+                                  highlightColor="#000000"
+                                  onVote={() => {}}
+                                  onTagClick={() => {}}
+                                  onFilterOpen={() => {}}
+                                  onFilterBool={() => {}}
+                                  onFilterSelect={() => {}}
+                                  onEdit={() => item.go()}
+                                  onReport={() => item.go()}
+                                  onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
                     </li>
                   )
                 })}
@@ -345,56 +421,6 @@ function GetConnectedAccordion({
       })}
     </div>
 
-    {/* ONE shared detail panel below the whole grid — not per-item/per-
-        column anymore (that was `position: absolute`, which kept the
-        other 3 columns from growing but floated the open panel over
-        whatever sat below it in its own column, including spilling onto
-        Zmanim once the whole Get Connected section's own height didn't
-        account for it). This single panel, in normal flow, grows the
-        WHOLE section instead — pushing Zmanim down, no overlap — while
-        the 4-column grid above it still never changes shape, since
-        nothing about the open item lives inside it anymore. `openItem`/
-        `isSectionOpen` (see above) are found across ALL categories, not
-        one — there's only ever one open item at a time regardless of
-        which category it's in. */}
-    <div
-      style={{ gridTemplateRows: isSectionOpen ? '1fr' : '0fr' }}
-      className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-    >
-      <div className="overflow-hidden">
-        <div className="mx-1.5 mt-1.5 rounded-md border border-slate-200 bg-white">
-          {openItemIsEmbed ? (
-            openItem!.embed === 'support' ? (
-              <SupportWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-            ) : (
-              <VolunteerWizard variant="inline" onClose={() => setEmbeddedFlow(null)} />
-            )
-          ) : openItemIsDetail && openItem?.detail && openItemDetailCategory ? (
-            <div className="p-3">
-              <GenericListingCard
-                item={openItem.detail}
-                category={openItemDetailCategory}
-                upvotes={!!openItemDetailCategory.upvotesEnabled}
-                count={openItem.detail.upvotes ?? 0}
-                expanded
-                dense
-                hideBorder
-                hideName
-                highlightColor="#000000"
-                onVote={() => {}}
-                onTagClick={() => {}}
-                onFilterOpen={() => {}}
-                onFilterBool={() => {}}
-                onFilterSelect={() => {}}
-                onEdit={() => openItem.go()}
-                onReport={() => openItem.go()}
-                onExpandedChange={(next) => { if (!next) setDetailItemId(null) }}
-              />
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
     </>
   )
 }
@@ -520,6 +546,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
+  // Ported from the map's own search bar (`ResourceMapView`'s
+  // `sortByDistance`/`listCollapsed`), on request — "Sort by distance"
+  // re-orders `placeHits` below by `milesFromAddress` instead of relevance;
+  // the collapse toggle tucks the results away without losing the query,
+  // same as the map's own chevron does for its dropdown.
+  const [sortByDistance, setSortByDistance] = useState(false)
+  const [resultsCollapsed, setResultsCollapsed] = useState(false)
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   // The Map pseudo-category still gates whether the map shows at all —
@@ -556,6 +589,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // expanded — and isolated together on the map — at once.
   const [focusedListingId, setFocusedListingId] = useState<string | null>(null)
   const [focusedCategoryIds, setFocusedCategoryIds] = useState<Set<string>>(new Set())
+  // Set by `focusPlace` below when a top-search-bar result whose item lives
+  // in Get Connected is tapped — `GetConnectedAccordion` watches this and
+  // expands that exact item's own panel, on request.
+  const [focusGetConnectedId, setFocusGetConnectedId] = useState<string | null>(null)
   // The exact ids currently surviving each expanded category row's own
   // filters (search/open-now/kosher/etc.), keyed by that category's map id —
   // no entry yet until that row reports its first batch, in which case the
@@ -699,7 +736,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   // Individual places that match the query by name + tags (e.g. a grocery store
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
-  const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
+  // Sorted by distance instead of relevance when `sortByDistance` is on
+  // (ported from the map's own search bar, on request) — `searchListings`
+  // already stamps `milesFromAddress` per hit whenever `coords` is set, so
+  // this is a pure re-sort, no extra distance computation needed. Hits with
+  // no distance (no `coords` yet, or a category `searchListings` doesn't
+  // stamp) sort to the end rather than jumbling in as `0 mi`.
+  const rawPlaceHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
+  const placeHits = sortByDistance
+    ? [...rawPlaceHits].sort((a, b) => (a.item.milesFromAddress ?? Infinity) - (b.item.milesFromAddress ?? Infinity))
+    : rawPlaceHits
   // Same matches, as an id set — marks their pins on the map (see HomeMap/
   // ResourceMapView's `highlightedListingIds`) so a search result stands
   // out where it already lives on the page, not just in the separate
@@ -746,16 +792,27 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // results list). Map-plottable categories (grocery/restaurant/synagogue/
   // hotel/mikvah) focus that exact pin (`focusedListingId`, already wired
   // to HomeMap — overrides the normal filtered pin set to show just this
-  // one, same mechanism `ResourceMapView`'s own "jump to" results use) and
-  // scroll to the map; WhatsApp/young-professional listings (Get
-  // Connected's Professional Networks/Social Opportunities/WhatsApp Groups
-  // columns) scroll to Get Connected instead. Anything else falls back to
-  // `openPlace`'s full navigate.
+  // one, same mechanism `ResourceMapView`'s own "jump to" results use) —
+  // ALSO adds its category to `focusedCategoryIds` now (on request), since
+  // `ResourceMapView`'s own detail panel only resolves `focusedItem` when
+  // BOTH `focusedListingId` AND that category are set (see its own
+  // `focusedItem` computation) — without this, the pin would pan into view
+  // but never actually expand. Added, not swapped in (`toggleCategory`
+  // would also reset `focusedListingId` right back to null, undoing the
+  // line above it), so it doesn't clear whatever categories were already
+  // isolated, same "only ever turn ON" rule `jumpToMapCategory` follows.
+  // WhatsApp/young-professional listings (Get Connected's Professional
+  // Networks/Social Opportunities/WhatsApp Groups columns) set
+  // `focusGetConnectedId` instead — `GetConnectedAccordion` watches that
+  // prop and opens the matching item's own panel itself. Anything else
+  // falls back to `openPlace`'s full navigate.
   const focusPlace = (hit: (typeof placeHits)[number]) => {
     if (onMapCardIds.has(hit.item.category)) {
+      setFocusedCategoryIds((prev) => (prev.has(hit.item.category) ? prev : new Set(prev).add(hit.item.category)))
       setFocusedListingId(hit.item.id)
       mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } else if (hit.item.category === 'whatsapp' || hit.item.category === 'young-professional') {
+      setFocusGetConnectedId(hit.item.id)
       jumpToGetConnected()
     } else {
       openPlace(hit)
@@ -857,11 +914,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 the taller side), so its content centers vertically in
                 that extra room instead of sitting flush at the top with a
                 dead gap below. ─────────────────────────────────────────── */}
-        {/* Flat `#C7F2D7` (was flat `#FBFBFD`, before that flat `#fefefe`,
-            before that a left-to-right white->cyan `linear-gradient`,
-            before that flat `#fefefe`, before that a teal
-            `linear-gradient`), on request. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:bg-[#C7F2D7] sm:px-6 sm:py-8 sm:text-left">
+        {/* Flat `#ABE4ED` (was flat `#C7F2D7`, before that flat `#FBFBFD`,
+            before that flat `#fefefe`, before that a left-to-right
+            white->cyan `linear-gradient`, before that flat `#fefefe`,
+            before that a teal `linear-gradient`), on request. */}
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:bg-[#ABE4ED] sm:px-6 sm:py-8 sm:text-left">
           <HamburgerMenu resources={resources} />
           {/* Sans-serif (Figtree, the site's only face now — the serif
               headline face was removed entirely on request, weight is
@@ -937,6 +994,28 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     aria-label="Search website…"
                     className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-[#1C1B19] placeholder:text-slate-500 focus:outline-none"
                   />
+                  {/* Collapses the results below without touching the query
+                      — ported from the map's own search bar chevron, on
+                      request. Only shown when there's actually a list to
+                      collapse. */}
+                  {placeHits.length > 0 && (
+                    <button
+                      onClick={() => setResultsCollapsed((v) => !v)}
+                      aria-label={resultsCollapsed ? 'Show results' : 'Hide results'}
+                      className="flex shrink-0 h-6 w-6 items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer"
+                    >
+                      <svg
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ${resultsCollapsed ? '-rotate-90' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
                   {query && (
                     <button
                       onClick={() => setQuery('')}
@@ -947,6 +1026,29 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     </button>
                   )}
                 </div>
+                {/* "Sort by distance" toggle — ported from the map's own
+                    search bar, on request. Re-sorts `placeHits` (see above)
+                    by `milesFromAddress` instead of relevance. Without a
+                    location set yet, this opens the header's location
+                    picker first (`jpc:open-location`, the same event
+                    LocationControl.tsx already listens for) rather than
+                    silently no-op'ing — sorting by distance is meaningless
+                    without one to measure from. */}
+                {placeHits.length > 0 && !resultsCollapsed && (
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      onClick={() => {
+                        if (!coords) document.dispatchEvent(new CustomEvent('jpc:open-location'))
+                        setSortByDistance((v) => !v)
+                      }}
+                      className={`rounded-full border-2 px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                        sortByDistance ? 'border-[#df4c73] bg-[#df4c73] text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Sort by distance
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* ── Desktop: matching listings populate directly under the
@@ -969,9 +1071,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                       (see their own doc comment above) — mirrors
                       `focusPlace`'s exact branches so a result never shows
                       up under a heading that doesn't match what clicking it
-                      does. ─────────────────────────────────────────────── */}
-              {placeHits.length > 0 && (
-                <div className="mx-auto mt-6 w-full max-w-xl max-h-40 space-y-3 overflow-y-auto">
+                      does. Each result is a small card now (bold name +
+                      muted "category · distance" subtitle), not a
+                      name-only pill — same "bold title + muted subtitle"
+                      recipe the map's own search dropdown rows use (and
+                      Get Connected's item cards adopted too), ported here
+                      on request so distance/category actually show
+                      somewhere, matching what "Sort by distance" above
+                      needs to make sense of. Collapses away (no height,
+                      not just hidden — `resultsCollapsed`) via the chevron
+                      in the search pill, ported from the map's own list
+                      toggle. ──────────────────────────────────────────── */}
+              {placeHits.length > 0 && !resultsCollapsed && (
+                <div className="mx-auto mt-3 w-full max-w-xl max-h-52 space-y-3 overflow-y-auto">
                   {[
                     { label: 'On the Map', hits: mapHits },
                     { label: 'In Get Connected', hits: getConnectedHits },
@@ -989,15 +1101,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                           {group.label}
                         </h2>
                         <div className="flex flex-wrap justify-center gap-2">
-                          {group.hits.map((hit) => (
-                            <button
-                              key={hit.item.id}
-                              onClick={() => focusPlace(hit)}
-                              className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-[#1C1B19] shadow-sm transition-colors hover:border-black hover:bg-slate-50 cursor-pointer"
-                            >
-                              {hit.item.name}
-                            </button>
-                          ))}
+                          {group.hits.map((hit) => {
+                            const subtitle = [
+                              hit.categoryLabel,
+                              hit.item.milesFromAddress != null ? `${hit.item.milesFromAddress.toFixed(1)} mi` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                            return (
+                              <button
+                                key={hit.item.id}
+                                onClick={() => focusPlace(hit)}
+                                className="flex w-40 flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 ring-slate-900/5 bg-white transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#8FC6CF]"
+                              >
+                                <span className="min-w-0 w-full truncate text-sm font-semibold text-[#1C1B19]">{hit.item.name}</span>
+                                {subtitle && <span className="min-w-0 w-full truncate text-xs font-normal text-slate-400">{subtitle}</span>}
+                              </button>
+                            )
+                          })}
                         </div>
                       </div>
                     ))}
@@ -1130,7 +1251,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           shared detail panel, if one's open) and this section's own bottom
           border, on request (was flush against it before). */}
       <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-2 sm:border-t-0 sm:border-b-2 sm:border-[#2D3636] sm:bg-[#F5F5F7] sm:pt-3 sm:pb-4">
-        <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} />
+        <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 
       {/* ── Mobile: original combined grid, grouped into the admin's labeled
