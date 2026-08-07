@@ -52,11 +52,26 @@ export const BED_ICON_PATHS = [
 // ResourceMap.tsx) has a stroke to color — a CSS filter crush can only ever
 // produce pure black/white on an emoji, never an arbitrary hue.
 export const STAR_ICON_PATHS = ['M12 3 L19.8 16.5 L4.2 16.5 Z', 'M12 21 L4.2 7.5 L19.8 7.5 Z']
-// Tines widened (6/12/18, was 8/12/16) and the arc/handle retimed to
-// match — the narrower original blurred into a solid blob at actual pin
-// size (~15px); wider gaps between tines read clearly as a fork even that
-// small.
-export const FORK_ICON_PATHS = ['M6 2v6.5', 'M12 2v6.5', 'M18 2v6.5', 'M6 8.5a6 4.5 0 0 0 12 0', 'M12 12v10']
+// A fork+knife pair (was a fork alone) — on request, the standard
+// "restaurant" pictogram instead of a single utensil. Both halves
+// compressed to fit the same 24-wide viewBox as every other single-glyph
+// icon here: three tines (4/6.5/9) merging into a handle on the left, a
+// closed blade shape (straight spine, curved cutting edge) merging into
+// its own handle on the right. The knife's cutting edge curves toward the
+// fork/center (spine straight along the outer right edge) — was mirrored
+// the other way at first, flipped on request to match the Google Maps
+// restaurant pin convention. Verified at actual pin size (~15px) — the gap
+// between the two halves reads clearly even that small.
+export const FORK_ICON_PATHS = [
+  'M4 2v6', // tine 1
+  'M6.5 2v6', // tine 2
+  'M9 2v6', // tine 3
+  'M4 8a2.5 2.5 0 0 0 5 0', // tines merge
+  'M6.5 10v12', // fork handle
+  'M20.5 2v9.5', // knife spine (outer edge)
+  'M20.5 2c-2.8 0 -3.5 3.5 -3.5 5.5s1.2 3.5 3.5 4', // knife cutting edge (curves inward, toward the fork)
+  'M20.5 11.5v10.5', // knife handle
+]
 export const CART_ICON_PATHS = ['M3 4h2l2.4 12.4a2 2 0 0 0 2 1.9h8.2a2 2 0 0 0 2-1.6L21 8H6']
 export const CART_ICON_CIRCLES = [
   { cx: 9, cy: 20, r: 1.5 },
@@ -162,9 +177,12 @@ export function StarOfDavid({ className }: IconProps) {
   )
 }
 
-// Restaurant's map pin/key-button icon — a fork, same open hollow-stroke
-// treatment as PacifierIcon/BedIcon above (replacing the 🍴 emoji). Geometry
-// shared with the map's own pin glyphs — see FORK_ICON_PATHS above.
+// Restaurant's map pin/key-button icon — a fork+knife pair (was a fork
+// alone), same open hollow-stroke treatment as PacifierIcon/BedIcon above
+// (replacing the 🍴/🍽️ emoji). Geometry shared with the map's own pin
+// glyphs — see FORK_ICON_PATHS above. Kept the `Fork`-only name (the fork
+// is still half the glyph) rather than renaming every call site for a
+// cosmetic-only mismatch.
 export function ForkIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

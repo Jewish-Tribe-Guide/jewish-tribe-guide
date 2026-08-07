@@ -938,23 +938,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     // around it, so the boundary area between the bordered sections and
     // the true edge of the page still reads as one continuous color no
     // matter how wide that margin ends up being.
-    // `sm:pt-7 sm:pb-8` extends that same fill along the top and bottom
-    // too (the top row's own `mt-8` moved here so the two don't stack into
-    // a double-size gap; the bottom used to have none at all, since
-    // `<main>` itself has `sm:pb-0`). Top was `14`, halved to `7` on
-    // request, to match the side margins' own halving (`sm:px-12` ->
-    // `sm:px-6` above) — bottom stays as it was, this wasn't about the
-    // whole shelf shifting, just the top margin specifically.
-    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2D3636] sm:pt-7 sm:pb-8">
+    // `sm:pt-[19px] sm:pb-8` extends that same fill along the top and
+    // bottom too (the top row's own `mt-8` moved here so the two don't
+    // stack into a double-size gap; the bottom used to have none at all,
+    // since `<main>` itself has `sm:pb-0`). Top was `14`, halved to `7`,
+    // then cut to about 2/3 of THAT (`28px` -> `~19px`) on request — bottom
+    // stays as it was, this was about the top/side margins specifically,
+    // not the whole shelf shifting.
+    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2D3636] sm:pt-[19px] sm:pb-8">
     {/* `px-4 sm:px-6` is a FIXED margin now (not `max-w-6xl mx-auto`,
             which let the page's max width stay capped while all the
             extra viewport width just piled up into bigger and bigger
             side margins) — on request, so expanding/shrinking the
             browser window keeps this margin exactly the same size and
             lets the bordered sections themselves grow into the freed-up
-            space instead. `sm:px-6` (was `sm:px-12`, half) — on request,
-            the desktop margin read too thick. */}
-    <main className="px-4 sm:px-6 pb-24 sm:pb-0">
+            space instead. `sm:px-6` (was `sm:px-12`, half), then `sm:px-4`
+            (about 2/3 of THAT — 24px -> 16px) — on request, the desktop
+            margin read too thick. */}
+    <main className="px-4 pb-24 sm:pb-0">
       {/* ── Top bar, SIDE BY SIDE with (search bar + map) (used to each be
               their own full-width stacked bands). Title column WIDTH is now
               draggable (`titleColWidth`, was a permanently fixed `14.4rem`)

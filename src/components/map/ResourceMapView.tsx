@@ -95,12 +95,12 @@ const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 // category instead of `getCategoryColor`'s generic position-indexed
 // palette or the gradient sweep that replaced it after that.
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#B7E1DE', // pastel teal
-  restaurant: '#E1D3B7', // pastel amber
+  synagogue: '#E1D3B7', // pastel amber (was teal — swapped with restaurant, on request)
+  restaurant: '#B7D7E1', // pastel slate-blue (was teal, then swapped with mikvah, on request)
   grocery: '#D2E1B7', // pastel olive-green
   // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR itself — exclusive to this category.)
   hotel: '#E1B7D0', // pastel mauve (was slate-blue — swapped with mikvah, on request)
-  mikvah: '#B7D7E1', // pastel slate-blue (was mauve — swapped with hotel, on request)
+  mikvah: '#B7E1DE', // pastel teal (was slate-blue, then swapped with restaurant, on request)
   childcare: '#E1CBB7', // pastel tan
 }
 const ERUV_COLOR = '#BCE1B7' // pastel sage
@@ -976,9 +976,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         embedded map only (see note near the old bar above).
                         No Map/Nearby toggle here since Nearby is dropped
                         for the embedded map — the map key's own tabs already
-                        cover browsing every listing. Scaled down to a
-                        compact size (`text-[10px]`, tighter padding)
-                        instead of its original full-size button. ───────── */}
+                        cover browsing every listing. Sized to match
+                        `ResourceMap.tsx`'s own "Re-center" pill (`px-3 py-2
+                        text-sm font-semibold`) instead of its previous
+                        compact `text-[10px]` treatment, on request, so
+                        every bottom-of-map control reads as one consistent
+                        button size. ───────────────────────────────────── */}
                 {embedded && !loading && ui.map.liveTracking && (
                   <div className="absolute left-3 bottom-3 z-10 flex flex-col items-start">
                     {/* Red used to signal "recording"/"live" the way it
@@ -991,18 +994,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     {tracking ? (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full pl-1.5 pr-2 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-2 text-sm font-semibold text-white shadow-sm"
                           style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                         >
-                          <span className="relative flex h-2 w-2">
+                          <span className="relative flex h-2.5 w-2.5">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
                           </span>
                           Live — updating as you move
                         </span>
                         <button
                           onClick={stop}
-                          className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
+                          className="rounded-full px-3 py-2 text-sm font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
                           style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                         >
                           Stop tracking
@@ -1011,7 +1014,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     ) : (
                       <button
                         onClick={handleStart}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
                         style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                       >
                         Start live tracking

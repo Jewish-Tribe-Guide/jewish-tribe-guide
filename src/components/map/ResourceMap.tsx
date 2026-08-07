@@ -344,9 +344,13 @@ function buildInfoContent(
   return wrap
 }
 
-// The "you are here" dot: a solid blue marker with a white ring and an
-// expanding pulse so it's unmistakable against the category pins. Keyframes are
-// injected once, app-wide.
+// The "you are here" dot: a solid marker with a white ring and an
+// expanding pulse so it's unmistakable against the category pins.
+// `#3E6E6E` (was a generic `#2563eb` blue, outside the established
+// palette) — on request, the same teal "Re-center"/"Start live tracking"
+// already use, so every piece of live-tracking UI reads as one family
+// instead of the dot being an off-palette one-off. Keyframes are injected
+// once, app-wide.
 function buildUserDot(): HTMLElement {
   if (!document.getElementById('jpc-userdot-style')) {
     const style = document.createElement('style')
@@ -359,10 +363,10 @@ function buildUserDot(): HTMLElement {
   wrap.style.cssText = 'position:relative;width:22px;height:22px'
   const pulse = document.createElement('div')
   pulse.style.cssText =
-    'position:absolute;inset:0;border-radius:9999px;background:#2563eb;animation:jpcPulse 1.8s ease-out infinite'
+    'position:absolute;inset:0;border-radius:9999px;background:#3E6E6E;animation:jpcPulse 1.8s ease-out infinite'
   const dot = document.createElement('div')
   dot.style.cssText =
-    'position:absolute;inset:5px;border-radius:9999px;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)'
+    'position:absolute;inset:5px;border-radius:9999px;background:#3E6E6E;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)'
   wrap.append(pulse, dot)
   return wrap
 }
@@ -746,19 +750,19 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
       )}
       {/* "Reset view" — glides the camera back to `fallbackCenter`/
           `initialZoom` (see `resetToDefaultView` above), on request, as a
-          plain always-available escape hatch distinct from "Re-center"
-          above (which only exists once live location tracking is on, and
-          targets the user's own position rather than the map's own
-          default). Shares "Re-center"'s teal so the two read as the same
-          control family; stacks to its left when both are present
-          (`right-14` bumped to `right-32`), otherwise sits in
-          "Re-center"'s own slot. */}
-      {ready && (
+          plain escape hatch distinct from "Re-center" above (which targets
+          the user's own live position rather than the map's own default).
+          Shares "Re-center"'s teal so the two read as the same control
+          family, and shares its exact slot (`right-14`) too — on request,
+          this one now disappears once "Re-center" is available instead of
+          both stacking side by side, since "Re-center" already covers
+          getting back to a known place once live tracking is on. */}
+      {ready && !userLocation && (
         <button
           onClick={resetToDefaultView}
           aria-label="Reset to default view"
           title="Reset to default view"
-          className={`absolute bottom-3 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110 ${userLocation ? 'right-32' : 'right-14'}`}
+          className="absolute bottom-3 right-14 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
           style={{ backgroundColor: '#3E6E6E' }}
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
