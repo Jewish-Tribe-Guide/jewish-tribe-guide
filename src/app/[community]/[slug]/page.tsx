@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import { listCategories } from '@/lib/categoryStore'
 import { listPublishedForms } from '@/lib/formStore'
 import { listCommunities } from '@/lib/communityStore'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { RESERVED_SLUGS } from '@/lib/routes'
 import { Suspense } from 'react'
 import SlugScreen from './SlugScreen'
@@ -57,15 +59,22 @@ export async function generateMetadata(props: PageProps<'/[community]/[slug]'>):
   const resolved = await resolveSlug(community, slug)
   if (!resolved || !site) return {}
 
-  // "Kosher Groceries · Jewish Philly Guide" — the category first, because
-  // that's what the link is about and what a preview card shows first.
-  const title = `${resolved.label} · ${site.name}`
+  // The site name comes from the admin-edited settings, the same source the
+  // header and the community layout's metadata use — reading it off the
+  // community row instead would put a different name in the tab than on the
+  // page. The row is the fallback for a settings table not yet migrated.
+  const settings = await getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS)
+  const siteName = settings.name || site.name
+
+  // "Grocery Stores · Philly Jewish Guide" — the category first, because that's
+  // what the link is about and what a preview card shows first.
+  const title = `${resolved.label} · ${siteName}`
   const description = resolved.description || `${resolved.label} in ${site.region}.`
 
   return {
     title,
     description,
-    openGraph: { title, description, siteName: site.name, type: 'website' },
+    openGraph: { title, description, siteName, type: 'website' },
     twitter: { card: 'summary', title, description },
   }
 }
