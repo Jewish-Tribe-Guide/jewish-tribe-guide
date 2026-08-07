@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { optimizedImagePatterns } from "./src/lib/imageHosts";
 
 // Security headers applied to every response. These are the "safe" set — they
 // harden against clickjacking, MIME-sniffing, and referrer leakage without
@@ -21,6 +22,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    // Shared with the components that render these images, so the config and
+    // the "can this be optimized?" check can't drift apart — see
+    // src/lib/imageHosts.ts for why the list is narrow rather than a wildcard.
+    remotePatterns: optimizedImagePatterns(process.env.NEXT_PUBLIC_SUPABASE_URL),
+  },
   // Cache Components. Two things this buys:
   //
   //   1. `use cache` + cacheTag on the content reads, so a category directory

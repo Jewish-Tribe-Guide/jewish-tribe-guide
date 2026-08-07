@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
@@ -259,10 +260,22 @@ export default function SiteSettingsEditor({
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
           <div className="flex items-center gap-3">
             {draft.logoUrl?.trim() && (
-              <div
-                className="h-9 w-9 rounded-xl shrink-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${draft.logoUrl})` }}
-              />
+              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl">
+                {/* Same reasoning as the header's mark: an attribute rather
+                    than a URL interpolated into a style string. `unoptimized`
+                    because this one previews a logo the admin may have
+                    uploaded seconds ago — going through the image optimizer
+                    would risk showing them a cached copy of the old file while
+                    they're checking whether the new one took. */}
+                <Image
+                  src={draft.logoUrl}
+                  alt="Site logo preview"
+                  fill
+                  sizes="36px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
             )}
             <label className="shrink-0 text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer">
               {uploadingLogo ? 'Uploading…' : 'Upload image'}
