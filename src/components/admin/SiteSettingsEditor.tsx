@@ -5,7 +5,8 @@ import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import DevicePreviewFrame from './DevicePreviewFrame'
-import { PREVIEW_URL, writePreviewDraft } from '@/lib/previewDraft'
+import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
+import { useActiveCommunity } from '@/lib/communityContext'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
 import MobileTabsEditor from './MobileTabsEditor'
 import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
@@ -37,6 +38,8 @@ export default function SiteSettingsEditor({
 }) {
   // Which device's home screen is being edited. Not persisted — it's a lens on
   // the same draft, not a setting.
+  // Which community the preview should open — the one the console is editing.
+  const { community } = useActiveCommunity()
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
@@ -178,7 +181,7 @@ export default function SiteSettingsEditor({
   if (previewing) {
     return (
       <DevicePreviewFrame
-        src={PREVIEW_URL}
+        src={previewUrl(community.slug)}
         onClose={closePreview}
         // Open on whichever device is being edited, so Preview answers the
         // question actually being asked. Still switchable inside the preview.

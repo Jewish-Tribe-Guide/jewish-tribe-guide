@@ -19,11 +19,22 @@ import { COMMUNITY_COOKIE } from '@/lib/communityContext'
 // decides. A stale slug (a community since renamed or removed) falls through
 // to the default rather than 404ing.
 // ─────────────────────────────────────────────────────────────────────────────
-export default async function RootPage() {
+export default async function RootPage(props: PageProps<'/'>) {
+  // Carry the query string through the redirect. A dropped param is a silent
+  // failure — the admin's preview frame opens "/?preview=1" and would land on
+  // the ordinary site with the draft ignored and nothing to say why.
+  const params = new URLSearchParams(
+    Object.entries(await props.searchParams).flatMap(([key, value]) =>
+      value === undefined ? [] : Array.isArray(value) ? value.map((v) => [key, v] as [string, string]) : [[key, value] as [string, string]],
+    ),
+  )
+  const qs = params.toString()
+  const suffix = qs ? `?${qs}` : ''
+
   const remembered = (await cookies()).get(COMMUNITY_COOKIE)?.value
   if (remembered) {
     const communities = await listCommunities()
-    if (communities.some((c) => c.slug === remembered)) redirect(`/${remembered}`)
+    if (communities.some((c) => c.slug === remembered)) redirect(`/${remembered}${suffix}`)
   }
-  redirect(`/${(await getDefaultCommunity()).slug}`)
+  redirect(`/${(await getDefaultCommunity()).slug}${suffix}`)
 }
