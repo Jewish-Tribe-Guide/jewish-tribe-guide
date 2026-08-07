@@ -26,6 +26,10 @@ export default function HomeMap({
       onViewListing={(categoryId, listingId) =>
         onNavigate('patient', 'find', { findView: categoryId, findItemId: listingId })
       }
+      // Expanded here, then narrowed to a phone: this embedded map has nowhere
+      // to be on mobile (the home screen hides it entirely), so send the
+      // visitor to the real map screen rather than dropping their map.
+      onPromoteToMapScreen={() => onNavigate('patient', 'map')}
     />
   )
 }

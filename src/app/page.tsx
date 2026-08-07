@@ -55,6 +55,10 @@ type NavState = {
    *  writes it for its own sub-views); page.tsx only mirrors it, to highlight a
    *  matching mobile tab. */
   findView?: string
+  /** Set when arriving home by collapsing the fullscreen map — desktop's home
+   *  screen has the map embedded in it, so landing at the very top would read
+   *  as being thrown somewhere else entirely rather than zooming back out. */
+  homeScrollTo?: 'map'
 }
 
 export default function Page() {
@@ -103,6 +107,9 @@ export default function Page() {
   // Which section the All Categories page should scroll to — see
   // NavState.allCategoriesSection.
   const [allCategoriesSection, setAllCategoriesSection] = useState<string | null>(null)
+  // Set when home is reached by collapsing the fullscreen map — Landing scrolls
+  // its embedded map band into view instead of leaving the visitor at the hero.
+  const [homeScrollTo, setHomeScrollTo] = useState<'map' | null>(null)
   // Whether ResourceMapView has ever been mounted — once true it stays mounted
   // forever (see the render below), so switching tabs away and back hides it
   // via CSS instead of unmounting/remounting, preserving pan/zoom, the
@@ -149,6 +156,7 @@ export default function Page() {
       setMapEnteredFromListing(!!s?.mapFromListing)
       setAllCategoriesSection(s?.allCategoriesSection ?? null)
       setFindView(s?.findView ?? null)
+      setHomeScrollTo(s?.homeScrollTo ?? null)
     }
 
     window.addEventListener('popstate', onPopState)
@@ -181,6 +189,7 @@ export default function Page() {
     setMode(nextMode)
     setFlow(null)
     setFindView(typeof extra?.findView === 'string' ? extra.findView : null)
+    setHomeScrollTo(extra?.homeScrollTo === 'map' ? 'map' : null)
     history.pushState({ mode: nextMode, ...extra } as NavState, '')
   }
 
@@ -268,6 +277,13 @@ export default function Page() {
   // Up buttons lead back to the single home screen.
   const goToHome = () => navigate(null, 'home')
 
+  // Collapsing the fullscreen map screen. On desktop the home screen has the
+  // map embedded in it, so this is really a zoom-out — land on that band rather
+  // than at the hero, which would read as being sent somewhere unrelated.
+  // Mobile's home screen has no map at all (it has its own tab), so there's
+  // nothing to scroll to and it just goes home.
+  const exitMapToHome = () => navigate(null, 'home', isMobile ? undefined : { homeScrollTo: 'map' })
+
   // Desktop's "Browse all categories" button and its section tabs — the tabs
   // pass the section they want scrolled into view, the button passes nothing
   // and lands at the top.
@@ -343,6 +359,7 @@ export default function Page() {
             onViewAllCategories={viewAllCategories}
             coords={coords}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
+            scrollTo={homeScrollTo}
           />
         </div>
       )}
@@ -420,14 +437,14 @@ export default function Page() {
             // However the visitor actually got here (a listing's own "Map"
             // button, the mobile tab bar, browser back/forward into a 'map'
             // history entry), landing on this screen means fullscreen.
-            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : goToHome}
+            onExitFullscreenToListing={mapEnteredFromListing ? exitMapToListing : exitMapToHome}
             liveTracking={{ tracking, error: geoError, start: startLiveTracking, stop: stopLiveTracking }}
           />
         </main>
       )}
 
       <div className="hidden sm:block">
-        <SiteFooter />
+        <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} />
       </div>
       {tabBar}
       {overlay}

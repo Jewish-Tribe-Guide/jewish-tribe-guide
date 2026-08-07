@@ -43,7 +43,7 @@ const DRY_RUN = process.argv.includes('--dry-run')
 // behave identically. In short: Google may write a field it filled itself
 // (recorded in details.googleFields) or one that's still empty. A value with
 // no ownership record was typed by a person — leave it alone.
-const OWNABLE_SYNC_FIELDS = ['hours', 'phone', 'address']
+const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address']
 
 function isEmptyValue(v) {
   if (v === null || v === undefined) return true
@@ -53,9 +53,10 @@ function isEmptyValue(v) {
 }
 
 function syncMayWrite(details, field, currentValue) {
-  if (isEmptyValue(currentValue)) return true
+  if (field === 'address') return isEmptyValue(currentValue)
   const owned = details?.googleFields
-  return Array.isArray(owned) && owned.includes(field)
+  if (Array.isArray(owned)) return owned.includes(field)
+  return isEmptyValue(currentValue)
 }
 
 function nextGoogleFields(details, written) {
@@ -91,7 +92,7 @@ function mapHours(oh) {
 }
 
 async function fetchDetails(placeId) {
-  const fields = 'business_status,formatted_phone_number,formatted_address,opening_hours'
+  const fields = 'name,business_status,formatted_phone_number,formatted_address,opening_hours'
   const u =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${mapsKey}`
@@ -147,6 +148,10 @@ for (const r of rows) {
 
   const wrote = []
   const update = { details }
+  if (result.name && syncMayWrite(r.details, 'name', r.name)) {
+    update.name = result.name
+    wrote.push('name')
+  }
   if (hours && syncMayWrite(r.details, 'hours', r.details?.hours)) {
     details.hours = hours
     wrote.push('hours')
@@ -168,6 +173,9 @@ for (const r of rows) {
     // own are skipped above, so they never show up here. A list of 111 "no
     // change" entries would bury the handful that matter.
     const changes = wrote.includes('hours') ? describeHoursChange(r.details.hours, hours) : []
+    if (update.name && update.name !== r.name) {
+      changes.push(`      name: ${r.name} → ${update.name}`)
+    }
     if (update.phone && update.phone !== r.phone) {
       changes.push(`      phone: ${r.phone ?? '(none)'} → ${update.phone}`)
     }

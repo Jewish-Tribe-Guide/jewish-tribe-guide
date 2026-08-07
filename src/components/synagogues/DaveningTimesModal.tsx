@@ -309,7 +309,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
             "All" chip — zero selected means "show every day", clicking a
             selected chip again clears just that one, and any number can be
             active at once. ──────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 px-5 py-2 border-b border-slate-100 shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1.5 pl-5 py-2 border-b border-slate-100 shrink-0 overflow-x-auto">
           {ALL_MINYAN_DAYS.map((d) => {
             const active = selectedDays.includes(d)
             return (
@@ -325,6 +325,14 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
               </button>
             )
           })}
+          {/* Trailing spacer, and why the row uses pl-5 rather than px-5: a
+              horizontal scroll container's padding-right is dropped once its
+              content overflows, so on a phone (where these pills always
+              overflow) the last chip ended up flush against the modal edge
+              while the first still had its inset — lopsided. An empty flex
+              item can't be dropped that way. 14px + the row's 6px gap gives
+              back the same 20px as the pl-5 on the other side. */}
+          <span aria-hidden className="w-3.5 shrink-0" />
         </div>
 
         {/* One-time disclaimer, not per-row — only shown when at least one

@@ -20,6 +20,9 @@ export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERM
 /** What a single sync pulls back from Google for one listing. Any field may be
  *  null when Google doesn't have it (e.g. a place with no posted hours). */
 export type PlaceSync = {
+  /** Google's current name for the place. Only written when the sync owns the
+   *  name field — see OWNABLE_SYNC_FIELDS. */
+  name: string | null
   hours: StructuredHours | null
   phone: string | null
   /** Google's formatted address. The sync only fills this in when the listing
@@ -43,27 +46,38 @@ function serverKey(): string | null {
 // hours corrected by hand shouldn't be reverted by Google's (sometimes wrong)
 // posted hours.
 //
-// The rule is provenance, not a blanket policy: Google may write a field it
-// filled itself, or one that's still empty. A field that already has a value
-// with no record of Google having set it was put there by a person — leave it.
+// The rule is provenance, tracked per field, and it comes from the submission
+// form: picking an address autofills the name, phone, and hours, and whether
+// each of those SURVIVES to submit unchanged is the signal. Kept as autofilled
+// → Google's, refreshed forever. Typed over → the submitter's, never touched.
 //
-// Ownership is recorded as `details.googleFields`, the list of fields this job
-// filled. Two properties make that reliable rather than bookkeeping:
+// Per field is the whole point. Someone clarifying "Giant" to "Giant
+// (Wynnewood)" is still pointing at the same business: that protects the name
+// and nothing else, while its hours and phone keep tracking Google.
 //
-//   * No backfill is needed. The recurring sync had never run against this data
-//     when ownership was introduced, so every value that existed then was
-//     manual by definition — and absence of the marker means exactly that.
+// Ownership is recorded as `details.googleFields`, the list of fields Google
+// may write. Two properties make it reliable rather than bookkeeping:
 //
 //   * A human edit releases ownership for free. Approving an edit REPLACES
 //     `details` with the submitted form's values (see listingColumns in
-//     submissionStore.ts), which drops the marker along with it. So the moment
-//     a person corrects a field, Google stops touching it, with no extra
+//     submissionStore.ts), and the form recomputes the list from what it just
+//     compared — so correcting a field by hand hands it back with no extra
 //     wiring in the edit path.
+//
+//   * Rows predating the form capturing this were reconciled once by
+//     scripts/reconcile-google-provenance.mjs, which infers the same answer by
+//     comparing stored values against Google's: an exact match means the
+//     autofill was kept. Anything that differed was left as the submitter's.
 
 /** Fields the sync will only write when it owns them. `businessStatus` and
  *  `googleDescription` are deliberately absent — they're Google-only concepts
- *  with no hand-curated counterpart, so they're always refreshed. */
-export const OWNABLE_SYNC_FIELDS = ['hours', 'phone', 'address'] as const
+ *  with no hand-curated counterpart, so they're always refreshed.
+ *
+ *  `name` is tracked per-field like the rest, deliberately: a submitter who
+ *  clarifies "Giant" to "Giant (Wynnewood)" is still pointing at the same
+ *  business, so the edit protects the name and nothing else — hours and phone
+ *  keep following Google. */
+export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address'] as const
 export type OwnableSyncField = (typeof OWNABLE_SYNC_FIELDS)[number]
 
 /** Nothing there to protect: unset, blank, or an object with no keys. Note that
@@ -83,9 +97,21 @@ export function syncMayWrite(
   field: OwnableSyncField,
   currentValue: unknown,
 ): boolean {
-  if (isEmptyValue(currentValue)) return true
+  // Address is special regardless of provenance: `geo` is derived from it, so
+  // replacing a curated address would silently move the pin. Only ever filled
+  // when there's nothing there.
+  if (field === 'address') return isEmptyValue(currentValue)
+
   const owned = details?.googleFields
-  return Array.isArray(owned) && owned.includes(field)
+  // Provenance on record (the submission form captured it, or a previous sync
+  // wrote it) — believe it exactly. A field that isn't listed is the
+  // submitter's, even when it's blank: someone who deliberately cleared a
+  // wrong autofilled phone number shouldn't get it put back.
+  if (Array.isArray(owned)) return owned.includes(field)
+
+  // No provenance recorded — a row that predates the form capturing it. Fill
+  // gaps only; anything with a value in it was put there by a person.
+  return isEmptyValue(currentValue)
 }
 
 /** The `googleFields` list to store after a sync wrote `written`. Additive —
@@ -132,6 +158,7 @@ type GooglePeriodEndpoint = { day: number; time: string } // time is "HHMM"
 type GooglePeriod = { open: GooglePeriodEndpoint; close?: GooglePeriodEndpoint }
 type GoogleOpeningHours = { periods?: GooglePeriod[] }
 type GooglePlaceResult = {
+  name?: string
   business_status?: string
   formatted_phone_number?: string
   formatted_address?: string
@@ -148,7 +175,7 @@ export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null>
   const key = serverKey()
   if (!key) return null
   try {
-    const fields = 'business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary'
+    const fields = 'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary'
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`
@@ -158,6 +185,7 @@ export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null>
     if (data.status !== 'OK' || !data.result) return null
     const r = data.result
     return {
+      name: r.name ?? null,
       hours: googleHoursToStructured(r.opening_hours),
       phone: r.formatted_phone_number ?? null,
       address: r.formatted_address ?? null,
