@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import ServiceWorker from '@/components/ServiceWorker'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-surface text-slate-900 antialiased min-h-dvh flex flex-col">
         {children}
         <Analytics />
+        <ServiceWorker />
       </body>
     </html>
   )

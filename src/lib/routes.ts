@@ -34,6 +34,9 @@ export const RESERVED_SLUGS = new Set([
   'admin',
   'inbox',
   'api',
+  // The service worker's offline fallback, and the worker itself.
+  'offline',
+  'sw.js',
   // Framework and metadata paths.
   '_next',
   'favicon.ico',

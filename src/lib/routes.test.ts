@@ -40,6 +40,7 @@ describe('slugRejectionReason', () => {
     expect(slugRejectionReason('feedback')).toMatch(/reserved/i)
     expect(slugRejectionReason('admin')).toMatch(/reserved/i)
     expect(slugRejectionReason('api')).toMatch(/reserved/i)
+    expect(slugRejectionReason('offline')).toMatch(/reserved/i)
   })
 
   it('is case- and whitespace-insensitive when matching reserved slugs', () => {
