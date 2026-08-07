@@ -7,15 +7,23 @@ import type { SiteSettings } from '@/lib/siteSettings'
 export default function SiteFooter({
   previewSettings,
   onPromoteFeedbackToPage,
+  year,
 }: {
   previewSettings?: SiteSettings
   /** Forwarded to FeedbackButton — see its own note. Omitted by the admin
    *  category preview, which has no page-level feedback screen to hand off to. */
   onPromoteFeedbackToPage?: () => void
-} = {}) {
+  /** The copyright year, resolved on the server and passed in.
+   *
+   *  It used to be `new Date().getFullYear()` right here, which reads the clock
+   *  during render — non-deterministic, so the page couldn't be prerendered and
+   *  the whole route was held back from producing a static shell. Nobody needs
+   *  a per-visitor copyright year; one value, cached for everyone, is the same
+   *  answer and costs nothing. */
+  year: number
+}) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
-  const year = new Date().getFullYear()
 
   return (
     <footer className="mt-16 border-t border-slate-200/80 bg-white/60">

@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory } from '@/lib/categoryStore'
@@ -65,6 +66,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
         fieldKeys: body.clearFields.keys,
       }))
     }
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, category, cleared })
   } catch (err) {
     console.error('[admin/categories/:id] PATCH failed:', err)
@@ -81,6 +84,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
   const { id } = await ctx.params
   try {
     const { listings } = await deleteCategory(id)
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, listings })
   } catch (err) {
     console.error('[admin/categories/:id] DELETE failed:', err)

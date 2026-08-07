@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { approveSubmission, rejectSubmission } from '@/lib/submissionStore'
@@ -45,5 +46,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     console.error('[admin/submissions/:id] Decision email failed:', err),
   )
 
+  // The public site caches this content; drop it so the edit shows up.
+  await revalidatePublicContent()
   return Response.json({ ok: true, submission })
 }

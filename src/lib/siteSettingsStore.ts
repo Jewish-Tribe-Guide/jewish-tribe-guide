@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import {
   DEFAULT_MOBILE_TABS,
@@ -62,6 +64,9 @@ function toSettings(row: Row | null): SiteSettings {
 // The single settings row, or the community.config defaults if none exists
 // yet (a fresh deployment, before the first admin edit).
 export async function getSiteSettings(community: string): Promise<SiteSettings> {
+  'use cache'
+  cacheTag(TAGS.siteSettings(community))
+  cacheLife('days')
   const { data, error } = await getAdminClient()
     .from('site_settings')
     .select('*')

@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import type { AppMode } from '@/types'
 import SiteHeader from '@/components/SiteHeader'
@@ -37,15 +38,17 @@ function screenFromPath(pathname: string): { mode: AppMode; cardId: string | nul
   return { mode: 'find', cardId: first }
 }
 
-function Chrome({ children }: { children: React.ReactNode }) {
+/** The tab bar, split out because it's the only part of the chrome that needs
+ *  the current path — and reading the path suspends during prerendering. On its
+ *  own behind a Suspense boundary it costs a tab bar that appears a beat late on
+ *  a cold load; folded into the chrome it would have held back the whole page. */
+function PathAwareTabBar({ tabs, iconForTarget }: {
+  tabs: MobileTabConfig[]
+  iconForTarget: (target: string) => string | undefined
+}) {
   const pathname = usePathname()
-  const { controls, liveTracking } = useLocation()
   const { navigate, goHome, openFlow } = useSiteNavigation()
-  const categories = useCategories()
-  const settings = useSiteSettings()
-
   const { mode, cardId } = screenFromPath(pathname)
-  const hasMap = !!categories?.some((c) => c.kind === 'map')
 
   const selectTab = (tab: MobileTabConfig) => {
     if (tab.target === 'categories') goHome()
@@ -57,6 +60,25 @@ function Chrome({ children }: { children: React.ReactNode }) {
     // that had to tell a deleted category from a valid form id.
     else openFlow(tab.target)
   }
+
+  return (
+    <MobileTabBar
+      mode={mode}
+      tabs={tabs}
+      onSelect={selectTab}
+      activeCardId={cardId}
+      iconForTarget={iconForTarget}
+    />
+  )
+}
+
+function Chrome({ children, year }: { children: React.ReactNode; year: number }) {
+  const { controls, liveTracking } = useLocation()
+  const { navigate, goHome } = useSiteNavigation()
+  const categories = useCategories()
+  const settings = useSiteSettings()
+
+  const hasMap = !!categories?.some((c) => c.kind === 'map')
 
   // `?? DEFAULT_MOBILE_TABS` guards a response from a deployment older than the
   // mobileTabs field (or a stale cached one): the bar is on every mobile
@@ -71,15 +93,14 @@ function Chrome({ children }: { children: React.ReactNode }) {
       <SiteHeader onGoHome={goHome} location={controls} />
       {children}
       <div className="hidden sm:block">
-        <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} />
+        <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />
       </div>
-      <MobileTabBar
-        mode={mode}
-        tabs={visibleTabs}
-        onSelect={selectTab}
-        activeCardId={cardId}
-        iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
-      />
+      <Suspense fallback={null}>
+        <PathAwareTabBar
+          tabs={visibleTabs}
+          iconForTarget={(target) => categories?.find((c) => c.id === target)?.icon ?? undefined}
+        />
+      </Suspense>
       <LiveLocationPrompt
         enabled={ui.map.liveTracking && !liveTracking.tracking}
         onShare={liveTracking.start}
@@ -88,10 +109,17 @@ function Chrome({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function SiteChrome({ children }: { children: React.ReactNode }) {
+export default function SiteChrome({
+  children,
+  year,
+}: {
+  children: React.ReactNode
+  /** Resolved on the server — see the note on SiteFooter's own `year` prop. */
+  year: number
+}) {
   return (
     <LocationProvider>
-      <Chrome>{children}</Chrome>
+      <Chrome year={year}>{children}</Chrome>
     </LocationProvider>
   )
 }

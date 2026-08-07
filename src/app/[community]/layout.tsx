@@ -5,6 +5,7 @@ import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { CommunityProvider } from '@/lib/communityContext'
 import SiteChrome from '@/components/SiteChrome'
+import { currentYear } from '@/lib/currentYear'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Everything public lives under a community segment.
@@ -73,7 +74,7 @@ export default async function CommunityLayout(props: LayoutProps<'/[community]'>
         className="contents"
         style={{ '--color-primary': community.themeColor } as React.CSSProperties}
       >
-        <SiteChrome>{props.children}</SiteChrome>
+        <SiteChrome year={await currentYear()}>{props.children}</SiteChrome>
       </div>
     </CommunityProvider>
   )

@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { restoreResource, hardDeleteArchivedResource } from '@/lib/resourceStore'
@@ -15,6 +16,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (!resource) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, resource })
   } catch (err) {
     console.error('[admin/archived-listings/:id] PATCH failed:', err)
@@ -34,6 +37,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
     if (!found) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true })
   } catch (err) {
     console.error('[admin/archived-listings/:id] DELETE failed:', err)

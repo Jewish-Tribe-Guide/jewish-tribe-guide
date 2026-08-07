@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import type { Community } from './communityStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +67,6 @@ export type ActiveCommunity = {
 export function useActiveCommunity(): ActiveCommunity {
   const ctx = useContext(CommunityContext)
   const router = useRouter()
-  const pathname = usePathname()
 
   if (!ctx) {
     throw new Error('useActiveCommunity must be used inside a CommunityProvider')
@@ -82,12 +81,19 @@ export function useActiveCommunity(): ActiveCommunity {
       // are deliberately excluded: a category slug isn't guaranteed to exist in
       // the other community, and a listing id certainly doesn't, so those land
       // on that community's home rather than a 404.
-      const rest = pathname.split('/').filter(Boolean).slice(1)
+      //
+      // The path is read from window at click time rather than through
+      // usePathname, deliberately. This hook is used by the header, which is on
+      // every screen, so subscribing it to the path would subscribe the whole
+      // chrome — and reading the path suspends during prerendering, which held
+      // back every page from rendering. An event handler has no such problem:
+      // by the time it runs there is a window, and its value is current.
+      const rest = window.location.pathname.split('/').filter(Boolean).slice(1)
       const screen = rest[0]
       const portable = rest.length === 1 && (screen === 'map' || screen === 'all' || screen === 'feedback')
       router.push(portable ? `/${next}/${screen}` : `/${next}`)
     },
-    [pathname, router],
+    [router],
   )
 
   return {

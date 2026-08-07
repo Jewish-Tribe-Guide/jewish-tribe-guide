@@ -79,6 +79,35 @@ export async function generateMetadata(props: PageProps<'/[community]/[slug]'>):
   }
 }
 
+/** Every category and form, for every community.
+ *
+ *  Without this, `params` here is request-time data, which blocks the route
+ *  from producing a static shell — and since the community layout wraps the
+ *  page, that held back the header and chrome too. With it, each directory is a
+ *  real prerendered page: the fastest thing to serve and the thing a crawler
+ *  can actually index, which is most of the point of giving these URLs at all.
+ *
+ *  A slug that isn't listed here still works — it's rendered on demand and
+ *  404s if it resolves to nothing. */
+export async function generateStaticParams() {
+  const communities = await listCommunities().catch(() => [])
+
+  const params = await Promise.all(
+    communities.map(async (community) => {
+      const [categories, forms] = await Promise.all([
+        listCategories(community.slug).catch(() => []),
+        listPublishedForms(community.slug).catch(() => []),
+      ])
+      return [...categories.map((c) => c.id), ...forms.map((f) => f.id)].map((slug) => ({
+        community: community.slug,
+        slug,
+      }))
+    }),
+  )
+
+  return params.flat()
+}
+
 export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) {
   const { community, slug } = await props.params
   const resolved = await resolveSlug(community, slug)

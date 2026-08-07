@@ -21,6 +21,24 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Cache Components. Two things this buys:
+  //
+  //   1. `use cache` + cacheTag on the content reads, so a category directory
+  //      isn't a fresh Supabase query for every visitor of every page. The
+  //      content is public, identical for everyone, and changes when an admin
+  //      edits it — so it's cached until an admin edit invalidates the tag,
+  //      rather than on a timer that's either too slow or too eager.
+  //
+  //   2. Route state preservation. Next keeps recent routes mounted behind
+  //      React's <Activity> instead of unmounting them, which is exactly what
+  //      the old page.tsx hand-rolled for the map — kept permanently mounted
+  //      under `display: none` so pan/zoom and the selected pin survived a tab
+  //      switch. That hack is gone; this replaces it properly.
+  //
+  // The trade-off is that component state now survives navigating away and
+  // back, which it didn't before. Anything that relied on unmounting to reset
+  // needs to say so explicitly — see the wizard and dropdown reset patterns.
+  cacheComponents: true,
   allowedDevOrigins: ['192.168.1.176', '*.ngrok-free.dev', '*.ngrok-free.app', '*.ngrok.io'],
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];

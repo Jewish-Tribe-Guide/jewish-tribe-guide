@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { getDefaultCommunity } from './communityStore'
 import {
@@ -53,6 +55,9 @@ function toConfig(row: CategoryRow): CategoryConfig {
 
 // All categories, ordered for the directory index.
 export async function listCategories(community: string): Promise<CategoryConfig[]> {
+  'use cache'
+  cacheTag(TAGS.categories(community))
+  cacheLife('days')
   // Ordered alphabetically by the plural label shown on the cards. (The
   // `sort_order` column is still stored so a community can switch to manual
   // ordering later, but for now the directory is purely alphabetical.)
