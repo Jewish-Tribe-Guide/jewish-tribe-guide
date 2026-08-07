@@ -32,6 +32,13 @@ export default function Error({
         >
           Try again
         </button>
+        {/* A plain <a>, not next/link, on purpose. This renders when something
+            has already gone wrong, and a client-side navigation would keep
+            whatever broken state caused it. A full document load is the more
+            reliable escape hatch, which is the whole job of this button —
+            `reset()` above is the soft option, and this is the one that works
+            when the soft option doesn't. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/"
           className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"

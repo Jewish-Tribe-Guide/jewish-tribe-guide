@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
@@ -75,7 +75,11 @@ export default function FindResources({ view, anchor, onUp, onViewAllCategories,
   const zmanimCoords = anchor.coords ?? community.mapCenter
   const locationLabel = anchor.label || community.region
 
-  const [action, setAction] = useState<ListingAction | null>(null)
+  // The listing being edited or reported. Only the *subject* is state — whether
+  // a form is open at all is `?form=` in the URL (see formOpen below), so
+  // browser back closes it. The listing itself can't live in the URL: the form
+  // needs the whole record, not an id it would have to re-fetch.
+  const [actionSubject, setActionSubject] = useState<ListingAction | null>(null)
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
 
@@ -116,10 +120,12 @@ export default function FindResources({ view, anchor, onUp, onViewAllCategories,
 
   // A form is only open while its param says so, so browser back closes it
   // without this component listening for anything.
-  const formOpen = params.get('form') !== null
-  useEffect(() => {
-    if (!formOpen && action) setAction(null)
-  }, [formOpen, action])
+  //
+  // Derived rather than synced: an effect that cleared the subject whenever the
+  // param went away would be a second source of truth chasing the first, and
+  // would render one frame of a form the URL says is closed. Reading them
+  // together means there is no in-between state to get wrong.
+  const action = params.get('form') !== null ? actionSubject : null
 
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {
@@ -134,7 +140,7 @@ export default function FindResources({ view, anchor, onUp, onViewAllCategories,
   // Open a listing action (create/edit/report form). Pushes its own history
   // entry so browser-back from the form lands on the category list, not home.
   function openAction(act: ListingAction) {
-    setAction(act)
+    setActionSubject(act)
     setParams({
       form: act.mode,
       // Re-expands the relevant card when the form closes.
@@ -145,7 +151,7 @@ export default function FindResources({ view, anchor, onUp, onViewAllCategories,
   // Up from a listing form / report form → the category list it was opened from
   // (the path is still the category; `item` re-expands the relevant card).
   const goToCategoryList = () => {
-    setAction(null)
+    setActionSubject(null)
     setParams({ form: null })
   }
 
