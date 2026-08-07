@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
 import CategoryPickerList from './CategoryPickerList'
@@ -132,15 +132,27 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
-  const mapBoxRef = useRef<HTMLDivElement>(null)
+  // A state-backed callback ref, not useRef — the map box is rendered inside
+  // the `loading ? … : …` else-branch below, so on first mount it doesn't
+  // exist yet. A plain ref + `[]`-dep effect read null and, having no reason
+  // to re-run, never observed the box at all: mapBoxHeight stayed 0, which
+  // collapsed the sheet's half/full snap points onto PEEK_PX and left it
+  // unable to open at all. Keying the effect off the element itself makes it
+  // attach the moment the box mounts. Same pattern as topOverlayEl above.
+  const [mapBoxEl, setMapBoxEl] = useState<HTMLDivElement | null>(null)
   const [mapBoxHeight, setMapBoxHeight] = useState(0)
-  useEffect(() => {
-    const el = mapBoxRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => setMapBoxHeight(entry.contentRect.height))
-    ro.observe(el)
-    return () => ro.disconnect()
+  // Measured on attach rather than waiting for the observer's first callback,
+  // so the snap points are usable from the very first frame the box exists.
+  const attachMapBox = useCallback((el: HTMLDivElement | null) => {
+    setMapBoxEl(el)
+    if (el) setMapBoxHeight(el.getBoundingClientRect().height)
   }, [])
+  useEffect(() => {
+    if (!mapBoxEl) return
+    const ro = new ResizeObserver(([entry]) => setMapBoxHeight(entry.contentRect.height))
+    ro.observe(mapBoxEl)
+    return () => ro.disconnect()
+  }, [mapBoxEl])
   // Current px height of the mobile nearby sheet — reported up so ResourceMap
   // can center a newly-selected pin within the visible strip of map ABOVE the
   // sheet, instead of the whole box's center (which the sheet mostly covers).
@@ -706,8 +718,21 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // further taps add/remove from that subset as before. Any category's
     // stored filters ride along either way (see clearFiltersForCategories).
     setSidebarCollapsed(false)
+
+    // Picking a category on mobile brings the nearby sheet up to half, the way
+    // the Google Maps app does — the results are the point of the tap, and
+    // leaving them behind a collapsed handle makes the chip look like it did
+    // nothing. Only when the tap SELECTS a category: switching one off is a
+    // narrowing gesture, and shoving the sheet up over the map for it would be
+    // the opposite of what was asked. `raise` leaves an already-expanded sheet
+    // alone, so it can't shrink a list someone deliberately opened.
+    const raiseSheet = () => {
+      if (isMobile) nearbySheetRef.current?.raise()
+    }
+
     if (effectiveSelected.size === options.length) {
       setSelected(new Set([id]))
+      raiseSheet()
       return
     }
     const next = new Set(effectiveSelected)
@@ -715,6 +740,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       next.delete(id)
     } else {
       next.add(id)
+      raiseSheet()
     }
     setSelected(next)
   }
@@ -1050,7 +1076,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   same edge-to-edge treatment, no boxed card — same as Google
                   Maps. ────────────────────────────────────────────────────── */}
           <div
-            ref={mapBoxRef}
+            ref={attachMapBox}
             className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:min-h-0 sm:w-auto sm:translate-x-0"
           >
               <ResourceMap
