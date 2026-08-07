@@ -63,7 +63,7 @@ function mapHours(oh) {
 }
 
 async function fetchDetails(placeId) {
-  const fields = 'formatted_phone_number,opening_hours'
+  const fields = 'name,formatted_phone_number,opening_hours'
   const u =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${mapsKey}`
@@ -116,6 +116,12 @@ for (const r of rows) {
   const owned = []
   const unclear = []
 
+  // Name — exact match means the submitter kept what autofill supplied.
+  const gName = result.name ?? null
+  if (isEmpty(r.name)) owned.push('name')
+  else if (gName && gName.trim() === r.name.trim()) owned.push('name')
+  else if (gName) unclear.push({ field: 'name', stored: r.name, google: gName })
+
   // Phone
   const gPhone = result.formatted_phone_number ?? null
   if (isEmpty(r.phone)) owned.push('phone')
@@ -160,7 +166,7 @@ if (ambiguous.length === 0) {
         console.log(`    hours stored: ${summarizeHours(u.stored)}`)
         console.log(`    hours google: ${summarizeHours(u.google)}`)
       } else {
-        console.log(`    phone stored: ${u.stored}   google: ${u.google}`)
+        console.log(`    ${u.field} stored: ${u.stored}   google: ${u.google}`)
       }
     }
   }

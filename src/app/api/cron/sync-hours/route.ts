@@ -29,6 +29,7 @@ export const dynamic = 'force-dynamic'
 
 type SyncedRow = {
   id: string
+  name: string
   phone: string | null
   address: string | null
   details: Record<string, unknown>
@@ -61,7 +62,7 @@ async function runSync(): Promise<NextResponse> {
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from('resource')
-    .select('id,phone,address,details')
+    .select('id,name,phone,address,details')
     .eq('status', 'approved')
     .not('details->>placeId', 'is', null)
     // Cap the number of paid Google Place Details calls a single run can make.
@@ -95,8 +96,17 @@ async function runSync(): Promise<NextResponse> {
     // Everything else is written only where Google owns the field: one it
     // filled itself, or one still empty. See syncMayWrite in googlePlaces.ts.
     const wrote: OwnableSyncField[] = []
-    const update: { details: Record<string, unknown>; phone?: string; address?: string } = { details }
+    const update: {
+      details: Record<string, unknown>
+      name?: string
+      phone?: string
+      address?: string
+    } = { details }
 
+    if (sync.name && syncMayWrite(row.details, 'name', row.name)) {
+      update.name = sync.name
+      wrote.push('name')
+    }
     if (sync.hours && syncMayWrite(row.details, 'hours', row.details?.hours)) {
       details.hours = sync.hours
       wrote.push('hours')

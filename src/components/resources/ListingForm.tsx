@@ -62,7 +62,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // which fields the submitter accepted from Google and which they replaced —
   // see googleFieldsForSubmit. Populated by handlePlaceSelect; a ref because
   // nothing renders from it.
-  const autofilled = useRef<{ phone?: string; hours?: string }>({})
+  const autofilled = useRef<{ name?: string; phone?: string; hours?: string }>({})
   // Whatever provenance the listing already carries (edits only). A field stays
   // Google's across an edit unless this edit actually changes it.
   const priorGoogleFields: string[] = Array.isArray(existing?.googleFields)
@@ -127,6 +127,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // values survive to submit is what tells the recurring Google sync which
     // fields it owns — see googleFieldsForSubmit below.
     autofilled.current = {
+      name: result.name ?? undefined,
       phone: result.phone ? formatPhone(result.phone) : undefined,
       hours: result.hours ? JSON.stringify(result.hours) : undefined,
     }
@@ -159,7 +160,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     const priorHours = hoursKey ? JSON.stringify((existing?.[hoursKey] as unknown) ?? null) : undefined
 
     const decide = (
-      field: 'phone' | 'hours',
+      field: 'name' | 'phone' | 'hours',
       autofilledValue: string | undefined,
       current: string | undefined,
       prior: string | undefined,
@@ -170,6 +171,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
 
     const out: string[] = []
+    if (decide('name', autofilled.current.name, name, existing?.name ?? '')) out.push('name')
     if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
     if (hoursKey && decide('hours', autofilled.current.hours, currentHours, priorHours)) out.push('hours')
     return out
