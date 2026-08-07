@@ -717,6 +717,34 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const soleChips = soleConfig ? buildFilterChips(soleConfig, soleItems) : []
   const showFilterBar = !!soleOption && !!soleConfig && soleChips.length > 0
 
+  // Sole-category filter chips ("Open Now", kosher cert, etc. — see
+  // `soleChips` above) already scroll sideways on overflow
+  // (`overflow-x-auto`, no visible scrollbar); a scroll ARROW next to it is
+  // additionally shown once there's actually something to scroll TO, on
+  // request, since a hidden scrollbar alone gives no hint more chips exist
+  // off the right edge. `chipOverflowing` is re-measured whenever the chip
+  // row's own size or content could have changed — the container's own
+  // width (ResizeObserver, e.g. the title column drag resizing this whole
+  // map) and the chip list itself (a category swap can add/drop chips
+  // without the container changing size at all).
+  const chipScrollRef = useRef<HTMLDivElement>(null)
+  const [chipOverflowing, setChipOverflowing] = useState(false)
+  useEffect(() => {
+    const el = chipScrollRef.current
+    if (!el) {
+      setChipOverflowing(false)
+      return
+    }
+    const measure = () => setChipOverflowing(el.scrollWidth > el.clientWidth + 1)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [soleChips.length, soleOption?.id])
+  const scrollChips = () => {
+    chipScrollRef.current?.scrollBy({ left: 140, behavior: 'smooth' })
+  }
+
   // The dropdown never groups by category — one flat list regardless of
   // whether one or several categories are selected — sorted by distance
   // from `activeLocation` when `sortByDistance` is on and a location is
@@ -977,11 +1005,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         No Map/Nearby toggle here since Nearby is dropped
                         for the embedded map — the map key's own tabs already
                         cover browsing every listing. Sized to match
-                        `ResourceMap.tsx`'s own "Re-center" pill (`px-3 py-2
-                        text-sm font-semibold`) instead of its previous
-                        compact `text-[10px]` treatment, on request, so
-                        every bottom-of-map control reads as one consistent
-                        button size. ───────────────────────────────────── */}
+                        `ResourceMap.tsx`'s own "Re-center" pill instead of
+                        its previous compact `text-[10px]` treatment, on
+                        request, so every bottom-of-map control reads as one
+                        consistent button size — then both scaled down
+                        another ~10% together on request (`px-3 py-2
+                        text-sm` -> `px-[11px] py-[7px] text-[13px]`). ── */}
                 {embedded && !loading && ui.map.liveTracking && (
                   <div className="absolute left-3 bottom-3 z-10 flex flex-col items-start">
                     {/* Red used to signal "recording"/"live" the way it
@@ -994,18 +1023,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     {tracking ? (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-2 text-sm font-semibold text-white shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-full pl-[9px] pr-[11px] py-[7px] text-[13px] font-semibold text-white shadow-sm"
                           style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                         >
-                          <span className="relative flex h-2.5 w-2.5">
+                          <span className="relative flex h-[9px] w-[9px]">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white" />
-                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+                            <span className="relative inline-flex h-[9px] w-[9px] rounded-full bg-white" />
                           </span>
                           Live — updating as you move
                         </span>
                         <button
                           onClick={stop}
-                          className="rounded-full px-3 py-2 text-sm font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
+                          className="rounded-full px-[11px] py-[7px] text-[13px] font-medium text-white shadow-sm hover:brightness-110 cursor-pointer"
                           style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                         >
                           Stop tracking
@@ -1014,7 +1043,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     ) : (
                       <button
                         onClick={handleStart}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-[11px] py-[7px] text-[13px] font-semibold text-white shadow-md hover:brightness-110 cursor-pointer"
                         style={{ backgroundColor: FILTER_PILL_ACTIVE }}
                       >
                         Start live tracking
@@ -1287,7 +1316,16 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               showing here instead of the category buttons.
                               `top-2` becomes `top-8` in true Fullscreen API
                               mode (see the search bar wrapper's own doc
-                              comment above) — same reasoning, on request. ── */}
+                              comment above) — same reasoning, on request.
+                              Every button directly on the map — this row,
+                              "Filter categories" beside it, Re-center/reset
+                              view/fullscreen in the map's own corners, and
+                              the live-tracking cluster (all in
+                              ResourceMap.tsx/further below) — is sized
+                              about 10% down from its previous size here, on
+                              request (`h-8`/`h-9` -> `h-[29px]`/`h-8`,
+                              `px-3` -> `px-[11px]`, `text-sm` ->
+                              `text-[13px]`, etc.). ────────────────────── */}
                       <div className={`absolute left-72 right-12 z-20 flex items-center gap-1 ${isFullscreen ? 'top-8' : 'top-2'}`}>
                       {/* ── "Filter categories" dropdown — moved to the front
                               of this row (was after Select all/Unselect all),
@@ -1318,11 +1356,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={() => setCategoryPickerOpen((v) => !v)}
                           aria-expanded={categoryPickerOpen}
-                          className="inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+                          className="inline-flex shrink-0 h-[29px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 bg-white px-[11px] text-[13px] font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
                         >
                           Filter categories{focusedCategoryIds?.size ? ` (${focusedCategoryIds.size})` : ''}
                           <svg
-                            className={`h-3 w-3 shrink-0 transition-transform duration-200 ${categoryPickerOpen ? 'rotate-180' : ''}`}
+                            className={`h-[11px] w-[11px] shrink-0 transition-transform duration-200 ${categoryPickerOpen ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2.5}
@@ -1370,14 +1408,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         <button
                           onClick={selectAll}
                           disabled={options.every((o) => focusedCategoryIds?.has(o.id))}
-                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-[29px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-[11px] text-[13px] font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Select all
                         </button>
                         <button
                           onClick={unselectAll}
                           disabled={!focusedCategoryIds || focusedCategoryIds.size === 0}
-                          className="inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                          className="inline-flex shrink-0 h-[29px] items-center justify-center whitespace-nowrap rounded-full border border-slate-300 bg-white px-[11px] text-[13px] font-medium text-[#2D3636] shadow-sm transition-colors hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Unselect all
                         </button>
@@ -1386,8 +1424,29 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                 shown (not swapped in, see above) whenever
                                 exactly one category is selected, so filtering
                                 it (denomination, Open Now, etc.) doesn't
-                                require digging into the dropdown above. ── */
-                        <div className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                require digging into the dropdown above.
+                                Buttons sized down ~10% along with every
+                                other map button, on request (`h-8` ->
+                                `h-[29px]`, `px-3` -> `px-[11px]`, `text-sm`
+                                -> `text-[13px]`). Split into a scrollable
+                                inner div (`chipScrollRef`, still
+                                `overflow-x-auto`/no visible scrollbar) plus
+                                a `shrink-0` scroll-arrow button as its flex
+                                sibling — not absolutely positioned over it —
+                                so the scrollable area's own `min-w-0`
+                                naturally crops its last chip short of the
+                                arrow instead of the two overlapping. The
+                                arrow only renders once there's actually
+                                overflow to scroll to (`chipOverflowing`, see
+                                above) and sits right where the row already
+                                ends (`right-12` on the outer wrapper), i.e.
+                                right next to the map's own zoom control, on
+                                request. ─────────────────────────────────── */
+                        <div className="flex min-w-0 flex-1 items-center gap-1">
+                          <div
+                            ref={chipScrollRef}
+                            className="flex min-w-0 items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                          >
                           {/* Was paired with a "‹ Back to categories" button
                               — no longer needed now that the dropdown above
                               is always visible on its own. Clicking this
@@ -1397,7 +1456,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                             onClick={() => selectTab(soleOption.id)}
                             aria-label={`Unselect ${soleOption.label}`}
                             style={{ backgroundColor: soleOption.color }}
-                            className={`inline-flex shrink-0 h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium shadow-md cursor-pointer ${
+                            className={`inline-flex shrink-0 h-[29px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-[11px] text-[13px] font-medium shadow-md cursor-pointer ${
                               needsDarkText(soleOption.color) ? 'text-black' : 'text-white'
                             }`}
                           >
@@ -1429,7 +1488,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                                     ? { backgroundColor: soleOption.color }
                                     : { borderColor: soleOption.color, color: readableTextOnWhite(soleOption.color) }
                                 }
-                                className={`inline-flex shrink-0 h-8 items-center justify-center whitespace-nowrap rounded-full border-2 px-3 text-sm font-medium shadow-sm transition-colors cursor-pointer ${
+                                className={`inline-flex shrink-0 h-[29px] items-center justify-center whitespace-nowrap rounded-full border-2 px-[11px] text-[13px] font-medium shadow-sm transition-colors cursor-pointer ${
                                   active ? (needsDarkText(soleOption.color) ? 'text-black' : 'text-white') : 'bg-white hover:bg-slate-50'
                                 }`}
                               >
@@ -1437,6 +1496,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                               </button>
                             )
                           })}
+                          </div>
+                          {chipOverflowing && (
+                            <button
+                              onClick={scrollChips}
+                              aria-label="Scroll filters"
+                              // `mr-2` — was flush against the map's own
+                              // zoom control (`right-12` on the outer
+                              // wrapper left just ~2px of clearance, close
+                              // enough to read as overlapping), on request.
+                              className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#2D3636] shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       )}
                       </div>

@@ -1523,8 +1523,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
-            itself on both sides (was flush with the letters), on request. */}
-        <h2 className="inline-block border-b-[2px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
+            itself on both sides (was flush with the letters), on request.
+            `#fefefe` (was `#E8E8E8` light gray), on request. */}
+        <h2 className="inline-block border-b-[2px] border-[#fefefe] px-10 pb-2 text-[29px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
           Get Involved
         </h2>
       </div>

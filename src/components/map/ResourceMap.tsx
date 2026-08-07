@@ -737,14 +737,18 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           `#3E6E6E` fill (was `bg-blue-600`) — on request, to match
           "Start live tracking"'s own teal (`FILTER_PILL_ACTIVE` in
           ResourceMapView.tsx) instead of blue, so the two read as the same
-          visual family. */}
+          visual family. Every button on the map (this one, "Reset view"/
+          fullscreen below, the live-tracking cluster in
+          ResourceMapView.tsx) is sized about 10% down from its previous
+          size on request (`px-3 py-2 text-sm` -> `px-[11px] py-[7px]
+          text-[13px]`, `h-9 w-9` -> `h-8 w-8`, etc.). */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
-          className="absolute bottom-3 right-14 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
+          className="absolute bottom-3 right-14 flex items-center gap-1.5 rounded-full px-[11px] py-[7px] text-[13px] font-semibold text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
           style={{ backgroundColor: '#3E6E6E' }}
         >
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-white/40" aria-hidden="true" />
+          <span className="inline-block h-[9px] w-[9px] rounded-full bg-white ring-2 ring-white/40" aria-hidden="true" />
           Re-center
         </button>
       )}
@@ -762,10 +766,10 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           onClick={resetToDefaultView}
           aria-label="Reset to default view"
           title="Reset to default view"
-          className="absolute bottom-3 right-14 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
+          className="absolute bottom-3 right-14 flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
           style={{ backgroundColor: '#3E6E6E' }}
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 1 2.6 6.3M3 12v5h5" />
           </svg>
         </button>
@@ -780,14 +784,14 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
         <button
           onClick={onToggleFullscreen}
           aria-label={isFullscreen ? 'Exit full screen' : 'View full screen'}
-          className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#2D3636] shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
+          className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#2D3636] shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors hover:bg-slate-50"
         >
           {isFullscreen ? (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0v4m0-4h4m7 5l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m7-5l5 5m0 0v-4m0 4h-4" />
             </svg>
           ) : (
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           )}
