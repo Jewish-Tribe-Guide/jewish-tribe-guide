@@ -58,17 +58,18 @@ type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem
 
 // One shared tint for every Get Connected category tile (Support &
 // Volunteering, Professional Networks, Social Opportunities, WhatsApp
-// Groups) — `#F6FAFB`, a pale teal (~8% of the sidebar's own `#8FC6CF`
-// blended into white — was `#FBFBFD`, before a long lineage of other flat
-// colors, see git history), on request ("a very light background tint
-// distinct from the pure white above/below"), same color as the
-// containing Get Connected section itself (heading + this tile grid) so
-// the whole run reads as one continuous tinted band — the individual item
-// cards (see GetConnectedAccordion) sit on top of it, each in their own
-// column's accent color now instead of plain white. The map area above
-// keeps its own separate `#F0F6F6` — this request was scoped to "What are
-// you looking for" and "Get Connected" only.
-const CATEGORY_FILL = '#FBFBFD'
+// Groups) — `#C5E5E9`, the "Philly Jewish Guide" title's own pale cyan
+// (was a near-white `#FBFBFD`/`#F6FAFB`, before a long lineage of other
+// flat colors, see git history) — on request, extends the heading/padding
+// bands' own color all the way through the tile grid area too, instead of
+// stopping short at a different near-white fill right behind the buttons.
+// Same color as the containing Get Connected section itself (heading +
+// this tile grid) so the whole run reads as one continuous tinted band —
+// the individual item cards (see GetConnectedAccordion) sit on top of it,
+// each in their own column's accent color now instead of plain white. The
+// map area above keeps its own separate `#F0F6F6` — this request was
+// scoped to "What are you looking for" and "Get Connected" only.
+const CATEGORY_FILL = '#C5E5E9'
 
 // One accent color per Get Connected column (Support & Volunteering,
 // Professional Networks, Social Opportunities, WhatsApp Groups, in that
@@ -82,6 +83,18 @@ const CATEGORY_FILL = '#FBFBFD'
 // other three are analogous/complementary hues at a matching darkness so
 // none of the four reads louder than the others.
 const GET_CONNECTED_ACCENTS = ['#2E7D8C', '#3B5F8A', '#3D8464', '#6B5490']
+
+// Header-only darkened variants of the four accents above — needed once
+// `CATEGORY_FILL` (the header/tile-grid background) became the saturated
+// `#C5E5E9` pale cyan instead of a near-white fill, on request: at that
+// point neither the 65%-opacity `accentSoft` (2.1-2.6:1) nor even the
+// solid accents themselves (three of four still under 4.5:1 against
+// `#C5E5E9`) held up as header TEXT anymore. Teal/green darkened further
+// here to clear 4.5:1; blue/violet were already there and are repeated
+// unchanged. Only the header text uses these — the item border/arrow
+// still use `accentSoft` against the button's own near-white fill, which
+// never changed and is unaffected.
+const GET_CONNECTED_HEADER_ACCENTS = ['#276B78', '#3B5F8A', '#336E53', '#6B5490']
 
 // `rgba(var(--accent-rgb), alpha)` needs "r, g, b" (see each item button's
 // own `style` below) — Tailwind's arbitrary-value `bg-[rgba(...)]` classes
@@ -220,11 +233,17 @@ function GetConnectedAccordion({
         // border, and its arrow glyph below, on request.
         const accent = GET_CONNECTED_ACCENTS[catIndex % GET_CONNECTED_ACCENTS.length]
         const accentRgb = hexToRgbString(accent)
-        // The header/border/arrow uses of `accent` (NOT the background
-        // tints below, which are already very light) at 65% opacity
-        // instead of solid, on request — a softer, more pastel read
-        // instead of the fully-saturated hex.
+        // The border/arrow uses of `accent` (NOT the background tints
+        // below, which are already very light) at 65% opacity instead of
+        // solid, on request — a softer, more pastel read instead of the
+        // fully-saturated hex. Sits on the item button's own near-white
+        // fill, unaffected by `CATEGORY_FILL` below.
         const accentSoft = `rgba(${accentRgb}, 0.65)`
+        // Header text specifically uses the darker, contrast-vetted
+        // variant (see GET_CONNECTED_HEADER_ACCENTS' own doc comment) —
+        // it sits directly on `CATEGORY_FILL`, unlike the border/arrow
+        // above, so it needs its own solid, darker color to stay readable.
+        const headerAccent = GET_CONNECTED_HEADER_ACCENTS[catIndex % GET_CONNECTED_HEADER_ACCENTS.length]
 
         return (
           <div key={cat.id} className="flex min-w-0 flex-col">
@@ -242,12 +261,15 @@ function GetConnectedAccordion({
                 CATEGORY_FILL the same way that shared teal already did.
                 `font-semibold` (600, was `font-medium`/500, briefly
                 `font-bold`/700 before that) — bumped back up a step, on
-                request: the 65%-opacity `accentSoft` (see above) reads too
-                faint/washed on its own against this light a fill, so the
-                extra weight does the contrast work the solid color used
-                to. A text-shadow was tried alongside it but removed again
-                on request — weight alone carries it. */}
-            <div className="px-3 py-1.5 text-center text-sm font-semibold uppercase tracking-wider" style={{ color: accentSoft }}>
+                request: the 65%-opacity `accentSoft` reads too faint/washed
+                on its own, so the extra weight does contrast work too. A
+                text-shadow was tried alongside it but removed again on
+                request — weight alone carries it. Color is
+                `headerAccent` (a further-darkened variant, NOT the plain
+                `accent`/`accentSoft` the border/arrow use below) — needed
+                once `CATEGORY_FILL` became the saturated `#C5E5E9`; see
+                `GET_CONNECTED_HEADER_ACCENTS`' own doc comment. */}
+            <div className="px-3 py-1.5 text-center text-sm font-semibold uppercase tracking-wider" style={{ color: headerAccent }}>
               {twoLineTitle(cat.title).map((line, i) => (
                 <span key={i} className="block">
                   {line}
@@ -477,8 +499,8 @@ function GetConnectedAccordion({
             ) : (
               // `slate-800` — darkened a few steps from an original
               // `slate-400` across this tile's fill changing colors several
-              // times (see CATEGORY_FILL); clears 13.44:1 against the
-              // current `#F5F5F7` fill, comfortably past WCAG AA.
+              // times (see CATEGORY_FILL); clears ~11:1 against the
+              // current `#C5E5E9` fill, comfortably past WCAG AA.
               <p className="px-4 py-2 text-sm italic text-slate-800">Coming soon</p>
             )}
           </div>
@@ -1027,11 +1049,25 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 the taller side), so its content centers vertically in
                 that extra room instead of sitting flush at the top with a
                 dead gap below. ─────────────────────────────────────────── */}
-        {/* Left-to-right gradient, pale blue into soft teal (was flat
+        {/* Left-to-right near-white gradient, `#fefefe`->`#E6E6E6` — held
+            flat at `#fefefe` through the first 65% (was transitioning
+            evenly across the full width from 0%, on request — "more of
+            the fefefe should show"), only actually gradating over the
+            remaining stretch toward the right edge. (Was `#FBFBFD`->
+            `#E5E5EA`, before that `#F5F5F7`->`#FBFBFD` — flipped and given
+            more contrast between the two stops, on request, so the darker
+            end lines up with the section's own right-edge inset shadow
+            (`shadow-[inset_-6px ...]` below, which reads on that same
+            right/interior-seam edge) instead of fighting it from the
+            lighter end.) Before that:
+            pale blue into soft teal, `#C5E5E9`->`#8FC6CF` — swapped with
+            "What are you looking for?"/"Get Involved"'s own near-white
+            gradient on request; those two now carry the blue/teal instead,
+            see their own sections below. Before the blue/teal: flat
             `#ABE4ED`, before that flat `#C7F2D7`, before that flat
             `#FBFBFD`, before that flat `#fefefe`, before that a
             left-to-right white->cyan `linear-gradient`, before that flat
-            `#fefefe`, before that a teal `linear-gradient`), on request. */}
+            `#fefefe`, before that a teal `linear-gradient`. */}
         {/* Found the actual "stops shrinking partway" bug via a real drag
             (Playwright), not just reasoning about it: this section's own
             `px-6`/`py-8` padding turned out to be a hard floor no CSS
@@ -1057,7 +1093,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             vertically centered again in whatever height the (much taller)
             map/search column beside it leaves free, same as before that
             experiment. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#C5E5E9_0%,#8FC6CF_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.15)]">
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#fefefe_0%,#fefefe_65%,#E6E6E6_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.15)]">
           {/* `< 100` (was `< 60`) — the real constraint isn't just "does the
               trigger itself still fit," it's "does the drag handle's own
               position ever land inside the hamburger's hover-triggered
@@ -1184,7 +1220,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            <section className="sm:bg-[#FBFBFD] sm:px-6 sm:py-6 sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.15)]">
+            // Flat fill again (was a symmetric vertical gradient, darker at
+            // both the top and bottom edges — removed back to flat on
+            // request). Carries the "Philly Jewish Guide" title's own pale
+            // cyan (`#C5E5E9`) — swapped with the title section's
+            // near-white fill on request; see its own comment above.
+            <section className="sm:bg-[#C5E5E9] sm:px-6 sm:py-6 sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.15)]">
               {/* Section header, on request — matches "Get Connected"'s own
                   treatment (same weight/size/color) so the two read as
                   siblings; mobile keeps its own `settings.heroTitle` copy
@@ -1474,7 +1515,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               tracking-[-0.75px]`) — a touch bigger, heavier, and tighter,
               on request ("make the headings feel a little richer"), same
               treatment as "What are you looking for?" above. ──────────── */}
-      <div className="hidden sm:block sm:border-x-[2px] sm:border-[#E8E8E8] sm:bg-[#F6FAFB] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center sm:shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.15)]">
+      {/* Flat fill again (was a symmetric vertical gradient — removed back
+          to flat on request). Carries the "Philly Jewish Guide" title's
+          own pale cyan (`#C5E5E9`) — swapped with the title section's
+          near-white fill on request; see its own comment above. */}
+      <div className="hidden sm:block sm:border-x-[2px] sm:border-[#E8E8E8] sm:bg-[#C5E5E9] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center sm:shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.15)]">
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
@@ -1519,7 +1564,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           section so it doesn't feel cramped) — buffer between the lowest
           button (or the shared detail panel, if one's open) and this
           section's own bottom border. */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#F6FAFB] sm:pt-3 sm:pb-12">
+      {/* Flat fill again (was a symmetric vertical gradient — removed back
+          to flat on request). Carries the "Philly Jewish Guide" title's
+          own pale cyan (`#C5E5E9`) — swapped with the title section's
+          near-white fill on request; see its own comment above. */}
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#C5E5E9] sm:pt-3 sm:pb-12">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 
