@@ -6,14 +6,15 @@ import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
 import { needsDarkText } from '@/components/Collapsible'
 import {
-  TOY_ICON_PATHS,
-  TOY_ICON_CIRCLES,
+  PACIFIER_ICON_PATHS,
+  PACIFIER_ICON_CIRCLES,
   BED_ICON_PATHS,
   STAR_ICON_PATHS,
   FORK_ICON_PATHS,
   CART_ICON_PATHS,
   CART_ICON_CIRCLES,
   DROP_ICON_PATHS,
+  SCHOOL_ICON_PATHS,
 } from '@/components/icons'
 
 // Google Maps animates `panTo` smoothly on its own, but `setZoom` always
@@ -41,9 +42,10 @@ function smoothZoomTo(map: google.maps.Map, targetZoom: number, currentZoom: num
 // `brightness(0)` turns every non-transparent pixel pure black regardless
 // of its original color, then an optional `invert(1)` flips that black to
 // white — the glyph's own alpha shape survives, just recolored flat
-// black-or-white. `dark` picks which: some pin colors (see `getCategoryColor`
-// in ResourceMapView) are too light for a white glyph to read against, so
-// callers pass `needsDarkText(pin color)` through to decide.
+// black-or-white. `dark` picks which: some pin colors (see
+// `colorForListingCategory` in ResourceMapView) are too light for a white
+// glyph to read against, so callers pass `needsDarkText(pin color)`
+// through to decide.
 function monoGlyphElement(glyph: string, dark: boolean): HTMLElement {
   const span = document.createElement('span')
   span.textContent = glyph
@@ -151,17 +153,18 @@ function glyphTintFor(hex: string): string {
 // `icons.tsx`'s matching React components (used for the map key's own
 // category buttons) via the same path/circle exports, so the pins and
 // buttons can never draw different shapes.
-type LineIconKey = 'toy' | 'bed' | 'star' | 'fork' | 'cart' | 'drop'
+type LineIconKey = 'pacifier' | 'bed' | 'star' | 'fork' | 'cart' | 'drop' | 'school'
 const LINE_ICON_PATHS: Record<LineIconKey, string[]> = {
-  toy: TOY_ICON_PATHS,
+  pacifier: PACIFIER_ICON_PATHS,
   bed: BED_ICON_PATHS,
   star: STAR_ICON_PATHS,
   fork: FORK_ICON_PATHS,
   cart: CART_ICON_PATHS,
   drop: DROP_ICON_PATHS,
+  school: SCHOOL_ICON_PATHS,
 }
 const LINE_ICON_CIRCLES: Partial<Record<LineIconKey, { cx: number; cy: number; r: number }[]>> = {
-  toy: TOY_ICON_CIRCLES,
+  pacifier: PACIFIER_ICON_CIRCLES,
   cart: CART_ICON_CIRCLES,
 }
 function lineIconElement(icon: LineIconKey, color: string): Element {
@@ -637,6 +640,23 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
     })
   }
 
+  // Resets the camera back to where this map opened — `fallbackCenter`/
+  // `initialZoom`, the same values the very first `new google.maps.Map(...)`
+  // call below used — regardless of how far a search, a category filter, or
+  // manual panning/zooming has since carried it. Always available (not
+  // gated on `userLocation` the way "Re-center" is), on request, as a plain
+  // "go back to the default view" escape hatch alongside it.
+  const resetToDefaultView = () => {
+    const map = mapRef.current
+    if (!map) return
+    const startZoom = map.getZoom() ?? initialZoom
+    map.panTo(fallbackCenter)
+    smoothZoomTo(map, initialZoom, startZoom, () => {
+      const inset = leftInsetPxRef.current
+      if (inset) map.panBy(-inset / 2, 0)
+    })
+  }
+
   // `isFullscreen` is owned by ResourceMapView (see its own doc comment on
   // `mapAreaRef`) — this just reacts to it changing to fix up the map
   // itself, which doesn't detect its container's size changing on its own.
@@ -722,6 +742,28 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
         >
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-white ring-2 ring-white/40" aria-hidden="true" />
           Re-center
+        </button>
+      )}
+      {/* "Reset view" — glides the camera back to `fallbackCenter`/
+          `initialZoom` (see `resetToDefaultView` above), on request, as a
+          plain always-available escape hatch distinct from "Re-center"
+          above (which only exists once live location tracking is on, and
+          targets the user's own position rather than the map's own
+          default). Shares "Re-center"'s teal so the two read as the same
+          control family; stacks to its left when both are present
+          (`right-14` bumped to `right-32`), otherwise sits in
+          "Re-center"'s own slot. */}
+      {ready && (
+        <button
+          onClick={resetToDefaultView}
+          aria-label="Reset to default view"
+          title="Reset to default view"
+          className={`absolute bottom-3 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110 ${userLocation ? 'right-32' : 'right-14'}`}
+          style={{ backgroundColor: '#3E6E6E' }}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 1 2.6 6.3M3 12v5h5" />
+          </svg>
         </button>
       )}
       {/* Fullscreen toggle — bottom-right corner, always available (not

@@ -58,16 +58,39 @@ type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem
 
 // One shared tint for every Get Connected category tile (Support &
 // Volunteering, Professional Networks, Social Opportunities, WhatsApp
-// Groups) — `#FBFBFD` (was `#F5F5F7`, before that `#91D7E6`, a light
-// cyan-blue, before that `#A2DAF2`, before that a bright cyan `#64D6E3` —
-// the shelf's own border color at the time — before that mustard yellow
-// `#D4A017`, before that mustard green `#BBC167`, before that `#F0F6F6`, on
-// request), same color as the containing Get Connected section itself
-// (heading + this tile grid) so the whole run reads as one continuous
-// band — the individual white item cards (see GetConnectedAccordion) sit on
-// top of it. The map area above keeps its own separate `#F0F6F6` — this
-// request was scoped to "What are you looking for" and "Get Connected" only.
+// Groups) — `#F6FAFB`, a pale teal (~8% of the sidebar's own `#8FC6CF`
+// blended into white — was `#FBFBFD`, before a long lineage of other flat
+// colors, see git history), on request ("a very light background tint
+// distinct from the pure white above/below"), same color as the
+// containing Get Connected section itself (heading + this tile grid) so
+// the whole run reads as one continuous tinted band — the individual item
+// cards (see GetConnectedAccordion) sit on top of it, each in their own
+// column's accent color now instead of plain white. The map area above
+// keeps its own separate `#F0F6F6` — this request was scoped to "What are
+// you looking for" and "Get Connected" only.
 const CATEGORY_FILL = '#FBFBFD'
+
+// One accent color per Get Connected column (Support & Volunteering,
+// Professional Networks, Social Opportunities, WhatsApp Groups, in that
+// fixed order — see `getConnectedCategories` below), on request — each
+// column's own header/item-border/arrow all pick up its color, so the
+// four read as distinct at a glance instead of one uniform gray. All four
+// sit in the same cool teal/blue/green/violet family as the sidebar's own
+// `#C5E5E9`->`#8FC6CF` gradient (see the title `<section>` below) —
+// `#2E7D8C` is that same teal, just darkened enough to work as TEXT (the
+// pastel gradient itself doesn't clear 4.5:1 on a light background) — the
+// other three are analogous/complementary hues at a matching darkness so
+// none of the four reads louder than the others.
+const GET_CONNECTED_ACCENTS = ['#2E7D8C', '#3B5F8A', '#3D8464', '#6B5490']
+
+// `rgba(var(--accent-rgb), alpha)` needs "r, g, b" (see each item button's
+// own `style` below) — Tailwind's arbitrary-value `bg-[rgba(...)]` classes
+// can reference a CSS custom property directly, but only as a plain
+// number list, not a hex string, hence this conversion.
+function hexToRgbString(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`
+}
 
 /** "Get Connected" — same width as the map above it (both sit inside the
  *  same fluid-width `<main>`, see its own doc comment). The four
@@ -187,11 +210,21 @@ function GetConnectedAccordion({
         one, since every item button is normally the same uniform height
         anyway. */}
     <div className="grid w-full grid-cols-4 items-start" style={{ backgroundColor: CATEGORY_FILL }}>
-      {categories.map((cat) => {
+      {categories.map((cat, catIndex) => {
         const embedItem = cat.items.find((it) => it.embed && it.embed === embeddedFlow)
         const detailItem = cat.items.find((it) => it.detail && it.id === detailItemId)
         const detailCategory = detailItem?.detail ? categoryConfigs?.find((c) => c.id === detailItem.detail!.category) : undefined
         const hasSecondBox = !!embedItem || !!(detailItem?.detail && detailCategory)
+        // One fixed accent per column position (see GET_CONNECTED_ACCENTS'
+        // own doc comment) — colors the header text, each item's left
+        // border, and its arrow glyph below, on request.
+        const accent = GET_CONNECTED_ACCENTS[catIndex % GET_CONNECTED_ACCENTS.length]
+        const accentRgb = hexToRgbString(accent)
+        // The header/border/arrow uses of `accent` (NOT the background
+        // tints below, which are already very light) at 65% opacity
+        // instead of solid, on request — a softer, more pastel read
+        // instead of the fully-saturated hex.
+        const accentSoft = `rgba(${accentRgb}, 0.65)`
 
         return (
           <div key={cat.id} className="flex min-w-0 flex-col">
@@ -202,19 +235,19 @@ function GetConnectedAccordion({
                 `py-1.5` (was
                 `py-3`, then `py-2`) — shorter again, part of shrinking the
                 whole Get Connected + Zmanim run of sections next to the
-                map. Forced two lines via `twoLineTitle` (see above).
-                `#2B3B3B` — a muted teal, darkened a few steps from an
-                original `#4F6B6B`/`#1C1B19` lineage across this tile's fill
-                changing colors several times (see CATEGORY_FILL); clears
-                10.77:1 against the current `#F5F5F7` fill, comfortably past
-                WCAG AA. Still reads as a distinct step in the page's color
-                hierarchy: black for the main headlines (h1/h2), teal for
-                these category labels, neutral gray for plain body text.
-                `font-medium` (500, was `font-bold`/700) — matches the
-                site-wide weight scale's "card titles/category labels" step
-                now that hierarchy comes
-                from weight alone, not a separate serif face. */}
-            <div className="px-3 py-1.5 text-center text-sm font-medium uppercase tracking-wider text-[#2B3B3B]">
+                map. Forced two lines via `twoLineTitle` (see above). Now
+                colored per-column (`accent`, see GET_CONNECTED_ACCENTS)
+                instead of one shared `#2B3B3B` muted teal, on request — all
+                four accents were picked/darkened to clear 4.5:1 against
+                CATEGORY_FILL the same way that shared teal already did.
+                `font-semibold` (600, was `font-medium`/500, briefly
+                `font-bold`/700 before that) — bumped back up a step, on
+                request: the 65%-opacity `accentSoft` (see above) reads too
+                faint/washed on its own against this light a fill, so the
+                extra weight does the contrast work the solid color used
+                to. A text-shadow was tried alongside it but removed again
+                on request — weight alone carries it. */}
+            <div className="px-3 py-1.5 text-center text-sm font-semibold uppercase tracking-wider" style={{ color: accentSoft }}>
               {twoLineTitle(cat.title).map((line, i) => (
                 <span key={i} className="block">
                   {line}
@@ -269,41 +302,51 @@ function GetConnectedAccordion({
                             item.go()
                           }
                         }}
-                        // White card, no border, subtle floating shadow —
-                        // `shadow-[0_1px_3px_rgb(0,0,0,0.1)]` (was a softer,
-                        // more diffuse `0_4px_14px_rgb(0,0,0,0.06)`) reads as
-                        // a tighter, crisper "tiny shadow" at rest, on
-                        // request ("make the buttons look more clickable"),
-                        // still growing to the bigger `hover:shadow-lg` on
-                        // hover exactly as before. Plus a hairline `ring-1
-                        // ring-slate-900/5` for just enough definition at
-                        // rest — replacing the old `border`+`shadow-sm`
-                        // bordered-chip look, on request. A search match
+                        // Card treatment, on request ("read as cards rather
+                        // than form fields"): `px-4` (16px, was `px-3`/
+                        // 12px) for more internal breathing room. `py-2`
+                        // (8px) — vertical padding specifically reverted
+                        // back to its pre-this-pass height on request (was
+                        // briefly `py-3.5`/14px). A `4px` left border in
+                        // this column's own `accent` color (see
+                        // `GET_CONNECTED_ACCENTS`) on every state instead of
+                        // a uniform gray ring on all four sides. Resting
+                        // fill is `#fefefe` (near-white, on request — was
+                        // briefly this same accent at ~7% opacity), rising
+                        // to ~15% of the accent on hover
+                        // (`hover:bg-[rgba(var(--accent-rgb),0.15)]`) — a
+                        // CSS custom property is how Tailwind's arbitrary
+                        // `bg-[rgba(...)]` classes can reference a color
+                        // that's only known at render time (this button's
+                        // own per-column accent), the same technique
+                        // `ResourceMapView.tsx`'s `--accent`-based checkbox
+                        // accents already use elsewhere in this codebase.
+                        // `hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]` (was
+                        // `hover:shadow-lg`) — a lighter, more precise lift
+                        // shadow, on request, paired with the existing
+                        // `hover:-translate-y-0.5` for the actual motion.
+                        // `shadow-[0_1px_3px_rgb(0,0,0,0.16)]` at rest is
+                        // unchanged from before this pass. A search match
                         // keeps the same gold accent the map's matching pins
                         // do (see ResourceMap's `highlighted`) — the one
-                        // deliberate spot of color left, since it's a
-                        // functional indicator shared with the rest of the
-                        // page's search-highlight system, not decorative
-                        // branding. One level below "open" (which still
-                        // wins if a matched row is also the one expanded)
-                        // but above the "every other item dims" treatment,
-                        // so a match never dims out. `hover:-translate-y-0.5
-                        // hover:shadow-lg` on every state (even dimmed) —
-                        // a lift, on top of whatever color change that
-                        // state already gets, to make the "this is a
-                        // button" affordance read even more clearly. Resting
-                        // state's hover is brand-teal — ring shifts to
-                        // `#8FC6CF`, background tints to a very faint teal
-                        // `#F4F8F8`. `duration-150 ease-out` — within the
-                        // requested 150-200ms "ease" range. `group` — lets
+                        // functional (not decorative) color exception, still
+                        // wins over the column accent since it's a shared
+                        // system, not this section's own branding. "Open"
+                        // similarly stays its own neutral state (wins over
+                        // both), and the "every other item dims" treatment
+                        // once something IS open also stays neutral gray —
+                        // none of those three states are the "plain
+                        // outlined rectangle" resting look this request was
+                        // about, so all three are unchanged. `group` — lets
                         // the arrow glyph below react to hover on this
                         // whole button (see its own `group-hover` below),
                         // not just its own individual hover.
-                        className={`group flex w-full flex-col items-stretch gap-0.5 rounded-lg px-3 py-2 text-left shadow-[0_1px_3px_rgb(0,0,0,0.1)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg ${
+                        style={{ '--accent-rgb': accentRgb, borderLeftColor: accentSoft } as React.CSSProperties}
+                        className={`group flex w-full flex-col items-stretch gap-0.5 rounded-lg border-l-4 px-4 py-2 text-left shadow-[0_1px_3px_rgb(0,0,0,0.16)] ring-1 transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 ${
                           isOpen
-                            ? 'ring-2 ring-black bg-slate-100 text-[#2D3636]'
+                            ? 'ring-2 ring-black bg-slate-100 text-[#2D3636] hover:shadow-lg'
                             : isMatch
-                              ? 'ring-2 ring-[#ffc145] bg-amber-50 text-[#2D3636]'
+                              ? 'ring-2 ring-[#ffc145] bg-amber-50 text-[#2D3636] hover:shadow-lg'
                               : // Once something in this list is open, every OTHER
                                 // item dims — the same "one item stands out, the
                                 // rest recede" read the two-item Support &
@@ -312,24 +355,35 @@ function GetConnectedAccordion({
                                 // as a muted gray on purpose (not black) — dimming
                                 // is the whole point of this state.
                                 hasSecondBox
-                                ? 'ring-slate-900/5 bg-white text-slate-300 hover:text-slate-500'
-                                : 'ring-slate-900/5 bg-white text-[#2D3636] hover:ring-[#8FC6CF] hover:bg-[#F4F8F8]'
+                                ? 'ring-slate-900/5 bg-white text-slate-300 hover:text-slate-500 hover:shadow-lg'
+                                : 'ring-slate-900/5 bg-[#fefefe] text-[#2D3636] hover:bg-[rgba(var(--accent-rgb),0.15)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
                         }`}
                       >
                         <span className="flex items-center">
                           {item.icon && <span aria-hidden="true" className="mr-1.5">{item.icon}</span>}
-                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{item.label}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.label}</span>
                           {/* Small right-aligned arrow, on request — reinforces
                               that every one of these rows leads somewhere
                               (a wizard, a listing's detail, or a full page)
                               instead of just being static text. `shrink-0`
-                              so it never gets squeezed by a long label.
-                              `group-hover:translate-x-1` — slides a few
-                              pixels right on hover (the button's own
-                              `group`, see above), another small "this is
-                              clickable" cue on top of the lift/shadow. */}
+                              so it never gets squeezed by a long label. Now
+                              spins instead of sliding, on request: points
+                              right at rest, rotates to point DOWN on hover
+                              (`group-hover:rotate-90`, the button's own
+                              `group`, see above) — "you can open this" —
+                              and to point UP once actually open (`isOpen`,
+                              `-rotate-90`, wins over the hover state) —
+                              "click to close." `stroke="currentColor"`
+                              reads its color from `style` below, set to
+                              this column's `accent` ONLY in the plain
+                              resting state — left `undefined` (inheriting
+                              the parent text color as before) for
+                              isOpen/isMatch/dimmed, so the accent doesn't
+                              fight those states' own neutral-gray/gold/
+                              black meaning. */}
                           <svg
-                            className="ml-1.5 h-3 w-3 shrink-0 opacity-60 transition-transform duration-150 group-hover:translate-x-1"
+                            style={!isOpen && !isMatch && !hasSecondBox ? { color: accentSoft } : undefined}
+                            className={`ml-1.5 h-3 w-3 shrink-0 opacity-60 transition-transform duration-150 ${isOpen ? '-rotate-90' : 'group-hover:rotate-90'}`}
                             fill="none"
                             stroke="currentColor"
                             strokeWidth={2.2}
@@ -401,6 +455,7 @@ function GetConnectedAccordion({
                                   hideBorder
                                   hideName
                                   highlightColor="#000000"
+                                  linkAccentColor={accent}
                                   onVote={() => {}}
                                   onTagClick={() => {}}
                                   onFilterOpen={() => {}}
@@ -1001,7 +1056,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             vertically centered again in whatever height the (much taller)
             map/search column beside it leaves free, same as before that
             experiment. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#D6EFFA_0%,#ABD6E0_100%)]">
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#C5E5E9_0%,#8FC6CF_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.15)]">
           {/* `< 100` (was `< 60`) — the real constraint isn't just "does the
               trigger itself still fit," it's "does the drag handle's own
               position ever land inside the hamburger's hover-triggered
@@ -1066,8 +1121,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                 kerning (glyph-pair spacing adjustments, e.g. tucking "o"
                 closer under a "T") on request — most browsers already
                 default to this, but it's not guaranteed across all of them
-                without stating it. */}
-            <h1 className="mt-4 text-[40px] font-extrabold leading-[1.3] tracking-[-0.75px] text-[#2D3636] [font-kerning:normal]">
+                without stating it. `[text-shadow:...]` — a soft dark drop
+                shadow (4px blur, 15% opacity), on request, for a bit of
+                lift/depth off the panel behind it; the same shadow is
+                also on "Get Connected" and "What are you looking for?"
+                now, on request, so all three headings match. */}
+            <h1 className="mt-4 text-[40px] font-bold leading-[1.3] tracking-[-0.75px] text-[#2D3636] [font-kerning:normal] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
               {settings.name}
             </h1>
             {/* Fixed copy per explicit request, not `settings.tagline` — this
@@ -1084,7 +1143,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     actual pixel gap, so it read as no visible change at
                     all. This is a real, visibly looser gap between rows
                     instead. */}
-            <p className="mt-3 text-sm leading-relaxed text-[#2D3636]/70">
+            <p className="mt-3 text-sm leading-relaxed text-[#2D3636]/85">
               Community resources for residents, visitors, and hospital patients
             </p>
           </div>
@@ -1092,20 +1151,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
         {/* Right column — search bar band stacked above the map, both
                 spanning the same 2/3-width column instead of the title's
-                narrower one. `sm:flex sm:flex-col` just stacks the two;
-                the search band's own `border-b-2` is the divider between
-                them (map has no matching `border-t` — only one side draws
-                the shared line) — same uniform 2px as every other border on
-                the shelf. `sm:border-l-2` here (was `sm:divide-x-2` on the
-                grid wrapper instead) — on request: the drag handle above is
-                a 3rd DOM child sitting between this div and the title
-                section, and Tailwind's `divide-x` borders every child except
-                the first, so it was ALSO putting its own left border on the
-                handle itself — two nearly-coincident vertical lines a few
-                px apart instead of one. An explicit border on just this
-                element is unaffected by how many other children exist in
-                between. ─────────────────────────────────────────────────── */}
-        <div className="sm:flex sm:flex-col sm:border-l-[2px] sm:border-[#E8E8E8]">
+                narrower one. `sm:flex sm:flex-col` just stacks the two.
+                No hard border lines at the interior seams anymore — on
+                request, every INTERIOR divider in the bento box (this
+                column's own left edge against the title, the search/map
+                seam below, and the map-row/Get-Connected seam further
+                down) lost its border line, replaced with a soft `inset`
+                `box-shadow` on whichever section owns that edge instead
+                (see the title `<section>`/search `<section>`/Get
+                Connected heading `<div>` themselves) — reads as a subtle
+                shaded groove rather than a crisp rule. `inset` keeps the
+                shadow INSIDE each element's own box, so it isn't clipped
+                by that element's own `overflow-hidden` and doesn't spill
+                onto its neighbor. Only the shape's true EXTERIOR edges
+                (the grid wrapper's own border, and Get Connected's) keep
+                a real border line. ──────────────────────────────────── */}
+        <div className="sm:flex sm:flex-col">
           {/* ── Search bar — used to live in the title cell; now its own
                   band above the map. Placeholder/aria-label is a fixed
                   "Search website…" now (was `settings.heroTitle`, the
@@ -1122,7 +1183,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            <section className="sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:px-6 sm:py-6">
+            <section className="sm:bg-[#FBFBFD] sm:px-6 sm:py-6 sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.15)]">
               {/* Section header, on request — matches "Get Connected"'s own
                   treatment (same weight/size/color) so the two read as
                   siblings; mobile keeps its own `settings.heroTitle` copy
@@ -1130,7 +1191,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   looking for?" text, but admin-editable there — this one's
                   a fixed string to match Get Connected/Zmanim, which aren't
                   editable either). */}
-              <h2 className="mb-2 text-center text-[20px] font-bold tracking-[-1px] text-[#2D3636]">
+              <h2 className="mb-2 text-center text-[20px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
                 What are you looking for?
               </h2>
               <div className="mx-auto w-full max-w-xl">
@@ -1142,7 +1203,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     (`slate-400` -> `slate-500`, hover `slate-600` ->
                     `slate-700`) for the same reason — text-[#2D3636] stays
                     untouched. */}
-                <div className="flex items-center rounded-full border border-slate-300 bg-white pl-4 pr-1.5 py-1.5 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+                <div className="flex items-center rounded-full border border-slate-300 bg-white pl-4 pr-1.5 py-1.5 shadow-[0_6px_20px_rgb(0,0,0,0.1)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.16)]">
                   <svg className="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                   </svg>
@@ -1273,10 +1334,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                               <button
                                 key={hit.item.id}
                                 onClick={() => focusPlace(hit)}
-                                className="flex w-40 flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 ring-slate-900/5 bg-white transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#8FC6CF]"
+                                className="flex w-36 flex-col items-start gap-0.5 rounded-xl px-2.5 py-1.5 text-left shadow-[0_4px_14px_rgb(0,0,0,0.06)] ring-1 ring-slate-900/5 bg-white transition-all duration-150 ease-out cursor-pointer hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#8FC6CF]"
                               >
-                                <span className="min-w-0 w-full truncate text-sm font-semibold text-[#2D3636]">{hit.item.name}</span>
-                                {subtitle && <span className="min-w-0 w-full truncate text-xs font-normal text-slate-400">{subtitle}</span>}
+                                <span className="min-w-0 w-full truncate text-xs font-semibold text-[#2D3636]">{hit.item.name}</span>
+                                {subtitle && <span className="min-w-0 w-full truncate text-[11px] font-normal text-slate-400">{subtitle}</span>}
                               </button>
                             )
                           })}
@@ -1386,22 +1447,25 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
       />
 
       {/* ── "Get Connected" heading — merged with the blank spacer band that
-              used to sit above it as its own separate div (on request), so
-              the `border-t` boundary line now sits right at the
-              top of this section (directly under the map/title row) instead
-              of partway down, right above the heading text — a border can
-              only ever be a div's own edge, not sit inside padding, so
-              merging necessarily moved it there. The gap from the map above
-              down to the "Get Connected" text itself is unchanged though:
+              used to sit above it as its own separate div (on request). No
+              `border-t` anymore (was the seam against the map/title row
+              above it) — dropped along with every other INTERIOR divider
+              in the bento box, on request ("hide bento borders except for
+              the exterior ones"); only `border-x` remains, continuing the
+              shape's true exterior left/right edges. The gap from the map
+              above down to the "Get Connected" text itself is unchanged
+              though:
               `sm:pt-[52px]` reproduces the old spacer's `h-10` (40px) plus
               the heading's own `py-3` top padding (12px) as one number,
               instead of two stacked elements adding up to it. `sm:pb-3`
               keeps that same bottom padding on its own. Same light gray
               `border-x` (2px, `#E8E8E8` — was `#2D3636` charcoal, before
               that 1px bright cyan — continuing the shelf's frame, on
-              request) as every other desktop section, `#FFFFFF` fill —
-              matching the search bar's own section background, tying the
-              two together.
+              request). `#F6FAFB` fill (was `#FBFBFD`/near-white, on
+              request — "a very light background tint distinct from the
+              pure white above/below") — matches CATEGORY_FILL below, so
+              the heading and the four columns underneath read as one
+              continuous tinted section.
               Bumped back up and past its original size so this heading
               reads clearly more prominent than the category tiles/item
               buttons under it (`text-sm`), on request. `text-[29px]
@@ -1409,13 +1473,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               tracking-[-0.75px]`) — a touch bigger, heavier, and tighter,
               on request ("make the headings feel a little richer"), same
               treatment as "What are you looking for?" above. ──────────── */}
-      <div className="hidden sm:block sm:border-x-[2px] sm:border-t-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center">
+      <div className="hidden sm:block sm:border-x-[2px] sm:border-[#E8E8E8] sm:bg-[#F6FAFB] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center sm:shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.15)]">
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
             itself on both sides (was flush with the letters), on request. */}
-        <h2 className="inline-block border-b-[2px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-bold tracking-[-1px] text-[#2D3636]">
-          Get Connected
+        <h2 className="inline-block border-b-[2px] border-[#E8E8E8] px-10 pb-2 text-[29px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
+          Get Involved
         </h2>
       </div>
 
@@ -1447,10 +1511,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
           `#E8E8E8` (light gray, 2px — was `#2D3636` charcoal, before that
           1px bright cyan, on request) closes the shelf's left/right/bottom
           outer frame here — `border-t` stays 0, the seam to the heading
-          above. `sm:pb-6` (was `sm:pb-4`) — buffer between the lowest
+          above. `#F6FAFB` fill (was `#FBFBFD`) matches the heading div
+          above and CATEGORY_FILL in GetConnectedAccordion itself — see
+          that div's own doc comment. `sm:pb-12` (was `sm:pb-6`, on
+          request — "40-60px vertical" padding around the whole tinted
+          section so it doesn't feel cramped) — buffer between the lowest
           button (or the shared detail panel, if one's open) and this
-          section's own bottom border, bumped up a bit further on request. */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#FBFBFD] sm:pt-3 sm:pb-6">
+          section's own bottom border. */}
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#F6FAFB] sm:pt-3 sm:pb-12">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 

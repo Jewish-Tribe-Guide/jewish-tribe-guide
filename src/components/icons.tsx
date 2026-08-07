@@ -13,7 +13,7 @@ const base = {
   'aria-hidden': true,
 }
 
-// Path/circle data for the map's childcare (toy/teddy bear) and hotel (bed)
+// Path/circle data for the map's childcare (pacifier) and hotel (bed)
 // pin icons — plain geometry, exported alongside the React components below
 // so ResourceMap.tsx's marker layer (which builds pin glyphs as raw SVG DOM
 // nodes — Google Maps markers aren't React-rendered) can draw the exact same
@@ -22,36 +22,53 @@ const base = {
 // own SVG builder) can never drift apart. Both replace an emoji (🧸, 🛏️)
 // that reads as a chunky solid blob once crushed to a silhouette at pin
 // size — these are drawn as open, hollow-stroke shapes from the start
-// instead, so there's nothing to crush.
-export const TOY_ICON_CIRCLES = [
-  { cx: 12, cy: 7.5, r: 3.5 }, // head
-  { cx: 7.8, cy: 4, r: 2 }, // left ear
-  { cx: 16.2, cy: 4, r: 2 }, // right ear
+// instead, so there's nothing to crush. The childcare glyph was a
+// teddy-bear head (circle + two ear circles) originally, but that read as
+// an unrecognizable blob at actual pin size — a pacifier (ring + shield)
+// on request reads clearly even that small.
+export const PACIFIER_ICON_CIRCLES = [
+  { cx: 12, cy: 6, r: 2.3 }, // ring/handle
 ]
-export const TOY_ICON_PATHS = ['M6.5 12.5a5.5 5.5 0 0 1 11 0v4a5.5 5.5 0 0 1-11 0z'] // body
+export const PACIFIER_ICON_PATHS = [
+  'M9.7 8.1v1', // short stem connecting the ring to the shield
+  'M7 10.3h10a1 1 0 0 1 1 1v.7a6 6 0 0 1-12 0v-.7a1 1 0 0 1 1-1z', // shield
+]
+// Was a suitcase-reading frame+pillow+blanket-fold combo that didn't read
+// as a bed at actual pin size — replaced on request with a plainer side
+// profile (headboard post, mattress/frame line, floor line, pillow
+// divider) that holds up better that small.
 export const BED_ICON_PATHS = [
-  'M2 20v-7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v7', // frame
-  'M2 20h20', // floor line
-  'M4 11V6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5', // headboard
-  'M5 11h4v3h-4z', // pillow
-  'M10 13h11', // blanket fold
+  'M2 4v16', // headboard post
+  'M2 8h18a2 2 0 0 1 2 2v10', // mattress top + frame corner + right wall
+  'M2 17h20', // floor line
+  'M6 8v9', // pillow/headboard divider
 ]
 
 // Path data for the map's synagogue (Magen David), restaurant (fork), grocery
 // (cart), and mikvah (water drop) pin icons — same open hollow-stroke
-// treatment as TOY_ICON_PATHS/BED_ICON_PATHS above, replacing those
+// treatment as PACIFIER_ICON_PATHS/BED_ICON_PATHS above, replacing those
 // categories' emoji glyphs (✡, 🍴, 🛒, 💧) so the pastel pin palette's
 // "darker version of the same hue" glyph tint (see `darkenForGlyph` in
 // ResourceMap.tsx) has a stroke to color — a CSS filter crush can only ever
 // produce pure black/white on an emoji, never an arbitrary hue.
 export const STAR_ICON_PATHS = ['M12 3 L19.8 16.5 L4.2 16.5 Z', 'M12 21 L4.2 7.5 L19.8 7.5 Z']
-export const FORK_ICON_PATHS = ['M8 2v7', 'M12 2v7', 'M16 2v7', 'M8 9a4 4 0 0 0 8 0', 'M12 13v9']
+// Tines widened (6/12/18, was 8/12/16) and the arc/handle retimed to
+// match — the narrower original blurred into a solid blob at actual pin
+// size (~15px); wider gaps between tines read clearly as a fork even that
+// small.
+export const FORK_ICON_PATHS = ['M6 2v6.5', 'M12 2v6.5', 'M18 2v6.5', 'M6 8.5a6 4.5 0 0 0 12 0', 'M12 12v10']
 export const CART_ICON_PATHS = ['M3 4h2l2.4 12.4a2 2 0 0 0 2 1.9h8.2a2 2 0 0 0 2-1.6L21 8H6']
 export const CART_ICON_CIRCLES = [
   { cx: 9, cy: 20, r: 1.5 },
   { cx: 17, cy: 20, r: 1.5 },
 ]
 export const DROP_ICON_PATHS = ['M12 3s6.2 7.3 6.2 11.6A6.2 6.2 0 0 1 5.8 14.6C5.8 10.3 12 3 12 3z']
+// School's map pin/key-button icon — a graduation cap, same open
+// hollow-stroke treatment as the others above, replacing the admin-set
+// pencil emoji (✏️) on request, since it didn't read as a "school" symbol
+// at pin size and the pencil's straight diagonal also clashed with every
+// other category's rounder linework.
+export const SCHOOL_ICON_PATHS = ['M12 4L4 8.5L12 13L20 8.5Z', 'M20 8.5V14', 'M7.5 10.2V14.5a4.5 3 0 0 0 9 0v-4.3']
 
 export function PencilIcon({ className }: IconProps) {
   return (
@@ -99,18 +116,18 @@ export function PinIcon({ className }: IconProps) {
   )
 }
 
-// Childcare's map pin/key-button icon — a teddy bear head/ears/body, open
+// Childcare's map pin/key-button icon — a pacifier (ring + shield), open
 // hollow-stroke shapes (no fill) so it reads as a simple outline instead of
 // the 🧸 emoji's chunky solid silhouette once crushed at pin size. Geometry
-// shared with the map's own pin glyphs — see `TOY_ICON_PATHS`/
-// `TOY_ICON_CIRCLES` above.
-export function ToyIcon({ className }: IconProps) {
+// shared with the map's own pin glyphs — see `PACIFIER_ICON_PATHS`/
+// `PACIFIER_ICON_CIRCLES` above.
+export function PacifierIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
-      {TOY_ICON_PATHS.map((d) => (
+      {PACIFIER_ICON_PATHS.map((d) => (
         <path key={d} d={d} />
       ))}
-      {TOY_ICON_CIRCLES.map((c) => (
+      {PACIFIER_ICON_CIRCLES.map((c) => (
         <circle key={`${c.cx}-${c.cy}`} cx={c.cx} cy={c.cy} r={c.r} />
       ))}
     </svg>
@@ -118,9 +135,9 @@ export function ToyIcon({ className }: IconProps) {
 }
 
 // Hotel's map pin/key-button icon — a bed frame with headboard, pillow, and
-// a blanket-fold line, same open hollow-stroke treatment as ToyIcon above
-// (replacing the 🛏️ emoji). Geometry shared with the map's own pin glyphs —
-// see `BED_ICON_PATHS` above.
+// a blanket-fold line, same open hollow-stroke treatment as PacifierIcon
+// above (replacing the 🛏️ emoji). Geometry shared with the map's own pin
+// glyphs — see `BED_ICON_PATHS` above.
 export function BedIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
@@ -146,12 +163,26 @@ export function StarOfDavid({ className }: IconProps) {
 }
 
 // Restaurant's map pin/key-button icon — a fork, same open hollow-stroke
-// treatment as ToyIcon/BedIcon above (replacing the 🍴 emoji). Geometry
+// treatment as PacifierIcon/BedIcon above (replacing the 🍴 emoji). Geometry
 // shared with the map's own pin glyphs — see FORK_ICON_PATHS above.
 export function ForkIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
       {FORK_ICON_PATHS.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  )
+}
+
+// School's map pin/key-button icon — a graduation cap, same open
+// hollow-stroke treatment as the others above (replacing the ✏️ emoji).
+// Geometry shared with the map's own pin glyphs — see SCHOOL_ICON_PATHS
+// above.
+export function SchoolIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      {SCHOOL_ICON_PATHS.map((d) => (
         <path key={d} d={d} />
       ))}
     </svg>

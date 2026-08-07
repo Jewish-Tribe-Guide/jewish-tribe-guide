@@ -198,11 +198,19 @@ function ShabbosRow({
 
   const value = `${entry.label} ${entry.time}`
 
+  // Same teal "next up" treatment the daily zmanim list uses for its own
+  // highlighted row (see `isNext` above) — was a solid bright-blue block
+  // (`bg-[#3a86ff]`), swapped on request to match Sunrise's subtler
+  // teal-tint-plus-dot look instead of standing out as a different color
+  // language of its own.
   if (emphasized) {
     return (
-      <div className="rounded-lg flex items-baseline justify-between gap-3 bg-[#3a86ff] px-3 py-1.5 -mx-1">
-        <span className="text-sm font-semibold text-[#fefefe]">{label}</span>
-        <span className="text-sm font-semibold text-[#fefefe] tabular-nums">{value}</span>
+      <div className="rounded flex items-baseline justify-between gap-3 bg-[#8FC6CF]/25 px-3 py-1.5 -mx-1">
+        <span className="flex items-center gap-1.5 text-sm font-semibold text-[#fefefe]">
+          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#8FC6CF]" />
+          {label}
+        </span>
+        <span className="text-sm font-bold text-[#fefefe] tabular-nums">{value}</span>
       </div>
     )
   }

@@ -21,12 +21,10 @@ export default function SiteFooter({
   const year = new Date().getFullYear()
 
   return (
-    // `#2D3636` — matches the desktop home page's own outer margin color
-    // (see Landing.tsx), on request, so the footer bookends the page in
-    // the same color the page already opens with instead of its own
-    // separate navy. Still dark enough that the white/light text variants
-    // below keep their contrast — no color changes needed there.
-    <footer className={`${flush ? '' : 'mt-16'} border-t border-[#fefefe]/15 bg-[#2D3636]`}>
+    // `#000000` (was `#2D3636`, on request) — pure black. Still dark enough
+    // that the white/light text variants below keep their contrast — no
+    // color changes needed there.
+    <footer className={`${flush ? '' : 'mt-16'} border-t border-[#fefefe]/15 bg-[#000000]`}>
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-md">

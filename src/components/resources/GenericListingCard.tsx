@@ -51,6 +51,7 @@ export function GenericListingCard({
   defaultExpanded,
   expanded: expandedProp,
   highlightColor,
+  linkAccentColor,
   dense = false,
   hideBorder = false,
   hideName = false,
@@ -78,6 +79,13 @@ export function GenericListingCard({
    *  highlight when `expanded` is controlled true, so the highlight matches
    *  the category it's in rather than one fixed color for every category. */
   highlightColor?: string
+  /** Recolors the header "Website"-style link button(s) below to match a
+   *  surrounding section's own theme instead of the site-wide `primary`
+   *  color — e.g. the home page's Get Connected accordion, where each
+   *  column has its own accent (see `GET_CONNECTED_ACCENTS` in
+   *  Landing.tsx) and a uniform `primary`-colored button would clash with
+   *  that column's border/heading color. Omit to keep the default. */
+  linkAccentColor?: string
   /** Smaller text/padding throughout — the home page's map sidebar list
    *  (via `CategoryRow.tsx`) uses this since a full column of these cards
    *  reads as overwhelming at the normal directory-page size. Defaults to
@@ -378,7 +386,12 @@ export function GenericListingCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs font-medium text-primary border border-primary rounded px-2 py-1.5 sm:py-1 hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                style={linkAccentColor ? ({ '--link-accent': linkAccentColor } as React.CSSProperties) : undefined}
+                className={`text-xs font-medium border rounded px-2 py-1.5 sm:py-1 transition-colors whitespace-nowrap ${
+                  linkAccentColor
+                    ? 'text-[var(--link-accent)] border-[var(--link-accent)] hover:bg-[var(--link-accent)] hover:text-white'
+                    : 'text-primary border-primary hover:bg-primary hover:text-white'
+                }`}
               >
                 {f.linkLabel ?? f.label}
               </a>
