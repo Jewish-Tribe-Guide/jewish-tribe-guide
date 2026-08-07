@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import type { CategoryConfig } from './categories'
 import { isValidPhone, isHttpUrl } from './validation'
@@ -32,6 +34,17 @@ export async function listApprovedResources(
   community: string,
   opts: { category?: string } = {},
 ): Promise<DirectoryResource[]> {
+  'use cache'
+  // Tagged per community rather than per category: approving a listing, an
+  // edit, and an archive all change one category's list, but the admin write
+  // paths don't reliably know which — and a stale directory is the failure
+  // that matters here, not one extra query.
+  cacheTag(TAGS.resources(community))
+  // Upvote counts ride along in this result, so they're as stale as the list.
+  // That's the right trade for a soft signal: an hour-old vote tally is fine,
+  // and making it live would mean giving up caching the listings themselves.
+  cacheLife('hours')
+
   let query = getAdminClient()
     .from('resource')
     .select('*')

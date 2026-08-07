@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { publishDraft } from '@/lib/formStore'
@@ -12,6 +13,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/f
   try {
     const form = await publishDraft(id)
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, form })
   } catch (err) {
     console.error('[admin/forms/:id/publish] POST failed:', err)

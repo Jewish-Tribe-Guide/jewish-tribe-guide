@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { slugify } from './categoryStore'
 import type { HomeSection } from './homeSections'
@@ -20,6 +22,9 @@ function toSection(row: HomeSectionRow): HomeSection {
 
 // All sections, in display order.
 export async function listHomeSections(community: string): Promise<HomeSection[]> {
+  'use cache'
+  cacheTag(TAGS.homeSections(community))
+  cacheLife('days')
   const { data, error } = await getAdminClient()
     .from('home_section')
     .select('*')

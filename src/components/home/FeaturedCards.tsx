@@ -45,7 +45,16 @@ export default function FeaturedCards({
         {loading
           ? Array.from({ length: FEATURED_CARD_COUNT }, (_, i) => <CardSkeleton key={i} />)
           : cards.map((card, i) => (
-              <Card key={card.id ?? card.title} card={card} tint={TINTS[i % TINTS.length]} />
+              <Card
+                key={card.id ?? card.title}
+                card={card}
+                tint={TINTS[i % TINTS.length]}
+                // These three are the largest thing above the fold on desktop,
+                // so one of them is almost always the largest contentful paint.
+                // Lazy-loading them would defer the exact image the page's
+                // loading speed is measured by.
+                priority
+              />
             ))}
       </div>
     </section>

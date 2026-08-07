@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
+import { isOptimizableImage } from '@/lib/imageHosts'
 import { listingSearchText } from '@/lib/searchListing'
 import { distanceMiles } from '@/lib/geo'
 import { travelCompare } from '@/lib/listingTravel'
@@ -39,15 +41,45 @@ export type CardDef = {
 // Soft tile tints, cycled per card across the grid.
 export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
-export function Card({ card, tint }: { card: CardDef; tint: string }) {
+export function Card({ card, tint, priority = false }: { card: CardDef; tint: string; priority?: boolean }) {
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
   return (
     <button onClick={card.go} className="group w-full cursor-pointer">
       <div
-        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? '' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
-        style={hasImage ? { backgroundImage: `url(${card.cardImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+        className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
+        {/* next/image rather than a CSS background, which is what this was.
+            A background-image ships one full-size original to every device:
+            no resizing, no AVIF/WebP, no lazy loading, and no way to tell the
+            browser how big it will actually be. These tiles are the heaviest
+            thing on the desktop home screen, so that was the page's weight.
+
+            `fill` + `sizes` is what makes it worth doing: sizes tells Next the
+            tile is a quarter of the grid on desktop and half on a phone, so it
+            generates and serves that width instead of the original.
+
+            alt="" is deliberate — the title is rendered as real text directly
+            below, so describing the photo again would just make a screen
+            reader say everything twice. */}
+        {hasImage && (
+          <Image
+            src={card.cardImageUrl!}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            className="object-cover"
+            // Set on the first row of cards only — they're above the fold and
+            // usually the largest contentful paint. Lazy-loading those delays
+            // the very thing the page is measured on.
+            priority={priority}
+            // An admin can paste a URL from anywhere. next/image *throws* on a
+            // host it wasn't configured for, so without this one pasted link
+            // takes down the whole home screen — which is exactly what happened
+            // the first time this was wired up. Unlisted hosts render as-is.
+            unoptimized={!isOptimizableImage(card.cardImageUrl!)}
+          />
+        )}
         {/* A photo card gets a dark scrim regardless of the photo's own
             brightness, so the title stays legible no matter what's pasted in
             — same idea as the cRc-style reference. */}
@@ -90,7 +122,14 @@ export function CardGrid({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
       {cards.map((card, i) => (
-        <Card key={card.id ?? card.title} card={card} tint={TINTS[i % TINTS.length]} />
+        <Card
+          key={card.id ?? card.title}
+          card={card}
+          tint={TINTS[i % TINTS.length]}
+          // The first row is above the fold at every breakpoint (4 cards is the
+          // widest row the grid ever renders), so those load eagerly.
+          priority={i < 4}
+        />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />

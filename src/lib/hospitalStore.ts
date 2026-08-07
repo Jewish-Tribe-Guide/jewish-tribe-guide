@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import type { Hospital } from '@/types'
 
@@ -12,6 +14,9 @@ type HospitalRow = {
 
 /** Every hospital, ordered for display. Empty for a non-hospital community. */
 export async function listHospitals(community: string): Promise<Hospital[]> {
+  'use cache'
+  cacheTag(TAGS.hospitals(community))
+  cacheLife('days')
   const { data, error } = await getAdminClient()
     .from('hospital')
     .select('id, name, latitude, longitude, timezone, info')

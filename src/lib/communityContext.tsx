@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { createContext, useCallback, useContext, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Community } from './communityStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,12 +13,17 @@ import type { Community } from './communityStore'
 // The community is a path segment now (see routes.ts), the server layout
 // resolves it, and this context hands it to the client tree.
 //
-// localStorage still exists, but demoted to a single job: remembering the last
-// community so a bare "/" can redirect somewhere sensible. It is a hint for one
-// redirect, never the answer to "what am I looking at".
+// Something still remembers the last community, but it's demoted to a single
+// job — telling a bare "/" where to send this device — and it's a cookie, not
+// localStorage. The cookie is what makes that redirect server-side: the root
+// route reads it and issues a real redirect, so a crawler and a link preview
+// resolve to a real community and a returning visitor never sees a flash of
+// the wrong one. It is a hint for one redirect, never the answer to "what am I
+// looking at" — the URL is.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'jpc:community'
+/** Remembers the last community read on this device, for the "/" redirect. */
+export const COMMUNITY_COOKIE = 'jpc_community'
 
 type CommunityContextValue = {
   community: Community
@@ -32,6 +37,14 @@ export function CommunityProvider({
   communities,
   children,
 }: CommunityContextValue & { children: React.ReactNode }) {
+  // Remember wherever the visitor actually ends up, not only an explicit
+  // switch — most people arrive on a shared link rather than through the
+  // switcher, and that link is just as good a signal of which community is
+  // theirs.
+  useEffect(() => {
+    rememberCommunity(community.slug)
+  }, [community.slug])
+
   return (
     <CommunityContext.Provider value={{ community, communities }}>
       {children}
@@ -54,7 +67,6 @@ export type ActiveCommunity = {
 export function useActiveCommunity(): ActiveCommunity {
   const ctx = useContext(CommunityContext)
   const router = useRouter()
-  const pathname = usePathname()
 
   if (!ctx) {
     throw new Error('useActiveCommunity must be used inside a CommunityProvider')
@@ -69,12 +81,19 @@ export function useActiveCommunity(): ActiveCommunity {
       // are deliberately excluded: a category slug isn't guaranteed to exist in
       // the other community, and a listing id certainly doesn't, so those land
       // on that community's home rather than a 404.
-      const rest = pathname.split('/').filter(Boolean).slice(1)
+      //
+      // The path is read from window at click time rather than through
+      // usePathname, deliberately. This hook is used by the header, which is on
+      // every screen, so subscribing it to the path would subscribe the whole
+      // chrome — and reading the path suspends during prerendering, which held
+      // back every page from rendering. An event handler has no such problem:
+      // by the time it runs there is a window, and its value is current.
+      const rest = window.location.pathname.split('/').filter(Boolean).slice(1)
       const screen = rest[0]
       const portable = rest.length === 1 && (screen === 'map' || screen === 'all' || screen === 'feedback')
       router.push(portable ? `/${next}/${screen}` : `/${next}`)
     },
-    [pathname, router],
+    [router],
   )
 
   return {
@@ -94,21 +113,18 @@ export function useCommunitySlug(): string {
 // ── The "/" redirect hint ────────────────────────────────────────────────────
 
 /** Records the community the visitor is reading, so a later bare "/" can send
- *  them back to it. Safe to lose: iOS Safari evicts this after about a week of
- *  not visiting, and the only consequence is landing on the default community. */
+ *  them back to it. Safe to lose — the only consequence is landing on the
+ *  default community.
+ *
+ *  Deliberately not `Secure`, so it works over plain http in local development;
+ *  it holds a community slug and nothing else, so there is nothing here worth
+ *  protecting. `SameSite=Lax` still applies it to a normal top-level visit,
+ *  which is the only navigation that reads it. */
 export function rememberCommunity(slug: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, slug)
+    const year = 60 * 60 * 24 * 365
+    document.cookie = `${COMMUNITY_COOKIE}=${encodeURIComponent(slug)}; Path=/; Max-Age=${year}; SameSite=Lax`
   } catch {
-    /* private mode — the default community is a fine answer */
-  }
-}
-
-/** The last community this device read, if any. Only "/" consults it. */
-export function lastVisitedCommunity(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEY)
-  } catch {
-    return null
+    /* cookies disabled — the default community is a fine answer */
   }
 }

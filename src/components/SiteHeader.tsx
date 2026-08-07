@@ -1,10 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { useActiveCommunity } from '@/lib/useCommunities'
+import { useActiveCommunity } from '@/lib/communityContext'
+import { isOptimizableImage } from '@/lib/imageHosts'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
@@ -36,11 +38,27 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
             pin, so the logo comes back. Always shown from sm up. */}
         {(() => {
           const mark = settings.logoUrl?.trim() ? (
+            // next/image rather than a CSS background. Beyond the resizing and
+            // format negotiation, this also closes a small hole: the URL used
+            // to be interpolated straight into a style string, so an admin
+            // logo URL containing a ")" broke the rule, and the value was
+            // never escaped. Here it's an attribute, handled by React.
             <span
-              className={`${location.address ? 'block' : 'hidden'} sm:block h-9 w-9 shrink-0 rounded-xl bg-cover bg-center`}
-              style={{ backgroundImage: `url(${settings.logoUrl})` }}
+              className={`${location.address ? 'block' : 'hidden'} sm:block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl`}
               aria-hidden="true"
-            />
+            >
+              <Image
+                src={settings.logoUrl}
+                alt=""
+                fill
+                sizes="36px"
+                className="object-cover"
+                // The logo is usually a Supabase upload, but it's a free text
+                // field — a pasted URL from anywhere must not throw and take
+                // the header down with it. See imageHosts.ts.
+                unoptimized={!isOptimizableImage(settings.logoUrl)}
+              />
+            </span>
           ) : (
             <span className={`${location.address ? 'grid' : 'hidden'} sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white`}>
               <StarOfDavid className="h-5 w-5" />

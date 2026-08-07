@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { getAdminClient } from '@/lib/supabase/admin'
 
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
     if (uploadError) throw uploadError
 
     const { data } = getAdminClient().storage.from(BUCKET).getPublicUrl(path)
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, url: data.publicUrl })
   } catch (err) {
     console.error('[admin/site-settings/logo] upload failed:', err)

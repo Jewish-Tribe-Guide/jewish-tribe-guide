@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { listHomeSections, createHomeSection } from '@/lib/homeSectionStore'
 import { getDefaultCommunity } from '@/lib/communityStore'
@@ -43,6 +44,8 @@ export async function POST(request: Request) {
 
   try {
     const section = await createHomeSection({ title: body.title, cardIds: body.cardIds })
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, section })
   } catch (err) {
     console.error('[admin/home-sections] POST failed:', err)

@@ -1,0 +1,70 @@
+import type { MetadataRoute } from 'next'
+import { listCommunities } from '@/lib/communityStore'
+import { listCategories } from '@/lib/categoryStore'
+import { listPublishedForms } from '@/lib/formStore'
+import { routes } from '@/lib/routes'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A sitemap only became possible when screens got URLs. Before this the whole
+// site was "/", so there was exactly one page to declare and nothing about the
+// directory was indexable — which matters for a site whose entire job is
+// answering "kosher grocery near this hospital", a question people type into a
+// search engine.
+//
+// Change frequencies reflect how the content actually moves: a category
+// directory changes when an admin approves a listing (weekly-ish), the home
+// and index pages whenever any of them do.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function baseUrl(): string {
+  // Vercel provides the production domain; the env var is the override for a
+  // custom domain. Falls back to localhost so `next build` works anywhere.
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL
+  if (explicit) return explicit.replace(/\/$/, '')
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
+  return vercel ? `https://${vercel}` : 'http://localhost:3000'
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const base = baseUrl()
+  const communities = await listCommunities().catch(() => [])
+  const now = new Date()
+
+  const entries: MetadataRoute.Sitemap = []
+
+  for (const community of communities) {
+    const slug = community.slug
+    entries.push(
+      { url: `${base}${routes.home(slug)}`, lastModified: now, changeFrequency: 'daily', priority: 1 },
+      { url: `${base}${routes.allCategories(slug)}`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+      { url: `${base}${routes.map(slug)}`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+    )
+
+    // A failure here should cost that community its category URLs, not the
+    // whole sitemap — a partial sitemap is still worth serving.
+    const [categories, forms] = await Promise.all([
+      listCategories(slug).catch(() => []),
+      listPublishedForms(slug).catch(() => []),
+    ])
+
+    for (const category of categories) {
+      entries.push({
+        url: `${base}${routes.slug(slug, category.id)}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.9,
+      })
+    }
+
+    for (const form of forms) {
+      entries.push({
+        url: `${base}${routes.slug(slug, form.id)}`,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: 0.5,
+      })
+    }
+  }
+
+  return entries
+}

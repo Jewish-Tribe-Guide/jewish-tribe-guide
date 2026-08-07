@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { community as configCommunity } from '@/community.config'
 
@@ -99,8 +101,17 @@ function communityFromConfig(): Community {
 
 /** Every community, in display order. Never empty — falls back to the config
  *  community when the table is missing or bare (fresh install, or the
- *  migration not yet run). */
+ *  migration not yet run).
+ *
+ *  Cached: this is read on every request (the layout resolves the community
+ *  from the path with it) and changes only when someone adds a community by
+ *  hand. `communities` is the tag to invalidate if that ever moves into the
+ *  admin. */
 export async function listCommunities(): Promise<Community[]> {
+  'use cache'
+  cacheTag(TAGS.communities)
+  cacheLife('days')
+
   try {
     const { data, error } = await getAdminClient()
       .from('community')

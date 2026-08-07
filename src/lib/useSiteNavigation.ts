@@ -47,7 +47,7 @@ export type SiteNavigation = {
   navigate: NavigateFn
   /** Opens a guided form — a category-or-form slug under the community. */
   openFlow: (kind: string, preselect?: string[]) => void
-  goHome: () => void
+  goHome: (opts?: { at?: 'map' }) => void
   viewAllCategories: (section?: string) => void
   viewListing: (categoryId: string, listingId: string) => void
   viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
@@ -75,15 +75,26 @@ export function useSiteNavigation(): SiteNavigation {
     [router, community],
   )
 
-  const goHome = useCallback(() => {
-    router.push(routes.home(community))
-  }, [router, community])
+  const goHome = useCallback(
+    (opts?: { at?: 'map' }) => {
+      // `?at=map` lands the visitor on the home screen's embedded map band
+      // rather than at the hero — used when collapsing the fullscreen map, so
+      // the collapse reads as zooming out. Mobile's home screen has no map
+      // band, so the param is simply ignored there.
+      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`)
+    },
+    [router, community],
+  )
 
   const viewAllCategories = useCallback(
     (section?: string) => {
-      // The section to scroll to is a fragment, which is exactly what fragments
-      // are for — and it means a link to one section of the index is shareable.
-      router.push(`${routes.allCategories(community)}${section ? `#${section}` : ''}`)
+      // A query param rather than a fragment: the sections load async, so the
+      // browser's native fragment scrolling would fire before the target
+      // exists, and AllCategories has to do the scroll itself once they're
+      // there. A param is also readable with useSearchParams, which a hash
+      // isn't. Either way the link is shareable, which history state was not.
+      const qs = section ? `?section=${encodeURIComponent(section)}` : ''
+      router.push(`${routes.allCategories(community)}${qs}`)
     },
     [router, community],
   )

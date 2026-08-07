@@ -34,9 +34,16 @@ export type PreviewDraft = {
   sections: DraftHomeSection[]
 }
 
-/** The URL the admin's preview iframe points at. Relative so it inherits the
- *  origin (and therefore access to the sessionStorage written just before). */
-export const PREVIEW_URL = `/?${PREVIEW_PARAM}=1`
+/** The URL the admin's preview iframe points at, for the community being
+ *  edited. Relative so it inherits the origin (and therefore access to the
+ *  sessionStorage written just before).
+ *
+ *  Points straight at the community rather than at "/" so the flag survives:
+ *  "/" is a redirect now, and a redirect that dropped the query string would
+ *  land the frame on the normal site with the draft silently ignored. */
+export function previewUrl(community: string): string {
+  return `/${community}?${PREVIEW_PARAM}=1`
+}
 
 /** True when this page was opened as an admin preview. Always false on the
  *  server, so it can't affect SSR output. */

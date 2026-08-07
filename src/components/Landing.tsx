@@ -15,7 +15,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { pickFeaturedCards } from '@/lib/featuredCards'
 import { community } from '@/community.config'
 import type { NavigateFn } from '@/types'
-import type { Flow } from '@/app/page'
+import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 
 type Props = {

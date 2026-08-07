@@ -24,8 +24,9 @@ import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField }
 import { submitGoogleClosure } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 
-// Does network + DB work; never prerender or cache it.
-export const dynamic = 'force-dynamic'
+// Does network + DB work, so it's never prerendered or cached — that follows
+// from the work itself now rather than from a `dynamic` export, which Cache
+// Components rejects.
 
 type SyncedRow = {
   id: string

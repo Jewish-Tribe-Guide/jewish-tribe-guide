@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { listFormsForAdmin, createForm } from '@/lib/formStore'
 import type { FormContent } from '@/lib/forms'
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
       cardImageUrl: body.cardImageUrl,
       cardTextColor: body.cardTextColor,
     })
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, form })
   } catch (err) {
     console.error('[admin/forms] POST failed:', err)

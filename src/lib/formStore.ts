@@ -1,3 +1,5 @@
+import { cacheLife, cacheTag } from 'next/cache'
+import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from './forms'
 
@@ -42,6 +44,9 @@ function toConfig(row: FormRow): FormConfig {
 // Every form, published content only — no drafts. Used by the public
 // GET /api/forms that the live wizards read.
 export async function listPublishedForms(community: string): Promise<Omit<FormConfig, 'draft'>[]> {
+  'use cache'
+  cacheTag(TAGS.forms(community))
+  cacheLife('days')
   const { data, error } = await getAdminClient()
     .from('form')
     .select('*')

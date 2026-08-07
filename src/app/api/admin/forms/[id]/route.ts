@@ -1,3 +1,4 @@
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
@@ -53,6 +54,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       cardTextColor: body.cardTextColor,
     })
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, form })
   } catch (err) {
     console.error('[admin/forms/:id] PATCH failed:', err)
@@ -72,6 +75,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
   const { id } = await ctx.params
   try {
     const { responses } = await deleteForm(id)
+    // The public site caches this content; drop it so the edit shows up.
+    await revalidatePublicContent()
     return Response.json({ ok: true, responses })
   } catch (err) {
     console.error('[admin/forms/:id] DELETE failed:', err)

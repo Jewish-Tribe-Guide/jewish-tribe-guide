@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
-import { useActiveCommunity } from '@/lib/useCommunities'
+import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {
