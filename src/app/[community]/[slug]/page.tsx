@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { listCategories } from '@/lib/categoryStore'
 import { listPublishedForms } from '@/lib/formStore'
+import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
@@ -113,9 +114,24 @@ export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) 
   const resolved = await resolveSlug(community, slug)
   if (!resolved) notFound()
 
+  // Only a category has listings; a form doesn't. Loaded here so the directory
+  // ships with its places in the HTML rather than fetching them after
+  // hydration — this is the page someone opens to find a kosher grocery, so
+  // it's the one where a round trip costs the most.
+  //
+  // null on failure, deliberately distinct from an empty category. See
+  // ResourceLoader's `items` prop.
+  const listings =
+    resolved.kind === 'category'
+      ? await listApprovedResources(community, { category: slug }).catch((err) => {
+          console.error(`[${slug}] listings failed to load:`, err)
+          return null
+        })
+      : []
+
   return (
     <Suspense fallback={<main className="flex flex-1 flex-col" />}>
-      <SlugScreen slug={slug} kind={resolved.kind} />
+      <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
     </Suspense>
   )
 }

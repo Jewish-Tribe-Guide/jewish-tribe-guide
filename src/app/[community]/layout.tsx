@@ -4,6 +4,8 @@ import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { CommunityProvider } from '@/lib/communityContext'
+import { ContentProvider } from '@/lib/contentContext'
+import { loadCommunityContent } from '@/lib/loadCommunityContent'
 import SiteChrome from '@/components/SiteChrome'
 import { currentYear } from '@/lib/currentYear'
 
@@ -65,17 +67,25 @@ export default async function CommunityLayout(props: LayoutProps<'/[community]'>
   const { community, communities } = await resolveFromPath(slug)
   if (!community) notFound()
 
+  // Fetched here, on the server, so the HTML ships with the real categories,
+  // branding and sections instead of the five client-side requests these used
+  // to be. The layout is the right place: every screen below it needs this,
+  // and it isn't re-fetched when navigating between them.
+  const content = await loadCommunityContent(community.slug)
+
   return (
     <CommunityProvider community={community} communities={communities}>
-      {/* The brand color is per-community now, so it's set here rather than on
-          <html> in the root layout — switching community restyles the site
-          without a reload. globals.css still holds the build-time fallback. */}
-      <div
-        className="contents"
-        style={{ '--color-primary': community.themeColor } as React.CSSProperties}
-      >
-        <SiteChrome year={await currentYear()}>{props.children}</SiteChrome>
-      </div>
+      <ContentProvider content={content}>
+        {/* The brand color is per-community now, so it's set here rather than on
+            <html> in the root layout — switching community restyles the site
+            without a reload. globals.css still holds the build-time fallback. */}
+        <div
+          className="contents"
+          style={{ '--color-primary': community.themeColor } as React.CSSProperties}
+        >
+          <SiteChrome year={await currentYear()}>{props.children}</SiteChrome>
+        </div>
+      </ContentProvider>
     </CommunityProvider>
   )
 }

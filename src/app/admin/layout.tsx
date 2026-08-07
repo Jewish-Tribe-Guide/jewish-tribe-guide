@@ -1,5 +1,7 @@
 import { getDefaultCommunity, listCommunities } from '@/lib/communityStore'
 import { CommunityProvider } from '@/lib/communityContext'
+import { ContentProvider } from '@/lib/contentContext'
+import { loadCommunityContent } from '@/lib/loadCommunityContent'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The admin lives outside /[community] — it's one console, not a public screen
@@ -15,10 +17,14 @@ import { CommunityProvider } from '@/lib/communityContext'
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const [community, communities] = await Promise.all([getDefaultCommunity(), listCommunities()])
+  // The editors render the same content hooks the public site does, and those
+  // read from context now rather than fetching. Without this the console would
+  // throw on load — the same failure the missing CommunityProvider caused.
+  const content = await loadCommunityContent(community.slug)
 
   return (
     <CommunityProvider community={community} communities={communities}>
-      {children}
+      <ContentProvider content={content}>{children}</ContentProvider>
     </CommunityProvider>
   )
 }

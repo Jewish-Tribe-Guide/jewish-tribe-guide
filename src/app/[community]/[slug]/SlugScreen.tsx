@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import type { DirectoryResource } from '@/types'
 import FindResources from '@/components/FindResources'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
@@ -11,7 +12,16 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only
 // has to render the right one.
-export default function SlugScreen({ slug, kind }: { slug: string; kind: 'category' | 'form' }) {
+export default function SlugScreen({
+  slug,
+  kind,
+  listings,
+}: {
+  slug: string
+  kind: 'category' | 'form'
+  /** The category's listings from the route; null means the read failed. */
+  listings: DirectoryResource[] | null
+}) {
   const { anchor } = useLocation()
   const { goHome, viewAllCategories, viewMapForCategory } = useSiteNavigation()
   const params = useSearchParams()
@@ -32,6 +42,7 @@ export default function SlugScreen({ slug, kind }: { slug: string; kind: 'catego
     <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
       <FindResources
         view={slug}
+        listings={listings}
         anchor={anchor}
         onUp={goHome}
         onViewAllCategories={() => viewAllCategories()}

@@ -7,6 +7,7 @@ import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
 import MobileTabBar from '@/components/MobileTabBar'
 import LiveLocationPrompt from '@/components/LiveLocationPrompt'
+import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCategories } from '@/lib/useCategories'
@@ -91,6 +92,9 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
   return (
     <>
       <SiteHeader onGoHome={goHome} location={controls} />
+      {/* Only renders when something actually failed — see its own note for why
+          a fallback has to announce itself rather than pass as data. */}
+      <ContentFailureNotice />
       {children}
       <div className="hidden sm:block">
         <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />

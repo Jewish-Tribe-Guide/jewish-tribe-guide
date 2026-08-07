@@ -35,6 +35,9 @@ type Props = {
    *  page.tsx. Both are gone: the URL says which view is open, so there is
    *  nothing left to keep in sync. */
   view: string
+  /** The open category's approved listings, loaded by the route.
+   *  `null` means the read failed — not an empty category. */
+  listings: DirectoryResource[] | null
   anchor: DirectoryAnchor
   /** Up from any resource view. On mobile this is the only "up" there is —
    *  the home grid IS the index. On desktop it's the fallback for views that
@@ -57,7 +60,7 @@ type Props = {
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form.
-export default function FindResources({ view, anchor, onUp, onViewAllCategories, onViewMap }: Props) {
+export default function FindResources({ view, listings, anchor, onUp, onViewAllCategories, onViewMap }: Props) {
   // Every "All resources" button below means what it says — the actual list
   // of every resource. On mobile that's still the home grid (onUp). On
   // desktop, home is now a short gateway with just three featured cards, not
@@ -230,6 +233,7 @@ export default function FindResources({ view, anchor, onUp, onViewAllCategories,
         <ResourceLoader
           key={category.id + (initialSearch ?? '')}
           category={category}
+          items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}

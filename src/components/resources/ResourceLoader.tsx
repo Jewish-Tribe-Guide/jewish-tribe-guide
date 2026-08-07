@@ -1,16 +1,21 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
 import UpButton from '@/components/UpButton'
-import { useActiveCommunity } from '@/lib/communityContext'
-import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {
   category: CategoryConfig
+  /** This category's approved listings, loaded on the server by the route.
+   *
+   *  `null` means the read FAILED — it is not an empty category. Keeping those
+   *  two apart is the whole point: this component used to fetch its own list
+   *  and a failure rendered as "no results", which tells someone standing in a
+   *  hospital that there is no kosher grocery near them. */
+  items: DirectoryResource[] | null
   anchor: DirectoryAnchor
   /** When returning from a form, re-expand this listing's card. */
   reopenItemId?: string | null
@@ -27,37 +32,12 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, anchor, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
-  const [items, setItems] = useState<DirectoryResource[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
   const title = category.pluralLabel
 
-  // Extract stable deps from the anchor object (anchor itself is re-created each
-  // parent render, so referencing it directly in effect deps would over-fire).
+  // Extract a stable dep from the anchor object (anchor itself is re-created
+  // each parent render).
   const anchorCoords = anchor.coords
-  const communitySlug = useActiveCommunity().community?.slug ?? ''
-
-  useEffect(() => {
-    let cancelled = false
-    setItems(null)
-    setError(null)
-
-    // Scoped to the active community — without this a directory opened in one
-    // community lists another's places, since category slugs repeat across them.
-    fetch(withCommunity(`/api/resources?category=${encodeURIComponent(category.id)}`, communitySlug))
-      .then(async (res) => {
-        const body = await res.json()
-        if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-        if (!cancelled) setItems(body.resources as DirectoryResource[])
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || 'Something went wrong.')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [category.id, communitySlug])
 
   // Distance to the visitor's anchor: straight-line miles (haversine) from their
   // typed address to each listing's geocoded coordinates.
@@ -73,22 +53,32 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
     })
   }, [items, anchorCoords, category.hasAddress])
 
-  if (error) {
-    return (
-      <div>
-        <UpButton label="All resources" onClick={onUp} />
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
-        <p className="text-sm text-red-600">{error}</p>
-      </div>
-    )
-  }
-
+  // The listings failed to load. Said plainly, because the alternative — an
+  // empty directory — is a confident, wrong answer: it tells someone there are
+  // no kosher groceries here rather than that we couldn't check.
+  //
+  // There's no "loading" branch any more. The listings arrive with the page, so
+  // by the time this renders they are either here or they failed.
   if (withDistance === null || withDistance === undefined) {
     return (
       <div>
         <UpButton label="All resources" onClick={onUp} />
         <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
-        <p className="text-sm text-muted">Loading…</p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-900">
+            We couldn’t load {title.toLowerCase()} just now.
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            This is a problem on our end, not a sign that there aren’t any. Please try again in a
+            moment.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 rounded-md bg-amber-900 px-3 py-1.5 text-sm font-medium text-white cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     )
   }
