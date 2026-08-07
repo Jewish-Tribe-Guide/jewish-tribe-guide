@@ -28,8 +28,15 @@ export function normalizeRow(row: ResourceRow): DirectoryResource {
 // Approved resources for a category. Listings are no longer hospital-scoped —
 // every listing shows under every hospital, and distance to the selected hospital
 // is computed on the client from the listing's geocoded coordinates.
-export async function listApprovedResources(opts: { category?: string } = {}): Promise<DirectoryResource[]> {
-  let query = getAdminClient().from('resource').select('*').eq('status', 'approved')
+export async function listApprovedResources(
+  community: string,
+  opts: { category?: string } = {},
+): Promise<DirectoryResource[]> {
+  let query = getAdminClient()
+    .from('resource')
+    .select('*')
+    .eq('community_id', community)
+    .eq('status', 'approved')
   if (opts.category) query = query.eq('category', opts.category)
 
   const { data, error } = await query

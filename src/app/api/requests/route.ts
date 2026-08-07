@@ -20,6 +20,7 @@ import { easternTimestamp } from '@/lib/time'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { getDefaultCommunity } from '@/lib/communityStore'
 
 export async function POST(request: Request) {
   // Writes to Sheets + sends two emails per call — throttle hard.
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
   //    change-requests → Volunteer Changes tab; all other requests → default
   //    Requests tab. Resolve hospital ids → names once for the row builders.
   try {
-    const names = await hospitalNameMap()
+    const names = await hospitalNameMap((await getDefaultCommunity()).slug)
     if (payload.requestType === 'Volunteer') {
       await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp, names), { tab: VOLUNTEER_SHEET_TAB })
     } else if (payload.requestType === 'Volunteer Edit' || payload.requestType === 'Volunteer Removal') {

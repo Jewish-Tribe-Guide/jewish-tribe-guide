@@ -4,6 +4,7 @@ import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
+import { getDefaultCommunity } from '@/lib/communityStore'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -267,7 +268,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           : 'Removal reported'
     title = payload.name ?? 'a listing'
     const categoryLabel = payload.category
-      ? (await getCategoryById(payload.category))?.label ?? payload.category
+      ? (await getCategoryById((await getDefaultCommunity()).slug, payload.category))?.label ?? payload.category
       : ''
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
     subject =

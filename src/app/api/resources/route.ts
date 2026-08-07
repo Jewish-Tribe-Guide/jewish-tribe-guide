@@ -1,4 +1,5 @@
 import { listApprovedResources } from '@/lib/resourceStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/resources?category=grocery
 // Returns every approved listing for a category. Distance to the selected
@@ -8,7 +9,8 @@ export async function GET(request: Request) {
   const category = searchParams.get('category') ?? undefined
 
   try {
-    const resources = await listApprovedResources({ category })
+    const community = await resolveCommunity(communitySlugFromRequest(request))
+      const resources = await listApprovedResources(community.slug, { category })
     return Response.json({ ok: true, resources })
   } catch (err) {
     console.error('[resources] GET failed:', err)

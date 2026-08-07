@@ -41,8 +41,12 @@ function toConfig(row: FormRow): FormConfig {
 
 // Every form, published content only — no drafts. Used by the public
 // GET /api/forms that the live wizards read.
-export async function listPublishedForms(): Promise<Omit<FormConfig, 'draft'>[]> {
-  const { data, error } = await getAdminClient().from('form').select('*').order('id')
+export async function listPublishedForms(community: string): Promise<Omit<FormConfig, 'draft'>[]> {
+  const { data, error } = await getAdminClient()
+    .from('form')
+    .select('*')
+    .eq('community_id', community)
+    .order('id')
   if (error) throw new Error(`Failed to load forms: ${error.message}`)
   return (data as FormRow[]).map(toConfig)
 }

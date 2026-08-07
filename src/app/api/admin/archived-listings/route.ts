@@ -1,6 +1,7 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategories } from '@/lib/categoryStore'
+import { getDefaultCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/archived-listings — every soft-deleted listing (an approved
 // removal report leaves the row as status='archived' rather than dropping
@@ -11,7 +12,11 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const [listings, categories] = await Promise.all([listArchivedResources(), listCategories()])
+    const community = await getDefaultCommunity()
+    const [listings, categories] = await Promise.all([
+      listArchivedResources(),
+      listCategories(community.slug),
+    ])
     const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
     const enriched = listings.map((l) => ({ ...l, categoryLabel: labelById.get(l.category) ?? l.category }))
     return Response.json({ ok: true, listings: enriched })
