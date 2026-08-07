@@ -6,7 +6,7 @@ import UpButton from '@/components/UpButton'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import type { NavigateFn } from '@/types'
-import type { Flow } from '@/app/page'
+import type { Flow } from '@/types'
 
 // ── The full category index ───────────────────────────────────────────────────
 // Everything that used to sit below the map on the desktop home screen, moved

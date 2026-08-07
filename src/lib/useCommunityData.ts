@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useActiveCommunity } from './useCommunities'
+import { useActiveCommunity } from './communityContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared per-community fetch cache.

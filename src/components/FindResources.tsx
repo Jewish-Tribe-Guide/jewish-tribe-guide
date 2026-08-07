@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
@@ -18,21 +19,6 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { resolveCapabilities } from '@/lib/categories'
 import { community } from '@/community.config'
 
-// The history shape page.tsx stamps on every pushState/replaceState call, plus
-// the two extra fields this view adds when opening a listing form.
-type FindNavState = {
-  mode?: string
-  findView?: string
-  findAction?: string
-  /** Which hospital's About page to show (set when tapping one in the list). */
-  findHospitalId?: string
-  /** Pre-fill the category's search box (set when arriving from a landing "Places"
-   *  result, e.g. "cheese"). */
-  findQuery?: string
-  /** Expand this listing on arrival (the place tapped on the landing page). */
-  findItemId?: string
-}
-
 // A pending add/edit/report action on a listing within the current category.
 type ListingAction =
   | { mode: 'create' }
@@ -40,6 +26,15 @@ type ListingAction =
   | { mode: 'report'; listing: DirectoryResource }
 
 type Props = {
+  /** Which resource view is open — a category id, or one of the curated pages
+   *  ('hospitals', 'eruv', 'zmanim'). This is the URL's slug segment, resolved
+   *  and validated by the route before this renders.
+   *
+   *  It used to be state seeded from history.state and kept in sync by this
+   *  component's own popstate listener, running alongside a second one in
+   *  page.tsx. Both are gone: the URL says which view is open, so there is
+   *  nothing left to keep in sync. */
+  view: string
   anchor: DirectoryAnchor
   /** Up from any resource view. On mobile this is the only "up" there is —
    *  the home grid IS the index. On desktop it's the fallback for views that
@@ -62,7 +57,7 @@ type Props = {
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form.
-export default function FindResources({ anchor, onUp, onViewAllCategories, onViewMap }: Props) {
+export default function FindResources({ view, anchor, onUp, onViewAllCategories, onViewMap }: Props) {
   // Every "All resources" button below means what it says — the actual list
   // of every resource. On mobile that's still the home grid (onUp). On
   // desktop, home is now a short gateway with just three featured cards, not
@@ -80,12 +75,6 @@ export default function FindResources({ anchor, onUp, onViewAllCategories, onVie
   const zmanimCoords = anchor.coords ?? community.mapCenter
   const locationLabel = anchor.label || community.region
 
-  // Initialize from history so browser forward/back re-opens the right sub-view.
-  const [view, setView] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    const s = window.history.state as FindNavState | null
-    return s?.findView ?? null
-  })
   const [action, setAction] = useState<ListingAction | null>(null)
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -97,73 +86,74 @@ export default function FindResources({ anchor, onUp, onViewAllCategories, onVie
   // making Add/Edit open into a multi-second "Verifying…" wait every time.
   const [turnstileToken, setTurnstileToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
-  // The listing id most recently opened for edit/report, OR the place tapped on
-  // the landing page — restored as expanded when the category list shows.
-  const [reopenItemId, setReopenItemId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return (window.history.state as FindNavState | null)?.findItemId ?? null
-  })
-  // Pre-filled search for the category list, set when arriving from a landing
-  // "Places" result so the tapped place is already filtered in.
-  const [initialSearch, setInitialSearch] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return (window.history.state as FindNavState | null)?.findQuery ?? null
-  })
-  // Which hospital's About page is showing (chosen from the Hospitals list).
-  const [hospitalDetailId, setHospitalDetailId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null
-    return (window.history.state as FindNavState | null)?.findHospitalId ?? null
-  })
+  // ── Sub-view state, read from the query string ─────────────────────────────
+  // These were four useStates seeded from history.state and reset by the
+  // popstate handler above. As query params they survive a reload, make each
+  // sub-view a real shareable link, and get browser back/forward for free.
+  //
+  //   ?item=<id>      expand this listing on arrival
+  //   ?q=<text>       pre-fill the category's search box
+  //   ?hospital=<id>  show that hospital's About page
+  //   ?form=<mode>    an add/edit/report form is open over the list
+  const params = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
 
-  // Keep internal view/action in sync with browser back/forward. page.tsx has its
-  // own popstate listener for mode; this one only acts while mode is still 'find'.
-  useEffect(() => {
-    function onPop(e: PopStateEvent) {
-      const s = e.state as FindNavState | null
-      if (s?.mode !== 'find') return
-      setView(s.findView ?? null)
-      setHospitalDetailId(s.findHospitalId ?? null)
-      setReopenItemId(s.findItemId ?? null)
-      setInitialSearch(s.findQuery ?? null)
-      setAction(null) // edit/report listings can't be serialized into history
+  const reopenItemId = params.get('item')
+  const initialSearch = params.get('q')
+  const hospitalDetailId = params.get('hospital')
+
+  /** Pushes a change to this view's query params, keeping the path. */
+  const setParams = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(params)
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) next.delete(key)
+      else next.set(key, value)
     }
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
+    const qs = next.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+  }
+
+  // A form is only open while its param says so, so browser back closes it
+  // without this component listening for anything.
+  const formOpen = params.get('form') !== null
+  useEffect(() => {
+    if (!formOpen && action) setAction(null)
+  }, [formOpen, action])
 
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {
-    setHospitalDetailId(id)
-    setView('about-hospital')
-    history.pushState({ mode: 'find', findView: 'about-hospital', findHospitalId: id }, '')
+    setParams({ hospital: id })
   }
 
   // Up from a hospital's About page → back to the Hospitals list.
   const goToHospitals = () => {
-    setView('hospitals')
-    history.pushState({ mode: 'find', findView: 'hospitals' }, '')
+    setParams({ hospital: null })
   }
 
-  // Open a listing action (create/edit/report form). Pushes its own history entry
-  // so browser-back from the form lands on the category list, not all the way home.
+  // Open a listing action (create/edit/report form). Pushes its own history
+  // entry so browser-back from the form lands on the category list, not home.
   function openAction(act: ListingAction) {
     setAction(act)
-    if (act.mode === 'edit' || act.mode === 'report') setReopenItemId(act.listing.id)
-    history.pushState({ mode: 'find', findView: view, findAction: 'open' }, '')
+    setParams({
+      form: act.mode,
+      // Re-expands the relevant card when the form closes.
+      ...(act.mode === 'edit' || act.mode === 'report' ? { item: act.listing.id } : {}),
+    })
   }
 
   // Up from a listing form / report form → the category list it was opened from
-  // (view is still the category id; reopenItemId re-expands the relevant card).
+  // (the path is still the category; `item` re-expands the relevant card).
   const goToCategoryList = () => {
     setAction(null)
-    history.pushState({ mode: 'find', findView: view }, '')
+    setParams({ form: null })
   }
 
   // ── Special (non-category) detail views ─────────────────────────────────────
-  if (view === 'hospitals') {
+  if (view === 'hospitals' && !hospitalDetailId) {
     return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
-  if (view === 'about-hospital') {
+  if (view === 'hospitals' && hospitalDetailId) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
     // (Patient feature — hospitals is non-empty whenever this view is reachable.)
     const id = hospitalDetailId ?? hospitals[0]?.id ?? ''

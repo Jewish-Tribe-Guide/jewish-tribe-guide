@@ -4,7 +4,7 @@ import LocationControl, { type LocationControls } from '@/components/home/Locati
 import CommunitySwitcher from '@/components/CommunitySwitcher'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
-import { useActiveCommunity } from '@/lib/useCommunities'
+import { useActiveCommunity } from '@/lib/communityContext'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {

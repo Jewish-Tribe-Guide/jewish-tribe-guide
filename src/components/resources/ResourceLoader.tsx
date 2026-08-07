@@ -6,7 +6,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
 import UpButton from '@/components/UpButton'
-import { useActiveCommunity } from '@/lib/useCommunities'
+import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {

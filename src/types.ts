@@ -288,6 +288,14 @@ export type MapFilters = {
 
 export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback' | 'all-categories'
 
+/** A guided form opened over the current page: 'support'/'volunteer' for the
+ *  two built-in wizards, or any other form's id for an admin-created one.
+ *  `preselect` pre-checks needs chosen from the card or a search result.
+ *
+ *  Lived in src/app/page.tsx while that file was the entire site; it moved
+ *  here when the site gained real routes and that file became a redirect. */
+export type Flow = { kind: string; preselect?: string[] }
+
 /** page.tsx's central navigation function, passed down to every screen that
  *  deep-links. `extra` is merged into the history state so the target screen
  *  can restore a sub-view on mount (findView / findQuery / volunteerPreselect).
