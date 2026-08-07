@@ -2,6 +2,7 @@ import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
+import { getDefaultCommunity } from './communityStore'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -27,7 +28,7 @@ export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {
   const submissions = data as SubmissionRow[]
 
   // Resolve category labels for display.
-  const categories = await listCategories()
+  const categories = await listCategories((await getDefaultCommunity()).slug)
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
@@ -282,13 +283,13 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
 // shouldn't block approving the listing.
 async function growTagVocabulary(payload: ResourceSubmission): Promise<void> {
   try {
-    const category = await getCategoryById(payload.category)
+    const category = await getCategoryById((await getDefaultCommunity()).slug, payload.category)
     if (!category) return
     for (const field of category.detailFields) {
       if (field.type !== 'tags' || !field.tagGroup) continue
       const labels = payload.details?.[field.key]
       if (Array.isArray(labels) && labels.length > 0) {
-        await upsertTags(labels as string[], field.tagGroup)
+        await upsertTags((await getDefaultCommunity()).slug, labels as string[], field.tagGroup)
       }
     }
   } catch (err) {

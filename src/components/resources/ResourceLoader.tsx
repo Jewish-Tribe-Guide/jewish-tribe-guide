@@ -6,6 +6,8 @@ import type { CategoryConfig } from '@/lib/categories'
 import { distanceMiles } from '@/lib/geo'
 import GenericDirectory from './GenericDirectory'
 import UpButton from '@/components/UpButton'
+import { useActiveCommunity } from '@/lib/useCommunities'
+import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {
   category: CategoryConfig
@@ -33,13 +35,16 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
   // Extract stable deps from the anchor object (anchor itself is re-created each
   // parent render, so referencing it directly in effect deps would over-fire).
   const anchorCoords = anchor.coords
+  const communitySlug = useActiveCommunity().community?.slug ?? ''
 
   useEffect(() => {
     let cancelled = false
     setItems(null)
     setError(null)
 
-    fetch(`/api/resources?category=${encodeURIComponent(category.id)}`)
+    // Scoped to the active community — without this a directory opened in one
+    // community lists another's places, since category slugs repeat across them.
+    fetch(withCommunity(`/api/resources?category=${encodeURIComponent(category.id)}`, communitySlug))
       .then(async (res) => {
         const body = await res.json()
         if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
@@ -52,7 +57,7 @@ export default function ResourceLoader({ category, anchor, reopenItemId, initial
     return () => {
       cancelled = true
     }
-  }, [category.id])
+  }, [category.id, communitySlug])
 
   // Distance to the visitor's anchor: straight-line miles (haversine) from their
   // typed address to each listing's geocoded coordinates.

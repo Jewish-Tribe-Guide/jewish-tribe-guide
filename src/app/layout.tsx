@@ -5,6 +5,7 @@ import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
+import { getDefaultCommunity } from '@/lib/communityStore'
 
 const figtree = Figtree({ subsets: ['latin'] })
 
@@ -13,7 +14,7 @@ const figtree = Figtree({ subsets: ['latin'] })
 // (e.g. the site_settings table not migrated yet) — a settings hiccup must
 // never break metadata generation for the whole page.
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSiteSettings().catch(() => SITE_SETTINGS_DEFAULTS)
+  const settings = await getSiteSettings((await getDefaultCommunity()).slug).catch(() => SITE_SETTINGS_DEFAULTS)
   return {
     title: settings.name,
     description: settings.mission,

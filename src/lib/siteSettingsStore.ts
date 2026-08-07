@@ -61,11 +61,11 @@ function toSettings(row: Row | null): SiteSettings {
 
 // The single settings row, or the community.config defaults if none exists
 // yet (a fresh deployment, before the first admin edit).
-export async function getSiteSettings(): Promise<SiteSettings> {
+export async function getSiteSettings(community: string): Promise<SiteSettings> {
   const { data, error } = await getAdminClient()
     .from('site_settings')
     .select('*')
-    .eq('id', ROW_ID)
+    .eq('community_id', community)
     .maybeSingle()
 
   if (error) throw new Error(`Failed to load site settings: ${error.message}`)
@@ -74,8 +74,11 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 
 // Merges the given fields into the current settings and upserts the single
 // row (creating it on first save). Only the provided keys change.
-export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<SiteSettings> {
-  const current = await getSiteSettings()
+export async function updateSiteSettings(
+  community: string,
+  patch: Partial<SiteSettings>,
+): Promise<SiteSettings> {
+  const current = await getSiteSettings(community)
   const merged: SiteSettings = { ...current, ...patch }
 
   const { data, error } = await getAdminClient()
@@ -83,6 +86,7 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
     .upsert(
       {
         id: ROW_ID,
+        community_id: community,
         name: merged.name,
         tagline: merged.tagline,
         hero_title: merged.heroTitle,
@@ -96,7 +100,7 @@ export async function updateSiteSettings(patch: Partial<SiteSettings>): Promise<
         mobile_tabs: merged.mobileTabs,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'id' },
+      { onConflict: 'community_id' },
     )
     .select('*')
     .single()

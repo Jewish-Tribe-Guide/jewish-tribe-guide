@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 
 // Per-category icon overrides — e.g. the ✡️ emoji renders as a garish purple
@@ -25,38 +24,27 @@ export const FALLBACK_CATEGORIES: CategoryConfig[] = [
 ]
 
 // Module-level cache — the landing page, audience pages, search bar, and the
-// resource directory all want the category list, so fetch it once per page
-// load and share it.
-let cache: CategoryConfig[] | null = null
-let inflight: Promise<CategoryConfig[]> | null = null
+import { useCommunityData } from './useCommunityData'
 
-/** The live category list, or null while loading. Falls back to the seeded
- *  category set if the API fails or returns nothing. */
+/** The live category list for the active community, or null while loading.
+ *  Falls back to the seeded category set if the API fails or returns nothing.
+ *  Cached per community — see useCommunityData. */
 export function useCategories(): CategoryConfig[] | null {
-  const [categories, setCategories] = useState<CategoryConfig[] | null>(cache)
-
-  useEffect(() => {
-    if (cache) return
-    inflight ??= fetch('/api/categories')
-      .then((res) => res.json())
-      .then((body) =>
-        body.ok && (body.categories as CategoryConfig[]).length > 0
-          ? (body.categories as CategoryConfig[]).map((c) => ({
-              ...c,
-              icon: ICON_OVERRIDES[c.id] ?? c.icon,
-            }))
-          : FALLBACK_CATEGORIES,
-      )
-      .catch(() => FALLBACK_CATEGORIES)
-    let active = true
-    inflight.then((cats) => {
-      cache = cats
-      if (active) setCategories(cats)
-    })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  return categories
+  const { data } = useCommunityData<CategoryConfig[] | null>(
+    '/api/categories',
+    (url) =>
+      fetch(url)
+        .then((res) => res.json())
+        .then((body) =>
+          body.ok && (body.categories as CategoryConfig[]).length > 0
+            ? (body.categories as CategoryConfig[]).map((c) => ({
+                ...c,
+                icon: ICON_OVERRIDES[c.id] ?? c.icon,
+              }))
+            : FALLBACK_CATEGORIES,
+        )
+        .catch(() => FALLBACK_CATEGORIES),
+    null,
+  )
+  return data
 }

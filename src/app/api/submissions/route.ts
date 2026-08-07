@@ -15,6 +15,7 @@ import { verifyTurnstile } from '@/lib/turnstile'
 import { normalizeUrl } from '@/lib/validation'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
+import { getDefaultCommunity } from '@/lib/communityStore'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
         ? (await getResourceById(targetId))?.category
         : undefined
   if (categoryId) {
-    const cat = await getCategoryById(categoryId)
+    const cat = await getCategoryById((await getDefaultCommunity()).slug, categoryId)
     if (cat) {
       const caps = resolveCapabilities(cat.capabilities)
       const capOk =
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
   }
 
   if (payload) {
-    const category = await getCategoryById(payload.category)
+    const category = await getCategoryById((await getDefaultCommunity()).slug, payload.category)
     // Nobody types the "https://" scheme by hand for a website field — add it
     // before validating (so a bare "example.com" isn't rejected) and before
     // storing (so the saved value is still a real, working link — the card

@@ -19,10 +19,11 @@ function toSection(row: HomeSectionRow): HomeSection {
 }
 
 // All sections, in display order.
-export async function listHomeSections(): Promise<HomeSection[]> {
+export async function listHomeSections(community: string): Promise<HomeSection[]> {
   const { data, error } = await getAdminClient()
     .from('home_section')
     .select('*')
+    .eq('community_id', community)
     .order('sort_order', { ascending: true })
 
   if (error) throw new Error(`Failed to load home sections: ${error.message}`)

@@ -1,4 +1,5 @@
 import { getAdminClient } from './supabase/admin'
+import { getDefaultCommunity } from './communityStore'
 import {
   DEFAULT_CATEGORY_ICON,
   resolveCapabilities,
@@ -51,23 +52,25 @@ function toConfig(row: CategoryRow): CategoryConfig {
 }
 
 // All categories, ordered for the directory index.
-export async function listCategories(): Promise<CategoryConfig[]> {
+export async function listCategories(community: string): Promise<CategoryConfig[]> {
   // Ordered alphabetically by the plural label shown on the cards. (The
   // `sort_order` column is still stored so a community can switch to manual
   // ordering later, but for now the directory is purely alphabetical.)
   const { data, error } = await getAdminClient()
     .from('category')
     .select('*')
+    .eq('community_id', community)
     .order('plural_label', { ascending: true })
 
   if (error) throw new Error(`Failed to load categories: ${error.message}`)
   return (data as CategoryRow[]).map(toConfig)
 }
 
-export async function getCategoryById(id: string): Promise<CategoryConfig | null> {
+export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {
   const { data, error } = await getAdminClient()
     .from('category')
     .select('*')
+    .eq('community_id', community)
     .eq('id', id)
     .maybeSingle()
 
@@ -195,11 +198,16 @@ export async function updateCategory(
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
   if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
 
-  if (Object.keys(row).length === 0) return getCategoryById(id)
+  // Admin edits are still single-community — see the note in communityStore.
+  // Scoping the write by community as well as id means a future second
+  // community's identically-slugged category can't be hit by mistake.
+  const community = (await getDefaultCommunity()).slug
+  if (Object.keys(row).length === 0) return getCategoryById(community, id)
 
   const { data, error } = await supabase
     .from('category')
     .update(row)
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()

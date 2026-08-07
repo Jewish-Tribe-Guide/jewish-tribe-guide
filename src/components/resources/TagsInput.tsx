@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { CategoryField } from '@/lib/categories'
+import { useActiveCommunity } from '@/lib/useCommunities'
+import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {
   field: CategoryField
@@ -30,12 +32,13 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
   const always = value ?? []
   const showConsistency = !!onChangeSometimes
   const vocab = field.fixedVocabulary ? (field.options ?? []).map((o) => o.label) : fetchedVocab
+  const communitySlug = useActiveCommunity().community?.slug ?? ''
 
   useEffect(() => {
     if (field.fixedVocabulary) return
     if (!field.tagGroup) return
     let cancelled = false
-    fetch(`/api/tags?group=${encodeURIComponent(field.tagGroup)}`)
+    fetch(withCommunity(`/api/tags?group=${encodeURIComponent(field.tagGroup)}`, communitySlug))
       .then((r) => r.json())
       .then((b) => {
         if (!cancelled && b.ok) setFetchedVocab((b.tags as { label: string }[]).map((t) => t.label))
@@ -44,7 +47,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
     return () => {
       cancelled = true
     }
-  }, [field.tagGroup, field.fixedVocabulary])
+  }, [field.tagGroup, field.fixedVocabulary, communitySlug])
 
   const add = (label: string) => {
     const v = label.trim()

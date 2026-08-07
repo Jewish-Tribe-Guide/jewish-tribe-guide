@@ -11,10 +11,11 @@ type HospitalRow = {
 }
 
 /** Every hospital, ordered for display. Empty for a non-hospital community. */
-export async function listHospitals(): Promise<Hospital[]> {
+export async function listHospitals(community: string): Promise<Hospital[]> {
   const { data, error } = await getAdminClient()
     .from('hospital')
     .select('id, name, latitude, longitude, timezone, info')
+    .eq('community_id', community)
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
 
@@ -31,9 +32,9 @@ export async function listHospitals(): Promise<Hospital[]> {
 
 /** Map of hospital id → name, for labeling request rows without shipping the
  *  whole list. Falls back to an empty map if the table can't be read. */
-export async function hospitalNameMap(): Promise<Record<string, string>> {
+export async function hospitalNameMap(community: string): Promise<Record<string, string>> {
   try {
-    const rows = await listHospitals()
+    const rows = await listHospitals(community)
     return Object.fromEntries(rows.map((h) => [h.id, h.name]))
   } catch {
     return {}
