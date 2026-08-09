@@ -1,4 +1,5 @@
 import { cacheLife, cacheTag } from 'next/cache'
+import { CONFIG_COMMUNITY_SLUG } from './configCommunity'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { community as configCommunity } from '@/community.config'
@@ -75,9 +76,9 @@ function toCommunity(row: Row): Community {
   }
 }
 
-/** The implicit single community a database with no `community` rows behaves
- *  as — built from community.config.ts so a fresh install still renders. */
-export const CONFIG_COMMUNITY_SLUG = 'philly'
+// Re-exported so existing importers keep working; defined in its own module
+// so proxy.ts can use it without pulling in the Supabase client.
+export { CONFIG_COMMUNITY_SLUG }
 
 function communityFromConfig(): Community {
   return {

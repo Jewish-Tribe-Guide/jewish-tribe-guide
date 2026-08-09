@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Community } from './communityStore'
+import { COMMUNITY_COOKIE } from './configCommunity'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Which community the visitor is looking at — now decided by the URL.
@@ -22,8 +23,9 @@ import type { Community } from './communityStore'
 // looking at" — the URL is.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Remembers the last community read on this device, for the "/" redirect. */
-export const COMMUNITY_COOKIE = 'jpc_community'
+// Defined in configCommunity.ts (a server-safe module) so proxy.ts can read
+// it; re-exported here so this file's existing importers are unchanged.
+export { COMMUNITY_COOKIE }
 
 type CommunityContextValue = {
   community: Community
