@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useLayoutEffect, useState } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lets a screen tell the shared header to get out of the way for as long as
@@ -46,10 +46,24 @@ export function useHeaderCollapsed(): boolean {
  *  mounted (pass `false` — the default — to leave the header alone). Reset
  *  happens automatically on unmount, so leaving the screen by any route,
  *  including the browser's back button, can never leave the header stuck
- *  hidden. */
+ *  hidden.
+ *
+ *  useLayoutEffect, not useEffect: on a cold load of the map screen, this
+ *  fires after the very first commit either way — the header is briefly
+ *  mounted *uncollapsed* no matter which one is used, since `collapsed`
+ *  genuinely starts false in the provider above. The difference is whether
+ *  the browser ever paints that frame. useLayoutEffect's setCollapsed(true)
+ *  flushes before paint, so the visitor never sees it; useEffect's runs
+ *  after, and on a slow/cold load — competing with hydration and this same
+ *  screen's own data fetching — that gap is wide enough to paint. Anything
+ *  reading `collapsed` at that instant (LocationControl's popover, opened by
+ *  a geoError effect that can fire just as early if tracking auto-resumes
+ *  into an already-blocked permission) then renders anchored to the header
+ *  pill instead of the map's bottom sheet — the "opens in a different place
+ *  on first load" bug this replaced. */
 export function useCollapseHeader(collapse: boolean): void {
   const { setCollapsed } = useHeaderCollapseContext()
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!collapse) return
     setCollapsed(true)
     return () => setCollapsed(false)
