@@ -16,6 +16,8 @@ const figtree = Figtree({ subsets: ['latin'] })
 // never break metadata generation for the whole page.
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings((await getDefaultCommunity()).slug).catch(() => SITE_SETTINGS_DEFAULTS)
+  const hasLogo = !!settings.logoUrl?.trim()
+
   return {
     title: settings.name,
     description: settings.mission,
@@ -26,6 +28,21 @@ export async function generateMetadata(): Promise<Metadata> {
       title: community.shortName,
       statusBarStyle: 'default',
     },
+    // Generated from the admin's logo (app/icons/[size]). Declared here as
+    // well as in the manifest because iOS reads `apple-touch-icon` for "Add to
+    // Home Screen" rather than the manifest's icon list — the manifest alone
+    // left iPhones falling back to favicon.ico, which is still the Next.js
+    // starter file. `icon` overrides that same file for the browser tab.
+    //
+    // Omitted entirely when no logo is set, so nothing points at a 404.
+    ...(hasLogo
+      ? {
+          icons: {
+            icon: [{ url: '/icons/32', sizes: '32x32', type: 'image/png' }],
+            apple: [{ url: '/icons/180', sizes: '180x180', type: 'image/png' }],
+          },
+        }
+      : {}),
   }
 }
 
