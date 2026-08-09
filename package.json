@@ -15,7 +15,10 @@
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
-    "import": "node --env-file=.env.local scripts/import.mjs"
+    "import": "node --env-file=.env.local scripts/import.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "vitest run && playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
@@ -29,6 +32,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/google.maps": "^3.65.0",
     "@types/node": "^20",
