@@ -41,8 +41,8 @@ export default function UpvoteButton({
   count: number
   /** Notifies the parent of the latest count so it can re-sort by popularity. */
   onCountChange?: (count: number) => void
-  /** 'box' — the bordered ▲/count tile. 'inline' — a minimal "▲ count" that sits
-   *  in a row (used in the collapsed listing header). */
+  /** 'box' — the bordered 👍/count tile. 'inline' — a minimal "👍 count" that
+   *  sits in a row (used in the collapsed listing header). */
   variant?: 'box' | 'inline'
 }) {
   const [count, setCount] = useState(initialCount)
@@ -115,7 +115,7 @@ export default function UpvoteButton({
           voted ? 'text-primary' : 'text-slate-600 hover:text-primary',
         ].join(' ')}
       >
-        <span aria-hidden="true">▲</span>
+        <span aria-hidden="true">👍</span>
         {count}
       </button>
     )
@@ -134,7 +134,7 @@ export default function UpvoteButton({
           : 'border-slate-300 text-slate-500 hover:border-primary hover:text-primary',
       ].join(' ')}
     >
-      <span className="text-sm leading-none" aria-hidden="true">▲</span>
+      <span className="text-sm leading-none" aria-hidden="true">👍</span>
       <span className="text-xs font-semibold leading-tight">{count}</span>
     </button>
   )
