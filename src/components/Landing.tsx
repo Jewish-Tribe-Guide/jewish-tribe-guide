@@ -509,36 +509,34 @@ function GetConnectedAccordion({
   )
 }
 
-/** Left-edge browse menu (a faint arrow tab in the margin now, not a
- *  hamburger icon in the top bar — see below) — a quick-link list to
- *  every resource category's full directory page (Synagogues, Restaurants,
- *  Hospitals, Eruv, etc. — reuses the same `resources` the card grid below
- *  builds from, so it's never a second, drifting copy of that list). Exists
- *  because those "View full page" links used to live on the map's own
- *  category headings — once multiple categories selected there merge into
- *  one flat, ungrouped list (see ResourceMapView), there's no per-category
- *  heading left to click through from; this is the one place they're
- *  always reachable regardless of what's currently selected on the map.
- *  Opens as a panel that folds out WITHIN this box's own bounds now (not
- *  a full-height drawer sliding out from the browser edge) — the trigger
- *  and panel both position against the title section itself (which is
- *  `sm:relative sm:overflow-hidden`, see its call site), not the
- *  viewport, so the whole thing stays visually contained inside the
- *  "Philly Jewish Guide" box's own border rather than spilling into the
- *  margin outside it. The trigger is a faint right-pointing arrow tucked
- *  in the box's own top-left corner — low-opacity until hovered, when it
- *  darkens AND reveals a "Browse Resources" label beside it (grown open
- *  via `max-width`, not `display`, so the reveal actually animates
- *  instead of popping in) — completely invisible/inert otherwise; the
- *  menu itself only ever shows once that arrow is clicked. The panel
- *  (`absolute inset-0`) fills this same box exactly and slides in from
- *  its left edge via transform, clipped to the section's own rectangle
- *  by its `overflow-hidden` so it can't bleed outside those bounds. The
- *  backdrop is a transparent, full-page click-catcher (not a dimmed
+/** Left-edge browse menu — a quick-link list to every resource category's
+ *  full directory page (Synagogues, Restaurants, Hospitals, Eruv, etc. —
+ *  reuses the same `resources` the card grid below builds from, so it's
+ *  never a second, drifting copy of that list). Exists because those "View
+ *  full page" links used to live on the map's own category headings — once
+ *  multiple categories selected there merge into one flat, ungrouped list
+ *  (see ResourceMapView), there's no per-category heading left to click
+ *  through from; this is the one place they're always reachable regardless
+ *  of what's currently selected on the map.
+ *  The trigger is a faint right-pointing arrow tucked in the top-left
+ *  corner of the stacked title/search/map column (its call site's own
+ *  `sm:relative` wrapper — see Landing itself) — low-opacity until
+ *  hovered, when it darkens AND reveals a "Browse Resources" label beside
+ *  it (grown open via `max-width`, not `display`, so the reveal actually
+ *  animates instead of popping in) — completely invisible/inert
+ *  otherwise; the menu itself only ever shows once that arrow is clicked.
+ *  The panel is a narrow drawer (`w-72`) pinned to that same top-left
+ *  corner, sliding in from the left via transform — NOT clipped to the
+ *  "Philly Jewish Guide" section's own (now short, since the desktop
+ *  home page stacks title/search/map vertically instead of side by side)
+ *  height, on request ("expand vertically beyond just the philly jewish
+ *  guide section") — it grows down past it, capped at `max-h-[85vh]` with
+ *  its own internal scroll once the resource list is longer than that.
+ *  The backdrop is a transparent, full-page click-catcher (not a dimmed
  *  overlay) purely so clicking anywhere else on the page still closes
  *  it — visually dimming the whole page would fight with a reveal that's
- *  deliberately contained to one small box. */
-function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; collapsed?: boolean }) {
+ *  deliberately contained to one narrow drawer. */
+function HamburgerMenu({ resources }: { resources: CardDef[] | null }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -550,34 +548,24 @@ function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; 
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open])
 
-  // Closes the panel (not just hides the trigger) once the title column
-  // collapses out from under it while dragging — on request ("that can
-  // also disappear as the slide expands"). During render, not an effect
-  // (React's own recommended pattern for "adjust state when a prop
-  // changes" — see the matching comment on GetConnectedAccordion's
-  // `focusItemId` handling above).
-  const [lastCollapsed, setLastCollapsed] = useState(collapsed)
-  if (collapsed !== lastCollapsed) {
-    setLastCollapsed(collapsed)
-    if (collapsed && open) setOpen(false)
-  }
-
   return (
     <>
-      {/* The trigger — a faint right-pointing arrow in this box's own
+      {/* The trigger — a faint right-pointing arrow in the stack's own
           top-left corner (not a hamburger icon, not out in the margin).
           Low-opacity until hovered, when it darkens and reveals the
-          "Browse Resources." label beside it. Hidden entirely once
-          `collapsed` (the title column dragged too narrow for it to sit
-          in cleanly, see Landing's own `titleColWidth`) — on request,
-          rather than just letting the section's `overflow-hidden` clip it
-          part-way, which read as sticking out/getting cut off awkwardly
-          instead of cleanly disappearing the way the title text does. */}
+          "Browse Resources." label beside it. `left-5 top-5` (was `left-2
+          top-2`, on request) — the title section's own top-left corner is
+          rounded (`sm:rounded-t-2xl`, a 16px radius), which cuts away a
+          small curved notch of its background right at that corner,
+          exposing the page's own margin color behind it; `left-2/top-2`
+          (8px) sat inside that cut notch, so part of the trigger rendered
+          over the margin instead of the section itself. `left-5/top-5`
+          (20px) clears the 16px radius with room to spare. */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Browse resources"
         aria-expanded={open}
-        className={`group absolute left-2 top-2 z-30 hidden items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 text-[#2D3636]/50 transition-colors cursor-pointer hover:bg-slate-100 hover:text-[#2D3636] ${collapsed ? '' : 'sm:flex'}`}
+        className="group absolute left-5 top-5 z-30 hidden items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 text-[#2D3636]/50 transition-colors cursor-pointer hover:bg-slate-100 hover:text-[#2D3636] sm:flex"
       >
         <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -587,19 +575,6 @@ function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; 
         </span>
       </button>
 
-      {/* Neither the backdrop nor the panel itself renders at all once
-          `collapsed` — on request: the panel's own header row ("Browse" +
-          a close ✕) doesn't shrink below its own content's natural width,
-          so on a badly narrowed title column it could render wider than
-          the (nearly-zero-width) section actually meant to contain it —
-          visibly spilling out over the map/search area beside it instead
-          of staying clipped inside. `collapsed` already force-closes
-          `open` above, which handles this for any panel that was ALREADY
-          open before narrowing past the threshold; not rendering the
-          nodes at all here is the belt-and-suspenders version, in case
-          the panel could otherwise still flash open mid-narrow. */}
-      {!collapsed && (
-        <>
       {/* Transparent click-catcher — closes the menu on any click outside
           the box, without visually dimming the rest of the page (the
           panel itself doesn't cover the rest of the page, so darkening
@@ -610,13 +585,28 @@ function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; 
         className={`fixed inset-0 z-40 ${open ? '' : 'pointer-events-none'}`}
       />
 
-      {/* The panel — fills this box's own bounds exactly (`inset-0`) and
-          slides in from ITS left edge, not the viewport's. Slides in/out
-          via transform rather than mounting/unmounting so the motion
-          actually reads as a slide instead of a snap. */}
+      {/* The panel — a fixed-width drawer (`w-72`) pinned to the same
+          top-left corner as the trigger, growing down to fit its own
+          content up to `max-h-[85vh]` (past that, the nav below scrolls
+          internally) — no longer clipped to the short title section's own
+          height. Slides in/out via transform rather than mounting/
+          unmounting so the motion actually reads as a slide instead of a
+          snap. Closed state is `translate-x-[calc(-100%-16px)]` (was
+          plain `-translate-x-full`, i.e. `-100%`) — found via a real
+          Chrome DevTools inspection (Computed tab confirmed `-100%` WAS
+          being applied correctly): `-100%` only shifts the panel by its
+          OWN width, which isn't enough, because this `absolute left-0`
+          panel's containing block (the wrapper above) is already inset
+          16px from the true page edge (matching `<main>`'s own `px-4`).
+          So a plain `-100%` landed the panel's right edge exactly at
+          that 16px inset line rather than past the true edge — the
+          opaque white panel ended up covering the ENTIRE margin strip
+          instead of clearing it, for its whole height. The extra
+          `-16px` (matching that same inset) pushes it the rest of the
+          way clear. */}
       <div
-        className={`absolute inset-0 z-50 flex flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`absolute left-0 top-0 z-50 flex max-h-[85vh] w-72 flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
+          open ? 'translate-x-0' : 'translate-x-[calc(-100%-16px)]'
         }`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
@@ -648,8 +638,6 @@ function HamburgerMenu({ resources, collapsed }: { resources: CardDef[] | null; 
           </nav>
         )}
       </div>
-        </>
-      )}
     </>
   )
 }
@@ -709,46 +697,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
   // in Get Connected is tapped — `GetConnectedAccordion` watches this and
   // expands that exact item's own panel, on request.
   const [focusGetConnectedId, setFocusGetConnectedId] = useState<string | null>(null)
-  // Draggable divider between the title column and the (search+map) column
-  // — on request, so the title can be dragged toward the left edge to
-  // shrink/hide it and give the map/search area more room, instead of
-  // that column staying a permanently fixed width. The handle can drag it
-  // anywhere from fully collapsed (`0`) up to this max width, never wider
-  // — this is a "give room to the map" control, not a general
-  // resize-wider one. `210` (was `230`, matching the column's original
-  // fixed `14.4rem`) — narrowed slightly on request, to accommodate the
-  // title's own font-size shrinking from 51px to 40px.
-  const TITLE_COL_MAX_WIDTH = 210
-  // How far left of the actual divider line the drag handle renders — on
-  // request, so its circular hit target sits beside the line instead of
-  // straddling/intersecting it. Purely a rendering offset (see the handle's
-  // own `style={{ left: ... }}` below); doesn't affect the drag math itself,
-  // which still tracks the real `titleColWidth`/divider position exactly.
-  const TITLE_COL_HANDLE_OFFSET = 6
-  const [titleColWidth, setTitleColWidth] = useState(TITLE_COL_MAX_WIDTH)
-  const titleColDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
-  const handleTitleColDragStart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    titleColDragRef.current = { startX: e.clientX, startWidth: titleColWidth }
-    const onMove = (ev: MouseEvent) => {
-      if (!titleColDragRef.current) return
-      const delta = ev.clientX - titleColDragRef.current.startX
-      setTitleColWidth(Math.min(TITLE_COL_MAX_WIDTH, Math.max(0, titleColDragRef.current.startWidth + delta)))
-    }
-    const onUp = () => {
-      titleColDragRef.current = null
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }
-  // True once there's no more room for the drag handle to sit to the LEFT
-  // of the divider at its usual `TITLE_COL_HANDLE_OFFSET` without going
-  // negative — past this point the handle flips to the right side of the
-  // line and its arrow points right instead of left, on request (see the
-  // handle's own doc comment further down for the full reasoning).
-  const titleColHandleCollapsed = titleColWidth <= TITLE_COL_HANDLE_OFFSET
   // The exact ids currently surviving each expanded category row's own
   // filters (search/open-now/kosher/etc.), keyed by that category's map id —
   // no entry yet until that row reports its first batch, in which case the
@@ -969,7 +917,25 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     // then cut to about 2/3 of THAT (`28px` -> `~19px`) on request — bottom
     // stays as it was, this was about the top/side margins specifically,
     // not the whole shelf shifting.
-    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2563EB] sm:pt-[19px] sm:pb-8">
+    // No `sm:w-screen sm:ml-[calc(50%-50vw)]` breakout anymore (removed,
+    // on request, tracking down a persistent vertical sliver of the page's
+    // default background showing along the left edge, through every
+    // section, on real desktop Safari — never reproduced in headless
+    // Playwright, which doesn't reserve scrollbar-gutter space the way a
+    // real windowed browser with classic (non-overlay) scrollbars does).
+    // That `100vw`-based full-bleed trick is a well-known source of
+    // exactly this symptom: `100vw` measures the viewport INCLUDING the
+    // scrollbar's own width, but the visible content area excludes it
+    // once a classic scrollbar reserves that space, so the breakout math
+    // (`50% - 50vw`) comes out slightly wrong and leaves a thin gap. It
+    // turns out to have been unnecessary here anyway — this wrapper's
+    // real ancestors (`<body>` in layout.tsx, the `<div className=
+    // "flex-1">` around `<Landing>` in page.tsx) are already unconstrained
+    // (no `max-w`/centering), unlike the OTHER `<main>` in page.tsx (the
+    // find/map/feedback screens' `max-w-4xl mx-auto` one) that a `vw`
+    // breakout would actually be needed to escape. Plain `sm:w-full`
+    // reaches the same full width here with no `vw` math involved.
+    <div className="sm:w-full sm:bg-[#2563EB] sm:pt-[19px] sm:pb-8">
     {/* `px-4 sm:px-6` is a FIXED margin now (not `max-w-6xl mx-auto`,
             which let the page's max width stay capped while all the
             extra viewport width just piled up into bigger and bigger
@@ -980,182 +946,69 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             (about 2/3 of THAT — 24px -> 16px) — on request, the desktop
             margin read too thick. */}
     <main className="px-4 pb-24 sm:pb-0">
-      {/* ── Top bar, SIDE BY SIDE with (search bar + map) (used to each be
-              their own full-width stacked bands). Title column WIDTH is now
-              draggable (`titleColWidth`, was a permanently fixed `14.4rem`)
-              — on request, so the divider between it and the map can be
-              dragged toward the left edge to shrink/hide the title and give
-              the map/search area more room, all the way down to fully
-              collapsed. `14.4rem` (`TITLE_COL_MAX_WIDTH` = 230px) is now
-              just the drag range's own upper bound, restored on load. The
-              search bar used to live in the title cell too; it's now its
-              own band stacked ABOVE the map, spanning that same flexible
-              column instead of the title's fixed one.
-              The vertical line between the title and the (search+map)
-              column — i.e. directly to the left of "What are you looking
-              for" and the map beneath it — is the right column's own
-              `sm:border-l-2` now (see its own doc comment; was
-              `sm:divide-x-2` here on the wrapper, moved once the drag
-              handle below became a 3rd DOM child and broke that utility's
-              "every child but the first" assumption), colored `#E8E8E8`
-              (a light neutral gray, was the dark charcoal `#2D3636` that
-              the page's own outer margin used at the time — the margin
-              has since moved a few more times (`#9BE1F2`, now `#2563EB`),
-              see the wrapper above; the border color here was already
-              independent of it) — the drag handle (below)
-              renders right on top of that same line. Every border across
-              the whole shelf (interior dividers and the outer frame alike)
-              is a uniform 2px now, on request — while `sm:border-x-[2px]`/
-              `sm:border-t-[2px]` on this wrapper frame the row's own outer
-              edges at that same weight. Falls back to a single column (just
-              the title) when there's no map (`hasMap` false) rather than
-              leaving an empty second cell. `sm:rounded-t-2xl`+
-              `sm:overflow-hidden` on the wrapper (not any piece
-              individually) rounds the row's combined top corners as one
-              shape — the same "curved edges belong to the group, not each
-              piece" rule the rest of the page's borders follow (see Get
-              Connected's matching bottom corners below). The gap holding
-              it off the very top of the page now comes from the outer
-              wrapper's own `sm:py-8` (see above), not a margin here.
-              Exterior border dropped to `0` (was `border-x-[2px]`/
-              `border-t-[2px]` at `#E8E8E8` light gray), on request — none
-              of the bento layout's exterior frame borders are visible
-              anymore now (see the matching `0` on Get Connected's own
-              exterior edges below).
-              This whole row is now nested one level deeper than before —
-              a new `sm:relative` OUTER wrapper (below) that does NOT clip
-              its own contents (unlike the `sm:overflow-hidden` grid div
-              still directly below it, kept for the rounded-corner clip)
-              holds the drag handle as its own sibling, out from under that
-              clip — on request, the handle used to live INSIDE the
-              `overflow-hidden` grid div and rendered at a position that
-              went negative/near-zero once the title mostly collapsed,
-              getting clipped away and becoming impossible to grab again
-              for a second drag. ──────────────────────────────────────── */}
+      {/* ── Title, "What are you looking for?", and the map now STACK
+              vertically (title on top, then search, then the map), on
+              request — was a side-by-side layout (title in its own
+              draggable-width column to the left, search+map stacked in the
+              flexible column beside it). That whole drag-to-resize
+              mechanism (`titleColWidth`/the resize handle/the collapsing
+              hamburger trigger) is gone along with it — there's no second
+              column fighting the title for width anymore, so nothing to
+              negotiate. `sm:relative` (not `sm:overflow-hidden` — that's
+              back on the title section itself below, once it's the only
+              thing HamburgerMenu's own `overflow-hidden` needs to avoid
+              clipping) is this stack's own containing block for
+              HamburgerMenu, whose trigger/panel now anchor to the top-left
+              corner of the WHOLE stack (still visually the "Philly Jewish
+              Guide" section's own corner, since that's first) rather than
+              just that one section — see HamburgerMenu's own doc comment
+              for why its panel specifically needs that. ──────────────── */}
       <div className="hidden sm:relative sm:block">
-      <div
-        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-0 sm:border-t-0 ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
-        style={hasMap || ui.search.landing ? { gridTemplateColumns: `${titleColWidth}px 1fr` } : undefined}
-      >
-        {/* Used to also carry a Volunteer/Support/Young Professionals
-                quick-links row here; removed as duplicative once the "Get
-                Connected" section further down covered the same links
-                with real lists under them. `sm:relative sm:overflow-hidden`
-                — HamburgerMenu's trigger sits inside this box now (not out
-                in the margin), and its panel opens WITHIN these bounds
-                (absolutely positioned + clipped to this section, not fixed
-                to the viewport), so both need this as their containing
-                block (see HamburgerMenu itself). Left-justified (was
-                centered) — same
-                `px-6`/`py-8` gap between the text and this cell's own
-                border as before, just aligned to it instead of floating in
-                the middle. `sm:flex sm:flex-col sm:justify-center` — this
-                cell is usually much shorter than the (search bar + map)
-                column beside it (they share ONE row height, stretched to
-                the taller side), so its content centers vertically in
-                that extra room instead of sitting flush at the top with a
-                dead gap below. ─────────────────────────────────────────── */}
-        {/* Left-to-right near-white gradient, `#fefefe`->`#E6E6E6` — held
-            flat at `#fefefe` through the first 65% (was transitioning
-            evenly across the full width from 0%, on request — "more of
-            the fefefe should show"), only actually gradating over the
-            remaining stretch toward the right edge. (Was `#FBFBFD`->
-            `#E5E5EA`, before that `#F5F5F7`->`#FBFBFD` — flipped and given
-            more contrast between the two stops, on request, so the darker
-            end lines up with the section's own right-edge inset shadow
-            (`shadow-[inset_-6px ...]` below, which reads on that same
-            right/interior-seam edge) instead of fighting it from the
-            lighter end.) Before that:
-            pale blue into soft teal, `#C5E5E9`->`#8FC6CF` — swapped with
-            "What are you looking for?"/"Get Involved"'s own near-white
-            gradient on request; those two now carry the blue/teal instead,
-            see their own sections below. Before the blue/teal: flat
-            `#ABE4ED`, before that flat `#C7F2D7`, before that flat
-            `#FBFBFD`, before that flat `#fefefe`, before that a
-            left-to-right white->cyan `linear-gradient`, before that flat
-            `#fefefe`, before that a teal `linear-gradient`. */}
-        {/* Found the actual "stops shrinking partway" bug via a real drag
-            (Playwright), not just reasoning about it: this section's own
-            `px-6`/`py-8` padding turned out to be a hard floor no CSS
-            `min-width` can override — a border-box element apparently
-            can't render narrower than its own padding sum (24px * 2 =
-            48px here) in this browser, regardless of `min-width: 0`
-            explicitly set (confirmed: forcing `min-width:0` directly had
-            zero effect; forcing `padding:0` directly dropped it straight
-            to the track's real 30px). So the section physically couldn't
-            render narrower than 48px no matter how far `titleColWidth`
-            (the grid TRACK) kept shrinking past that, and once the track
-            dropped below 48px the section started overflowing past its
-            own track boundary, bleeding into the search bar column beside
-            it — exactly the "stops expanding, leaves a strip of blue"
-            symptom. Fix: the padding moved OFF this grid-item section
-            entirely (down onto the fixed-width inner wrapper below,
-            which doesn't participate in grid track sizing) — this
-            section itself now has zero padding of its own, so it has
-            nothing preventing it from reaching a genuine 0. */}
-        {/* `sm:justify-center` (was briefly `sm:justify-start` for the
-            "premium panel" top-anchored look, reverted back on request —
-            "center those vertically") — the Title/Tagline block now floats
-            vertically centered again in whatever height the (much taller)
-            map/search column beside it leaves free, same as before that
-            experiment. */}
-        {/* Shadow opacity bumped `0.15` -> `0.32` (was too subtle), on
-            request — "a little more contrast" on this right-edge seam. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#fefefe_0%,#fefefe_65%,#E6E6E6_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.32)]">
-          {/* `< 100` (was `< 60`) — the real constraint isn't just "does the
-              trigger itself still fit," it's "does the drag handle's own
-              position ever land inside the hamburger's hover-triggered
-              footprint" (its collapsed icon alone reaches ~48px from the
-              left edge; the handle sits at `titleColWidth - 16`). At the
-              old `60` threshold the handle was still at `44` right as the
-              hamburger became hidden — inside that footprint, not clear of
-              it — so hovering the handle could still trigger the
-              hamburger's OWN `group-hover` label reveal underneath/beside
-              it (the "Browse Resources" snippet bug). `100` puts the
-              handle at `84` by the time the hamburger hides, comfortably
-              past its collapsed edge. */}
+        <HamburgerMenu resources={resources?.filter((r) => r.id !== 'zmanim') ?? null} />
+
+        {/* ── "Philly Jewish Guide" — first in the stack now, full width,
+                centered (was left-justified in its own narrow column) to
+                match "What are you looking for?"/"Get Connected" below it.
+                `sm:rounded-t-2xl sm:overflow-hidden` rounds this section's
+                own top corners now (was the old grid wrapper's, rounding
+                the whole former side-by-side row as one shape) — the first
+                piece of the stack carries it instead, same "curved edges
+                belong to whichever piece owns that edge" rule Get
+                Connected's own bottom corners already follow. Gradient
+                flipped from left-to-right to top-to-bottom
+                (`linear-gradient(90deg,...)` -> `(180deg,...)`), and the
+                shadow from the old right-edge seam (against the search
+                column that used to sit beside it) to a bottom-edge one
+                (against "What are you looking for?", which now sits
+                below it instead) — both follow the same "darker end/
+                shadow lines up with whichever edge is now the actual
+                seam" logic this section already used before stacking.
+                `sm:py-8` (was `sm:py-16`) — condensed vertically, on
+                request, now that this is a full-width band rather than a
+                column sharing height with the (much taller) map beside
+                it, so the old generous padding just read as excess empty
+                space above/below the title. */}
+        <section className="sm:flex sm:flex-col sm:items-center sm:overflow-hidden sm:rounded-t-2xl sm:bg-[linear-gradient(180deg,#fefefe_0%,#fefefe_65%,#E6E6E6_100%)] sm:px-6 sm:py-8 sm:text-center sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.32)]">
           {/* Zmanim dropped from this list specifically, on request — it
               already has its own always-visible section further down the
               page (see `zmanimSectionRef`), so a second entry here was
               redundant. `resources` itself stays untouched — the mobile
               grid (`allCards`, built from this same `resources`) still
               shows its Zmanim tile as before; only what's passed into the
-              hamburger changes. */}
-          <HamburgerMenu resources={resources?.filter((r) => r.id !== 'zmanim') ?? null} collapsed={titleColWidth < 100} />
+              hamburger changes — see the actual `<HamburgerMenu>` call
+              above, now a sibling of this whole section rather than
+              nested inside it. */}
           {/* "Premium panel" spacing structure, on request — Title -> Tagline
               (was Emblem -> Title -> Tagline; the emblem was removed again
-              on request), left-justified (was briefly centered, reverted
-              back on request), with generous padding above and below
-              (`sm:pt-16`/`sm:pb-16`, was `sm:py-8` shared top/bottom) —
-              the whole block sits vertically centered in the section
-              again now (see the section's own doc comment above; that
-              padding still gives the text itself room to breathe within
-              the centered block, on top of whatever extra space centering
-              adds around it). `(Optional) small nav` from the same brief
-              is the
-              existing HamburgerMenu trigger above (a corner icon,
-              deliberately left outside this stack rather than duplicated
-              into it — it already reads as exactly that "small nav" role
-              tucked unobtrusively out of the
-              way). Fixed-width (`TITLE_COL_MAX_WIDTH`, matching the
-              section's original full width) — on request (separately from
-              the spacing restructure), so dragging the resize handle
-              narrower makes this whole block CLIP away (disappear)
-              instead of reflowing/wrapping into the shrinking space.
-              Without this, "Philly Jewish Guide"/the tagline would rewrap
-              into more, shorter lines as the column narrowed ("condensing"
-              instead of disappearing) — and since this section's own
-              height is whatever its tallest content needs, that extra
-              wrapped height would grow the WHOLE row (both columns share
-              one height), shifting Get Connected/everything below it
-              while dragging. Pinning this to a constant width means the
-              text always wraps exactly the same way it does at full
-              width — this section's natural height never changes while
-              dragging, only how much of that fixed-size content is still
-              visible past the shrinking `overflow-hidden` edge on the
-              section above. `shrink-0` stops flexbox from compressing it
-              back down on its own. */}
-          <div className="shrink-0 flex flex-col items-start sm:px-6 sm:pt-16 sm:pb-16 sm:text-left" style={{ width: TITLE_COL_MAX_WIDTH }}>
+              on request). Centered now (was left-justified in the old
+              narrow column) to match every other section in the stack.
+              `max-w-xl` caps the line length at this section's new full
+              page width (matches "What are you looking for?"'s own search
+              pill cap below) instead of the old fixed-pixel
+              `TITLE_COL_MAX_WIDTH`, which existed purely to stop this
+              block from reflowing while the (now-removed) drag handle
+              resized the column around it. */}
+          <div className="flex w-full max-w-xl flex-col items-center">
             {/* No emblem anymore (was the site's brand mark, then briefly
                 the admin-uploaded logo — both removed, on request) —
                 straight to Title -> Tagline now. */}
@@ -1187,31 +1040,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     close to 1 on a small `text-sm` face barely moves the
                     actual pixel gap, so it read as no visible change at
                     all. This is a real, visibly looser gap between rows
-                    instead. */}
-            <p className="mt-3 text-sm leading-relaxed text-[#2D3636]/85">
+                    instead. `text-base` (16px, was `text-sm`/14px), on
+                    request — a step up, but still under "What are you
+                    looking for?"'s `text-[20px]`. */}
+            <p className="mt-3 text-base leading-relaxed text-[#2D3636]/85">
               Community resources for residents, visitors, and hospital patients
             </p>
           </div>
         </section>
 
-        {/* Right column — search bar band stacked above the map, both
-                spanning the same 2/3-width column instead of the title's
-                narrower one. `sm:flex sm:flex-col` just stacks the two.
-                No hard border lines at the interior seams anymore — on
-                request, every INTERIOR divider in the bento box (this
-                column's own left edge against the title, the search/map
-                seam below, and the map-row/Get-Connected seam further
-                down) lost its border line, replaced with a soft `inset`
+        {/* "What are you looking for?" and the map — used to be a "right
+                column" stacked beside the title, spanning a flexible grid
+                track; now they're just the next two pieces of this same
+                vertical stack, full width like everything else in it. No
+                hard border lines at the interior seams — on request, every
+                INTERIOR divider in the bento box (title/search seam,
+                search/map seam, map-row/Get-Connected seam further down)
+                lost its border line, replaced with a soft `inset`
                 `box-shadow` on whichever section owns that edge instead
                 (see the title `<section>`/search `<section>`/Get
                 Connected heading `<div>` themselves) — reads as a subtle
-                shaded groove rather than a crisp rule. `inset` keeps the
-                shadow INSIDE each element's own box, so it isn't clipped
-                by that element's own `overflow-hidden` and doesn't spill
-                onto its neighbor. Only the shape's true EXTERIOR edges
-                (the grid wrapper's own border, and Get Connected's) keep
-                a real border line. ──────────────────────────────────── */}
-        <div className="sm:flex sm:flex-col">
+                shaded groove rather than a crisp rule. Only the shape's
+                true EXTERIOR edges (this whole stack's own top/bottom, and
+                Get Connected's) keep a real border line (currently `0`,
+                see its own doc comment — none render visibly right now
+                either). ─────────────────────────────────────────────── */}
           {/* ── Search bar — used to live in the title cell; now its own
                   band above the map. Placeholder/aria-label is a fixed
                   "Search website…" now (was `settings.heroTitle`, the
@@ -1429,68 +1282,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               />
             </div>
           )}
-        </div>
-      </div>
-      {/* ── Drag handle — a thin strip sitting just to the LEFT of the
-              title/map divider (was centered directly on top of it, on
-              request — the circle was intersecting the line rather than
-              sitting clear of it). A sibling of the grid div above now,
-              not nested inside it (see that div's own doc comment for
-              why — its `overflow-hidden` was clipping this handle away
-              once it got close to the edge, making it impossible to grab
-              for a second drag once the title was mostly collapsed).
-              Dragging it left/right resizes `titleColWidth` (clamped
-              0..`TITLE_COL_MAX_WIDTH` in `handleTitleColDragStart`); a
-              double-click snaps it back to the original full width, an
-              escape hatch since dragging alone has no other way back once
-              the title's collapsed to nothing. `TITLE_COL_HANDLE_OFFSET`
-              (16px) shifts the whole handle's anchor point left of the
-              actual line by roughly the grip's own half-width, so it reads
-              as a control sitting beside the border rather than stamped
-              on it — `Math.max(0, ...)` keeps that offset from ever
-              pushing it to a negative (off-screen) position once
-              `titleColWidth` drops below the offset itself, on request —
-              it now stays pinned at the left edge, fully visible and
-              grabbable, instead of continuing past 0 and out of view.
-              Back to a chevron arrow (was a 3-dot grip bar for one pass, on
-              request that it read less like a button — now reverted, on
-              further request, to an arrow again) — but drawn as a small
-              solid `#2D3636` tab sitting snug against the line (offset
-              shrunk from `16` to `10`, roughly its own radius) so it reads
-              as growing out of the border itself, not a separate floating
-              control beside it. Points left and sits left of the line
-              normally — the direction dragging this collapses the title
-              toward — but flips to point right and hops to the RIGHT side
-              of the line instead once the title's collapsed to (or near)
-              nothing (`titleColHandleCollapsed`), same swap-sides logic as
-              before. Restyled to match HamburgerMenu's own trigger arrow
-              exactly, on request — a bare stroke chevron with no fill at
-              rest (was a solid `#2D3636` circle, which read as "surrounded
-              by black"), `/50` opacity darkening to full `#2D3636` with a
-              faint `slate-100` circular background ONLY on hover, same as
-              that trigger. `TITLE_COL_HANDLE_OFFSET` shrunk further (10 ->
-              6) so it sits right up against the line instead of clearly
-              floating beside it, on request ("more attached to the border
-              boundary it's near"). Only rendered when there's actually a
-              second column to negotiate space with. ───────────────────── */}
-      {(hasMap || ui.search.landing) && (
-        <div
-          onMouseDown={handleTitleColDragStart}
-          onDoubleClick={() => setTitleColWidth(TITLE_COL_MAX_WIDTH)}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Drag to resize the title column"
-          title="Drag to resize — double-click to reset"
-          className="group absolute top-0 bottom-0 z-30 hidden w-3 -translate-x-1/2 cursor-col-resize items-center justify-center sm:flex"
-          style={{ left: titleColHandleCollapsed ? titleColWidth + TITLE_COL_HANDLE_OFFSET : titleColWidth - TITLE_COL_HANDLE_OFFSET }}
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[#2D3636]/50 transition-colors group-hover:bg-slate-100 group-hover:text-[#2D3636]">
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d={titleColHandleCollapsed ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
-            </svg>
-          </span>
-        </div>
-      )}
       </div>
 
       {/* ── Mobile-only now: "What are you looking for?" heading + filter —
