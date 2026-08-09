@@ -111,8 +111,12 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   // The card grid shows inline on mobile always, and on desktop only as search
-  // results (see the component note above).
-  const showInlineGrid = isMobile || !!q
+  // results (see the component note above). Expressed as a class rather than a
+  // branch: `isMobile` starts false on every render, including on a phone, so
+  // branching here meant a phone laid out the desktop home screen on its first
+  // React render and corrected itself a frame later. The media query is right
+  // the first time, so there is no correction to see.
+  const inlineGridClass = q ? '' : ' sm:hidden'
 
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
@@ -143,8 +147,10 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {/* ── The three featured cards (desktop) — between the search box and
                 the map. Hidden while searching, when the grid below takes
                 over as the answer to what was typed. ───────────────────────── */}
-        {!isMobile && !q && (
-          <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+        {!q && (
+          <div className="hidden sm:block">
+            <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+          </div>
         )}
 
         {/* ── The map — the real full map screen, right on the home screen.
@@ -163,8 +169,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
 
         {/* ── The grid — grouped into labeled sections; a search narrows each
                 section's cards and hides any section left empty. ──────────── */}
-        {showInlineGrid && (
-          <section className="mt-12 sm:mt-14 space-y-10">
+        <section className={`mt-12 sm:mt-14 space-y-10${inlineGridClass}`}>
             {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
               <p className="text-center text-sm text-slate-500">
                 Nothing matches “{q}”. Try a different word or clear the filter.
@@ -180,8 +185,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 </div>
               ))
             )}
-          </section>
-        )}
+        </section>
 
         {/* ── Matching places (individual listings within the cards) ─────────── */}
         {placeHits.length > 0 && (
@@ -196,6 +200,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
               background can run edge to edge. Falls back to the community
               center so it renders something real before the visitor has set
               an address. ──────────────────────────────────────────────────── */}
+      {/* Still a JS branch, unlike the featured cards and the grid above, and
+          deliberately: ZmanimStrip calls useZmanim, which fetches /api/zmanim —
+          uncached, straight through to Hebcal. Rendering it and hiding it with
+          `sm:` would cost every phone visitor a round-trip for a section they
+          never see. CSS should own a layout difference; it shouldn't own one
+          that costs a request. The one-frame correction is the cheaper error
+          here, and nothing above the fold moves when it happens. */}
       {!isMobile && !q && zmanimCategory && (
         <ZmanimStrip
           coords={coords ?? community.mapCenter}
