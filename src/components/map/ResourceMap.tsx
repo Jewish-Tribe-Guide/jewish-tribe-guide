@@ -734,19 +734,20 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           deliberate, explicit re-center. `right-14` — beside the fullscreen
           toggle now (was stacked above it at `bottom-16`), on request, so
           the two share one row along the bottom edge instead of stacking.
-          `#3E6E6E` fill (was `bg-blue-600`) — on request, to match
-          "Start live tracking"'s own teal (`FILTER_PILL_ACTIVE` in
-          ResourceMapView.tsx) instead of blue, so the two read as the same
-          visual family. Every button on the map (this one, "Reset view"/
-          fullscreen below, the live-tracking cluster in
-          ResourceMapView.tsx) is sized about 10% down from its previous
-          size on request (`px-3 py-2 text-sm` -> `px-[11px] py-[7px]
-          text-[13px]`, `h-9 w-9` -> `h-8 w-8`, etc.). */}
+          `#2563EB` fill (was teal `#3E6E6E`, before that `bg-blue-600`) —
+          on request, matching `main`'s own blue (`FILTER_PILL_ACTIVE` in
+          ResourceMapView.tsx, also used for the map pin palette — see
+          MAIN_CATEGORY_PALETTE there) instead of the dedicated teal, so
+          every accent on the map reads as one family again. Every button
+          on the map (this one, "Reset view"/fullscreen below, the
+          live-tracking cluster in ResourceMapView.tsx) is sized about 10%
+          down from its previous size on request (`px-3 py-2 text-sm` ->
+          `px-[11px] py-[7px] text-[13px]`, `h-9 w-9` -> `h-8 w-8`, etc.). */}
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
           className="absolute bottom-3 right-14 flex items-center gap-1.5 rounded-full px-[11px] py-[7px] text-[13px] font-semibold text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
-          style={{ backgroundColor: '#3E6E6E' }}
+          style={{ backgroundColor: '#2563EB' }}
         >
           <span className="inline-block h-[9px] w-[9px] rounded-full bg-white ring-2 ring-white/40" aria-hidden="true" />
           Re-center
@@ -756,7 +757,7 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           `initialZoom` (see `resetToDefaultView` above), on request, as a
           plain escape hatch distinct from "Re-center" above (which targets
           the user's own live position rather than the map's own default).
-          Shares "Re-center"'s teal so the two read as the same control
+          Shares "Re-center"'s blue so the two read as the same control
           family, and shares its exact slot (`right-14`) too — on request,
           this one now disappears once "Re-center" is available instead of
           both stacking side by side, since "Re-center" already covers
@@ -767,7 +768,7 @@ export default function ResourceMap({ points, userLocation, fallbackCenter = DEF
           aria-label="Reset to default view"
           title="Reset to default view"
           className="absolute bottom-3 right-14 flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md cursor-pointer transition-colors hover:brightness-110"
-          style={{ backgroundColor: '#3E6E6E' }}
+          style={{ backgroundColor: '#2563EB' }}
         >
           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 1 1 2.6 6.3M3 12v5h5" />

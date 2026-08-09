@@ -79,17 +79,19 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
   }, [coords?.lat, coords?.lng])
 
   return (
-    // No card chrome (border/background/padding) of its own — this now sits
-    // directly on the page's dark `#2D3636` margin (see Landing.tsx), not a
-    // light card, so every text color below is a light-on-dark one instead
-    // of the dark-on-light set this widget used while it lived inside the
-    // bordered box.
+    // No card chrome (border/background/padding) of its own — sits
+    // directly on the page's own outer margin (see Landing.tsx), not a
+    // light/dark card of its own, so every text color below tracks
+    // whatever that margin's own fill needs for contrast. Currently the
+    // saturated blue `#2563EB` (was light `#9BE1F2`, before that dark
+    // `#2D3636`), so every text color below is light `#fefefe` again — see
+    // the margin wrapper's own doc comment in Landing.tsx.
     <div>
       {/* Centered, title/location stacked — matching "Get Connected"'s own
           centered heading treatment. */}
       <div className="mb-2 text-center">
         {/* `text-xl` (was `text-3xl`, matching "Get Connected") — shrunk on
-            request now that this reads as a plain header band in the dark
+            request now that this reads as a plain header band in the
             margin rather than a boxed major-section heading. */}
         {/* Manrope Semibold (600) on request, matching "Get Connected". */}
         <h3 className="text-xl font-semibold tracking-[-0.75px] text-[#fefefe]">
@@ -100,10 +102,10 @@ export default function ZmanimWidget({ coords, locationLabel, title = 'Zmanim & 
 
       {status === 'loading' && (
         <div className="animate-pulse space-y-3">
-          <div className="h-3 w-32 bg-white/10" />
+          <div className="h-3 w-32 bg-[#fefefe]/10" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-4 bg-white/5" />
+              <div key={i} className="h-4 bg-[#fefefe]/5" />
             ))}
           </div>
         </div>
@@ -135,22 +137,25 @@ function ReadyState({ data }: { data: ZmanimData }) {
       </div>
 
       {/* Daily zmanim — every entry, same as the full Zmanim page. The next
-          upcoming one (see `nextIndex` above) gets a small teal dot, bolder
-          label weight, and a faint teal row tint — on request, so the
-          table reads as live/dynamic rather than a flat static list.
-          Brighter tint/dot than the old light-card version (`/25` and the
-          paler `#8FC6CF` itself instead of `/15` and the deeper `#5C8A8C`)
-          so both still pop against the dark `#2D3636` background. */}
+          upcoming one (see `nextIndex` above) gets a small gold dot, bolder
+          label weight, and a faint gold row tint — on request, so the
+          table reads as live/dynamic rather than a flat static list. Gold
+          `#ffc145` (was teal `#8FC6CF`) — on request, once the margin
+          itself became a saturated blue (`#2563EB`), the teal highlight
+          blended into it instead of standing out; gold is a warm color
+          against a cool background, so it stays clearly visible. Text
+          colors are light `#fefefe` again now that the margin is dark —
+          see this component's own top-of-file doc comment for why. */}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
         {dailyZmanim.map((z, i) => {
           const isNext = i === nextIndex
           return (
             <div
               key={z.label}
-              className={`flex items-baseline justify-between gap-3 rounded px-1.5 py-0.5 -mx-1.5 ${isNext ? 'bg-[#8FC6CF]/25' : ''}`}
+              className={`flex items-baseline justify-between gap-3 rounded px-1.5 py-0.5 -mx-1.5 ${isNext ? 'bg-[#ffc145]/25' : ''}`}
             >
               <dt className={`flex items-center gap-1.5 text-sm ${isNext ? 'font-semibold text-[#fefefe]' : 'text-[#fefefe]/80'}`}>
-                {isNext && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#8FC6CF]" />}
+                {isNext && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffc145]" />}
                 {z.label}
               </dt>
               <dd className={`text-sm tabular-nums ${isNext ? 'font-bold text-[#fefefe]' : 'font-medium text-[#fefefe]/80'}`}>{z.time}</dd>
@@ -176,7 +181,7 @@ function ReadyState({ data }: { data: ZmanimData }) {
           href="https://www.hebcal.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="underline hover:text-[#8FC6CF]"
+          className="underline hover:text-[#ffc145]"
         >
           Hebcal.com
         </a>
@@ -198,16 +203,16 @@ function ShabbosRow({
 
   const value = `${entry.label} ${entry.time}`
 
-  // Same teal "next up" treatment the daily zmanim list uses for its own
-  // highlighted row (see `isNext` above) — was a solid bright-blue block
-  // (`bg-[#3a86ff]`), swapped on request to match Sunrise's subtler
-  // teal-tint-plus-dot look instead of standing out as a different color
-  // language of its own.
+  // Same gold "next up" treatment the daily zmanim list uses for its own
+  // highlighted row (see `isNext` above) — was teal `#8FC6CF` (before that
+  // a solid bright-blue block, `bg-[#3a86ff]`), swapped to gold on request
+  // once the margin itself became the saturated blue `#2563EB` — teal blended
+  // into it, gold (a warm color against that cool background) stays visible.
   if (emphasized) {
     return (
-      <div className="rounded flex items-baseline justify-between gap-3 bg-[#8FC6CF]/25 px-3 py-1.5 -mx-1">
+      <div className="rounded flex items-baseline justify-between gap-3 bg-[#ffc145]/25 px-3 py-1.5 -mx-1">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-[#fefefe]">
-          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#8FC6CF]" />
+          <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffc145]" />
           {label}
         </span>
         <span className="text-sm font-bold text-[#fefefe] tabular-nums">{value}</span>

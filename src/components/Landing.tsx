@@ -58,43 +58,46 @@ type GetConnectedCategory = { id: string; title: string; items: GetConnectedItem
 
 // One shared tint for every Get Connected category tile (Support &
 // Volunteering, Professional Networks, Social Opportunities, WhatsApp
-// Groups) — `#C5E5E9`, the "Philly Jewish Guide" title's own pale cyan
-// (was a near-white `#FBFBFD`/`#F6FAFB`, before a long lineage of other
-// flat colors, see git history) — on request, extends the heading/padding
+// Groups) — `#2D3636` dark charcoal (was the pale cyan `#C5E5E9`, before
+// that a near-white `#FBFBFD`/`#F6FAFB`, before a long lineage of other
+// flat colors, see git history), on request — extends the heading/padding
 // bands' own color all the way through the tile grid area too, instead of
-// stopping short at a different near-white fill right behind the buttons.
-// Same color as the containing Get Connected section itself (heading +
-// this tile grid) so the whole run reads as one continuous tinted band —
-// the individual item cards (see GetConnectedAccordion) sit on top of it,
-// each in their own column's accent color now instead of plain white. The
-// map area above keeps its own separate `#F0F6F6` — this request was
-// scoped to "What are you looking for" and "Get Connected" only.
-const CATEGORY_FILL = '#C5E5E9'
+// stopping short at a different fill right behind the buttons. Same color
+// as the containing Get Connected section itself (heading + this tile
+// grid) so the whole run reads as one continuous tinted band — the
+// individual item cards (see GetConnectedAccordion) sit on top of it in
+// their own light card fills, unaffected by this going dark. The map area
+// above keeps its own separate `#F0F6F6` — this request was scoped to
+// "What are you looking for" and "Get Connected" only.
+const CATEGORY_FILL = '#2D3636'
 
 // One accent color per Get Connected column (Support & Volunteering,
 // Professional Networks, Social Opportunities, WhatsApp Groups, in that
 // fixed order — see `getConnectedCategories` below), on request — each
-// column's own header/item-border/arrow all pick up its color, so the
-// four read as distinct at a glance instead of one uniform gray. All four
-// sit in the same cool teal/blue/green/violet family as the sidebar's own
-// `#C5E5E9`->`#8FC6CF` gradient (see the title `<section>` below) —
-// `#2E7D8C` is that same teal, just darkened enough to work as TEXT (the
-// pastel gradient itself doesn't clear 4.5:1 on a light background) — the
-// other three are analogous/complementary hues at a matching darkness so
-// none of the four reads louder than the others.
-const GET_CONNECTED_ACCENTS = ['#2E7D8C', '#3B5F8A', '#3D8464', '#6B5490']
+// column's own item-border/arrow/"Website" link all pick up its color, so
+// the four read as distinct at a glance instead of one uniform gray. Now
+// four swatches straight out of the map's own pin palette (see
+// `MAIN_CATEGORY_PALETTE` in ResourceMapView.tsx — synagogue's blue,
+// restaurant's green, grocery's purple, hotel's orange), on request, so
+// this section reads as the same color language as the map instead of its
+// own separate teal/blue/green/violet family. Green/orange darkened a
+// touch from the map's own exact swatches (`#16a34a`->`#12883E`,
+// `#ea580c`->`#C94B0A`) — both fell under 4.5:1 as the "Website" link's
+// TEXT color against white at full saturation; blue/purple already
+// cleared it unchanged.
+const GET_CONNECTED_ACCENTS = ['#2563EB', '#12883E', '#9333ea', '#C94B0A']
 
-// Header-only darkened variants of the four accents above — needed once
-// `CATEGORY_FILL` (the header/tile-grid background) became the saturated
-// `#C5E5E9` pale cyan instead of a near-white fill, on request: at that
-// point neither the 65%-opacity `accentSoft` (2.1-2.6:1) nor even the
-// solid accents themselves (three of four still under 4.5:1 against
-// `#C5E5E9`) held up as header TEXT anymore. Teal/green darkened further
-// here to clear 4.5:1; blue/violet were already there and are repeated
-// unchanged. Only the header text uses these — the item border/arrow
-// still use `accentSoft` against the button's own near-white fill, which
-// never changed and is unaffected.
-const GET_CONNECTED_HEADER_ACCENTS = ['#276B78', '#3B5F8A', '#336E53', '#6B5490']
+// Header-only override for the four accents above — needed once
+// `CATEGORY_FILL` (the header/tile-grid background) went from a light
+// fill to the dark `#2D3636`, on request: none of the accent hues (even
+// their darkest, most-contrast-vetted variants, tuned for a series of
+// LIGHT fills) clear 4.5:1 against a DARK fill — dark-on-dark, not
+// light-on-dark. All four flattened to plain `#fefefe` white per that same
+// "switch to fefefe wherever contrast fails" rule, so the per-column hue
+// distinction is gone from the header text specifically (the item
+// border/arrow below keep their own `accentSoft`, unaffected — that sits
+// on the button's own near-white fill, which never changed).
+const GET_CONNECTED_HEADER_ACCENTS = ['#fefefe', '#fefefe', '#fefefe', '#fefefe']
 
 // `rgba(var(--accent-rgb), alpha)` needs "r, g, b" (see each item button's
 // own `style` below) — Tailwind's arbitrary-value `bg-[rgba(...)]` classes
@@ -254,21 +257,14 @@ function GetConnectedAccordion({
                 `py-1.5` (was
                 `py-3`, then `py-2`) — shorter again, part of shrinking the
                 whole Get Connected + Zmanim run of sections next to the
-                map. Forced two lines via `twoLineTitle` (see above). Now
-                colored per-column (`accent`, see GET_CONNECTED_ACCENTS)
-                instead of one shared `#2B3B3B` muted teal, on request — all
-                four accents were picked/darkened to clear 4.5:1 against
-                CATEGORY_FILL the same way that shared teal already did.
+                map. Forced two lines via `twoLineTitle` (see above).
                 `font-semibold` (600, was `font-medium`/500, briefly
                 `font-bold`/700 before that) — bumped back up a step, on
-                request: the 65%-opacity `accentSoft` reads too faint/washed
-                on its own, so the extra weight does contrast work too. A
-                text-shadow was tried alongside it but removed again on
-                request — weight alone carries it. Color is
-                `headerAccent` (a further-darkened variant, NOT the plain
-                `accent`/`accentSoft` the border/arrow use below) — needed
-                once `CATEGORY_FILL` became the saturated `#C5E5E9`; see
-                `GET_CONNECTED_HEADER_ACCENTS`' own doc comment. */}
+                request. Color is `headerAccent` — plain `#fefefe` white for
+                every column now (was a per-column darkened accent hue;
+                CATEGORY_FILL going dark meant none of those hues could
+                clear 4.5:1 anymore) — see `GET_CONNECTED_HEADER_ACCENTS`'
+                own doc comment. */}
             <div className="px-3 py-1.5 text-center text-sm font-semibold uppercase tracking-wider" style={{ color: headerAccent }}>
               {twoLineTitle(cat.title).map((line, i) => (
                 <span key={i} className="block">
@@ -497,11 +493,12 @@ function GetConnectedAccordion({
                 })}
               </ul>
             ) : (
-              // `slate-800` — darkened a few steps from an original
-              // `slate-400` across this tile's fill changing colors several
-              // times (see CATEGORY_FILL); clears ~11:1 against the
-              // current `#C5E5E9` fill, comfortably past WCAG AA.
-              <p className="px-4 py-2 text-sm italic text-slate-800">Coming soon</p>
+              // `#fefefe` (was `slate-800`, before that `slate-400`,
+              // across this tile's fill changing colors several times —
+              // see CATEGORY_FILL) — `slate-800` cleared ~11:1 against the
+              // section's old near-white fills but fails (1.18:1) now that
+              // it's the dark `#2D3636`.
+              <p className="px-4 py-2 text-sm italic text-[#fefefe]">Coming soon</p>
             )}
           </div>
         )
@@ -952,7 +949,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
   return (
     // Full-bleed outer wrapper, desktop only — exists purely to carry
-    // `sm:bg-[#2D3636]` all the way out to the true page edges. `<main>`
+    // `sm:bg-[#2563EB]` (main's own blue, matching the map pin palette —
+    // was light `#9BE1F2`, before that dark charcoal `#2D3636`, on
+    // request — text sitting directly on this margin, i.e. ZmanimWidget,
+    // flipped from dark `#2D3636` back to light `#fefefe` to keep clearing
+    // contrast against this saturated blue; see ZmanimWidget.tsx) all the
+    // way out to the true page edges. `<main>`
     // below no longer caps out at `max-w-6xl` — it's fluid-width now
     // (fixed `px-12` margin on both sides, growing/shrinking with the
     // window instead of a capped column with the margin absorbing all
@@ -967,7 +969,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
     // then cut to about 2/3 of THAT (`28px` -> `~19px`) on request — bottom
     // stays as it was, this was about the top/side margins specifically,
     // not the whole shelf shifting.
-    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2D3636] sm:pt-[19px] sm:pb-8">
+    <div className="sm:w-screen sm:ml-[calc(50%-50vw)] sm:bg-[#2563EB] sm:pt-[19px] sm:pb-8">
     {/* `px-4 sm:px-6` is a FIXED margin now (not `max-w-6xl mx-auto`,
             which let the page's max width stay capped while all the
             extra viewport width just piled up into bigger and bigger
@@ -996,10 +998,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               `sm:divide-x-2` here on the wrapper, moved once the drag
               handle below became a 3rd DOM child and broke that utility's
               "every child but the first" assumption), colored `#E8E8E8`
-              (a light neutral gray, was the dark charcoal `#2D3636` — the
-              page's own outer margin background, unaffected, is still that
-              same charcoal via the `sm:bg-[#2D3636]` wrapper above; only
-              the borders themselves lightened) — the drag handle (below)
+              (a light neutral gray, was the dark charcoal `#2D3636` that
+              the page's own outer margin used at the time — the margin
+              has since moved a few more times (`#9BE1F2`, now `#2563EB`),
+              see the wrapper above; the border color here was already
+              independent of it) — the drag handle (below)
               renders right on top of that same line. Every border across
               the whole shelf (interior dividers and the outer frame alike)
               is a uniform 2px now, on request — while `sm:border-x-[2px]`/
@@ -1014,8 +1017,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               Connected's matching bottom corners below). The gap holding
               it off the very top of the page now comes from the outer
               wrapper's own `sm:py-8` (see above), not a margin here.
-              `border-x-[2px]`/`border-t-[2px]` at `#E8E8E8` (light
-              gray) — every other section's own border below matches.
+              Exterior border dropped to `0` (was `border-x-[2px]`/
+              `border-t-[2px]` at `#E8E8E8` light gray), on request — none
+              of the bento layout's exterior frame borders are visible
+              anymore now (see the matching `0` on Get Connected's own
+              exterior edges below).
               This whole row is now nested one level deeper than before —
               a new `sm:relative` OUTER wrapper (below) that does NOT clip
               its own contents (unlike the `sm:overflow-hidden` grid div
@@ -1028,7 +1034,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               for a second drag. ──────────────────────────────────────── */}
       <div className="hidden sm:relative sm:block">
       <div
-        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-[2px] sm:border-t-[2px] sm:border-[#E8E8E8] ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
+        className={`sm:grid sm:overflow-hidden sm:rounded-t-2xl sm:border-x-0 sm:border-t-0 ${hasMap || ui.search.landing ? '' : 'sm:grid-cols-1'}`}
         style={hasMap || ui.search.landing ? { gridTemplateColumns: `${titleColWidth}px 1fr` } : undefined}
       >
         {/* Used to also carry a Volunteer/Support/Young Professionals
@@ -1093,7 +1099,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
             vertically centered again in whatever height the (much taller)
             map/search column beside it leaves free, same as before that
             experiment. */}
-        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#fefefe_0%,#fefefe_65%,#E6E6E6_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.15)]">
+        {/* Shadow opacity bumped `0.15` -> `0.32` (was too subtle), on
+            request — "a little more contrast" on this right-edge seam. */}
+        <section className="sm:relative sm:flex sm:flex-col sm:justify-center sm:overflow-hidden sm:min-w-0 sm:bg-[linear-gradient(90deg,#fefefe_0%,#fefefe_65%,#E6E6E6_100%)] sm:shadow-[inset_-6px_0_6px_-6px_rgba(0,0,0,0.32)]">
           {/* `< 100` (was `< 60`) — the real constraint isn't just "does the
               trigger itself still fit," it's "does the drag handle's own
               position ever land inside the hamburger's hover-triggered
@@ -1220,12 +1228,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   on request, flat instead of a gradient — same color as
                   "Get Connected" below (see CATEGORY_FILL). ────────────── */}
           {ui.search.landing && (
-            // Flat fill again (was a symmetric vertical gradient, darker at
-            // both the top and bottom edges — removed back to flat on
-            // request). Carries the "Philly Jewish Guide" title's own pale
-            // cyan (`#C5E5E9`) — swapped with the title section's
-            // near-white fill on request; see its own comment above.
-            <section className="sm:bg-[#C5E5E9] sm:px-6 sm:py-6 sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.15)]">
+            // `#2D3636` dark charcoal (was the pale cyan `#C5E5E9`), on
+            // request — text directly on this fill (the heading below, the
+            // "On the Map"/"In Get Connected"/"More Results" labels
+            // further down) switched from dark to `#fefefe` white to keep
+            // clearing contrast against it; the search pill/result cards
+            // keep their own white backgrounds so their own internal text
+            // is unaffected.
+            <section className="sm:bg-[#2D3636] sm:px-6 sm:py-6 sm:shadow-[inset_0_-6px_6px_-6px_rgba(0,0,0,0.15)]">
               {/* Section header, on request — matches "Get Connected"'s own
                   treatment (same weight/size/color) so the two read as
                   siblings; mobile keeps its own `settings.heroTitle` copy
@@ -1233,18 +1243,20 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                   looking for?" text, but admin-editable there — this one's
                   a fixed string to match Get Connected/Zmanim, which aren't
                   editable either). */}
-              <h2 className="mb-2 text-center text-[20px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
+              <h2 className="mb-2 text-center text-[20px] font-semibold tracking-[-1px] text-[#fefefe] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
                 What are you looking for?
               </h2>
               <div className="mx-auto w-full max-w-xl">
                 {/* `border-slate-300` — the pill had no border at all
                     before, relying only on its shadow to read against this
-                    section's own near-white `#FFFFFF` fill; too little
-                    contrast for the pill itself to be visible. Icon/
-                    placeholder/clear-button grays darkened a step too
-                    (`slate-400` -> `slate-500`, hover `slate-600` ->
-                    `slate-700`) for the same reason — text-[#2D3636] stays
-                    untouched. */}
+                    section's own (then near-white, now dark `#2D3636`)
+                    fill; too little contrast for the pill itself to be
+                    visible. Icon/placeholder/clear-button grays darkened a
+                    step too (`slate-400` -> `slate-500`, hover `slate-600`
+                    -> `slate-700`) for the same reason — text-[#2D3636]
+                    stays untouched since the pill itself is still its own
+                    white card, unaffected by the section's own fill going
+                    dark. */}
                 <div className="flex items-center rounded-full border border-slate-300 bg-white pl-4 pr-1.5 py-1.5 shadow-[0_6px_20px_rgb(0,0,0,0.1)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.16)]">
                   <svg className="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
@@ -1356,12 +1368,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
                     .filter((group) => group.hits.length > 0)
                     .map((group) => (
                       <div key={group.label}>
-                        {/* `slate-800` (was `slate-500`) — this label sits
-                            directly on the section's own fill (`#F5F5F7`,
-                            see the section below), not the white search
-                            pill; `slate-500` only cleared 2:1 contrast
-                            there. */}
-                        <h2 className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-800">
+                        {/* `#fefefe` (was `slate-800`, before that
+                            `slate-500`) — this label sits directly on the
+                            section's own fill, not the white search pill;
+                            `slate-800` cleared 4.5:1+ against the section's
+                            old near-white fills but fails badly (1.18:1)
+                            now that the section itself is the dark
+                            `#2D3636` (see the section above). */}
+                        <h2 className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-[#fefefe]">
                           {group.label}
                         </h2>
                         <div className="flex flex-wrap justify-center gap-2">
@@ -1500,10 +1514,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               `sm:pt-[52px]` reproduces the old spacer's `h-10` (40px) plus
               the heading's own `py-3` top padding (12px) as one number,
               instead of two stacked elements adding up to it. `sm:pb-3`
-              keeps that same bottom padding on its own. Same light gray
-              `border-x` (2px, `#E8E8E8` — was `#2D3636` charcoal, before
-              that 1px bright cyan — continuing the shelf's frame, on
-              request). `#F6FAFB` fill (was `#FBFBFD`/near-white, on
+              keeps that same bottom padding on its own. `border-x` dropped
+              to `0` (was 2px light gray `#E8E8E8`, before that `#2D3636`
+              charcoal, before that 1px bright cyan), on request — none of
+              the bento layout's exterior borders are visible anymore.
+              `#F6FAFB` fill (was `#FBFBFD`/near-white, on
               request — "a very light background tint distinct from the
               pure white above/below") — matches CATEGORY_FILL below, so
               the heading and the four columns underneath read as one
@@ -1515,17 +1530,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               tracking-[-0.75px]`) — a touch bigger, heavier, and tighter,
               on request ("make the headings feel a little richer"), same
               treatment as "What are you looking for?" above. ──────────── */}
-      {/* Flat fill again (was a symmetric vertical gradient — removed back
-          to flat on request). Carries the "Philly Jewish Guide" title's
-          own pale cyan (`#C5E5E9`) — swapped with the title section's
-          near-white fill on request; see its own comment above. */}
-      <div className="hidden sm:block sm:border-x-[2px] sm:border-[#E8E8E8] sm:bg-[#C5E5E9] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center sm:shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.15)]">
+      {/* `#2D3636` dark charcoal (was the pale cyan `#C5E5E9`), on
+          request — heading text below switched from dark to `#fefefe`
+          white to keep clearing contrast against it. */}
+      <div className="hidden sm:block sm:border-x-0 sm:bg-[#2D3636] sm:px-6 sm:pt-[52px] sm:pb-3 sm:text-center sm:shadow-[inset_0_6px_6px_-6px_rgba(0,0,0,0.15)]">
         {/* `inline-block` so the border centers under the heading (the
             parent's `text-center` still centers it) instead of spanning the
             whole section — `px-10` extends the rule out past the text
             itself on both sides (was flush with the letters), on request.
             `#fefefe` (was `#E8E8E8` light gray), on request. */}
-        <h2 className="inline-block border-b-[2px] border-[#fefefe] px-10 pb-2 text-[29px] font-semibold tracking-[-1px] text-[#2D3636] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
+        <h2 className="inline-block border-b-[2px] border-[#fefefe] px-10 pb-2 text-[29px] font-semibold tracking-[-1px] text-[#fefefe] [text-shadow:0_2px_4px_rgba(0,0,0,0.15)]">
           Get Involved
         </h2>
       </div>
@@ -1552,24 +1566,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
               headers, on request (was flush/no-`py`, same as every other
               section, before this). ─────────────────────────────────────── */}
       {/* `sm:overflow-hidden sm:rounded-b-2xl` — this is now the box's last
-          section (Zmanim moved out below, into the dark margin — see its
-          own doc comment further down), so it closes the frame's bottom
-          corners instead of Zmanim. `border-x-2`/`border-b-2` at
-          `#E8E8E8` (light gray, 2px — was `#2D3636` charcoal, before that
-          1px bright cyan, on request) closes the shelf's left/right/bottom
-          outer frame here — `border-t` stays 0, the seam to the heading
-          above. `#F6FAFB` fill (was `#FBFBFD`) matches the heading div
+          section (Zmanim moved out below, into the margin — see its own
+          doc comment further down), so it closes the frame's bottom
+          corners instead of Zmanim. `border-x`/`border-b` dropped to `0`
+          (was 2px light gray `#E8E8E8`, before that `#2D3636` charcoal,
+          before that 1px bright cyan), on request — none of the bento
+          layout's exterior borders are visible anymore. `#F6FAFB` fill
+          (was `#FBFBFD`) matches the heading div
           above and CATEGORY_FILL in GetConnectedAccordion itself — see
           that div's own doc comment. `sm:pb-12` (was `sm:pb-6`, on
           request — "40-60px vertical" padding around the whole tinted
           section so it doesn't feel cramped) — buffer between the lowest
           button (or the shared detail panel, if one's open) and this
           section's own bottom border. */}
-      {/* Flat fill again (was a symmetric vertical gradient — removed back
-          to flat on request). Carries the "Philly Jewish Guide" title's
-          own pale cyan (`#C5E5E9`) — swapped with the title section's
-          near-white fill on request; see its own comment above. */}
-      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-[2px] sm:border-t-0 sm:border-b-[2px] sm:border-[#E8E8E8] sm:bg-[#C5E5E9] sm:pt-3 sm:pb-12">
+      {/* `#2D3636` dark charcoal (was the pale cyan `#C5E5E9`), on
+          request — matches `CATEGORY_FILL` above so the whole band (this
+          padding plus the tile grid it wraps) reads as one continuous
+          dark fill. */}
+      <div ref={getConnectedSectionRef} className="hidden sm:block sm:overflow-hidden scroll-mt-24 sm:rounded-b-2xl sm:border-x-0 sm:border-t-0 sm:border-b-0 sm:bg-[#2D3636] sm:pt-3 sm:pb-12">
         <GetConnectedAccordion categories={getConnectedCategories} categoryConfigs={categories} searchQuery={q} focusItemId={focusGetConnectedId} />
       </div>
 
@@ -1605,18 +1619,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: Props) {
 
       {/* ── Zmanim widget — moved out of the bordered/rounded "shelf" box
               above (Get Connected is now that box's bottom section, see its
-              own doc comment) and out here into the page's own dark
-              `#2D3636` margin instead, on request — no card fill, no
-              border, no rounded corners of its own, so it reads as a plain
-              header band sitting directly in the margin rather than another
-              boxed section. `ZmanimWidget` itself is restyled for this dark
-              background (light text throughout, was dark text for the old
-              light card — see ZmanimWidget.tsx), and its own title is
+              own doc comment) and out here into the page's own outer
+              margin instead, on request — no card fill, no border, no
+              rounded corners of its own, so it reads as a plain header band
+              sitting directly in the margin rather than another boxed
+              section. `ZmanimWidget` itself is restyled to track that
+              margin's own fill (currently saturated blue `#2563EB`, light
+              `#fefefe` text — see ZmanimWidget.tsx), and its own title is
               smaller now (`text-xl`, was `text-3xl`) so it reads as a
               compact header label instead of a major section heading like
               "Get Connected" above it. `sm:pt-8` gives it breathing room
               below the box; `sm:pb-2` keeps it snug against the footer
-              directly below (also `#2D3636` — see SiteFooter.tsx). ────── */}
+              directly below (its own separate `#000000` fill — see
+              SiteFooter.tsx). ──────────────────────────────────────────── */}
       <div ref={zmanimSectionRef} className="hidden sm:block scroll-mt-24 sm:px-6 sm:pt-8 sm:pb-2">
         <ZmanimWidget coords={coords} locationLabel="Your location" title={zmanimCategory?.pluralLabel} />
       </div>

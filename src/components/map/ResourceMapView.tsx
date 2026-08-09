@@ -43,18 +43,19 @@ export const HOSPITALS_ID = '__hospitals__'
 // of hardcoding a comparison against a specific hex.
 export const ACCENT_PALETTE = ['#a8dadc', '#457b9d', '#1d3557', '#5390d9', '#84c5f4', '#3a86ff']
 
-// Brand teal for the embedded (desktop home page) map's live-tracking
-// button/badges (see `handleStart`/`tracking` below) — was red, which
-// clashed with the rest of the page's teal palette. Independent of the pin
-// palette below (that's a live-tracking-only accent, not a category color,
-// so it didn't move when the pins went pastel) — was `#5C8A8C`, an earlier
-// approximation from before this value was pinned down. A brief unified
-// two-state redesign for the filter pills themselves (this same teal for
-// their active fill) was tried and then undone on request — those pills are
-// back to their per-category pin colors, which is also how they already
-// stay in sync with the map's own pin palette without needing anything
-// special here.
-const FILTER_PILL_ACTIVE = '#3E6E6E'
+// Brand color for the embedded (desktop home page) map's live-tracking
+// button/badges (see `handleStart`/`tracking` below), and (in
+// ResourceMap.tsx) the matching "Re-center"/"Reset view" buttons — `main`'s
+// own blue `#2563EB` (was a dedicated teal `#3E6E6E`, on request, to match
+// the map pin palette elsewhere on this branch — see MAIN_CATEGORY_PALETTE
+// above), before that red, which clashed with the page's then-teal
+// palette; before that `#5C8A8C`, an earlier teal approximation. A brief
+// unified two-state redesign for the filter pills themselves (this same
+// color for their active fill) was tried and then undone on request —
+// those pills are back to their per-category pin colors, which is also how
+// they already stay in sync with the map's own pin palette without needing
+// anything special here.
+const FILTER_PILL_ACTIVE = '#2563EB'
 
 // Exported so callers coloring external UI to match the map's legend (e.g.
 // the home page's category list) use the exact same colors. `#E1BFB7` — a
@@ -82,28 +83,54 @@ export function rankMapId(id: string): number {
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
 const isOpenNowWord = (v: string) => OPEN_NOW_WORDS.has(v.trim().toLowerCase())
 
-// Every glyph drawn on top of these gets a darker version of the SAME hue,
-// not black — see `glyphTintFor` in ResourceMap.tsx, which derives that
-// tint straight from each color below rather than a separate hardcoded dict,
-// so the two can never drift out of sync.
+// The same 10-color palette `main` uses for category colors (see
+// `PALETTE` in `src/lib/categoryColor.ts` on that branch) — copied here
+// verbatim rather than imported, since that file doesn't exist on this
+// branch's lineage. `main` assigns these by each category's POSITION in
+// the admin category list (so a category's color can drift if categories
+// are reordered/added); this branch keeps every category pinned to one
+// fixed swatch below instead, on request — same colors as main, but
+// stable per category id rather than shifting with list order.
+const MAIN_CATEGORY_PALETTE = [
+  '#2563eb', // blue
+  '#16a34a', // green
+  '#9333ea', // purple
+  '#ea580c', // orange
+  '#0891b2', // cyan
+  '#db2777', // pink
+  '#ca8a04', // amber
+  '#4f46e5', // indigo
+  '#0d9488', // teal
+  '#65a30d', // lime
+]
+
+// Every glyph drawn on top of these gets a contrast-aware tint of its own
+// (dark or light, whichever hue variant actually reads) — see
+// `glyphTintFor` in ResourceMap.tsx, which derives that straight from each
+// color below rather than a separate hardcoded dict, so the two can never
+// drift out of sync.
 // Keyed by category id for regular listing categories; kind:
 // 'medical'/'zmanim'/'eruv'/'map' categories aren't uniquely identified
 // by a fixed id the way listing categories are, so eruv is matched by
 // kind instead below (hospitals use HOSPITAL_COLOR directly, not this
-// dict — see allPoints below). Applies the color palette from
-// explore-new-format-ariel-6, on request — a fixed pastel per known
-// category instead of `getCategoryColor`'s generic position-indexed
-// palette or the gradient sweep that replaced it after that.
+// dict — see allPoints below). Sourced from `MAIN_CATEGORY_PALETTE`
+// above, on request ("map pin colors should be the same as main") — was
+// a slice of `ACCENT_PALETTE` (this file's own blue-only ramp) before
+// that, and a fixed multi-hue pastel set before that.
 const CATEGORY_COLORS: Record<string, string> = {
-  synagogue: '#E1D3B7', // pastel amber (was teal — swapped with restaurant, on request)
-  restaurant: '#B7D7E1', // pastel slate-blue (was teal, then swapped with mikvah, on request)
-  grocery: '#D2E1B7', // pastel olive-green
+  synagogue: MAIN_CATEGORY_PALETTE[0], // '#2563eb' blue
+  restaurant: MAIN_CATEGORY_PALETTE[1], // '#16a34a' green
+  grocery: MAIN_CATEGORY_PALETTE[2], // '#9333ea' purple
   // (Hospitals sit here in MAP_CATEGORY_ORDER, using HOSPITAL_COLOR itself — exclusive to this category.)
-  hotel: '#E1B7D0', // pastel mauve (was slate-blue — swapped with mikvah, on request)
-  mikvah: '#B7E1DE', // pastel teal (was slate-blue, then swapped with restaurant, on request)
-  childcare: '#E1CBB7', // pastel tan
+  hotel: MAIN_CATEGORY_PALETTE[3], // '#ea580c' orange
+  mikvah: MAIN_CATEGORY_PALETTE[4], // '#0891b2' cyan
+  childcare: MAIN_CATEGORY_PALETTE[5], // '#db2777' pink
+  school: MAIN_CATEGORY_PALETTE[6], // '#ca8a04' amber
 }
-const ERUV_COLOR = '#BCE1B7' // pastel sage
+const ERUV_COLOR = '#BCE1B7' // pastel sage — main has no dedicated eruv
+// color (it falls through the same position-indexed palette there); kept
+// as its own reserved constant here, unchanged, matching how
+// HOSPITAL_COLOR also stays reserved rather than joining this rotation.
 
 // Exported so external UI (the home page's category list) computes the exact
 // same color as the map's pins for a given category. Same colors for the
@@ -112,11 +139,10 @@ const ERUV_COLOR = '#BCE1B7' // pastel sage
 export function colorForListingCategory(categories: CategoryConfig[], categoryId: string): string {
   const category = categories.find((c) => c.id === categoryId)
   if (category?.kind === 'eruv') return ERUV_COLOR
-  // `#D4CFC4` — a low-saturation, L80 neutral in the same pastel family as
-  // CATEGORY_COLORS, for any category outside the fixed set above (e.g. a
-  // future admin-added one) rather than falling back to a plain gray that'd
-  // clash with the rest of the palette.
-  return CATEGORY_COLORS[categoryId] ?? '#D4CFC4'
+  // `#64748b` — same neutral slate `main`'s own `getCategoryColor` falls
+  // back to (`FALLBACK_COLOR` in categoryColor.ts), on request, for any
+  // category outside the fixed set above (e.g. a future admin-added one).
+  return CATEGORY_COLORS[categoryId] ?? '#64748b'
 }
 
 // Fixed pin glyphs, one per category — deliberately NOT the admin-configurable
