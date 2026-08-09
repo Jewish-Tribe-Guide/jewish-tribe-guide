@@ -6,7 +6,7 @@ import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
-import { RESERVED_SLUGS } from '@/lib/routes'
+import { FIXED_VIEW_KINDS, RESERVED_SLUGS } from '@/lib/routes'
 import { Suspense } from 'react'
 import SlugScreen from './SlugScreen'
 
@@ -28,8 +28,24 @@ import SlugScreen from './SlugScreen'
 type Resolved =
   | { kind: 'category'; label: string; description: string }
   | { kind: 'form'; label: string; description: string }
+  // Hospitals / Eruv Information / Zmanim & Shabbos — see FIXED_VIEW_KINDS.
+  | { kind: 'view'; label: string; description: string }
 
 async function resolveSlug(community: string, slug: string): Promise<Resolved | null> {
+  // Checked before RESERVED_SLUGS, not after: these three slugs ARE reserved
+  // (see FIXED_VIEW_KINDS), so the check below would otherwise 404 them before
+  // this ever ran.
+  const fixedKind = FIXED_VIEW_KINDS[slug]
+  if (fixedKind) {
+    const categories = await listCategories(community).catch(() => [])
+    // The card that links here (see resourceCards) only exists once this
+    // category does — a link to an unconfigured fixed view is exactly as
+    // stale as a link to a deleted category, so it 404s the same way.
+    const category = categories.find((c) => c.kind === fixedKind)
+    if (!category) return null
+    return { kind: 'view', label: category.pluralLabel || category.label, description: category.description }
+  }
+
   if (RESERVED_SLUGS.has(slug)) return null
 
   const [categories, forms] = await Promise.all([
@@ -99,7 +115,13 @@ export async function generateStaticParams() {
         listCategories(community.slug).catch(() => []),
         listPublishedForms(community.slug).catch(() => []),
       ])
-      return [...categories.map((c) => c.id), ...forms.map((f) => f.id)].map((slug) => ({
+      // The fixed views' own slugs, not the id of the category that gates
+      // them — that category's id is whatever the admin's label slugified to
+      // (e.g. `eruv-information`), and isn't a real route on its own.
+      const fixedViewSlugs = Object.entries(FIXED_VIEW_KINDS)
+        .filter(([, kind]) => categories.some((c) => c.kind === kind))
+        .map(([slug]) => slug)
+      return [...categories.map((c) => c.id), ...forms.map((f) => f.id), ...fixedViewSlugs].map((slug) => ({
         community: community.slug,
         slug,
       }))

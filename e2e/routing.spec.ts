@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+
+// hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
+// sync by hand rather than imported: these are the literal strings the home
+// screen's cards link to (src/components/home/sections.tsx), and the point of
+// this test is that those two independent places still agree.
+const FIXED_VIEW_KINDS: Record<string, string> = { hospitals: 'medical', eruv: 'eruv', zmanim: 'zmanim' }
 
 // The routing migration — every screen getting its own URL — was the largest
 // change this codebase has had and had no automated coverage. These are the
@@ -136,5 +142,52 @@ test.describe('URLs', () => {
       const response = await page.goto(`/${community}/${screen}`)
       expect(response?.status(), `/${community}/${screen} should be a real screen`).toBe(200)
     }
+  })
+
+  // The regression this guards: Hospitals/Eruv Information/Zmanim & Shabbos
+  // are opened by a card that links to a fixed word (/eruv), but the category
+  // that gates them is created with a human-readable label whose slug can be
+  // anything ("Eruv Information" → eruv-information). Before FIXED_VIEW_KINDS,
+  // the route only knew how to resolve a slug that matched a category's own
+  // id — so the card's fixed link 404'd for any label that didn't happen to
+  // slugify back to the literal word. Reproduced by clicking the actual card
+  // in a browser, not just hitting the URL.
+  for (const [slug, kind] of Object.entries(FIXED_VIEW_KINDS)) {
+    test(`the fixed "${slug}" view resolves at its own URL, whatever its category is named`, async ({
+      page,
+      request,
+    }) => {
+      const community = await defaultCommunity(page)
+      const category = (await categories(request, community)).find((c) => c.kind === kind)
+      test.skip(!category, `no ${kind}-kind category configured for ${community}`)
+      if (!category) return
+
+      const response = await page.goto(`/${community}/${slug}`)
+      expect(response?.status(), `/${community}/${slug}`).toBe(200)
+      // Hospitals, Eruv Information and Zmanim & Shabbos are three differently
+      // shaped screens (a picker, a status list, a data card), so there's no
+      // one piece of copy all three share — except that a broken resolution
+      // falls through to FindResources' generic "isn't available" fallback
+      // (see the unknown-view branch at the bottom of that file). Its absence
+      // is the assertion that generalizes.
+      await expect(page.getByText(/isn.t available/i)).toHaveCount(0)
+    })
+  }
+
+  test('the card that opens a fixed view links to its reserved slug, not the category’s own id', async ({
+    page,
+    request,
+  }) => {
+    const community = await defaultCommunity(page)
+    const cats = await categories(request, community)
+    const eruv = cats.find((c) => c.kind === 'eruv')
+    test.skip(!eruv, `no eruv-kind category configured for ${community}`)
+    if (!eruv) return
+
+    await page.goto(`/${community}/all`)
+    await dismissLocationPrompt(page)
+    await page.getByRole('button', { name: eruv.pluralLabel }).first().click()
+
+    await expect(page).toHaveURL(`/${community}/eruv`)
   })
 })

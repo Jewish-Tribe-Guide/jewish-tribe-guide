@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertUsableSlug,
+  FIXED_VIEW_KINDS,
   mapQueryString,
   parseMapQuery,
   routes,
@@ -41,6 +42,17 @@ describe('slugRejectionReason', () => {
     expect(slugRejectionReason('admin')).toMatch(/reserved/i)
     expect(slugRejectionReason('api')).toMatch(/reserved/i)
     expect(slugRejectionReason('offline')).toMatch(/reserved/i)
+  })
+
+  // A category named "Eruv" would slugify to exactly the word the Eruv
+  // Information screen's URL is reserved for (see FIXED_VIEW_KINDS) — this is
+  // the collision that let a listing category shadow that screen before
+  // FIXED_VIEW_KINDS existed. "Eruv Information" itself is fine; it slugifies
+  // to "eruv-information", a different string.
+  it('rejects the fixed views’ own slugs', () => {
+    for (const slug of Object.keys(FIXED_VIEW_KINDS)) {
+      expect(slugRejectionReason(slug), slug).toMatch(/reserved/i)
+    }
   })
 
   it('is case- and whitespace-insensitive when matching reserved slugs', () => {

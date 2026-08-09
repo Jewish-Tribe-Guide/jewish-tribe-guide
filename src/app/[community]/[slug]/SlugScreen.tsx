@@ -18,7 +18,11 @@ export default function SlugScreen({
   listings,
 }: {
   slug: string
-  kind: 'category' | 'form'
+  // 'view' is a fixed screen (hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in
+  // routes.ts). It renders through the same branch as 'category' below:
+  // FindResources already dispatches those three slugs to their own screen
+  // before falling through to a database-backed category.
+  kind: 'category' | 'form' | 'view'
   /** The category's listings from the route; null means the read failed. */
   listings: DirectoryResource[] | null
 }) {

@@ -31,6 +31,9 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
 - On mobile, the "Share your live location?" prompt overlays everything and intercepts clicks. Call `dismissLocationPrompt(page)` after navigating, as a real visitor would.
 - **Nothing in `e2e/` may write to the database.** The suite runs against the real Supabase project, so a test that submits a listing leaves a row in the moderation queue for a human to clear. `api.spec.ts` posts to the write endpoints deliberately, but only unauthenticated and only with ids that cannot exist — a pass means each one was refused before it reached the database.
 - **Check that a new test fails.** Several here would have passed against a broken app: an offline test passes when the page is simply still online, and a "not cached" assertion passes when the header is absent for an unrelated reason. Break the thing on purpose, watch it go red, put it back.
+- **Never assert content against the raw HTML string.** A React Server Components response serializes every listing name into a `<script>`, so `expect(html).toContain(name)` passes on a page that rendered nothing — which is how the server-rendering tests came to certify the exact bug they were written to prevent. Use `serverMarkup()` from the helpers, which strips script contents.
+- **The content is client-rendered, so `<main>` is empty for a moment.** `ready()` waits for the header, and the header is part of the shell that was always there. A one-shot `innerText()` read after it caught an empty string roughly two runs in three. Use auto-retrying assertions (`await expect(locator).toContainText(...)`) instead of snapshotting text.
+- **Run a new e2e test several times before trusting it**, and under the full suite rather than alone — the parallel run is where the timing-dependent ones fall over. Both flakes found here passed in isolation.
 
 ## Caching
 
@@ -39,6 +42,16 @@ Cached content reads are wired in three places that have to agree: a `use cache`
 `cacheTags.test.ts` derives the expected tag list from `TAGS` itself, so adding a store without wiring its invalidation fails the unit suite. `caching.spec.ts` then checks the pages really are served from the cache (`x-nextjs-cache: HIT`), since `use cache` that has quietly stopped applying looks identical to one that works.
 
 Note that `/admin` and `/inbox` **are** prerendered and CDN-cached, correctly — both are `'use client'` shells that fetch their data in the browser with an `Authorization` header. That stops being safe the moment anyone moves one of those fetches to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+
+## The content is not server-rendered (known, marked `test.fail`)
+
+`[community]/page.tsx` and `[slug]/page.tsx` wrap their screens in `<Suspense>` so `useSearchParams` doesn't block prerendering. The intent was that only the part reading the query string waits for the request; in practice the whole content subtree sits inside the boundary. What ships is a shell — `/philly`'s `<main>` is `<div class="flex-1"></div>`, the literal fallback, followed by an unresolved `<template id="B:0">`.
+
+The data *is* loaded on the server and arrives with the document, so "a category page makes no API calls of its own" genuinely passes — that part of the work stands. Titles, metadata and Open Graph tags render server-side too, so link previews are fine. The cost is no-JS clients, first contentful paint, and lower-tier crawlers.
+
+The two tests asserting rendered content are marked `test.fail()`. The suite stays green, the bug stays visible, and **the day someone narrows those boundaries they will turn red** — that is the signal to remove the marker, not a regression.
+
+This is the same mechanism as the `/` redirect bug: a Suspense boundary added for Cache Components silently changed what gets delivered, and the test meant to catch it didn't.
 
 ## What still has no coverage
 

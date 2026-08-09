@@ -49,7 +49,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(false)
-  const [sortByPopular, setSortByPopular] = useState(false)
+  // Distance is meaningless with nothing to measure from — start on
+  // Popularity instead when there's no anchor yet, so the initial sort isn't
+  // silently falling back to alphabetical (see travelCompare) while claiming
+  // to be "Distance". Lazy initializer: this is a one-time default. An
+  // anchor becoming available later doesn't retroactively flip this by
+  // itself — see wantsDistance below for the one case where it should.
+  const [sortByPopular, setSortByPopular] = useState(() => !anchorLabel)
+  // Set when the visitor clicks "Distance" with no anchor yet — see
+  // selectSort, which opens the location picker instead of switching
+  // immediately. Clicking Distance IS asking for distance sort; it just
+  // can't happen yet. The effect below finishes the job the moment an
+  // anchor actually shows up, so providing one (address or live location)
+  // reads as "and now it's on", not as a click that silently did nothing.
+  const wantsDistance = useRef(false)
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [daveningModalOpen, setDaveningModalOpen] = useState(false)
@@ -135,6 +148,34 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     ready: true,
     source: category.pluralLabel,
   })
+
+  // Selecting the Popular/Distance toggle. Distance with no anchor set has
+  // nothing to sort by (see the sortByPopular default above) — rather than
+  // switch to a "Distance" sort that's actually falling back to alphabetical,
+  // open the same location picker the header's pill and the map's FAB use,
+  // record that Distance is what was actually asked for, and leave the
+  // current sort alone until there's somewhere to measure from — see the
+  // effect below, which finishes the switch once there is.
+  const selectSort = (byPopular: boolean) => {
+    if (!byPopular && !anchorLabel) {
+      wantsDistance.current = true
+      document.dispatchEvent(new CustomEvent('jpc:open-location'))
+      return
+    }
+    wantsDistance.current = false
+    setSortByPopular(byPopular)
+  }
+
+  // Finishes a pending "Distance" click the moment an anchor actually shows
+  // up — from the popover selectSort just opened, or from anywhere else
+  // (the map's FAB, a listing's "Use as my location" if that ships) the
+  // visitor happens to set one from in the meantime.
+  useEffect(() => {
+    if (anchorLabel && wantsDistance.current) {
+      wantsDistance.current = false
+      setSortByPopular(false)
+    }
+  }, [anchorLabel])
 
   const searchPlaceholder =
     tagFields.length > 0
@@ -298,10 +339,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     !hasMinyanim && !category.externalLink ? 'ml-auto' : '',
                   ].join(' ')}
                 >
-                  {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
+                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
                     <button
                       key={opt.label}
-                      onClick={() => setSortByPopular(opt.v)}
+                      onClick={() => selectSort(opt.v)}
                       className={[
                         'px-2.5 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
                         sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
@@ -420,10 +461,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                     !hasMinyanim && !category.externalLink ? 'sm:ml-auto' : '',
                   ].join(' ')}
                 >
-                  {[{ v: true, label: '▲ Popular' }, { v: false, label: 'Distance' }].map((opt) => (
+                  {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (
                     <button
                       key={opt.label}
-                      onClick={() => setSortByPopular(opt.v)}
+                      onClick={() => selectSort(opt.v)}
                       className={[
                         'px-3 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
                         sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',

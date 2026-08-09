@@ -30,9 +30,31 @@ test.skip(({ isMobile }) => !!isMobile, 'the worker is not viewport-dependent')
 
 /** Waits for the worker to be not just registered but *controlling* the page —
  *  a registered worker that hasn't taken over yet caches nothing, so asserting
- *  on registration alone would pass while offline support was broken. */
+ *  on registration alone would pass while offline support was broken.
+ *
+ *  Done in two steps rather than one wait on `controller`, which was flaky
+ *  under a parallel run. ServiceWorker.tsx registers on `window.load`, and the
+ *  worker then has to install (which fetches /offline over the network),
+ *  activate, and claim before it controls anything. Waiting on the end of that
+ *  chain means waiting on a race. Waiting for activation and then reloading if
+ *  the page still isn't controlled makes it deterministic: a page loaded after
+ *  a worker is active is always controlled by it. */
 async function serviceWorkerReady(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, { timeout: 15_000 })
+  await page.waitForFunction(
+    async () => {
+      const reg = await navigator.serviceWorker?.getRegistration()
+      return !!reg?.active
+    },
+    null,
+    { timeout: 30_000 },
+  )
+
+  if (await page.evaluate(() => navigator.serviceWorker.controller == null)) {
+    await page.reload()
+    await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
+      timeout: 30_000,
+    })
+  }
 }
 
 /** Every URL the worker has written to any of its caches. */
@@ -90,6 +112,9 @@ test.describe('service worker', () => {
     await page.reload()
     await ready(page)
 
+    // Waited for, not snapshotted: the content is client-rendered, so <main> is
+    // briefly an empty fallback even once `ready()` has seen the header.
+    await expect(page.locator('main')).toContainText(category.pluralLabel)
     const online = await page.locator('main').innerText()
 
     await context.setOffline(true)

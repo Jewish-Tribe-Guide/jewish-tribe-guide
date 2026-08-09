@@ -23,6 +23,30 @@
 // prevents at the point a category or form is created.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { CategoryKind } from './categories'
+
+/** The three cards (see resourceCards in home/sections.tsx) that open a fixed,
+ *  hand-built screen rather than a normal listing directory — About Your
+ *  Hospital, Eruv Information, Zmanim & Shabbos (see FindResources). Their URL
+ *  slug is one of these literals, permanently, regardless of what an admin
+ *  names the matching category — that category only supplies display text
+ *  (its pluralLabel/description), the same way a card's label can be edited
+ *  without moving what it links to.
+ *
+ *  This used to not matter: which screen was open lived in in-memory state,
+ *  never a real URL, so nothing ever compared a category's slug against these
+ *  literals. Giving every screen a shareable URL turned that into a real
+ *  lookup — see resolveSlug in [slug]/page.tsx — and a category's slug is
+ *  derived from its label (see createCategory), so "Eruv Information" became
+ *  `eruv-information`, not `eruv`. The card kept linking to `/eruv`; nothing
+ *  was ever there to resolve it. This map is what makes `/eruv` resolve to the
+ *  eruv-kind category regardless of what that category's own slug is. */
+export const FIXED_VIEW_KINDS: Record<string, CategoryKind> = {
+  hospitals: 'medical',
+  eruv: 'eruv',
+  zmanim: 'zmanim',
+}
+
 /** Slugs a category or form may never take, because a route already owns them.
  *  Enforced when an admin creates or renames one — see assertUsableSlug. */
 export const RESERVED_SLUGS = new Set([
@@ -30,6 +54,9 @@ export const RESERVED_SLUGS = new Set([
   'all',
   'map',
   'feedback',
+  // The fixed views above — a listing category named "Eruv" would otherwise
+  // shadow the real Eruv Information screen at the same URL.
+  ...Object.keys(FIXED_VIEW_KINDS),
   // Top-level routes that would otherwise look like a community.
   'admin',
   'inbox',

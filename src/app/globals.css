@@ -1,5 +1,29 @@
 @import 'tailwindcss';
 
+/* Nothing in this app is meant to scroll sideways — every horizontal-scroll
+ * region (the admin tab bar, a category filter row, the map's chip strip)
+ * owns its own `overflow-x-auto` container specifically so the scroll stays
+ * local to that strip. The trap: a flex-item cross-axis (or a plain block
+ * inside one) can grow wider than the viewport to fit an unwrapped row of
+ * content, and unless every ancestor in the chain happens to clip or shrink
+ * to match, that growth propagates up to <body> — at which point it's the
+ * whole page dragging sideways when you try to scroll just the row, not the
+ * row scrolling on its own. That happened on /admin: the tab labels forced
+ * <main> wider than the screen, `min-w-0` on <main> alone wasn't enough to
+ * stop it (something further down was still escaping), and chasing the exact
+ * flex chain responsible cost two rounds without landing it.
+ *
+ * This is the backstop: cap the page itself at the viewport width, so no
+ * fix elsewhere in the tree can regress into a repeat of that. It doesn't
+ * conflict with the app's one legitimate full-bleed technique (the mobile
+ * map's edge-to-edge band, `w-screen` + `left-1/2` + `-translate-x-1/2` in
+ * ResourceMapView) — that trick centers an element that's exactly 100vw wide,
+ * so it never actually extends past the viewport edge either. */
+html,
+body {
+  overflow-x: hidden;
+}
+
 @theme {
   /* Fallback only — the real brand color is injected on <html> from
      community.config (themeColor) in layout.tsx, so `primary` always tracks it.

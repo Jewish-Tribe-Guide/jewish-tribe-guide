@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
+import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
 import FeaturedCards from '@/components/home/FeaturedCards'
 import ZmanimStrip from '@/components/home/ZmanimStrip'
@@ -32,6 +33,10 @@ type Props = {
    *  embedded home-screen map so its tracking controls act on the same shared
    *  watch as the full map page and the header pill. */
   liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
+  /** Same controls object the header pill uses — passed through to the
+   *  embedded map so it can surface its own copy while fullscreen covers the
+   *  header (see ResourceMapView's `controls` prop). */
+  controls: LocationControls
   /** 'map' when the visitor arrived by collapsing the fullscreen map — scrolls
    *  the embedded map band into view so the collapse reads as zooming out of
    *  the map rather than being dropped at the top of an unrelated page.
@@ -57,7 +62,7 @@ type Props = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, scrollTo }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
@@ -111,8 +116,12 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   // The card grid shows inline on mobile always, and on desktop only as search
-  // results (see the component note above).
-  const showInlineGrid = isMobile || !!q
+  // results (see the component note above). Expressed as a class rather than a
+  // branch: `isMobile` starts false on every render, including on a phone, so
+  // branching here meant a phone laid out the desktop home screen on its first
+  // React render and corrected itself a frame later. The media query is right
+  // the first time, so there is no correction to see.
+  const inlineGridClass = q ? '' : ' sm:hidden'
 
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
@@ -143,8 +152,10 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {/* ── The three featured cards (desktop) — between the search box and
                 the map. Hidden while searching, when the grid below takes
                 over as the answer to what was typed. ───────────────────────── */}
-        {!isMobile && !q && (
-          <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+        {!q && (
+          <div className="hidden sm:block">
+            <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+          </div>
         )}
 
         {/* ── The map — the real full map screen, right on the home screen.
@@ -157,14 +168,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {hasMap && !q && (
           <div ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
-            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
+            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
           </div>
         )}
 
         {/* ── The grid — grouped into labeled sections; a search narrows each
                 section's cards and hides any section left empty. ──────────── */}
-        {showInlineGrid && (
-          <section className="mt-12 sm:mt-14 space-y-10">
+        <section className={`mt-12 sm:mt-14 space-y-10${inlineGridClass}`}>
             {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
               <p className="text-center text-sm text-slate-500">
                 Nothing matches “{q}”. Try a different word or clear the filter.
@@ -180,8 +190,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 </div>
               ))
             )}
-          </section>
-        )}
+        </section>
 
         {/* ── Matching places (individual listings within the cards) ─────────── */}
         {placeHits.length > 0 && (
@@ -196,6 +205,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
               background can run edge to edge. Falls back to the community
               center so it renders something real before the visitor has set
               an address. ──────────────────────────────────────────────────── */}
+      {/* Still a JS branch, unlike the featured cards and the grid above, and
+          deliberately: ZmanimStrip calls useZmanim, which fetches /api/zmanim —
+          uncached, straight through to Hebcal. Rendering it and hiding it with
+          `sm:` would cost every phone visitor a round-trip for a section they
+          never see. CSS should own a layout difference; it shouldn't own one
+          that costs a request. The one-frame correction is the cheaper error
+          here, and nothing above the fold moves when it happens. */}
       {!isMobile && !q && zmanimCategory && (
         <ZmanimStrip
           coords={coords ?? community.mapCenter}

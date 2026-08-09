@@ -76,6 +76,23 @@ export async function ready(page: Page): Promise<void> {
   await page.locator('header').first().waitFor({ state: 'visible' })
 }
 
+/** The server's HTML with `<script>` contents removed — i.e. the markup a
+ *  browser would actually lay out, minus the data React ships alongside it.
+ *
+ *  This distinction is the whole point. A React Server Components response
+ *  carries every listing name and category label a second time, serialized into
+ *  `self.__next_f.push(...)` inside a script tag, whether or not any of it was
+ *  rendered. So `expect(html).toContain('Rodeph Shalom Synagogue')` passes on a
+ *  page that rendered an empty shell — which is exactly what these tests were
+ *  doing, while claiming to prove the opposite.
+ *
+ *  Streamed content is deliberately kept: React flushes late Suspense content
+ *  into `<div hidden>` blocks and moves it with a script, and that content was
+ *  still rendered on the server, so it counts. Only the serialized payload goes. */
+export function serverMarkup(html: string): string {
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+}
+
 /** Counts requests this document made to the app's own /api/*.
  *
  *  Uses the performance timeline rather than Playwright's network events

@@ -19,6 +19,7 @@ import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
+import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
@@ -105,11 +106,21 @@ type Props = {
     start: () => void
     stop: () => void
   }
+  /** Full address-entry + tracking controls, same object the header pill
+   *  reads (see LocationProvider). Only needed on desktop: when the map goes
+   *  fullscreen (`sm:fixed sm:inset-0 sm:z-50` below) it paints over the
+   *  header entirely, taking its LocationControl pill with it, so this
+   *  screen surfaces its own copy of the same control while that's the case.
+   *  Mobile never loses the header's control this way — its own header is
+   *  merely collapsed, not covered, and its pin FAB already reopens the same
+   *  popover. Omitted by callers with nowhere to set an address anyway (the
+   *  admin category-preview map), which just means no control renders. */
+  controls?: LocationControls
 }
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -124,11 +135,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // categories plus a trailing "More" chip; tapping it opens this full-screen
   // picker with every category, Google-Maps-style.
   const [categoriesOpen, setCategoriesOpen] = useState(false)
-  // Dismissible for the rest of this visit once tapped away — plain local
-  // state (not persisted), so it resets on a real page reload but, since
-  // ResourceMapView now stays mounted across tab switches (see page.tsx),
-  // doesn't nag again just for leaving and returning to the Map tab.
-  const [locationPromptDismissed, setLocationPromptDismissed] = useState(false)
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
@@ -1133,6 +1139,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </p>
               )}
 
+              {/* ── Address entry (desktop, fullscreen only) — the fullscreen
+                      map (see the `fullscreen` className above) is `sm:fixed
+                      sm:inset-0 sm:z-50`, which paints directly over the site
+                      header and, with it, the only other place a visitor can
+                      type an address. Below fullscreen the header is still
+                      right there above the map, so this would just be a
+                      redundant second copy of the same control. Same
+                      component the header uses, not a bespoke one — reusing
+                      it keeps "where should distances be measured from"
+                      behaving identically everywhere it appears. ────────── */}
+              {!isMobile && fullscreen && controls && (
+                <div className="absolute right-3 top-14 z-20 hidden sm:block">
+                  <LocationControl controls={controls} />
+                </div>
+              )}
+
               {/* ── Floating search + filters (mobile) — laid directly over the
                       map, Google-Maps-style, instead of pushing it down. Category
                       chips sit right under the search bar as their own
@@ -1262,22 +1284,40 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </div>
               )}
 
-              {/* Mobile-only tracking FAB — ResourceMap's own re-center pill
-                  (bottom-right) takes over automatically once activeLocation
-                  is set, so this only needs to cover the "not started yet"
-                  state and the explicit stop action. */}
-              {/* bottom-[4.75rem]: clears MobileNearbySheet's peek height
-                  (64px) + margin, same offset as ResourceMap's own re-center
-                  pill uses once tracking is active. */}
-              {ui.map.liveTracking && !activeLocation && (
-                <button
-                  onClick={handleStart}
-                  aria-label="Start live tracking"
-                  className="absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
-                >
-                  <span aria-hidden="true">📍</span>
-                </button>
-              )}
+              {/* Mobile-only "set/change your location" FAB. Opens the same
+                  header popover as AddressPrompt, via the TOGGLING
+                  'jpc:toggle-location' event rather than AddressPrompt's
+                  plain "open" one — this is a standing button a visitor can
+                  tap again while the popover is already up, and a second tap
+                  should close it, not re-open what's already open — rather
+                  than jumping straight into requesting GPS: a visitor who'd
+                  rather type an address gets that choice instead of a
+                  permission prompt they didn't ask for.
+                  Always rendered, not just while there's no anchor yet — this
+                  used to disappear the moment a location was set (ResourceMap
+                  draws its own "Re-center"/"Following" pill in the same slot
+                  once activeLocation exists), which meant there was no way to
+                  change your mind on this screen once you'd shared a location
+                  or typed an address: the header pill that would normally do
+                  that is itself collapsed away here (see MapScreen).
+                  Fixed position/size regardless of activeLocation — it used
+                  to jump to a smaller, higher slot once a location was set,
+                  to stay clear of the Following/Re-center pill in this same
+                  bottom-right corner. That pill now lives bottom-LEFT instead
+                  (see ResourceMap), specifically so this FAB never has to
+                  move for it; the only other bottom-right neighbor, the
+                  mobile "Stop tracking" pill below, sits well clear of this
+                  one's height already.
+                  Not gated on ui.map.liveTracking: unlike the old FAB this
+                  replaced, tapping it doesn't itself start tracking — it just
+                  opens the picker, which offers an address either way. */}
+              <button
+                onClick={() => document.dispatchEvent(new CustomEvent('jpc:toggle-location'))}
+                aria-label={activeLocation ? 'Change your location' : 'Set your location'}
+                className="absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+              >
+                <span aria-hidden="true">📍</span>
+              </button>
               {ui.map.liveTracking && tracking && (
                 <button
                   onClick={stop}
@@ -1285,39 +1325,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 >
                   Stop tracking
                 </button>
-              )}
-
-              {/* ── No-location prompt (mobile) — without an anchor, distances/
-                      sorting and the re-center dot have nothing to work from, and
-                      it's easy to land here from the Categories tab without ever
-                      noticing the "Set location" pill up in the header. Sits above
-                      the tracking FAB (bottom-[8.25rem] clears its 4.75rem offset
-                      + 3rem height + a small gap) so the two never collide. Opens
-                      the same header popover as AddressPrompt, via the same
-                      'jpc:open-location' event, rather than duplicating an address
-                      input here. */}
-              {!activeLocation && !locationPromptDismissed && (
-                <div className="absolute bottom-[8.25rem] inset-x-3 z-10 flex items-center gap-2.5 rounded-2xl bg-white px-3.5 py-3 shadow-lg ring-1 ring-slate-900/5 sm:hidden">
-                  <span className="text-xl shrink-0" aria-hidden="true">📍</span>
-                  <p className="min-w-0 flex-1 text-xs text-slate-600">
-                    Set your location to see how far places are.
-                  </p>
-                  <button
-                    onClick={() => document.dispatchEvent(new CustomEvent('jpc:open-location'))}
-                    className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white cursor-pointer"
-                  >
-                    Set location
-                  </button>
-                  <button
-                    onClick={() => setLocationPromptDismissed(true)}
-                    aria-label="Dismiss"
-                    className="shrink-0 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
               )}
 
               {/* ── Mobile nearby list — a draggable bottom sheet over the

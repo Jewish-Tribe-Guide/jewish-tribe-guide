@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { getDefaultCommunity } from './communityStore'
+import { assertUsableSlug } from './routes'
 import {
   DEFAULT_CATEGORY_ICON,
   resolveCapabilities,
@@ -122,6 +123,15 @@ export async function createCategory(input: {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
   const kind = input.kind ?? 'listing'
+
+  // Only a listing category's slug comes from an admin freely typing a label —
+  // Map/Zmanim/Eruv Information/Jewish Medical Resources are created with a
+  // fixed label from CategoryManager's SINGLETON_KIND_LABELS (addSingleton),
+  // and one of those, 'Zmanim', legitimately slugifies to the reserved word
+  // 'zmanim' (it IS the category that reserved word exists for — see
+  // FIXED_VIEW_KINDS in routes.ts). Guarding every kind here would block that
+  // singleton from ever being created.
+  if (kind === 'listing') assertUsableSlug(base)
 
   // Ensure a unique id.
   let id = base
