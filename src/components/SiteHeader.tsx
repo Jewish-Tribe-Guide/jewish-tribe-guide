@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
@@ -7,6 +8,8 @@ import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { isOptimizableImage } from '@/lib/imageHosts'
+import { nextHeaderVisible, useHeaderCollapsed } from '@/lib/headerVisibility'
+import { useIsMobile } from '@/lib/useIsMobile'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
@@ -28,8 +31,79 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
   // a switcher there would change what the real visitor sees from inside a
   // preview, so it's suppressed by passing no communities.
   const switchable = previewSettings ? null : communities
+
+  const collapsed = useHeaderCollapsed()
+  const isMobile = useIsMobile()
+  const [scrollVisible, setScrollVisible] = useState(true)
+
+  // Hides the header while scrolling down — more room for what you're
+  // reading — and brings it back the moment you scroll up, even slightly,
+  // the same pattern most mobile browsers use for their own address bar.
+  // Desktop keeps the header pinned; scrolling behaves differently there and
+  // there's no cramped-screen problem to solve.
+  useEffect(() => {
+    // No listener needed on desktop — `visible` below ignores scrollVisible
+    // there, so there's nothing for one to drive.
+    if (!isMobile) return
+    let lastY = window.scrollY
+
+    // Deliberately no rAF/ticking-flag throttle here. That pattern schedules
+    // the actual work on the next animation frame and guards re-entry with a
+    // boolean that only that frame clears — and a frame can simply never
+    // come (the tab going to the background mid-scroll, which a phone does
+    // constantly: a notification pull-down, switching apps, the screen
+    // locking). Then the flag is stuck true forever and every future scroll
+    // event is silently ignored — the header dies hidden, or dies shown, and
+    // nothing in the UI says why. The work here is a couple of comparisons
+    // and a setState; it doesn't need deferring, and running it inline can't
+    // get stuck.
+    function onScroll() {
+      const y = window.scrollY
+      setScrollVisible((prev) => nextHeaderVisible(y, lastY, prev))
+      lastY = y
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isMobile])
+
+  // On desktop `scrollVisible` just isn't consulted, rather than an effect
+  // fighting to keep resetting it to true — one less thing that could race
+  // the isMobile flip on a resize across the breakpoint.
+  const scrollHideVisible = !isMobile || scrollVisible
+
+  // `collapsed` (a whole screen, like the mobile map, saying "get out of the
+  // way for as long as I'm mounted") is `invisible h-0`, not `hidden`
+  // (display: none) and not just translated off-screen.
+  //
+  // `position: sticky` still occupies its normal box in the document flow
+  // even when transformed away — transforms are paint-only, they don't
+  // affect layout — so a translated-but-still-`sticky` header left a
+  // header-height gap of empty space at the top of the screen it was
+  // supposedly out of, and the map rendered starting below that gap rather
+  // than filling it. `h-0` closes that gap.
+  //
+  // `display: none` also closes it, and was the first thing tried — but it
+  // removes the header's entire subtree from rendering, and that subtree is
+  // where LocationControl's popover lives. The mobile map's pin FAB opens
+  // that exact popover (see ResourceMapView) while the header is collapsed,
+  // and with `hidden` there was nothing left mounted to open — confirmed
+  // live: the popover's own text was still in the DOM, genuinely present,
+  // just not painted anywhere. `invisible` (visibility: hidden) hides the
+  // header's own content the same way, but — unlike display — a descendant
+  // can opt back in with its own `visible`, which is exactly what the
+  // popover does (see its wrapper in LocationControl.tsx), so it can still
+  // render while everything else in the collapsed header stays gone.
+  const className = collapsed
+    ? 'invisible h-0 overflow-visible'
+    : `sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${
+        scrollHideVisible ? 'translate-y-0' : '-translate-y-full'
+      }`
+
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)]">
+    <header
+      className={className}
+    >
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
         {/* On mobile the logo only hides while no location is set — that's when
             the wide "Set location" pill competes with the full title + tagline

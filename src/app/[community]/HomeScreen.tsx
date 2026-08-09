@@ -9,7 +9,7 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 // embedded map band, zmanim); mobile is the full card index inline. Landing
 // itself owns that split — see its own header comment.
 export default function HomeScreen() {
-  const { coords, liveTracking } = useLocation()
+  const { coords, liveTracking, controls } = useLocation()
   const { navigate, openFlow, viewAllCategories } = useSiteNavigation()
   const params = useSearchParams()
 
@@ -21,6 +21,7 @@ export default function HomeScreen() {
         onViewAllCategories={viewAllCategories}
         coords={coords}
         liveTracking={liveTracking}
+        controls={controls}
         // Set when the visitor got here by collapsing the fullscreen map, so
         // the collapse reads as zooming out to the map band rather than being
         // dropped at the top of an unrelated page. A query param rather than

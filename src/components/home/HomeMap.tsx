@@ -1,6 +1,7 @@
 'use client'
 
 import ResourceMapView from '@/components/map/ResourceMapView'
+import type { LocationControls } from '@/components/home/LocationControl'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import type { NavigateFn } from '@/types'
 
@@ -13,16 +14,19 @@ export default function HomeMap({
   onNavigate,
   coords,
   liveTracking,
+  controls,
 }: {
   onNavigate: NavigateFn
   coords: LatLng | null
   liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
+  controls: LocationControls
 }) {
   return (
     <ResourceMapView
       onUp={() => {}}
       userLocation={coords}
       liveTracking={liveTracking}
+      controls={controls}
       onViewListing={(categoryId, listingId) =>
         onNavigate('patient', 'find', { findView: categoryId, findItemId: listingId })
       }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
+import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
 import FeaturedCards from '@/components/home/FeaturedCards'
 import ZmanimStrip from '@/components/home/ZmanimStrip'
@@ -32,6 +33,10 @@ type Props = {
    *  embedded home-screen map so its tracking controls act on the same shared
    *  watch as the full map page and the header pill. */
   liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
+  /** Same controls object the header pill uses — passed through to the
+   *  embedded map so it can surface its own copy while fullscreen covers the
+   *  header (see ResourceMapView's `controls` prop). */
+  controls: LocationControls
   /** 'map' when the visitor arrived by collapsing the fullscreen map — scrolls
    *  the embedded map band into view so the collapse reads as zooming out of
    *  the map rather than being dropped at the top of an unrelated page.
@@ -57,7 +62,7 @@ type Props = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, scrollTo }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: Props) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
@@ -163,7 +168,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {hasMap && !q && (
           <div ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
-            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} />
+            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
           </div>
         )}
 

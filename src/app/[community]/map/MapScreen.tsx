@@ -5,6 +5,8 @@ import ResourceMapView from '@/components/map/ResourceMapView'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { parseMapQuery } from '@/lib/routes'
+import { useCollapseHeader } from '@/lib/headerVisibility'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The map screen.
@@ -21,10 +23,18 @@ import { parseMapQuery } from '@/lib/routes'
 // ─────────────────────────────────────────────────────────────────────────────
 export default function MapScreen() {
   const params = useSearchParams()
-  const { coords, liveTracking } = useLocation()
+  const { coords, liveTracking, controls } = useLocation()
   const { goHome, viewListing } = useSiteNavigation()
+  const isMobile = useIsMobile()
 
   const view = parseMapQuery(params)
+
+  // The mobile map floats its own search bar and controls directly over the
+  // map (see ResourceMapView), so the header above it is dead space competing
+  // for the same screen — collapse it for as long as this screen is up. Only
+  // on mobile: desktop's map is a contained card, not an immersive fullscreen
+  // view, and the header isn't in its way.
+  useCollapseHeader(isMobile)
 
   return (
     <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-0 pb-[calc(3.75rem+env(safe-area-inset-bottom))] sm:pt-8 sm:pb-8">
@@ -47,6 +57,7 @@ export default function MapScreen() {
         // than being dropped somewhere unrelated.
         onExitFullscreenToListing={() => goHome({ at: 'map' })}
         liveTracking={liveTracking}
+        controls={controls}
       />
     </main>
   )

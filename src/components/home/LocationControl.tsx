@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AddressInput from '@/components/intake/AddressInput'
 import { PinIcon } from '@/components/icons'
+import { useHeaderCollapsed } from '@/lib/headerVisibility'
 
 export type LocationControls = {
   address: string
@@ -26,6 +27,12 @@ type Props = {
 export default function LocationControl({ controls }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const wasTracking = useRef(controls.tracking)
+  // True on the mobile map screen (see MapScreen/useCollapseHeader) — the
+  // header pill this popover would normally hang from is itself invisible
+  // there, and the only way in is the map's own pin FAB, bottom-right. Used
+  // below to anchor the popover near that FAB instead of the header.
+  const collapsed = useHeaderCollapsed()
 
   // Close when tapping/clicking anywhere outside the popover. Listens during
   // the CAPTURE phase, not bubble — the Google Map (mobile's Map tab) runs its
@@ -48,6 +55,41 @@ export default function LocationControl({ controls }: Props) {
     document.addEventListener('jpc:open-location', onOpen)
     return () => document.removeEventListener('jpc:open-location', onOpen)
   }, [])
+
+  // A second, TOGGLING variant of the same event — used by the mobile map's
+  // pin FAB, which (unlike AddressPrompt's plain "open" link) is a button a
+  // visitor can tap again while the popover it opened is still up, and
+  // expects that second tap to close it, the same as tapping the header pill
+  // itself twice would.
+  useEffect(() => {
+    function onToggle() { setOpen((o) => !o) }
+    document.addEventListener('jpc:toggle-location', onToggle)
+    return () => document.removeEventListener('jpc:toggle-location', onToggle)
+  }, [])
+
+  // Closes the popover once live tracking starts — mirrors handleCoords
+  // closing it once an address is picked, so either answer to "Where should
+  // distances be measured from?" ends the popover the same way.
+  //
+  // useWatchPosition's start() sets `tracking` true optimistically, the
+  // instant it's called — before the browser has actually asked the visitor
+  // for permission, let alone gotten an answer — and only reverts it to false
+  // once (if) the request comes back denied. So this transition alone isn't
+  // "tracking actually started," it's "tracking was just requested," and
+  // closing on it can close the popover moments before an error arrives with
+  // nowhere left to show it. The effect below re-opens if that happens.
+  useEffect(() => {
+    if (controls.tracking && !wasTracking.current) setOpen(false)
+    wasTracking.current = controls.tracking
+  }, [controls.tracking])
+
+  // Reopens if starting tracking just failed, so geoError (rendered below,
+  // inside the popover) is never silently swallowed by the optimistic close
+  // above — the visitor needs to see why, and to still have the address
+  // input in front of them as the fallback.
+  useEffect(() => {
+    if (controls.geoError) setOpen(true)
+  }, [controls.geoError])
 
   const label = controls.tracking ? 'Live' : controls.address || 'Set location'
 
@@ -91,7 +133,41 @@ export default function LocationControl({ controls }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10">
+        // `visible`: on the mobile map screen the header itself is
+        // `invisible` (see SiteHeader) while this popover is still meant to
+        // show, opened by the map's pin FAB rather than the header's own
+        // (there, also invisible) trigger pill. `visibility` is inherited,
+        // but a descendant can opt back out of an ancestor's `hidden` with
+        // its own `visible` — this is that opt-out. A no-op everywhere the
+        // header isn't collapsed, since `visible` is already the default.
+        //
+        // Two different anchors, not one shared position tweaked by a class:
+        // the normal case is `absolute`, hanging off the trigger pill inside
+        // this component's own `relative` wrapper, which is the right anchor
+        // when that pill is the thing the visitor actually tapped. Collapsed,
+        // that pill is invisible and the real trigger — the map's pin FAB —
+        // lives in a completely different part of the tree (ResourceMapView,
+        // bottom-right), so anchoring to a wrapper here would put the sheet
+        // wherever this component happens to be mounted, not where the FAB
+        // is. `fixed` positions it against the viewport instead, above where
+        // the FAB actually is.
+        //
+        // bottom-[12.5rem] is measured, not derived: the FAB is positioned
+        // `absolute` within ResourceMapView's own container, not `fixed` to
+        // the viewport the way this sheet is, so the two don't share a
+        // coordinate space and computing a value from the FAB's own offset
+        // classes (as the very first version of this did, copying the number
+        // from the FAB's old standalone prompt card) landed the sheet
+        // overlapping it — confirmed live, then corrected by measuring the
+        // FAB's actual on-screen position and adjusting until there was a
+        // real gap above it.
+        <div
+          className={
+            collapsed
+              ? 'visible fixed inset-x-3 bottom-[12.5rem] z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10'
+              : 'visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10'
+          }
+        >
           <p className="text-sm font-semibold text-slate-900">
             Where should distances be measured from?
           </p>

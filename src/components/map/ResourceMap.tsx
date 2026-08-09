@@ -565,7 +565,13 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
           onClick={centerOnMe}
           // bottom-[4.75rem] on mobile clears MobileNearbySheet's peek height
           // (64px) plus a little margin; desktop has no sheet, so bottom-3.
-          className={`absolute bottom-[4.75rem] right-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:bottom-3 ${
+          // left-3 on mobile (sm:right-3 on desktop): mobile's own "set/change
+          // location" pin FAB (see ResourceMapView) already owns the
+          // bottom-right corner, stacked above the sheet — this sits opposite
+          // it instead of piling a second control onto the same corner.
+          // Desktop has no such FAB competing for the corner, so it keeps its
+          // original right-3 spot.
+          className={`absolute bottom-[4.75rem] left-3 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:bottom-3 sm:left-auto sm:right-3 ${
             follow
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-white text-blue-600 hover:bg-blue-50'
