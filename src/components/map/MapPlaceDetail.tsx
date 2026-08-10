@@ -1,14 +1,16 @@
 'use client'
 
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
+import PinButton from '@/components/resources/PinButton'
+import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
+import { ui } from '@/lib/uiConfig'
 
 type Props = {
   item: DirectoryResource
   category: CategoryConfig
-  glyph?: string
   color: string
   onBack: () => void
 }
@@ -22,7 +24,7 @@ type Props = {
  * such filters of its own), plus its own header and back button. Doesn't
  * show Edit/Report/upvote, which stay a tap away in the full listing.
  */
-export default function MapPlaceDetail({ item, category, glyph, color, onBack }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
   return (
     <div className="space-y-4 pb-2">
       <button
@@ -35,17 +37,22 @@ export default function MapPlaceDetail({ item, category, glyph, color, onBack }:
 
       {/* ── Header: icon, name, category ─────────────────────────────────── */}
       <div className="flex items-start gap-3">
-        <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
-          style={{ backgroundColor: color + '22' }}
-          aria-hidden="true"
-        >
-          {glyph ?? '📍'}
-        </span>
+        <CategoryIcon
+          icon={category.icon}
+          iconImageUrl={
+            (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
+              ? (item[PHOTO_FIELD_KEY] as string)
+              : category.iconImageUrl) ?? undefined
+          }
+          color={color}
+          className="h-12 w-12 text-2xl"
+          sizePx={48}
+        />
         <div className="min-w-0 flex-1 pt-0.5">
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
+        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
       </div>
 
       <PlaceDetailBody item={item} category={category} />

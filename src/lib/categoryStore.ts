@@ -29,6 +29,7 @@ type CategoryRow = {
   external_link_url: string | null
   card_image_url: string | null
   card_text_color: string | null
+  icon_image_url: string | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -51,6 +52,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
         : null,
     cardImageUrl: row.card_image_url,
     cardTextColor: row.card_text_color,
+    iconImageUrl: row.icon_image_url,
   }
 }
 
@@ -119,6 +121,7 @@ export async function createCategory(input: {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  iconImageUrl?: string | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const base = slugify(input.label) || 'category'
@@ -158,6 +161,7 @@ export async function createCategory(input: {
     external_link_url: input.externalLink?.url ?? null,
     card_image_url: input.cardImageUrl?.trim() || null,
     card_text_color: input.cardTextColor?.trim() || null,
+    icon_image_url: input.iconImageUrl?.trim() || null,
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()
@@ -191,6 +195,7 @@ export async function updateCategory(
     externalLink?: { label: string; url: string } | null
     cardImageUrl?: string | null
     cardTextColor?: string | null
+    iconImageUrl?: string | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -212,6 +217,7 @@ export async function updateCategory(
   }
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
   if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
+  if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
 
   // Admin edits are still single-community — see the note in communityStore.
   // Scoping the write by community as well as id means a future second

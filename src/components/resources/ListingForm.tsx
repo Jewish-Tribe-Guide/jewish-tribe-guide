@@ -5,6 +5,7 @@ import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConf
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
+import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
@@ -513,6 +514,21 @@ function DetailFieldInput({
           className={inputClass}
         />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
+      </div>
+    )
+  }
+
+  if (field.type === 'image') {
+    return (
+      <div>
+        <span className="block text-sm font-medium text-slate-700 mb-1">{labelOverride ?? field.label}</span>
+        <ImageUploadField
+          value={(value as string) ?? ''}
+          onChange={onChange}
+          uploadUrl="/api/submissions/photo"
+          shape="square"
+          helpText="Shown instead of the category's usual icon for this listing — on the map, in search, and in the directory. Optional."
+        />
       </div>
     )
   }

@@ -20,6 +20,7 @@ type PatchBody = {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  iconImageUrl?: string | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every

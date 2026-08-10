@@ -7,7 +7,7 @@
 // client code fetches them from `GET /api/categories`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim'
+export type FieldType = 'text' | 'tel' | 'textarea' | 'number' | 'boolean' | 'select' | 'tags' | 'url' | 'hours' | 'minyanim' | 'image'
 
 /** The field types offered in the editor's Type picker, most-common first. */
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
@@ -38,6 +38,10 @@ export const FIELD_TYPE_SHAPE: Record<FieldType, 'badge' | 'row'> = {
   number: 'row',
   hours: 'row',
   minyanim: 'row',
+  // Never actually rendered as a card row (see the "Photo" toggle below) —
+  // this entry exists only because FIELD_TYPE_SHAPE is a Record over every
+  // FieldType.
+  image: 'row',
 }
 
 /** Types where badge-vs-row is a genuine, effective choice (a short categorical
@@ -235,9 +239,22 @@ export type CategoryConfig = {
    *  image so the title/icon stay legible regardless of the photo. Ignored
    *  when there's no image. */
   cardTextColor?: string | null
+  /** An uploaded image shown in place of the emoji `icon`, wherever this
+   *  category's circular avatar/pin renders (listing rows, map pins/chips,
+   *  the nearby list) — the icon equivalent of `cardImageUrl`, but this one
+   *  IS an upload (see /api/admin/categories/icon), not just a pasted URL.
+   *  `icon` is kept as the fallback if this is null/unset or fails to load. */
+  iconImageUrl?: string | null
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'
+
+/** The fixed `details` key for a listing's own uploaded photo — added/removed
+ *  as a single managed field (type 'image') by the category editor's "Photo"
+ *  checkbox, the same way Hours/Website are managed there. When set, it wins
+ *  over the category's shared `iconImageUrl` wherever this one listing's
+ *  avatar/pin renders (see CategoryIcon's call sites). */
+export const PHOTO_FIELD_KEY = 'photo'
 
 /** Turns a human field label into a safe `details` key, e.g. "Grades served" →
  *  "grades_served". Used by the admin field editor to auto-fill the key. */

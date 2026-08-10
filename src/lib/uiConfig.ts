@@ -8,7 +8,7 @@ import { community } from '@/community.config'
 type UiConfig = {
   contributions: { add: boolean; edit: boolean; report: boolean }
   search: { landing: boolean; directory: boolean; map: boolean }
-  map: { enabled: boolean; liveTracking: boolean; nearbyList: boolean }
+  map: { enabled: boolean; liveTracking: boolean; nearbyList: boolean; pins: boolean }
   upvotes: boolean
 }
 
@@ -31,6 +31,7 @@ export const ui: UiConfig = {
     enabled: raw.map?.enabled ?? true,
     liveTracking: raw.map?.liveTracking ?? true,
     nearbyList: raw.map?.nearbyList ?? true,
+    pins: raw.map?.pins ?? true,
   },
   upvotes: raw.upvotes ?? true,
 }

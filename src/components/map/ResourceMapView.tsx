@@ -9,7 +9,7 @@ import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, PHOTO_FIELD_KEY, resolveCapabilities, selectValues } from '@/lib/categories'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -20,11 +20,20 @@ import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
+import { usePinned } from '@/lib/pinnedContext'
+import { useDroppedPins } from '@/lib/droppedPinsContext'
+import DroppedPinEditor from './DroppedPinEditor'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
 const HOSPITAL_ICON = '🏥'
+// A dropped pin's marker id is prefixed with this so a click handler can
+// tell it apart from a real listing/hospital point without a separate prop
+// threaded through every consumer — see droppedMapPoints below.
+const DROPPED_PREFIX = 'dropped:'
+const DROPPED_FILTER_ID = '__dropped__'
+const DROPPED_PIN_COLOR = '#D85A30'
 
 // Typing one of these in the search box searches "open now" instead of
 // matching literal text.
@@ -124,6 +133,38 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
+  const { pinned, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
+  const pinnedIds = useMemo(() => new Set(pinned.map((p) => p.id)), [pinned])
+  // Whether the Pinned chip is toggled on — it behaves like one more category
+  // chip in the row (see the Pinned button below), not an exclusive "only
+  // show pinned" mode: with Pinned AND a category both on, the map shows the
+  // union — every pinned place (regardless of its own category) plus every
+  // other place in the selected category, exactly as if Pinned really were a
+  // category of its own. Lives in PinnedContext, not local state — see
+  // filterActive's own doc comment for why.
+
+  // Dropped pins — arbitrary points the visitor marks themselves, not tied
+  // to a listing. `pendingDropAt` is the coordinate of a long-press waiting
+  // to be named; `editingDroppedId` is an already-saved pin the visitor
+  // tapped to rename/remove. At most one editor is ever open, so these don't
+  // need to be one combined state.
+  const { droppedPins, add: addDroppedPin, remove: removeDroppedPin, rename: renameDroppedPin } = useDroppedPins()
+  const [pendingDropAt, setPendingDropAt] = useState<{ lat: number; lng: number } | null>(null)
+  const [editingDroppedId, setEditingDroppedId] = useState<string | null>(null)
+  const droppedMapPoints = useMemo<SelectablePoint[]>(
+    () =>
+      droppedPins.map((p) => ({
+        id: `${DROPPED_PREFIX}${p.id}`,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.label,
+        color: DROPPED_PIN_COLOR,
+        glyph: '📍',
+        categoryLabel: 'Your pin',
+        filterId: DROPPED_FILTER_ID,
+      })),
+    [droppedPins],
+  )
   const { tracking, error: geoError, start, stop } = liveTracking ?? NOOP_LIVE_TRACKING
 
   // `userLocation` (page.tsx's global coords) already updates continuously
@@ -352,16 +393,25 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         phone: r.phone,
         color: colorById.get(r.category) ?? '#64748b',
         glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
+        // This listing's own photo (see the category editor's "Photo"
+        // toggle) wins over the category's shared icon image — a listing
+        // that uploaded its own picture should show that, not the generic
+        // category avatar every other pin in the same category uses.
+        glyphSrc:
+          (typeof r[PHOTO_FIELD_KEY] === 'string' && (r[PHOTO_FIELD_KEY] as string).trim()
+            ? (r[PHOTO_FIELD_KEY] as string)
+            : cat?.iconImageUrl) ?? undefined,
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,
         // tags, detail fields) — so a query that matches in the directory
         // matches here too.
         searchText: listingSearchText(r, cat),
         raw: r,
+        pinned: pinnedIds.has(r.id),
       })
     }
     return out
-  }, [listings, categories, colorById, hospitals])
+  }, [listings, categories, colorById, hospitals, pinnedIds])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()
@@ -647,7 +697,11 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
   const visiblePoints = useMemo(() => {
     return allPoints
-      .filter((p) => effectiveSelected.has(p.filterId))
+      // Pinned is a UNION with the category chips, not a replacement — a
+      // pinned place shows up whether or not its own category chip happens
+      // to be on, while an unpinned place in a selected category still
+      // shows too (see the Pinned chip's own comment above).
+      .filter((p) => effectiveSelected.has(p.filterId) || (pinnedSelected && p.pinned))
       .filter((p) => activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
       .filter((p) => {
@@ -655,7 +709,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         const keys = hoursKeysByCat.get(p.raw.category)
         return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k]) === true)
       })
-  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, hoursKeysByCat])
+  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, hoursKeysByCat, pinnedSelected])
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
   // sheet-raise/auto-select effect below to commit points instead of every
@@ -750,13 +804,30 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
     setSelected(next)
   }
+  // Show all/Hide all cover every chip in the row, Pinned included — not
+  // just the real categories — so the button's own "everything is on/off"
+  // promise actually holds.
   const showAll = () => {
     setSelected(new Set(options.map((o) => o.id)))
+    setPinnedSelected(true)
     setSidebarCollapsed(false)
+  }
+  // Same "surface the results" side effects toggling a category chip gets
+  // (raise the mobile sheet, drop the desktop sidebar's collapse) — without
+  // them, turning Pinned on looked like it did nothing when nothing else
+  // had already narrowed the map.
+  const togglePinnedSelected = () => {
+    const next = !pinnedSelected
+    setPinnedSelected(next)
+    if (next) {
+      setSidebarCollapsed(false)
+      if (isMobile) nearbySheetRef.current?.raise()
+    }
   }
   const hideAll = () => {
     setSelected(new Set())
     clearFiltersForCategories(effectiveSelected)
+    setPinnedSelected(false)
     setSidebarCollapsed(false)
   }
 
@@ -820,7 +891,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // sidebar starts bare (just the search box + quick chips), not with every
   // place already listed; the results list only appears once there's a
   // reason to show one.
-  const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0
+  const desktopNarrowed = selected !== null || committedQuery.length > 0 || filterChips.length > 0 || pinnedSelected
 
   // Whether the sidebar is actually on screen right now — either because
   // something narrowed the map down (a search, a category, a selected
@@ -931,6 +1002,42 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     </div>
   )
 
+  // A standalone toggle, not one of CategoryFilter's own chips — it narrows
+  // ACROSS categories rather than toggling one, so it doesn't belong to
+  // that component's select/all/none model. Rendered by CategoryFilter
+  // itself, right after Show all/Hide all and before the real category
+  // chips — it's the most important shortlist, not just another category.
+  // Hidden until there's at least one pin: an always-visible "Pinned 0"
+  // that narrows the map to nothing isn't a useful default state for a
+  // feature nobody's touched yet.
+  const pinnedChip = ui.map.pins && pinned.length > 0 && (
+    <div
+      className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
+        pinnedSelected ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+      }`}
+      // Same blue as the pin badge overlaid on a pinned marker (see
+      // ResourceMap's buildPin) — Pinned isn't a real category with its own
+      // hue, but this chip should still read with exactly the same weight
+      // (size, dot, count) as one, not a lighter/different-shaped control.
+      style={pinnedSelected ? { backgroundColor: '#2563eb' } : undefined}
+    >
+      <button
+        onClick={togglePinnedSelected}
+        aria-pressed={pinnedSelected}
+        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedSelected ? '' : 'hover:bg-slate-50'}`}
+      >
+        <span
+          className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
+          style={{ backgroundColor: pinnedSelected ? 'rgba(255,255,255,0.9)' : '#2563eb' }}
+          aria-hidden="true"
+        />
+        <span aria-hidden="true">📌</span>
+        <span>Pinned</span>
+        <span className={pinnedSelected ? 'text-white/80' : 'text-slate-400'}>{pinned.length}</span>
+      </button>
+    </div>
+  )
+
   // The category chips — sit beside the search box (not below it), so they
   // stay put next to it even while the dropdown is open, same as Google
   // Maps' own chip row.
@@ -947,6 +1054,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       onToggleBool={toggleBoolField}
       selectFilters={selectFilters}
       onToggleSelectValue={toggleSelectValue}
+      pinnedChip={pinnedChip}
+      pinnedOn={pinnedSelected}
     />
   )
 
@@ -1002,7 +1111,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                     <MapPlaceDetail
                       item={desktopSelected.raw}
                       category={desktopSelectedCategory}
-                      glyph={desktopSelected.glyph}
                       color={desktopSelected.color}
                       onBack={() => setDesktopSelected(null)}
                     />
@@ -1086,15 +1194,26 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:min-h-0 sm:w-auto sm:translate-x-0"
           >
               <ResourceMap
-                points={visiblePoints}
+                points={ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints}
                 userLocation={activeLocation}
                 follow={follow}
                 onResumeFollow={() => setFollow(true)}
                 onManualDrag={() => setFollow(false)}
                 onViewListing={onViewListing}
-                onSelectPoint={(p) => selectPlace(p as SelectablePoint)}
+                onSelectPoint={(p) => {
+                  const sp = p as SelectablePoint
+                  // A dropped pin isn't a listing — open its own name/remove
+                  // editor instead of routing into the nearby-list/sidebar
+                  // detail flow selectPlace drives for real places.
+                  if (sp.filterId === DROPPED_FILTER_ID) {
+                    setEditingDroppedId(sp.id.slice(DROPPED_PREFIX.length))
+                    return
+                  }
+                  selectPlace(sp)
+                }}
                 onDeselectPoint={deselectPlace}
                 onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.lower() : setDesktopSelected(null))}
+                onMapLongPress={ui.map.pins ? (coords) => setPendingDropAt(coords) : undefined}
                 searchActive={searchActive}
                 selectedId={selectedPointId}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
@@ -1242,6 +1361,8 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onToggleBool={toggleBoolField}
                         selectFilters={selectFilters}
                         onToggleSelectValue={toggleSelectValue}
+                        pinnedChip={pinnedChip}
+                        pinnedOn={pinnedSelected}
                       />
                     </div>
                   )}
@@ -1410,6 +1531,40 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           </div>
         </div>
       )}
+
+      {/* ── Dropped-pin naming/editing — a long-press on empty map (see
+              onMapLongPress above) opens this with pendingDropAt set; tapping
+              an already-placed one opens it with editingDroppedId instead.
+              Never both at once. ──────────────────────────────────────── */}
+      {pendingDropAt && (
+        <DroppedPinEditor
+          onSave={(label) => {
+            addDroppedPin({ id: crypto.randomUUID(), lat: pendingDropAt.lat, lng: pendingDropAt.lng, label })
+            setPendingDropAt(null)
+          }}
+          onCancel={() => setPendingDropAt(null)}
+        />
+      )}
+      {editingDroppedId && (() => {
+        const pin = droppedPins.find((p) => p.id === editingDroppedId)
+        // The pin was removed (e.g. from another tab) between the tap and
+        // this render — nothing left to edit.
+        if (!pin) return null
+        return (
+          <DroppedPinEditor
+            initialLabel={pin.label}
+            onSave={(label) => {
+              renameDroppedPin(pin.id, label)
+              setEditingDroppedId(null)
+            }}
+            onDelete={() => {
+              removeDroppedPin(pin.id)
+              setEditingDroppedId(null)
+            }}
+            onCancel={() => setEditingDroppedId(null)}
+          />
+        )
+      })()}
     </div>
   )
 }

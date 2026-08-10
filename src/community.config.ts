@@ -94,6 +94,8 @@ export const community = {
       liveTracking: true,
       /** The "Nearby" list tab on the map. */
       nearbyList: true,
+      /** Pinning listings to a personal shortlist, and the map's "Pinned" filter. */
+      pins: true,
     },
     /** Global on/off for upvotes, layered on top of each category's DB setting. */
     upvotes: true,

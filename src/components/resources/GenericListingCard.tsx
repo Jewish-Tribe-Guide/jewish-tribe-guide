@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus } from '@/lib/hours'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
+import CategoryIcon from '@/components/CategoryIcon'
 import UpvoteButton from './UpvoteButton'
+import PinButton from './PinButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import Chip from './Chip'
@@ -86,7 +88,7 @@ export function GenericListingCard({
   const canReport = ui.contributions.report && caps.report
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const badgeFields = fields.filter((f) => {
-    if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim') return false
+    if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image') return false
     return (f.renderAs ?? (f.type === 'boolean' ? 'badge' : 'row')) === 'badge'
   })
 
@@ -136,16 +138,19 @@ export function GenericListingCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
         className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        {/* Icon avatar — same glyph + tinted color as this category's map pin
-            (see getCategoryColor), so a place reads as the same thing here
-            and on the map. */}
-        <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl"
-          style={{ backgroundColor: color + '22' }}
-          aria-hidden="true"
-        >
-          {category.icon}
-        </span>
+        {/* Icon avatar — same glyph/image + tinted color as this category's
+            map pin (see getCategoryColor), so a place reads as the same
+            thing here and on the map. */}
+        <CategoryIcon
+          icon={category.icon}
+          iconImageUrl={
+            (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
+              ? (item[PHOTO_FIELD_KEY] as string)
+              : category.iconImageUrl) ?? undefined
+          }
+          color={color}
+          className="h-10 w-10 text-xl"
+        />
 
         {/* Name + subtitle + the only chips that survive collapsed: Open and
             any badge tied to an actual filter control. */}
@@ -249,6 +254,7 @@ export function GenericListingCard({
               {f.linkLabel ?? f.label}
             </a>
           ))}
+          {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
           <svg
             className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"

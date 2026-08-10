@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import AddressInput from '@/components/intake/AddressInput'
 import { PinIcon } from '@/components/icons'
 import { useHeaderCollapsed } from '@/lib/headerVisibility'
+import { useScrollLock } from '@/lib/useScrollLock'
 
 export type LocationControls = {
   address: string
@@ -33,6 +34,13 @@ export default function LocationControl({ controls }: Props) {
   // there, and the only way in is the map's own pin FAB, bottom-right. Used
   // below to anchor the popover near that FAB instead of the header.
   const collapsed = useHeaderCollapsed()
+
+  // The popover is anchored (absolute/fixed), not part of normal page flow,
+  // so nothing stops the page or map behind it from still scrolling while
+  // it's open — it would drift out from under an address the visitor is
+  // mid-type into. Locked for as long as it's open, on every screen this
+  // renders on, not just the collapsed map case.
+  useScrollLock(open)
 
   // Close when tapping/clicking anywhere outside the popover. Listens during
   // the CAPTURE phase, not bubble — the Google Map (mobile's Map tab) runs its

@@ -146,7 +146,11 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const minyanimField = fields.find((f) => f.type === 'minyanim')
-  const special = (f: CategoryField) => f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim'
+  // 'image' (the per-listing Photo field — see PHOTO_FIELD_KEY) is excluded
+  // for the same reason as the others: it isn't consumed generically here at
+  // all, only by the icon/avatar renderers (CategoryIcon's callers).
+  const special = (f: CategoryField) =>
+    f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image'
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
 

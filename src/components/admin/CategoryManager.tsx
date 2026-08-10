@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CATEGORY_CAPABILITY_KEYS,
   DEFAULT_CATEGORY_ICON,
+  PHOTO_FIELD_KEY,
   FIELD_TYPES,
   FIELD_TYPE_SHAPE,
   TYPE_HAS_SHAPE_CHOICE,
@@ -18,6 +19,7 @@ import {
 import type { FormConfig } from '@/lib/forms'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
+import ImageUploadField from '@/components/ImageUploadField'
 import FormEditor from './FormEditor'
 import CategoryPreview from './CategoryPreview'
 
@@ -613,6 +615,7 @@ function SingletonEditor({
 }) {
   const [name, setName] = useState(category.pluralLabel)
   const [icon, setIcon] = useState(category.icon || '')
+  const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
   const [saving, setSaving] = useState(false)
@@ -633,6 +636,7 @@ function SingletonEditor({
           label: name.trim(),
           pluralLabel: name.trim(),
           icon,
+          iconImageUrl: iconImageUrl.trim() || null,
           cardImageUrl: cardImageUrl.trim() || null,
           cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
         }),
@@ -674,7 +678,7 @@ function SingletonEditor({
           />
           <span className="block text-[11px] text-muted mt-1">The card&rsquo;s title on the home screen.</span>
         </label>
-        <IconField icon={icon} onChange={setIcon} />
+        <IconField icon={icon} onChange={setIcon} iconImageUrl={iconImageUrl} onIconImageUrl={setIconImageUrl} token={token} />
         <CardBackgroundField
           cardImageUrl={cardImageUrl}
           onCardImageUrl={setCardImageUrl}
@@ -818,6 +822,9 @@ type Draft = {
   pluralLabel: string
   /** One emoji shown on the card (home grid, map legend, admin list). */
   icon: string
+  /** An uploaded picture shown instead of `icon` — see CategoryConfig's own
+   *  iconImageUrl. Blank means none (fall back to the emoji). */
+  iconImageUrl: string
   description: string
   hasAddress: boolean
   hasPhone: boolean
@@ -847,16 +854,26 @@ type Draft = {
 
 function toDraft(c: CategoryConfig | null): Draft {
   const all = (c?.detailFields ?? []).map((f) => ({ ...f }))
+  const fields = all.filter((f) => f.renderAs !== 'hidden')
+  // Photo starts checked — for a brand-new category AND the first time an
+  // existing one is opened after this feature shipped — unlike Hours/Website,
+  // which start off. Once saved (even untouched), its presence in `fields`
+  // becomes the real source of truth, same as everything else here; an
+  // admin who explicitly unchecks it stays unchecked from then on.
+  if (!fields.some((f) => f.type === 'image')) {
+    fields.push({ key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
+  }
   return {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
     icon: c?.icon ?? '',
+    iconImageUrl: c?.iconImageUrl ?? '',
     description: c?.description ?? '',
     hasAddress: c?.hasAddress ?? true,
     hasPhone: c?.hasPhone ?? true,
     upvotesEnabled: !!c?.upvotesEnabled,
     capabilities: resolveCapabilities(c?.capabilities),
-    fields: all.filter((f) => f.renderAs !== 'hidden'),
+    fields,
     hiddenFields: all.filter((f) => f.renderAs === 'hidden'),
     externalLinkEnabled: !!c?.externalLink,
     externalLinkLabel: c?.externalLink?.label ?? '',
@@ -866,12 +883,34 @@ function toDraft(c: CategoryConfig | null): Draft {
   }
 }
 
-// The emoji field + curated browse panel — shared by the full category editor
+// The emoji field + curated browse panel, plus (when the caller wires up
+// upload support) an image alternative — shared by the full category editor
 // and SingletonEditor (Map/Zmanim/Eruv), which has nothing else to edit.
-export function IconField({ icon, onChange }: { icon: string; onChange: (value: string) => void }) {
+export function IconField({
+  icon,
+  onChange,
+  iconImageUrl,
+  onIconImageUrl,
+  token,
+}: {
+  icon: string
+  onChange: (value: string) => void
+  /** When both this and `onIconImageUrl`/`token` are provided, an "or upload
+   *  a picture" option renders below the emoji picker — omitted by any
+   *  caller that hasn't wired up image storage for its icon (there are
+   *  none today, but this keeps the emoji-only path available without a
+   *  required prop every call site has to pass). */
+  iconImageUrl?: string
+  onIconImageUrl?: (url: string) => void
+  token?: string
+}) {
   const [open, setOpen] = useState(false)
   return (
-    <label className="block">
+    // A <div>, not <label> — an image URL text input renders inside this
+    // (see the ImageUploadField block below) with its own <label>, and
+    // labels can't nest. The emoji <input> below carries its own
+    // aria-label="Icon" instead of relying on an ancestor <label> for that.
+    <div className="block">
       <span className="block text-xs font-medium text-slate-700 mb-1">Icon</span>
       <div className="flex gap-2">
         {/* inputClass bakes in w-full — wrap it rather than adding a competing
@@ -930,7 +969,20 @@ export function IconField({ icon, onChange }: { icon: string; onChange: (value: 
         Browse a curated list, or type/paste any emoji directly into the box. Used as the map
         marker, and as the card icon if no background photo is set.
       </span>
-    </label>
+
+      {onIconImageUrl && token !== undefined && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Or use a picture instead</span>
+          <ImageUploadField
+            value={iconImageUrl ?? ''}
+            onChange={onIconImageUrl}
+            uploadUrl="/api/admin/categories/icon"
+            token={token}
+            helpText="Replaces the emoji above everywhere this category's icon shows — listing rows, map pins, the nearby list. Clear it to go back to the emoji."
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1120,7 +1172,17 @@ function CategoryEditor({
       hasPhone: template.hasPhone ?? d.hasPhone,
       upvotesEnabled: template.upvotesEnabled ?? d.upvotesEnabled,
       capabilities: { ...d.capabilities, ...template.capabilities },
-      fields: template.fields.map((f) => ({ ...f })),
+      // A template's own field list replaces the draft's wholesale (same as
+      // Hours/Website silently going along for the ride) — re-seed Photo the
+      // same way toDraft does, so applying a template doesn't quietly turn
+      // this checkbox off.
+      fields: (() => {
+        const f = template.fields.map((field) => ({ ...field }))
+        if (!f.some((field) => field.type === 'image')) {
+          f.push({ key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
+        }
+        return f
+      })(),
     }))
     setLastAppliedTemplate(template)
   }
@@ -1196,6 +1258,16 @@ function CategoryEditor({
   function isWebsiteField(f: CategoryField): boolean {
     return f.type === 'url' && f.label.trim().toLowerCase() === 'website'
   }
+  // Same managed-field pattern as Hours/Website, but for a per-LISTING photo
+  // (see PHOTO_FIELD_KEY) — the checkbox's own upload happens on the public
+  // add/edit form, one photo per listing, shown instead of this category's
+  // shared icon (see CategoryIcon's callers) wherever that listing's own
+  // avatar/pin renders. `type === 'image'` alone is enough to identify it:
+  // unlike Hours/Website, 'image' isn't offered in the manual "+ Add detail"
+  // type picker, so only this checkbox ever creates one.
+  function isPhotoField(f: CategoryField): boolean {
+    return f.type === 'image'
+  }
   function nextFieldKey(fields: CategoryField[], hidden: CategoryField[], base: string): string {
     const used = new Set([...fields, ...hidden].map((f) => f.key))
     let key = base
@@ -1246,6 +1318,23 @@ function CategoryEditor({
       // removable in the Details list instead of vanishing along with the
       // one the checkbox actually owns.
       const idx = d.fields.findIndex(isWebsiteField)
+      if (idx === -1) return d
+      return { ...d, fields: d.fields.filter((_, i) => i !== idx) }
+    })
+  }
+
+  // No positional placement to preserve (unlike Hours/Website, which line up
+  // with the intake form's Phone field) — the photo field is never shown as
+  // a form row of its own text-input kind; it's consumed directly by the
+  // icon/avatar renderers instead (see PHOTO_FIELD_KEY). Appending is fine.
+  function togglePhotoField(on: boolean) {
+    setDraft((d) => {
+      if (on) {
+        if (d.fields.some(isPhotoField)) return d
+        const field: CategoryField = { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image' as FieldType, renderAs: 'row' }
+        return { ...d, fields: [...d.fields, field] }
+      }
+      const idx = d.fields.findIndex(isPhotoField)
       if (idx === -1) return d
       return { ...d, fields: d.fields.filter((_, i) => i !== idx) }
     })
@@ -1389,6 +1478,7 @@ function CategoryEditor({
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,
+        iconImageUrl: draft.iconImageUrl.trim() || null,
         description: draft.description,
         hasAddress: draft.hasAddress,
         hasPhone: draft.hasPhone,
@@ -1439,6 +1529,7 @@ function CategoryEditor({
       label: draft.label || 'Listing',
       pluralLabel: draft.pluralLabel || draft.label || 'Preview',
       icon: draft.icon.trim() || DEFAULT_CATEGORY_ICON,
+      iconImageUrl: draft.iconImageUrl.trim() || null,
       description: draft.description,
       detailFields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
       kind: 'listing',
@@ -1464,6 +1555,7 @@ function CategoryEditor({
   // deleted alongside the one the checkbox actually manages.
   const managedHoursIndex = draft.fields.findIndex(isPlainHoursField)
   const managedWebsiteIndex = draft.fields.findIndex(isWebsiteField)
+  const managedPhotoIndex = draft.fields.findIndex(isPhotoField)
 
   return (
     <div>
@@ -1579,7 +1671,13 @@ function CategoryEditor({
           </div>
           {draft.capabilities.map && (
             <div className="mt-3 pt-3 border-t border-slate-100">
-              <IconField icon={draft.icon} onChange={(v) => set('icon', v)} />
+              <IconField
+                icon={draft.icon}
+                onChange={(v) => set('icon', v)}
+                iconImageUrl={draft.iconImageUrl}
+                onIconImageUrl={(v) => set('iconImageUrl', v)}
+                token={token}
+              />
               <span className="block text-[11px] text-muted mt-1">
                 Used as this category&rsquo;s marker on the map.
               </span>
@@ -1674,6 +1772,8 @@ function CategoryEditor({
               // in the Details list below (see managedWebsiteIndex), so its
               // "show as a button" setting — otherwise only reachable from
               // that row's own FieldEditor — needs a way in from here instead.
+              // Stays directly under "A website" (not after Photo below it),
+              // same as any checkbox's own sub-option would.
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer ml-6">
                 <input
                   type="checkbox"
@@ -1684,12 +1784,23 @@ function CategoryEditor({
                 Also show it as a button on the collapsed card, before the arrow
               </label>
             )}
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.fields.some(isPhotoField)}
+                onChange={(e) => togglePhotoField(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              A photo
+            </label>
             <span className="block text-[11px] text-muted">
               Address and phone are on by default; turn either off for listings that aren’t a physical
               place — like WhatsApp groups — and it disappears from the form and the card. With no
               address, distance sorting and the Map button don’t apply either. Hours and website start
-              off — turn one on to add it to every listing below. All four fill in automatically from
-              Google when you type the address.
+              off — turn one on to add it to every listing below. Photo starts on: each listing can
+              upload its own picture on the add/edit form, shown instead of this category’s icon for
+              that one listing — turn it off if listings here shouldn’t have their own photo. Address,
+              phone, hours, and website fill in automatically from Google when you type the address.
             </span>
           </div>
 
@@ -1755,19 +1866,19 @@ function CategoryEditor({
             </div>
           )}
 
-          {draft.fields.filter((_, i) => i !== managedHoursIndex && i !== managedWebsiteIndex).length === 0 ? (
+          {draft.fields.filter((_, i) => i !== managedHoursIndex && i !== managedWebsiteIndex && i !== managedPhotoIndex).length === 0 ? (
             <p className="text-xs text-muted">No details yet — listings will show just name, address, and phone.</p>
           ) : (
             <div className="space-y-3">
               {draft.fields.map((f, i) => {
-                // The one Hours/Website field each checkbox above actually
-                // owns doesn't get a row here — same as address/phone,
-                // checking the box is the whole interaction, nothing left to
-                // configure per-listing. A second field that happens to
-                // match the same shape (see managedHoursIndex/
-                // managedWebsiteIndex above) is NOT this checkbox's — it
-                // still gets a normal, editable row below.
-                if (i === managedHoursIndex || i === managedWebsiteIndex) return null
+                // The one Hours/Website/Photo field each checkbox above
+                // actually owns doesn't get a row here — same as
+                // address/phone, checking the box is the whole interaction,
+                // nothing left to configure per-listing. A second field that
+                // happens to match the same shape (see managedHoursIndex/
+                // managedWebsiteIndex/managedPhotoIndex above) is NOT this
+                // checkbox's — it still gets a normal, editable row below.
+                if (i === managedHoursIndex || i === managedWebsiteIndex || i === managedPhotoIndex) return null
                 return (
                 <FieldEditor
                   key={i}

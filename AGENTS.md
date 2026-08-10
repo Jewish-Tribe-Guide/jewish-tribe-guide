@@ -4,6 +4,10 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Only when a task actually touches Next.js framework mechanics — routing/`app` directory conventions, data fetching, server actions, middleware, `next.config.ts`, or other file conventions — read the matching guide in `node_modules/next/dist/docs/` first and heed its deprecation notices. Ordinary component/logic edits that don't call a Next.js API directly don't need this.
 <!-- END:nextjs-agent-rules -->
 
+# Local admin access
+
+Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed.
+
 # Tests
 
 ```bash
