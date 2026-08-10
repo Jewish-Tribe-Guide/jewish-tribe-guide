@@ -16,6 +16,9 @@ export type MapPoint = {
   phone?: string
   /** Emoji/glyph shown inside the pin (e.g. a category icon). */
   glyph?: string
+  /** An uploaded picture shown inside the pin instead of `glyph` — see
+   *  CategoryConfig.iconImageUrl. */
+  glyphSrc?: string
   /** Pin background color (hex). */
   color: string
   /** Subtitle shown in the info window (e.g. the category label). */
@@ -26,6 +29,10 @@ export type MapPoint = {
    *  carried through so a marker tap can show full details without a second
    *  lookup. See MapPlaceDetail. */
   raw?: DirectoryResource
+  /** On the visitor's personal "Pinned" shortlist (see lib/pinned.ts) — draws
+   *  a small badge on the marker so a pinned place still stands out once the
+   *  map is showing dozens of same-category pins. */
+  pinned?: boolean
 }
 
 const HOSPITALS_FILTER_ID = '__hospitals__'
@@ -62,6 +69,11 @@ type Props = {
    *  sheet back to peek height, keeping any selected place so dragging back
    *  up returns to it instead of losing it in favor of the nearby list. */
   onBackgroundClick?: () => void
+  /** A long-press (touch) or right-click (desktop) on empty map — both fire
+   *  as the same 'contextmenu' event, which is the standard way to offer
+   *  "drop a pin here" without hijacking the plain single-tap/click that
+   *  onBackgroundClick already owns. */
+  onMapLongPress?: (coords: LatLng) => void
   /** True while a search query or filter chip is narrowing `points` — overrides
    *  the "don't reframe if a user location is set" rule below, so searching
    *  actually takes you to the result(s), same as the Google Maps app. */
@@ -159,17 +171,40 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    glyph: p.glyph ?? null,
+    // glyphSrc (an uploaded category picture) wins over the plain emoji
+    // glyph when both would otherwise apply — a category with an image set
+    // still carries its emoji as the CategoryIcon fallback everywhere else,
+    // but on the map itself there's room for only one.
+    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : { glyph: p.glyph ?? null }),
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
   })
-  if (!isSelected) return pin.element
+  if (!isSelected && !p.pinned) return pin.element
 
   const wrap = document.createElement('div')
-  wrap.style.cssText = 'position:relative;display:flex;align-items:flex-end;justify-content:center;animation:jpcPinDrop 0.35s ease-out'
-  const halo = document.createElement('div')
-  halo.style.cssText = `position:absolute;bottom:6px;width:30px;height:30px;border-radius:9999px;background:${p.color};animation:jpcPinHalo 1.4s ease-out infinite`
-  wrap.append(halo, pin.element)
+  wrap.style.cssText =
+    'position:relative;display:flex;align-items:flex-end;justify-content:center' +
+    (isSelected ? ';animation:jpcPinDrop 0.35s ease-out' : '')
+  if (isSelected) {
+    const halo = document.createElement('div')
+    halo.style.cssText = `position:absolute;bottom:6px;width:30px;height:30px;border-radius:9999px;background:${p.color};animation:jpcPinHalo 1.4s ease-out infinite`
+    wrap.append(halo)
+  }
+  wrap.append(pin.element)
+  // A small badge over the pin's own glyph, not a swap to a different marker
+  // color/icon — the category color+glyph is how a visitor already tells
+  // pins apart at a glance, and a pinned place is still that same category,
+  // just also shortlisted. Overlaid at the pin's shoulder (not the tip) so
+  // it never covers the glyph itself.
+  if (p.pinned) {
+    const badge = document.createElement('div')
+    badge.style.cssText =
+      'position:absolute;top:0;right:0;width:16px;height:16px;border-radius:9999px;' +
+      'background:#2563eb;border:2px solid #fff;display:flex;align-items:center;justify-content:center;' +
+      'font-size:9px;line-height:1;color:#fff'
+    badge.textContent = '📌'
+    wrap.appendChild(badge)
+  }
   return wrap
 }
 
@@ -239,7 +274,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
+export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -261,6 +296,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const onSelectPointRef = useRef(onSelectPoint)
   const onDeselectPointRef = useRef(onDeselectPoint)
   const onBackgroundClickRef = useRef(onBackgroundClick)
+  const onMapLongPressRef = useRef(onMapLongPress)
   const userLocationRef = useRef(userLocation)
   const searchActiveRef = useRef(searchActive)
   const selectedIdRef = useRef(selectedId)
@@ -271,6 +307,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
   useEffect(() => { onBackgroundClickRef.current = onBackgroundClick }, [onBackgroundClick])
+  useEffect(() => { onMapLongPressRef.current = onMapLongPress }, [onMapLongPress])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
   useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
@@ -311,6 +348,15 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         // effect's own panning.
         mapRef.current.addListener('dragstart', () => {
           onManualDragRef.current?.()
+        })
+        // Long-press (touch) and right-click (desktop) both fire as
+        // 'contextmenu' — Google's own documented pattern for "the user
+        // wants to do something with this exact spot," as opposed to the
+        // plain tap/click onBackgroundClick already handles.
+        mapRef.current.addListener('contextmenu', (e: google.maps.MapMouseEvent) => {
+          if (!e.latLng) return
+          e.domEvent?.preventDefault?.()
+          onMapLongPressRef.current?.({ lat: e.latLng.lat(), lng: e.latLng.lng() })
         })
         setReady(true)
       })

@@ -156,10 +156,14 @@ export function validateSubmission(
     }
   }
 
-  // URL fields render as clickable link buttons on approved cards — only allow
-  // http/https so a `javascript:`/`data:` URL can't be smuggled into an href.
+  // URL fields render as clickable link buttons on approved cards, and an
+  // 'image' field's value becomes an <img>/next/image src (see CategoryIcon)
+  // — both only allow http/https so a `javascript:`/`data:` value can't be
+  // smuggled in. The upload route itself only ever returns an https storage
+  // URL; this also covers the "…or paste an image URL directly" fallback in
+  // ImageUploadField, which accepts arbitrary typed text.
   for (const field of category?.detailFields ?? []) {
-    if (field.type !== 'url') continue
+    if (field.type !== 'url' && field.type !== 'image') continue
     const value = submission.details?.[field.key]
     if (typeof value === 'string' && value.trim() && !isHttpUrl(value)) {
       errs.push(`${field.label} must be a valid http(s) link.`)

@@ -54,6 +54,18 @@ type Props = {
   onToggleBool: (categoryId: string, key: string) => void
   selectFilters: Record<string, string[]>
   onToggleSelectValue: (categoryId: string, key: string, value: string) => void
+  /** The "Pinned" shortlist toggle — not one of `options`, so it can't just
+   *  be another entry in that array: it narrows ACROSS categories rather
+   *  than being one, and it's the single most important chip in the row, so
+   *  it renders right after Show all/Hide all rather than sorted in among
+   *  the regular category chips by count like everything else here. */
+  pinnedChip?: React.ReactNode
+  /** Whether the Pinned chip (above) is currently on — folded into "is
+   *  everything on" below (only while `pinnedChip` is actually rendered, so
+   *  its absence — nothing pinned yet — can't read as "something's off")
+   *  so Show all/Hide all's own label, and what tapping it does, accounts
+   *  for Pinned too, not just the real categories. */
+  pinnedOn?: boolean
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
@@ -75,6 +87,8 @@ export default function CategoryFilter({
   onToggleBool,
   selectFilters,
   onToggleSelectValue,
+  pinnedChip,
+  pinnedOn,
 }: Props) {
   // Mobile keeps the original, simpler chip: a filter segment only shows up
   // once something's already active (spelled out, e.g. "IKC"), and tapping
@@ -85,7 +99,7 @@ export default function CategoryFilter({
   // shared component either way — this is the one thing that still tells
   // the two apart, everything else below branches off it.
   const isMobile = useIsMobile()
-  const allOn = options.every((o) => selected.has(o.id))
+  const allOn = options.every((o) => selected.has(o.id)) && (!pinnedChip || !!pinnedOn)
   // Selected categories always take priority for the compact row's limited
   // slots over unselected ones — otherwise turning one on from the full
   // "More" list that isn't already one of the top-N by count would just
@@ -212,6 +226,7 @@ export default function CategoryFilter({
       >
         {allOn ? 'Hide all' : 'Show all'}
       </button>
+      {pinnedChip}
       {visible.map((o) => {
         const on = selected.has(o.id)
         const editorOpen = openFilterFor === o.id

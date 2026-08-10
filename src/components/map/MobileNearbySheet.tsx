@@ -309,7 +309,6 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
           <MapPlaceDetail
             item={selected.raw}
             category={selectedCategory}
-            glyph={selected.glyph}
             color={selected.color}
             onBack={() => setSelected(null)}
           />

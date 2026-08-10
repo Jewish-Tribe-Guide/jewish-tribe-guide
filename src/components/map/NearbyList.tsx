@@ -4,6 +4,9 @@ import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import { directionsUrl } from '@/lib/googleMapsLinks'
 import { DirectionsIcon } from '@/components/icons'
+import PinButton from '@/components/resources/PinButton'
+import CategoryIcon from '@/components/CategoryIcon'
+import { ui } from '@/lib/uiConfig'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
@@ -75,13 +78,13 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               disabled={!canViewListing}
               className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
             >
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg"
-                style={{ backgroundColor: p.color + '22' }}
-                aria-hidden="true"
-              >
-                {p.glyph ?? '📍'}
-              </span>
+              <CategoryIcon
+                icon={p.glyph ?? '📍'}
+                iconImageUrl={p.glyphSrc}
+                color={p.color}
+                className="h-9 w-9 text-lg"
+                sizePx={36}
+              />
               <span className="min-w-0 flex-1">
                 <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
                   {p.name}
@@ -96,7 +99,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               </span>
             </button>
 
-            {/* Distance + Directions — a quiet round icon button, not a
+            {/* Distance + pin + Directions — a quiet round icon button, not a
                 labeled blue pill, so it reads like Google Maps' understated
                 directions shortcut instead of competing with the row tap target. */}
             <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
@@ -105,6 +108,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
                   {distanceLabel(p.miles)}
                 </span>
               )}
+              {ui.map.pins && p.raw && <PinButton id={p.id} categoryId={p.filterId} name={p.name} />}
               <a
                 href={href}
                 target="_blank"

@@ -9,6 +9,8 @@ import MobileTabBar from '@/components/MobileTabBar'
 import LiveLocationPrompt from '@/components/LiveLocationPrompt'
 import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
+import { PinnedProvider } from '@/lib/pinnedContext'
+import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCategories } from '@/lib/useCategories'
@@ -124,9 +126,13 @@ export default function SiteChrome({
 }) {
   return (
     <LocationProvider>
-      <HeaderCollapseProvider>
-        <Chrome year={year}>{children}</Chrome>
-      </HeaderCollapseProvider>
+      <PinnedProvider>
+        <DroppedPinsProvider>
+          <HeaderCollapseProvider>
+            <Chrome year={year}>{children}</Chrome>
+          </HeaderCollapseProvider>
+        </DroppedPinsProvider>
+      </PinnedProvider>
     </LocationProvider>
   )
 }
