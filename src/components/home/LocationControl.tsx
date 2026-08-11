@@ -193,21 +193,6 @@ export default function LocationControl({ controls }: Props) {
             Where should distances be measured from?
           </p>
 
-          {listingAnchorName && (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
-              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
-                <CrosshairIcon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{listingAnchorName}</span>
-              </span>
-              <button
-                onClick={() => location?.clearAnchor()}
-                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-
           {controls.tracking ? (
             <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
@@ -234,18 +219,46 @@ export default function LocationControl({ controls }: Props) {
             </button>
           )}
 
-          <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
-            <span className="h-px flex-1 bg-slate-100" />
-            or enter an address
-            <span className="h-px flex-1 bg-slate-100" />
-          </div>
+          {/* Two slots, each showing either its control or its own active
+              state: live tracking above, "a fixed point you picked" here.
+              That's why the listing anchor lands in the address input's slot
+              rather than above the live button — it IS the fixed point, so
+              keeping it here leaves the live option where it always sits
+              instead of shuffling the order once something's set. Same
+              in-place swap tracking already does with its Stop row.
 
-          <AddressInput
-            value={controls.tracking || listingAnchorName ? '' : controls.address}
-            onChange={handleAddressChange}
-            onCoords={handleCoords}
-            placeholder="Enter your address"
-          />
+              The "or enter an address" divider goes with the input: above a
+              summary row it would be describing something that isn't there.
+              Clearing brings both back. */}
+          {listingAnchorName ? (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
+                <CrosshairIcon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{listingAnchorName}</span>
+              </span>
+              <button
+                onClick={() => location?.clearAnchor()}
+                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
+                <span className="h-px flex-1 bg-slate-100" />
+                or enter an address
+                <span className="h-px flex-1 bg-slate-100" />
+              </div>
+
+              <AddressInput
+                value={controls.tracking ? '' : controls.address}
+                onChange={handleAddressChange}
+                onCoords={handleCoords}
+                placeholder="Enter your address"
+              />
+            </>
+          )}
 
           {controls.geoError && <p className="mt-2 text-xs text-red-600">{controls.geoError}</p>}
         </div>
