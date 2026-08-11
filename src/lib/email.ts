@@ -77,26 +77,19 @@ export async function sendEmail({
 
 // ── Admin notification (intake forms) ────────────────────────────────────────
 
-function sheetsTabUrl(requestType: string): string {
-  const id = process.env.GOOGLE_SHEETS_ID
-  if (!id) return ''
-  const base = `https://docs.google.com/spreadsheets/d/${id}/edit`
-  // Volunteer Edit / Volunteer Removal → "Volunteer Changes" tab
-  if (requestType === 'Volunteer Edit' || requestType === 'Volunteer Removal') {
-    const gid = process.env.GOOGLE_SHEETS_VOLUNTEER_CHANGES_GID
-    return gid ? `${base}#gid=${gid}` : base
-  }
-  // New Volunteer signup → "Volunteer" tab
-  if (requestType === 'Volunteer') {
-    const gid = process.env.GOOGLE_SHEETS_VOLUNTEER_GID
-    return gid ? `${base}#gid=${gid}` : base
-  }
-  if (requestType === 'Feedback') {
-    const gid = process.env.GOOGLE_SHEETS_FEEDBACK_GID
-    return gid ? `${base}#gid=${gid}` : base
-  }
-  // All other requests (meals, transportation, etc.) → base sheet
-  return base
+// Where this request lives once it's off Sheets: the 4 built-in hospital-
+// facing types (Direct Support, Volunteer, Volunteer Edit, Volunteer
+// Removal) are /inbox's whole reason for existing (see lib/inbox.ts); a
+// custom admin-created form (payload.formId set) is a form response, which
+// lives in /admin's Responses tab instead, same as Feedback. Neither /inbox
+// nor that tab currently supports deep-linking to a specific sub-tab (see
+// buildFeedbackHtml's own note on /admin/responses landing on Feedback only
+// because it happens to be the default) — this links to the right SCREEN,
+// not a further-selected tab within it.
+function appLinkFor(payload: SubmissionPayload): string | null {
+  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  if (!appUrl) return null
+  return payload.formId ? `${appUrl}/admin/responses` : `${appUrl}/inbox`
 }
 
 function buildHtml(
@@ -106,9 +99,9 @@ function buildHtml(
 ): string {
   const { contact, requestType, formData } = payload
   const formJson = JSON.stringify(formData, null, 2)
-  const sheetsUrl = sheetsTabUrl(requestType)
-  const sheetsLink = sheetsUrl
-    ? `<p style="margin-top:16px;"><a href="${escapeHtml(sheetsUrl)}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open Google Sheets →</a></p>`
+  const appUrl = appLinkFor(payload)
+  const appLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in ${payload.formId ? 'admin' : 'inbox'} →</a></p>`
     : ''
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">New ${escapeHtml(requestType)} Request</h2>
@@ -125,7 +118,7 @@ function buildHtml(
     </table>
     <h3 style="color:#334155;margin-bottom:6px;">Request Details</h3>
     <pre style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(formJson)}</pre>
-    ${sheetsLink}
+    ${appLink}
   </div>`
 }
 
