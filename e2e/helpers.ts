@@ -51,6 +51,29 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
+/** The listing-kind category with the MOST listings — for tests that need a
+ *  page long enough to actually scroll. `categoryWithListings` returns the
+ *  first one with any at all, which is routinely a 4-entry category whose
+ *  page is shorter than the viewport; a scroll test on that scrolls zero
+ *  pixels and then passes or fails for reasons having nothing to do with
+ *  what it meant to check. Derived from the running app, not hardcoded —
+ *  which category is biggest changes as an admin edits content. */
+export async function largestCategory(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; count: number }> {
+  const all = await categories(request, community)
+  let best: { category: Category; count: number } | null = null
+  for (const category of all.filter((c) => c.kind === 'listing')) {
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const body = await res.json()
+    const count = body.ok ? (body.resources as unknown[]).length : 0
+    if (!best || count > best.count) best = { category, count }
+  }
+  if (!best || best.count === 0) throw new Error('No listing category has any listings')
+  return best
+}
+
 /** Dismisses the "Share your live location?" prompt if it's showing.
  *
  *  It's a full-screen overlay that intercepts pointer events, so on mobile —
