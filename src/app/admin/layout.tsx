@@ -2,6 +2,7 @@ import { getDefaultCommunity, listCommunities } from '@/lib/communityStore'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { loadCommunityContent } from '@/lib/loadCommunityContent'
+import AdminAuthGate from '@/components/admin/AdminAuthGate'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The admin lives outside /[community] — it's one console, not a public screen
@@ -24,7 +25,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <CommunityProvider community={community} communities={communities}>
-      <ContentProvider content={content}>{children}</ContentProvider>
+      <ContentProvider content={content}>
+        {/* Real routes now live under here (/admin, /admin/categories, …) —
+            this one gate covers every one of them, subscribing to the
+            Supabase session once at the layout level (which persists across
+            sibling-route navigations) instead of every route re-doing its
+            own session check. */}
+        <AdminAuthGate>{children}</AdminAuthGate>
+      </ContentProvider>
     </CommunityProvider>
   )
 }
