@@ -51,19 +51,26 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
               : category.iconImageUrl) ?? undefined
           }
           color={color}
-          className="h-12 w-12 text-2xl"
+          className="h-12 w-12 text-2xl self-start"
           sizePx={48}
         />
         <div className="min-w-0 flex-1 pt-0.5">
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
       </div>
 
       <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
 
-      <PlaceDetailBody item={item} category={category} />
+      {/* Pin lives next to "I'm here" inside PlaceDetailBody's own address
+          row, not up here — both are small per-listing toggles (see
+          PinButton's own doc comment), so they read as a matched pair
+          instead of one sitting in the header and the other buried below. */}
+      <PlaceDetailBody
+        item={item}
+        category={category}
+        pinButton={ui.map.pins ? <PinButton id={item.id} categoryId={category.id} name={item.name} /> : undefined}
+      />
     </div>
   )
 }

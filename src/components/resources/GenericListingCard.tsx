@@ -144,7 +144,11 @@ export function GenericListingCard({
       >
         {/* Icon avatar — same glyph/image + tinted color as this category's
             map pin (see getCategoryColor), so a place reads as the same
-            thing here and on the map. */}
+            thing here and on the map. self-start (overriding the row's own
+            items-center) lines its top edge up with the name's first line —
+            without it, a card with a subtitle and chip row underneath makes
+            the icon look like it's floating in the middle of the whole
+            block rather than sitting next to what it's naming. */}
         <CategoryIcon
           icon={category.icon}
           iconImageUrl={
@@ -153,7 +157,7 @@ export function GenericListingCard({
               : category.iconImageUrl) ?? undefined
           }
           color={color}
-          className="h-10 w-10 text-xl"
+          className="h-10 w-10 text-xl self-start"
         />
 
         {/* Name + subtitle + the only chips that survive collapsed: Open and

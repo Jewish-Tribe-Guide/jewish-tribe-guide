@@ -127,6 +127,13 @@ type Props = {
   /** Signal-badge field keys to skip in the status row for the same reason —
    *  they're the ones already showing in the caller's own header. */
   hiddenBadgeKeys?: string[]
+  /** The "Pin" bookmark toggle (see PinButton) — only the map's place detail
+   *  passes this; the category directory's own card doesn't offer pinning.
+   *  Rendered right next to "I'm here" (SetLocationButton) rather than up in
+   *  the header: both are small per-listing toggles that belong together
+   *  (see PinButton's own doc comment — it's already styled to match this
+   *  one), not split across two different parts of the screen. */
+  pinButton?: ReactNode
 }
 
 /**
@@ -138,7 +145,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], pinButton }: Props) {
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
   // A url field already shown up top on the collapsed card (showInHeader —
@@ -299,6 +306,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
           <p className="min-w-0 text-sm text-slate-800">{item.address}</p>
           <SetLocationButton item={item} category={category} />
+          {pinButton}
         </div>
       )}
 
