@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import type { DirectoryResource, MapFilters } from '@/types'
 import type { Coords } from '@/lib/useStoredLocation'
-import { distanceMiles } from '@/lib/geo'
+import { withMilesFromAddress } from '@/lib/listingTravel'
 import GenericDirectory from '@/components/resources/GenericDirectory'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
@@ -198,12 +198,14 @@ export default function CategoryPreview({
 }
 
 // Mirrors ResourceLoader's distance annotation — straight-line miles from the
-// preview's own address anchor to each listing's geocoded coordinates.
+// preview's own address anchor to each listing's geocoded coordinates. No
+// anchorListingId here: "I'm here" needs a LocationProvider, which the
+// preview deliberately doesn't have (see useOptionalLocation's own note).
 function itemsWithDistance(
   items: DirectoryResource[],
   category: CategoryConfig,
   coords: Coords | null,
 ): DirectoryResource[] {
-  if (category.hasAddress === false || !coords) return items
-  return items.map((item) => (item.geo ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) } : item))
+  if (category.hasAddress === false) return items
+  return withMilesFromAddress(items, coords)
 }

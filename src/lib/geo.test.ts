@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { distanceMiles, haversineMiles, type LatLng } from './geo'
+import { distanceMiles, haversineMiles, roundMiles, type LatLng } from './geo'
 
 // Reference points around Philadelphia, where the distances are the ones the
 // directory actually sorts by.
@@ -56,5 +56,19 @@ describe('distanceMiles', () => {
   it('never returns more than one decimal', () => {
     const d = distanceMiles(PENN_PRESBYTERIAN, CHOP)
     expect(d).toBe(Math.round(d * 10) / 10)
+  })
+})
+
+describe('roundMiles', () => {
+  it('rounds to one decimal place', () => {
+    expect(roundMiles(2.16)).toBe(2.2)
+    expect(roundMiles(0.04)).toBe(0)
+  })
+
+  // The whole reason this is a separate step from distanceMiles: sorting
+  // needs the unrounded value, or two places a couple hundred feet apart
+  // round to the same bucket and tie.
+  it('collapses two distinct nearby distances to the same label', () => {
+    expect(roundMiles(0.31)).toBe(roundMiles(0.34))
   })
 })

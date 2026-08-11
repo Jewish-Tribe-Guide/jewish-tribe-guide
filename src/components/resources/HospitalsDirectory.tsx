@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useHospitals } from '@/lib/useHospitals'
 import type { DirectoryAnchor, HospitalInfo } from '@/types'
-import { distanceMiles } from '@/lib/geo'
+import { haversineMiles, roundMiles } from '@/lib/geo'
 import UpButton from '@/components/UpButton'
 import DirectoryHeader from './DirectoryHeader'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -13,6 +13,10 @@ type Props = {
   /** Open the About Your Hospital page for the chosen hospital. */
   onSelect: (hospitalId: string) => void
   onUp: () => void
+  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
+   *  index there), "All resources" on desktop (a separate index page). See
+   *  FindResources' upToAllResources, which this mirrors. */
+  upLabel?: string
   /** Open the map view (all resources, no category filter). */
   onViewMap?: () => void
 }
@@ -32,15 +36,18 @@ function features(info?: HospitalInfo | null): string[] {
 // Lists every hospital, sorted by distance from the visitor's address (when set),
 // with a search box. Tapping one opens its Jewish-resources page. Framed as a
 // question so it reads as a clear first step, not a database listing.
-export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }: Props) {
+export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = 'All resources', onViewMap }: Props) {
   const [search, setSearch] = useState('')
   const hospitals = useHospitals() ?? []
   const coords = anchor.coords
   const label = anchor.label || null
 
+  // Unrounded — sorted on directly below, so two hospitals a couple hundred
+  // feet apart don't round to the same 0.1-mile bucket and tie into
+  // arbitrary order. Only the label (below) rounds.
   const withDistance = hospitals.map((h) => ({
     ...h,
-    miles: coords ? distanceMiles(coords, { lat: h.latitude, lng: h.longitude }) : null,
+    miles: coords ? haversineMiles(coords, { lat: h.latitude, lng: h.longitude }) : null,
   }))
 
   // A search box only earns its space once the list is long; with a handful of
@@ -60,7 +67,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
 
   return (
     <div>
-      <UpButton label="All resources" onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} />
 
       <DirectoryHeader
         title="Which hospital?"
@@ -138,7 +145,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }
 
                 <span className="flex flex-col items-end gap-2 shrink-0 pt-0.5">
                   {h.miles != null && (
-                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {h.miles} mi</span>
+                    <span className="text-xs font-medium text-slate-600 whitespace-nowrap">📍 {roundMiles(h.miles)} mi</span>
                   )}
                   <svg className="w-5 h-5 text-slate-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
