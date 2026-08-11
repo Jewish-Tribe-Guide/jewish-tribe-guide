@@ -59,8 +59,22 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
     // get stuck.
     function onScroll() {
       const y = window.scrollY
-      setScrollVisible((prev) => nextHeaderVisible(y, lastY, prev))
+      // `prevY` must be read into a const BEFORE `lastY` moves, and the
+      // updater below must close over that const rather than over `lastY`
+      // itself. React only sometimes runs a functional updater immediately —
+      // it does when nothing else is queued for this fiber, and otherwise
+      // defers it to render. A deferred updater reading `lastY` would read it
+      // AFTER the reassignment below, i.e. compare `y` against itself: both
+      // direction checks in nextHeaderVisible fail on equal values, so it
+      // returns the current state and the header never moves.
+      //
+      // That's why this looked like it worked and then stopped — one slow
+      // scroll with an empty queue evaluates eagerly and behaves; actual
+      // scrolling queues updates, takes the deferred path, and the header
+      // silently freezes wherever it was.
+      const prevY = lastY
       lastY = y
+      setScrollVisible((prev) => nextHeaderVisible(y, prevY, prev))
     }
 
     window.addEventListener('scroll', onScroll, { passive: true })
