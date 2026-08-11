@@ -11,17 +11,21 @@ type Props = {
   /** Subtitle shown under the heading — the visitor's location or community name. */
   locationLabel: string
   onUp: () => void
+  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
+   *  index there), "All resources" on desktop (a separate index page). See
+   *  FindResources' upToAllResources, which this mirrors. */
+  upLabel?: string
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
   title?: string
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos' }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos' }: Props) {
   const { data, status } = useZmanim(coords)
 
   return (
     <div>
-      <UpButton label="All resources" onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} />
 
       {/* Heading */}
       <div className="mb-6">

@@ -33,6 +33,12 @@ type Props = {
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
   onUp: () => void
+  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
+   *  index there), "All resources" on desktop (a separate index page). See
+   *  FindResources' upToAllResources, which this mirrors. Defaults to "All
+   *  resources" for callers (the admin's category preview) that always mean
+   *  that literally, regardless of device. */
+  upLabel?: string
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -43,7 +49,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -289,7 +295,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   return (
     <div>
-      <UpButton label="All resources" onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} />
 
       <DirectoryHeader
         title={category.pluralLabel}
