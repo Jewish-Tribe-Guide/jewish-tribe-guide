@@ -169,9 +169,15 @@ function buildFeedbackHtml(
 ): string {
   const message = escapeHtml(String(payload.formData.message ?? ''))
   const email = payload.contact.email?.trim()
-  const sheetsUrl = sheetsTabUrl('Feedback')
-  const sheetsLink = sheetsUrl
-    ? `<p style="margin-top:16px;"><a href="${escapeHtml(sheetsUrl)}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open Feedback in Sheets →</a></p>`
+  // Feedback lives in the admin's Responses tab now, not a Sheet — same
+  // link shape as sendSubmissionNotification's own adminLink below, just
+  // pointed at /admin/responses (its own real route since the admin routing
+  // refactor) rather than /admin. Feedback is that tab's default sub-tab
+  // (see ResponsesManager's FEEDBACK_KEY), so no query param is needed to
+  // land there directly.
+  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const adminLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin/responses" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in admin →</a></p>`
     : ''
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">New Site Feedback</h2>
@@ -180,7 +186,7 @@ function buildFeedbackHtml(
       ${row('Message', message)}
       ${email ? row('Email', email) : ''}
     </table>
-    ${sheetsLink}
+    ${adminLink}
   </div>`
 }
 
