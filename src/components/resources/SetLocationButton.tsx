@@ -41,14 +41,17 @@ export default function SetLocationButton({
 
   const active = location.anchorListingId === item.id
   const label = active
-    ? `You're here — ${item.name} is where distances are measured from. Tap to clear.`
+    ? `You're here — ${item.name} is where distances are measured from. Tap to undo.`
     : `I'm here — measure distances from ${item.name}`
 
   return (
     <button
       onClick={(e) => {
         e.stopPropagation()
-        if (active) location.clearAnchor()
+        // unsetListingAnchor, not clearAnchor: tapping this off is an undo, so
+        // it restores whatever address this listing displaced. The picker's
+        // own Clear button is the one that means "no location at all".
+        if (active) location.unsetListingAnchor()
         else location.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
       }}
       aria-pressed={active}
