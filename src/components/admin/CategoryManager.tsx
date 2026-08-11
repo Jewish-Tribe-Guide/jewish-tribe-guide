@@ -852,6 +852,20 @@ type Draft = {
   cardTextColor: string
 }
 
+// Where a newly-added Photo field belongs: right after Website (or right
+// after Hours if there's no Website; or at the very front if neither) — same
+// slot it holds in this editor's own "Every listing also has" checkboxes, so
+// the intake/edit form's field order actually matches what admins see here.
+// A plain function (not a component method) since toDraft below — where a
+// fresh category's Photo first gets seeded — runs outside CategoryEditor.
+function photoInsertIndex(fields: CategoryField[]): number {
+  const websiteIndex = fields.findIndex((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')
+  if (websiteIndex !== -1) return websiteIndex + 1
+  const hoursIndex = fields.findIndex((f) => f.type === 'hours' && !f.audienceKey)
+  if (hoursIndex !== -1) return hoursIndex + 1
+  return 0
+}
+
 function toDraft(c: CategoryConfig | null): Draft {
   const all = (c?.detailFields ?? []).map((f) => ({ ...f }))
   const fields = all.filter((f) => f.renderAs !== 'hidden')
@@ -860,9 +874,19 @@ function toDraft(c: CategoryConfig | null): Draft {
   // which start off. Once saved (even untouched), its presence in `fields`
   // becomes the real source of truth, same as everything else here; an
   // admin who explicitly unchecks it stays unchecked from then on.
-  if (!fields.some((f) => f.type === 'image')) {
-    fields.push({ key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
-  }
+  //
+  // Position is re-derived on every load (not just when first added) rather
+  // than trusted from whatever was saved — Photo isn't reachable in the
+  // Details list to manually reorder (see managedPhotoIndex), so unlike a
+  // real field its position is never a deliberate admin choice to respect,
+  // only ever this checkbox's own placement rule (photoInsertIndex). This
+  // also self-heals categories saved before that rule existed.
+  const existingPhotoIndex = fields.findIndex((f) => f.type === 'image')
+  const photoField =
+    existingPhotoIndex === -1
+      ? { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image' as FieldType, renderAs: 'row' as const }
+      : fields.splice(existingPhotoIndex, 1)[0]!
+  fields.splice(photoInsertIndex(fields), 0, photoField)
   return {
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
@@ -1179,7 +1203,7 @@ function CategoryEditor({
       fields: (() => {
         const f = template.fields.map((field) => ({ ...field }))
         if (!f.some((field) => field.type === 'image')) {
-          f.push({ key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
+          f.splice(photoInsertIndex(f), 0, { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image', renderAs: 'row' })
         }
         return f
       })(),
@@ -1323,16 +1347,17 @@ function CategoryEditor({
     })
   }
 
-  // No positional placement to preserve (unlike Hours/Website, which line up
-  // with the intake form's Phone field) — the photo field is never shown as
-  // a form row of its own text-input kind; it's consumed directly by the
-  // icon/avatar renderers instead (see PHOTO_FIELD_KEY). Appending is fine.
+  // Same slot as toDraft/applyTemplate seed it into (see photoInsertIndex) —
+  // right after Website, so the intake form shows Photo exactly where this
+  // editor's own checkboxes do, not wherever it happens to land at the end.
   function togglePhotoField(on: boolean) {
     setDraft((d) => {
       if (on) {
         if (d.fields.some(isPhotoField)) return d
         const field: CategoryField = { key: PHOTO_FIELD_KEY, label: 'Photo', type: 'image' as FieldType, renderAs: 'row' }
-        return { ...d, fields: [...d.fields, field] }
+        const fields = [...d.fields]
+        fields.splice(photoInsertIndex(fields), 0, field)
+        return { ...d, fields }
       }
       const idx = d.fields.findIndex(isPhotoField)
       if (idx === -1) return d
@@ -2047,6 +2072,10 @@ function normalizeField(f: CategoryField): CategoryField {
     out.filterable = false
     out.multiSelect = undefined
   }
+  // "Other" only means anything for a Choice field (single- or multi-value
+  // alike — see MultiSelectField/SelectOtherField) — clear it if the type
+  // changed away from 'select'.
+  if (out.type !== 'select') out.allowOther = undefined
   return out
 }
 
@@ -2224,6 +2253,18 @@ function FieldEditor({
             className="rounded border-slate-300"
           />
           Allow more than one choice per listing (e.g. Restaurant + Catering)
+        </label>
+      )}
+
+      {f.type === 'select' && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.allowOther}
+            onChange={(e) => onChange({ allowOther: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Add an &ldquo;Other&rdquo; choice that lets them type their own answer
         </label>
       )}
 

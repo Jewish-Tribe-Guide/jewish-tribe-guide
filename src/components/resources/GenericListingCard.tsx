@@ -8,7 +8,6 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import CategoryIcon from '@/components/CategoryIcon'
 import UpvoteButton from './UpvoteButton'
-import PinButton from './PinButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import Chip from './Chip'
@@ -254,7 +253,6 @@ export function GenericListingCard({
               {f.linkLabel ?? f.label}
             </a>
           ))}
-          {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
           <svg
             className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"

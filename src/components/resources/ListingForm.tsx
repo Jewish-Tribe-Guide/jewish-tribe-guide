@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
@@ -526,7 +526,12 @@ function DetailFieldInput({
           value={(value as string) ?? ''}
           onChange={onChange}
           uploadUrl="/api/submissions/photo"
-          shape="square"
+          // Wherever this photo actually renders (CategoryIcon's callers —
+          // map pins, listing cards, place detail) it's always circular, so
+          // the crop step's own guide has to match that, not show a square
+          // shape and let corners the visitor thinks are kept quietly get
+          // clipped away later.
+          shape="circle"
           helpText="Shown instead of the category's usual icon for this listing — on the map, in search, and in the directory. Optional."
         />
       </div>
@@ -569,36 +574,11 @@ function DetailFieldInput({
   }
 
   if (field.type === 'select' && field.multiSelect) {
-    // Badge-shown choice fields always allow more than one value on a single
-    // listing (e.g. a place that's both a Restaurant and a Caterer) — see
-    // `selectValues` for why the stored shape can still be a bare string on
-    // older listings.
-    const chosen = selectValues(value)
-    function toggle(v: string) {
-      onChange(chosen.includes(v) ? chosen.filter((x) => x !== v) : [...chosen, v])
-    }
-    return (
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-        <div className="flex flex-wrap gap-2">
-          {field.options?.map((opt) => {
-            const on = chosen.includes(opt.value)
-            return (
-              <label
-                key={opt.value}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm cursor-pointer transition-colors ${
-                  on ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <input type="checkbox" checked={on} onChange={() => toggle(opt.value)} className="sr-only" />
-                {opt.label}
-              </label>
-            )
-          })}
-        </div>
-        {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
-      </div>
-    )
+    return <MultiSelectField field={field} label={label} value={value} onChange={onChange} />
+  }
+
+  if (field.type === 'select' && field.allowOther) {
+    return <SelectOtherField field={field} label={label} value={value} onChange={onChange} />
   }
 
   if (field.type === 'select') {
@@ -639,6 +619,236 @@ function DetailFieldInput({
         placeholder={field.placeholder}
         className={inputClass}
       />
+      {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
+    </div>
+  )
+}
+
+// A single-value Choice field with an "Other…" option (see
+// CategoryField.allowOther) — its own component (not just another branch in
+// DetailFieldInput) because it needs its own local state: whether the
+// free-text box is showing. Starts open if the saved value doesn't match any
+// of the field's own options — an edit of a listing whose value came from a
+// choice the admin has since renamed or removed reopens with that value
+// still there, in the box, instead of silently discarding it back to blank.
+function SelectOtherField({
+  field,
+  label,
+  value,
+  onChange,
+}: {
+  field: CategoryField
+  label: string
+  value: unknown
+  onChange: (value: unknown) => void
+}) {
+  const strValue = (value as string) ?? ''
+  const isKnownOption = (field.options ?? []).some((opt) => opt.value === strValue)
+  const [showOther, setShowOther] = useState(strValue !== '' && !isKnownOption)
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <select
+        value={showOther ? OTHER_OPTION_VALUE : strValue}
+        onChange={(e) => {
+          if (e.target.value === OTHER_OPTION_VALUE) {
+            setShowOther(true)
+            onChange('')
+          } else {
+            setShowOther(false)
+            onChange(e.target.value)
+          }
+        }}
+        className={inputClass}
+      >
+        <option value="">Select…</option>
+        {field.options?.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+        <option value={OTHER_OPTION_VALUE}>Other…</option>
+      </select>
+      {showOther && (
+        <input
+          value={strValue}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Please specify"
+          autoFocus
+          className={`${inputClass} mt-2`}
+        />
+      )}
+      {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
+    </div>
+  )
+}
+
+// Never a real option value (admin-typed choices come from free text, but a
+// literal match is astronomically unlikely and harmless either way — worst
+// case, that one choice can't be selected without going through the "Other"
+// box, which still saves the same string). Not persisted anywhere itself;
+// it only ever exists as this <select>'s transient value.
+const OTHER_OPTION_VALUE = '__other__'
+
+// Badge-shown choice fields always allow more than one value on a single
+// listing (e.g. a place that's both a Restaurant and a Caterer) — see
+// `selectValues` for why the stored shape can still be a bare string on
+// older listings.
+//
+// A real closed dropdown (like SelectOtherField's <select>), not
+// always-expanded pills sitting inline — this is the intake/edit form, and a
+// long Choice field (Kosher Certification's 10+ options) shouldn't push
+// every other field down the page just to show its own state. Closed, it
+// reads as a single boxed control with a summary of what's picked, exactly
+// like any other field here; open, it's a checklist popover (plus an
+// "Other…" row when the field allows it — see CategoryField.allowOther).
+// Only the form uses this: the map/directory's own multi-select FILTER
+// controls are a different component (CheckboxDropdown) for a different
+// purpose (narrowing a list, not entering a value) and aren't touched here.
+function MultiSelectField({
+  field,
+  label,
+  value,
+  onChange,
+}: {
+  field: CategoryField
+  label: string
+  value: unknown
+  onChange: (value: unknown) => void
+}) {
+  const chosen = selectValues(value)
+  const options = field.options ?? []
+  const knownValues = new Set(options.map((opt) => opt.value))
+  // Already-chosen values that aren't one of the field's own options — e.g.
+  // someone typed "Vegan Certification" into Other on a previous edit. Shown
+  // as their own checked rows alongside the regular ones, so a custom pick
+  // from before doesn't just vanish the next time this listing is edited.
+  const customChosen = chosen.filter((v) => !knownValues.has(v))
+  const [open, setOpen] = useState(false)
+  const [addingOther, setAddingOther] = useState(false)
+  const [otherText, setOtherText] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent | TouchEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+        setAddingOther(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick, true)
+    document.addEventListener('touchstart', handleClick, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClick, true)
+      document.removeEventListener('touchstart', handleClick, true)
+    }
+  }, [open])
+
+  function toggle(v: string) {
+    onChange(chosen.includes(v) ? chosen.filter((x) => x !== v) : [...chosen, v])
+  }
+  function labelFor(v: string): string {
+    return options.find((opt) => opt.value === v)?.label ?? v
+  }
+  function commitOther() {
+    const v = otherText.trim()
+    setAddingOther(false)
+    setOtherText('')
+    if (!v || chosen.includes(v)) return
+    onChange([...chosen, v])
+  }
+
+  const summary = chosen.length > 0 ? chosen.map(labelFor).join(', ') : 'Select…'
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={`${inputClass} flex items-center justify-between gap-2 text-left ${chosen.length === 0 ? 'text-slate-400' : ''}`}
+      >
+        <span className="truncate">{summary}</span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-300 bg-white py-1 shadow-lg">
+          {options.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+            >
+              <input
+                type="checkbox"
+                checked={chosen.includes(opt.value)}
+                onChange={() => toggle(opt.value)}
+                className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
+              />
+              {opt.label}
+            </label>
+          ))}
+          {customChosen.map((v) => (
+            <label
+              key={v}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
+            >
+              <input
+                type="checkbox"
+                checked
+                onChange={() => toggle(v)}
+                className="accent-primary h-3.5 w-3.5 shrink-0 cursor-pointer"
+              />
+              {v}
+            </label>
+          ))}
+          {field.allowOther && (
+            addingOther ? (
+              <div className="flex gap-1.5 px-3 py-2">
+                <input
+                  value={otherText}
+                  onChange={(e) => setOtherText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      commitOther()
+                    } else if (e.key === 'Escape') {
+                      setAddingOther(false)
+                      setOtherText('')
+                    }
+                  }}
+                  placeholder="Type your own…"
+                  autoFocus
+                  className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  type="button"
+                  onClick={commitOther}
+                  className="shrink-0 text-xs font-medium text-primary hover:underline cursor-pointer"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingOther(true)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 cursor-pointer"
+              >
+                + Other…
+              </button>
+            )
+          )}
+        </div>
+      )}
       {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
     </div>
   )

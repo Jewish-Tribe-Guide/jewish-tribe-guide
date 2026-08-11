@@ -11,6 +11,10 @@ import ReportListing from '@/components/resources/ReportListing'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
+import { HeaderCollapseProvider } from '@/lib/headerVisibility'
+import { PinnedProvider } from '@/lib/pinnedContext'
+import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
+import { ListingsProvider } from '@/lib/listingsContext'
 import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the real directory page for a category — the exact same
@@ -49,6 +53,31 @@ export default function CategoryPreview({
   // the live site, and vice versa.
   const [address, setAddress] = useState('')
   const [coords, setCoords] = useState<Coords | null>(null)
+  // Every approved listing across every category, site-wide — ResourceMapView
+  // doesn't fetch its own (on the live site that's a server component's job,
+  // via ListingsProvider — see MapPage), so without this the Map action would
+  // sit on "Loading map…" forever, reading a listings context that never
+  // gets filled in. Fetched once, lazily, the first time the admin actually
+  // clicks Map — not up front with `realListings` — since most preview
+  // sessions never open it, and this is the whole site's listings, not just
+  // this one category's.
+  const [mapListings, setMapListings] = useState<DirectoryResource[] | null>(null)
+
+  useEffect(() => {
+    if (action?.mode !== 'map' || mapListings !== null) return
+    let cancelled = false
+    fetch('/api/resources')
+      .then(async (res) => {
+        const body = await res.json()
+        if (!cancelled) setMapListings(res.ok && body.ok ? (body.resources as DirectoryResource[]) : [])
+      })
+      .catch(() => {
+        if (!cancelled) setMapListings([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [action?.mode, mapListings])
 
   useEffect(() => {
     let cancelled = false
@@ -110,13 +139,15 @@ export default function CategoryPreview({
     )
   } else if (action?.mode === 'map') {
     content = (
-      <ResourceMapView
-        onUp={goToDirectory}
-        userLocation={coords}
-        initialCategory={category.id}
-        initialQuery={action.query}
-        initialFilters={action.filters}
-      />
+      <ListingsProvider listings={mapListings}>
+        <ResourceMapView
+          onUp={goToDirectory}
+          userLocation={coords}
+          initialCategory={category.id}
+          initialQuery={action.query}
+          initialFilters={action.filters}
+        />
+      </ListingsProvider>
     )
   } else if (realListings === null) {
     content = <p className="text-sm text-muted p-4">Loading…</p>
@@ -141,12 +172,27 @@ export default function CategoryPreview({
 
   return (
     <DevicePreviewFrame onClose={onClose}>
-      <SiteHeader
-        onGoHome={onClose}
-        location={{ address, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, onStartTracking: () => {}, onStopTracking: () => {} }}
-      />
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
-      <SiteFooter year={new Date().getFullYear()} />
+      {/* Same provider stack SiteChrome wraps every real screen in (minus
+          LocationProvider — this preview tracks its own address/coords above
+          and hands them to SiteHeader directly, no context needed) — the Map
+          action renders the real ResourceMapView, and PinButton shows up
+          inside its own place detail, and both reach for PinnedProvider/
+          DroppedPinsProvider the same way they do on the live site. Missing
+          either here is invisible until an admin actually clicks Map or a
+          pin from inside this preview, at which point it throws instead of
+          just rendering wrong. */}
+      <PinnedProvider>
+        <DroppedPinsProvider>
+          <HeaderCollapseProvider>
+            <SiteHeader
+              onGoHome={onClose}
+              location={{ address, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, onStartTracking: () => {}, onStopTracking: () => {} }}
+            />
+            <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
+            <SiteFooter year={new Date().getFullYear()} />
+          </HeaderCollapseProvider>
+        </DroppedPinsProvider>
+      </PinnedProvider>
     </DevicePreviewFrame>
   )
 }
