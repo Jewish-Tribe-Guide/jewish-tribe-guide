@@ -18,6 +18,7 @@ import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
 import { useCategories } from '@/lib/useCategories'
+import { useOptionalLocation } from '@/lib/locationContext'
 
 type Props = {
   category: CategoryConfig
@@ -96,15 +97,85 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const showSearch = ui.search.directory && caps.directorySearch
   const liveCount = (item: DirectoryResource) => voteCounts[item.id] ?? item.upvotes ?? 0
 
-  const reopenRef = useRef<HTMLDivElement>(null)
+  // Every rendered card's row, keyed by listing id — a callback ref rather
+  // than a plain array so a card can be found and scrolled to by id after
+  // the list re-sorts, not just by its position at mount. Shared by the
+  // reopen-on-mount scroll below and the "I'm here" scroll further down.
+  const itemRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const setItemRowRef = (id: string) => (el: HTMLDivElement | null) => {
+    if (el) itemRowRefs.current.set(id, el)
+    else itemRowRefs.current.delete(id)
+  }
+  const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
+    const el = itemRowRefs.current.get(id)
+    if (!el) return
+    const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
+    const top = el.getBoundingClientRect().top + window.scrollY - headerH
+    window.scrollTo({ top: Math.max(0, top), behavior })
+  }
+
   useEffect(() => {
-    if (reopenItemId && reopenRef.current) {
-      const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
-      const top = reopenRef.current.getBoundingClientRect().top + window.scrollY - headerH
-      window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
-    }
+    if (reopenItemId) scrollItemIntoView(reopenItemId, 'instant')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally empty — only fire on mount
+
+  // Tapping a listing's "I'm here" (see SetLocationButton) re-anchors every
+  // distance to it, which — for anyone not already on Distance sort — flips
+  // the whole list to Distance and reorders it. On a long list, scrolled deep
+  // in, that reorder happens entirely off-screen: the visitor is left looking
+  // at whatever listing now occupies the spot they were scrolled to, with no
+  // sign their tap did anything. This follows the tapped listing back into
+  // view once the reorder actually lands.
+  //
+  // anchorListingId, not the whole anchor: a typed address or a GPS fix also
+  // changes anchorLabel and re-sorts, but there's no single card to return
+  // to for those — this is specifically the "I tapped a listing" case.
+  const anchorListingId = useOptionalLocation()?.anchorListingId ?? null
+  // Skips the very first commit, which is either the initial mount (nothing
+  // to follow back to yet) or a returning visitor's already-stored anchor
+  // restoring — neither should yank the page to a card the visitor didn't
+  // just tap.
+  const anchorSettledRef = useRef(false)
+  useEffect(() => {
+    if (!anchorSettledRef.current) {
+      anchorSettledRef.current = true
+      return
+    }
+    if (!anchorListingId) return
+    // This commit is the anchor id changing — the sortByPopular effect above
+    // (and every card's own distance-label recompute) hasn't reacted to the
+    // new anchorLabel yet, so the tapped card's row is still at its OLD
+    // position. A fixed delay isn't reliably enough: setting an anchor also
+    // stops GPS tracking and touches several other contexts upstream (see
+    // setListingAnchor), and their re-renders can land a tick or two apart.
+    // Rather than guess a delay, poll until the card's own position has
+    // stopped moving for two consecutive checks — i.e. the reorder has
+    // actually finished painting — before scrolling to it.
+    //
+    // setTimeout, not requestAnimationFrame: rAF is paused entirely while the
+    // tab is backgrounded, which would silently drop this if the visitor
+    // switched apps mid-tap and back.
+    let timer = 0
+    let lastTop: number | null = null
+    let stableChecks = 0
+    const waitForSettled = () => {
+      const el = itemRowRefs.current.get(anchorListingId)
+      if (!el) {
+        timer = window.setTimeout(waitForSettled, 32)
+        return
+      }
+      const top = el.getBoundingClientRect().top
+      stableChecks = lastTop !== null && Math.abs(top - lastTop) < 0.5 ? stableChecks + 1 : 0
+      lastTop = top
+      if (stableChecks >= 2) {
+        scrollItemIntoView(anchorListingId, 'smooth')
+        return
+      }
+      timer = window.setTimeout(waitForSettled, 32)
+    }
+    timer = window.setTimeout(waitForSettled, 32)
+    return () => window.clearTimeout(timer)
+  }, [anchorListingId])
 
   const q = search.trim().toLowerCase()
   const tokens = q.split(/\s+/).filter(Boolean)
@@ -504,7 +575,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       ) : (
         <div className="space-y-2">
           {filtered.map((item) => (
-            <div key={item.id} ref={item.id === reopenItemId ? reopenRef : undefined}>
+            <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
               item={item}
               category={category}

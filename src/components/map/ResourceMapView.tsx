@@ -71,6 +71,11 @@ type Props = {
   /** Field filters (open-now / kosher / type / …) carried from the directory the
    *  visitor came from, applied to pins and shown as removable chips. */
   initialFilters?: MapFilters
+  /** The pin id to open the detail panel/sheet for on arrival — the `place`
+   *  query param (see mapQueryString/parseMapQuery), read once on mount.
+   *  Standalone only: this is what makes a map link shareable down to the
+   *  specific pin someone had open, not just the pins and filters. */
+  initialPlaceId?: string
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
   /** True for the one page-level map screen (mode 'map' in page.tsx) — as
@@ -129,7 +134,7 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
+export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -345,6 +350,35 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     else setDesktopSelected(null)
   }
 
+  // Keeps the standalone map screen's own address bar in sync with which pin
+  // is open, so a map link is shareable down to the specific place someone
+  // had selected — not just the pins and filters mapQueryString already
+  // covered. Plain history.replaceState, not next/navigation's router —
+  // same choice the existing mapQuery/mapSelected/mapFilters sync above
+  // already made (see its own comment), and for the same reason: router.replace
+  // re-subscribes every useSearchParams() caller (this component now among
+  // them) to the change, and this screen's marker layer already re-renders
+  // far more often than its own state actually changes (see the `hospitals`
+  // dependency warning on allPoints below) — feeding that back through the
+  // router turns a harmless extra render into a real navigation each time.
+  // A plain history write has no such feedback loop: nothing subscribes to
+  // it, so it only ever affects a future cold load (initialPlaceId) or a
+  // copy-pasted address bar.
+  useEffect(() => {
+    if (!standalone) return
+    const next = new URLSearchParams(window.location.search)
+    if (selectedPointId) next.set('place', selectedPointId)
+    else next.delete('place')
+    const qs = next.toString()
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+    if (url === `${window.location.pathname}${window.location.search}`) return
+    window.history.replaceState(window.history.state, '', url)
+  }, [selectedPointId, standalone])
+  // Restoring the selection from `initialPlaceId` needs allPoints, which
+  // isn't computed yet at this point in the component — see below, right
+  // after allPoints itself.
+  const restoredInitialPlace = useRef(false)
+
   const colorById = useMemo(() => {
     const map = new Map<string, string>()
     ;(categories ?? []).forEach((c) => map.set(c.id, getCategoryColor(categories, c.id)))
@@ -411,6 +445,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     }
     return out
   }, [listings, categories, colorById, hospitals, pinnedIds])
+
+  // Restores the pin `initialPlaceId` named, once it's actually in allPoints
+  // (a plain state initializer would run before listings have loaded).
+  // Guarded to fire only once — after that, selectedPointId and the effect
+  // above are the source of truth, and re-running this on every allPoints
+  // change (e.g. a live-tracking location update touching a memoized array)
+  // would re-open a pin the visitor had already closed.
+  useEffect(() => {
+    if (restoredInitialPlace.current || !standalone || !initialPlaceId) return
+    const point = allPoints.find((p) => p.id === initialPlaceId)
+    if (!point) return
+    restoredInitialPlace.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    selectPlace(point)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPoints, standalone, initialPlaceId])
 
   const options = useMemo<FilterOption[]>(() => {
     const counts = new Map<string, number>()

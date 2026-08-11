@@ -16,6 +16,7 @@ export default function SlugScreen({
   slug,
   kind,
   listings,
+  initialItemId,
 }: {
   slug: string
   // 'view' is a fixed screen (hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in
@@ -25,6 +26,12 @@ export default function SlugScreen({
   kind: 'category' | 'form' | 'view'
   /** The category's listings from the route; null means the read failed. */
   listings: DirectoryResource[] | null
+  /** Mount with this listing already expanded — set by the [id] route (a
+   *  single listing's own canonical URL), which has no `?item=` in its own
+   *  address bar to read this from. A plain `/community/slug` visit has no
+   *  such id, and falls back to the `?item=` query param inside
+   *  FindResources, same as before this existed. */
+  initialItemId?: string
 }) {
   const { anchor } = useLocation()
   const { goHome, viewAllCategories, viewMapForCategory } = useSiteNavigation()
@@ -48,6 +55,7 @@ export default function SlugScreen({
         view={slug}
         listings={listings}
         anchor={anchor}
+        initialItemId={initialItemId}
         onUp={goHome}
         onViewAllCategories={() => viewAllCategories()}
         onViewMap={viewMapForCategory}

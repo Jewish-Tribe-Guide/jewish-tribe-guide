@@ -2,7 +2,9 @@ import type { MetadataRoute } from 'next'
 import { listCommunities } from '@/lib/communityStore'
 import { listCategories } from '@/lib/categoryStore'
 import { listPublishedForms } from '@/lib/formStore'
+import { listApprovedResources } from '@/lib/resourceStore'
 import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A sitemap only became possible when screens got URLs. Before this the whole
@@ -54,6 +56,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'weekly',
         priority: 0.9,
       })
+
+      // Individual listings — this is the content people actually search for
+      // ("kosher grocery near X"), not just the category shell around it. A
+      // failure here costs this category its listing URLs, not the sitemap.
+      if (category.kind === 'listing') {
+        const listings = await listApprovedResources(slug, { category: category.id }).catch(() => [])
+        for (const item of listings) {
+          entries.push({
+            url: `${base}${routes.listing(slug, category.id, listingSlug(item))}`,
+            lastModified: now,
+            changeFrequency: 'monthly',
+            priority: 0.6,
+          })
+        }
+      }
     }
 
     for (const form of forms) {

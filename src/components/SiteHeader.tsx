@@ -45,7 +45,18 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
     // No listener needed on desktop — `visible` below ignores scrollVisible
     // there, so there's nothing for one to drive.
     if (!isMobile) return
+
+    // `anchorY` is where the current run of scrolling in one direction began —
+    // NOT the position at the previous event. The threshold in
+    // nextHeaderVisible is meant to be "how far have you scrolled this way",
+    // and a browser fires a scroll event roughly per frame: a finger drag or
+    // a trackpad moves single-digit pixels per event, so comparing against
+    // the previous event's position means the 8px slack is essentially never
+    // cleared and the header only ever reacts to a hard flick. Measuring from
+    // the start of the run is what makes an ordinary, unhurried scroll work.
     let lastY = window.scrollY
+    let anchorY = lastY
+    let goingDown = true
 
     // Deliberately no rAF/ticking-flag throttle here. That pattern schedules
     // the actual work on the next animation frame and guards re-entry with a
@@ -59,22 +70,25 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
     // get stuck.
     function onScroll() {
       const y = window.scrollY
-      // `prevY` must be read into a const BEFORE `lastY` moves, and the
-      // updater below must close over that const rather than over `lastY`
-      // itself. React only sometimes runs a functional updater immediately —
-      // it does when nothing else is queued for this fiber, and otherwise
-      // defers it to render. A deferred updater reading `lastY` would read it
-      // AFTER the reassignment below, i.e. compare `y` against itself: both
-      // direction checks in nextHeaderVisible fail on equal values, so it
-      // returns the current state and the header never moves.
-      //
-      // That's why this looked like it worked and then stopped — one slow
-      // scroll with an empty queue evaluates eagerly and behaves; actual
-      // scrolling queues updates, takes the deferred path, and the header
-      // silently freezes wherever it was.
-      const prevY = lastY
-      lastY = y
-      setScrollVisible((prev) => nextHeaderVisible(y, prevY, prev))
+      if (y !== lastY) {
+        const down = y > lastY
+        // Reversing restarts the measurement from where the reversal
+        // happened, so "scroll up a little to get the header back" costs the
+        // same small distance no matter how far down the page you already
+        // are.
+        if (down !== goingDown) {
+          goingDown = down
+          anchorY = lastY
+        }
+        lastY = y
+      }
+      // Read into a const before handing it to the updater. React runs a
+      // functional updater immediately only when nothing else is queued for
+      // this fiber, and otherwise defers it to render — an updater closing
+      // over the mutable `anchorY` would then read whatever it had become by
+      // then, rather than its value at the moment of this event.
+      const anchor = anchorY
+      setScrollVisible((prev) => nextHeaderVisible(y, anchor, prev))
     }
 
     window.addEventListener('scroll', onScroll, { passive: true })

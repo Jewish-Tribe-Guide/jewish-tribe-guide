@@ -108,8 +108,12 @@ export const routes = {
   feedback: (community: string) => `/${community}/feedback`,
   /** A category directory or a form wizard — they share this namespace. */
   slug: (community: string, slug: string) => `/${community}/${slug}`,
-  listing: (community: string, slug: string, listingId: string) =>
-    `/${community}/${slug}/${listingId}`,
+  /** The third argument is normally a listing's friendly slug (see
+   *  listingSlug.ts) — /philly/grocery/goldi-a1b2c3 — but any string works;
+   *  resolveListing falls back to a bare id, so an older raw-id link keeps
+   *  resolving. */
+  listing: (community: string, slug: string, listingIdOrSlug: string) =>
+    `/${community}/${slug}/${listingIdOrSlug}`,
 }
 
 /** Serializes the map's live view into query params, so a shared map link
@@ -121,12 +125,17 @@ export function mapQueryString(state: {
   openNow?: boolean
   bool?: string[] | null
   select?: Record<string, string[]> | null
+  /** The point id of the pin currently shown in the detail panel/sheet, so
+   *  the map reopens with the same place selected, not just the same pins
+   *  and filters. */
+  place?: string | null
 }): string {
   const params = new URLSearchParams()
   if (state.categories?.length) params.set('cat', state.categories.join(','))
   if (state.query) params.set('q', state.query)
   if (state.openNow) params.set('open', '1')
   if (state.bool?.length) params.set('is', state.bool.join(','))
+  if (state.place) params.set('place', state.place)
   if (state.select && Object.keys(state.select).length) {
     // key:v1|v2 pairs, comma separated — readable and safe in a URL.
     params.set(
@@ -149,6 +158,7 @@ export function parseMapQuery(params: URLSearchParams): {
   openNow: boolean
   bool: string[] | null
   select: Record<string, string[]> | null
+  place: string | null
 } {
   const list = (v: string | null) => {
     const items = (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -173,5 +183,6 @@ export function parseMapQuery(params: URLSearchParams): {
     openNow: params.get('open') === '1',
     bool: list(params.get('is')),
     select,
+    place: params.get('place') || null,
   }
 }

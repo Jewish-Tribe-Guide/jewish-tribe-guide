@@ -92,22 +92,48 @@ test.describe('mobile', () => {
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight))
       .toBeGreaterThan(1400)
 
+    // Scroll in SMALL steps, the way a finger or trackpad actually does —
+    // a browser fires a scroll event about once a frame, so real scrolling
+    // arrives as a stream of single-digit-pixel moves. This matters more
+    // than it looks: an earlier version of this test moved 1200px in one
+    // jump, which sailed past the threshold and passed against a header
+    // that was completely broken for every real gesture.
+    //
     // scrollBy rather than mouse.wheel: this project emulates a touch
-    // device, where a wheel event doesn't scroll the page at all. scrollBy
-    // dispatches the same real scroll events a finger would, which is what
-    // matters here — the broken version got every scroll POSITION right and
-    // only failed at what the header did about it.
-    const scrollBy = (px: number) => page.evaluate((d) => window.scrollBy(0, d), px)
+    // device, where a wheel event doesn't scroll the page at all.
+    // One step PER FRAME, via rAF inside the page. This is load-bearing: the
+    // browser coalesces scroll events to one a frame, so firing eight
+    // scrollBy calls back to back produces a single event carrying their
+    // whole 48px sum — which clears the threshold and passes even against a
+    // header that is broken for every real gesture. Spacing them by a frame
+    // is what makes each one arrive as its own small-delta event, the way a
+    // finger's does.
+    const drag = async (px: number, steps = 8) => {
+      await page.evaluate(
+        async ({ d, n }) => {
+          for (let i = 0; i < n; i++) {
+            window.scrollBy(0, d)
+            await new Promise((r) => requestAnimationFrame(() => r(null)))
+          }
+        },
+        { d: px, n: steps },
+      )
+    }
 
-    await scrollBy(1200)
+    // Get well down the page first, so scrolling back up lands mid-page
+    // rather than at the top — the header always shows at the top, so a test
+    // that drifts back to 0 would pass without proving anything.
+    await page.evaluate(() => window.scrollTo(0, 2000))
+
+    await drag(6)
     await expect(header).toHaveClass(/-translate-y-full/)
 
     // Up, but nowhere near the top — the case that regressed.
-    await scrollBy(-200)
+    await drag(-6)
     await expect(header).not.toHaveClass(/-translate-y-full/)
-    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(500)
 
-    await scrollBy(600)
+    await drag(6)
     await expect(header).toHaveClass(/-translate-y-full/)
   })
 })

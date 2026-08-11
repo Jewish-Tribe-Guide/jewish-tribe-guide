@@ -93,6 +93,10 @@ describe('mapQueryString', () => {
     expect(mapQueryString({ bool: ['isKosher'] })).toBe('?is=isKosher')
     expect(mapQueryString({ select: { hechsher: ['OU', 'Star-K'] } })).toContain('sel=hechsher%3AOU%7CStar-K')
   })
+
+  it('writes the selected place', () => {
+    expect(mapQueryString({ place: 'abc123' })).toBe('?place=abc123')
+  })
 })
 
 describe('parseMapQuery', () => {
@@ -105,6 +109,7 @@ describe('parseMapQuery', () => {
       openNow: true,
       bool: ['isKosher'],
       select: { hechsher: ['OU', 'Star-K'] },
+      place: 'abc123',
     }
     expect(parse(mapQueryString(state))).toEqual(state)
   })
@@ -116,6 +121,7 @@ describe('parseMapQuery', () => {
       openNow: false,
       bool: null,
       select: null,
+      place: null,
     })
   })
 

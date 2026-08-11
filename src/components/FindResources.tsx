@@ -39,6 +39,12 @@ type Props = {
    *  `null` means the read failed — not an empty category. */
   listings: DirectoryResource[] | null
   anchor: DirectoryAnchor
+  /** Expand this listing on arrival, same as `?item=` below — set by the
+   *  [id] route (a listing's own canonical URL), which has no query param of
+   *  its own to carry this. `?item=` still wins if both are somehow present,
+   *  since it reflects an in-page navigation (e.g. Edit/Report closing) that
+   *  happened after this screen mounted. */
+  initialItemId?: string
   /** Up from any resource view. On mobile this is the only "up" there is —
    *  the home grid IS the index. On desktop it's the fallback for views that
    *  aren't a category's own "All resources" (the unknown/loading states
@@ -60,7 +66,7 @@ type Props = {
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form.
-export default function FindResources({ view, listings, anchor, onUp, onViewAllCategories, onViewMap }: Props) {
+export default function FindResources({ view, listings, anchor, initialItemId, onUp, onViewAllCategories, onViewMap }: Props) {
   // Every "All resources" button below means what it says — the actual list
   // of every resource. On mobile that's still the home grid (onUp). On
   // desktop, home is now a short gateway with just three featured cards, not
@@ -106,7 +112,7 @@ export default function FindResources({ view, listings, anchor, onUp, onViewAllC
   const pathname = usePathname()
   const router = useRouter()
 
-  const reopenItemId = params.get('item')
+  const reopenItemId = params.get('item') ?? initialItemId ?? null
   const initialSearch = params.get('q')
   const hospitalDetailId = params.get('hospital')
 

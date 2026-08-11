@@ -4,9 +4,13 @@ import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import PinButton from '@/components/resources/PinButton'
+import ShareButton from '@/components/resources/ShareButton'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
 
 type Props = {
   item: DirectoryResource
@@ -25,6 +29,8 @@ type Props = {
  * show Edit/Report/upvote, which stay a tap away in the full listing.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+  const community = useCommunitySlug()
+
   return (
     <div className="space-y-4 pb-2">
       <button
@@ -54,6 +60,8 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         </div>
         {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
       </div>
+
+      <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
 
       <PlaceDetailBody item={item} category={category} />
     </div>
