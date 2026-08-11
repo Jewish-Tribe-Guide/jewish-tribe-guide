@@ -7,6 +7,7 @@ import { getOpenStatus } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
+import SetLocationButton from './SetLocationButton'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
 import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon } from '@/components/icons'
@@ -284,9 +285,14 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const addressSection = (showAddress || showPhone || hoursFields.length > 0) && (
     <div className="space-y-3">
       {showAddress && (
+        // The address takes its own min-w-0 flex-1 column so it WRAPS beside
+        // the button rather than truncating or pushing it to a line of its
+        // own — on a narrow phone a full street address is routinely two
+        // lines, and the button rides the top of them.
         <div className="flex items-start gap-3">
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-          <p className="text-sm text-slate-800">{item.address}</p>
+          <p className="min-w-0 flex-1 text-sm text-slate-800">{item.address}</p>
+          <SetLocationButton item={item} category={category} />
         </div>
       )}
 

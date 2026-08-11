@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import AddressInput from '@/components/intake/AddressInput'
-import { PinIcon } from '@/components/icons'
+import { CrosshairIcon, PinIcon } from '@/components/icons'
 import { useHeaderCollapsed } from '@/lib/headerVisibility'
+import { useOptionalLocation } from '@/lib/locationContext'
 import { useScrollLock } from '@/lib/useScrollLock'
 
 export type LocationControls = {
@@ -101,6 +102,18 @@ export default function LocationControl({ controls }: Props) {
 
   const label = controls.tracking ? 'Live' : controls.address || 'Set location'
 
+  // When the anchor came from tapping "I'm here" on a listing, `controls.address`
+  // holds that listing's NAME, not a street address — so it must not be
+  // prefilled into the address box below (a name sitting in an address field
+  // reads as a typo waiting to happen). Shown as its own summary row instead.
+  //
+  // useOptionalLocation, not useLocation: this component also renders inside
+  // the admin's category preview, which supplies a hand-built `controls`
+  // object and no LocationProvider at all. Null there simply means no listing
+  // anchor exists to summarize.
+  const location = useOptionalLocation()
+  const listingAnchorName = !controls.tracking && location?.anchorListingId ? controls.address : null
+
   // Picking a real address (or typing one) means the visitor wants a fixed
   // point, not a moving one — stop live tracking first, or the very next GPS
   // tick would silently overwrite what they just typed.
@@ -180,6 +193,21 @@ export default function LocationControl({ controls }: Props) {
             Where should distances be measured from?
           </p>
 
+          {listingAnchorName && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
+                <CrosshairIcon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{listingAnchorName}</span>
+              </span>
+              <button
+                onClick={() => location?.clearAnchor()}
+                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           {controls.tracking ? (
             <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
@@ -213,7 +241,7 @@ export default function LocationControl({ controls }: Props) {
           </div>
 
           <AddressInput
-            value={controls.tracking ? '' : controls.address}
+            value={controls.tracking || listingAnchorName ? '' : controls.address}
             onChange={handleAddressChange}
             onCoords={handleCoords}
             placeholder="Enter your address"

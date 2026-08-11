@@ -36,12 +36,18 @@ export function useLiveLocation() {
   // Every GPS tick updates the same stored coords/address everything else
   // already reads from — this is what makes tracking "site-wide" rather than
   // scoped to whichever screen started it.
+  //
+  // Both setters also clear `listingId` (see useStoredLocation), which is what
+  // stops a listing anchor from going stale here: without that, a visitor who
+  // tapped "I'm here" at their hotel and then turned on GPS would keep seeing
+  // the hotel marked as their location while the coordinates walked away from
+  // it.
   useEffect(() => {
     if (!watch.position) return
     stored.setCoords({ lat: watch.position.lat, lng: watch.position.lng })
     stored.setAddress('Current location')
-    // stored.setCoords/setAddress are stable setState setters — omitting them
-    // avoids re-running this on unrelated `stored` identity changes.
+    // stored.setCoords/setAddress are stable useCallback setters — omitting
+    // them avoids re-running this on unrelated `stored` identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watch.position])
 
