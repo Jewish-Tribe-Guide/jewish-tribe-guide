@@ -9,7 +9,7 @@ import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { DEFAULT_CATEGORY_ICON, PHOTO_FIELD_KEY, resolveCapabilities, selectValues } from '@/lib/categories'
+import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -393,14 +393,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         phone: r.phone,
         color: colorById.get(r.category) ?? '#64748b',
         glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
-        // This listing's own photo (see the category editor's "Photo"
-        // toggle) wins over the category's shared icon image — a listing
-        // that uploaded its own picture should show that, not the generic
-        // category avatar every other pin in the same category uses.
-        glyphSrc:
-          (typeof r[PHOTO_FIELD_KEY] === 'string' && (r[PHOTO_FIELD_KEY] as string).trim()
-            ? (r[PHOTO_FIELD_KEY] as string)
-            : cat?.iconImageUrl) ?? undefined,
+        // The map (pins and this sidebar's nearby list) always shows the
+        // category's own icon/image, even for a listing that's uploaded its
+        // own photo — that per-listing photo only shows once you're actually
+        // looking at the listing (its directory row, or this map's own place
+        // detail — see GenericListingCard/MapPlaceDetail, which read
+        // PHOTO_FIELD_KEY directly rather than through this point).
+        glyphSrc: cat?.iconImageUrl ?? undefined,
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,
         // tags, detail fields) — so a query that matches in the directory
@@ -770,6 +769,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     })
   }
 
+  // Whether every chip in the row — the real categories AND the Pinned chip,
+  // when it's showing — is currently on. Mirrors CategoryFilter's own `allOn`
+  // (which drives Show all/Hide all's label): the Pinned chip only counts
+  // when it actually renders (see pinnedChip below), so a visitor who's
+  // never pinned anything isn't blocked from "narrow to just this one" by a
+  // chip they can't see.
+  const hasPinnedChip = ui.map.pins && pinned.length > 0
+  const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
+
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
     // straight down to just that category — same as Google Maps' filter
@@ -790,8 +798,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       if (isMobile) nearbySheetRef.current?.raise()
     }
 
-    if (effectiveSelected.size === options.length) {
+    if (allChipsOn) {
+      // Narrowing to just this one category also switches Pinned off — same
+      // "everything else unclicks" promise the Pinned chip's own tap makes
+      // in the other direction (see togglePinnedSelected).
       setSelected(new Set([id]))
+      setPinnedSelected(false)
       raiseSheet()
       return
     }
@@ -817,6 +829,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // them, turning Pinned on looked like it did nothing when nothing else
   // had already narrowed the map.
   const togglePinnedSelected = () => {
+    // Same "narrow to just this one" behavior toggle() gives every category
+    // chip when everything's on — Pinned is just another chip in the row
+    // (see CategoryFilter's pinnedChip prop), so it has to unclick
+    // everything else the same way tapping a category chip would.
+    if (allChipsOn) {
+      setSelected(new Set())
+      setPinnedSelected(true)
+      setSidebarCollapsed(false)
+      if (isMobile) nearbySheetRef.current?.raise()
+      return
+    }
     const next = !pinnedSelected
     setPinnedSelected(next)
     if (next) {

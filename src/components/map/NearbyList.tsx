@@ -4,9 +4,7 @@ import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import { directionsUrl } from '@/lib/googleMapsLinks'
 import { DirectionsIcon } from '@/components/icons'
-import PinButton from '@/components/resources/PinButton'
 import CategoryIcon from '@/components/CategoryIcon'
-import { ui } from '@/lib/uiConfig'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
@@ -99,7 +97,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               </span>
             </button>
 
-            {/* Distance + pin + Directions — a quiet round icon button, not a
+            {/* Distance + Directions — a quiet round icon button, not a
                 labeled blue pill, so it reads like Google Maps' understated
                 directions shortcut instead of competing with the row tap target. */}
             <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
@@ -108,7 +106,6 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
                   {distanceLabel(p.miles)}
                 </span>
               )}
-              {ui.map.pins && p.raw && <PinButton id={p.id} categoryId={p.filterId} name={p.name} />}
               <a
                 href={href}
                 target="_blank"
