@@ -100,17 +100,52 @@ export default function CategoryFilter({
   // the two apart, everything else below branches off it.
   const isMobile = useIsMobile()
   const allOn = options.every((o) => selected.has(o.id)) && (!pinnedChip || !!pinnedOn)
-  // Selected categories always take priority for the compact row's limited
-  // slots over unselected ones — otherwise turning one on from the full
-  // "More" list that isn't already one of the top-N by count would just
-  // silently do nothing visible here, still hidden behind "More" despite now
-  // actively filtering the map. `options` already comes in highest-count-
-  // first order, and this sort is stable, so within each group (selected /
-  // not) that count order is untouched — this only reorders across the
-  // selected/unselected boundary itself.
+
+  // The compact row's own display order — deliberately NOT re-derived from
+  // `selected` on every render. A category checked from elsewhere (the
+  // full-screen picker, or already checked on arrival) that isn't part of
+  // the visible row yet still gets promoted to the front, same as always —
+  // that visitor never had a position in this row to remember. But a chip
+  // that's ALREADY visible must never jump when tapped in place: once
+  // someone has scanned this row they've built a spatial map of it
+  // ("grocery is third"), and moving the chip they just tapped breaks that
+  // memory and can land a fast second tap on whatever slid into its spot.
+  //
+  // Only matters when `maxVisible` truncates the row — the full/wrap picker
+  // (`maxVisible` unset) already shows every chip, so there's nothing to
+  // promote and `order` stays unused.
+  const [order, setOrder] = useState<string[] | null>(null)
+  const optionIds = options.map((o) => o.id).join(',')
+  const prevSelectedRef = useRef(selected)
+  useEffect(() => {
+    if (maxVisible == null) return
+    const ids = options.map((o) => o.id)
+    const prevSelected = prevSelectedRef.current
+    prevSelectedRef.current = selected
+    setOrder((prev) => {
+      if (!prev || prev.length !== ids.length || !ids.every((id) => prev.includes(id))) {
+        // An unseen set of categories (mount, or the category list itself
+        // changed) — seed selected-first, same promotion this row always
+        // did on arrival.
+        return [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).map((o) => o.id)
+      }
+      const visibleIds = new Set(prev.slice(0, maxVisible))
+      // Only an id that just became selected AND isn't already visible gets
+      // promoted — an id toggled on or off while already in view is left
+      // exactly where it was.
+      const toPromote = ids.filter((id) => selected.has(id) && !prevSelected.has(id) && !visibleIds.has(id))
+      if (toPromote.length === 0) return prev
+      return [...toPromote, ...prev.filter((id) => !toPromote.includes(id))]
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionIds, selected, maxVisible])
+
   const visible =
     maxVisible != null
-      ? [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).slice(0, maxVisible)
+      ? (order ?? options.map((o) => o.id))
+          .map((id) => options.find((o) => o.id === id))
+          .filter((o): o is FilterOption => !!o)
+          .slice(0, maxVisible)
       : options
   const hiddenCount = maxVisible != null ? Math.max(0, options.length - maxVisible) : 0
 
