@@ -119,6 +119,17 @@ export type CategoryField = {
    *  field, which always lets a visitor pick multiple values regardless of
    *  this setting (see GenericDirectory's filterableSelects rendering). */
   multiSelect?: boolean
+  /** For `type: 'select'`: adds an "Other…" choice that reveals a free-text
+   *  box instead of just literally storing the word "Other" — the typed
+   *  value is saved as this field's value directly, same as if it had been
+   *  one of the listed options all along. Works for both a single-value
+   *  select (SelectOtherField, the dropdown swaps to a text box) and a
+   *  `multiSelect` one (MultiSelectField, an "+ Other…" pill adds one more
+   *  custom pill per typed value — more than one is fine). A listing whose
+   *  saved value(s) don't match any option in the current list (the admin
+   *  renamed/removed one, or this is how it got set) reopens with those
+   *  already showing, pre-filled, rather than silently dropped. */
+  allowOther?: boolean
   /** For `type: 'url'`: show the link button in the collapsed card header so it's
    *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
   showInHeader?: boolean
