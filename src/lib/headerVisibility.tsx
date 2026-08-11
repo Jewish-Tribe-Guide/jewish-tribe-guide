@@ -70,8 +70,17 @@ export function useCollapseHeader(collapse: boolean): void {
   }, [collapse, setCollapsed])
 }
 
-/** Whether the header should be showing after a scroll to `y`, given it was
- *  last at `lastY` and was `visible` beforehand.
+/** Whether the header should be showing after a scroll to `y`, given the
+ *  current run of scrolling began at `anchorY` and it was `visible` before.
+ *
+ *  `anchorY` is where the visitor last reversed direction — deliberately NOT
+ *  the position at the previous scroll event. A browser fires scroll events
+ *  roughly per frame, so an ordinary drag moves single-digit pixels per
+ *  event; measured event-to-event, the slack below is essentially never
+ *  cleared and the header only reacts to a hard flick. Measured from the
+ *  start of the run, `threshold` means what it reads like: how far you have
+ *  to scroll one way before the header responds. SiteHeader owns tracking
+ *  the anchor, since that needs memory and this deliberately has none.
  *
  *  Pure so the part that actually has room for a mistake — the scroll-
  *  direction math — can be tested without simulating a browser scroll. See
@@ -82,9 +91,9 @@ export function useCollapseHeader(collapse: boolean): void {
  *  the header on every frame. Only a deliberate scroll past the slack changes
  *  anything; a scroll that stays inside it leaves the header exactly as it
  *  was. */
-export function nextHeaderVisible(y: number, lastY: number, visible: boolean, threshold = 8): boolean {
+export function nextHeaderVisible(y: number, anchorY: number, visible: boolean, threshold = 8): boolean {
   if (y <= 0) return true
-  if (y > lastY + threshold) return false
-  if (y < lastY - threshold) return true
+  if (y > anchorY + threshold) return false
+  if (y < anchorY - threshold) return true
   return visible
 }
