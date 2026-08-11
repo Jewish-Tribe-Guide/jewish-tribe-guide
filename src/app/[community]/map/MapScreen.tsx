@@ -43,6 +43,7 @@ export default function MapScreen() {
         userLocation={coords}
         initialSelectedCategories={view.categories ?? undefined}
         initialQuery={view.query ?? undefined}
+        initialPlaceId={view.place ?? undefined}
         initialFilters={{
           openNow: view.openNow,
           bool: view.bool ?? undefined,
