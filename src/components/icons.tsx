@@ -201,3 +201,29 @@ export function CollapseIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Crosshair — "measure distances from this listing" (see SetLocationButton).
+// Deliberately NOT PinIcon: this button sits immediately right of the address
+// row, whose own left gutter is already a PinIcon, and the header location
+// pill and the pinned-shortlist toggle both use it too. A second pin inches
+// from the first would read as decoration rather than an action.
+export function CrosshairIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M12 2v3" />
+      <path d="M12 19v3" />
+      <path d="M2 12h3" />
+      <path d="M19 12h3" />
+    </svg>
+  )
+}
+
+export function CheckIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}

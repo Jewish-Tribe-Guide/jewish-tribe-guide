@@ -7,6 +7,7 @@ import { getOpenStatus } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
+import SetLocationButton from './SetLocationButton'
 import { businessUrl } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
 import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon } from '@/components/icons'
@@ -284,9 +285,20 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const addressSection = (showAddress || showPhone || hoursFields.length > 0) && (
     <div className="space-y-3">
       {showAddress && (
+        // min-w-0 but deliberately NOT flex-1: the address sizes to its own
+        // text, so the button sits immediately after it and reads as being
+        // about the address. flex-1 made the address fill the row, which on a
+        // wide desktop card pushed the button to the far right edge — far
+        // enough away that it looked like an unrelated control.
+        //
+        // Mobile is unchanged by that: there the address wants more room than
+        // the row has, so it shrinks (min-w-0 is what permits it) and wraps to
+        // two lines with the button riding the top of them, rather than
+        // truncating or being pushed onto a line of its own.
         <div className="flex items-start gap-3">
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-          <p className="text-sm text-slate-800">{item.address}</p>
+          <p className="min-w-0 text-sm text-slate-800">{item.address}</p>
+          <SetLocationButton item={item} category={category} />
         </div>
       )}
 
