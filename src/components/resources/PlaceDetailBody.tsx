@@ -285,13 +285,19 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const addressSection = (showAddress || showPhone || hoursFields.length > 0) && (
     <div className="space-y-3">
       {showAddress && (
-        // The address takes its own min-w-0 flex-1 column so it WRAPS beside
-        // the button rather than truncating or pushing it to a line of its
-        // own — on a narrow phone a full street address is routinely two
-        // lines, and the button rides the top of them.
+        // min-w-0 but deliberately NOT flex-1: the address sizes to its own
+        // text, so the button sits immediately after it and reads as being
+        // about the address. flex-1 made the address fill the row, which on a
+        // wide desktop card pushed the button to the far right edge — far
+        // enough away that it looked like an unrelated control.
+        //
+        // Mobile is unchanged by that: there the address wants more room than
+        // the row has, so it shrinks (min-w-0 is what permits it) and wraps to
+        // two lines with the button riding the top of them, rather than
+        // truncating or being pushed onto a line of its own.
         <div className="flex items-start gap-3">
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-          <p className="min-w-0 flex-1 text-sm text-slate-800">{item.address}</p>
+          <p className="min-w-0 text-sm text-slate-800">{item.address}</p>
           <SetLocationButton item={item} category={category} />
         </div>
       )}
