@@ -4,13 +4,9 @@ import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import PinButton from '@/components/resources/PinButton'
-import ShareButton from '@/components/resources/ShareButton'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { routes } from '@/lib/routes'
-import { listingSlug } from '@/lib/listingSlug'
 
 type Props = {
   item: DirectoryResource
@@ -26,11 +22,9 @@ type Props = {
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
  * such filters of its own), plus its own header and back button. Doesn't
- * show Edit/Report/upvote, which stay a tap away in the full listing.
+ * show Share/Edit/Report/upvote, which stay a tap away in the full listing.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
-  const community = useCommunitySlug()
-
   return (
     <div className="space-y-4 pb-2">
       <button
@@ -84,8 +78,6 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             vs. icon height. */}
         {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start mt-[-2.75px]" />}
       </div>
-
-      <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
 
       <PlaceDetailBody item={item} category={category} />
     </div>
