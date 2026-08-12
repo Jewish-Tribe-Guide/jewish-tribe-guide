@@ -791,6 +791,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k]) === true)
       })
   }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, hoursKeysByCat, pinnedSelected])
+  // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
+  // JSX below would build a fresh array on every ResourceMapView render —
+  // including ones that don't touch either input, e.g. a background tap
+  // that only closes the sheet. ResourceMap treats a new `points` reference
+  // as new data and re-fits its bounds, so that unrelated re-render was
+  // enough to visibly re-zoom the map. Memoizing keeps the reference stable
+  // unless the actual point set changed.
+  const mapPoints = useMemo(
+    () => (ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints),
+    [ui.map.pins, visiblePoints, droppedMapPoints],
+  )
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
   // sheet-raise/auto-select effect below to commit points instead of every
@@ -894,6 +905,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // Resets every chip in the row, Pinned included — not just the real
   // categories — so "All" actually means all.
   const showAll = () => {
+    // Re-tapping "All" while it's already the active filter used to still
+    // build a brand-new Set — a fresh reference flows through
+    // effectiveSelected → visiblePoints → ResourceMap's `points` prop, which
+    // reruns that component's fit-bounds effect and visibly re-zooms the
+    // map for no actual change in what's shown.
+    if (allChipsOn) return
     setSelected(new Set(options.map((o) => o.id)))
     setPinnedSelected(true)
     setSidebarCollapsed(false)
@@ -1319,7 +1336,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:min-h-0 sm:w-auto sm:translate-x-0"
           >
               <ResourceMap
-                points={ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints}
+                points={mapPoints}
                 userLocation={activeLocation}
                 follow={follow}
                 onResumeFollow={() => setFollow(true)}
