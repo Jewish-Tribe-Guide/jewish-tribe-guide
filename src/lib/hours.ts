@@ -111,6 +111,20 @@ export function getOpenStatus(
   return { isOpen, closing: isOpen ? hoursClosing(openVal) : null }
 }
 
+/** "2026-06-07T…" → "Synced from Google · updated 3d ago" / "… updated today".
+ *  Returns null if unparseable or absent. A listing-level fact (from its
+ *  Google placeId), not tied to any one hours field — see PlaceDetailBody's
+ *  own use of this for why it isn't gated on the category having hours at all. */
+export function syncedLabel(iso?: string): string | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return null
+  const days = Math.floor((Date.now() - then) / 86_400_000)
+  if (days <= 0) return 'Synced from Google · updated today'
+  if (days === 1) return 'Synced from Google · updated 1d ago'
+  return `Synced from Google · updated ${days}d ago`
+}
+
 /**
  * One-line label for today's hours shown on a directory card.
  *  - Structured hours → "Today: 9:00 AM – 5:00 PM" or "Closed today"
