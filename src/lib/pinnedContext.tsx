@@ -16,7 +16,8 @@ type PinnedContextValue = {
    *  (not as ResourceMapView's own local state) so pinning a place from
    *  ANY pin button (a directory row, the map's nearby list, a place detail)
    *  turns the chip on immediately, even though those buttons don't know
-   *  the map exists. Toggling it back off (the chip itself, or Hide all)
+   *  the map exists. Toggling it back off (the chip itself, or another
+   *  category chip narrowing the row)
    *  writes here too, so the two stay in sync no matter which one changed
    *  it last. */
   filterActive: boolean

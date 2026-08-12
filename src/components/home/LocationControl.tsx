@@ -32,9 +32,16 @@ export default function LocationControl({ controls }: Props) {
   const wasTracking = useRef(controls.tracking)
   // True on the mobile map screen (see MapScreen/useCollapseHeader) — the
   // header pill this popover would normally hang from is itself invisible
-  // there, and the only way in is the map's own pin FAB, bottom-right. Used
-  // below to anchor the popover near that FAB instead of the header.
+  // there, and the only way in is the map's own pin button next to its
+  // search bar. Used below to anchor the popover under that button instead
+  // of the (invisible) header.
   const collapsed = useHeaderCollapsed()
+  // The actual on-screen button that opened this while collapsed (the map's
+  // own pin button, passed along in the toggle event's detail — see below) —
+  // used to anchor the popover directly under IT, since the header's own
+  // trigger pill (this component's `ref` below) is invisible on this screen
+  // and has no real position to hang a `top-full` popover from.
+  const [mapAnchor, setMapAnchor] = useState<HTMLElement | null>(null)
 
   // The popover is anchored (absolute/fixed), not part of normal page flow,
   // so nothing stops the page or map behind it from still scrolling while
@@ -49,14 +56,25 @@ export default function LocationControl({ controls }: Props) {
   // document, so a normal bubble-phase listener never saw taps on the map and
   // the popover was stuck open. Capture runs on the way down, before the
   // map's own handler gets a chance to swallow it, so this fires regardless.
+  //
+  // `mapAnchor` counts as "inside" too, not just `ref.current` — collapsed,
+  // the button that opens this popover lives outside `ref` entirely (see
+  // `mapAnchor` above), so without this a tap on THAT button read as an
+  // outside click: this handler closed the popover on pointerdown, and then
+  // the click's own 'jpc:toggle-location' handler immediately re-opened it
+  // (toggling what it saw as still-open), so a second tap on the button
+  // never actually closed anything.
   useEffect(() => {
     if (!open) return
     function onDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      if (mapAnchor?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('pointerdown', onDown, true)
     return () => document.removeEventListener('pointerdown', onDown, true)
-  }, [open])
+  }, [open, mapAnchor])
 
   // Allow any component (e.g. AddressPrompt) to open the picker without prop drilling.
   useEffect(() => {
@@ -66,12 +84,18 @@ export default function LocationControl({ controls }: Props) {
   }, [])
 
   // A second, TOGGLING variant of the same event — used by the mobile map's
-  // pin FAB, which (unlike AddressPrompt's plain "open" link) is a button a
-  // visitor can tap again while the popover it opened is still up, and
+  // pin button, which (unlike AddressPrompt's plain "open" link) is a button
+  // a visitor can tap again while the popover it opened is still up, and
   // expects that second tap to close it, the same as tapping the header pill
-  // itself twice would.
+  // itself twice would. Its `detail.anchor` (the button's own DOM node) is
+  // what lets the popover drop down under it below, instead of floating
+  // detached near the bottom of the screen.
   useEffect(() => {
-    function onToggle() { setOpen((o) => !o) }
+    function onToggle(e: Event) {
+      const anchor = (e as CustomEvent<{ anchor?: HTMLElement }>).detail?.anchor
+      if (anchor) setMapAnchor(anchor)
+      setOpen((o) => !o)
+    }
     document.addEventListener('jpc:toggle-location', onToggle)
     return () => document.removeEventListener('jpc:toggle-location', onToggle)
   }, [])
@@ -127,6 +151,85 @@ export default function LocationControl({ controls }: Props) {
     controls.onAddressChange(address)
   }
 
+  // Shared between both popover placements below (normal vs. collapsed) —
+  // same content either way, only the wrapping div's position differs.
+  const popoverBody = (
+    <>
+      <p className="text-sm font-semibold text-slate-900">
+        Where should distances be measured from?
+      </p>
+
+      {controls.tracking ? (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            </span>
+            Live — updating as you move
+          </span>
+          <button
+            onClick={controls.onStopTracking}
+            className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          >
+            Stop
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={controls.onStartTracking}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20 cursor-pointer"
+        >
+          <PinIcon className="h-4 w-4 shrink-0" />
+          Share my live location
+        </button>
+      )}
+
+      {/* Two slots, each showing either its control or its own active
+          state: live tracking above, "a fixed point you picked" here.
+          That's why the listing anchor lands in the address input's slot
+          rather than above the live button — it IS the fixed point, so
+          keeping it here leaves the live option where it always sits
+          instead of shuffling the order once something's set. Same
+          in-place swap tracking already does with its Stop row.
+
+          The "or enter an address" divider goes with the input: above a
+          summary row it would be describing something that isn't there.
+          Clearing brings both back. */}
+      {listingAnchorName ? (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
+          <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
+            <CrosshairIcon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{listingAnchorName}</span>
+          </span>
+          <button
+            onClick={() => location?.clearAnchor()}
+            className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-100" />
+            or enter an address
+            <span className="h-px flex-1 bg-slate-100" />
+          </div>
+
+          <AddressInput
+            value={controls.tracking ? '' : controls.address}
+            onChange={handleAddressChange}
+            onCoords={handleCoords}
+            placeholder="Enter your address"
+          />
+        </>
+      )}
+
+      {controls.geoError && <p className="mt-2 text-xs text-red-600">{controls.geoError}</p>}
+    </>
+  )
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -156,113 +259,43 @@ export default function LocationControl({ controls }: Props) {
       {open && (
         // `visible`: on the mobile map screen the header itself is
         // `invisible` (see SiteHeader) while this popover is still meant to
-        // show, opened by the map's pin FAB rather than the header's own
-        // (there, also invisible) trigger pill. `visibility` is inherited,
-        // but a descendant can opt back out of an ancestor's `hidden` with
-        // its own `visible` — this is that opt-out. A no-op everywhere the
-        // header isn't collapsed, since `visible` is already the default.
+        // show, opened by the map's own pin button rather than the header's
+        // own (there, also invisible) trigger pill. `visibility` is
+        // inherited, but a descendant can opt back out of an ancestor's
+        // `hidden` with its own `visible` — this is that opt-out. A no-op
+        // everywhere the header isn't collapsed, since `visible` is already
+        // the default.
         //
         // Two different anchors, not one shared position tweaked by a class:
         // the normal case is `absolute`, hanging off the trigger pill inside
         // this component's own `relative` wrapper, which is the right anchor
         // when that pill is the thing the visitor actually tapped. Collapsed,
-        // that pill is invisible and the real trigger — the map's pin FAB —
-        // lives in a completely different part of the tree (ResourceMapView,
-        // bottom-right), so anchoring to a wrapper here would put the sheet
-        // wherever this component happens to be mounted, not where the FAB
-        // is. `fixed` positions it against the viewport instead, above where
-        // the FAB actually is.
-        //
-        // bottom-[12.5rem] is measured, not derived: the FAB is positioned
-        // `absolute` within ResourceMapView's own container, not `fixed` to
-        // the viewport the way this sheet is, so the two don't share a
-        // coordinate space and computing a value from the FAB's own offset
-        // classes (as the very first version of this did, copying the number
-        // from the FAB's old standalone prompt card) landed the sheet
-        // overlapping it — confirmed live, then corrected by measuring the
-        // FAB's actual on-screen position and adjusting until there was a
-        // real gap above it.
-        <div
-          className={
-            collapsed
-              ? 'visible fixed inset-x-3 bottom-[12.5rem] z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10'
-              : 'visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10'
-          }
-        >
-          <p className="text-sm font-semibold text-slate-900">
-            Where should distances be measured from?
-          </p>
-
-          {controls.tracking ? (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
-              <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-                </span>
-                Live — updating as you move
-              </span>
-              <button
-                onClick={controls.onStopTracking}
-                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Stop
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={controls.onStartTracking}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 active:bg-primary/20 cursor-pointer"
-            >
-              <PinIcon className="h-4 w-4 shrink-0" />
-              Share my live location
-            </button>
-          )}
-
-          {/* Two slots, each showing either its control or its own active
-              state: live tracking above, "a fixed point you picked" here.
-              That's why the listing anchor lands in the address input's slot
-              rather than above the live button — it IS the fixed point, so
-              keeping it here leaves the live option where it always sits
-              instead of shuffling the order once something's set. Same
-              in-place swap tracking already does with its Stop row.
-
-              The "or enter an address" divider goes with the input: above a
-              summary row it would be describing something that isn't there.
-              Clearing brings both back. */}
-          {listingAnchorName ? (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
-              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-primary">
-                <CrosshairIcon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{listingAnchorName}</span>
-              </span>
-              <button
-                onClick={() => location?.clearAnchor()}
-                className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-              >
-                Clear
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="my-3 flex items-center gap-3 text-xs text-slate-400">
-                <span className="h-px flex-1 bg-slate-100" />
-                or enter an address
-                <span className="h-px flex-1 bg-slate-100" />
-              </div>
-
-              <AddressInput
-                value={controls.tracking ? '' : controls.address}
-                onChange={handleAddressChange}
-                onCoords={handleCoords}
-                placeholder="Enter your address"
-              />
-            </>
-          )}
-
-          {controls.geoError && <p className="mt-2 text-xs text-red-600">{controls.geoError}</p>}
-        </div>
+        // that pill is invisible and the real trigger — the map's own pin
+        // button — lives in a completely different part of the tree
+        // (ResourceMapView), so anchoring to a wrapper here would put the
+        // sheet wherever this component happens to be mounted, not where
+        // that button is. `fixed`, positioned from `mapAnchor`'s own
+        // measured rect (passed along on the toggle event, see above),
+        // drops it directly under that button instead — same "comes down
+        // under the button" behavior as the header pill's own popover, just
+        // computed rather than relying on shared layout flow. Falls back to
+        // a plain centered-under-the-header-strip position if this ever
+        // opens collapsed without an anchor (there's currently no such path,
+        // but nothing should render off-screen if one appears later).
+        collapsed ? (
+          <div
+            className="visible fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
+            style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8 }}
+          >
+            {popoverBody}
+          </div>
+        ) : (
+          <div className="visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10">
+            {popoverBody}
+          </div>
+        )
       )}
     </div>
   )
 }
+

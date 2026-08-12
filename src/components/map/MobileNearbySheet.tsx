@@ -59,13 +59,17 @@ export type MobileNearbySheetHandle = {
    *  falls back to the nearby list at whatever height it was already at
    *  (same as swiping left on the place's card). */
   deselectPoint: () => void
-  /** Collapses the sheet and clears any selected place — called when
-   *  clearing the search box, so it resets back to the default browse state. */
+  /** Collapses the sheet and clears any selected place — called both when
+   *  clearing the search box (resets back to the default browse state) and
+   *  when the visitor taps empty map while viewing a place's card (see
+   *  ResourceMap's onBackgroundClick) — that tap counts as unselecting the
+   *  place, same as tapping its pin again would. */
   collapse: () => void
-  /** Drops the sheet to 'peek' WITHOUT clearing a selected place — called
-   *  when the visitor taps empty map while viewing a place's card. Dragging
-   *  back up brings the same place back, rather than losing it in favor of
-   *  the plain nearby list (see ResourceMap's onBackgroundClick). */
+  /** Drops the sheet to 'peek' WITHOUT clearing a selected place — used
+   *  while the visitor is actively typing in the search box, so the sheet
+   *  gets out from under the search box/dropdown without losing whatever
+   *  place was already selected; dismissing the keyboard brings it right
+   *  back to where it was (see the mobile search input's onFocus). */
   lower: () => void
   /** Clears any selected place and raises a collapsed sheet to 'half' —
    *  called when a search narrows to several results, so the list becomes
