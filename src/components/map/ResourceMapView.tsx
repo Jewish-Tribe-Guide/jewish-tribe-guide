@@ -1620,15 +1620,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   </svg>
                 </button>
               )}
-              {ui.map.liveTracking && tracking && (
-                <button
-                  onClick={stop}
-                  className="absolute bottom-36 right-3 z-10 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
-                >
-                  Stop tracking
-                </button>
-              )}
-
               {/* ── Mobile nearby list — a draggable bottom sheet over the
                       map instead of the desktop Map/Nearby toggle; see
                       MobileNearbySheet for the peek/half/full snap points. ── */}
