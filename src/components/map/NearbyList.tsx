@@ -2,8 +2,6 @@
 
 import { useMemo } from 'react'
 import { haversineMiles } from '@/lib/geo'
-import { directionsUrl } from '@/lib/googleMapsLinks'
-import { DirectionsIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
 import { PHOTO_FIELD_KEY } from '@/lib/categories'
 import type { MapPoint } from './ResourceMap'
@@ -63,8 +61,6 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
   return (
     <div className="divide-y divide-slate-100 rounded-2xl ring-1 ring-slate-900/5 bg-white overflow-hidden">
       {sorted.map((p) => {
-        const dest = p.address || `${p.lat},${p.lng}`
-        const href = directionsUrl(dest)
         const canViewListing = !!(onSelectPlace || onViewListing) && p.filterId !== HOSPITALS_FILTER_ID
 
         return (
@@ -102,25 +98,29 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
               </span>
             </button>
 
-            {/* Distance + Directions — a quiet round icon button, not a
-                labeled blue pill, so it reads like Google Maps' understated
-                directions shortcut instead of competing with the row tap target. */}
+            {/* A small category badge + distance — a quiet color-tinted
+                glyph, not a directions shortcut: the row's own tap already
+                opens full details (including a real directions link), so a
+                second action here just competed with it. The badge repeats
+                the left icon's color/glyph in miniature purely so the
+                category still reads at a glance once the photo/logo (not
+                always present) isn't what's showing on the left. Badge on
+                top, distance below — the badge is the more glanceable of the
+                two (color/shape read faster than digits), same as the pin
+                markers on the map themselves sit above their labels. */}
             <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+                style={{ backgroundColor: p.color + '22' }}
+                aria-hidden="true"
+              >
+                {p.glyph ?? '📍'}
+              </span>
               {p.miles !== null && (
                 <span className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>
                   {distanceLabel(p.miles)}
                 </span>
               )}
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Directions to ${p.name}`}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 active:bg-slate-300 transition-colors"
-              >
-                <DirectionsIcon className="h-4 w-4" />
-              </a>
             </div>
           </div>
         )

@@ -17,7 +17,7 @@ import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
-import { ChevronLeftIcon, ExpandIcon, CollapseIcon } from '@/components/icons'
+import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
@@ -138,7 +138,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const listings = useAllListings()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
-  const { pinned, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
+  const { pinned, toggle: togglePinnedListing, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
   const pinnedIds = useMemo(() => new Set(pinned.map((p) => p.id)), [pinned])
   // Whether the Pinned chip is toggled on — it behaves like one more category
   // chip in the row (see the Pinned button below), not an exclusive "only
@@ -350,6 +350,19 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     else setDesktopSelected(null)
   }
 
+  // Press-and-hold a marker to toggle it Pinned, without opening its card —
+  // a shortcut alongside the existing PinButton inside the full detail view
+  // (MapPlaceDetail), for shortlisting a place without drilling into it
+  // first. Hospitals and dropped pins aren't real directory listings (no
+  // `filterId`/a synthetic one), so there's no categoryId a PinnedListing
+  // could hold for them — long-pressing those is a no-op instead of
+  // corrupting the pinned list with a fake category.
+  const handleLongPressPoint = (p: MapPoint) => {
+    const sp = p as SelectablePoint
+    if (!sp.filterId || sp.filterId === HOSPITALS_ID || sp.filterId === DROPPED_FILTER_ID) return
+    togglePinnedListing({ id: sp.id, categoryId: sp.filterId })
+  }
+
   // Keeps the standalone map screen's own address bar in sync with which pin
   // is open, so a map link is shareable down to the specific place someone
   // had selected — not just the pins and filters mapQueryString already
@@ -531,6 +544,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   const [searchFocused, setSearchFocused] = useState(false)
   const mobileSearchInputRef = useRef<HTMLInputElement>(null)
   const desktopSearchInputRef = useRef<HTMLInputElement>(null)
+  // Handed to LocationControl (via the 'jpc:toggle-location' event's detail)
+  // so its popover can anchor directly under THIS button — the header's own
+  // trigger pill is invisible on this screen (see useCollapseHeader), so
+  // LocationControl has no DOM position of its own to hang the popover from
+  // here otherwise.
+  const locationButtonRef = useRef<HTMLButtonElement>(null)
   const searchSuggestions = useMemo(() => {
     const q = stripApostrophes(input.trim().toLowerCase())
     if (isOpenNowWord(q)) return []
@@ -805,47 +824,23 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committedQuery, filterChips, isMobile])
 
-  // Clears any active bool/select filter belonging to one of `ids` — an
-  // explicit reset (Hide all, or narrowing down via "Show all" → one chip),
-  // not something that happens just from toggling a category off: a filter
-  // stays put across an off/on cycle so it's there again when the category
-  // comes back, and the only way to actually clear it is to unset it directly
-  // (the picker's per-field controls, or the chip's own inline editor).
-  function clearFiltersForCategories(ids: Iterable<string>) {
-    const idSet = new Set(ids)
-    if (idSet.size === 0) return
-    const keys = new Set<string>()
-    for (const cat of categories ?? []) {
-      if (!idSet.has(cat.id)) continue
-      for (const f of cat.detailFields) {
-        if (f.filterable && (f.type === 'boolean' || f.type === 'select')) keys.add(f.key)
-      }
-    }
-    if (keys.size === 0) return
-    setBoolFields((prev) => prev.filter((k) => !keys.has(k)))
-    setSelectFilters((prev) => {
-      const next = { ...prev }
-      for (const k of keys) delete next[k]
-      return next
-    })
-  }
-
   // Whether every chip in the row — the real categories AND the Pinned chip,
   // when it's showing — is currently on. Mirrors CategoryFilter's own `allOn`
-  // (which drives Show all/Hide all's label): the Pinned chip only counts
-  // when it actually renders (see pinnedChip below), so a visitor who's
-  // never pinned anything isn't blocked from "narrow to just this one" by a
-  // chip they can't see.
+  // (which drives the "All" chip's highlighted state): the Pinned chip only
+  // counts when it actually renders (see pinnedChip below), so a visitor
+  // who's never pinned anything isn't blocked from "narrow to just this
+  // one" by a chip they can't see.
   const hasPinnedChip = ui.map.pins && pinned.length > 0
   const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
 
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
     // straight down to just that category — same as Google Maps' filter
-    // chips — rather than requiring "Hide all" first and then re-enabling
-    // the one category you actually wanted. Once you've narrowed down,
-    // further taps add/remove from that subset as before. Any category's
-    // stored filters ride along either way (see clearFiltersForCategories).
+    // chips — rather than requiring an unclick-everything-else step first.
+    // Once you've narrowed down, further taps add/remove from that subset
+    // as before. A category's own stored filters ride along either way — a
+    // filter stays put across an off/on cycle, so it's there again when the
+    // category comes back.
     setSidebarCollapsed(false)
 
     // Picking a category on mobile brings the nearby sheet up to half, the way
@@ -875,11 +870,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       next.add(id)
       raiseSheet()
     }
+    // Unclicking the last remaining chip goes back to showing everything,
+    // same as Google Maps/Too Good To Go's filter rows — there's no
+    // "nothing shown" state a chip tap can land you in, so a separate
+    // Hide-all shortcut has nothing left to do.
+    if (next.size === 0 && !pinnedSelected) {
+      showAll()
+      return
+    }
     setSelected(next)
   }
-  // Show all/Hide all cover every chip in the row, Pinned included — not
-  // just the real categories — so the button's own "everything is on/off"
-  // promise actually holds.
+  // Resets every chip in the row, Pinned included — not just the real
+  // categories — so "All" actually means all.
   const showAll = () => {
     setSelected(new Set(options.map((o) => o.id)))
     setPinnedSelected(true)
@@ -902,19 +904,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       return
     }
     const next = !pinnedSelected
+    // Same revert-to-all as unclicking the last category chip — turning
+    // Pinned off shouldn't be able to leave the row with nothing on.
+    if (!next && effectiveSelected.size === 0) {
+      showAll()
+      return
+    }
     setPinnedSelected(next)
     if (next) {
       setSidebarCollapsed(false)
       if (isMobile) nearbySheetRef.current?.raise()
     }
   }
-  const hideAll = () => {
-    setSelected(new Set())
-    clearFiltersForCategories(effectiveSelected)
-    setPinnedSelected(false)
-    setSidebarCollapsed(false)
-  }
-
   // A plain, unconditional on/off toggle — unlike `toggle` above, this never
   // "narrows to just this one" when everything's currently shown. That smart
   // behavior makes sense for the compact chip row (each chip reads as its own
@@ -927,6 +928,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       next.delete(id)
     } else {
       next.add(id)
+    }
+    // Same revert-to-all as the chip row — unchecking the last box goes
+    // back to everything rather than leaving the picker (and the map behind
+    // it) at "nothing shown".
+    if (next.size === 0 && !pinnedSelected) {
+      showAll()
+      return
     }
     setSelected(next)
   }
@@ -1089,35 +1097,41 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // A standalone toggle, not one of CategoryFilter's own chips — it narrows
   // ACROSS categories rather than toggling one, so it doesn't belong to
   // that component's select/all/none model. Rendered by CategoryFilter
-  // itself, right after Show all/Hide all and before the real category
+  // itself, right after the "All" chip and before the real category
   // chips — it's the most important shortlist, not just another category.
   // Hidden until there's at least one pin: an always-visible "Pinned 0"
   // that narrows the map to nothing isn't a useful default state for a
   // feature nobody's touched yet.
+  // Display only, same reasoning as CategoryFilter's own chips — while
+  // "All" is on, Pinned is technically part of the selection too, but
+  // coloring it in adds nothing the map (showing everything already) hasn't
+  // already said. The real toggle state (aria-pressed, the click handler)
+  // stays keyed on `pinnedSelected` itself.
+  const pinnedHighlighted = pinnedSelected && !allChipsOn
   const pinnedChip = ui.map.pins && pinned.length > 0 && (
     <div
       className={`relative flex shrink-0 items-stretch rounded-full border text-xs font-medium transition-colors ${
-        pinnedSelected ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
+        pinnedHighlighted ? 'border-transparent text-white' : 'border-slate-300 bg-white text-slate-500'
       }`}
       // Same blue as the pin badge overlaid on a pinned marker (see
       // ResourceMap's buildPin) — Pinned isn't a real category with its own
       // hue, but this chip should still read with exactly the same weight
       // (size, dot, count) as one, not a lighter/different-shaped control.
-      style={pinnedSelected ? { backgroundColor: '#2563eb' } : undefined}
+      style={pinnedHighlighted ? { backgroundColor: '#2563eb' } : undefined}
     >
       <button
         onClick={togglePinnedSelected}
         aria-pressed={pinnedSelected}
-        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedSelected ? '' : 'hover:bg-slate-50'}`}
+        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${pinnedHighlighted ? '' : 'hover:bg-slate-50'}`}
       >
         <span
           className="inline-block h-2 w-2 rounded-full ring-1 ring-white/60"
-          style={{ backgroundColor: pinnedSelected ? 'rgba(255,255,255,0.9)' : '#2563eb' }}
+          style={{ backgroundColor: pinnedHighlighted ? 'rgba(255,255,255,0.9)' : '#2563eb' }}
           aria-hidden="true"
         />
         <span aria-hidden="true">📌</span>
         <span>Pinned</span>
-        <span className={pinnedSelected ? 'text-white/80' : 'text-slate-400'}>{pinned.length}</span>
+        <span className={pinnedHighlighted ? 'text-white/80' : 'text-slate-400'}>{pinned.length}</span>
       </button>
     </div>
   )
@@ -1131,7 +1145,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       selected={effectiveSelected}
       onToggle={toggle}
       onAll={showAll}
-      onNone={hideAll}
       categories={categories ?? []}
       points={allPoints}
       boolFields={boolFields}
@@ -1296,8 +1309,13 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   selectPlace(sp)
                 }}
                 onDeselectPoint={deselectPlace}
-                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.lower() : setDesktopSelected(null))}
+                // Tapping empty map while a place's card is showing counts as
+                // unselecting it, same as tapping its pin again would — the
+                // card goes away AND the pin stops reading as selected
+                // (collapse clears `selected`, not just the sheet's height).
+                onBackgroundClick={() => (isMobile ? nearbySheetRef.current?.collapse() : setDesktopSelected(null))}
                 onMapLongPress={ui.map.pins ? (coords) => setPendingDropAt(coords) : undefined}
+                onLongPressPoint={ui.map.pins ? handleLongPressPoint : undefined}
                 searchActive={searchActive}
                 selectedId={selectedPointId}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
@@ -1421,6 +1439,50 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         </button>
                       )}
                     </form>
+
+                    {/* ── Set/change location — Too-Good-To-Go-style: a
+                            round icon button riding right alongside the
+                            search bar (which shrinks to make room) instead
+                            of its own standing FAB down in the bottom-right
+                            corner. Styled to match the header's own
+                            LocationControl pill (same border/shadow/PinIcon,
+                            same tracking-dot swap) rather than a bespoke
+                            look, just collapsed to icon-only — there's no
+                            room for the pill's label in this row. Opens the
+                            same header popover as AddressPrompt, via the
+                            TOGGLING 'jpc:toggle-location' event rather than
+                            AddressPrompt's plain "open" one — this is a
+                            standing button a visitor can tap again while the
+                            popover is already up, and a second tap should
+                            close it, not re-open what's already open —
+                            rather than jumping straight into requesting GPS:
+                            a visitor who'd rather type an address gets that
+                            choice instead of a permission prompt they didn't
+                            ask for. The bottom-right corner it used to own is
+                            now the live-location FAB's (below). Passes its
+                            own DOM node along on the event so the popover can
+                            anchor (drop down) directly under IT, the same as
+                            the header pill's own popover does elsewhere,
+                            instead of floating as a detached bottom sheet. ── */}
+                    <button
+                      ref={locationButtonRef}
+                      type="button"
+                      onClick={() =>
+                        document.dispatchEvent(
+                          new CustomEvent('jpc:toggle-location', { detail: { anchor: locationButtonRef.current } }),
+                        )
+                      }
+                      aria-label={activeLocation ? 'Change your location' : 'Set your location'}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
+                    >
+                      {tracking ? (
+                        <span className="flex h-4 w-4 items-center justify-center" aria-hidden="true">
+                          <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
+                        </span>
+                      ) : (
+                        <PinIcon filled={!!activeLocation} className="h-4 w-4 text-primary" />
+                      )}
+                    </button>
                   </div>
 
                   {/* ── Category filter chips — Google-Maps-style: a always-
@@ -1436,7 +1498,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         selected={effectiveSelected}
                         onToggle={toggle}
                         onAll={showAll}
-                        onNone={hideAll}
                         maxVisible={4}
                         onMore={() => setCategoriesOpen(true)}
                                     categories={categories ?? []}
@@ -1489,49 +1550,30 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </div>
               )}
 
-              {/* Mobile-only "set/change your location" FAB. Opens the same
-                  header popover as AddressPrompt, via the TOGGLING
-                  'jpc:toggle-location' event rather than AddressPrompt's
-                  plain "open" one — this is a standing button a visitor can
-                  tap again while the popover is already up, and a second tap
-                  should close it, not re-open what's already open — rather
-                  than jumping straight into requesting GPS: a visitor who'd
-                  rather type an address gets that choice instead of a
-                  permission prompt they didn't ask for.
-                  Always rendered, not just while there's no anchor yet — this
-                  used to disappear the moment a location was set (ResourceMap
-                  draws its own "Re-center"/"Following" pill in the same slot
-                  once activeLocation exists), which meant there was no way to
-                  change your mind on this screen once you'd shared a location
-                  or typed an address: the header pill that would normally do
-                  that is itself collapsed away here (see MapScreen).
-                  Fixed position regardless of activeLocation — it used to
-                  jump to a smaller, higher slot once a location was set, to
-                  stay clear of the Following/Re-center pill in this same
-                  bottom-right corner. That pill now lives bottom-LEFT instead
-                  (see ResourceMap), specifically so this FAB never has to
-                  move for it; the only other bottom-right neighbor, the
-                  mobile "Stop tracking" pill below, sits well clear of this
-                  one's height already.
-                  Not gated on ui.map.liveTracking: unlike the old FAB this
-                  replaced, tapping it doesn't itself start tracking — it just
-                  opens the picker, which offers an address either way.
-                  Widens into a labeled pill until a location is set — a bare
-                  pin glyph with no visible text gave first-time visitors on
-                  this screen no way to guess it opens the location picker
-                  (the header pill everywhere else on the site spells this out
-                  in words; this FAB exists precisely because that pill is
-                  hidden here). Collapses to icon-only once set, same as the
-                  header pill does on mobile, so it doesn't sit oversized
-                  reporting a location the visitor already knows they set. */}
-              <button
-                onClick={() => document.dispatchEvent(new CustomEvent('jpc:toggle-location'))}
-                aria-label={activeLocation ? 'Change your location' : 'Set your location'}
-                className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 items-center justify-center gap-1.5 rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden ${activeLocation ? 'w-12' : 'pl-3 pr-4'}`}
-              >
-                <span aria-hidden="true">📍</span>
-                {!activeLocation && <span className="text-sm font-medium text-slate-700">Set location</span>}
-              </button>
+              {/* Mobile-only live-location FAB — Google-Maps/Too-Good-To-Go-
+                  style navigation-arrow button, bottom-right. The corner used
+                  to belong to a "set/change location" pin FAB, which has
+                  moved inline next to the search bar (above); this slot is
+                  now purely about the device's own GPS: tap to start
+                  tracking, or (once tracking) to resume following after a
+                  manual drag — same as ResourceMap's desktop
+                  Re-center/Following pill, just icon-only and living in the
+                  corner that pill can't use on mobile (MobileNearbySheet owns
+                  bottom-left there). Filled blue while actively following,
+                  same color language as that pill. */}
+              {ui.map.liveTracking && (
+                <button
+                  onClick={() => (tracking ? setFollow(true) : handleStart())}
+                  aria-label={tracking && follow ? 'Following your location' : 'Show my location'}
+                  className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:hidden ${
+                    tracking && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
+                  }`}
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2 19 21 12 17 5 21z" />
+                  </svg>
+                </button>
+              )}
               {ui.map.liveTracking && tracking && (
                 <button
                   onClick={stop}
@@ -1597,10 +1639,10 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
           </div>
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 pb-3">
             <button
-              onClick={effectiveSelected.size === options.length ? hideAll : showAll}
+              onClick={showAll}
               className="text-sm font-medium text-primary cursor-pointer"
             >
-              {effectiveSelected.size === options.length ? 'Hide all' : 'Show all'}
+              Show all
             </button>
             <button
               onClick={() => setCategoriesOpen(false)}

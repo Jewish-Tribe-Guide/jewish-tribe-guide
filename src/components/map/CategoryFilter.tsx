@@ -31,7 +31,6 @@ type Props = {
   selected: Set<string>
   onToggle: (id: string) => void
   onAll: () => void
-  onNone: () => void
   /** When set, only this many category chips render before a trailing
    *  "More" chip that hands off to `onMore` — the compact Google-Maps-style
    *  quick row mobile uses over the map. Omit to show every chip inline
@@ -57,27 +56,29 @@ type Props = {
   /** The "Pinned" shortlist toggle — not one of `options`, so it can't just
    *  be another entry in that array: it narrows ACROSS categories rather
    *  than being one, and it's the single most important chip in the row, so
-   *  it renders right after Show all/Hide all rather than sorted in among
-   *  the regular category chips by count like everything else here. */
+   *  it renders right after the "All" chip rather than sorted in among the
+   *  regular category chips by count like everything else here. */
   pinnedChip?: React.ReactNode
   /** Whether the Pinned chip (above) is currently on — folded into "is
    *  everything on" below (only while `pinnedChip` is actually rendered, so
    *  its absence — nothing pinned yet — can't read as "something's off")
-   *  so Show all/Hide all's own label, and what tapping it does, accounts
-   *  for Pinned too, not just the real categories. */
+   *  so the "All" chip's own highlighted state, and what tapping it does,
+   *  accounts for Pinned too, not just the real categories. */
   pinnedOn?: boolean
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
- *  legend, plus "Show all" / "Hide all" shortcuts. A single horizontal-scroll
- *  row (native scrollbar, styled thin via the `chip-scroll` class in
- *  globals.css) rather than wrapping, so it stays compact over the map. */
+ *  legend, plus an "All" shortcut. There's no "hide everything" state to
+ *  toggle back to — unclicking the last chip resets to all (see `toggle` in
+ *  ResourceMapView) — so this is a one-way reset, not a Show all/Hide all
+ *  pair. A single horizontal-scroll row (native scrollbar, styled thin via
+ *  the `chip-scroll` class in globals.css) rather than wrapping, so it stays
+ *  compact over the map. */
 export default function CategoryFilter({
   options,
   selected,
   onToggle,
   onAll,
-  onNone,
   maxVisible,
   onMore,
   wrap,
@@ -255,15 +256,32 @@ export default function CategoryFilter({
 
   return (
     <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
+      {/* Always resets to everything — there's no "hide everything" state
+          left to toggle to (unclicking the last chip already resets here,
+          see `toggle` in ResourceMapView), so this reads as a single "All"
+          chip, filled to match whenever it's already the active state,
+          rather than a Show all/Hide all pair. */}
       <button
-        onClick={allOn ? onNone : onAll}
-        className="shrink-0 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+        onClick={onAll}
+        aria-pressed={allOn}
+        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+          allOn
+            ? 'border-transparent bg-slate-700 text-white'
+            : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+        }`}
       >
-        {allOn ? 'Hide all' : 'Show all'}
+        All
       </button>
       {pinnedChip}
       {visible.map((o) => {
-        const on = selected.has(o.id)
+        const selectedState = selected.has(o.id)
+        // Display only — while "All" is active every category is technically
+        // selected, but coloring in the whole row just to say "everything's
+        // on" is redundant with the map itself already showing everything;
+        // the "All" chip alone carries that signal. A real, functional
+        // selection (aria-pressed, openEditor below) still uses
+        // `selectedState`, not this — only the paint job differs.
+        const on = selectedState && !allOn
         const editorOpen = openFilterFor === o.id
         const cat = categories.find((c) => c.id === o.id)
         // Desktop: any category with filterable fields, so there's a way to
@@ -288,7 +306,7 @@ export default function CategoryFilter({
             >
               <button
                 onClick={() => onToggle(o.id)}
-                aria-pressed={on}
+                aria-pressed={selectedState}
                 title={o.filterSuffix ? `Filtered: ${o.filterSuffix}` : undefined}
                 className={`flex items-center gap-1 py-1 pl-2.5 ${hasFilters ? 'pr-1.5' : 'pr-2.5'} ${
                   on ? 'rounded-full' : 'rounded-full hover:bg-slate-50'
@@ -328,7 +346,7 @@ export default function CategoryFilter({
                   // affordance to discover a filter that isn't active yet;
                   // that's still the full-screen category picker's job.
                   <button
-                    onClick={(e) => openEditor(o.id, on, e.currentTarget)}
+                    onClick={(e) => openEditor(o.id, selectedState, e.currentTarget)}
                     aria-expanded={editorOpen}
                     aria-label={`Edit ${o.label} filters`}
                     className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
@@ -344,7 +362,7 @@ export default function CategoryFilter({
                   // place, not only to review/remove one already set some
                   // other way (the full-screen picker).
                   <button
-                    onClick={(e) => openEditor(o.id, on, e.currentTarget)}
+                    onClick={(e) => openEditor(o.id, selectedState, e.currentTarget)}
                     aria-expanded={editorOpen}
                     aria-label={`${o.label} filters`}
                     className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
