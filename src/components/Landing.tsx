@@ -136,6 +136,20 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
     el.scrollIntoView({ block: 'start' })
   }, [scrollTo, hasMap])
 
+  // Tapping the tab bar's Home button, or the header logo, while already on
+  // home doesn't remount this component — see goHome's own note — so it fires
+  // this event instead to get the same "back to a clean home" result by hand:
+  // clear whatever was typed and jump back to the top, the way a fresh mount
+  // would if the URL had actually changed.
+  useEffect(() => {
+    function onGoHome() {
+      setQuery('')
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+    document.addEventListener('jpc:go-home', onGoHome)
+    return () => document.removeEventListener('jpc:go-home', onGoHome)
+  }, [])
+
   return (
     <>
       {/* ── Section tabs (desktop) — the primary way to reach a category now

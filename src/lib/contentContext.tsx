@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { CommunityContent, ContentKey } from './loadCommunityContent'
 import { draftSectionsAsHomeSections, readPreviewDraft } from './previewDraft'
 import { withIconOverrides } from './categoryFallback'
@@ -52,7 +52,14 @@ export function useContentFailures(): ContentKey[] {
 }
 
 export function useCategories() {
-  return withIconOverrides(useContent().categories)
+  // Memoized on the source array's reference (stable for the client tree's
+  // whole lifetime — see ContentProvider), not recomputed fresh on every call.
+  // withIconOverrides used to build a new array/objects every render, which
+  // broke referential equality for anything downstream that depended on it
+  // (e.g. the map's filterChips/raise-sheet effect, which re-fired on every
+  // unrelated render instead of only on a real category/filter change).
+  const categories = useContent().categories
+  return useMemo(() => withIconOverrides(categories), [categories])
 }
 
 /** The admin preview's unsaved draft, or null.

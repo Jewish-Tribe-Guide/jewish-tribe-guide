@@ -776,6 +776,15 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // its card; more than one shows the list (raising the sheet on mobile,
   // dropping any previously-selected place on desktop so the sidebar's list
   // is what's visible).
+  //
+  // `isMobile` is a dep too, not just read inside — useIsMobile starts false
+  // on every mount (SSR-safe default, corrected a render later — see its own
+  // note) and this effect otherwise only reruns when committedQuery/
+  // filterChips actually change. Arriving here already carrying a filter
+  // (e.g. tapping Map from an already-filtered category) commits that filter
+  // on the very first render, before isMobile has corrected itself — without
+  // this dep the effect ran once against the stale `isMobile === false`,
+  // took the desktop branch, and never got another chance to raise the sheet.
   useEffect(() => {
     if (suppressNextCommitEffectRef.current) {
       suppressNextCommitEffectRef.current = false
@@ -794,7 +803,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       setSidebarCollapsed(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committedQuery, filterChips])
+  }, [committedQuery, filterChips, isMobile])
 
   // Clears any active bool/select filter belonging to one of `ids` — an
   // explicit reset (Hide all, or narrowing down via "Show all" → one chip),
