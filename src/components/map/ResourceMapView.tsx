@@ -181,6 +181,17 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // categories plus a trailing "More" chip; tapping it opens this full-screen
   // picker with every category, Google-Maps-style.
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+  // Bumped every time the full-screen picker above closes (Back or Apply) —
+  // handed to the compact row as CategoryFilter's `resortToken`, the only
+  // signal (besides first mount) that should reorder it: selected categories
+  // to the front, unselected after, both highest-to-lowest. An ordinary tap
+  // on a chip already in that row must never reorder it — only having been
+  // off-screen, on the picker, resets what's worth remembering.
+  const [categoryResortToken, setCategoryResortToken] = useState(0)
+  const closeCategoriesPicker = () => {
+    setCategoriesOpen(false)
+    setCategoryResortToken((n) => n + 1)
+  }
   // Measured px height of the map box — the draggable mobile nearby sheet
   // computes its half/full snap points from this rather than the viewport,
   // since the box itself doesn't always fill the viewport.
@@ -887,6 +898,18 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
     setPinnedSelected(true)
     setSidebarCollapsed(false)
   }
+  // If Pinned was the ONLY thing narrowing the map (no categories checked —
+  // see togglePinnedSelected's own "narrow to just this one" branch) and the
+  // visitor unpins their last listing — possibly from somewhere else in the
+  // app entirely, not a tap on this screen's own chips — there's nothing
+  // left for that state to show. Revert to everything, same "never leave
+  // nothing shown" promise toggle/togglePinnedSelected/toggleCategoryCheckbox
+  // already keep for an on-screen tap; this covers the one way the same
+  // "nothing selected" state can be reached from OUTSIDE a chip tap.
+  useEffect(() => {
+    if (pinnedSelected && pinned.length === 0 && effectiveSelected.size === 0) showAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinned.length, pinnedSelected, effectiveSelected.size])
   // Same "surface the results" side effects toggling a category chip gets
   // (raise the mobile sheet, drop the desktop sidebar's collapse) — without
   // them, turning Pinned on looked like it did nothing when nothing else
@@ -1499,6 +1522,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         onToggle={toggle}
                         onAll={showAll}
                         maxVisible={4}
+                        resortToken={categoryResortToken}
                         onMore={() => setCategoriesOpen(true)}
                                     categories={categories ?? []}
                         points={allPoints}
@@ -1629,7 +1653,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
             style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
           >
             <button
-              onClick={() => setCategoriesOpen(false)}
+              onClick={closeCategoriesPicker}
               aria-label="Back to map"
               className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
             >
@@ -1645,7 +1669,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
               Show all
             </button>
             <button
-              onClick={() => setCategoriesOpen(false)}
+              onClick={closeCategoriesPicker}
               className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white cursor-pointer"
             >
               Apply
