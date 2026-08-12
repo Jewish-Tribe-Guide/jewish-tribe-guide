@@ -6,6 +6,10 @@ import { community } from '@/community.config'
 type Props = {
   eruvim: EruvRecord[]
   onUp: () => void
+  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
+   *  index there), "All resources" on desktop (a separate index page). See
+   *  FindResources' upToAllResources, which this mirrors. */
+  upLabel?: string
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
   title?: string
@@ -31,10 +35,10 @@ function EruvCard({ eruv }: { eruv: EruvRecord }) {
   )
 }
 
-export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information' }: Props) {
+export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information' }: Props) {
   return (
     <div>
-      <UpButton label="All resources" onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} />
       <h2 className="text-xl font-semibold text-slate-800 mb-1">{title}</h2>
       <p className="mb-4 text-sm text-muted">
         Check the current status of the {community.region}-area eruvim before Shabbos.

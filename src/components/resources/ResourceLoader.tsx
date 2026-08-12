@@ -3,7 +3,8 @@
 import { useMemo } from 'react'
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
-import { distanceMiles } from '@/lib/geo'
+import { withMilesFromAddress } from '@/lib/listingTravel'
+import { useOptionalLocation } from '@/lib/locationContext'
 import GenericDirectory from './GenericDirectory'
 import UpButton from '@/components/UpButton'
 
@@ -22,6 +23,10 @@ type Props = {
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
   onUp: () => void
+  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
+   *  index there), "All resources" on desktop (a separate index page). See
+   *  FindResources' upToAllResources, which this mirrors. */
+  upLabel?: string
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -32,26 +37,25 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, onUp, onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
   // each parent render).
   const anchorCoords = anchor.coords
+  // The listing "I'm here" is currently anchored to, if any — see
+  // withMilesFromAddress for why it needs this. Optional, not useLocation:
+  // this also renders inside the admin's category preview, which has no
+  // LocationProvider on purpose (see useOptionalLocation's own note).
+  const anchorListingId = useOptionalLocation()?.anchorListingId ?? null
 
   // Distance to the visitor's anchor: straight-line miles (haversine) from their
   // typed address to each listing's geocoded coordinates.
   const withDistance = useMemo(() => {
     if (!items) return items
     if (category.hasAddress === false) return items
-
-    const coords = anchorCoords
-    if (!coords) return items
-    return items.map((item) => {
-      if (!item.geo) return item
-      return { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
-    })
-  }, [items, anchorCoords, category.hasAddress])
+    return withMilesFromAddress(items, anchorCoords, anchorListingId)
+  }, [items, anchorCoords, category.hasAddress, anchorListingId])
 
   // The listings failed to load. Said plainly, because the alternative — an
   // empty directory — is a confident, wrong answer: it tells someone there are
@@ -62,7 +66,7 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   if (withDistance === null || withDistance === undefined) {
     return (
       <div>
-        <UpButton label="All resources" onClick={onUp} />
+        <UpButton label={upLabel} onClick={onUp} />
         <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">
@@ -91,6 +95,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
   )
 }

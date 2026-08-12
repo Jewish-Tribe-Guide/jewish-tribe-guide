@@ -9,6 +9,7 @@ import {
   hoursOpenNow,
   isStructuredHours,
   placesApiHoursToStructured,
+  syncedLabel,
   type StructuredHours,
 } from './hours'
 
@@ -296,5 +297,33 @@ describe('placesApiHoursToStructured', () => {
       { open: { day: 2, hour: 14, minute: 0 }, close: { day: 2, hour: 18, minute: 0 } },
     ])
     expect(result?.tue).toEqual({ open: '09:00', close: '18:00' })
+  })
+})
+
+describe('syncedLabel', () => {
+  beforeEach(() => {
+    vi.setSystemTime(WEDNESDAY(12))
+  })
+
+  it('returns null when there is nothing to sync from', () => {
+    expect(syncedLabel(undefined)).toBeNull()
+  })
+
+  it('returns null for an unparseable timestamp', () => {
+    expect(syncedLabel('not a date')).toBeNull()
+  })
+
+  it('says "today" for anything synced today', () => {
+    expect(syncedLabel(WEDNESDAY(9).toISOString())).toBe('Synced from Google · updated today')
+  })
+
+  it('says "1d ago" for yesterday', () => {
+    const yesterday = new Date(2026, 5, 23, 12)
+    expect(syncedLabel(yesterday.toISOString())).toBe('Synced from Google · updated 1d ago')
+  })
+
+  it('counts multiple days', () => {
+    const fiveDaysAgo = new Date(2026, 5, 19, 12)
+    expect(syncedLabel(fiveDaysAgo.toISOString())).toBe('Synced from Google · updated 5d ago')
   })
 })

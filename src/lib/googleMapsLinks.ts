@@ -17,10 +17,29 @@ export function directionsUrl(destination: string | LatLng): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
 }
 
+/** Whether `name` shows up in `address` — the signal for whether adding the
+ *  name to a Maps search is likely to help or hurt (see businessUrl). A
+ *  listing whose address names its own building/plaza ("123 Main St, ABC
+ *  Plaza") passes; a plain street address never will, regardless of how
+ *  well-known the business actually is. */
+function nameAppearsInAddress(name: string, address: string): boolean {
+  return address.toLowerCase().includes(name.toLowerCase())
+}
+
 /** Opens the business's Google Maps listing (name + address search, or exact
- *  place if a placeId is known). Shows hours, phone, photos, etc. */
+ *  place if a placeId is known). Shows hours, phone, photos, etc.
+ *
+ *  The name only joins the query when it's recognizable in the address
+ *  itself. Google's business search leans on the name to disambiguate, so
+ *  for a listing it can't find by that name — a mikvah run out of someone's
+ *  home, say, with no storefront for Google to have indexed — the name
+ *  doesn't narrow the search, it derails it: Google fuzzy-matches to
+ *  whatever similarly-named place it DOES know about, overriding an address
+ *  that was exact on its own. Dropping the name there falls back to a plain
+ *  address search, which has nothing to get wrong. */
 export function businessUrl(name: string, address?: string | null, placeId?: string | null): string {
-  const query = [name, address].filter(Boolean).join(' ')
+  const nameHelps = !address || nameAppearsInAddress(name, address)
+  const query = [nameHelps ? name : null, address].filter(Boolean).join(' ')
   const params = new URLSearchParams({ api: '1', query })
   if (placeId) params.set('query_place_id', placeId)
   return `https://www.google.com/maps/search/?${params.toString()}`

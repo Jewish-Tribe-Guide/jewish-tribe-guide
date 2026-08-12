@@ -7,7 +7,7 @@ import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { listingSearchText } from '@/lib/searchListing'
-import { distanceMiles } from '@/lib/geo'
+import { haversineMiles } from '@/lib/geo'
 import { travelCompare } from '@/lib/listingTravel'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
@@ -245,11 +245,13 @@ export function searchListings(
       .filter((tag) => score(tag) > 0)
       .sort((a, b) => score(b) - score(a) || a.length - b.length)
       .slice(0, 3)
-    // Stamp straight-line distance the same way the directory does (ResourceLoader):
-    // address-anchored categories only, when the listing has coordinates.
+    // Stamp straight-line distance the same way the directory does (see
+    // withMilesFromAddress) — unrounded, so two close-together hits don't tie
+    // and fall back to arbitrary order below: address-anchored categories
+    // only, when the listing has coordinates.
     const withDistance =
       coords && category.hasAddress !== false && item.geo
-        ? { ...item, milesFromAddress: distanceMiles(coords, item.geo) }
+        ? { ...item, milesFromAddress: haversineMiles(coords, item.geo) }
         : item
     hits.push({
       item: withDistance,
@@ -277,7 +279,7 @@ export function PlacesResults({
   onOpen,
 }: {
   hits: ListingHit[]
-  onOpen: (hit: ListingHit) => void
+  onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
 }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
 
@@ -300,8 +302,8 @@ export function PlacesResults({
             onFilterOpen={() => onOpen(hit)}
             onFilterBool={() => onOpen(hit)}
             onFilterSelect={() => onOpen(hit)}
-            onEdit={() => onOpen(hit)}
-            onReport={() => onOpen(hit)}
+            onEdit={() => onOpen(hit, 'edit')}
+            onReport={() => onOpen(hit, 'report')}
           />
         ))}
       </div>

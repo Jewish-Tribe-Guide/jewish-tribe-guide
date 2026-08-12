@@ -24,9 +24,19 @@ export default function ShareButton({ path, title }: Props) {
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({ title, url })
+        // The OS share sheet shows its own success feedback (and its own
+        // "Copy" action, if the visitor picks that) — nothing more to do.
         return
-      } catch {
-        // Cancelled or unsupported mid-call — fall through to copy.
+      } catch (err) {
+        // Dismissing the sheet without picking anything rejects with
+        // AbortError. That's not a failure — the visitor changed their mind —
+        // so it must NOT fall through to the clipboard copy below; doing so
+        // silently copied the link and claimed "Copied!" for a share the
+        // visitor had just cancelled. A share() that fails for any other
+        // reason (e.g. thrown synchronously because it's not really usable
+        // here) still falls through, since in that case the sheet never
+        // opened and copying is the only way left to hand over the link.
+        if (err instanceof Error && err.name === 'AbortError') return
       }
     }
     try {

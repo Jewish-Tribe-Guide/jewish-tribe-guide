@@ -14,9 +14,20 @@ export function haversineMiles(a: LatLng, b: LatLng): number {
   return R * 2 * Math.asin(Math.sqrt(s))
 }
 
-// Rounded to one decimal, the way distances are shown.
+// Rounds a miles value to the one decimal it's displayed at. Kept separate
+// from the raw haversine value: sorting ("nearest first") needs the
+// unrounded distance, or two listings a couple hundred feet apart round to
+// the same 0.1-mile bucket, tie, and fall back to whatever order they
+// happened to load in — which is what "nearest first" was supposed to
+// prevent. Only the label should round; see listingTravel.ts.
+export function roundMiles(miles: number): number {
+  return Math.round(miles * 10) / 10
+}
+
+// Rounded to one decimal, the way distances are shown. For display only —
+// see roundMiles's own note on why sorting needs haversineMiles directly.
 export function distanceMiles(a: LatLng, b: LatLng): number {
-  return Math.round(haversineMiles(a, b) * 10) / 10
+  return roundMiles(haversineMiles(a, b))
 }
 
 // Geocodes a free-text address to coordinates. Tries Google first (best

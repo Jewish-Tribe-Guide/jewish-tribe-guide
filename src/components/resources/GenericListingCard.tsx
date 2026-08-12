@@ -144,7 +144,16 @@ export function GenericListingCard({
       >
         {/* Icon avatar — same glyph/image + tinted color as this category's
             map pin (see getCategoryColor), so a place reads as the same
-            thing here and on the map. */}
+            thing here and on the map. self-start (overriding the row's own
+            items-center) lines its box up with the name's first line —
+            without it, a card with a subtitle and chip row underneath makes
+            the icon look like it's floating in the middle of the whole
+            block rather than sitting next to what it's naming. mt-0.5 on
+            top of that: the name's own line-height leaves a few px of
+            leading above the visible text, so even with matching box tops
+            the glyph itself still starts a couple pixels lower than the
+            icon — this nudges the icon down to where the letters actually
+            start, not just where the (invisible) line box does. */}
         <CategoryIcon
           icon={category.icon}
           iconImageUrl={
@@ -153,7 +162,7 @@ export function GenericListingCard({
               : category.iconImageUrl) ?? undefined
           }
           color={color}
-          className="h-10 w-10 text-xl"
+          className="h-10 w-10 text-xl self-start mt-0.5"
         />
 
         {/* Name + subtitle + the only chips that survive collapsed: Open and

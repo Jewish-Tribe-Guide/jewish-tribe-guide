@@ -3,7 +3,7 @@
 import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { getOpenStatus } from '@/lib/hours'
+import { getOpenStatus, syncedLabel } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
@@ -185,6 +185,19 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
 
   const showAddress = category.hasAddress !== false && !!item.address
   const showPhone = category.hasPhone !== false && !!item.phone
+  // Facts about the LISTING itself (from its Google placeId), not about any
+  // one hours field — a category with no hours field at all (Synagogues,
+  // some Schools) still gets its address/phone/status refreshed by the sync
+  // job (see sync-hours/route.ts), so these show regardless of whether
+  // hoursFields is empty. Used to live inside HoursDisplay, which meant they
+  // never appeared for exactly the listings without hours to show.
+  const closedBadge =
+    item.businessStatus === 'CLOSED_PERMANENTLY'
+      ? { text: 'Permanently closed', cls: 'bg-red-50 text-red-700 border-red-200' }
+      : item.businessStatus === 'CLOSED_TEMPORARILY'
+        ? { text: 'Temporarily closed', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+        : null
+  const syncedNote = syncedLabel(item.googleSyncedAt)
   const urlButtons = urlFields
     .map((f) => ({ f, href: display(item[f.key]) }))
     .filter((x): x is { f: CategoryField; href: string } => !!x.href)
@@ -282,8 +295,14 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   )
 
   // ── Address / phone ──────────────────────────────────────────────────────
-  const addressSection = (showAddress || showPhone || hoursFields.length > 0) && (
+  const addressSection = (showAddress || showPhone || hoursFields.length > 0 || closedBadge || syncedNote) && (
     <div className="space-y-3">
+      {closedBadge && (
+        <span className={`inline-block text-xs font-medium border rounded-full px-2 py-0.5 ${closedBadge.cls}`}>
+          {closedBadge.text}
+        </span>
+      )}
+
       {showAddress && (
         // min-w-0 but deliberately NOT flex-1: the address sizes to its own
         // text, so the button sits immediately after it and reads as being
@@ -316,23 +335,21 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         </div>
       )}
 
-      {hoursFields.map((f, i) => {
+      {hoursFields.map((f) => {
         const val = item[f.key]
-        if (val === undefined && !(i === 0 && item.businessStatus)) return null
+        if (val === undefined) return null
         return (
           <div key={f.key} className="flex items-start gap-3">
             <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0 flex-1">
               {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
-              <HoursDisplay
-                value={val}
-                businessStatus={i === 0 ? item.businessStatus : undefined}
-                syncedAt={i === 0 ? item.googleSyncedAt : undefined}
-              />
+              <HoursDisplay value={val} />
             </div>
           </div>
         )
       })}
+
+      {syncedNote && <p className="text-[11px] text-muted">{syncedNote}</p>}
     </div>
   )
 

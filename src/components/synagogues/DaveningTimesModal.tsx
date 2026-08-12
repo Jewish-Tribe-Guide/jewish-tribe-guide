@@ -14,6 +14,7 @@ import {
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import { directionsUrl } from '@/lib/googleMapsLinks'
+import { roundMiles } from '@/lib/geo'
 import DenominationFilter from './DenominationFilter'
 
 const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
@@ -155,7 +156,7 @@ function DistanceDirections({
       {hasDistance ? (
         <span className="ml-auto text-xs text-slate-600">
           {milesFromAddress != null ? (
-            `📍 ${milesFromAddress} mi away`
+            `📍 ${roundMiles(milesFromAddress)} mi away`
           ) : (
             <span className="flex items-center gap-2">
               {driveMinutes != null && <span>🚗 {driveMinutes} min</span>}

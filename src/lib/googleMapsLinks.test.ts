@@ -31,8 +31,28 @@ describe('directionsUrl', () => {
 })
 
 describe('businessUrl', () => {
-  it('searches by name and address together', () => {
-    expect(params(businessUrl('Maadan', '7594 Haverford Ave')).get('query')).toBe('Maadan 7594 Haverford Ave')
+  it('searches by name and address together when the name shows up in the address', () => {
+    expect(params(businessUrl('Maadan', '7594 Haverford Ave, Maadan Plaza')).get('query')).toBe(
+      'Maadan 7594 Haverford Ave, Maadan Plaza',
+    )
+  })
+
+  // The actual bug this guards: a listing with no storefront Google has ever
+  // indexed (a mikvah run out of someone's home, say) sent Google searching
+  // for the NAME and fuzzy-matching to some other, similarly-named place,
+  // even though the address alone was exact. Since the name doesn't appear
+  // anywhere in this address, it's dropped — a plain address search has
+  // nothing left to get wrong.
+  it('drops the name and searches the address alone when the name is not in the address', () => {
+    expect(params(businessUrl('Mikvah Moishe Tzvi', '456 Oak Ave, Philadelphia, PA')).get('query')).toBe(
+      '456 Oak Ave, Philadelphia, PA',
+    )
+  })
+
+  it('matches case-insensitively', () => {
+    expect(params(businessUrl('maadan', '7594 Haverford Ave, MAADAN Plaza')).get('query')).toBe(
+      'maadan 7594 Haverford Ave, MAADAN Plaza',
+    )
   })
 
   it('works from a name alone', () => {
@@ -42,7 +62,7 @@ describe('businessUrl', () => {
 
   // Without the place id, two shops with the same name open the wrong one.
   it('pins the exact place when a placeId is known', () => {
-    const url = businessUrl('Maadan', '7594 Haverford Ave', 'ChIJabc123')
+    const url = businessUrl('Maadan', '7594 Haverford Ave, Maadan Plaza', 'ChIJabc123')
     expect(params(url).get('query_place_id')).toBe('ChIJabc123')
   })
 
@@ -52,7 +72,9 @@ describe('businessUrl', () => {
   })
 
   it('escapes the query', () => {
-    expect(params(businessUrl('Ben & Jerry’s', 'Broad & Main')).get('query')).toBe('Ben & Jerry’s Broad & Main')
+    expect(params(businessUrl('Ben & Jerry’s', 'Ben & Jerry’s, Broad & Main')).get('query')).toBe(
+      'Ben & Jerry’s Ben & Jerry’s, Broad & Main',
+    )
   })
 })
 

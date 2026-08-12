@@ -427,12 +427,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         phone: r.phone,
         color: colorById.get(r.category) ?? '#64748b',
         glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
-        // The map (pins and this sidebar's nearby list) always shows the
-        // category's own icon/image, even for a listing that's uploaded its
-        // own photo — that per-listing photo only shows once you're actually
-        // looking at the listing (its directory row, or this map's own place
-        // detail — see GenericListingCard/MapPlaceDetail, which read
-        // PHOTO_FIELD_KEY directly rather than through this point).
+        // The map's pins always show the category's own icon/image, even for
+        // a listing that's uploaded its own photo — a pin is too small and
+        // too dense on-screen (often dozens at once) for a real photo to read
+        // as anything but noise. `glyphSrc` is just that category fallback;
+        // NearbyList reads the listing's own photo off `raw` directly and
+        // prefers it over this, the same way GenericListingCard/MapPlaceDetail
+        // do (see PHOTO_FIELD_KEY) — a scrollable list of a few rows is where
+        // a real logo actually helps recognition.
         glyphSrc: cat?.iconImageUrl ?? undefined,
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,
@@ -1494,9 +1496,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   change your mind on this screen once you'd shared a location
                   or typed an address: the header pill that would normally do
                   that is itself collapsed away here (see MapScreen).
-                  Fixed position/size regardless of activeLocation — it used
-                  to jump to a smaller, higher slot once a location was set,
-                  to stay clear of the Following/Re-center pill in this same
+                  Fixed position regardless of activeLocation — it used to
+                  jump to a smaller, higher slot once a location was set, to
+                  stay clear of the Following/Re-center pill in this same
                   bottom-right corner. That pill now lives bottom-LEFT instead
                   (see ResourceMap), specifically so this FAB never has to
                   move for it; the only other bottom-right neighbor, the
@@ -1504,13 +1506,22 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   one's height already.
                   Not gated on ui.map.liveTracking: unlike the old FAB this
                   replaced, tapping it doesn't itself start tracking — it just
-                  opens the picker, which offers an address either way. */}
+                  opens the picker, which offers an address either way.
+                  Widens into a labeled pill until a location is set — a bare
+                  pin glyph with no visible text gave first-time visitors on
+                  this screen no way to guess it opens the location picker
+                  (the header pill everywhere else on the site spells this out
+                  in words; this FAB exists precisely because that pill is
+                  hidden here). Collapses to icon-only once set, same as the
+                  header pill does on mobile, so it doesn't sit oversized
+                  reporting a location the visitor already knows they set. */}
               <button
                 onClick={() => document.dispatchEvent(new CustomEvent('jpc:toggle-location'))}
                 aria-label={activeLocation ? 'Change your location' : 'Set your location'}
-                className="absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden"
+                className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 items-center justify-center gap-1.5 rounded-full bg-white text-lg shadow-md ring-1 ring-slate-900/10 cursor-pointer sm:hidden ${activeLocation ? 'w-12' : 'pl-3 pr-4'}`}
               >
                 <span aria-hidden="true">📍</span>
+                {!activeLocation && <span className="text-sm font-medium text-slate-700">Set location</span>}
               </button>
               {ui.map.liveTracking && tracking && (
                 <button

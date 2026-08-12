@@ -78,6 +78,11 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
     if (!isMobile && onViewAllCategories) onViewAllCategories()
     else onUp()
   }
+  // What upToAllResources above actually goes to, for the Up button's own
+  // label — mobile has no separate "All resources" page to name (see the
+  // comment above), so naming the button after the real destination avoids
+  // promising an index screen mobile doesn't have.
+  const upToAllResourcesLabel = isMobile ? 'Home' : 'All resources'
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
   // works for any community, with or without hospitals.
@@ -134,7 +139,23 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
   // param went away would be a second source of truth chasing the first, and
   // would render one frame of a form the URL says is closed. Reading them
   // together means there is no in-between state to get wrong.
-  const action = params.get('form') !== null ? actionSubject : null
+  //
+  // A deep link (e.g. Edit/Report tapped on a home-screen search result) never
+  // went through openAction, so actionSubject is still null on first render —
+  // but `listings` arrived with this screen as a prop, not fetched after
+  // mount, so the listing named by ?item= is already in hand and edit/report
+  // can be resolved from the URL alone, same as reopenItemId already is for
+  // the expanded card.
+  const formParam = params.get('form')
+  const deepLinkListing =
+    (formParam === 'edit' || formParam === 'report') && reopenItemId
+      ? (listings?.find((l) => l.id === reopenItemId) ?? null)
+      : null
+  const action =
+    formParam !== null
+      ? (actionSubject ??
+        (deepLinkListing ? ({ mode: formParam, listing: deepLinkListing } as ListingAction) : null))
+      : null
 
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {
@@ -166,7 +187,7 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals' && !hospitalDetailId) {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} upLabel={upToAllResourcesLabel} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'hospitals' && hospitalDetailId) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
@@ -185,7 +206,7 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
   }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
-    return <EruvInfo eruvim={eruvim} onUp={upToAllResources} title={eruv?.pluralLabel} />
+    return <EruvInfo eruvim={eruvim} onUp={upToAllResources} upLabel={upToAllResourcesLabel} title={eruv?.pluralLabel} />
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
@@ -197,6 +218,7 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
         coords={zmanimCoords}
         locationLabel={locationLabel}
         onUp={upToAllResources}
+        upLabel={upToAllResourcesLabel}
         title={zmanim?.pluralLabel}
       />
     )
@@ -244,6 +266,7 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
           onUp={upToAllResources}
+          upLabel={upToAllResourcesLabel}
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}

@@ -41,7 +41,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         Back to list
       </button>
 
-      {/* ── Header: icon, name, category ─────────────────────────────────── */}
+      {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
         <CategoryIcon
           icon={category.icon}
@@ -51,14 +51,38 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
               : category.iconImageUrl) ?? undefined
           }
           color={color}
-          className="h-12 w-12 text-2xl"
+          className="h-12 w-12 text-2xl self-start"
           sizePx={48}
         />
-        <div className="min-w-0 flex-1 pt-0.5">
+        {/* min-w-0 but deliberately NOT flex-1 — same reasoning as the
+            address row further down (see PlaceDetailBody): sizing to its
+            own text lets Pin sit right after the name, closer to where
+            "I'm here" sits relative to the address below it, rather than
+            pinned to the row's far right edge regardless of how short the
+            name is.
+            No top padding either — self-start on the icon above already
+            puts its top edge flush with this block's, i.e. with the name's
+            first line. A pt would reintroduce exactly the few-pixel gap
+            that made the icon and the name look unaligned in the first
+            place. */}
+        <div className="min-w-0">
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} />}
+        {/* self-start + a measured nudge — centered on just the NAME line,
+            not the shorter category label under it. self-center would
+            center against the whole name+category block instead, pulling
+            Pin down further than the name alone calls for.
+            The nudge itself needs to be -2.75px, not the +3.25px the name/
+            icon math alone suggests: PinButton's own -m-1.5/p-1.5 (its tap-
+            target trick — see that component) cancel out to a net-zero
+            visual offset, and a plain mt-* utility here overrides the
+            shorthand's margin-top outright rather than adding to it, which
+            breaks that cancellation. -2.75 is the value that, combined with
+            the trick's fixed 6px padding-top, nets out to the actual
+            +3.25px of visual movement wanted: (22.5-14)/2, name line-height
+            vs. icon height. */}
+        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start mt-[-2.75px]" />}
       </div>
 
       <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />

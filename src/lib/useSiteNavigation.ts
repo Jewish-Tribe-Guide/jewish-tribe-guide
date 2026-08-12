@@ -34,7 +34,22 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
     case 'find': {
       // 'find' means "open a category directory"; which one is in `extra`.
       const view = typeof extra?.findView === 'string' ? extra.findView : null
-      return view ? routes.slug(community, view) : routes.allCategories(community)
+      if (!view) return routes.allCategories(community)
+      // findQuery/findItemId (set when navigating from a search result) become
+      // the same ?q=/?item= params FindResources reads on mount, so the target
+      // category opens pre-filtered with the tapped listing already expanded.
+      // findAction ('edit'/'report', from a search result's Edit/Report button)
+      // becomes ?form=, which FindResources resolves against the loaded listing
+      // to open that form directly rather than just expanding the card.
+      const query = typeof extra?.findQuery === 'string' ? extra.findQuery : null
+      const itemId = typeof extra?.findItemId === 'string' ? extra.findItemId : null
+      const action = typeof extra?.findAction === 'string' ? extra.findAction : null
+      const params = new URLSearchParams()
+      if (query) params.set('q', query)
+      if (itemId) params.set('item', itemId)
+      if (action) params.set('form', action)
+      const qs = params.toString()
+      return qs ? `${routes.slug(community, view)}?${qs}` : routes.slug(community, view)
     }
     // 'home', 'community-home' and the retired audience modes all land home.
     default:
