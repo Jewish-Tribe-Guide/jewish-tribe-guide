@@ -41,7 +41,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         Back to list
       </button>
 
-      {/* ── Header: icon, name, category ─────────────────────────────────── */}
+      {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
         <CategoryIcon
           icon={category.icon}
@@ -54,23 +54,25 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           className="h-12 w-12 text-2xl self-start"
           sizePx={48}
         />
-        <div className="min-w-0 flex-1 pt-0.5">
+        {/* No top padding here — self-start above already puts the icon's own
+            top edge flush with this block's, i.e. with the name's first
+            line. A pt would reintroduce exactly the few-pixel gap that made
+            the icon and the name look unaligned in the first place. */}
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
+        {/* self-start (like the icon above) lines it up with the name's own
+            line rather than the vertical center of the whole name+category
+            block — the same top-alignment PinButton's sibling "I'm here"
+            (SetLocationButton) gets for free further down, since its own row
+            has nothing else tall enough to visibly center against. */}
+        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start" />}
       </div>
 
       <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
 
-      {/* Pin lives next to "I'm here" inside PlaceDetailBody's own address
-          row, not up here — both are small per-listing toggles (see
-          PinButton's own doc comment), so they read as a matched pair
-          instead of one sitting in the header and the other buried below. */}
-      <PlaceDetailBody
-        item={item}
-        category={category}
-        pinButton={ui.map.pins ? <PinButton id={item.id} categoryId={category.id} name={item.name} /> : undefined}
-      />
+      <PlaceDetailBody item={item} category={category} />
     </div>
   )
 }

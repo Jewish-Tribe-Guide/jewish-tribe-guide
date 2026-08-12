@@ -20,7 +20,19 @@ import { usePinned } from '@/lib/pinnedContext'
  *  Same tappable-header-row concern as UpvoteButton: this sits inside a row
  *  whose whole header is itself clickable (to expand the card), so a tap here
  *  must never also toggle that. */
-export default function PinButton({ id, categoryId, name }: { id: string; categoryId: string; name: string }) {
+export default function PinButton({
+  id,
+  categoryId,
+  name,
+  className,
+}: {
+  id: string
+  categoryId: string
+  name: string
+  /** Extra classes appended after the button's own — e.g. `self-start` when
+   *  it sits in a flex row alongside taller content (see MapPlaceDetail). */
+  className?: string
+}) {
   const { isPinned, toggle } = usePinned()
   const pinned = isPinned(id)
   const label = pinned ? `Unpin ${name}` : `Pin ${name}`
@@ -40,7 +52,10 @@ export default function PinButton({ id, categoryId, name }: { id: string; catego
         // anything around it — same trick UpvoteButton's inline variant uses.
         '-m-1.5 p-1.5',
         pinned ? 'text-primary' : 'text-slate-400 hover:text-primary',
-      ].join(' ')}
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <PinIcon filled={pinned} className="h-3.5 w-3.5" />
       {pinned ? 'Pinned' : 'Pin'}
