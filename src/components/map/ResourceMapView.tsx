@@ -427,12 +427,14 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
         phone: r.phone,
         color: colorById.get(r.category) ?? '#64748b',
         glyph: cat?.icon ?? DEFAULT_CATEGORY_ICON,
-        // The map (pins and this sidebar's nearby list) always shows the
-        // category's own icon/image, even for a listing that's uploaded its
-        // own photo — that per-listing photo only shows once you're actually
-        // looking at the listing (its directory row, or this map's own place
-        // detail — see GenericListingCard/MapPlaceDetail, which read
-        // PHOTO_FIELD_KEY directly rather than through this point).
+        // The map's pins always show the category's own icon/image, even for
+        // a listing that's uploaded its own photo — a pin is too small and
+        // too dense on-screen (often dozens at once) for a real photo to read
+        // as anything but noise. `glyphSrc` is just that category fallback;
+        // NearbyList reads the listing's own photo off `raw` directly and
+        // prefers it over this, the same way GenericListingCard/MapPlaceDetail
+        // do (see PHOTO_FIELD_KEY) — a scrollable list of a few rows is where
+        // a real logo actually helps recognition.
         glyphSrc: cat?.iconImageUrl ?? undefined,
         categoryLabel: cat?.label ?? r.category,
         // Same haystack the category directory searches against (name, address,

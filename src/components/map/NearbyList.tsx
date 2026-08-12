@@ -5,6 +5,7 @@ import { haversineMiles } from '@/lib/geo'
 import { directionsUrl } from '@/lib/googleMapsLinks'
 import { DirectionsIcon } from '@/components/icons'
 import CategoryIcon from '@/components/CategoryIcon'
+import { PHOTO_FIELD_KEY } from '@/lib/categories'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
@@ -78,7 +79,11 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
             >
               <CategoryIcon
                 icon={p.glyph ?? '📍'}
-                iconImageUrl={p.glyphSrc}
+                iconImageUrl={
+                  (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
+                    ? (p.raw[PHOTO_FIELD_KEY] as string)
+                    : p.glyphSrc) ?? undefined
+                }
                 color={p.color}
                 className="h-9 w-9 text-lg"
                 sizePx={36}
