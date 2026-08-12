@@ -54,19 +54,26 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           className="h-12 w-12 text-2xl self-start"
           sizePx={48}
         />
-        {/* No top padding here — self-start above already puts the icon's own
-            top edge flush with this block's, i.e. with the name's first
-            line. A pt would reintroduce exactly the few-pixel gap that made
-            the icon and the name look unaligned in the first place. */}
-        <div className="min-w-0 flex-1">
+        {/* min-w-0 but deliberately NOT flex-1 — same reasoning as the
+            address row further down (see PlaceDetailBody): sizing to its
+            own text lets Pin sit right after the name, closer to where
+            "I'm here" sits relative to the address below it, rather than
+            pinned to the row's far right edge regardless of how short the
+            name is.
+            No top padding either — self-start on the icon above already
+            puts its top edge flush with this block's, i.e. with the name's
+            first line. A pt would reintroduce exactly the few-pixel gap
+            that made the icon and the name look unaligned in the first
+            place. */}
+        <div className="min-w-0">
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
         {/* self-start (like the icon above) lines it up with the name's own
             line rather than the vertical center of the whole name+category
-            block — the same top-alignment PinButton's sibling "I'm here"
-            (SetLocationButton) gets for free further down, since its own row
-            has nothing else tall enough to visibly center against. */}
+            block — the same top-alignment "I'm here" (SetLocationButton)
+            gets for free further down, since its own row has nothing else
+            tall enough to visibly center against. */}
         {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start" />}
       </div>
 

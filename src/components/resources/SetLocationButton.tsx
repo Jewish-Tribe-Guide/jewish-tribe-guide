@@ -62,11 +62,6 @@ export default function SetLocationButton({
         // -m-1.5 p-1.5 grows the tap target to ~32px on touch without moving
         // anything around it — same trick UpvoteButton's inline variant uses.
         '-m-1.5 p-1.5',
-        // Docks to the row's right edge rather than sitting wherever the
-        // address text happens to end — the same right edge Pin already
-        // docks to in the header above, so the two read as one action
-        // column running down the card instead of two unrelated controls.
-        'ml-auto',
         active ? 'text-primary' : 'text-slate-400 hover:text-primary',
       ].join(' ')}
     >
