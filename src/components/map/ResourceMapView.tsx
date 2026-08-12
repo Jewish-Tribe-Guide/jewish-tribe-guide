@@ -1226,7 +1226,12 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList && (
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+                // overscroll-contain: without it, a trackpad swipe closing a
+                // NearbyList row's pin action can still bleed into the
+                // browser's own swipe-to-go-back gesture once it reaches
+                // this scroll boundary, even though the row's own wheel
+                // handler already calls preventDefault (see NearbyList).
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
                       item={desktopSelected.raw}

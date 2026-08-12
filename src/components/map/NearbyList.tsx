@@ -49,6 +49,16 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
   // row snaps the first shut, same as iOS Mail's swipe actions.
   const [openRowId, setOpenRowId] = useState<string | null>(null)
 
+  // Mouse/trackpad users get the desktop convention instead of the touch
+  // one: hovering reveals the action (iMessage/Mail-on-Mac style) and it
+  // stays up for as long as the pointer sits over the row, no drag-and-hold
+  // required. Starts false to match SSR, then resolves after mount — same
+  // hydration-safety reasoning as PinnedProvider.
+  const [hoverCapable, setHoverCapable] = useState(false)
+  useEffect(() => {
+    setHoverCapable(window.matchMedia('(hover: hover) and (pointer: fine)').matches)
+  }, [])
+
   const sorted = useMemo<ScoredPoint[]>(() => {
     const scored = points.map((p) => ({
       ...p,
@@ -88,6 +98,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
             point={p}
             canViewListing={canViewListing}
             canPin={canPin}
+            hoverCapable={hoverCapable}
             isOpen={openRowId === p.id}
             onOpenChange={(open) => setOpenRowId(open ? p.id : null)}
             onSelect={() => (onSelectPlace ? onSelectPlace(p) : onViewListing!(p.filterId, p.id))}
@@ -106,42 +117,68 @@ type RowProps = {
   point: ScoredPoint
   canViewListing: boolean
   canPin: boolean
+  hoverCapable: boolean
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onSelect: () => void
   onTogglePin: () => void
 }
 
-function NearbyRow({ point: p, canViewListing, canPin, isOpen, onOpenChange, onSelect, onTogglePin }: RowProps) {
+function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onOpenChange, onSelect, onTogglePin }: RowProps) {
   const [dragX, setDragX] = useState(0)
-  const draggingRef = useRef(false)
+  const dragXRef = useRef(0)
+  // True while a touch drag or a trackpad swipe gesture is actively moving
+  // the row — covers both so the sync effect below doesn't fight either one.
+  const activeGestureRef = useRef(false)
   const movedRef = useRef(false)
   const startXRef = useRef(0)
   const startDragXRef = useRef(0)
+  const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // Keeps the row in sync when it's closed externally (another row opened,
-  // or a pin action just fired) without fighting an in-progress drag.
+  // the pin button fired, or an outside click landed) without fighting an
+  // in-progress drag/swipe.
   useEffect(() => {
-    if (!draggingRef.current) setDragX(isOpen ? -REVEAL_WIDTH : 0)
+    if (!activeGestureRef.current) {
+      dragXRef.current = isOpen ? -REVEAL_WIDTH : 0
+      setDragX(dragXRef.current)
+    }
   }, [isOpen])
 
+  // Closes the row when a swipe has left it open and the visitor clicks
+  // anywhere else on the page — the trackpad-swipe equivalent of iOS Mail's
+  // "tap elsewhere to dismiss," since desktop has no separate tap-to-close.
+  useEffect(() => {
+    if (!hoverCapable || !isOpen) return
+    function onDocClick(e: MouseEvent) {
+      if (!wrapperRef.current?.contains(e.target as Node)) onOpenChange(false)
+    }
+    document.addEventListener('click', onDocClick, true)
+    return () => document.removeEventListener('click', onDocClick, true)
+  }, [hoverCapable, isOpen, onOpenChange])
+
   function onPointerDown(e: React.PointerEvent) {
-    if (!canPin) return
+    // Desktop uses a trackpad swipe (onWheel below), not a held-mouse drag —
+    // there's no natural "release" moment on a mouse the way lifting a
+    // finger reads as committing to the action.
+    if (hoverCapable || !canPin) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     startXRef.current = e.clientX
     startDragXRef.current = dragX
-    draggingRef.current = false
+    activeGestureRef.current = false
     movedRef.current = false
   }
 
   function onPointerMove(e: React.PointerEvent) {
-    if (!canPin || startXRef.current === undefined) return
+    if (hoverCapable || !canPin || startXRef.current === undefined) return
     const delta = e.clientX - startXRef.current
-    if (!draggingRef.current) {
+    if (!activeGestureRef.current) {
       // Only claims the gesture once it's clearly horizontal, so vertical
       // scrolling of the sheet still works normally.
       if (Math.abs(delta) < 8) return
-      draggingRef.current = true
+      activeGestureRef.current = true
       movedRef.current = true
       // Can throw if the pointer was already released between events (fast
       // flicks) — capture is a nicety here, not required for the drag math.
@@ -149,21 +186,68 @@ function NearbyRow({ point: p, canViewListing, canPin, isOpen, onOpenChange, onS
         e.currentTarget.setPointerCapture(e.pointerId)
       } catch {}
     }
-    setDragX(Math.min(0, Math.max(-REVEAL_WIDTH, startDragXRef.current + delta)))
+    dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, startDragXRef.current + delta))
+    setDragX(dragXRef.current)
   }
 
   function endDrag() {
-    if (draggingRef.current) {
+    if (hoverCapable) return
+    if (activeGestureRef.current) {
       const shouldOpen = dragX < -REVEAL_WIDTH / 2
       onOpenChange(shouldOpen)
-      setDragX(shouldOpen ? -REVEAL_WIDTH : 0)
+      dragXRef.current = shouldOpen ? -REVEAL_WIDTH : 0
+      setDragX(dragXRef.current)
     }
-    draggingRef.current = false
+    activeGestureRef.current = false
   }
 
+  // Registered as a native, non-passive listener (see effect below) rather
+  // than React's onWheel prop — React attaches wheel handlers passively by
+  // default, which silently ignores preventDefault() and lets the sidebar
+  // scroll sideways underneath the swipe.
+  useEffect(() => {
+    if (!hoverCapable || !canPin) return
+    const el = contentRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      // Any real horizontal component gets prevented, not just events where
+      // it dominates deltaY — Chrome/Safari decide whether to hijack the
+      // *whole* gesture as swipe-navigation from its first couple of ticks,
+      // which often start diagonal before settling into a clean horizontal
+      // swipe. Waiting for deltaX to clearly win before calling
+      // preventDefault() left those opening ticks unconsumed, which was
+      // enough on its own to trigger the browser's back gesture — most
+      // noticeable swiping right to close a row that's already open. A tiny
+      // noise floor keeps genuine vertical scrolling (deltaX ~ 0) untouched.
+      if (Math.abs(e.deltaX) < 2) return
+      e.preventDefault()
+      activeGestureRef.current = true
+      // Trackpad "swipe left" reports positive deltaX under macOS's default
+      // natural-scrolling direction — subtracting it moves the row left, the
+      // same direction the fingers moved, mirroring the touch-drag math above.
+      dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, dragXRef.current - e.deltaX))
+      setDragX(dragXRef.current)
+      if (wheelSettleTimer.current) clearTimeout(wheelSettleTimer.current)
+      // Wheel events have no discrete "end" the way pointerup does — treat a
+      // short gap since the last tick as the gesture finishing, then snap
+      // open or closed the same way a touch drag resolves on release.
+      wheelSettleTimer.current = setTimeout(() => {
+        activeGestureRef.current = false
+        const shouldOpen = dragXRef.current < -REVEAL_WIDTH / 2
+        onOpenChange(shouldOpen)
+        dragXRef.current = shouldOpen ? -REVEAL_WIDTH : 0
+        setDragX(dragXRef.current)
+      }, 150)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [hoverCapable, canPin, onOpenChange])
+
   function onRowClickCapture(e: React.MouseEvent) {
-    // Swallow the click that follows a drag, and use a tap on an already-open
-    // row to close it instead of firing the row's normal action.
+    // Swallow the click that follows a drag/swipe, and use a click on an
+    // already-open row to close it instead of firing the row's normal
+    // action — same "dismiss before you can act again" rule on both touch
+    // and desktop.
     if (movedRef.current || isOpen) {
       e.preventDefault()
       e.stopPropagation()
@@ -173,7 +257,7 @@ function NearbyRow({ point: p, canViewListing, canPin, isOpen, onOpenChange, onS
   }
 
   return (
-    <div className="relative overflow-hidden bg-white">
+    <div ref={wrapperRef} className="relative overflow-hidden bg-white">
       {canPin && (
         <button
           onClick={onTogglePin}
@@ -186,10 +270,11 @@ function NearbyRow({ point: p, canViewListing, canPin, isOpen, onOpenChange, onS
         </button>
       )}
       <div
+        ref={contentRef}
         className="relative flex items-stretch gap-2 bg-white px-4 py-3 touch-pan-y"
         style={{
           transform: `translateX(${dragX}px)`,
-          transition: draggingRef.current ? 'none' : 'transform 200ms ease',
+          transition: activeGestureRef.current ? 'none' : 'transform 200ms ease',
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
