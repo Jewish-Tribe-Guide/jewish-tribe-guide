@@ -97,6 +97,19 @@ export function useSiteNavigation(): SiteNavigation {
       // the collapse reads as zooming out. Mobile's home screen has no map
       // band, so the param is simply ignored there.
       router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`)
+      // Tapping the mobile tab bar's Home button, or the header logo, while
+      // already on home pushes the exact URL that's already loaded — Next
+      // treats that as a no-op and never remounts Landing, so a typed search
+      // (local state, not a URL param — see Landing) and scroll position
+      // would otherwise just sit there, which isn't what "go home" means when
+      // you're tapping it as a reset. Landing listens for this and clears
+      // both by hand for that no-op case; a real cross-page navigation resets
+      // them for free by remounting, so this is only load-bearing there.
+      // Skipped for the `at: 'map'` case: that's always a real navigation
+      // (only ever called from the full-map screen, a different pathname),
+      // so it already resets on remount, and firing here too would race the
+      // scroll-to-map-band effect that same navigation triggers.
+      if (!opts?.at) document.dispatchEvent(new CustomEvent('jpc:go-home'))
     },
     [router, community],
   )
