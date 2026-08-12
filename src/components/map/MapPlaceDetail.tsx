@@ -69,12 +69,20 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {/* self-start (like the icon above) lines it up with the name's own
-            line rather than the vertical center of the whole name+category
-            block — the same top-alignment "I'm here" (SetLocationButton)
-            gets for free further down, since its own row has nothing else
-            tall enough to visibly center against. */}
-        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start" />}
+        {/* self-start + a measured nudge — centered on just the NAME line,
+            not the shorter category label under it. self-center would
+            center against the whole name+category block instead, pulling
+            Pin down further than the name alone calls for.
+            The nudge itself needs to be -2.75px, not the +3.25px the name/
+            icon math alone suggests: PinButton's own -m-1.5/p-1.5 (its tap-
+            target trick — see that component) cancel out to a net-zero
+            visual offset, and a plain mt-* utility here overrides the
+            shorthand's margin-top outright rather than adding to it, which
+            breaks that cancellation. -2.75 is the value that, combined with
+            the trick's fixed 6px padding-top, nets out to the actual
+            +3.25px of visual movement wanted: (22.5-14)/2, name line-height
+            vs. icon height. */}
+        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start mt-[-2.75px]" />}
       </div>
 
       <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
