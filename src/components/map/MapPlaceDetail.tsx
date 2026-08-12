@@ -25,6 +25,10 @@ type Props = {
  * show Share/Edit/Report/upvote, which stay a tap away in the full listing.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+  const iconImageUrl =
+    (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
+      ? (item[PHOTO_FIELD_KEY] as string)
+      : category.iconImageUrl) ?? undefined
   return (
     <div className="space-y-4 pb-2">
       <button
@@ -37,17 +41,32 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
-        <CategoryIcon
-          icon={category.icon}
-          iconImageUrl={
-            (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-              ? (item[PHOTO_FIELD_KEY] as string)
-              : category.iconImageUrl) ?? undefined
-          }
-          color={color}
-          className="h-12 w-12 text-2xl self-start"
-          sizePx={48}
-        />
+        <div className="relative shrink-0 self-start">
+          <CategoryIcon
+            icon={category.icon}
+            iconImageUrl={iconImageUrl}
+            color={color}
+            className="h-12 w-12 text-2xl"
+            sizePx={48}
+          />
+          {/* Map pins/list badges always show the category's own glyph, never
+              a listing's own photo (too small/dense on the map to read as
+              anything but noise there — see NearbyList's own note). Once you
+              tap through to here, the photo takes over as the main avatar, so
+              without this corner badge nothing visually ties this specific
+              store back to the colored glyph you tapped on the map. Same
+              badge treatment (white ring, small circle, top-right) as the
+              "pinned" badge NearbyList overlays on its own icon. */}
+          {iconImageUrl && (
+            <span
+              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[11px] leading-none"
+              style={{ backgroundColor: color }}
+              aria-hidden="true"
+            >
+              {category.icon}
+            </span>
+          )}
+        </div>
         {/* min-w-0 but deliberately NOT flex-1 — same reasoning as the
             address row further down (see PlaceDetailBody): sizing to its
             own text lets Pin sit right after the name, closer to where
