@@ -90,11 +90,14 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
 
   // Tapping a place opens its category directory, pre-filtered to the matched term
   // (so it survives that page's own search) with the place itself expanded.
-  const openPlace = (hit: (typeof placeHits)[number]) =>
+  // Edit/Report additionally carry `findAction` so the directory opens straight
+  // into that form instead of just the expanded card.
+  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') =>
     onNavigate('patient', 'find', {
       findView: hit.item.category,
       findQuery: hit.term,
       findItemId: hit.item.id,
+      ...(action ? { findAction: action } : {}),
     })
 
   // Capture searches that come up empty — the most actionable signal for what

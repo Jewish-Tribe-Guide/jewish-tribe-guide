@@ -139,7 +139,23 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
   // param went away would be a second source of truth chasing the first, and
   // would render one frame of a form the URL says is closed. Reading them
   // together means there is no in-between state to get wrong.
-  const action = params.get('form') !== null ? actionSubject : null
+  //
+  // A deep link (e.g. Edit/Report tapped on a home-screen search result) never
+  // went through openAction, so actionSubject is still null on first render —
+  // but `listings` arrived with this screen as a prop, not fetched after
+  // mount, so the listing named by ?item= is already in hand and edit/report
+  // can be resolved from the URL alone, same as reopenItemId already is for
+  // the expanded card.
+  const formParam = params.get('form')
+  const deepLinkListing =
+    (formParam === 'edit' || formParam === 'report') && reopenItemId
+      ? (listings?.find((l) => l.id === reopenItemId) ?? null)
+      : null
+  const action =
+    formParam !== null
+      ? (actionSubject ??
+        (deepLinkListing ? ({ mode: formParam, listing: deepLinkListing } as ListingAction) : null))
+      : null
 
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {

@@ -279,7 +279,7 @@ export function PlacesResults({
   onOpen,
 }: {
   hits: ListingHit[]
-  onOpen: (hit: ListingHit) => void
+  onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
 }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
 
@@ -302,8 +302,8 @@ export function PlacesResults({
             onFilterOpen={() => onOpen(hit)}
             onFilterBool={() => onOpen(hit)}
             onFilterSelect={() => onOpen(hit)}
-            onEdit={() => onOpen(hit)}
-            onReport={() => onOpen(hit)}
+            onEdit={() => onOpen(hit, 'edit')}
+            onReport={() => onOpen(hit, 'report')}
           />
         ))}
       </div>
