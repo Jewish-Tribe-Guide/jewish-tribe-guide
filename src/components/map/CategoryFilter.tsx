@@ -65,6 +65,12 @@ type Props = {
    *  so the "All" chip's own highlighted state, and what tapping it does,
    *  accounts for Pinned too, not just the real categories. */
   pinnedOn?: boolean
+  /** Bumped by the parent each time the full-screen category picker (the
+   *  compact row's own "More" chip opens it) closes — the only thing,
+   *  besides first mount or the category list itself changing, that
+   *  reorders this row. See the `order` state below for why an ordinary tap
+   *  on a chip already in the row must NOT do the same. */
+  resortToken?: number
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
@@ -90,6 +96,7 @@ export default function CategoryFilter({
   onToggleSelectValue,
   pinnedChip,
   pinnedOn,
+  resortToken,
 }: Props) {
   // Mobile keeps the original, simpler chip: a filter segment only shows up
   // once something's already active (spelled out, e.g. "IKC"), and tapping
@@ -103,43 +110,45 @@ export default function CategoryFilter({
   const allOn = options.every((o) => selected.has(o.id)) && (!pinnedChip || !!pinnedOn)
 
   // The compact row's own display order — deliberately NOT re-derived from
-  // `selected` on every render. A category checked from elsewhere (the
-  // full-screen picker, or already checked on arrival) that isn't part of
-  // the visible row yet still gets promoted to the front, same as always —
-  // that visitor never had a position in this row to remember. But a chip
-  // that's ALREADY visible must never jump when tapped in place: once
-  // someone has scanned this row they've built a spatial map of it
-  // ("grocery is third"), and moving the chip they just tapped breaks that
-  // memory and can land a fast second tap on whatever slid into its spot.
+  // `selected` on every render/tap. Once a visitor has scanned this row
+  // they've built a spatial map of it ("grocery is third"), and reordering
+  // out from under an ordinary tap breaks that memory and can land a fast
+  // second tap on whatever slid into its spot — so tapping a chip in place
+  // never moves it, only its on/off color changes.
+  //
+  // It's only worth recomputing when there's no "spot" to preserve: on
+  // mount, when the category list itself changes, or when `resortToken`
+  // bumps (the parent does this when the full-screen picker closes) — a
+  // visitor who's been off this screen entirely, picking from a plain
+  // top-down checklist, has no row layout to remember. Selected categories
+  // then lead (in their existing highest-to-lowest-count order — `options`
+  // already arrives sorted that way, see ResourceMapView), unselected ones
+  // follow, same highest-to-lowest; with everything selected that's a
+  // no-op, so this is also just the plain default order. `Array.sort` is
+  // guaranteed stable (ES2019+), so each group keeps its own relative order
+  // rather than a comparator returning 0 leaving it to chance.
   //
   // Only matters when `maxVisible` truncates the row — the full/wrap picker
   // (`maxVisible` unset) already shows every chip, so there's nothing to
-  // promote and `order` stays unused.
+  // reorder and `order` stays unused.
   const [order, setOrder] = useState<string[] | null>(null)
   const optionIds = options.map((o) => o.id).join(',')
-  const prevSelectedRef = useRef(selected)
-  useEffect(() => {
-    if (maxVisible == null) return
-    const ids = options.map((o) => o.id)
-    const prevSelected = prevSelectedRef.current
-    prevSelectedRef.current = selected
-    setOrder((prev) => {
-      if (!prev || prev.length !== ids.length || !ids.every((id) => prev.includes(id))) {
-        // An unseen set of categories (mount, or the category list itself
-        // changed) — seed selected-first, same promotion this row always
-        // did on arrival.
-        return [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).map((o) => o.id)
-      }
-      const visibleIds = new Set(prev.slice(0, maxVisible))
-      // Only an id that just became selected AND isn't already visible gets
-      // promoted — an id toggled on or off while already in view is left
-      // exactly where it was.
-      const toPromote = ids.filter((id) => selected.has(id) && !prevSelected.has(id) && !visibleIds.has(id))
-      if (toPromote.length === 0) return prev
-      return [...toPromote, ...prev.filter((id) => !toPromote.includes(id))]
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [optionIds, selected, maxVisible])
+  // React's own documented pattern for "recompute state when a prop
+  // changes" — compared and (conditionally) set DURING render, not in a
+  // `useEffect`. An effect here would run as a side effect after the row
+  // already painted with the stale order, and its only reason to re-fire
+  // would be `resortToken`/`optionIds` ticking — a value that exists purely
+  // to trigger it, which is exactly the "you might not need an effect"
+  // anti-pattern React's lint rule for this flags. Comparing here instead
+  // recomputes synchronously, before that stale paint would ever happen.
+  const resortKey = `${optionIds}:${resortToken ?? ''}`
+  const [lastResortKey, setLastResortKey] = useState(resortKey)
+  if (maxVisible != null && resortKey !== lastResortKey) {
+    setLastResortKey(resortKey)
+    // Deliberately NOT keyed on `selected` (see above) — only mount, the
+    // category list changing, or resortToken bumping should reorder.
+    setOrder([...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).map((o) => o.id))
+  }
 
   const visible =
     maxVisible != null
