@@ -110,6 +110,7 @@ const DEFAULT_CENTER = community.mapCenter
 function buildInfoContent(
   p: MapPoint,
   onViewListing?: (categoryId: string, listingId: string) => void,
+  origin?: LatLng | null,
 ): HTMLElement {
   const s = (el: HTMLElement, css: string) => { el.style.cssText = css; return el }
   const div = (css = '') => s(document.createElement('div'), css)
@@ -152,7 +153,11 @@ function buildInfoContent(
   }
 
   const dirRow = div('margin-top:6px;font-size:12px')
-  const dirLink = a(directionsUrl(p.address || { lat: p.lat, lng: p.lng }), 'Directions ↗', 'color:#2563eb')
+  const dirLink = a(
+    directionsUrl(p.address || { lat: p.lat, lng: p.lng }, { origin }),
+    'Directions ↗',
+    'color:#2563eb',
+  )
   dirLink.target = '_blank'; dirLink.rel = 'noopener'
   dirRow.appendChild(dirLink)
   wrap.appendChild(dirRow)
@@ -504,7 +509,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         }
         const iw = infoWindowRef.current
         if (!iw) return
-        iw.setContent(buildInfoContent(p, onViewListingRef.current))
+        iw.setContent(buildInfoContent(p, onViewListingRef.current, userLocationRef.current))
         iw.open({ map, anchor: marker })
       })
       markersRef.current.push(marker)

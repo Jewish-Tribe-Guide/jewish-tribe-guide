@@ -8,8 +8,9 @@ import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
 import SetLocationButton from './SetLocationButton'
-import { businessUrl } from '@/lib/googleMapsLinks'
+import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
+import { useOptionalLocation } from '@/lib/locationContext'
 import { PinIcon, PhoneIcon, ClockIcon, DirectionsIcon, ExternalIcon, GlobeIcon } from '@/components/icons'
 
 // ── Field helpers ────────────────────────────────────────────────────────────
@@ -139,6 +140,10 @@ type Props = {
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
 export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
+  // null outside a LocationProvider (the admin's category preview) — see
+  // useOptionalLocation's own doc comment.
+  const location = useOptionalLocation()
+  const directionsOrigin = location?.anchor.coords ?? location?.anchor.label ?? null
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
   // A url field already shown up top on the collapsed card (showInHeader —
@@ -265,7 +270,10 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     <div className="flex flex-wrap gap-x-6 gap-y-4">
       {showAddress && (
         <ActionButton
-          href={businessUrl(item.name, item.address!, item.placeId as string | undefined)}
+          href={directionsUrl(destinationQuery(item.name, item.address), {
+            origin: directionsOrigin,
+            placeId: item.placeId as string | undefined,
+          })}
           icon={<DirectionsIcon className="h-5 w-5" />}
           label="Directions"
         />

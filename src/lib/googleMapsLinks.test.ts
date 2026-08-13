@@ -28,6 +28,27 @@ describe('directionsUrl', () => {
   it('uses the documented api=1 form, which is what opens the native app', () => {
     expect(params(directionsUrl('anywhere')).get('api')).toBe('1')
   })
+
+  it('sets an explicit origin instead of leaving Maps to default to the device location', () => {
+    const url = directionsUrl('Playa Bowls', { origin: { lat: 39.97, lng: -75.17 } })
+    expect(params(url).get('origin')).toBe('39.97,-75.17')
+  })
+
+  it('accepts a text origin, e.g. a typed address', () => {
+    expect(params(directionsUrl('Playa Bowls', { origin: '210 W Rittenhouse Sq' })).get('origin')).toBe(
+      '210 W Rittenhouse Sq',
+    )
+  })
+
+  it('omits origin rather than sending an empty one when no location is set', () => {
+    expect(params(directionsUrl('anywhere', { origin: null })).has('origin')).toBe(false)
+    expect(params(directionsUrl('anywhere')).has('origin')).toBe(false)
+  })
+
+  it('pins the exact destination when a placeId is known', () => {
+    const url = directionsUrl('Playa Bowls', { placeId: 'ChIJabc123' })
+    expect(params(url).get('destination_place_id')).toBe('ChIJabc123')
+  })
 })
 
 describe('businessUrl', () => {
