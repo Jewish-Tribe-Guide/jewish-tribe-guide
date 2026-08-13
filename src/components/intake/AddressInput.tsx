@@ -152,6 +152,18 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     }
   }
 
+  // Mirrors handleChange's side effects for an empty value rather than just
+  // blanking the field — otherwise a stale coordinate/suggestion from
+  // whatever was typed or picked before would survive the clear.
+  function handleClear() {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    onChange('')
+    onCoords?.(null)
+    setSuggestions([])
+    setHighlighted(-1)
+    setOpen(false)
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open || suggestions.length === 0) return
     if (e.key === 'ArrowDown') {
@@ -181,7 +193,21 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         placeholder={resolving ? 'Loading…' : placeholder}
         disabled={resolving}
+        className={value && !resolving ? 'pr-9' : undefined}
       />
+
+      {value && !resolving && (
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label="Clear"
+          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
 
       {open && suggestions.length > 0 && (
         <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
