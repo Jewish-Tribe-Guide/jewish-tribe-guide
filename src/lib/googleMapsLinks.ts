@@ -11,10 +11,24 @@
 export type LatLng = { lat: number; lng: number }
 
 /** Live directions to a single destination (address preferred; falls back to
- *  coordinates). Opens turn-by-turn in the Google Maps app on mobile. */
-export function directionsUrl(destination: string | LatLng): string {
+ *  coordinates). Opens turn-by-turn in the Google Maps app on mobile.
+ *
+ *  `origin`, when given, becomes the starting point instead of leaving Google
+ *  Maps to default to the device's live location — e.g. the visitor's typed
+ *  address or a listing they set as their reference point ("I'm here").
+ *  `placeId` disambiguates the destination the same way it does in
+ *  businessUrl, when known. */
+export function directionsUrl(
+  destination: string | LatLng,
+  opts?: { origin?: string | LatLng | null; placeId?: string | null },
+): string {
   const dest = typeof destination === 'string' ? destination : `${destination.lat},${destination.lng}`
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
+  const params = new URLSearchParams({ api: '1', destination: dest })
+  if (opts?.placeId) params.set('destination_place_id', opts.placeId)
+  if (opts?.origin) {
+    params.set('origin', typeof opts.origin === 'string' ? opts.origin : `${opts.origin.lat},${opts.origin.lng}`)
+  }
+  return `https://www.google.com/maps/dir/?${params.toString()}`
 }
 
 /** Whether `name` shows up in `address` — the signal for whether adding the
@@ -24,6 +38,14 @@ export function directionsUrl(destination: string | LatLng): string {
  *  well-known the business actually is. */
 function nameAppearsInAddress(name: string, address: string): boolean {
   return address.toLowerCase().includes(name.toLowerCase())
+}
+
+/** Best-effort destination text for a Maps query — the name only joins when
+ *  Google's fuzzy name-matching won't misfire (see nameAppearsInAddress).
+ *  Shared by businessUrl and the "Directions" action button. */
+export function destinationQuery(name: string, address?: string | null): string {
+  const nameHelps = !address || nameAppearsInAddress(name, address)
+  return [nameHelps ? name : null, address].filter(Boolean).join(' ')
 }
 
 /** Opens the business's Google Maps listing (name + address search, or exact
@@ -38,9 +60,7 @@ function nameAppearsInAddress(name: string, address: string): boolean {
  *  that was exact on its own. Dropping the name there falls back to a plain
  *  address search, which has nothing to get wrong. */
 export function businessUrl(name: string, address?: string | null, placeId?: string | null): string {
-  const nameHelps = !address || nameAppearsInAddress(name, address)
-  const query = [nameHelps ? name : null, address].filter(Boolean).join(' ')
-  const params = new URLSearchParams({ api: '1', query })
+  const params = new URLSearchParams({ api: '1', query: destinationQuery(name, address) })
   if (placeId) params.set('query_place_id', placeId)
   return `https://www.google.com/maps/search/?${params.toString()}`
 }

@@ -15,6 +15,7 @@ import {
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import { directionsUrl } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
+import { useOptionalLocation } from '@/lib/locationContext'
 import DenominationFilter from './DenominationFilter'
 
 const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
@@ -139,12 +140,14 @@ function DistanceDirections({
 }) {
   const dest = address || geo || null
   const hasDistance = milesFromAddress != null || driveMinutes != null || walkMinutes != null
+  const location = useOptionalLocation()
+  const origin = location?.anchor.coords ?? location?.anchor.label ?? null
 
   return (
     <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
       {dest && (
         <a
-          href={directionsUrl(dest)}
+          href={directionsUrl(dest, { origin })}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
