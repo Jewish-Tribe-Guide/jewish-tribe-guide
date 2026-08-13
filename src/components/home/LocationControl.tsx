@@ -222,6 +222,7 @@ export default function LocationControl({ controls }: Props) {
             onChange={handleAddressChange}
             onCoords={handleCoords}
             placeholder="Enter your address"
+            preferPlaceName
           />
         </>
       )}

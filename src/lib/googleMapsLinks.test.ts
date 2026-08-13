@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { businessUrl, directionsUrl, searchNearUrl } from './googleMapsLinks'
+import { businessUrl, destinationQuery, directionsUrl, searchNearUrl } from './googleMapsLinks'
 
 // These URLs are the handoff to live turn-by-turn navigation — the one thing
 // this app deliberately doesn't try to do itself. A malformed one doesn't throw;
@@ -48,6 +48,23 @@ describe('directionsUrl', () => {
   it('pins the exact destination when a placeId is known', () => {
     const url = directionsUrl('Playa Bowls', { placeId: 'ChIJabc123' })
     expect(params(url).get('destination_place_id')).toBe('ChIJabc123')
+  })
+})
+
+describe('destinationQuery', () => {
+  // A shul's name almost never appears in its street address, and unlike a
+  // synced business it has no placeId to fall back on for disambiguation —
+  // so without this override, Maps has nothing left to label the pin with
+  // but the bare address. See destinationQuery's own doc comment.
+  it('keeps the name even when it is not in the address, when alwaysIncludeName is set', () => {
+    const q = destinationQuery('Mekor Habracha', '456 Oak Ave, Philadelphia, PA', { alwaysIncludeName: true })
+    expect(q).toBe('Mekor Habracha 456 Oak Ave, Philadelphia, PA')
+  })
+
+  it('still drops the name by default when it is not in the address', () => {
+    expect(destinationQuery('Mekor Habracha', '456 Oak Ave, Philadelphia, PA')).toBe(
+      '456 Oak Ave, Philadelphia, PA',
+    )
   })
 })
 

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
-import { directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
+import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
+import { isCategorySyncEligible } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 /** One plottable place on the map. */
@@ -41,6 +42,13 @@ type Props = {
   points: MapPoint[]
   /** The visitor's live or set location. Rendered as a pulsing blue dot. */
   userLocation?: LatLng | null
+  /** Origin for a pin's "Directions ↗" link. Prefers a human-readable label
+   *  (typed address, or a listing's name) over raw coordinates — which
+   *  Maps otherwise renders as an anonymous "Dropped pin" — so this is
+   *  usually text even though `userLocation` above is always coords. Falls
+   *  back to `userLocation` itself when the caller has nothing better (e.g.
+   *  the admin's category preview, or live GPS mid-tracking). */
+  directionsOrigin?: string | LatLng | null
   /** When true the map pans to keep the user centered as their position updates.
    *  When false the marker moves silently without interrupting browsing. */
   follow?: boolean
@@ -110,7 +118,7 @@ const DEFAULT_CENTER = community.mapCenter
 function buildInfoContent(
   p: MapPoint,
   onViewListing?: (categoryId: string, listingId: string) => void,
-  origin?: LatLng | null,
+  origin?: string | LatLng | null,
 ): HTMLElement {
   const s = (el: HTMLElement, css: string) => { el.style.cssText = css; return el }
   const div = (css = '') => s(document.createElement('div'), css)
@@ -153,8 +161,13 @@ function buildInfoContent(
   }
 
   const dirRow = div('margin-top:6px;font-size:12px')
+  const destination = p.address
+    ? destinationQuery(p.name, p.address, {
+        alwaysIncludeName: !!p.filterId && !isCategorySyncEligible(p.filterId),
+      })
+    : { lat: p.lat, lng: p.lng }
   const dirLink = a(
-    directionsUrl(p.address || { lat: p.lat, lng: p.lng }, { origin }),
+    directionsUrl(destination, { origin, placeId: p.raw?.placeId as string | undefined }),
     'Directions ↗',
     'color:#2563eb',
   )
@@ -287,7 +300,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -312,6 +325,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   const onMapLongPressRef = useRef(onMapLongPress)
   const onLongPressPointRef = useRef(onLongPressPoint)
   const userLocationRef = useRef(userLocation)
+  const directionsOriginRef = useRef(directionsOrigin)
   const searchActiveRef = useRef(searchActive)
   const selectedIdRef = useRef(selectedId)
   const obscuredBottomPxRef = useRef(obscuredBottomPx)
@@ -324,6 +338,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
   useEffect(() => { onMapLongPressRef.current = onMapLongPress }, [onMapLongPress])
   useEffect(() => { onLongPressPointRef.current = onLongPressPoint }, [onLongPressPoint])
   useEffect(() => { userLocationRef.current = userLocation }, [userLocation])
+  useEffect(() => { directionsOriginRef.current = directionsOrigin }, [directionsOrigin])
   useEffect(() => { searchActiveRef.current = searchActive }, [searchActive])
   useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
   useEffect(() => { obscuredBottomPxRef.current = obscuredBottomPx }, [obscuredBottomPx])
@@ -509,7 +524,7 @@ export default function ResourceMap({ points, userLocation, follow = true, onRes
         }
         const iw = infoWindowRef.current
         if (!iw) return
-        iw.setContent(buildInfoContent(p, onViewListingRef.current, userLocationRef.current))
+        iw.setContent(buildInfoContent(p, onViewListingRef.current, directionsOriginRef.current ?? userLocationRef.current))
         iw.open({ map, anchor: marker })
       })
       markersRef.current.push(marker)

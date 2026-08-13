@@ -2,7 +2,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus, syncedLabel } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
@@ -143,7 +143,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // null outside a LocationProvider (the admin's category preview) — see
   // useOptionalLocation's own doc comment.
   const location = useOptionalLocation()
-  const directionsOrigin = location?.anchor.coords ?? location?.anchor.label ?? null
+  const directionsOrigin = location?.directionsOrigin ?? null
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
   // A url field already shown up top on the collapsed card (showInHeader —
@@ -270,10 +270,10 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     <div className="flex flex-wrap gap-x-6 gap-y-4">
       {showAddress && (
         <ActionButton
-          href={directionsUrl(destinationQuery(item.name, item.address), {
-            origin: directionsOrigin,
-            placeId: item.placeId as string | undefined,
-          })}
+          href={directionsUrl(
+            destinationQuery(item.name, item.address, { alwaysIncludeName: !isCategorySyncEligible(category.id) }),
+            { origin: directionsOrigin, placeId: item.placeId as string | undefined },
+          )}
           icon={<DirectionsIcon className="h-5 w-5" />}
           label="Directions"
         />
