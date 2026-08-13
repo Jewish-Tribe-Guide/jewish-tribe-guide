@@ -42,9 +42,21 @@ function nameAppearsInAddress(name: string, address: string): boolean {
 
 /** Best-effort destination text for a Maps query — the name only joins when
  *  Google's fuzzy name-matching won't misfire (see nameAppearsInAddress).
- *  Shared by businessUrl and the "Directions" action button. */
-export function destinationQuery(name: string, address?: string | null): string {
-  const nameHelps = !address || nameAppearsInAddress(name, address)
+ *  Shared by businessUrl and the "Directions" action button.
+ *
+ *  `alwaysIncludeName` skips that guard. It exists for listings that can
+ *  never carry a placeId to disambiguate them instead (synagogues, mikvahs —
+ *  see SYNC_EXCLUDED_CATEGORY_IDS): without it, those listings' names almost
+ *  never appear verbatim in their street address, so the guard would drop
+ *  the name on nearly every one of them, and with no placeId to fall back on
+ *  either, Maps has nothing left to label the pin with but the bare address.
+ *  A same-named place mismatch is the rarer failure of the two here. */
+export function destinationQuery(
+  name: string,
+  address?: string | null,
+  opts?: { alwaysIncludeName?: boolean },
+): string {
+  const nameHelps = !!opts?.alwaysIncludeName || !address || nameAppearsInAddress(name, address)
   return [nameHelps ? name : null, address].filter(Boolean).join(' ')
 }
 

@@ -34,6 +34,13 @@ type LocationContextValue = {
   anchor: DirectoryAnchor
   coords: { lat: number; lng: number } | null
   liveTracking: LiveTracking
+  /** Ready-to-use origin for a Maps "Directions" link — the visitor's typed
+   *  address or a listing's name (anchor.label) when either is set, since
+   *  Maps renders a bare lat/lng origin as an anonymous "Dropped pin" rather
+   *  than a recognizable place. Live GPS falls back to raw coords instead:
+   *  its label is the literal string "Current location" (see
+   *  useLiveLocation), which doesn't geocode to anything. */
+  directionsOrigin: string | { lat: number; lng: number } | null
   /** The listing the anchor currently points at, if the visitor set it by
    *  tapping "I'm here" on one. Null for a typed address or a GPS fix.
    *
@@ -85,6 +92,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       anchor: { coords, label: address },
       coords,
       liveTracking: { tracking, error: geoError, start, stop },
+      directionsOrigin: !tracking && address ? address : coords,
       anchorListingId: listingId,
       setListingAnchor: (listing) => {
         // Remember what's being displaced, but only a typed address is worth

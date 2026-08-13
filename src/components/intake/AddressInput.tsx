@@ -39,6 +39,14 @@ type Props = {
    *  but the flag still short-circuits every network call for a caller that
    *  wants a deterministic, offline-safe field. */
   disableAutocomplete?: boolean
+  /** Fill the field with the chosen place's name instead of its formatted
+   *  address, when it has one (a plain address the visitor types has none).
+   *  For callers where the field IS the display label shown back to the
+   *  visitor — e.g. the "where should distances be measured from" picker —
+   *  rather than a structured address value another field depends on
+   *  (ListingForm's `address` field must stay a real address; it gets the
+   *  place's name separately via onPlaceSelect). */
+  preferPlaceName?: boolean
 }
 
 // Renders our own input and dropdown over Google's Autocomplete DATA API
@@ -51,7 +59,7 @@ type Props = {
 // inline under the field like everywhere else in this app. This is that same
 // underlying API, just rendered with our own markup, so it's a normal inline
 // dropdown on every screen size.
-export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete }: Props) {
+export default function AddressInput({ value, onChange, placeholder = 'Address or location', onCoords, onPlaceSelect, includedPrimaryTypes, disableAutocomplete, preferPlaceName }: Props) {
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
   const [open, setOpen] = useState(false)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -111,13 +119,19 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       const place = s.prediction.toPlace()
       const extraFields = onPlaceSelect
         ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI']
-        : []
+        : preferPlaceName
+          ? ['displayName']
+          : []
       await place.fetchFields({ fields: ['formattedAddress', 'location', ...extraFields] })
       // The session that started with the first keystroke concluded the
       // moment fetchFields ran — see the note in placesAutocomplete.ts.
       resetAutocompleteSession()
 
-      if (place.formattedAddress) onChange(place.formattedAddress)
+      // A plain address has no displayName distinct from its own formatted
+      // address, so this only actually swaps in a name for a business/POI
+      // suggestion — never a name-shaped surprise in a street address field.
+      const label = (preferPlaceName && place.displayName) || place.formattedAddress
+      if (label) onChange(label)
       const loc = place.location
       if (loc) onCoords?.({ lat: loc.lat(), lng: loc.lng() })
 

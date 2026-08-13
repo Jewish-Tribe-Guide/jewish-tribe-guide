@@ -13,7 +13,7 @@ import {
   ALL_MINYAN_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
-import { directionsUrl } from '@/lib/googleMapsLinks'
+import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
 import { useOptionalLocation } from '@/lib/locationContext'
 import DenominationFilter from './DenominationFilter'
@@ -126,22 +126,28 @@ function TravelLine({
  *  active mode instead. Directions still shows even with no location set at
  *  all — Google Maps can route from the device's own GPS at that point. */
 function DistanceDirections({
+  name,
   address,
   geo,
   milesFromAddress,
   driveMinutes,
   walkMinutes,
 }: {
+  name: string
   address?: string
   geo?: { lat: number; lng: number } | null
   milesFromAddress?: number
   driveMinutes?: number | null
   walkMinutes?: number | null
 }) {
-  const dest = address || geo || null
+  // alwaysIncludeName: a shul's name almost never appears verbatim in its
+  // street address, and — being sync-excluded — it never has a placeId to
+  // disambiguate the destination instead (see destinationQuery's own doc).
+  // Without this the pin comes up labeled with the bare address every time.
+  const dest = address ? destinationQuery(name, address, { alwaysIncludeName: true }) : geo || null
   const hasDistance = milesFromAddress != null || driveMinutes != null || walkMinutes != null
   const location = useOptionalLocation()
-  const origin = location?.anchor.coords ?? location?.anchor.label ?? null
+  const origin = location?.directionsOrigin ?? null
 
   return (
     <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
@@ -440,6 +446,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
 
                                 {rowOpen && (
                                   <DistanceDirections
+                                    name={row.shul}
                                     address={info?.address}
                                     geo={info?.geo}
                                     milesFromAddress={info?.milesFromAddress}
