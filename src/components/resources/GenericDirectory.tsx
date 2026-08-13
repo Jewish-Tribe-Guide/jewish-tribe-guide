@@ -329,21 +329,30 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       {/* Controls */}
       <div className="mb-4 space-y-2">
         {showSearch && (
-          <input
-            type="text"
-            placeholder={searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         )}
         {showSearch && q && tagFields.length > 0 && (
-          <p className="text-xs text-muted">
-            Showing places matching &ldquo;{search.trim()}&rdquo; &middot;{' '}
-            <button onClick={() => setSearch('')} className="text-primary hover:underline cursor-pointer">
-              clear
-            </button>
-          </p>
+          <p className="text-xs text-muted">Showing places matching &ldquo;{search.trim()}&rdquo;</p>
         )}
         {hasFilterRow && (
           <>
