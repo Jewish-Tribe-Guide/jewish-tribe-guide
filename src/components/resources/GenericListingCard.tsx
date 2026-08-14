@@ -140,140 +140,140 @@ export function GenericListingCard({
         aria-expanded={expanded}
         onClick={() => setExpanded((p) => !p)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
-        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
+        className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        {/* Icon avatar — same glyph/image + tinted color as this category's
-            map pin (see getCategoryColor), so a place reads as the same
-            thing here and on the map. self-start (overriding the row's own
-            items-center) lines its box up with the name's first line —
-            without it, a card with a subtitle and chip row underneath makes
-            the icon look like it's floating in the middle of the whole
-            block rather than sitting next to what it's naming. mt-0.5 on
-            top of that: the name's own line-height leaves a few px of
-            leading above the visible text, so even with matching box tops
-            the glyph itself still starts a couple pixels lower than the
-            icon — this nudges the icon down to where the letters actually
-            start, not just where the (invisible) line box does. */}
-        <CategoryIcon
-          icon={category.icon}
-          iconImageUrl={
-            (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-              ? (item[PHOTO_FIELD_KEY] as string)
-              : category.iconImageUrl) ?? undefined
-          }
-          color={color}
-          className="h-10 w-10 text-xl self-start mt-0.5"
-        />
+        <div className="flex items-center gap-3">
+          {/* Icon avatar — same glyph/image + tinted color as this category's
+              map pin (see getCategoryColor), so a place reads as the same
+              thing here and on the map. */}
+          <CategoryIcon
+            icon={category.icon}
+            iconImageUrl={
+              (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
+                ? (item[PHOTO_FIELD_KEY] as string)
+                : category.iconImageUrl) ?? undefined
+            }
+            color={color}
+            className="h-10 w-10 text-xl"
+          />
 
-        {/* Name + subtitle + the only chips that survive collapsed: Open and
-            any badge tied to an actual filter control. */}
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-slate-900">
-            {onNameClick ? (
-              // A span, not the whole <p>, carries the click/hover — the <p>
-              // is block-level and stretches to fill the row, which would
-              // make clicking empty space to the right of a short name (e.g.
-              // "Giant") count as clicking the name. The span sizes to just
-              // the text itself.
-              <span
-                className="cursor-pointer hover:underline hover:text-blue-600 transition-colors"
-                onClick={(e) => { e.stopPropagation(); onNameClick() }}
-              >
-                {item.name}
-              </span>
-            ) : (
-              item.name
-            )}
-          </p>
-          {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
-          {(isOpen || headerBadges.length > 0) && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {isOpen && (closing?.closesSoon ? (
-                <span className="relative group/tip">
-                  <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
-                    Closes Soon
-                  </Chip>
-                  <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                    Closes at {closing.closeLabel}
-                  </span>
+          {/* Name + subtitle only — badges get their own full-width row below
+              (see badge row further down) so they don't have to compete with
+              the distance/votes column for horizontal space and wrap early. */}
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900">
+              {onNameClick ? (
+                // A span, not the whole <p>, carries the click/hover — the <p>
+                // is block-level and stretches to fill the row, which would
+                // make clicking empty space to the right of a short name (e.g.
+                // "Giant") count as clicking the name. The span sizes to just
+                // the text itself.
+                <span
+                  className="cursor-pointer hover:underline hover:text-blue-600 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); onNameClick() }}
+                >
+                  {item.name}
                 </span>
               ) : (
-                <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
-                  Open
-                </Chip>
-              ))}
-              {headerBadges.flatMap((f) => {
-                const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
-                const note = caveatNote(f)
-                const amber = note !== null
-                return texts.map((text) => {
-                  const btn = (
-                    <Chip
-                      tone={amber ? 'amber' : 'slate'}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (f.type === 'boolean') onFilterBool(f.key)
-                        else onFilterSelect(f.key, text)
-                      }}
-                      title={amber ? undefined : `Filter by ${text}`}
-                    >
-                      {text}
-                    </Chip>
-                  )
-                  if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
-                  return (
-                    <span key={`${f.key}:${text}`} className="relative group/tip">
-                      {btn}
-                      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                        {note || 'Not everything here is kosher — please verify.'}
-                      </span>
-                    </span>
-                  )
-                })
-              })}
-            </div>
-          )}
+                item.name
+              )}
+            </p>
+            {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {(upvotes || travel.length > 0) && (
+              // Stacked on mobile to save horizontal space; side by side from sm
+              // up, each in its own fixed-width column so every row's upvote
+              // count lands in the same spot, and the distance column is
+              // left-aligned so the 📍/🚗/🚶 glyphs all line up under each
+              // other instead of drifting with how long the mileage text is.
+              <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+                {upvotes && (
+                  <div className="sm:flex sm:w-10 sm:justify-end">
+                    <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+                  </div>
+                )}
+                {travel.length > 0 && (
+                  <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:items-start sm:w-14">
+                    {travel.map((t) => <span key={t}>{t}</span>)}
+                  </div>
+                )}
+              </div>
+            )}
+            {headerUrlFields.map(({ f, href }) => (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            ))}
+            <svg
+              className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {(upvotes || travel.length > 0) && (
-            // Stacked on mobile to save horizontal space; side by side from sm
-            // up, each in its own fixed-width column so every row's upvote
-            // count lands in the same spot, and the distance column is
-            // left-aligned so the 📍/🚗/🚶 glyphs all line up under each
-            // other instead of drifting with how long the mileage text is.
-            <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-4">
-              {upvotes && (
-                <div className="sm:flex sm:w-10 sm:justify-end">
-                  <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-                </div>
-              )}
-              {travel.length > 0 && (
-                <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:items-start sm:w-14">
-                  {travel.map((t) => <span key={t}>{t}</span>)}
-                </div>
-              )}
-            </div>
-          )}
-          {headerUrlFields.map(({ f, href }) => (
-            <a
-              key={f.key}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-            >
-              {f.linkLabel ?? f.label}
-            </a>
-          ))}
-          <svg
-            className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-            fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        {/* Badge row — the only chips that survive collapsed: Open and any
+            badge tied to an actual filter control. Full-width and below the
+            name/distance row (rather than wrapping inside the name column)
+            so it gets the whole card's width to lay out in, instead of
+            fighting the distance/votes column for space and wrapping early. */}
+        {(isOpen || headerBadges.length > 0) && (
+          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+            {isOpen && (closing?.closesSoon ? (
+              <span className="relative group/tip">
+                <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
+                  Closes Soon
+                </Chip>
+                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                  Closes at {closing.closeLabel}
+                </span>
+              </span>
+            ) : (
+              <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
+                Open
+              </Chip>
+            ))}
+            {headerBadges.flatMap((f) => {
+              const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
+              const note = caveatNote(f)
+              const amber = note !== null
+              return texts.map((text) => {
+                const btn = (
+                  <Chip
+                    tone={amber ? 'amber' : 'slate'}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (f.type === 'boolean') onFilterBool(f.key)
+                      else onFilterSelect(f.key, text)
+                    }}
+                    title={amber ? undefined : `Filter by ${text}`}
+                  >
+                    {text}
+                  </Chip>
+                )
+                if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
+                return (
+                  <span key={`${f.key}:${text}`} className="relative group/tip">
+                    {btn}
+                    <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                      {note || 'Not everything here is kosher — please verify.'}
+                    </span>
+                  </span>
+                )
+              })
+            })}
+          </div>
+        )}
       </div>
 
       {expanded && (
