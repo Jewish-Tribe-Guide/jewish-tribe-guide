@@ -347,6 +347,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
+    // Cache Components keeps hidden routes alive under <Activity> instead of
+    // unmounting them, so switching tabs away and back re-runs this effect on
+    // the SAME already-initialized instance (mapRef/containerRef persist).
+    // Without this guard we'd build a second google.maps.Map on top of the
+    // still-live one, orphaning the existing markers on the discarded map.
+    if (mapRef.current) return
     let cancelled = false
     const unsubscribe = onMapsAuthFailure(() => setAuthFailed(true))
 
