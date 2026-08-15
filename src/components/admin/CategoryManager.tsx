@@ -2494,6 +2494,23 @@ function FieldEditor({
         </>
       )}
 
+      {(f.type === 'text' || f.type === 'textarea') && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.showInHeader}
+            onChange={(e) => onChange({ showInHeader: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Also show on the collapsed card, under the address
+        </label>
+      )}
+      {(f.type === 'text' || f.type === 'textarea') && f.showInHeader && (
+        <p className="text-[11px] text-muted ml-5 -mt-1">
+          Shown as a single line there, even on a long entry — keep it to about a sentence. Longer text still shows in full once the card is expanded.
+        </p>
+      )}
+
       {canChooseShape && (
         <label className="block sm:w-1/2">
           <span className={fieldLabel}>Show as</span>

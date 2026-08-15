@@ -130,8 +130,12 @@ export type CategoryField = {
    *  renamed/removed one, or this is how it got set) reopens with those
    *  already showing, pre-filled, rather than silently dropped. */
   allowOther?: boolean
-  /** For `type: 'url'`: show the link button in the collapsed card header so it's
-   *  always visible without expanding (e.g. "Join group" on WhatsApp listings). */
+  /** Show this field in the collapsed card, without expanding — always
+   *  visible instead of one tap away. For `type: 'url'`: a link button next
+   *  to the distance/chevron (e.g. "Join group" on WhatsApp listings). For
+   *  `type: 'text'`/`'textarea'`: a single truncated line under the address
+   *  (e.g. "Sit-down glatt kosher steakhouse, under IKC supervision") — see
+   *  headerTextFields in GenericListingCard.tsx. */
   showInHeader?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the

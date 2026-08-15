@@ -158,6 +158,14 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const special = (f: CategoryField) =>
     f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image'
   const badgeFields = fields.filter((f) => !special(f) && placement(f) === 'badge')
+  // Unlike urlFields above, a text/textarea field marked showInHeader still
+  // gets its row here too — the header only ever shows a truncated one-line
+  // preview (see GenericListingCard's headerTextFields), so if a listing's
+  // note runs long, excluding it here would make the full text genuinely
+  // unreachable: expanding the card is supposed to reveal MORE, and it
+  // wouldn't. A url field doesn't have this problem — it's the exact same
+  // link either place, nothing truncated, so showing it twice would be pure
+  // duplication rather than "preview vs. full."
   const rowFields = fields.filter((f) => !special(f) && placement(f) === 'row')
 
   const minyanimValue = minyanimField ? item[minyanimField.key] : undefined

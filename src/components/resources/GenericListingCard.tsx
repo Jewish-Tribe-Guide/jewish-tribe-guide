@@ -110,6 +110,18 @@ export function GenericListingCard({
     .map((f) => ({ f, href: item[f.key] as string | undefined }))
     .filter((x): x is { f: CategoryField; href: string } => !!x.href)
 
+  // text/textarea fields explicitly opted into the collapsed row — a short
+  // note ("Sit-down glatt kosher steakhouse, under IKC supervision") that
+  // says what the place actually is, without expanding the card first.
+  // Deliberately single-line: `truncate` (not a multi-line clamp) so the
+  // decision to keep this short lives in what gets typed, not in how long a
+  // line the layout happens to allow — the same one-line limit applies at
+  // every width, not just mobile's.
+  const headerTextFields = fields
+    .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
+    .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
+    .filter((x): x is { f: CategoryField; text: string } => !!x.text)
+
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
   // badges without a filter, all tags) only shows once expanded, inside
@@ -142,10 +154,16 @@ export function GenericListingCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
         className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
-              thing here and on the map. */}
+              thing here and on the map. items-start (below) keeps it, and the
+              trailing column, pinned near the name instead of drifting toward
+              the middle of a card that's grown taller — e.g. once a header
+              text field is filled in and the block is 3 lines, not 2. mt-0.5
+              nudges it those last couple pixels: the name's own line-height
+              leaves a little leading above the visible text, so even with
+              matching box tops the glyph itself starts lower than the icon. */}
           <CategoryIcon
             icon={category.icon}
             iconImageUrl={
@@ -154,12 +172,13 @@ export function GenericListingCard({
                 : category.iconImageUrl) ?? undefined
             }
             color={color}
-            className="h-10 w-10 text-xl"
+            className="h-10 w-10 text-xl mt-0.5"
           />
 
-          {/* Name + subtitle only — badges get their own full-width row below
-              (see badge row further down) so they don't have to compete with
-              the distance/votes column for horizontal space and wrap early. */}
+          {/* Name + subtitle + an optional one-line "what this place is" note
+              — badges get their own full-width row below (see badge row
+              further down) so they don't have to compete with the distance/
+              votes column for horizontal space and wrap early. */}
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900">
               {onNameClick ? (
@@ -179,9 +198,23 @@ export function GenericListingCard({
               )}
             </p>
             {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
+            {/* mt-2: enough gap that this reads as its own beat after the
+                name+address fact, not a third bullet inside it — but no
+                border/section treatment, which is reserved for the hairline
+                before the badge row (a genuinely different mode: read text
+                vs. scannable chips). */}
+            {headerTextFields.map(({ f, text }) => (
+              <p key={f.key} className="truncate text-sm text-slate-600 mt-2">{text}</p>
+            ))}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          {/* items-center here is its own, narrower concern from the outer
+              row's items-start above: keeps the chevron vertically centered
+              against the votes/distance stack next to it, regardless of
+              whether that stack is one line or two (mobile stacks upvote
+              count above distance) — unrelated to how tall the name column
+              gets. */}
+          <div className="flex items-center gap-3 shrink-0 mt-0.5">
             {(upvotes || travel.length > 0) && (
               // Stacked on mobile to save horizontal space; side by side from sm
               // up, each in its own fixed-width column so every row's upvote
