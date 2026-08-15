@@ -234,26 +234,31 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         </Chip>
       ))}
       {visibleSignalBadges.flatMap((f) => {
-        const texts = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
+        const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
+        // Resolve to the option's CURRENT label — see the matching comment in
+        // GenericListingCard.tsx for why this can't just display the raw
+        // stored value.
+        const labelFor = (v: string) => f.options?.find((opt) => opt.value === v)?.label ?? v
         const note = caveatNote(f)
         const amber = note !== null
-        return texts.map((text) => {
+        return values.map((value) => {
+          const text = labelFor(value)
           const onClick =
             f.filterable && f.type === 'boolean' && onFilterBool
               ? (e: MouseEvent) => { e.stopPropagation(); onFilterBool(f.key) }
               : f.filterable && f.type === 'select' && onFilterSelect
-              ? (e: MouseEvent) => { e.stopPropagation(); onFilterSelect(f.key, text) }
+              ? (e: MouseEvent) => { e.stopPropagation(); onFilterSelect(f.key, value) }
               : onTagClick
-              ? (e: MouseEvent) => { e.stopPropagation(); onTagClick(text) }
+              ? (e: MouseEvent) => { e.stopPropagation(); onTagClick(value) }
               : undefined
           const btn = (
             <Chip tone={amber ? 'amber' : 'slate'} onClick={onClick} title={amber ? undefined : (onClick ? `Filter by ${text}` : undefined)}>
               {text}
             </Chip>
           )
-          if (!amber) return <span key={`${f.key}:${text}`}>{btn}</span>
+          if (!amber) return <span key={`${f.key}:${value}`}>{btn}</span>
           return (
-            <span key={`${f.key}:${text}`} className="relative group/tip">
+            <span key={`${f.key}:${value}`} className="relative group/tip">
               {btn}
               <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
                 {note || 'Not everything here is kosher — please verify.'}
@@ -406,7 +411,15 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       {detailBadges.map((f) => {
         const v = item[f.key]
         if (f.type === 'boolean' ? !v : !display(v)) return null
-        const text = f.type === 'boolean' ? f.label : `${f.label}: ${display(v)}`
+        // Select values resolve to their option's CURRENT label — see the
+        // matching comment in GenericListingCard.tsx.
+        const shown =
+          f.type === 'select'
+            ? selectValues(v)
+                .map((val) => f.options?.find((opt) => opt.value === val)?.label ?? val)
+                .join(', ')
+            : display(v)
+        const text = f.type === 'boolean' ? f.label : `${f.label}: ${shown}`
         return <Chip key={f.key} tone="slate" size="expanded">{text}</Chip>
       })}
     </div>

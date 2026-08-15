@@ -271,3 +271,74 @@ export async function clearCategoryFieldData(
 
   return { updated }
 }
+
+/** How many of a category's listings currently store the OLD value of a
+ *  select/tags field option the admin is about to rename — checked before
+ *  offering to cascade the rename (see applyFieldOptionRenames). Handles both
+ *  a single stored string and a multiSelect array. */
+export async function countFieldOptionUsage(
+  categoryId: string,
+  renames: { fieldKey: string; oldValue: string; newValue: string }[],
+): Promise<{ fieldKey: string; oldValue: string; newValue: string; count: number }[]> {
+  const { data, error } = await getAdminClient()
+    .from('resource')
+    .select('details')
+    .eq('category', categoryId)
+  if (error) throw new Error(`Failed to check existing listings: ${error.message}`)
+
+  const rows = (data ?? []) as { details: Record<string, unknown> }[]
+  return renames.map((r) => {
+    let count = 0
+    for (const row of rows) {
+      const v = row.details?.[r.fieldKey]
+      const arr = Array.isArray(v) ? v : v !== undefined && v !== null && v !== '' ? [v] : []
+      if (arr.includes(r.oldValue)) count++
+    }
+    return { ...r, count }
+  })
+}
+
+/** Migrates listings whose select/tags field(s) reference an option's old
+ *  value to its new one — called only after the admin has confirmed against
+ *  the counts from countFieldOptionUsage. Deliberately separate from
+ *  clearCategoryFieldData: this replaces a value in place rather than
+ *  removing it, so a rename doesn't silently orphan existing listings the way
+ *  editing an option's text in the raw options list otherwise would. */
+export async function applyFieldOptionRenames(
+  categoryId: string,
+  renames: { fieldKey: string; oldValue: string; newValue: string }[],
+): Promise<{ updated: number }> {
+  if (renames.length === 0) return { updated: 0 }
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from('resource')
+    .select('id, details')
+    .eq('category', categoryId)
+  if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
+
+  const rows = (data ?? []) as { id: string; details: Record<string, unknown> }[]
+  let updated = 0
+
+  for (const row of rows) {
+    let details: Record<string, unknown> | null = null
+    for (const r of renames) {
+      const v = row.details?.[r.fieldKey]
+      if (Array.isArray(v)) {
+        if (!v.includes(r.oldValue)) continue
+        details ??= { ...row.details }
+        // Dedupe in case the new value was somehow already present alongside
+        // the old one (e.g. a multiSelect field with both selected).
+        details[r.fieldKey] = Array.from(new Set(v.map((x) => (x === r.oldValue ? r.newValue : x))))
+      } else if (v === r.oldValue) {
+        details ??= { ...row.details }
+        details[r.fieldKey] = r.newValue
+      }
+    }
+    if (!details) continue
+    const { error: updErr } = await supabase.from('resource').update({ details }).eq('id', row.id)
+    if (updErr) throw new Error(`Failed to migrate a listing's data: ${updErr.message}`)
+    updated++
+  }
+
+  return { updated }
+}
