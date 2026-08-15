@@ -160,6 +160,13 @@ export type DirectoryResource = {
   // ── Google Places sync (carried over from `details`, set by the sync job) ──
   /** Stable Google place id; its presence marks a listing as auto-syncing. */
   placeId?: string
+  /** Google place id confirmed (by name+address match) for categories that never
+   *  auto-sync (synagogue/mikvah/bikur-cholim — see SYNC_EXCLUDED_CATEGORY_IDS).
+   *  Unlike `placeId`, this NEVER makes a listing sync-eligible — it exists only
+   *  to disambiguate the "Directions" destination, so a listing whose name
+   *  Google can't reliably resolve on its own doesn't send someone to a
+   *  same-named place across town. Set by scripts/backfill-verified-directions.mjs. */
+  verifiedPlaceId?: string
   /** ISO timestamp of the last successful Google Places sync. */
   googleSyncedAt?: string
   /** ISO timestamp of the last time a user confirmed the community-curated info is still accurate. */

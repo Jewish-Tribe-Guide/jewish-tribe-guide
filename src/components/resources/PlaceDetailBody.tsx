@@ -2,7 +2,7 @@
 
 import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import { isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus, syncedLabel } from '@/lib/hours'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
@@ -271,8 +271,8 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       {showAddress && (
         <ActionButton
           href={directionsUrl(
-            destinationQuery(item.name, item.address, { alwaysIncludeName: !isCategorySyncEligible(category.id) }),
-            { origin: directionsOrigin, placeId: item.placeId as string | undefined },
+            destinationQuery(item.name, item.address, { alwaysIncludeName: !!item.verifiedPlaceId }),
+            { origin: directionsOrigin, placeId: (item.placeId ?? item.verifiedPlaceId) as string | undefined },
           )}
           icon={<DirectionsIcon className="h-5 w-5" />}
           label="Directions"
