@@ -21,10 +21,14 @@ export function useLiveLocation() {
   const stored = useStoredLocation()
   const watch = useWatchPosition()
 
-  // Auto-resume on mount if a previous visit turned tracking on.
+  // Auto-resume on mount if a previous visit turned tracking on. Silent: the
+  // visitor isn't doing anything at this instant, so if permission has since
+  // been revoked, that failure shouldn't pop the location picker open on a
+  // page they just loaded — see useWatchPosition's `start` and
+  // LocationControl's geoError effect.
   useEffect(() => {
     try {
-      if (localStorage.getItem(ENABLED_KEY) === '1') watch.start()
+      if (localStorage.getItem(ENABLED_KEY) === '1') watch.start({ silent: true })
     } catch {
       // Storage unavailable — just don't auto-resume.
     }
@@ -73,6 +77,7 @@ export function useLiveLocation() {
     ...stored,
     tracking: watch.tracking,
     geoError: watch.error,
+    geoErrorSilent: watch.errorSilent,
     start,
     stop,
   }

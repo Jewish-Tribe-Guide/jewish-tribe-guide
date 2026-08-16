@@ -12,8 +12,11 @@ export type LivePosition = {
 export type WatchState = {
   position: LivePosition | null
   error: string | null
+  /** Whether `error` came from a `start({ silent: true })` call rather than
+   *  one the visitor directly triggered — see `start`'s own doc. */
+  errorSilent: boolean
   tracking: boolean
-  start: () => void
+  start: (opts?: { silent?: boolean }) => void
   stop: () => void
 }
 
@@ -27,8 +30,12 @@ export type WatchState = {
 export function useWatchPosition(): WatchState {
   const [position, setPosition] = useState<LivePosition | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorSilent, setErrorSilent] = useState(false)
   const [tracking, setTracking] = useState(false)
   const watchIdRef = useRef<number | null>(null)
+  // Whether the in-flight `start()` call was silent — read by the error
+  // callback below, which fires well after `start` returns.
+  const silentRef = useRef(false)
   // Mirrors `tracking` for the visibilitychange listener below, which is only
   // ever attached once — a ref sidesteps re-subscribing that listener every
   // time tracking flips, and stays correct across the pause/resume cycle.
@@ -50,11 +57,13 @@ export function useWatchPosition(): WatchState {
           accuracy: pos.coords.accuracy,
         })
         setError(null)
+        setErrorSilent(false)
       },
       (err) => {
         wantsTrackingRef.current = false
         setTracking(false)
         watchIdRef.current = null
+        setErrorSilent(silentRef.current)
         if (err.code === err.PERMISSION_DENIED) {
           setError(
             'Location permission is blocked. Enable it in your browser settings and try again.',
@@ -75,12 +84,21 @@ export function useWatchPosition(): WatchState {
     setTracking(false)
   }, [clearWatch])
 
-  const start = useCallback(() => {
+  // `silent`: true for useLiveLocation's mount-time auto-resume, which isn't
+  // something the visitor just did — a failure there (typically permission
+  // having been revoked since the last visit) shouldn't pop any UI open the
+  // way a failure from a visitor-pressed "Use my location" button should.
+  // The message itself still comes through in `error` either way, for
+  // whoever opens the location picker next and wonders why tracking is off.
+  const start = useCallback((opts?: { silent?: boolean }) => {
+    silentRef.current = !!opts?.silent
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setError('Location is not available on this device.')
+      setErrorSilent(silentRef.current)
       return
     }
     setError(null)
+    setErrorSilent(false)
     setTracking(true)
     wantsTrackingRef.current = true
     subscribe()
@@ -106,5 +124,5 @@ export function useWatchPosition(): WatchState {
   // Always clear the watch when the component that owns this hook unmounts.
   useEffect(() => () => { clearWatch() }, [clearWatch])
 
-  return { position, error, tracking, start, stop }
+  return { position, error, errorSilent, tracking, start, stop }
 }
