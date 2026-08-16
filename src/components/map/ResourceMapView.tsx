@@ -1600,26 +1600,43 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                 </div>
               )}
 
-              {/* Mobile-only live-location FAB — Google-Maps/Too-Good-To-Go-
-                  style navigation-arrow button, bottom-right. The corner used
-                  to belong to a "set/change location" pin FAB, which has
-                  moved inline next to the search bar (above); this slot is
-                  now purely about the device's own GPS: tap to start
-                  tracking, or (once tracking) to resume following after a
-                  manual drag — same as ResourceMap's desktop
-                  Re-center/Following pill, just icon-only and living in the
-                  corner that pill can't use on mobile (MobileNearbySheet owns
-                  bottom-left there). Filled blue while actively following,
-                  same color language as that pill. */}
+              {/* Mobile-only recenter FAB — Google-Maps/Too-Good-To-Go-style
+                  navigation-arrow button, bottom-right. Same job as
+                  ResourceMap's desktop Re-center/Following pill — pan back to
+                  whatever anchor is set, address or live GPS, it doesn't
+                  care which — just icon-only and living in the corner that
+                  pill can't use on mobile (MobileNearbySheet owns bottom-left
+                  there). It used to branch on `tracking` instead of
+                  `activeLocation`, so a visitor who'd typed an address (no
+                  GPS involved) got a permission prompt instead of a pan back
+                  to their own address. Starting GPS itself isn't this
+                  button's job at all — that's the "set/change location" pin
+                  next to the search bar (above), same as how desktop keeps
+                  its GPS toggle (bottom-left) separate from its recenter pill
+                  (bottom-right). No anchor yet → open that same picker
+                  instead of assuming GPS. */}
               {ui.map.liveTracking && (
                 <button
-                  onClick={() => (tracking ? setFollow(true) : handleStart())}
-                  aria-label={tracking && follow ? 'Following your location' : 'Show my location'}
+                  onClick={() => {
+                    if (!activeLocation) {
+                      document.dispatchEvent(
+                        new CustomEvent('jpc:toggle-location', { detail: { anchor: locationButtonRef.current } }),
+                      )
+                      return
+                    }
+                    setFollow(true)
+                  }}
+                  aria-label={!activeLocation ? 'Set your location' : follow ? 'Following your location' : 'Recenter'}
                   className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:hidden ${
-                    tracking && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
+                    activeLocation && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
                   }`}
                 >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <svg
+                    className={`h-5 w-5 ${activeLocation ? '' : 'opacity-40'}`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
                     <path d="M12 2 19 21 12 17 5 21z" />
                   </svg>
                 </button>
