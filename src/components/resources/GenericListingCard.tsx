@@ -208,9 +208,14 @@ export function GenericListingCard({
                 name+address fact, not a third bullet inside it — but no
                 border/section treatment, which is reserved for the hairline
                 before the badge row (a genuinely different mode: read text
-                vs. scannable chips). */}
+                vs. scannable chips). Hidden on mobile: on a narrow card this
+                can run to 2-3 lines, and having it inside the row the trailing
+                chevron/votes/distance column centers against (below) would
+                drag that column down with it. The sm:hidden twin further down
+                renders it instead, outside that row, so on mobile the trailing
+                column centers against just the name + address. */}
             {headerTextFields.map(({ f, text }) => (
-              <p key={f.key} className="truncate text-sm text-slate-600 mt-2">{text}</p>
+              <p key={f.key} className="hidden sm:block truncate text-sm text-slate-600 mt-2">{text}</p>
             ))}
           </div>
 
@@ -254,6 +259,14 @@ export function GenericListingCard({
             </svg>
           </div>
         </div>
+
+        {/* Mobile-only twin of the headerTextFields loop above — see the
+            comment there. Indented to align under the name/address (same
+            52px = icon + gap as the badge row below), outside the row the
+            chevron/votes/distance column centers against. */}
+        {headerTextFields.map(({ f, text }) => (
+          <p key={f.key} className="sm:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
+        ))}
 
         {/* Badge row — the only chips that survive collapsed: Open and any
             badge tied to an actual filter control. Below the name/distance
