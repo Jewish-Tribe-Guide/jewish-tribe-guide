@@ -1,6 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listArchivedResources } from '@/lib/resourceStore'
-import { listCategories } from '@/lib/categoryStore'
+import { listCategoriesUncached } from '@/lib/categoryStore'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/archived-listings — every soft-deleted listing (an approved
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const community = await getDefaultCommunity()
     const [listings, categories] = await Promise.all([
       listArchivedResources(),
-      listCategories(community.slug),
+      listCategoriesUncached(community.slug),
     ])
     const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))
     const enriched = listings.map((l) => ({ ...l, categoryLabel: labelById.get(l.category) ?? l.category }))
