@@ -170,7 +170,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       })),
     [droppedPins],
   )
-  const { tracking, error: geoError, start, stop } = liveTracking ?? NOOP_LIVE_TRACKING
+  const { tracking, start, stop } = liveTracking ?? NOOP_LIVE_TRACKING
 
   // `userLocation` (page.tsx's global coords) already updates continuously
   // once tracking is on — see useLiveLocation — so this screen just reads it
@@ -1412,12 +1412,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                   <span aria-hidden="true">📍</span>
                 </button>
               )}
-              {ui.map.liveTracking && geoError && (
-                <p className="absolute bottom-14 left-3 z-10 hidden max-w-[220px] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 shadow-md sm:block">
-                  {geoError}
-                </p>
-              )}
-
               {/* ── Address entry (desktop, fullscreen only) — the fullscreen
                       map (see the `fullscreen` className above) is `sm:fixed
                       sm:inset-0 sm:z-50`, which paints directly over the site
@@ -1602,9 +1596,6 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
                         </button>
                       ))}
                     </div>
-                  )}
-                  {ui.map.liveTracking && geoError && (
-                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-lg">{geoError}</p>
                   )}
                 </div>
               )}

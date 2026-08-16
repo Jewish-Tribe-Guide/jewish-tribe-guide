@@ -65,8 +65,19 @@ type LocationContextValue = {
 const LocationContext = createContext<LocationContextValue | null>(null)
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const { address, coords, listingId, setAddress, setCoords, setAnchor, tracking, geoError, start, stop } =
-    useLiveLocation()
+  const {
+    address,
+    coords,
+    listingId,
+    setAddress,
+    setCoords,
+    setAnchor,
+    tracking,
+    geoError,
+    geoErrorSilent,
+    start,
+    stop,
+  } = useLiveLocation()
 
   // What a listing anchor displaced, so tapping that listing's button again
   // can put it back rather than leaving the visitor with nothing.
@@ -86,6 +97,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         onCoords: setCoords,
         tracking,
         geoError,
+        geoErrorSilent,
         onStartTracking: start,
         onStopTracking: stop,
       },
@@ -124,7 +136,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     // setAddress/setCoords/setAnchor are stable useCallback setters; start/stop
     // are stable closures over the same watch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [address, coords, listingId, tracking, geoError],
+    [address, coords, listingId, tracking, geoError, geoErrorSilent],
   )
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>

@@ -16,6 +16,12 @@ export type LocationControls = {
    *  moves, the same watch the map page's "live tracking" uses. */
   tracking: boolean
   geoError: string | null
+  /** True when `geoError` came from a silent, mount-time auto-resume rather
+   *  than the visitor pressing "Use my location" just now — see
+   *  useWatchPosition's `start`. Keeps that failure out of the reopen effect
+   *  below: the message still shows once the visitor opens this popover on
+   *  their own, it just doesn't pop it open for them. */
+  geoErrorSilent: boolean
   onStartTracking: () => void
   onStopTracking: () => void
 }
@@ -119,10 +125,13 @@ export default function LocationControl({ controls }: Props) {
   // Reopens if starting tracking just failed, so geoError (rendered below,
   // inside the popover) is never silently swallowed by the optimistic close
   // above — the visitor needs to see why, and to still have the address
-  // input in front of them as the fallback.
+  // input in front of them as the fallback. Skipped for a silent (mount-time
+  // auto-resume) failure — nobody just pressed anything, so there's no
+  // optimistic close to rescue and popping the popover open unprompted on
+  // page load would be the surprise, not the fix (see geoErrorSilent's doc).
   useEffect(() => {
-    if (controls.geoError) setOpen(true)
-  }, [controls.geoError])
+    if (controls.geoError && !controls.geoErrorSilent) setOpen(true)
+  }, [controls.geoError, controls.geoErrorSilent])
 
   const label = controls.tracking ? 'Live' : controls.address || 'Set location'
 
