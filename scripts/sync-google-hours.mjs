@@ -4,11 +4,15 @@
 // (src/app/api/cron/sync-hours) does the same thing for hosted scheduling.
 //
 // What it writes (into the listing's `details`, plus top-level `phone`):
-//   • details.hours          — Google's opening hours, mapped to {sun:{open,close}|null,…}
-//   • details.businessStatus — OPERATIONAL | CLOSED_TEMPORARILY | CLOSED_PERMANENTLY
-//   • details.googleSyncedAt — ISO timestamp of this run
-//   • phone                  — Google's formatted number (overwrites)
-//   • address                — only filled when the listing has none (never overwrites)
+//   • details.hours            — Google's opening hours, mapped to {sun:{open,close}|null,…}
+//   • details.businessStatus   — OPERATIONAL | CLOSED_TEMPORARILY | CLOSED_PERMANENTLY
+//   • details.googleDescription — Google's editorial summary, filled once and left
+//                                 alone after (see the write-once check below) — a
+//                                 category exposes it by adding a field with this
+//                                 exact key (see src/lib/categories.ts's showInHeader).
+//   • details.googleSyncedAt   — ISO timestamp of this run
+//   • phone                    — Google's formatted number (overwrites)
+//   • address                  — only filled when the listing has none (never overwrites)
 //
 // Requires GOOGLE_MAPS_SERVER_KEY (Places API enabled, NOT referrer-restricted).
 //
@@ -92,7 +96,7 @@ function mapHours(oh) {
 }
 
 async function fetchDetails(placeId) {
-  const fields = 'name,business_status,formatted_phone_number,formatted_address,opening_hours'
+  const fields = 'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary'
   const u =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${mapsKey}`
@@ -145,6 +149,11 @@ for (const r of rows) {
   const details = { ...r.details, googleSyncedAt: new Date().toISOString() }
   // Google-only concept, no curated counterpart — always refreshed.
   if (result.business_status) details.businessStatus = result.business_status
+  // Also Google-only, but filled once rather than refreshed every run — an
+  // admin who edits or clears it should see that stick, not get silently
+  // overwritten by Google's wording on the next sync. Mirrors sync-hours/route.ts.
+  const editorialSummary = result.editorial_summary?.overview
+  if (editorialSummary && !details.googleDescription) details.googleDescription = editorialSummary
 
   const wrote = []
   const update = { details }
@@ -183,6 +192,9 @@ for (const r of rows) {
     const statusBefore = r.details.businessStatus
     if (result.business_status && result.business_status !== statusBefore) {
       changes.push(`      status: ${statusBefore ?? '(unset)'} → ${result.business_status}`)
+    }
+    if (editorialSummary && !r.details.googleDescription) {
+      changes.push(`      description: (none) → ${editorialSummary}`)
     }
     // Say what was protected, so "why didn't my hours update" has an answer.
     const held = OWNABLE_SYNC_FIELDS.filter(
