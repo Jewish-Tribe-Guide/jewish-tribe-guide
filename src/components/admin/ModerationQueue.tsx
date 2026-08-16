@@ -11,6 +11,8 @@ import type {
 } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
+import { useCategories } from '@/lib/useCategories'
+import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // The admin's default screen (mounted at /admin itself) — review and
 // approve/reject every pending submission: new listings, edits to existing
@@ -23,35 +25,68 @@ const OP_META: Record<EnrichedSubmission['operation'], { label: string; cls: str
   delete: { label: '🗑️ Removal', cls: 'bg-red-50 text-red-700 border border-red-200' },
 }
 
-function fmt(value: unknown): string {
+// A select/tags field stores raw option *values*, which don't always match
+// what the admin typed as the option's label (e.g. renamed since). Resolve
+// through the field's own `options` so the queue reads the same text the
+// submission form and card show, not whatever happens to be in the JSON.
+function resolveOptionLabel(field: CategoryField | undefined, value: unknown): string {
+  const raw = String(value)
+  const label = field?.options?.find((o) => o.value === raw)?.label
+  return label ?? raw
+}
+
+function fmt(value: unknown, field?: CategoryField): string {
   if (value === undefined || value === null || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   // Structured hours object → human-readable multi-day summary instead of [object Object].
   if (isStructuredHours(value)) return formatHoursSummary(value)
-  // Structured minyanim array → "5 minyanim: Shacharis, Kabbalas Shabbos, Mincha, Maariv"
-  if (isMinyanim(value)) {
+  // Structured minyanim array → "5 minyanim: Shacharis, Kabbalas Shabbos, Mincha, Maariv".
+  // isMinyanim([]) is vacuously true (every callsite elsewhere guards this the
+  // same way), so an empty non-minyanim array (any other array-valued field
+  // with nothing picked) doesn't misrender as "0 minyanim:".
+  if (isMinyanim(value) && value.length > 0) {
     const count = value.length
     const tefillot = [...new Set(value.map((m) => TEFILLAH_LABELS[m.tefillah]))]
     return `${count} minyan${count !== 1 ? 'im' : ''}: ${tefillot.join(', ')}`
   }
-  if (Array.isArray(value)) return value.join(', ') || '—'
+  if (Array.isArray(value)) return value.map((v) => resolveOptionLabel(field, v)).join(', ') || '—'
+  if (field?.type === 'select') return resolveOptionLabel(field, value)
   return String(value)
 }
 
+// Internal bookkeeping the admin never authors directly (Google-sync
+// provenance, geocoding) — never real category content, so always excluded
+// regardless of what fields a category happens to have.
+const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
+
+type FlatField = { key: string; label: string; value: string }
+
 // Flattens a listing (current ResourceRow or proposed payload) into ordered
-// label/value pairs for display and diffing.
-function flatListing(src: ResourceRow | ResourceSubmission | undefined): Record<string, string> {
-  if (!src) return {}
+// label/value rows for display and diffing. Walks the category's own
+// `detailFields` first (so rows appear in the same order as the submission
+// form/card, under their real admin-configured label) then appends anything
+// left in `details` that isn't a currently-configured field — a renamed or
+// removed field, or a category the moderation queue hasn't loaded yet —
+// under its raw key, so a value is never silently dropped just because the
+// lookup missed it. New fields need no code change here: they're just
+// another entry in `fields` the next time a category gains one.
+function flatListing(src: ResourceRow | ResourceSubmission | undefined, fields: CategoryField[] | undefined): FlatField[] {
+  if (!src) return []
   const details = (src.details ?? {}) as Record<string, unknown>
-  const out: Record<string, string> = {
-    Name: fmt(src.name),
-    Address: fmt(src.address),
-    Phone: fmt(src.phone),
+  const out: FlatField[] = [
+    { key: 'name', label: 'Name', value: fmt(src.name) },
+    { key: 'address', label: 'Address', value: fmt(src.address) },
+    { key: 'phone', label: 'Phone', value: fmt(src.phone) },
+  ]
+  const seen = new Set<string>()
+  for (const f of fields ?? []) {
+    if (SKIP.has(f.key) || !(f.key in details)) continue
+    seen.add(f.key)
+    out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
   }
-  const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
   for (const [k, v] of Object.entries(details)) {
-    if (SKIP.has(k)) continue
-    out[k] = fmt(v)
+    if (SKIP.has(k) || seen.has(k)) continue
+    out.push({ key: k, label: k, value: fmt(v) })
   }
   return out
 }
@@ -61,6 +96,11 @@ export default function ModerationQueue({ session }: { session: Session }) {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const token = session.access_token
+  // Same categories the public site and the category admin editor read —
+  // loaded fresh per admin page request (see /admin/layout.tsx's
+  // ContentProvider), so a field added a minute ago already has a `label`
+  // here without this component needing its own fetch or any per-field code.
+  const categoriesById = new Map(useCategories().map((c) => [c.id, c]))
 
   const load = useCallback(async () => {
     setError(null)
@@ -129,7 +169,13 @@ export default function ModerationQueue({ session }: { session: Session }) {
       ) : (
         <div className="space-y-3">
           {items.map((s) => (
-            <SubmissionCard key={s.id} submission={s} busy={busyId === s.id} onModerate={moderate} />
+            <SubmissionCard
+              key={s.id}
+              submission={s}
+              busy={busyId === s.id}
+              onModerate={moderate}
+              categoriesById={categoriesById}
+            />
           ))}
         </div>
       )}
@@ -141,10 +187,12 @@ function SubmissionCard({
   submission: s,
   busy,
   onModerate,
+  categoriesById,
 }: {
   submission: EnrichedSubmission
   busy: boolean
   onModerate: (id: string, status: 'approved' | 'rejected', reason?: string) => void
+  categoriesById: Map<string, CategoryConfig>
 }) {
   const [pendingReject, setPendingReject] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -157,6 +205,13 @@ function SubmissionCard({
   const title = isCategory
     ? (s.payload as CategorySubmissionPayload).label
     : (s.payload as Partial<ResourceSubmission>).name || s.current?.name || '(unknown listing)'
+  // A create's category lives on the proposed payload; an edit/removal's
+  // lives on the existing row (the payload for those is a partial patch that
+  // may not repeat the category). Either one resolves the same detailFields.
+  const categoryId = !isCategory
+    ? (s.payload as Partial<ResourceSubmission>).category ?? s.current?.category
+    : undefined
+  const detailFields = categoryId ? categoriesById.get(categoryId)?.detailFields : undefined
 
   function handleRejectConfirm() {
     onModerate(s.id, 'rejected', rejectReason.trim() || undefined)
@@ -180,10 +235,10 @@ function SubmissionCard({
 
           {isCategory && <CategoryDetails payload={s.payload as CategorySubmissionPayload} />}
           {!isCategory && s.operation === 'create' && (
-            <ProposedDetails src={s.payload as ResourceSubmission} />
+            <ProposedDetails src={s.payload as ResourceSubmission} fields={detailFields} />
           )}
           {!isCategory && s.operation === 'update' && (
-            <Diff current={s.current} proposed={s.payload as ResourceSubmission} />
+            <Diff current={s.current} proposed={s.payload as ResourceSubmission} fields={detailFields} />
           )}
           {!isCategory && s.operation === 'delete' && (
             <div className="text-xs text-slate-600">
@@ -274,41 +329,57 @@ function CategoryDetails({ payload }: { payload: CategorySubmissionPayload }) {
   )
 }
 
-function ProposedDetails({ src }: { src: ResourceSubmission }) {
-  const fields = flatListing(src)
+function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: CategoryField[] }) {
+  const rows = flatListing(src, fields)
   return (
     <dl className="text-xs text-slate-600 space-y-0.5">
-      {Object.entries(fields).map(([k, v]) => (
-        <div key={k} className="flex gap-2">
-          <dt className="text-muted w-20 shrink-0">{k}</dt>
-          <dd className="text-slate-800">{v}</dd>
+      {rows.map((r) => (
+        <div key={r.key} className="flex gap-2">
+          <dt className="text-muted w-28 shrink-0">{r.label}</dt>
+          <dd className="text-slate-800">{r.value}</dd>
         </div>
       ))}
     </dl>
   )
 }
 
-function Diff({ current, proposed }: { current?: ResourceRow | null; proposed: ResourceSubmission }) {
-  const before = flatListing(current ?? undefined)
-  const after = flatListing(proposed)
-  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+function Diff({
+  current,
+  proposed,
+  fields,
+}: {
+  current?: ResourceRow | null
+  proposed: ResourceSubmission
+  fields?: CategoryField[]
+}) {
+  const before = flatListing(current ?? undefined, fields)
+  const after = flatListing(proposed, fields)
+  const beforeByKey = new Map(before.map((r) => [r.key, r]))
+  const afterByKey = new Map(after.map((r) => [r.key, r]))
+  // `after`'s order first (the category's own field order, and what a
+  // moderator approving mostly cares about), then any key only `before` had
+  // — a field the edit cleared out entirely rather than just changed.
+  const orderedKeys = [...after.map((r) => r.key), ...before.map((r) => r.key).filter((k) => !afterByKey.has(k))]
 
   return (
     <dl className="text-xs space-y-0.5">
-      {keys.map((k) => {
-        const changed = before[k] !== after[k]
+      {orderedKeys.map((k) => {
+        const label = afterByKey.get(k)?.label ?? beforeByKey.get(k)?.label ?? k
+        const beforeValue = beforeByKey.get(k)?.value ?? '—'
+        const afterValue = afterByKey.get(k)?.value ?? '—'
+        const changed = beforeValue !== afterValue
         return (
           <div key={k} className="flex gap-2">
-            <dt className="text-muted w-20 shrink-0">{k}</dt>
+            <dt className="text-muted w-28 shrink-0">{label}</dt>
             <dd className={changed ? 'text-slate-800' : 'text-slate-400'}>
               {changed ? (
                 <span>
-                  <span className="line-through text-red-500">{before[k] ?? '—'}</span>{' '}
+                  <span className="line-through text-red-500">{beforeValue}</span>{' '}
                   <span aria-hidden="true">→</span>{' '}
-                  <span className="text-green-700 font-medium">{after[k] ?? '—'}</span>
+                  <span className="text-green-700 font-medium">{afterValue}</span>
                 </span>
               ) : (
-                after[k]
+                afterValue
               )}
             </dd>
           </div>
