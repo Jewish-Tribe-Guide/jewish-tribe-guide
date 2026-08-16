@@ -474,7 +474,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // have content — never before the first or after the last — so a section
   // only ever gets a separating line when there's actually something on
   // both sides of it to separate.
-  const sections = [statusSection, actionsSection, addressSection, daveningSection, tagsSection, detailBadgesSection, rowFieldsSection, caveatSection]
+  const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, tagsSection, caveatSection]
     .filter((s): s is Exclude<typeof s, false> => s !== false)
 
   return (
