@@ -698,7 +698,16 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // count — each level needs to keep passing size down via flex, or
     // everything below silently collapses to 0 height.
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col">
-      <div ref={containerRef} className="w-full min-h-0 flex-1 rounded-2xl" />
+      {/* -webkit-touch-callout/user-select: without these, iOS Safari treats
+          the map tile imagery Google renders inside this div as a long-
+          press-able image and pops its own Save/Copy/Share sheet instead of
+          letting our pointerdown-timer long-press-to-pin handlers (below)
+          fire. */}
+      <div
+        ref={containerRef}
+        className="w-full min-h-0 flex-1 rounded-2xl select-none"
+        style={{ WebkitTouchCallout: 'none' }}
+      />
       {ready && userLocation && (
         <button
           onClick={centerOnMe}
