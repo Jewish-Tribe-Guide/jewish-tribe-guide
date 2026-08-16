@@ -1316,7 +1316,7 @@ function CategoryEditor({
       if (on) {
         if (d.fields.some(isPlainHoursField)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'hours')
-        const field: CategoryField = { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true }
+        const field: CategoryField = { key, label: 'Hours', type: 'hours' as FieldType, renderAs: 'row', filterable: true, coreSection: true }
         return { ...d, fields: [field, ...d.fields] }
       }
       // Only the first match — if a second plain Hours field somehow exists
@@ -1338,7 +1338,7 @@ function CategoryEditor({
       if (on) {
         if (d.fields.some(isWebsiteField)) return d
         const key = nextFieldKey(d.fields, d.hiddenFields, 'website')
-        const field: CategoryField = { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row' }
+        const field: CategoryField = { key, label: 'Website', type: 'url' as FieldType, renderAs: 'row', coreSection: true }
         const hoursIndex = d.fields.findIndex(isPlainHoursField)
         const fields = [...d.fields]
         fields.splice(hoursIndex === -1 ? 0 : hoursIndex + 1, 0, field)
