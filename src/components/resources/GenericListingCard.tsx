@@ -260,13 +260,14 @@ export function GenericListingCard({
             row (rather than wrapping inside the name column) so it gets the
             whole card's width to lay out in, instead of fighting the
             distance/votes column for space and wrapping early. The hairline
-            still spans the full card, but the chips themselves are indented
-            to start under the name/address (pl-[52px] = the 40px icon +
-            12px gap it sits next to above), not flush with the icon's own
-            left edge — padding, not the icon's own width, so the divider
-            above stays untouched. */}
+            still spans the full card, but on sm+ the chips themselves are
+            indented to start under the name/address (sm:pl-[52px] = the 40px
+            icon + 12px gap it sits next to above), not flush with the icon's
+            own left edge — padding, not the icon's own width, so the divider
+            above stays untouched. On mobile the chips sit flush left instead,
+            since the narrower width makes the indent crowd them into wrapping. */}
         {(isOpen || headerBadges.length > 0) && (
-          <div className="mt-2 pt-2 pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 pt-2 pl-0 sm:pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
             {isOpen && (closing?.closesSoon ? (
               <span className="relative group/tip">
                 <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
