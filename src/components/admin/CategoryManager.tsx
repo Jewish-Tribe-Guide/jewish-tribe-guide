@@ -1114,6 +1114,14 @@ function CategoryEditor({
     phoneOff: boolean
     removedKeys: string[]
   } | null>(null)
+  // Set once a save attempt detects what looks like a select/tags option
+  // rename (see detectOptionRenames) and has fetched how many existing
+  // listings currently store the old value — a confirmation gate before that
+  // data is migrated for real. Cleared on cancel or once the confirmed save
+  // completes.
+  const [pendingRename, setPendingRename] = useState<{
+    renames: { fieldKey: string; fieldLabel: string; oldValue: string; newValue: string; count: number }[]
+  } | null>(null)
   // The "+ Add audience group" mini-form's own draft state — separate from
   // `draft` since it's discarded on cancel and only ever produces a batch of
   // new fields, never edits an existing one.
@@ -1456,13 +1464,101 @@ function CategoryEditor({
     setPendingCleanup(null)
   }
 
-  async function save() {
+  // Detects a select/tags field whose options list lost exactly one value and
+  // gained exactly one — the unambiguous case of "the admin edited an
+  // option's text in place" (the options textarea otherwise treats that as
+  // removing the old value and adding an unrelated new one, orphaning any
+  // listing that had it selected). Anything less clear-cut (multiple options
+  // changed at once, a value removed with nothing added) isn't guessed at —
+  // it's left for the admin to notice via field-usage the normal way.
+  function detectOptionRenames(): { fieldKey: string; fieldLabel: string; oldValue: string; newValue: string }[] {
+    if (!initial) return []
+    const renames: { fieldKey: string; fieldLabel: string; oldValue: string; newValue: string }[] = []
+    for (const draftField of draft.fields) {
+      if (draftField.type !== 'select' && draftField.type !== 'tags') continue
+      const initialField = initial.detailFields.find((f) => f.key === draftField.key && f.type === draftField.type)
+      if (!initialField) continue
+      const initialOptions = initialField.options ?? []
+      const draftOptions = draftField.options ?? []
+      const removed = initialOptions.filter((o) => !draftOptions.some((d) => d.value === o.value))
+      const added = draftOptions.filter((o) => !initialOptions.some((i) => i.value === o.value))
+      if (removed.length === 1 && added.length === 1) {
+        renames.push({
+          fieldKey: draftField.key,
+          fieldLabel: draftField.label || draftField.key,
+          oldValue: removed[0].value,
+          newValue: added[0].value,
+        })
+      }
+    }
+    return renames
+  }
+
+  // Keeps a showIf condition pointed at the right value when the option it
+  // was gated on gets renamed — without this, "Delivery WhatsApp Group" would
+  // stay gated on a value nothing can select anymore the moment `foodType`'s
+  // "Out of Town Deliveries" became "Scheduled Deliveries" (or any other
+  // field's rename). Applied automatically; doesn't need admin confirmation
+  // since it's just keeping the config internally consistent.
+  function fieldsWithRenamedShowIf(
+    fields: CategoryField[],
+    renames: { fieldKey: string; oldValue: string; newValue: string }[],
+  ): CategoryField[] {
+    if (renames.length === 0) return fields
+    return fields.map((f) => {
+      if (!f.showIf) return f
+      const match = renames.find((r) => r.fieldKey === f.showIf!.field && f.showIf!.equals === r.oldValue)
+      if (!match) return f
+      return { ...f, showIf: { ...f.showIf, equals: match.newValue } }
+    })
+  }
+
+  function cancelRename() {
+    setPendingRename(null)
+  }
+
+  async function save(opts?: { skipRename?: boolean }) {
     const errs = validate()
     if (errs.length) {
       setErrors(errs)
       return
     }
     setErrors([])
+
+    // Editing an existing category and it looks like a select/tags option got
+    // renamed: check how many existing listings still have the old value
+    // before offering to migrate them — skip once the admin has already
+    // confirmed (pendingRename is set) or explicitly declined (skipRename,
+    // the "this wasn't actually a rename" escape hatch) so re-clicking Save
+    // doesn't loop.
+    if (!isNew && !pendingRename && !opts?.skipRename) {
+      const detected = detectOptionRenames()
+      if (detected.length > 0) {
+        setSaving(true)
+        try {
+          const res = await fetch(`/api/admin/categories/${initial!.id}/option-usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ renames: detected }),
+          })
+          const body = await res.json()
+          if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not check existing listings.')
+          const usage = body.usage as { fieldKey: string; oldValue: string; newValue: string; count: number }[]
+          setPendingRename({
+            renames: detected.map((d) => ({
+              ...d,
+              count: usage.find((u) => u.fieldKey === d.fieldKey && u.oldValue === d.oldValue)?.count ?? 0,
+            })),
+          })
+          return
+        } catch (err) {
+          setErrors([err instanceof Error ? err.message : 'Could not check existing listings.'])
+          return
+        } finally {
+          setSaving(false)
+        }
+      }
+    }
 
     // Editing an existing category, turning off address/phone or dropping a
     // field: check whether any existing listings actually have data there
@@ -1515,9 +1611,13 @@ function CategoryEditor({
             : null,
         cardImageUrl: draft.cardImageUrl.trim() || null,
         cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
-        // Apply the implied filter/tag rules, then re-merge the preserved hidden
+        // Apply the implied filter/tag rules, keep any showIf pointed at a
+        // renamed option's new value, then re-merge the preserved hidden
         // fields so editing never drops them.
-        fields: mergeFieldsWithHidden(draft.fields.map(normalizeField), draft.hiddenFields),
+        fields: mergeFieldsWithHidden(
+          fieldsWithRenamedShowIf(draft.fields.map(normalizeField), opts?.skipRename ? [] : (pendingRename?.renames ?? [])),
+          draft.hiddenFields,
+        ),
         ...(pendingCleanup && {
           clearFields: {
             address: pendingCleanup.addressOff,
@@ -1525,6 +1625,14 @@ function CategoryEditor({
             keys: pendingCleanup.removedKeys,
           },
         }),
+        ...(pendingRename &&
+          !opts?.skipRename && {
+            applyOptionRenames: pendingRename.renames.map(({ fieldKey, oldValue, newValue }) => ({
+              fieldKey,
+              oldValue,
+              newValue,
+            })),
+          }),
       }
       const res = await fetch(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
@@ -1542,6 +1650,7 @@ function CategoryEditor({
     } finally {
       setSaving(false)
       setPendingCleanup(null)
+      setPendingRename(null)
     }
   }
 
@@ -1944,13 +2053,21 @@ function CategoryEditor({
           </ul>
         )}
 
-        {pendingCleanup ? (
+        {pendingRename ? (
+          <RenameConfirm
+            rename={pendingRename}
+            saving={saving}
+            onCancel={cancelRename}
+            onConfirm={() => save()}
+            onSkip={() => save({ skipRename: true })}
+          />
+        ) : pendingCleanup ? (
           <CleanupConfirm
             cleanup={pendingCleanup}
             initial={initial}
             saving={saving}
             onCancel={cancelCleanup}
-            onConfirm={save}
+            onConfirm={() => save()}
           />
         ) : (
           <div className="flex gap-2">
@@ -1961,7 +2078,7 @@ function CategoryEditor({
               Preview
             </button>
             <button
-              onClick={save}
+              onClick={() => save()}
               disabled={saving}
               className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
             >
@@ -2032,6 +2149,72 @@ function CleanupConfirm({
           onClick={onCancel}
           disabled={saving}
           className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Blocks the save until the admin confirms migrating existing listings' data
+// to match a detected option rename (see detectOptionRenames) — a helpful
+// correction rather than data loss, so this uses a neutral/blue tone instead
+// of CleanupConfirm's amber warning, but still replaces the normal Save/
+// Cancel row so it can't be missed. "Save without updating" is the escape
+// hatch for the rare case the admin genuinely meant to remove the old option
+// and add an unrelated new one, not rename it.
+function RenameConfirm({
+  rename,
+  saving,
+  onCancel,
+  onConfirm,
+  onSkip,
+}: {
+  rename: { renames: { fieldKey: string; fieldLabel: string; oldValue: string; newValue: string; count: number }[] }
+  saving: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  onSkip: () => void
+}) {
+  const withListings = rename.renames.filter((r) => r.count > 0)
+  return (
+    <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 space-y-3">
+      <p className="text-sm font-medium text-sky-900">Update existing listings to match this rename?</p>
+      <ul className="text-sm text-sky-800 list-disc list-inside space-y-0.5">
+        {rename.renames.map((r) => (
+          <li key={r.fieldKey}>
+            {r.fieldLabel}: “{r.oldValue}” → “{r.newValue}”
+            {r.count > 0 ? ` — ${r.count} listing${r.count !== 1 ? 's' : ''}` : ' — no listings currently use this'}
+          </li>
+        ))}
+      </ul>
+      {withListings.length > 0 && (
+        <p className="text-xs text-sky-700">
+          Without this, those listings would keep the old value, which no longer matches any option — effectively
+          hiding this from them until fixed by hand.
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={saving}
+          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {saving ? 'Saving…' : 'Update listings & save'}
+        </button>
+        <button
+          onClick={onSkip}
+          disabled={saving}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+          title="This wasn't a rename — I removed one option and added an unrelated one on purpose."
+        >
+          Save without updating
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="text-sm font-medium text-slate-500 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
         >
           Cancel
         </button>
@@ -2311,6 +2494,62 @@ function FieldEditor({
         </>
       )}
 
+      {(f.type === 'text' || f.type === 'textarea') && (
+        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!f.showInHeader}
+            onChange={(e) => onChange({ showInHeader: e.target.checked })}
+            className="rounded border-slate-300"
+          />
+          Also show on the collapsed card, under the address
+        </label>
+      )}
+      {f.type === 'textarea' && f.showInHeader && (
+        <p className="text-[11px] text-muted ml-5 -mt-1">
+          Shown as a single line there, even on a long entry — keep it to about a sentence. Longer text still shows in full once the card is expanded.
+        </p>
+      )}
+
+      {f.type === 'text' && f.showInHeader && (
+        <div className="ml-5 -mt-1 space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={f.headerMaxLength != null}
+              onChange={(e) => onChange({ headerMaxLength: e.target.checked ? 60 : undefined })}
+              className="rounded border-slate-300"
+            />
+            Limit to one line (recommended)
+          </label>
+          {f.headerMaxLength != null ? (
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-slate-700">
+                Character limit
+                <input
+                  type="number"
+                  min={10}
+                  max={200}
+                  value={f.headerMaxLength}
+                  onChange={(e) => onChange({ headerMaxLength: Math.max(10, Number(e.target.value) || 60) })}
+                  className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+                />
+              </label>
+              <p className="text-[11px] text-muted">
+                The submission form stops accepting more input at this length, so it's guaranteed to fit one line —
+                nothing to truncate, so this detail won&rsquo;t repeat again once the card is expanded. ~60 fits most
+                phone widths at this font size; raise it if that's cutting entries short in practice.
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-muted">
+              Without a limit, a long entry truncates with &ldquo;&hellip;&rdquo; there, and still shows in full once
+              the card is expanded.
+            </p>
+          )}
+        </div>
+      )}
+
       {canChooseShape && (
         <label className="block sm:w-1/2">
           <span className={fieldLabel}>Show as</span>
@@ -2391,6 +2630,22 @@ function FieldEditor({
             already says who it&rsquo;s for). The card still uses the full name above.
           </span>
         </label>
+      )}
+
+      <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!f.coreSection}
+          onChange={(e) => onChange({ coreSection: e.target.checked })}
+          className="rounded border-slate-300"
+        />
+        Group with Address / Name / Phone at the top of the form
+      </label>
+      {f.coreSection && (
+        <p className="text-[11px] text-muted ml-5 -mt-1">
+          For a field Google fills in the same way it does Name/Phone/Hours when someone picks an address — keeps
+          everything auto-filled together, above the line where the rest of this category&rsquo;s fields start.
+        </p>
       )}
 
       {canRequire && (

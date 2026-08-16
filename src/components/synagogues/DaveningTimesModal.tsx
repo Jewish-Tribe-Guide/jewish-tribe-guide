@@ -96,6 +96,7 @@ function shulsFromItems(items: DirectoryResource[]) {
       address: item.address as string | undefined,
       geo: item.geo,
       minyanim: item.minyanim as Minyan[],
+      verifiedPlaceId: item.verifiedPlaceId,
     }))
 }
 
@@ -132,6 +133,7 @@ function DistanceDirections({
   milesFromAddress,
   driveMinutes,
   walkMinutes,
+  verifiedPlaceId,
 }: {
   name: string
   address?: string
@@ -139,12 +141,17 @@ function DistanceDirections({
   milesFromAddress?: number
   driveMinutes?: number | null
   walkMinutes?: number | null
+  /** Google place id confirmed by name+address match (see types.ts) — only
+   *  present when we've verified it's actually the right place. A shul's name
+   *  almost never appears verbatim in its street address, so without a
+   *  verified match the destination falls back to address-only rather than
+   *  risking Google fuzzy-matching the name to a same-named place elsewhere
+   *  (see destinationQuery's own doc). */
+  verifiedPlaceId?: string
 }) {
-  // alwaysIncludeName: a shul's name almost never appears verbatim in its
-  // street address, and — being sync-excluded — it never has a placeId to
-  // disambiguate the destination instead (see destinationQuery's own doc).
-  // Without this the pin comes up labeled with the bare address every time.
-  const dest = address ? destinationQuery(name, address, { alwaysIncludeName: true }) : geo || null
+  const dest = address
+    ? destinationQuery(name, address, { alwaysIncludeName: !!verifiedPlaceId })
+    : geo || null
   const hasDistance = milesFromAddress != null || driveMinutes != null || walkMinutes != null
   const location = useOptionalLocation()
   const origin = location?.directionsOrigin ?? null
@@ -153,7 +160,7 @@ function DistanceDirections({
     <div className="mt-1.5 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
       {dest && (
         <a
-          href={directionsUrl(dest, { origin })}
+          href={directionsUrl(dest, { origin, placeId: verifiedPlaceId })}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
@@ -452,6 +459,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                                     milesFromAddress={info?.milesFromAddress}
                                     driveMinutes={row.driveMinutes}
                                     walkMinutes={row.walkMinutes}
+                                    verifiedPlaceId={info?.verifiedPlaceId}
                                   />
                                 )}
                               </div>

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { community } from '@/community.config'
-import { isCategorySyncEligible } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 
 /** One plottable place on the map. */
@@ -161,13 +160,12 @@ function buildInfoContent(
   }
 
   const dirRow = div('margin-top:6px;font-size:12px')
+  const verifiedPlaceId = p.raw?.verifiedPlaceId as string | undefined
   const destination = p.address
-    ? destinationQuery(p.name, p.address, {
-        alwaysIncludeName: !!p.filterId && !isCategorySyncEligible(p.filterId),
-      })
+    ? destinationQuery(p.name, p.address, { alwaysIncludeName: !!verifiedPlaceId })
     : { lat: p.lat, lng: p.lng }
   const dirLink = a(
-    directionsUrl(destination, { origin, placeId: p.raw?.placeId as string | undefined }),
+    directionsUrl(destination, { origin, placeId: (p.raw?.placeId ?? verifiedPlaceId) as string | undefined }),
     'Directions ↗',
     'color:#2563eb',
   )

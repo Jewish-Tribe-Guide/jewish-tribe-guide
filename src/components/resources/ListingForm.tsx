@@ -141,6 +141,18 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       )
       if (websiteField) setDetail(websiteField.key, result.website)
     }
+    // Matched by key (the fixed `googleDescription` convention — see
+    // src/lib/categories.ts's showInHeader doc), not label, since a category
+    // names this field's display label whatever it wants ("Description",
+    // "About", …). Unlike name/phone/hours above, only fills a gap rather
+    // than always overwriting: this field has no googleFields ownership
+    // tracking of its own, so re-picking the address on an edit shouldn't
+    // risk clobbering hand-written text — mirrors the backend sync's own
+    // once-only fill (see scripts/sync-google-hours.mjs).
+    if (result.description) {
+      const descriptionField = config.detailFields.find((f) => f.key === 'googleDescription')
+      if (descriptionField && !details[descriptionField.key]) setDetail(descriptionField.key, result.description)
+    }
   }
 
   // ── Which fields the Google sync is allowed to keep refreshing ─────────────
@@ -336,10 +348,29 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </div>
         )}
 
-        {config.detailFields.some((f) => fieldIsVisible(f, details)) && (
+        {/* Fields marked coreSection (see CategoryField's doc comment) — a
+            Google-autofillable field (Hours, Website, a googleDescription
+            field) grouped with Address/Name/Phone rather than split off by
+            the divider below, since all of it fills in from the same
+            address pick. Rendered plain, no audience-section grouping —
+            that's for the more involved detail list past the divider. */}
+        {config.detailFields
+          .filter((field) => field.coreSection && fieldIsVisible(field, details))
+          .map((field) => (
+            <DetailFieldInput
+              key={field.key}
+              field={field}
+              value={details[field.key]}
+              onChange={(v) => setDetail(field.key, v)}
+              sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+              onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+            />
+          ))}
+
+        {config.detailFields.some((f) => !f.coreSection && fieldIsVisible(f, details)) && (
           <div className="space-y-4 border-t border-slate-200 pt-4">
             {(() => {
-              const visible = config.detailFields.filter((field) => fieldIsVisible(field, details))
+              const visible = config.detailFields.filter((field) => !field.coreSection && fieldIsVisible(field, details))
 
               // Group into ungrouped fields and audience sections — see
               // CategoryField.audienceKey. A section renders where its FIRST
@@ -617,9 +648,19 @@ function DetailFieldInput({
           )
         }
         placeholder={field.placeholder}
+        // Only meaningful for type: 'text' (see CategoryField.headerMaxLength)
+        // — a plain <input> can't contain a newline in the first place, so
+        // this is purely the character cap, guaranteeing the value fits the
+        // collapsed card's one line without any CSS truncation needed.
+        maxLength={field.type === 'text' ? field.headerMaxLength : undefined}
         className={inputClass}
       />
       {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
+      {field.type === 'text' && field.headerMaxLength != null && (
+        <p className="text-xs text-muted mt-1">
+          {((value as string) ?? '').length}/{field.headerMaxLength}
+        </p>
+      )}
     </div>
   )
 }
