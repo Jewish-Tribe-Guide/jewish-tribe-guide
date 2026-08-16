@@ -141,6 +141,18 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       )
       if (websiteField) setDetail(websiteField.key, result.website)
     }
+    // Matched by key (the fixed `googleDescription` convention — see
+    // src/lib/categories.ts's showInHeader doc), not label, since a category
+    // names this field's display label whatever it wants ("Description",
+    // "About", …). Unlike name/phone/hours above, only fills a gap rather
+    // than always overwriting: this field has no googleFields ownership
+    // tracking of its own, so re-picking the address on an edit shouldn't
+    // risk clobbering hand-written text — mirrors the backend sync's own
+    // once-only fill (see scripts/sync-google-hours.mjs).
+    if (result.description) {
+      const descriptionField = config.detailFields.find((f) => f.key === 'googleDescription')
+      if (descriptionField && !details[descriptionField.key]) setDetail(descriptionField.key, result.description)
+    }
   }
 
   // ── Which fields the Google sync is allowed to keep refreshing ─────────────

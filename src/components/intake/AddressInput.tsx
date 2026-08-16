@@ -13,6 +13,9 @@ export type PlaceSelectResult = {
   phone: string | null
   hours: StructuredHours | null
   website: string | null
+  /** Google's own short editorial summary, when it has one (see the
+   *  `googleDescription` field key convention — src/lib/categories.ts). */
+  description: string | null
 }
 
 type Props = {
@@ -118,7 +121,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     try {
       const place = s.prediction.toPlace()
       const extraFields = onPlaceSelect
-        ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI']
+        ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI', 'editorialSummary']
         : preferPlaceName
           ? ['displayName']
           : []
@@ -145,6 +148,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
           phone: p.nationalPhoneNumber ?? null,
           hours: periods ? placesApiHoursToStructured(periods) : null,
           website: p.websiteURI ?? null,
+          description: typeof p.editorialSummary === 'string' ? p.editorialSummary : null,
         })
       }
     } finally {
