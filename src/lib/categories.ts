@@ -147,6 +147,15 @@ export type CategoryField = {
    *  today's behavior: an unbounded value truncates with an ellipsis in the
    *  header, and the full text still shows once expanded. */
   headerMaxLength?: number
+  /** Renders in the submission form alongside Address/Name/Phone, above the
+   *  divider that starts the category-specific fields — for a field Google
+   *  can autofill the same way it does those three (Hours, Website, a
+   *  googleDescription-keyed field), so everything the address-pick fills in
+   *  lives together instead of getting split by a rule that has nothing to
+   *  do with where the data came from. Purely a form-layout concern — has no
+   *  bearing on `showInHeader`/card placement, or on the field's position in
+   *  the expanded panel. See ListingForm.tsx's `coreDetailFields`. */
+  coreSection?: boolean
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
    *  explanation — on hover (desktop) and in the expanded card (mobile). Used

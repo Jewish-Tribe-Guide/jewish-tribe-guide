@@ -348,10 +348,29 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </div>
         )}
 
-        {config.detailFields.some((f) => fieldIsVisible(f, details)) && (
+        {/* Fields marked coreSection (see CategoryField's doc comment) — a
+            Google-autofillable field (Hours, Website, a googleDescription
+            field) grouped with Address/Name/Phone rather than split off by
+            the divider below, since all of it fills in from the same
+            address pick. Rendered plain, no audience-section grouping —
+            that's for the more involved detail list past the divider. */}
+        {config.detailFields
+          .filter((field) => field.coreSection && fieldIsVisible(field, details))
+          .map((field) => (
+            <DetailFieldInput
+              key={field.key}
+              field={field}
+              value={details[field.key]}
+              onChange={(v) => setDetail(field.key, v)}
+              sometimes={field.type === 'tags' ? ((details[field.key + '_sometimes'] as string[] | undefined) ?? []) : undefined}
+              onChangeSometimes={field.type === 'tags' ? (v) => setDetail(field.key + '_sometimes', v) : undefined}
+            />
+          ))}
+
+        {config.detailFields.some((f) => !f.coreSection && fieldIsVisible(f, details)) && (
           <div className="space-y-4 border-t border-slate-200 pt-4">
             {(() => {
-              const visible = config.detailFields.filter((field) => fieldIsVisible(field, details))
+              const visible = config.detailFields.filter((field) => !field.coreSection && fieldIsVisible(field, details))
 
               // Group into ungrouped fields and audience sections — see
               // CategoryField.audienceKey. A section renders where its FIRST

@@ -2632,6 +2632,22 @@ function FieldEditor({
         </label>
       )}
 
+      <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!f.coreSection}
+          onChange={(e) => onChange({ coreSection: e.target.checked })}
+          className="rounded border-slate-300"
+        />
+        Group with Address / Name / Phone at the top of the form
+      </label>
+      {f.coreSection && (
+        <p className="text-[11px] text-muted ml-5 -mt-1">
+          For a field Google fills in the same way it does Name/Phone/Hours when someone picks an address — keeps
+          everything auto-filled together, above the line where the rest of this category&rsquo;s fields start.
+        </p>
+      )}
+
       {canRequire && (
         <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
           <input type="checkbox" checked={!!f.required} onChange={(e) => onChange({ required: e.target.checked })} className="rounded border-slate-300" />
