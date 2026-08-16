@@ -56,11 +56,11 @@ function toConfig(row: CategoryRow): CategoryConfig {
   }
 }
 
-// All categories, ordered for the directory index.
-export async function listCategories(community: string): Promise<CategoryConfig[]> {
-  'use cache'
-  cacheTag(TAGS.categories(community))
-  cacheLife('days')
+// All categories, ordered for the directory index. Uncached — reads Supabase
+// directly. Used by admin routes, which need read-after-write consistency
+// (revalidateTag('max') only marks the public cache stale; it doesn't purge
+// it, so a cached read right after a save can still serve the old row).
+export async function listCategoriesUncached(community: string): Promise<CategoryConfig[]> {
   // Ordered alphabetically by the plural label shown on the cards. (The
   // `sort_order` column is still stored so a community can switch to manual
   // ordering later, but for now the directory is purely alphabetical.)
@@ -72,6 +72,14 @@ export async function listCategories(community: string): Promise<CategoryConfig[
 
   if (error) throw new Error(`Failed to load categories: ${error.message}`)
   return (data as CategoryRow[]).map(toConfig)
+}
+
+// Same as listCategoriesUncached, but cached for the public site.
+export async function listCategories(community: string): Promise<CategoryConfig[]> {
+  'use cache'
+  cacheTag(TAGS.categories(community))
+  cacheLife('days')
+  return listCategoriesUncached(community)
 }
 
 export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {

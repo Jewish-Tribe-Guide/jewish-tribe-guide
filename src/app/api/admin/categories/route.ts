@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { listCategories, createCategory } from '@/lib/categoryStore'
+import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
 import { getDefaultCommunity } from '@/lib/communityStore'
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const categories = await listCategories((await getDefaultCommunity()).slug)
+    const categories = await listCategoriesUncached((await getDefaultCommunity()).slug)
     return Response.json({ ok: true, categories })
   } catch (err) {
     console.error('[admin/categories] GET failed:', err)
