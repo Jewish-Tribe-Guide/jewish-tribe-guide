@@ -157,13 +157,16 @@ export function GenericListingCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
         className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
-              thing here and on the map. items-start (below) keeps it, and the
-              trailing column, pinned near the name instead of drifting toward
-              the middle of a card that's grown taller — e.g. once a header
-              text field is filled in and the block is 3 lines, not 2. mt-0.5
+              thing here and on the map. self-start (overriding the row's own
+              items-center) keeps it pinned near the name's own line instead
+              of drifting toward the middle of the block once a header text
+              field makes it 3 lines instead of 2 — an avatar anchored to the
+              title reads right at any height; a trailing chevron/distance
+              centered against the whole block (below) still reads right too,
+              since it's a short glance-able number, not a title. mt-0.5
               nudges it those last couple pixels: the name's own line-height
               leaves a little leading above the visible text, so even with
               matching box tops the glyph itself starts lower than the icon. */}
@@ -175,7 +178,7 @@ export function GenericListingCard({
                 : category.iconImageUrl) ?? undefined
             }
             color={color}
-            className="h-10 w-10 text-xl mt-0.5"
+            className="h-10 w-10 text-xl self-start mt-0.5"
           />
 
           {/* Name + subtitle + an optional one-line "what this place is" note
@@ -211,13 +214,7 @@ export function GenericListingCard({
             ))}
           </div>
 
-          {/* items-center here is its own, narrower concern from the outer
-              row's items-start above: keeps the chevron vertically centered
-              against the votes/distance stack next to it, regardless of
-              whether that stack is one line or two (mobile stacks upvote
-              count above distance) — unrelated to how tall the name column
-              gets. */}
-          <div className="flex items-center gap-3 shrink-0 mt-0.5">
+          <div className="flex items-center gap-3 shrink-0">
             {(upvotes || travel.length > 0) && (
               // Stacked on mobile to save horizontal space; side by side from sm
               // up, each in its own fixed-width column so every row's upvote
