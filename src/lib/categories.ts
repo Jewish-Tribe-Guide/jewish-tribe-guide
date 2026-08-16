@@ -137,6 +137,16 @@ export type CategoryField = {
    *  (e.g. "Sit-down glatt kosher steakhouse, under IKC supervision") — see
    *  headerTextFields in GenericListingCard.tsx. */
   showInHeader?: boolean
+  /** For `type: 'text'` with `showInHeader`: caps the submission form's input
+   *  at this many characters (a plain `<input maxLength>`, so a newline can't
+   *  sneak in the way it could through a `textarea`) — guaranteeing the value
+   *  actually fits the collapsed card's one line, rather than relying on CSS
+   *  truncation. Since nothing is ever cut off, the field is also left out of
+   *  the expanded panel entirely (see PlaceDetailBody's rowFields) — there's
+   *  no fuller version to reveal by expanding. Unset (the default) keeps
+   *  today's behavior: an unbounded value truncates with an ellipsis in the
+   *  header, and the full text still shows once expanded. */
+  headerMaxLength?: number
   /** For a badge field: when `flagField` is truthy on the listing, render this
    *  badge in amber (caution) and surface `noteField`'s free text as the
    *  explanation — on hover (desktop) and in the expanded card (mobile). Used

@@ -2505,10 +2505,49 @@ function FieldEditor({
           Also show on the collapsed card, under the address
         </label>
       )}
-      {(f.type === 'text' || f.type === 'textarea') && f.showInHeader && (
+      {f.type === 'textarea' && f.showInHeader && (
         <p className="text-[11px] text-muted ml-5 -mt-1">
           Shown as a single line there, even on a long entry — keep it to about a sentence. Longer text still shows in full once the card is expanded.
         </p>
+      )}
+
+      {f.type === 'text' && f.showInHeader && (
+        <div className="ml-5 -mt-1 space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={f.headerMaxLength != null}
+              onChange={(e) => onChange({ headerMaxLength: e.target.checked ? 60 : undefined })}
+              className="rounded border-slate-300"
+            />
+            Limit to one line (recommended)
+          </label>
+          {f.headerMaxLength != null ? (
+            <>
+              <label className="flex items-center gap-1.5 text-xs text-slate-700">
+                Character limit
+                <input
+                  type="number"
+                  min={10}
+                  max={200}
+                  value={f.headerMaxLength}
+                  onChange={(e) => onChange({ headerMaxLength: Math.max(10, Number(e.target.value) || 60) })}
+                  className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+                />
+              </label>
+              <p className="text-[11px] text-muted">
+                The submission form stops accepting more input at this length, so it's guaranteed to fit one line —
+                nothing to truncate, so this detail won&rsquo;t repeat again once the card is expanded. ~60 fits most
+                phone widths at this font size; raise it if that's cutting entries short in practice.
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-muted">
+              Without a limit, a long entry truncates with &ldquo;&hellip;&rdquo; there, and still shows in full once
+              the card is expanded.
+            </p>
+          )}
+        </div>
       )}
 
       {canChooseShape && (

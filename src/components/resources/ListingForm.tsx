@@ -617,9 +617,19 @@ function DetailFieldInput({
           )
         }
         placeholder={field.placeholder}
+        // Only meaningful for type: 'text' (see CategoryField.headerMaxLength)
+        // — a plain <input> can't contain a newline in the first place, so
+        // this is purely the character cap, guaranteeing the value fits the
+        // collapsed card's one line without any CSS truncation needed.
+        maxLength={field.type === 'text' ? field.headerMaxLength : undefined}
         className={inputClass}
       />
       {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
+      {field.type === 'text' && field.headerMaxLength != null && (
+        <p className="text-xs text-muted mt-1">
+          {((value as string) ?? '').length}/{field.headerMaxLength}
+        </p>
+      )}
     </div>
   )
 }

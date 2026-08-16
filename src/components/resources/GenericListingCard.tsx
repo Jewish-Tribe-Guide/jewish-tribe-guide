@@ -116,7 +116,10 @@ export function GenericListingCard({
   // Deliberately single-line: `truncate` (not a multi-line clamp) so the
   // decision to keep this short lives in what gets typed, not in how long a
   // line the layout happens to allow — the same one-line limit applies at
-  // every width, not just mobile's.
+  // every width, not just mobile's. `truncate` still applies even for a
+  // `headerMaxLength`-capped field (guaranteed to already fit, so normally a
+  // no-op) — cheap insurance against a value that predates the cap, or one
+  // written some other way than the submission form.
   const headerTextFields = fields
     .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
