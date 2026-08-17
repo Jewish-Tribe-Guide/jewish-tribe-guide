@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormConfig } from '@/lib/forms'
 import type { InboxResponse } from '@/lib/inbox'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import ResponseCard from '@/components/responses/ResponseCard'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
@@ -113,13 +114,7 @@ function ResponsesList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // Fetch-on-mount — `load` only touches state after its `await`, so there's
-  // no synchronous cascading render here; the rule just can't see through
-  // the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   function handleUpdated(updated: InboxResponse) {
     setItems((prev) => prev?.map((it) => (it.id === updated.id ? updated : it)) ?? prev)

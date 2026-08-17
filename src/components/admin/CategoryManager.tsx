@@ -18,6 +18,7 @@ import {
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
 import FormEditor from './FormEditor'
@@ -163,13 +164,7 @@ export default function CategoryManager({
     }
   }, [token])
 
-  // Fetch-on-mount — `load` only touches state after its `await`, so there's
-  // no synchronous cascading render here; the rule just can't see through
-  // the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   const entries = useMemo<Entry[] | null>(() => {
     if (!categories || !forms) return null

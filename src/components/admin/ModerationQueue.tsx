@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { getBrowserClient } from '@/lib/supabase/client'
 import type {
   EnrichedSubmission,
@@ -126,13 +127,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     }
   }, [token, session.user.email])
 
-  // Fetch-on-mount — `load` only touches state after its `await`, so there's
-  // no synchronous cascading render here; the rule just can't see through
-  // the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   async function moderate(id: string, status: 'approved' | 'rejected', reason?: string) {
     setBusyId(id)

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 import ResponseCard from '@/components/responses/ResponseCard'
 import {
@@ -122,13 +123,7 @@ function InboxTabs({ session }: { session: Session }) {
     }
   }, [token, session.user.email])
 
-  // The classic fetch-on-mount effect — `load` only touches state after its
-  // `await`, so there's no synchronous cascading render for this rule to
-  // actually be warning about; it just can't see through the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   async function signOut() {
     await getBrowserClient().auth.signOut()

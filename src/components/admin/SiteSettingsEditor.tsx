@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
@@ -94,13 +95,7 @@ export default function SiteSettingsEditor({
     }
   }, [token])
 
-  // Fetch-on-mount — `load` only touches state after its `await`, so there's
-  // no synchronous cascading render here; the rule just can't see through
-  // the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   function set<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d))

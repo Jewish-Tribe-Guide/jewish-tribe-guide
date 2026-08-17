@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ResourceRow } from '@/types'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
 
 // The 'archived' tab in /admin: listings soft-deleted by an approved removal
 // report (see submissionStore.ts) — hidden from the public site but kept in
@@ -31,13 +32,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     }
   }, [token])
 
-  // Fetch-on-mount — `load` only touches state after its `await`, so there's
-  // no synchronous cascading render here; the rule just can't see through
-  // the function call.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   async function restore(id: string) {
     setBusyId(id)
