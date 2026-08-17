@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorker from '@/components/ServiceWorker'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-surface text-slate-900 antialiased min-h-dvh flex flex-col">
         {children}
         <Analytics />
+        <SpeedInsights />
         <ServiceWorker />
       </body>
     </html>
