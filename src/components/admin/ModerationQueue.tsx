@@ -57,7 +57,12 @@ function fmt(value: unknown, field?: CategoryField): string {
 // Internal bookkeeping the admin never authors directly (Google-sync
 // provenance, geocoding) — never real category content, so always excluded
 // regardless of what fields a category happens to have.
-const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
+// googleFields tracks which fields Google Places sync is allowed to
+// overwrite (see googlePlaces.ts) — the sync cron and the submission form
+// each recompute it independently and can land on the same set of fields in
+// a different order, which would otherwise show up here as a "changed"
+// field a submitter never touched.
+const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription', 'googleFields'])
 
 type FlatField = { key: string; label: string; value: string }
 

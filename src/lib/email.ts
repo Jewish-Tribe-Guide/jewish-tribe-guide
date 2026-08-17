@@ -244,7 +244,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription'])
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription', 'googleFields'])
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
