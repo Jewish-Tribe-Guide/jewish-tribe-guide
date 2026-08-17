@@ -1076,7 +1076,7 @@ export function CardBackgroundField({
   )
 }
 
-function CategoryEditor({
+export function CategoryEditor({
   token,
   initial,
   hasMapCategory,
