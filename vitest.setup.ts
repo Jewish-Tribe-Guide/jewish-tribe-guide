@@ -2,6 +2,7 @@
 // Vitest's `expect` — imported once here rather than per component test file.
 // A no-op for the plain-function tests that don't render anything.
 import '@testing-library/jest-dom/vitest'
+import { installMockGeolocation } from './src/test/geolocationMock'
 
 // jsdom 30's own window.localStorage isn't reliably wired up through
 // vitest's jsdom environment on this toolchain (Node 26 also defines its own
@@ -52,4 +53,8 @@ if (typeof window !== 'undefined') {
       dispatchEvent: () => false,
     })
   }
+
+  // jsdom has no navigator.geolocation at all — see geolocationMock.ts for
+  // the full rationale and how to drive a specific success/error path.
+  installMockGeolocation()
 }
