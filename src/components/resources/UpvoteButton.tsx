@@ -1,20 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
 
-const TOKEN_KEY = 'jpc_voter_token'
 const VOTED_KEY = 'jpc_voted'
-
-// A stable anonymous token per browser (created on first vote). Lets the server
-// dedupe one vote per browser without requiring accounts.
-function getToken(): string {
-  let t = localStorage.getItem(TOKEN_KEY)
-  if (!t) {
-    t = crypto.randomUUID()
-    localStorage.setItem(TOKEN_KEY, t)
-  }
-  return t
-}
 
 function getVotedSet(): Set<string> {
   try {
@@ -50,7 +39,20 @@ export default function UpvoteButton({
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    setVoted(getVotedSet().has(resourceId))
+    // Fast paint from the local cache first, then correct against the
+    // server's own record — the local "jpc_voted" cache can drift from it
+    // (evicted independently of the vote itself, or never written back after
+    // a successful vote), and the server is the only durable copy of "did
+    // this browser actually vote."
+    const localVoted = getVotedSet().has(resourceId)
+    setVoted(localVoted)
+    getMyVotedIds().then((serverIds) => {
+      const serverVoted = serverIds.has(resourceId)
+      if (serverVoted !== localVoted) {
+        setVoted(serverVoted)
+        rememberVote(resourceId, serverVoted)
+      }
+    })
   }, [resourceId])
 
   function applyCount(next: number) {
@@ -72,7 +74,7 @@ export default function UpvoteButton({
       const res = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resourceId, token: getToken() }),
+        body: JSON.stringify({ resourceId, token: getVoterToken() }),
       })
       const body = await res.json()
       if (res.ok && body.ok) {
