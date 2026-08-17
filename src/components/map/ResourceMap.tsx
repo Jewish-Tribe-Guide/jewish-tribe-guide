@@ -307,6 +307,9 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // selection-highlight effect below restyle just the one marker that
   // changed instead of rebuilding the whole marker set on every selection.
   const markersByIdRef = useRef(new Map<string, { marker: google.maps.marker.AdvancedMarkerElement; point: MapPoint }>())
+  // The `points` reference the marker-sync effect below last actually
+  // rebuilt from — see that effect's own comment for why this exists.
+  const syncedPointsRef = useRef<MapPoint[] | null>(null)
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null)
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
@@ -445,6 +448,18 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
+    // Cache Components keeps a hidden route alive under <Activity> instead of
+    // unmounting it (see the map-init effect's own comment above), which
+    // re-runs every effect — including this one — the moment the visitor
+    // switches back to this tab/screen, even though `points` never changed
+    // while they were away. Without this guard, every single return trip
+    // tore down and rebuilt every marker on the map (new DOM custom elements,
+    // new pointerdown/pointermove/pointerup/contextmenu/gmp-click listeners
+    // per marker) for no reason — on a category with a lot of pins, that's
+    // real synchronous work landing right as the visitor's looking at it,
+    // which reads as the map freezing for a beat.
+    if (syncedPointsRef.current === points) return
+    syncedPointsRef.current = points
 
     markersRef.current.forEach((m) => (m.map = null))
     markersRef.current = []

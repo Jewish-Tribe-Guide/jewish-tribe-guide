@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { listHomeSections, createHomeSection } from '@/lib/homeSectionStore'
+import { listHomeSectionsUncached, createHomeSection } from '@/lib/homeSectionStore'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/home-sections — every section, for the admin Sections tab.
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const sections = await listHomeSections((await getDefaultCommunity()).slug)
+    const sections = await listHomeSectionsUncached((await getDefaultCommunity()).slug)
     return Response.json({ ok: true, sections })
   } catch (err) {
     console.error('[admin/home-sections] GET failed:', err)

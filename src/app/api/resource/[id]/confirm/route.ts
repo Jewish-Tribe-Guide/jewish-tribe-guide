@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { enforceRateLimit } from '@/lib/rateLimit'
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 
 // POST /api/resource/:id/confirm
 // Records that a visitor verified the community-curated info is still accurate.
@@ -31,6 +32,10 @@ export async function POST(request: Request, ctx: RouteContext<'/api/resource/[i
     return Response.json({ ok: false, error: 'Could not save confirmation.' }, { status: 502 })
   }
 
+  // Same cached listApprovedResources() every category page reads through —
+  // without this, the confirmation the visitor just made wouldn't show for
+  // the next visitor until the cache's own lifetime elapsed.
+  await revalidatePublicContent()
   return Response.json({ ok: true, confirmedAt })
 }
 
@@ -68,5 +73,6 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
     return Response.json({ ok: false, error: 'Could not undo confirmation.' }, { status: 502 })
   }
 
+  await revalidatePublicContent()
   return Response.json({ ok: true, confirmedAt: body.previousConfirmedAt ?? null })
 }
