@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep } from '@/lib/forms'
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
-import { IconField, CardBackgroundField } from './CategoryManager'
+import { IconField, CardBackgroundField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
 
 // ── Editor for one form — title, chrome text, and questions. Mounted from
