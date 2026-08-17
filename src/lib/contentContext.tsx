@@ -1,8 +1,8 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react'
 import type { CommunityContent, ContentKey } from './loadCommunityContent'
-import { draftSectionsAsHomeSections, readPreviewDraft } from './previewDraft'
+import { draftSectionsAsHomeSections, readPreviewDraft, type PreviewDraft } from './previewDraft'
 import { withIconOverrides } from './categoryFallback'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +62,22 @@ export function useCategories() {
   return useMemo(() => withIconOverrides(categories), [categories])
 }
 
+// Cached after the first read so useSyncExternalStore's getSnapshot returns a
+// stable reference — the draft is a one-time snapshot (written once by the
+// admin before the frame opens, see previewDraft.ts), never updated again for
+// the life of this tab, so there's nothing to actually re-read.
+let cachedPreviewDraft: PreviewDraft | null | undefined
+function getPreviewDraftSnapshot(): PreviewDraft | null {
+  if (cachedPreviewDraft === undefined) cachedPreviewDraft = readPreviewDraft()
+  return cachedPreviewDraft
+}
+function getPreviewDraftServerSnapshot(): PreviewDraft | null {
+  return null
+}
+function subscribeToPreviewDraft() {
+  return () => {}
+}
+
 /** The admin preview's unsaved draft, or null.
  *
  *  Read after mount rather than during render, for two reasons: it lives in
@@ -70,11 +86,7 @@ export function useCategories() {
  *  hydration mismatch. And this is the same timing the old code had — the
  *  draft used to short-circuit a fetch, which also resolved after mount. */
 function usePreviewDraft() {
-  const [draft, setDraft] = useState<ReturnType<typeof readPreviewDraft>>(null)
-  useEffect(() => {
-    setDraft(readPreviewDraft())
-  }, [])
-  return draft
+  return useSyncExternalStore(subscribeToPreviewDraft, getPreviewDraftSnapshot, getPreviewDraftServerSnapshot)
 }
 
 export function useSiteSettings() {

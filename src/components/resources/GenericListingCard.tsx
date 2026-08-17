@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus } from '@/lib/hours'
@@ -153,7 +154,10 @@ export function GenericListingCard({
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
-        onClick={() => setExpanded((p) => !p)}
+        onClick={() => setExpanded((p) => {
+          if (!p) track('listing_opened', { listing: item.name, category: category.id })
+          return !p
+        })}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
         className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >

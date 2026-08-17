@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
@@ -92,13 +93,15 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   // (so it survives that page's own search) with the place itself expanded.
   // Edit/Report additionally carry `findAction` so the directory opens straight
   // into that form instead of just the expanded card.
-  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') =>
+  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') => {
+    if (!action) track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
     onNavigate('patient', 'find', {
       findView: hit.item.category,
       findQuery: hit.term,
       findItemId: hit.item.id,
       ...(action ? { findAction: action } : {}),
     })
+  }
 
   // Capture searches that come up empty — the most actionable signal for what
   // content to add next. Only counts once data has loaded, so a slow load never

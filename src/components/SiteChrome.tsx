@@ -109,7 +109,14 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
         />
       </Suspense>
       <LiveLocationPrompt
-        enabled={ui.map.liveTracking && !liveTracking.tracking}
+        // !errorSilent: a silent failure means tracking was already on from a
+        // previous visit and just quietly dropped (permission revoked between
+        // visits, a transient GPS error) — that's not "never asked yet," and
+        // popping the first-time "Share your live location?" pitch back up
+        // reads as the site not remembering it was already granted. The
+        // header pill's own error text (LocationControl) still surfaces what
+        // actually happened; this modal just stays out of the way for it.
+        enabled={ui.map.liveTracking && !liveTracking.tracking && !liveTracking.errorSilent && !liveTracking.resumingSilently}
         onShare={liveTracking.start}
       />
     </>

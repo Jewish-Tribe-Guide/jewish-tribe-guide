@@ -16,7 +16,6 @@ if (!url || !key) {
   process.exit(1)
 }
 const s = createClient(url, key, { auth: { persistSession: false } })
-const slugify = (x) => x.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
 // ── #3 Kosher Challah ─────────────────────────────────────────────────────────
 {

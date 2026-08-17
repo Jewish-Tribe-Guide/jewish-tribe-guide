@@ -38,13 +38,17 @@ export default function UpvoteButton({
   const [voted, setVoted] = useState(false) // set from localStorage after mount (hydration-safe)
   const [busy, setBusy] = useState(false)
 
+  // Fast paint from the local cache first, then correct against the server's
+  // own record below — not a useSyncExternalStore candidate: this reconciles
+  // with an async server call and gets rewritten by rememberVote elsewhere,
+  // not a pure read from one external source.
   useEffect(() => {
-    // Fast paint from the local cache first, then correct against the
-    // server's own record — the local "jpc_voted" cache can drift from it
-    // (evicted independently of the vote itself, or never written back after
-    // a successful vote), and the server is the only durable copy of "did
-    // this browser actually vote."
+    // The local "jpc_voted" cache can drift from the server (evicted
+    // independently of the vote itself, or never written back after a
+    // successful vote), and the server is the only durable copy of "did this
+    // browser actually vote."
     const localVoted = getVotedSet().has(resourceId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVoted(localVoted)
     getMyVotedIds().then((serverIds) => {
       const serverVoted = serverIds.has(resourceId)

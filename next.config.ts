@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import { optimizedImagePatterns } from "./src/lib/imageHosts";
 
 // Security headers applied to every response. These are the "safe" set — they
@@ -52,4 +53,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wraps the build to upload source maps to Sentry so stack traces show real
+// file/line instead of minified output. Silently skips the upload (build still
+// succeeds) until SENTRY_ORG/SENTRY_PROJECT/SENTRY_AUTH_TOKEN are set — see
+// .env.example.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+});

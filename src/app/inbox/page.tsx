@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { parseOkJson } from '@/lib/fetchJson'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 import ResponseCard from '@/components/responses/ResponseCard'
 import {
@@ -74,7 +76,16 @@ function Shell({ children }: { children: React.ReactNode }) {
 type InboxNavState = { inboxTab?: InboxTab }
 
 function InboxTabs({ session }: { session: Session }) {
-  const [tab, setTab] = useState<InboxTab>('support')
+  // Lazy initializer, not an effect: this page is never prerendered (see the
+  // file's own header comment — the whole point of a client-fetched shell is
+  // no server/client markup to keep in sync), so reading history.state
+  // synchronously on first render has no hydration-mismatch risk. On a full
+  // reload the browser keeps the current entry's history.state — restore
+  // whichever tab the viewer was on instead of resetting to Support.
+  const [tab, setTab] = useState<InboxTab>(() => {
+    const s = window.history.state as InboxNavState | null
+    return s?.inboxTab ?? 'support'
+  })
   const [items, setItems] = useState<InboxResponse[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -87,13 +98,6 @@ function InboxTabs({ session }: { session: Session }) {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
-  // On a full reload the browser keeps the current entry's history.state —
-  // restore whichever tab the viewer was on instead of resetting to Support.
-  useEffect(() => {
-    const s = window.history.state as InboxNavState | null
-    if (s?.inboxTab) setTab(s.inboxTab)
   }, [])
 
   function goToTab(t: InboxTab) {
@@ -112,17 +116,14 @@ function InboxTabs({ session }: { session: Session }) {
         setItems([])
         return
       }
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setItems(body.responses as InboxResponse[])
+      const body = await parseOkJson<{ responses: InboxResponse[] }>(res, 'Failed to load.')
+      setItems(body.responses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token, session.user.email])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   async function signOut() {
     await getBrowserClient().auth.signOut()

@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
+
 // The last resort: an error in the root layout itself, above every other
 // boundary. It replaces the whole document, so it has to render its own <html>
 // and <body> and can't rely on the app's fonts, CSS variables, or chrome —
@@ -11,6 +14,10 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
   return (
     <html lang="en">
       <body

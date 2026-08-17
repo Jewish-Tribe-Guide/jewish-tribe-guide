@@ -63,6 +63,7 @@ export default function GenericFormWizard({ formId, onClose }: Props) {
       submitLabel={form.submitLabel}
       successTitle={form.successTitle}
       successMessage={form.successMessage}
+      formLabel={form.title}
     />
   )
 }

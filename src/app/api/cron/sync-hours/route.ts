@@ -37,6 +37,22 @@ type SyncedRow = {
   details: Record<string, unknown>
 }
 
+// Best-effort ping to a dead-man's-switch monitor (e.g. healthchecks.io) so a
+// silently broken sync — Google API key revoked, quota exhausted, an
+// unhandled exception — shows up as a missed check-in instead of just stale
+// hours nobody notices. `/fail` is the convention healthchecks.io (and
+// compatible services) use for an explicit failure ping vs. a plain success
+// ping. A monitor outage must never fail the actual sync, hence the swallow.
+async function pingHealthcheck(ok: boolean): Promise<void> {
+  const base = process.env.CRON_HEALTHCHECK_URL
+  if (!base) return
+  try {
+    await fetch(ok ? base : `${base}/fail`, { method: 'GET' })
+  } catch {
+    // Best-effort.
+  }
+}
+
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) {
@@ -71,6 +87,7 @@ async function runSync(): Promise<NextResponse> {
     .limit(maxRecords())
 
   if (error) {
+    await pingHealthcheck(false)
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
@@ -150,15 +167,28 @@ async function runSync(): Promise<NextResponse> {
   // hour after the very sync meant to keep it current.
   if (synced > 0) await revalidatePublicContent()
 
+  await pingHealthcheck(true)
   return NextResponse.json({ ok: true, total: rows.length, synced, failed, flaggedClosed })
+}
+
+// Catches anything runSync itself doesn't (a thrown error, not just its own
+// { ok: false } responses) so an unhandled exception still registers as a
+// failed check-in instead of just vanishing.
+async function runSyncGuarded(): Promise<NextResponse> {
+  try {
+    return await runSync()
+  } catch (err) {
+    await pingHealthcheck(false)
+    throw err
+  }
 }
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  return runSync()
+  return runSyncGuarded()
 }
 
 export async function POST(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  return runSync()
+  return runSyncGuarded()
 }

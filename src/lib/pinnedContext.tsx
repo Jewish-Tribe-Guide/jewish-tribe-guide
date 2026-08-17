@@ -1,7 +1,8 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
 import { isPinned, loadPinned, savePinned, togglePinned, type PinnedListing } from './pinned'
+import { usePersistedState } from './usePersistedState'
 
 // The visitor's pinned-listing shortlist, shared by every screen that shows a
 // pin toggle (directory rows, the map's nearby list, map markers) — same
@@ -29,22 +30,15 @@ const PinnedContext = createContext<PinnedContextValue | null>(null)
 export function PinnedProvider({ children }: { children: React.ReactNode }) {
   // Starts empty to match the server-rendered markup, then restores from
   // localStorage in a post-mount effect — same hydration-safety reasoning as
-  // useStoredLocation (reading localStorage during render would mismatch SSR).
-  const [pinned, setPinned] = useState<PinnedListing[]>([])
+  // useStoredLocation. Not a useSyncExternalStore candidate despite the
+  // hydration-timing issue looking similar to NearbyList's hoverCapable:
+  // `pinned` is subsequently mutated locally (toggle, below) and written
+  // back to storage, not purely read from an external source — modeling
+  // that as an external store would mean moving the mutation logic out of
+  // React entirely, a real redesign of state used by "every screen that
+  // shows a pin toggle" (see the comment atop this file), not a lint fix.
+  const [pinned, setPinned] = usePersistedState<PinnedListing[]>([], loadPinned, savePinned)
   const [filterActive, setFilterActive] = useState(false)
-  const hydrated = useRef(false)
-
-  useEffect(() => {
-    setPinned(loadPinned())
-    hydrated.current = true
-  }, [])
-
-  useEffect(() => {
-    // Guards against the empty initial state clobbering a previously-saved
-    // list before the restore effect above has actually run.
-    if (!hydrated.current) return
-    savePinned(pinned)
-  }, [pinned])
 
   const value = useMemo<PinnedContextValue>(
     () => ({
@@ -63,7 +57,10 @@ export function PinnedProvider({ children }: { children: React.ReactNode }) {
       filterActive,
       setFilterActive,
     }),
-    [pinned, filterActive],
+    // setPinned is stable (it's usePersistedState's underlying useState
+    // setter), but that stability isn't visible to eslint across the custom
+    // hook boundary.
+    [pinned, filterActive, setPinned],
   )
 
   return <PinnedContext.Provider value={value}>{children}</PinnedContext.Provider>

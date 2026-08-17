@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { ContactHospitalData } from '@/types'
 import type { InboxResponse } from '@/lib/inbox'
+import { fetchJson } from '@/lib/fetchJson'
 
 // Shared response card — expandable, editable, deletable — used by both
 // /inbox (hospital-facing: support/volunteer/volunteer changes) and /admin's
@@ -84,14 +85,16 @@ export default function ResponseCard({
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`${apiBase}/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ contact: draftContact, data: draftData }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
-      onUpdated(body.response as InboxResponse)
+      const body = await fetchJson<{ response: InboxResponse }>(
+        `${apiBase}/${item.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ contact: draftContact, data: draftData }),
+        },
+        'Save failed.',
+      )
+      onUpdated(body.response)
       setEditing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
@@ -104,12 +107,11 @@ export default function ResponseCard({
     setDeleting(true)
     setError(null)
     try {
-      const res = await fetch(`${apiBase}/${item.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      await fetchJson(
+        `${apiBase}/${item.id}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Delete failed.',
+      )
       onDeleted(item.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed.')

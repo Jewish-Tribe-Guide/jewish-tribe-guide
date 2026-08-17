@@ -1,7 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { ResourceRow } from '@/types'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { fetchJson } from '@/lib/fetchJson'
 
 // The 'archived' tab in /admin: listings soft-deleted by an approved removal
 // report (see submissionStore.ts) — hidden from the public site but kept in
@@ -20,31 +22,28 @@ export default function ArchivedListings({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch('/api/admin/archived-listings', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setListings(body.listings as ArchivedListing[])
+      const body = await fetchJson<{ listings: ArchivedListing[] }>(
+        '/api/admin/archived-listings',
+        { headers: { Authorization: `Bearer ${token}` } },
+        'Failed to load.',
+      )
+      setListings(body.listings)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   async function restore(id: string) {
     setBusyId(id)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/archived-listings/${id}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Restore failed.')
+      await fetchJson(
+        `/api/admin/archived-listings/${id}`,
+        { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } },
+        'Restore failed.',
+      )
       setListings((prev) => (prev ? prev.filter((l) => l.id !== id) : prev))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Restore failed.')
@@ -57,12 +56,11 @@ export default function ArchivedListings({ token }: { token: string }) {
     setBusyId(id)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/archived-listings/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      await fetchJson(
+        `/api/admin/archived-listings/${id}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Delete failed.',
+      )
       setListings((prev) => (prev ? prev.filter((l) => l.id !== id) : prev))
       setConfirmDeleteId(null)
     } catch (err) {

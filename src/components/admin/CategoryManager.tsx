@@ -18,6 +18,8 @@ import {
 } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
+import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
 import FormEditor from './FormEditor'
@@ -153,19 +155,16 @@ export default function CategoryManager({
         fetch('/api/admin/categories', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/admin/forms', { headers: { Authorization: `Bearer ${token}` } }),
       ])
-      const [catBody, formBody] = await Promise.all([catRes.json(), formRes.json()])
-      if (!catRes.ok || !catBody.ok) throw new Error(catBody.errors?.join(' ') || 'Failed to load categories.')
-      if (!formRes.ok || !formBody.ok) throw new Error(formBody.errors?.join(' ') || 'Failed to load forms.')
-      setCategories(catBody.categories as CategoryConfig[])
-      setForms(formBody.forms as FormConfig[])
+      const catBody = await parseOkJson<{ categories: CategoryConfig[] }>(catRes, 'Failed to load categories.')
+      const formBody = await parseOkJson<{ forms: FormConfig[] }>(formRes, 'Failed to load forms.')
+      setCategories(catBody.categories)
+      setForms(formBody.forms)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
   }, [token])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useLoadOnMount(load)
 
   const entries = useMemo<Entry[] | null>(() => {
     if (!categories || !forms) return null
@@ -186,13 +185,15 @@ export default function CategoryManager({
     setAddingSingleton(kind)
     try {
       const label = SINGLETON_KIND_LABELS[kind]
-      const res = await fetch('/api/admin/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ label, pluralLabel: label, kind, icon: SINGLETON_ICONS[kind] }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not add it.')
+      await fetchJson(
+        '/api/admin/categories',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ label, pluralLabel: label, kind, icon: SINGLETON_ICONS[kind] }),
+        },
+        'Could not add it.',
+      )
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add it.')
@@ -205,12 +206,11 @@ export default function CategoryManager({
     setError(null)
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      await fetchJson(
+        `/api/admin/categories/${id}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Delete failed.',
+      )
       setConfirmDeleteId(null)
       load()
     } catch (err) {
@@ -226,12 +226,11 @@ export default function CategoryManager({
     setError(null)
     setDeletingId(`${FORM_PREFIX}${id}`)
     try {
-      const res = await fetch(`/api/admin/forms/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Delete failed.')
+      await fetchJson(
+        `/api/admin/forms/${id}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Delete failed.',
+      )
       setConfirmDeleteId(null)
       load()
     } catch (err) {
@@ -629,20 +628,22 @@ function SingletonEditor({
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/categories/${category.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          label: name.trim(),
-          pluralLabel: name.trim(),
-          icon,
-          iconImageUrl: iconImageUrl.trim() || null,
-          cardImageUrl: cardImageUrl.trim() || null,
-          cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
-        }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+      await fetchJson(
+        `/api/admin/categories/${category.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            label: name.trim(),
+            pluralLabel: name.trim(),
+            icon,
+            iconImageUrl: iconImageUrl.trim() || null,
+            cardImageUrl: cardImageUrl.trim() || null,
+            cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+          }),
+        },
+        'Save failed.',
+      )
       onSaved()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
@@ -1075,7 +1076,7 @@ export function CardBackgroundField({
   )
 }
 
-function CategoryEditor({
+export function CategoryEditor({
   token,
   initial,
   hasMapCategory,
@@ -1536,14 +1537,16 @@ function CategoryEditor({
       if (detected.length > 0) {
         setSaving(true)
         try {
-          const res = await fetch(`/api/admin/categories/${initial!.id}/option-usage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ renames: detected }),
-          })
-          const body = await res.json()
-          if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not check existing listings.')
-          const usage = body.usage as { fieldKey: string; oldValue: string; newValue: string; count: number }[]
+          const body = await fetchJson<{ usage: { fieldKey: string; oldValue: string; newValue: string; count: number }[] }>(
+            `/api/admin/categories/${initial!.id}/option-usage`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ renames: detected }),
+            },
+            'Could not check existing listings.',
+          )
+          const usage = body.usage
           setPendingRename({
             renames: detected.map((d) => ({
               ...d,
@@ -1571,14 +1574,16 @@ function CategoryEditor({
       if (addressOff || phoneOff || removedKeys.length > 0) {
         setSaving(true)
         try {
-          const res = await fetch(`/api/admin/categories/${initial!.id}/field-usage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ address: addressOff, phone: phoneOff, fieldKeys: removedKeys }),
-          })
-          const body = await res.json()
-          if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not check existing listings.')
-          const usage = body.usage as { address: number; phone: number; fields: Record<string, number> }
+          const body = await fetchJson<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
+            `/api/admin/categories/${initial!.id}/field-usage`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ address: addressOff, phone: phoneOff, fieldKeys: removedKeys }),
+            },
+            'Could not check existing listings.',
+          )
+          const usage = body.usage
           const total = usage.address + usage.phone + Object.values(usage.fields).reduce((a, b) => a + b, 0)
           if (total > 0) {
             setPendingCleanup({ ...usage, addressOff, phoneOff, removedKeys })
@@ -1634,16 +1639,15 @@ function CategoryEditor({
             })),
           }),
       }
-      const res = await fetch(
+      await fetchJson(
         isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
         {
           method: isNew ? 'POST' : 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         },
+        'Save failed.',
       )
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
       onSaved()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Save failed.'])
@@ -2357,6 +2361,13 @@ function FieldEditor({
   // re-normalize) on blur, once the admin's done editing that line.
   const [choicesText, setChoicesText] = useState(() => serializeOptions(f.options))
   useEffect(() => {
+    // The textbook fix for "reset state when a prop changes" is a `key` on
+    // this component instead of this effect, but this component's list
+    // already keys on the array slot (deliberately, for reorder stability —
+    // see the comment above) — swapping that to `f.key` risks resetting
+    // other local state in this editor on every reorder too, not just a
+    // genuine field switch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoicesText(serializeOptions(f.options))
     // Only resync from the field's own saved options when switching to a
     // genuinely different field (its stable `key`, not the array index,
@@ -2536,9 +2547,9 @@ function FieldEditor({
                 />
               </label>
               <p className="text-[11px] text-muted">
-                The submission form stops accepting more input at this length, so it's guaranteed to fit one line —
+                The submission form stops accepting more input at this length, so it&rsquo;s guaranteed to fit one line —
                 nothing to truncate, so this detail won&rsquo;t repeat again once the card is expanded. ~60 fits most
-                phone widths at this font size; raise it if that's cutting entries short in practice.
+                phone widths at this font size; raise it if that&rsquo;s cutting entries short in practice.
               </p>
             </>
           ) : (

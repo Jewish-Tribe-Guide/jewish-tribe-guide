@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 
 const PROMPT_KEY = 'jpc:live-location-prompt'
 // How long to wait before asking again after a "Not now" — not a permanent
@@ -28,7 +29,24 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
   const interactedRef = useRef(false)
 
   useEffect(() => {
-    if (!enabled || interactedRef.current) return
+    if (interactedRef.current) return
+    if (!enabled) {
+      // Self-correcting: `enabled` can start out true for a render or two
+      // before a pending silent auto-resume (see useLiveLocation's
+      // `resumingSilently`) has propagated down — effects fire child-before-
+      // parent, so this component's very first tick can run before the
+      // ancestor effect that will end up setting `enabled` false even has a
+      // chance to run. If that already opened the prompt, take it back down
+      // the moment the real answer arrives, rather than leaving a stale
+      // "share your location?" pitch open once we know tracking was already
+      // on and just silently dropped. Deliberately still an effect, not
+      // computed during render — this reacts to `enabled` flipping false
+      // after the prompt was already shown, which needs the two-tick timing
+      // this comment describes, not a one-time derivation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisible(false)
+      return
+    }
     try {
       const raw = localStorage.getItem(PROMPT_KEY)
       const dismissedAt = raw ? Number(raw) : 0
@@ -48,6 +66,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
       // Best-effort — worst case we ask again next visit.
     }
     setVisible(false)
+    track('location_prompt_dismissed')
   }
 
   const share = () => {
@@ -58,6 +77,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
       // Best-effort.
     }
     setVisible(false)
+    track('location_prompt_shared')
     onShare()
   }
 

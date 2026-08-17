@@ -582,7 +582,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     }
     // Rebuild only when the points themselves change — GPS ticks and callback
     // identity are read via refs so an open info window survives them.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, ready])
 
   // ── Highlight whichever marker matches the sheet's selected place ────────

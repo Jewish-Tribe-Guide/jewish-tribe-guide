@@ -121,7 +121,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
 
           <div>
             <label htmlFor="feedback-email" className="block text-sm font-medium text-slate-700">
-              Email <span className="font-normal text-slate-400">(optional, if you'd like a reply)</span>
+              Email <span className="font-normal text-slate-400">(optional, if you&rsquo;d like a reply)</span>
             </label>
             <input
               id="feedback-email"

@@ -117,6 +117,7 @@ export default function SupportWizard({ preselect, onClose }: Props) {
       submitLabel={form.submitLabel}
       successTitle={form.successTitle}
       successMessage={form.successMessage}
+      formLabel="Direct Support"
     />
   )
 }

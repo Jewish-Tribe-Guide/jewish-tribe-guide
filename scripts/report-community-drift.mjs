@@ -184,7 +184,7 @@ for (const r of rows) {
 
 console.log(`\n${rows.length} listings checked — ${noMatch} no match, ${lowConfidence} low-confidence match, ${clean} clean (matched, no field diffs), ${withDiffs} with field diffs.\n`)
 
-for (const { listing, match, confidence, flagged, diffs } of report) {
+for (const { listing, match, flagged, diffs } of report) {
   if (!flagged && diffs.length === 0) continue // clean ones don't need a look
   console.log(`• ${listing.name} (${listing.category})`)
   console.log(`    matched: ${match.name} — ${match.address}${flagged ? '   ⚠️  LOW CONFIDENCE MATCH — verify this is the right place' : ''}`)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStoredLocation } from './useStoredLocation'
 import { useWatchPosition } from './useWatchPosition'
 
@@ -21,14 +21,34 @@ export function useLiveLocation() {
   const stored = useStoredLocation()
   const watch = useWatchPosition()
 
+  // Whether a mount-time silent auto-resume is in flight — true from the
+  // instant we decide to attempt one until it actually resolves (tracking
+  // starts, or an error comes back). `watchPosition`'s callback is always
+  // asynchronous, even for an already-denied permission that fails
+  // "immediately" — so on the very first render, before that callback has
+  // had a chance to run, `tracking` and `errorSilent` both still read their
+  // initial `false`. A consumer computing "should I invite this visitor to
+  // share their location" from those alone (see LiveLocationPrompt) would
+  // read that first render as a fresh, un-decided visitor and flash its
+  // prompt open for a beat before the real (silent) failure lands and hides
+  // it again — exactly the kind of glitch this flag exists to prevent.
+  const [resumingSilently, setResumingSilently] = useState(false)
+
   // Auto-resume on mount if a previous visit turned tracking on. Silent: the
   // visitor isn't doing anything at this instant, so if permission has since
   // been revoked, that failure shouldn't pop the location picker open on a
   // page they just loaded — see useWatchPosition's `start` and
   // LocationControl's geoError effect.
+  // Recently tuned (see git history) to fix the exact glitch resumingSilently
+  // exists to prevent — not touching either effect below beyond the
+  // required-for-CI lint suppression.
   useEffect(() => {
     try {
-      if (localStorage.getItem(ENABLED_KEY) === '1') watch.start({ silent: true })
+      if (localStorage.getItem(ENABLED_KEY) === '1') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setResumingSilently(true)
+        watch.start({ silent: true })
+      }
     } catch {
       // Storage unavailable — just don't auto-resume.
     }
@@ -36,6 +56,13 @@ export function useLiveLocation() {
     // restore, not a live sync (see the effect below for that).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The attempt above has resolved — one way or the other — once either a
+  // position or an error comes back.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (resumingSilently && (watch.position || watch.error)) setResumingSilently(false)
+  }, [resumingSilently, watch.position, watch.error])
 
   // Every GPS tick updates the same stored coords/address everything else
   // already reads from — this is what makes tracking "site-wide" rather than
@@ -78,6 +105,7 @@ export function useLiveLocation() {
     tracking: watch.tracking,
     geoError: watch.error,
     geoErrorSilent: watch.errorSilent,
+    resumingSilently,
     start,
     stop,
   }

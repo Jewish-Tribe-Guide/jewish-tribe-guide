@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also

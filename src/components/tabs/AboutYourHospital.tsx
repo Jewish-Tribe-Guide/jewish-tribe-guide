@@ -167,11 +167,15 @@ function Badge({ children }: { children: React.ReactNode }) {
 // ── Icons (inline to avoid a dependency) ──────────────────────────────────────
 
 type IconProps = { className?: string }
-const svg = (path: React.ReactNode) => ({ className }: IconProps) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-    {path}
-  </svg>
-)
+const svg = (path: React.ReactNode) => {
+  const Icon = ({ className }: IconProps) => (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+      {path}
+    </svg>
+  )
+  Icon.displayName = 'Icon'
+  return Icon
+}
 
 const BuildingIcon = svg(
   <>

@@ -134,10 +134,10 @@ type Props = {
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ onUp, userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
-  const hospitals = useHospitals() ?? []
+  const hospitalsData = useHospitals()
   const { pinned, toggle: togglePinnedListing, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
   const pinnedIds = useMemo(() => new Set(pinned.map((p) => p.id)), [pinned])
   // Whether the Pinned chip is toggled on — it behaves like one more category
@@ -394,9 +394,9 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // already made (see its own comment), and for the same reason: router.replace
   // re-subscribes every useSearchParams() caller (this component now among
   // them) to the change, and this screen's marker layer already re-renders
-  // far more often than its own state actually changes (see the `hospitals`
-  // dependency warning on allPoints below) — feeding that back through the
-  // router turns a harmless extra render into a real navigation each time.
+  // more often than its own state actually changes — feeding that back
+  // through the router turns a harmless extra render into a real navigation
+  // each time.
   // A plain history write has no such feedback loop: nothing subscribes to
   // it, so it only ever affects a future cold load (initialPlaceId) or a
   // copy-pasted address bar.
@@ -428,7 +428,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
 
     // Hospital pins are a patient-oriented overlay — only when that module is on.
     if ((categories ?? []).some((c) => c.kind === 'medical')) {
-      for (const h of hospitals) {
+      for (const h of hospitalsData ?? []) {
         out.push({
           filterId: HOSPITALS_ID,
           id: `hospital:${h.id}`,
@@ -482,7 +482,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
       })
     }
     return out
-  }, [listings, categories, colorById, hospitals, pinnedIds])
+  }, [listings, categories, colorById, hospitalsData, pinnedIds])
 
   // Restores the pin `initialPlaceId` named, once it's actually in allPoints
   // (a plain state initializer would run before listings have loaded).
@@ -812,7 +812,7 @@ export default function ResourceMapView({ onUp, userLocation, initialCategory, i
   // unless the actual point set changed.
   const mapPoints = useMemo(
     () => (ui.map.pins ? [...visiblePoints, ...droppedMapPoints] : visiblePoints),
-    [ui.map.pins, visiblePoints, droppedMapPoints],
+    [visiblePoints, droppedMapPoints],
   )
 
   // Whether a search/filter is meaningfully "active" — used to (a) gate the
