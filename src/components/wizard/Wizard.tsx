@@ -292,8 +292,9 @@ export default function Wizard({
           {step.kind === 'contact' && (
             <div className="flex flex-col gap-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">Phone number</label>
+                <label htmlFor="wizard-contact-phone" className="mb-1.5 block text-sm font-medium text-slate-600">Phone number</label>
                 <input
+                  id="wizard-contact-phone"
                   autoFocus
                   type="tel"
                   inputMode="tel"
@@ -304,8 +305,9 @@ export default function Wizard({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-600">Email</label>
+                <label htmlFor="wizard-contact-email" className="mb-1.5 block text-sm font-medium text-slate-600">Email</label>
                 <input
+                  id="wizard-contact-email"
                   type="email"
                   inputMode="email"
                   value={(answers.email as string) ?? ''}
