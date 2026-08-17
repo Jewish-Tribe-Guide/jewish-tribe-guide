@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import {
   addDroppedPin,
   loadDroppedPins,
@@ -9,6 +9,7 @@ import {
   saveDroppedPins,
   type DroppedPin,
 } from './droppedPins'
+import { usePersistedState } from './usePersistedState'
 
 // The visitor's own hand-placed map pins ("where I parked") — same
 // localStorage-backed provider pattern as pinnedContext.tsx, kept as its own
@@ -26,23 +27,11 @@ type DroppedPinsContextValue = {
 const DroppedPinsContext = createContext<DroppedPinsContextValue | null>(null)
 
 export function DroppedPinsProvider({ children }: { children: React.ReactNode }) {
-  const [droppedPins, setDroppedPins] = useState<DroppedPin[]>([])
-  const hydrated = useRef(false)
-
   // Same reasoning as pinnedContext.tsx (this file's own comment says "same
   // provider pattern") — not a useSyncExternalStore candidate since
   // `droppedPins` is subsequently mutated locally and written back, not
   // purely read from an external source.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDroppedPins(loadDroppedPins())
-    hydrated.current = true
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated.current) return
-    saveDroppedPins(droppedPins)
-  }, [droppedPins])
+  const [droppedPins, setDroppedPins] = usePersistedState<DroppedPin[]>([], loadDroppedPins, saveDroppedPins)
 
   const value = useMemo<DroppedPinsContextValue>(
     () => ({
@@ -51,7 +40,10 @@ export function DroppedPinsProvider({ children }: { children: React.ReactNode })
       remove: (id: string) => setDroppedPins((prev) => removeDroppedPin(prev, id)),
       rename: (id: string, label: string) => setDroppedPins((prev) => renameDroppedPin(prev, id, label)),
     }),
-    [droppedPins],
+    // setDroppedPins is stable (it's usePersistedState's underlying useState
+    // setter), but that stability isn't visible to eslint across the custom
+    // hook boundary.
+    [droppedPins, setDroppedPins],
   )
 
   return <DroppedPinsContext.Provider value={value}>{children}</DroppedPinsContext.Provider>
