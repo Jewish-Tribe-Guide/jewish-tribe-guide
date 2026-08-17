@@ -183,10 +183,16 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       return false
     }
 
+    // Pushed in the same order as googlePlaces.ts's own OWNABLE_SYNC_FIELDS
+    // (name, hours, phone, address) — this list gets diffed byte-for-byte
+    // against what the sync cron writes (see nextGoogleFields), so a
+    // same-membership-different-order result there would otherwise show up
+    // as a fabricated "change" in the moderation queue for a submission that
+    // never touched Google-sync ownership at all.
     const out: string[] = []
     if (decide('name', autofilled.current.name, name, existing?.name ?? '')) out.push('name')
-    if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
     if (hoursKey && decide('hours', autofilled.current.hours, currentHours, priorHours)) out.push('hours')
+    if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
     return out
   }
 
