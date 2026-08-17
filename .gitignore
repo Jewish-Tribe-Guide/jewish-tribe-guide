@@ -16,6 +16,8 @@
 /playwright-report/
 /blob-report/
 /.playwright/
+# Real admin session tokens minted by e2e/auth.setup.ts — never commit these.
+/e2e/.auth/
 
 # next.js
 /.next/
