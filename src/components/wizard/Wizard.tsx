@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 import { formatPhone, isValidPhone } from '@/lib/validation'
 import { stepIsVisible, type StepCondition } from '@/lib/forms'
 import Honeypot from '@/components/Honeypot'
@@ -50,6 +51,8 @@ type Props = {
   /** Shown on the final thank-you screen. */
   successTitle?: string
   successMessage?: string
+  /** Identifies which form this is for analytics (e.g. "Direct Support", "Volunteer", a custom form's title). */
+  formLabel?: string
 }
 
 const asArray = (v: string | string[] | undefined): string[] =>
@@ -95,6 +98,7 @@ export default function Wizard({
   submitLabel = 'Submit',
   successTitle = 'All set',
   successMessage = 'A community representative will reach out to you shortly.',
+  formLabel,
 }: Props) {
   const [answers, setAnswers] = useState<Answers>(initial)
   const [idx, setIdx] = useState(0)
@@ -102,6 +106,10 @@ export default function Wizard({
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Fires once per wizard open, not per step — this is "a visitor started this
+  // form," which pairs with the submit event below to give a start→finish rate.
+  useEffect(() => { track('form_started', { form: formLabel ?? 'unknown' }) }, [formLabel])
 
   // Steps visible given the current answers — branching recomputes this live.
   const visible = useMemo(() => steps.filter((s) => stepIsVisible(s, answers)), [steps, answers])
@@ -157,8 +165,10 @@ export default function Wizard({
       try {
         await onSubmit(answers)
         setSubmitted(true)
+        track('form_submitted', { form: formLabel ?? 'unknown' })
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+        track('form_submit_failed', { form: formLabel ?? 'unknown' })
       } finally {
         setSubmitting(false)
       }

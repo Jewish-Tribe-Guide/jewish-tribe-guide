@@ -112,6 +112,7 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
       submitLabel={form.submitLabel}
       successTitle={form.successTitle}
       successMessage={form.successMessage}
+      formLabel="Volunteer"
     />
   )
 }

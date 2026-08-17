@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 
 const PROMPT_KEY = 'jpc:live-location-prompt'
 // How long to wait before asking again after a "Not now" — not a permanent
@@ -61,6 +62,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
       // Best-effort — worst case we ask again next visit.
     }
     setVisible(false)
+    track('location_prompt_dismissed')
   }
 
   const share = () => {
@@ -71,6 +73,7 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
       // Best-effort.
     }
     setVisible(false)
+    track('location_prompt_shared')
     onShare()
   }
 

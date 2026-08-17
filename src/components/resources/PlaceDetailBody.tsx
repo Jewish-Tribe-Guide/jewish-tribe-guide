@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus, syncedLabel } from '@/lib/hours'
@@ -38,7 +39,10 @@ function ActionButton({ href, icon, label }: { href: string; icon: ReactNode; la
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        track('listing_action', { action: label })
+      }}
       className="flex flex-col items-center gap-1 text-primary"
     >
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 hover:bg-primary/15 transition-colors">
