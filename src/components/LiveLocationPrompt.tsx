@@ -28,7 +28,20 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
   const interactedRef = useRef(false)
 
   useEffect(() => {
-    if (!enabled || interactedRef.current) return
+    if (interactedRef.current) return
+    if (!enabled) {
+      // Self-correcting: `enabled` can start out true for a render or two
+      // before a pending silent auto-resume (see useLiveLocation's
+      // `resumingSilently`) has propagated down — effects fire child-before-
+      // parent, so this component's very first tick can run before the
+      // ancestor effect that will end up setting `enabled` false even has a
+      // chance to run. If that already opened the prompt, take it back down
+      // the moment the real answer arrives, rather than leaving a stale
+      // "share your location?" pitch open once we know tracking was already
+      // on and just silently dropped.
+      setVisible(false)
+      return
+    }
     try {
       const raw = localStorage.getItem(PROMPT_KEY)
       const dismissedAt = raw ? Number(raw) : 0
