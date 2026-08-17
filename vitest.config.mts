@@ -26,6 +26,18 @@ export default defineConfig({
       // application code the numbers are meant to describe.
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.d.ts'],
+      // A floor, not a target: `npm run test:coverage` (and so CI) fails if
+      // coverage drops below this. Set a few points under the actual number
+      // (run `npm run test:coverage` to see it) so normal work doesn't
+      // trip it, but a PR that adds a meaningful chunk of untested code
+      // will. Raise these numbers as coverage grows — never lower them to
+      // make a failing PR pass; fix the coverage instead.
+      thresholds: {
+        statements: 29,
+        branches: 26,
+        functions: 29,
+        lines: 29,
+      },
     },
   },
 })
