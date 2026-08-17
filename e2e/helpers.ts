@@ -79,13 +79,21 @@ export async function largestCategory(
  *  It's a full-screen overlay that intercepts pointer events, so on mobile —
  *  where it appears on a first visit — nothing else on the page is clickable
  *  until it's dealt with. A real visitor answers it before doing anything else,
- *  so tests do too. Harmless when it isn't there. */
+ *  so tests do too.
+ *
+ *  The prompt renders after a data-dependent effect, not on first paint, so
+ *  a one-shot `isVisible()` check races it: it can appear moments after the
+ *  check passes and intercept whatever the test clicks next. Actively wait a
+ *  bit instead — harmless (and fast to resolve) when it never shows up. */
 export async function dismissLocationPrompt(page: Page): Promise<void> {
   const notNow = page.getByRole('button', { name: 'Not now' })
-  if (await notNow.isVisible().catch(() => false)) {
-    await notNow.click()
-    await notNow.waitFor({ state: 'hidden' })
+  try {
+    await notNow.waitFor({ state: 'visible', timeout: 1000 })
+  } catch {
+    return
   }
+  await notNow.click()
+  await notNow.waitFor({ state: 'hidden' })
 }
 
 /** Waits for the page to be settled enough to assert on.
