@@ -57,4 +57,17 @@ if (typeof window !== 'undefined') {
   // jsdom has no navigator.geolocation at all — see geolocationMock.ts for
   // the full rationale and how to drive a specific success/error path.
   installMockGeolocation()
+
+  // jsdom has no ResizeObserver either — a no-op stand-in (never fires a
+  // callback) is enough for components that only use it to measure an
+  // element after mount (ResourceMapView's map-box/overlay height tracking);
+  // nothing here depends on a real resize actually being observed.
+  if (!window.ResizeObserver) {
+    class NoopResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    window.ResizeObserver = NoopResizeObserver as unknown as typeof ResizeObserver
+  }
 }
