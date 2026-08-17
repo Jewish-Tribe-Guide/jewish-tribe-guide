@@ -71,8 +71,12 @@ export function photoInsertIndex(fields: CategoryField[]): number {
   return 0
 }
 
+// Derive the singular from the plural name by dropping a trailing "s" (only
+// when preceded by a non-"s", so "Class"/"Mikvah" stay put). Good enough for
+// the "Add a …" phrasing across realistic category names.
 export function singularize(plural: string): string {
-  return plural.replace(/s$/i, '')
+  const s = plural.trim()
+  return /[^s]s$/i.test(s) ? s.slice(0, -1) : s
 }
 
 export function toDraft(c: CategoryConfig | null): Draft {
