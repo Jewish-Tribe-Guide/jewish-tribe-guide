@@ -131,8 +131,15 @@ test.describe('URLs', () => {
 
     await expect(page).toHaveURL(`/${community}/map?cat=${category.id}&open=1`)
     // The chip for that category reads as selected, i.e. the params were
-    // actually applied rather than just preserved in the address bar.
-    await expect(page.getByRole('button', { name: new RegExp(category.pluralLabel) }).first()).toBeVisible()
+    // actually applied rather than just preserved in the address bar. The
+    // chip row only renders once the map's own resource fetch resolves (see
+    // ResourceMapView's `allPoints`/`options`), so this is slower under CI's
+    // shared runners than the default 5s assert timeout reliably covers —
+    // seen failing there, never locally. Same treatment as the async-fetch
+    // assertions in offline.spec.ts.
+    await expect(page.getByRole('button', { name: new RegExp(category.pluralLabel) }).first()).toBeVisible({
+      timeout: 10_000,
+    })
   })
 
   test('reserved screens are not treated as categories', async ({ page }) => {
