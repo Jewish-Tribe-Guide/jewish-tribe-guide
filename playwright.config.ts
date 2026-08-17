@@ -25,7 +25,9 @@ export default defineConfig({
   fullyParallel: true,
   // Nothing here should be flaky; a retry that passes is hiding something.
   retries: 0,
-  reporter: process.env.CI ? 'dot' : 'list',
+  // CI keeps console output terse (dot) but also writes an HTML report, so a
+  // failure has a real artifact to open instead of just a scrollback line.
+  reporter: process.env.CI ? [['dot'], ['html', { open: 'never' }]] : 'list',
 
   use: {
     baseURL: BASE_URL,
