@@ -29,7 +29,12 @@ export function DroppedPinsProvider({ children }: { children: React.ReactNode })
   const [droppedPins, setDroppedPins] = useState<DroppedPin[]>([])
   const hydrated = useRef(false)
 
+  // Same reasoning as pinnedContext.tsx (this file's own comment says "same
+  // provider pattern") — not a useSyncExternalStore candidate since
+  // `droppedPins` is subsequently mutated locally and written back, not
+  // purely read from an external source.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDroppedPins(loadDroppedPins())
     hydrated.current = true
   }, [])

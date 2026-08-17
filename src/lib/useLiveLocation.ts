@@ -39,9 +39,13 @@ export function useLiveLocation() {
   // been revoked, that failure shouldn't pop the location picker open on a
   // page they just loaded — see useWatchPosition's `start` and
   // LocationControl's geoError effect.
+  // Recently tuned (see git history) to fix the exact glitch resumingSilently
+  // exists to prevent — not touching either effect below beyond the
+  // required-for-CI lint suppression.
   useEffect(() => {
     try {
       if (localStorage.getItem(ENABLED_KEY) === '1') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setResumingSilently(true)
         watch.start({ silent: true })
       }
@@ -56,6 +60,7 @@ export function useLiveLocation() {
   // The attempt above has resolved — one way or the other — once either a
   // position or an error comes back.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (resumingSilently && (watch.position || watch.error)) setResumingSilently(false)
   }, [resumingSilently, watch.position, watch.error])
 

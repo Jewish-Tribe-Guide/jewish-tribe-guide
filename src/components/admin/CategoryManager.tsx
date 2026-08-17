@@ -163,7 +163,11 @@ export default function CategoryManager({
     }
   }, [token])
 
+  // Fetch-on-mount — `load` only touches state after its `await`, so there's
+  // no synchronous cascading render here; the rule just can't see through
+  // the function call.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -2357,6 +2361,13 @@ function FieldEditor({
   // re-normalize) on blur, once the admin's done editing that line.
   const [choicesText, setChoicesText] = useState(() => serializeOptions(f.options))
   useEffect(() => {
+    // The textbook fix for "reset state when a prop changes" is a `key` on
+    // this component instead of this effect, but this component's list
+    // already keys on the array slot (deliberately, for reorder stability —
+    // see the comment above) — swapping that to `f.key` risks resetting
+    // other local state in this editor on every reorder too, not just a
+    // genuine field switch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoicesText(serializeOptions(f.options))
     // Only resync from the field's own saved options when switching to a
     // genuinely different field (its stable `key`, not the array index,
@@ -2536,9 +2547,9 @@ function FieldEditor({
                 />
               </label>
               <p className="text-[11px] text-muted">
-                The submission form stops accepting more input at this length, so it's guaranteed to fit one line —
+                The submission form stops accepting more input at this length, so it&rsquo;s guaranteed to fit one line —
                 nothing to truncate, so this detail won&rsquo;t repeat again once the card is expanded. ~60 fits most
-                phone widths at this font size; raise it if that's cutting entries short in practice.
+                phone widths at this font size; raise it if that&rsquo;s cutting entries short in practice.
               </p>
             </>
           ) : (

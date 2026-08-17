@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
 import { PinIcon } from '@/components/icons'
@@ -15,6 +15,26 @@ import type { DirectoryResource } from '@/types'
 // threshold, so a visitor scrolling the sheet vertically can't pin something
 // by accident.
 const REVEAL_WIDTH = 84
+
+// Mouse/trackpad users get the desktop convention instead of the touch one:
+// hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
+// up for as long as the pointer sits over the row, no drag-and-hold required.
+// useSyncExternalStore (not state+effect) because this is genuinely reading
+// an external source of truth — starts false to match SSR (getServerSnapshot),
+// then the real value on the client, same hydration-safety reasoning as
+// PinnedProvider.
+const HOVER_QUERY = '(hover: hover) and (pointer: fine)'
+function subscribeHoverCapable(callback: () => void) {
+  const mql = window.matchMedia(HOVER_QUERY)
+  mql.addEventListener('change', callback)
+  return () => mql.removeEventListener('change', callback)
+}
+function getHoverCapableSnapshot() {
+  return window.matchMedia(HOVER_QUERY).matches
+}
+function getHoverCapableServerSnapshot() {
+  return false
+}
 
 type LatLng = { lat: number; lng: number }
 type InputPoint = MapPoint & { filterId: string; raw?: DirectoryResource }
@@ -49,15 +69,7 @@ export default function NearbyList({ points, userLocation, onViewListing, onSele
   // row snaps the first shut, same as iOS Mail's swipe actions.
   const [openRowId, setOpenRowId] = useState<string | null>(null)
 
-  // Mouse/trackpad users get the desktop convention instead of the touch
-  // one: hovering reveals the action (iMessage/Mail-on-Mac style) and it
-  // stays up for as long as the pointer sits over the row, no drag-and-hold
-  // required. Starts false to match SSR, then resolves after mount — same
-  // hydration-safety reasoning as PinnedProvider.
-  const [hoverCapable, setHoverCapable] = useState(false)
-  useEffect(() => {
-    setHoverCapable(window.matchMedia('(hover: hover) and (pointer: fine)').matches)
-  }, [])
+  const hoverCapable = useSyncExternalStore(subscribeHoverCapable, getHoverCapableSnapshot, getHoverCapableServerSnapshot)
 
   const sorted = useMemo<ScoredPoint[]>(() => {
     const scored = points.map((p) => ({
@@ -274,6 +286,16 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         className="relative flex items-stretch gap-2 bg-white px-4 py-3 touch-pan-y"
         style={{
           transform: `translateX(${dragX}px)`,
+          // Deliberately a ref, not state: every write above is paired with a
+          // setDragX call that already re-renders this, except the two resets
+          // to `false` (pointerdown, end-of-drag-when-never-dragged) — both are
+          // no-ops for this style either way, so there's no stale-read case
+          // that actually changes what renders. Converting to state would risk
+          // a real regression instead: reading state in these pointer-event
+          // closures can lag behind rapid-fire move events across renders in a
+          // way a ref never does, and that's exactly the drag math this file's
+          // comments above are tuned around.
+          // eslint-disable-next-line react-hooks/refs
           transition: activeGestureRef.current ? 'none' : 'transform 200ms ease',
         }}
         onPointerDown={onPointerDown}

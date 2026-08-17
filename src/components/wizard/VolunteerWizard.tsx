@@ -58,8 +58,8 @@ type Props = {
 
 export default function VolunteerWizard({ preselect, onClose }: Props) {
   const form = useForm('volunteer')
-  const hospitals = useHospitals() ?? []
-  const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitals) : []), [form, hospitals])
+  const hospitalsData = useHospitals()
+  const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitalsData ?? []) : []), [form, hospitalsData])
   const initial: Answers = preselect && preselect.length ? { waysToHelp: preselect } : {}
 
   const handleSubmit = async (a: Answers) => {

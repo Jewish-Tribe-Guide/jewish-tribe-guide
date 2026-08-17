@@ -162,7 +162,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
           ))}
           {canAddNew && (
             <button type="button" onClick={() => add(input)} className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 hover:bg-primary/20 transition-colors cursor-pointer">
-              + Add "{input.trim()}"
+              + Add &ldquo;{input.trim()}&rdquo;
             </button>
           )}
         </div>

@@ -212,7 +212,13 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // Sync denomination each time the modal opens so it mirrors the parent's filter
   // (seeds the multi-select with just that one value — the visitor can add more
   // from there without it getting stomped, since this only fires on open).
+  // The textbook fix for "reset state on a prop change" is a `key` on this
+  // component instead of this effect, but that would reset `selectedDays`
+  // too (currently untouched here, deliberately — day filter persists across
+  // opens while denomination doesn't), which is a real behavior change, not
+  // just a lint fix.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOpen) setSelectedDenominations(initialDenomination ? [initialDenomination] : [])
     else setOpenRowKey(null)
   }, [isOpen, initialDenomination])

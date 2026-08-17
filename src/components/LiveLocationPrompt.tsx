@@ -39,7 +39,11 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
       // chance to run. If that already opened the prompt, take it back down
       // the moment the real answer arrives, rather than leaving a stale
       // "share your location?" pitch open once we know tracking was already
-      // on and just silently dropped.
+      // on and just silently dropped. Deliberately still an effect, not
+      // computed during render — this reacts to `enabled` flipping false
+      // after the prompt was already shown, which needs the two-tick timing
+      // this comment describes, not a one-time derivation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(false)
       return
     }

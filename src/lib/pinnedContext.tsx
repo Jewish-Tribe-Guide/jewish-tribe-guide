@@ -34,7 +34,15 @@ export function PinnedProvider({ children }: { children: React.ReactNode }) {
   const [filterActive, setFilterActive] = useState(false)
   const hydrated = useRef(false)
 
+  // Not a useSyncExternalStore candidate despite the hydration-timing issue
+  // looking similar to NearbyList's hoverCapable: `pinned` is subsequently
+  // mutated locally (toggle, below) and written back to storage, not purely
+  // read from an external source — modeling that as an external store would
+  // mean moving the mutation logic out of React entirely, a real redesign of
+  // state used by "every screen that shows a pin toggle" (see the comment atop
+  // this file), not a lint fix.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPinned(loadPinned())
     hydrated.current = true
   }, [])

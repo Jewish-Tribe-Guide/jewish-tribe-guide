@@ -74,7 +74,16 @@ function Shell({ children }: { children: React.ReactNode }) {
 type InboxNavState = { inboxTab?: InboxTab }
 
 function InboxTabs({ session }: { session: Session }) {
-  const [tab, setTab] = useState<InboxTab>('support')
+  // Lazy initializer, not an effect: this page is never prerendered (see the
+  // file's own header comment — the whole point of a client-fetched shell is
+  // no server/client markup to keep in sync), so reading history.state
+  // synchronously on first render has no hydration-mismatch risk. On a full
+  // reload the browser keeps the current entry's history.state — restore
+  // whichever tab the viewer was on instead of resetting to Support.
+  const [tab, setTab] = useState<InboxTab>(() => {
+    const s = window.history.state as InboxNavState | null
+    return s?.inboxTab ?? 'support'
+  })
   const [items, setItems] = useState<InboxResponse[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -87,13 +96,6 @@ function InboxTabs({ session }: { session: Session }) {
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
-
-  // On a full reload the browser keeps the current entry's history.state —
-  // restore whichever tab the viewer was on instead of resetting to Support.
-  useEffect(() => {
-    const s = window.history.state as InboxNavState | null
-    if (s?.inboxTab) setTab(s.inboxTab)
   }, [])
 
   function goToTab(t: InboxTab) {
@@ -120,7 +122,11 @@ function InboxTabs({ session }: { session: Session }) {
     }
   }, [token, session.user.email])
 
+  // The classic fetch-on-mount effect — `load` only touches state after its
+  // `await`, so there's no synchronous cascading render for this rule to
+  // actually be warning about; it just can't see through the function call.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 

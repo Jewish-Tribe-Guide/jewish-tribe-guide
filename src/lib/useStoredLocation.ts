@@ -61,9 +61,15 @@ export function useStoredLocation() {
   // initial empty state would clobber a previously-saved location before we read it.
   const hydrated = useRef(false)
 
+  // Not a useSyncExternalStore candidate: `location` is the linchpin of the
+  // whole directory experience (see comment above) and gets mutated locally
+  // via setAddress/setCoords/setAnchor and written back below — modeling that
+  // as an external store would mean moving all of that mutation logic outside
+  // React, a real redesign, not a lint fix.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setLocation(parseStoredLocation(raw))
     } catch {
       // Corrupt/blocked storage — fall back to the empty in-memory location.
