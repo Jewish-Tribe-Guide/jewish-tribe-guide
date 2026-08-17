@@ -20,11 +20,12 @@ function toSection(row: HomeSectionRow): HomeSection {
   }
 }
 
-// All sections, in display order.
-export async function listHomeSections(community: string): Promise<HomeSection[]> {
-  'use cache'
-  cacheTag(TAGS.homeSections(community))
-  cacheLife('days')
+// All sections, in display order. Uncached — reads Supabase directly. Used by
+// the admin route, which needs read-after-write consistency (revalidateTag
+// only marks the public cache stale, it doesn't purge it, so a cached read
+// right after a save can still serve the pre-save list — see
+// categoryStore.ts's listCategoriesUncached for the same pattern).
+export async function listHomeSectionsUncached(community: string): Promise<HomeSection[]> {
   const { data, error } = await getAdminClient()
     .from('home_section')
     .select('*')
@@ -33,6 +34,14 @@ export async function listHomeSections(community: string): Promise<HomeSection[]
 
   if (error) throw new Error(`Failed to load home sections: ${error.message}`)
   return (data as HomeSectionRow[]).map(toSection)
+}
+
+// Same as listHomeSectionsUncached, but cached for the public site.
+export async function listHomeSections(community: string): Promise<HomeSection[]> {
+  'use cache'
+  cacheTag(TAGS.homeSections(community))
+  cacheLife('days')
+  return listHomeSectionsUncached(community)
 }
 
 // Creates a section, picking a unique slug derived from its title. New

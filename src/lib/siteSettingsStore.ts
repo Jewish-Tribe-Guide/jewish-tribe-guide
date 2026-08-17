@@ -62,11 +62,14 @@ function toSettings(row: Row | null): SiteSettings {
 }
 
 // The single settings row, or the community.config defaults if none exists
-// yet (a fresh deployment, before the first admin edit).
-export async function getSiteSettings(community: string): Promise<SiteSettings> {
-  'use cache'
-  cacheTag(TAGS.siteSettings(community))
-  cacheLife('days')
+// yet (a fresh deployment, before the first admin edit). Uncached — reads
+// Supabase directly. Used by the admin route (read-after-write consistency,
+// same reasoning as categoryStore's listCategoriesUncached) and by
+// updateSiteSettings' own merge-before-save below, which would otherwise risk
+// merging a patch onto a stale cached snapshot if two saves land close
+// together (revalidateTag('max') marks the cache stale but doesn't purge it,
+// so a read right after a save can still return the pre-save row).
+export async function getSiteSettingsUncached(community: string): Promise<SiteSettings> {
   const { data, error } = await getAdminClient()
     .from('site_settings')
     .select('*')
@@ -77,13 +80,21 @@ export async function getSiteSettings(community: string): Promise<SiteSettings> 
   return toSettings(data as Row | null)
 }
 
+// Same as getSiteSettingsUncached, but cached for the public site.
+export async function getSiteSettings(community: string): Promise<SiteSettings> {
+  'use cache'
+  cacheTag(TAGS.siteSettings(community))
+  cacheLife('days')
+  return getSiteSettingsUncached(community)
+}
+
 // Merges the given fields into the current settings and upserts the single
 // row (creating it on first save). Only the provided keys change.
 export async function updateSiteSettings(
   community: string,
   patch: Partial<SiteSettings>,
 ): Promise<SiteSettings> {
-  const current = await getSiteSettings(community)
+  const current = await getSiteSettingsUncached(community)
   const merged: SiteSettings = { ...current, ...patch }
 
   const { data, error } = await getAdminClient()

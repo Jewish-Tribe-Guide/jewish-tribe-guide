@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { getSiteSettings, updateSiteSettings } from '@/lib/siteSettingsStore'
+import { getSiteSettingsUncached, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_MOBILE_TABS, type SiteSettings } from '@/lib/siteSettings'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const settings = await getSiteSettings((await getDefaultCommunity()).slug)
+    const settings = await getSiteSettingsUncached((await getDefaultCommunity()).slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
     console.error('[admin/site-settings] GET failed:', err)

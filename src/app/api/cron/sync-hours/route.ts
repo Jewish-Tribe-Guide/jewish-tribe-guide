@@ -23,6 +23,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
+import { revalidatePublicContent } from '@/lib/revalidateContent'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -142,6 +143,12 @@ async function runSync(): Promise<NextResponse> {
       }
     }
   }
+
+  // Resources are served through the same cached listApprovedResources()
+  // every category page uses (cacheLife('hours')) — without this, a synced
+  // hours/phone/closure change would sit invisible to visitors for up to an
+  // hour after the very sync meant to keep it current.
+  if (synced > 0) await revalidatePublicContent()
 
   return NextResponse.json({ ok: true, total: rows.length, synced, failed, flaggedClosed })
 }
