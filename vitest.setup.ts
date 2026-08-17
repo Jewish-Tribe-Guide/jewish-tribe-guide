@@ -34,4 +34,22 @@ if (typeof window !== 'undefined') {
       writable: true,
     })
   }
+
+  // jsdom doesn't implement window.matchMedia at all (not a stub gap, just
+  // absent) — anything using useIsMobile() (SiteHeader, CommunitySwitcher,
+  // ...) throws without this. Always reports `matches: false` (desktop),
+  // matching useIsMobile's own SSR-safe default; a test that specifically
+  // needs the mobile branch should override window.matchMedia itself.
+  if (!window.matchMedia) {
+    window.matchMedia = (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })
+  }
 }
