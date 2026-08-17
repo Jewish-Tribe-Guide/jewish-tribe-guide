@@ -18,6 +18,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Integration tests (src/**/*.integration.test.ts) hit a real Supabase
+    // project and need credentials + setup this config doesn't provide — they
+    // run separately via vitest.integration.config.mts / `npm run
+    // test:integration`. Excluding them here isn't just scoping: without it,
+    // this config's real-project SUPABASE_SERVICE_ROLE_KEY would let them
+    // run for real, writing to and deleting from production data.
+    exclude: ['src/**/*.integration.test.ts', 'node_modules/**'],
     setupFiles: ['./vitest.setup.ts'],
     coverage: {
       provider: 'v8',

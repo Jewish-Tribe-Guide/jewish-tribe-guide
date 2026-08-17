@@ -143,6 +143,35 @@ This repo is set up to be used as a **GitHub template**. To spin up a community:
 3. Stand up Supabase + Google Maps, then `npm run setup`.
 4. Deploy (the Vercel button above, or any Next.js host).
 
+## Testing
+
+`npm test` (unit + component) and `npm run test:e2e` (Playwright, against a
+production build) need no setup beyond `npm ci` — see `AGENTS.md` for how
+they're organized and what each is for.
+
+### Integration tests
+
+`npm run test:integration` exercises real Supabase reads/writes (the
+submit → moderate → live-table pipeline in `src/lib/submissionStore.ts` and
+friends) against a **second, disposable** Supabase project — never your real
+one. It's optional for everyday work; skip it if `TEST_SUPABASE_URL` /
+`TEST_SUPABASE_SERVICE_ROLE_KEY` aren't set.
+
+To set one up:
+
+1. Create a free Supabase project (same as step 1 above, but a new one —
+   name it something like `<yourapp>-test`).
+2. Apply the schema: `supabase db push` against it, or paste
+   `supabase/migrations/*.sql` into its SQL editor in filename order. No
+   seeding needed — the tests create and delete their own rows.
+3. Add `TEST_SUPABASE_URL` and `TEST_SUPABASE_SERVICE_ROLE_KEY` (Project
+   Settings → API on the *test* project) to `.env.local`.
+4. For CI, add the same two as repo secrets (Settings → Secrets and
+   variables → Actions) — see `.github/workflows/ci.yml`'s `integration` job.
+
+Every test cleans up the rows it creates in `afterEach`, tracked by id rather
+than assumed, so a failed assertion still leaves the project clean.
+
 ## License
 
 [MIT](LICENSE) — free to fork, adapt, and deploy for your own community.
