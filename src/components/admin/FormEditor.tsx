@@ -5,6 +5,7 @@ import { DEFAULT_CONTACT_STEPS, type FormConfig, type FormContent, type FormStep
 import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
 import { IconField, CardBackgroundField } from './CategoryManager'
+import { fetchJson } from '@/lib/fetchJson'
 
 // ── Editor for one form — title, chrome text, and questions. Mounted from
 // CategoryManager's unified list, both for the two built-in forms (Request
@@ -147,13 +148,15 @@ export default function FormEditor({
     setErrors([])
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/forms/${form.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(draft),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
+      await fetchJson(
+        `/api/admin/forms/${form.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(draft),
+        },
+        'Save failed.',
+      )
       setSavedNotice(true)
       return true
     } catch (err) {
@@ -176,13 +179,15 @@ export default function FormEditor({
     setErrors([])
     setPublishing(true)
     try {
-      const res = await fetch('/api/admin/forms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(draft),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create form.')
+      await fetchJson(
+        '/api/admin/forms',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(draft),
+        },
+        'Could not create form.',
+      )
       onDone()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Could not create form.'])
@@ -197,12 +202,11 @@ export default function FormEditor({
     try {
       const ok = await saveDraft()
       if (!ok) return
-      const res = await fetch(`/api/admin/forms/${form.id}/publish`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Publish failed.')
+      await fetchJson(
+        `/api/admin/forms/${form.id}/publish`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
+        'Publish failed.',
+      )
       onDone()
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Publish failed.'])
@@ -216,12 +220,11 @@ export default function FormEditor({
     setDiscarding(true)
     setErrors([])
     try {
-      const res = await fetch(`/api/admin/forms/${form.id}/draft`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not discard the draft.')
+      await fetchJson(
+        `/api/admin/forms/${form.id}/draft`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        'Could not discard the draft.',
+      )
       setDraft({
         title: form.title,
         submitLabel: form.submitLabel,

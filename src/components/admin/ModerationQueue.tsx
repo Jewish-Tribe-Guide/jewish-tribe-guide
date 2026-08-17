@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { getBrowserClient } from '@/lib/supabase/client'
 import type {
   EnrichedSubmission,
@@ -119,9 +120,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
         setItems([])
         return
       }
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setItems(body.submissions as EnrichedSubmission[])
+      const body = await parseOkJson<{ submissions: EnrichedSubmission[] }>(res, 'Failed to load.')
+      setItems(body.submissions)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -132,13 +132,15 @@ export default function ModerationQueue({ session }: { session: Session }) {
   async function moderate(id: string, status: 'approved' | 'rejected', reason?: string) {
     setBusyId(id)
     try {
-      const res = await fetch(`/api/admin/submissions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to update.')
+      await fetchJson(
+        `/api/admin/submissions/${id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status, ...(reason ? { reason } : {}) }),
+        },
+        'Failed to update.',
+      )
       setItems((prev) => (prev ? prev.filter((s) => s.id !== id) : prev))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')

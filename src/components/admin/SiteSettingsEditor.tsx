@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { HomeSection, DraftHomeSection } from '@/lib/homeSections'
 import { saveHomeSections } from '@/lib/homeSectionsDraft'
@@ -81,15 +82,13 @@ export default function SiteSettingsEditor({
         fetch('/api/admin/site-settings', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/admin/home-sections', { headers: { Authorization: `Bearer ${token}` } }),
       ])
-      const settingsBody = await settingsRes.json()
-      if (!settingsRes.ok || !settingsBody.ok) throw new Error(settingsBody.errors?.join(' ') || 'Failed to load.')
-      const sectionsBody = await sectionsRes.json()
-      if (!sectionsRes.ok || !sectionsBody.ok) throw new Error(sectionsBody.errors?.join(' ') || 'Failed to load.')
+      const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
+      const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
 
-      setSettings(settingsBody.settings as SiteSettings)
-      setDraft(settingsBody.settings as SiteSettings)
-      setSections(sectionsBody.sections as HomeSection[])
-      setSectionsDraft(sectionsBody.sections as HomeSection[])
+      setSettings(settingsBody.settings)
+      setDraft(settingsBody.settings)
+      setSections(sectionsBody.sections)
+      setSectionsDraft(sectionsBody.sections)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -109,16 +108,14 @@ export default function SiteSettingsEditor({
     setLogoError(null)
     setUploadingLogo(true)
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const res = await fetch('/api/admin/site-settings/logo', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body,
-      })
-      const json = await res.json()
-      if (!res.ok || !json.ok) throw new Error(json.errors?.join(' ') || 'Upload failed.')
-      set('logoUrl', json.url as string)
+      const formData = new FormData()
+      formData.append('file', file)
+      const json = await fetchJson<{ url: string }>(
+        '/api/admin/site-settings/logo',
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData },
+        'Upload failed.',
+      )
+      set('logoUrl', json.url)
     } catch (err) {
       setLogoError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {
@@ -146,15 +143,17 @@ export default function SiteSettingsEditor({
     setSaving(true)
     try {
       if (JSON.stringify(settings) !== JSON.stringify(draft)) {
-        const res = await fetch('/api/admin/site-settings', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(draft),
-        })
-        const body = await res.json()
-        if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Save failed.')
-        setSettings(body.settings as SiteSettings)
-        setDraft(body.settings as SiteSettings)
+        const body = await fetchJson<{ settings: SiteSettings }>(
+          '/api/admin/site-settings',
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify(draft),
+          },
+          'Save failed.',
+        )
+        setSettings(body.settings)
+        setDraft(body.settings)
       }
 
       if (!sectionsEqual(sections, sectionsDraft)) {

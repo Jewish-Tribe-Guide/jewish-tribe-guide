@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormConfig } from '@/lib/forms'
 import type { InboxResponse } from '@/lib/inbox'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
@@ -100,12 +101,12 @@ function ResponsesList({
     setItems(null)
     try {
       const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
-      const res = await fetch(`/api/admin/responses?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setItems(body.responses as InboxResponse[])
+      const body = await fetchJson<{ responses: InboxResponse[] }>(
+        `/api/admin/responses?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        'Failed to load.',
+      )
+      setItems(body.responses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }

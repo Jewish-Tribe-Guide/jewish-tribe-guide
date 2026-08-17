@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
+import { parseOkJson } from '@/lib/fetchJson'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 import ResponseCard from '@/components/responses/ResponseCard'
 import {
@@ -115,9 +116,8 @@ function InboxTabs({ session }: { session: Session }) {
         setItems([])
         return
       }
-      const body = await res.json()
-      if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Failed to load.')
-      setItems(body.responses as InboxResponse[])
+      const body = await parseOkJson<{ responses: InboxResponse[] }>(res, 'Failed to load.')
+      setItems(body.responses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
