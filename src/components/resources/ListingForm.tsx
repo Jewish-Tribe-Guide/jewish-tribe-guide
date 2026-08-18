@@ -343,14 +343,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
+          <label htmlFor="listing-name" className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+          <input id="listing-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Kosher Mart" />
         </div>
 
         {hasPhone && (
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
+            <label htmlFor="listing-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+            <input id="listing-phone" type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className={inputClass} placeholder="(215) 555-0100" />
           </div>
         )}
 
@@ -462,12 +462,12 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
-            <input value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+            <label htmlFor="listing-submitter-name" className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
+            <input id="listing-submitter-name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
-            <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+            <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
+            <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
           </div>
         </div>
 
@@ -538,8 +538,9 @@ function DetailFieldInput({
   if (field.type === 'url') {
     return (
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
         <input
+          id={`detail-${field.key}`}
           type="url"
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
@@ -603,8 +604,8 @@ function DetailFieldInput({
   if (field.type === 'textarea') {
     return (
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-        <textarea value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
+        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <textarea id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} className={inputClass} />
         {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )
@@ -621,8 +622,8 @@ function DetailFieldInput({
   if (field.type === 'select') {
     return (
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-        <select value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+        <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <select id={`detail-${field.key}`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} className={inputClass}>
           <option value="">Select…</option>
           {field.options?.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -637,8 +638,9 @@ function DetailFieldInput({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       <input
+        id={`detail-${field.key}`}
         type={field.type === 'number' ? 'number' : field.type === 'tel' ? 'tel' : 'text'}
         value={(value as string) ?? ''}
         onChange={(e) =>
@@ -695,8 +697,9 @@ function SelectOtherField({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       <select
+        id={`detail-${field.key}`}
         value={showOther ? OTHER_OPTION_VALUE : strValue}
         onChange={(e) => {
           if (e.target.value === OTHER_OPTION_VALUE) {
@@ -811,8 +814,9 @@ function MultiSelectField({
 
   return (
     <div ref={containerRef} className="relative">
-      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+      <label htmlFor={`detail-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       <button
+        id={`detail-${field.key}`}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
