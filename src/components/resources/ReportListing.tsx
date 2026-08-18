@@ -98,8 +98,9 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
       <form onSubmit={handleSubmit} className="space-y-4">
         <Honeypot value={honeypot} onChange={setHoneypot} />
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">What&apos;s the issue?</label>
+          <label htmlFor="report-note" className="block text-sm font-medium text-slate-700 mb-1">What&apos;s the issue?</label>
           <textarea
+            id="report-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
@@ -108,8 +109,8 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
-          <input value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+          <label htmlFor="report-submitter-name" className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
+          <input id="report-submitter-name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
         </div>
 
         {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>}

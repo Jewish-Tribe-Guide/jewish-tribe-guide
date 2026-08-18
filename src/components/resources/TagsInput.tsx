@@ -93,7 +93,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1">{field.label}</label>
+      <label htmlFor={`tags-input-${field.key}`} className="block text-sm font-medium text-slate-700 mb-1">{field.label}</label>
       {field.help && <p className="text-xs text-muted mb-1.5">{field.help}</p>}
 
       {(always.length > 0 || sometimes.length > 0) && (
@@ -140,6 +140,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
       )}
 
       <input
+        id={`tags-input-${field.key}`}
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}

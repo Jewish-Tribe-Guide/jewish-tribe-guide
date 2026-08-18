@@ -56,8 +56,9 @@ export default function MagicLinkLogin({ requestLinkUrl, emailLabel, sentMessage
 
   return (
     <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
-      <label className="block text-sm font-medium text-slate-700">{emailLabel}</label>
+      <label htmlFor="magic-link-email" className="block text-sm font-medium text-slate-700">{emailLabel}</label>
       <input
+        id="magic-link-email"
         type="email"
         required
         value={email}
