@@ -33,6 +33,7 @@ afterEach(() => {
 function location(overrides: Partial<LocationControls> = {}): LocationControls {
   return {
     address: '',
+    coords: null,
     onAddressChange: vi.fn(),
     onCoords: vi.fn(),
     tracking: false,

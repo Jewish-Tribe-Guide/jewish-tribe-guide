@@ -9,6 +9,11 @@ import { useScrollLock } from '@/lib/useScrollLock'
 
 export type LocationControls = {
   address: string
+  /** Null until `address` resolves to a real place — either the visitor
+   *  picked an autocomplete suggestion or a listing anchor supplied it.
+   *  Free-typed text with no coords is not a location: see the pill
+   *  fill/label below, which deliberately don't treat it as "set". */
+  coords: { lat: number; lng: number } | null
   onAddressChange: (address: string) => void
   onCoords: (coords: { lat: number; lng: number } | null) => void
   /** Whether the site-wide live GPS watch is currently running (see
@@ -138,7 +143,12 @@ export default function LocationControl({ controls }: Props) {
     if (controls.geoError && !controls.geoErrorSilent) setOpen(true)
   }, [controls.geoError, controls.geoErrorSilent])
 
-  const label = controls.tracking ? 'Live' : controls.address || 'Set location'
+  // Only a resolved address counts as "set" here — typed-but-unpicked text
+  // stays in the input (see the AddressInput below) but isn't shown as the
+  // pill's own label, which would otherwise claim a location is active when
+  // there's no coordinate behind it to actually measure distances from.
+  const resolvedAddress = controls.coords ? controls.address : ''
+  const label = controls.tracking ? 'Live' : resolvedAddress || 'Set location'
 
   // When the anchor came from tapping "I'm here" on a listing, `controls.address`
   // holds that listing's NAME, not a street address — so it must not be
@@ -263,12 +273,12 @@ export default function LocationControl({ controls }: Props) {
             <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
           </span>
         ) : (
-          <PinIcon filled={!!controls.address} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+          <PinIcon filled={!!resolvedAddress} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
         )}
         {/* Show the "Set location" prompt on every size so first-time mobile
             visitors discover it; once an address is set, collapse to just the
             pin on mobile to save header space. */}
-        <span className={`truncate ${controls.address ? 'hidden md:block' : 'block'}`}>{label}</span>
+        <span className={`truncate ${resolvedAddress ? 'hidden md:block' : 'block'}`}>{label}</span>
       </button>
 
       {open && (

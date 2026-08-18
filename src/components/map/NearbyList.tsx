@@ -3,18 +3,26 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
-import { PinIcon } from '@/components/icons'
+import { ExternalIcon, PinIcon } from '@/components/icons'
 import { PHOTO_FIELD_KEY } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { useShareLink } from '@/lib/useShareLink'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
 import type { MapPoint } from './ResourceMap'
 import type { DirectoryResource } from '@/types'
 
-// Width of the pin/unpin action revealed behind a row when it's swiped left,
+// Width of one action button revealed behind a row when it's swiped left,
 // matching the reveal-and-tap pattern iOS Mail uses for its row actions —
-// swiping exposes the button rather than firing the action at a drag
-// threshold, so a visitor scrolling the sheet vertically can't pin something
-// by accident.
-const REVEAL_WIDTH = 84
+// swiping exposes the buttons rather than firing an action at a drag
+// threshold, so a visitor scrolling the sheet vertically can't pin or share
+// something by accident.
+const ACTION_WIDTH = 84
+// Share sits left of Pin, which stays at the row's edge — that's the button
+// a visitor already has muscle memory for, so a small swipe still reveals it
+// first, same as before Share existed.
+const REVEAL_WIDTH = ACTION_WIDTH * 2
 
 // Mouse/trackpad users get the desktop convention instead of the touch one:
 // hovering reveals the row action (iMessage/Mail-on-Mac style) and it stays
@@ -149,6 +157,14 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
+  // Sharing needs the same real directory entry pinning does — hospitals
+  // (canPin false, no `raw`) have neither. listingPath is '' in that case;
+  // the hook is still called unconditionally (rules of hooks), it's just
+  // never reachable since the Share button isn't rendered for that row.
+  const community = useCommunitySlug()
+  const listingPath = canPin ? routes.listing(community, p.filterId, p.raw ? listingSlug(p.raw) : p.id) : ''
+  const { share, copied } = useShareLink(listingPath, p.name)
+
   // Keeps the row in sync when it's closed externally (another row opened,
   // the pin button fired, or an outside click landed) without fighting an
   // in-progress drag/swipe.
@@ -271,15 +287,31 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   return (
     <div ref={wrapperRef} className="relative overflow-hidden bg-white">
       {canPin && (
-        <button
-          onClick={onTogglePin}
-          aria-label={p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
-          className="absolute inset-y-0 right-0 flex w-[84px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
-          style={{ backgroundColor: p.pinned ? '#64748b' : '#2563eb' }}
-        >
-          <PinIcon filled={p.pinned} className="h-4 w-4" />
-          {p.pinned ? 'Unpin' : 'Pin'}
-        </button>
+        <div className="absolute inset-y-0 right-0 flex" style={{ width: REVEAL_WIDTH }}>
+          {/* Doesn't close the row on its own, unlike Pin below — the
+              clipboard-copy fallback's "Copied!" feedback renders on this
+              same button, so closing immediately would hide it before the
+              visitor sees it. The native share sheet (when available)
+              doesn't need this row for feedback at all. */}
+          <button
+            onClick={share}
+            aria-label={`Share ${p.name}`}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
+            style={{ backgroundColor: '#0f172a' }}
+          >
+            <ExternalIcon className="h-4 w-4" />
+            {copied ? 'Copied!' : 'Share'}
+          </button>
+          <button
+            onClick={onTogglePin}
+            aria-label={p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
+            style={{ backgroundColor: p.pinned ? '#64748b' : '#2563eb' }}
+          >
+            <PinIcon filled={p.pinned} className="h-4 w-4" />
+            {p.pinned ? 'Unpin' : 'Pin'}
+          </button>
+        </div>
       )}
       <div
         ref={contentRef}

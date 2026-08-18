@@ -159,8 +159,8 @@ export default function CategoryPreview({
       <GenericDirectory
         category={category}
         items={itemsWithDistance(items, category, coords)}
-        anchorLabel={address || undefined}
-        addressPrompt={!address && category.hasAddress !== false}
+        anchorLabel={(coords && address) || undefined}
+        addressPrompt={!(coords && address) && category.hasAddress !== false}
         onUp={onClose}
         onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
@@ -186,7 +186,7 @@ export default function CategoryPreview({
           <HeaderCollapseProvider>
             <SiteHeader
               onGoHome={onClose}
-              location={{ address, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
+              location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
             />
             <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
             <SiteFooter year={new Date().getFullYear()} />

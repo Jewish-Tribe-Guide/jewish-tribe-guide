@@ -104,6 +104,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     () => ({
       controls: {
         address,
+        coords,
         onAddressChange: setAddress,
         onCoords: setCoords,
         tracking,
@@ -112,10 +113,17 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         onStartTracking: start,
         onStopTracking: stop,
       },
-      anchor: { coords, label: address },
+      // label is deliberately gated on coords, not just a non-empty address —
+      // a visitor can type text and never pick a suggestion (or a suggestion
+      // Google couldn't resolve to a place), which leaves `address` set with
+      // `coords` still null. Surfacing that text as "your location" anywhere
+      // (the address prompt suppressing itself, a directory subtitle claiming
+      // to measure "near <text>") would be a real place with no distance data
+      // ever showing, which reads as broken rather than as "no location set."
+      anchor: { coords, label: coords ? address : '' },
       coords,
       liveTracking: { tracking, error: geoError, errorSilent: geoErrorSilent, resumingSilently, start, stop },
-      directionsOrigin: !tracking && address ? address : coords,
+      directionsOrigin: !tracking && coords && address ? address : coords,
       anchorListingId: listingId,
       setListingAnchor: (listing) => {
         // Remember what's being displaced, but only a typed address is worth
