@@ -129,7 +129,20 @@ test.describe('URLs', () => {
 
     await page.goto(`/${community}/map?cat=${category.id}&open=1`)
 
-    await expect(page).toHaveURL(`/${community}/map?cat=${category.id}&open=1`)
+    // Not an exact-URL match: `open=1` seeds the map's search text as "open
+    // now" (see ResourceMapView's `initialQueryText`), which is a real
+    // `committedQuery` — and committing a query that narrows the result set
+    // to exactly one match auto-opens that place's card (Google-Maps-style,
+    // see the effect gated on `searchActive` there), appending its own
+    // `place=<id>` to the URL. Whether that happens here depends on how many
+    // of this category's listings are open *right now*, which genuinely
+    // varies by wall-clock time — not a bug, but incompatible with asserting
+    // the URL string exactly. Assert the params this test actually cares
+    // about instead.
+    const url = new URL(page.url())
+    expect(url.pathname).toBe(`/${community}/map`)
+    expect(url.searchParams.get('cat')).toBe(category.id)
+    expect(url.searchParams.get('open')).toBe('1')
     // The chip for that category reads as selected, i.e. the params were
     // actually applied rather than just preserved in the address bar. The
     // chip row only renders once the map's own resource fetch resolves (see
