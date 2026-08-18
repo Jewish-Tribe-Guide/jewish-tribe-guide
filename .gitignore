@@ -42,6 +42,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Supabase CLI local link state (project ref, pooler URL) from `supabase link`/
+# `db push` — local machine state, not something to share via git.
+/supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
