@@ -46,7 +46,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     hasAddress: row.has_address !== false,
     hasPhone: row.has_phone !== false,
     upvotesEnabled: !!row.upvotes_enabled,
-    capabilities: resolveCapabilities(row.capabilities),
+    capabilities: resolveCapabilities(row.capabilities, row.has_address !== false),
     externalLink:
       row.external_link_label && row.external_link_url
         ? { label: row.external_link_label, url: row.external_link_url }

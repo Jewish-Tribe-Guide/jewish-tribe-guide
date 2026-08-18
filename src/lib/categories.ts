@@ -220,11 +220,27 @@ export const CATEGORY_CAPABILITY_DEFAULTS: CategoryCapabilities = {
 
 /** Fills in defaults for any missing capability key. Use this everywhere a
  *  capability is read, so partial/absent stored objects (and the fallback
- *  categories) always resolve to a complete, valid shape. */
+ *  categories) always resolve to a complete, valid shape.
+ *
+ *  Pass the category's `hasAddress` too when it's known: `map` forces to
+ *  false when it's exactly `false`, regardless of what's stored. The admin
+ *  editor hides the Map checkbox once "Has address" is off (there's nothing
+ *  to plot without one), but that's only a display filter — it never
+ *  clears the stored value, so a category toggled that way keeps a stale
+ *  `map: true` sitting underneath, invisible in the form. Real case: a
+ *  "Cemetery" category with addresses turned off still had `map: true`
+ *  stored, so it showed up as a filter chip on the map with nothing behind
+ *  it. Enforcing the derivation here, the single place every consumer
+ *  already resolves capabilities through, fixes it everywhere at once
+ *  without a data migration — and stays fixed even if raw JSON like that
+ *  gets written again some other way. */
 export function resolveCapabilities(
   raw?: Partial<CategoryCapabilities> | null,
+  hasAddress?: boolean,
 ): CategoryCapabilities {
-  return { ...CATEGORY_CAPABILITY_DEFAULTS, ...(raw ?? {}) }
+  const resolved = { ...CATEGORY_CAPABILITY_DEFAULTS, ...(raw ?? {}) }
+  if (hasAddress === false) resolved.map = false
+  return resolved
 }
 
 /** Almost every category row is a real listing directory ('listing'). The other
