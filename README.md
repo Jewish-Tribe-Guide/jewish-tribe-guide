@@ -157,15 +157,26 @@ friends) against a **second, disposable** Supabase project — never your real
 one. It's optional for everyday work; skip it if `TEST_SUPABASE_URL` /
 `TEST_SUPABASE_SERVICE_ROLE_KEY` aren't set.
 
-`npm run test:cache-roundtrip` uses the **same** test project to prove an
-admin's save actually reaches the cached public page — something the real
-e2e suite can't test (it's barred from writing to the database). It boots a
-real production build against the test project (`scripts/run-cache-e2e-server.mjs`),
-signs in as a fixed test-only admin (`cache-roundtrip-admin@test.invalid`,
-created automatically on first run — no seeding needed), saves a setting
-through the real admin API, and polls the public home page until the new
-content appears, then reverts it. This one also needs
-`TEST_SUPABASE_ANON_KEY`, since it signs in for real.
+`npm run test:cache-roundtrip` and `npm run test:form-roundtrip` use the
+**same** test project to prove two things the real e2e suite can't (it's
+barred from writing to the database):
+
+- **Cache round-trip** — an admin's save actually reaches the cached public
+  page. Boots a real production build against the test project
+  (`scripts/run-test-project-server.mjs`), signs in as a fixed test-only
+  admin (`cache-roundtrip-admin@test.invalid`, created automatically on
+  first run), saves a setting through the real admin API, and polls the
+  public home page until the new content appears, then reverts it.
+- **Form submission** — a real wizard, filled out and submitted through the
+  UI, actually reaches the database. Drives a real browser through a seeded
+  test form (name → contact → a genuinely branching question → an optional
+  final step), submits through `/api/requests`, confirms the response
+  landed with the right data, then deletes it. No admin session needed —
+  submitting is public.
+
+Both need `TEST_SUPABASE_ANON_KEY` in addition to the integration suite's
+two vars (the cache suite signs in for real; the form suite's build needs it
+to boot even though the test itself doesn't sign in).
 
 To set the test project up:
 
@@ -173,18 +184,18 @@ To set the test project up:
    name it something like `<yourapp>-test`).
 2. Apply the schema: `supabase db push` against it, or paste
    `supabase/migrations/*.sql` into its SQL editor in filename order. No
-   seeding needed — both suites create/delete/edit their own rows.
+   seeding needed — all three suites create/delete/edit their own rows.
 3. Add `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, and
    `TEST_SUPABASE_SERVICE_ROLE_KEY` (all under Project Settings → API on the
    *test* project) to `.env.local`.
 4. For CI, add the same three as repo secrets (Settings → Secrets and
-   variables → Actions) — see `.github/workflows/ci.yml`'s `integration` and
-   `cache-roundtrip` jobs.
+   variables → Actions) — see `.github/workflows/ci.yml`'s `integration`,
+   `cache-roundtrip` and `form-roundtrip` jobs.
 
 The integration suite cleans up the rows it creates in `afterEach`, tracked
 by id rather than assumed, so a failed assertion still leaves the project
-clean. The cache-round-trip suite reverts the one setting it changes in a
-`finally` block, same guarantee.
+clean. The cache-round-trip and form-submission suites each revert/delete
+the one thing they changed in a `finally` block, same guarantee.
 
 ## License
 
