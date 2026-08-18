@@ -146,14 +146,19 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
     setRelative(row.id, draft?.anchor ?? 'sunset', draft?.direction ?? 'before', draft?.magnitudeText ?? '0')
   }
 
-  function switchToClock(row: Minyan) {
+  // `extraPatch` lets a caller fold in another field change (e.g. a new
+  // tefillah) atomically with the mode switch — combining them into the one
+  // updateRow call below, rather than two separate calls in the same handler,
+  // which would each read the pre-update `rows` closure and the second would
+  // silently clobber the first's change.
+  function switchToClock(row: Minyan, extraPatch: Partial<Omit<Minyan, 'id'>> = {}) {
     mergeDraft(row.id, {
       anchor: row.anchor,
       direction: (row.offsetMinutes ?? 0) < 0 ? 'before' : (row.offsetMinutes ?? 0) > 0 ? 'after' : drafts[row.id]?.direction,
       magnitudeText: row.anchor ? String(Math.abs(row.offsetMinutes ?? 0)) : drafts[row.id]?.magnitudeText,
     })
     const clockTime = drafts[row.id]?.clockTime ?? ''
-    updateRow(row.id, { anchor: undefined, offsetMinutes: undefined, time: clockTime })
+    updateRow(row.id, { anchor: undefined, offsetMinutes: undefined, time: clockTime, ...extraPatch })
   }
 
   const inputClass =
@@ -191,12 +196,14 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 value={row.tefillah}
                 onChange={(e) => {
                   const tefillah = e.target.value as Tefillah
-                  updateRow(row.id, { tefillah })
                   // Relative mode only makes sense for a handful of tefillos
                   // (see RELATIVE_ELIGIBLE) — picking one that isn't among
-                  // them drops a currently-relative row back to clock mode.
+                  // them drops a currently-relative row back to clock mode,
+                  // atomically with the tefillah change (see switchToClock).
                   if (isRelative && !RELATIVE_ELIGIBLE.includes(tefillah)) {
-                    switchToClock({ ...row, tefillah })
+                    switchToClock(row, { tefillah })
+                  } else {
+                    updateRow(row.id, { tefillah })
                   }
                 }}
                 className={inputClass}
