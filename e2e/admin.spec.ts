@@ -108,6 +108,18 @@ test.describe('admin console', () => {
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
+  test('the Metrics tab shows real submission stats, not stuck loading', async ({ page }) => {
+    await page.goto('/admin/metrics')
+
+    // Loading text should resolve to a real number, not sit forever — and
+    // "Approved"/"Rejected" tiles always render even with zero decided
+    // submissions (getSubmissionFunnelStats returns 0s, not an error).
+    await expect(page.getByText('Loading metrics…')).not.toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Pending')).toBeVisible()
+    await expect(page.getByText('Approval rate')).toBeVisible()
+    await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
+  })
+
   test('opening the Site tab’s preview shows the live home screen, and closes back to the editor untouched', async ({ page }) => {
     await page.goto('/admin/site')
     await page.getByRole('button', { name: 'Preview' }).click()
