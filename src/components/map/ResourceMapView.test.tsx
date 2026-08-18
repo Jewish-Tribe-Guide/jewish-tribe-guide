@@ -11,10 +11,21 @@ import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import type { DirectoryResource } from '@/types'
 import { track } from '@vercel/analytics'
+import { mockRouter } from '@/test/nextNavigationMock'
 import type { MapPoint } from './ResourceMap'
 import ResourceMapView from './ResourceMapView'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+
+// NearbyList's row-level Share action calls useCommunitySlug(), which pulls
+// in next/navigation's useRouter() unconditionally (see nextNavigationMock's
+// own comment) — required here even though this suite never asserts on
+// routing itself.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // ResourceMap.tsx renders a REAL google.maps.Map instance — script-injected
 // SDK, no wrapper library (see loadGoogleMaps.ts) — which jsdom has no
