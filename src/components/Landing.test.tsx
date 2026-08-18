@@ -38,6 +38,7 @@ const handlers = {
   liveTracking: { tracking: false, error: null, start: vi.fn(), stop: vi.fn() },
   controls: {
     address: '',
+    coords: null,
     onAddressChange: vi.fn(),
     onCoords: vi.fn(),
     tracking: false,

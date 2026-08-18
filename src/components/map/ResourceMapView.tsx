@@ -187,14 +187,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Origin for a pin's "Directions ↗" link — prefers the visitor's typed
   // address (controls.address) over raw coordinates, since Maps renders a
   // bare lat/lng origin as an anonymous "Dropped pin" rather than a
-  // recognizable place. Same reasoning as LocationContextValue.directionsOrigin,
-  // duplicated here rather than read from context because this screen also
-  // renders inside the admin's category-preview map, which has no
-  // LocationProvider and supplies `controls`/`liveTracking` as plain props
-  // instead. Live tracking's own label is just "Current location" (see
-  // useLiveLocation), which doesn't geocode to anything, so that still falls
-  // back to coords.
-  const directionsOrigin: string | LatLng | null = !tracking && controls?.address ? controls.address : activeLocation
+  // recognizable place. Gated on controls.coords too — free-typed text the
+  // visitor never picked a suggestion for (or that never resolved) isn't a
+  // real place Maps can route to, so this falls back to raw coords the same
+  // way it already does for live tracking's "Current location" label. Same
+  // reasoning as LocationContextValue.directionsOrigin, duplicated here
+  // rather than read from context because this screen also renders inside
+  // the admin's category-preview map, which has no LocationProvider and
+  // supplies `controls`/`liveTracking` as plain props instead.
+  const directionsOrigin: string | LatLng | null =
+    !tracking && controls?.coords && controls.address ? controls.address : activeLocation
 
   // Mobile only — the quick chip row over the map shows a handful of
   // categories plus a trailing "More" chip; tapping it opens this full-screen
