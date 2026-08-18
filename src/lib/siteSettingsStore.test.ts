@@ -65,6 +65,25 @@ describe('getSiteSettingsUncached', () => {
     await expect(getSiteSettingsUncached('philly')).rejects.toThrow('Failed to load site settings: boom')
   })
 
+  describe('map zoom radius', () => {
+    it('maps a real configured value straight through', async () => {
+      mockFrom.mockReturnValue(chainable({ data: { ...rawRow, map_zoom_radius_miles: 10 }, error: null }))
+      expect((await getSiteSettingsUncached('philly')).mapZoomRadiusMiles).toBe(10)
+    })
+
+    it('normalizes an explicit null (migrated, never configured) to null', async () => {
+      mockFrom.mockReturnValue(chainable({ data: { ...rawRow, map_zoom_radius_miles: null }, error: null }))
+      expect((await getSiteSettingsUncached('philly')).mapZoomRadiusMiles).toBeNull()
+    })
+
+    it('normalizes a missing column (migration not yet run) to null rather than undefined', async () => {
+      // rawRow itself has no map_zoom_radius_miles key at all — the real
+      // shape of a row read before this migration has been applied.
+      mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
+      expect((await getSiteSettingsUncached('philly')).mapZoomRadiusMiles).toBeNull()
+    })
+  })
+
   describe('mobile tabs validation (toMobileTabs)', () => {
     it('falls back to the default trio when mobile_tabs is not an array', async () => {
       mockFrom.mockReturnValue(chainable({ data: { ...rawRow, mobile_tabs: 'not-an-array' }, error: null }))
@@ -127,6 +146,23 @@ describe('updateSiteSettings', () => {
         name: 'My Community', // unchanged field carried through from current
         tagline: 'New Tagline', // patched field
       }),
+      { onConflict: 'community_id' },
+    )
+  })
+
+  it('includes the map zoom radius patch in the upsert payload', async () => {
+    const readBuilder = chainable({ data: rawRow, error: null })
+    const writeBuilder = chainable({ data: { ...rawRow, map_zoom_radius_miles: 10 }, error: null })
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? readBuilder : writeBuilder
+    })
+
+    await updateSiteSettings('philly', { mapZoomRadiusMiles: 10 })
+
+    expect(writeBuilder.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ map_zoom_radius_miles: 10 }),
       { onConflict: 'community_id' },
     )
   })

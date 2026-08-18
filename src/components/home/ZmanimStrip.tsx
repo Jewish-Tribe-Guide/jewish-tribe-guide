@@ -6,8 +6,11 @@ import { useZmanim } from '@/lib/useZmanim'
 // ── The desktop home screen's zmanim section ────────────────────────────────
 // Full content (Hebrew date, the whole daily zmanim grid, upcoming Shabbos) —
 // not a trimmed-down preview. Contained to the same width as the category
-// grid and map above it, so it reads as another section of the page rather
-// than a full-bleed band.
+// grid and map above it, and wrapped in the same bordered card ZmanimCard
+// (the full Zmanim & Shabbos page) already uses for this exact content, so
+// it reads as a defined section of the page — the heading names the topic,
+// the card below is that topic's content — instead of loose content
+// trailing under a heading.
 
 export default function ZmanimStrip({
   coords,
@@ -45,7 +48,9 @@ export default function ZmanimStrip({
         )}
       </div>
 
-      <ZmanimBody data={data} status={status} />
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+        <ZmanimBody data={data} status={status} />
+      </div>
     </section>
   )
 }

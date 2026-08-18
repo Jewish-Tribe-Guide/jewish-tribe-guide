@@ -140,6 +140,34 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).not.toBeInTheDocument()
   })
 
+  it('shows the current map zoom radius, blank when unset', async () => {
+    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: 10 })
+    expect(screen.getByRole('spinbutton')).toHaveValue(10)
+  })
+
+  it('saving an edited map zoom radius sends the number, and blanking it sends null', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: null })
+
+    await user.type(screen.getByRole('spinbutton'), '10')
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: 10 } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(body.mapZoomRadiusMiles).toBe(10)
+
+    // Now blank it back out — should send null, not an empty string or NaN.
+    vi.mocked(fetchJson).mockClear()
+    await user.clear(screen.getByRole('spinbutton'))
+    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: null } })
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
+    const secondBody = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
+    expect(secondBody.mapZoomRadiusMiles).toBeNull()
+  })
+
   it('opens and closes the device preview', async () => {
     const user = userEvent.setup()
     await renderEditor('site')

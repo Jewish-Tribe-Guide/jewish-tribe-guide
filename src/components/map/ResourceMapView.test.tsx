@@ -283,38 +283,87 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     for (const box of boxes) expect(box).not.toBeChecked()
   })
 
-  it('disables Apply and Back, with a note, once nothing is checked — and re-enables them once something is', async () => {
+  // Back is always enabled — unlike Apply, it can never leave the map in an
+  // invalid ("nothing shown") state, since it doesn't touch the real
+  // selection at all (see the draft-vs-apply tests below).
+  it('disables Apply, with a note, once nothing is checked — Back stays enabled throughout', async () => {
     const user = userEvent.setup()
     await openPicker(user)
     const boxes = allCheckboxes()
     const applyButton = screen.getByRole('button', { name: 'Apply' })
     const backButton = screen.getByRole('button', { name: 'Back to map' })
     expect(applyButton).not.toBeDisabled()
+    expect(backButton).not.toBeDisabled()
     expect(screen.queryByText(/Select at least one category/)).not.toBeInTheDocument()
 
     for (const box of boxes) await user.click(box)
 
     expect(applyButton).toBeDisabled()
-    expect(backButton).toBeDisabled()
+    expect(backButton).not.toBeDisabled()
     expect(screen.getByText(/Select at least one category/)).toBeInTheDocument()
 
     await user.click(boxes[0]!)
 
     expect(applyButton).not.toBeDisabled()
-    expect(backButton).not.toBeDisabled()
     expect(screen.queryByText(/Select at least one category/)).not.toBeInTheDocument()
   })
 
-  it('"Show all" always works as an escape hatch, even from the all-unchecked state', async () => {
+  // "Show all" is a toggle now that the draft can genuinely sit at zero —
+  // re-tapping it from an all-checked draft clears it, the same shortcut
+  // working in both directions, and its label reflects which way a tap
+  // would go.
+  it('"Show all" toggles to "Deselect all" and back, both from the picker’s own draft', async () => {
     const user = userEvent.setup()
     await openPicker(user)
-    const boxes = allCheckboxes()
-    for (const box of boxes) await user.click(box)
+    expect(screen.getByRole('button', { name: 'Deselect all' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Deselect all' }))
+
+    for (const box of allCheckboxes()) expect(box).not.toBeChecked()
+    const showAllButton = screen.getByRole('button', { name: 'Show all' })
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled()
 
-    await user.click(screen.getByRole('button', { name: 'Show all' }))
+    await user.click(showAllButton)
 
     for (const box of allCheckboxes()) expect(box).toBeChecked()
     expect(screen.getByRole('button', { name: 'Apply' })).not.toBeDisabled()
+  })
+
+  // Regression coverage for the actual ask: editing the picker (unchecking
+  // boxes, deselecting all) must not touch the map until Apply — and Back
+  // must restore exactly what was live before the picker opened, discarding
+  // whatever was mid-edit.
+  it('editing the picker does not filter the map until Apply is pressed', async () => {
+    const user = userEvent.setup()
+    await openPicker(user)
+    expect(screen.getByTestId('point-count')).toHaveTextContent('5')
+
+    await user.click(allCheckboxes()[0]!)
+    expect(screen.getByTestId('point-count')).toHaveTextContent('5')
+
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('4')
+  })
+
+  it('Back discards the draft — the map keeps showing what it did before the picker opened', async () => {
+    const user = userEvent.setup()
+    await openPicker(user)
+
+    await user.click(screen.getByRole('button', { name: 'Deselect all' }))
+    await user.click(screen.getByRole('button', { name: 'Back to map' }))
+
+    expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('point-count')).toHaveTextContent('5')
+  })
+
+  it('reopening the picker after Back starts from the live selection again, not the discarded draft', async () => {
+    const user = userEvent.setup()
+    await openPicker(user)
+    await user.click(allCheckboxes()[0]!)
+    await user.click(screen.getByRole('button', { name: 'Back to map' }))
+
+    await user.click(screen.getByRole('button', { name: '⋯ More' }))
+
+    for (const box of allCheckboxes()) expect(box).toBeChecked()
   })
 })
