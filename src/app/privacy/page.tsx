@@ -41,19 +41,17 @@ export default function PrivacyPage() {
           <h2 className="text-base font-semibold text-slate-900">If you reach out through a form</h2>
           <p className="mt-2">
             The site has a few forms — requesting support, signing up to volunteer, sending feedback, or a
-            custom form we&rsquo;ve set up — where you can optionally give us your name and a way to reach
-            you (phone and/or email). We only ask for this so our team can respond to{' '}
-            <strong>that specific request</strong>. That&rsquo;s the only reason it exists:
+            custom form we&rsquo;ve set up. For a support or volunteer request (or a custom form), we ask
+            for your name and at least one way to reach you (phone and/or email), because a real person on
+            our team needs to know who&rsquo;s asking and how to follow up. Sending feedback doesn&rsquo;t
+            require any of that — you can leave it blank. Either way, we only ask for this so our team can
+            respond to <strong>that specific request</strong>. That&rsquo;s the only reason it exists:
           </p>
           <ul className="mt-2 list-disc pl-5 space-y-1">
             <li>We use it to reply to you, and for nothing else.</li>
             <li>
               We never sell it, use it for marketing, or share it with anyone outside the small team of
               volunteers and staff who handle these requests.
-            </li>
-            <li>
-              If you don&rsquo;t want to be contacted back, you don&rsquo;t have to give us a way to reach
-              you — you can submit most forms with just the details of your request.
             </li>
           </ul>
           <p className="mt-2">
@@ -95,22 +93,21 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-base font-semibold text-slate-900">Anonymous usage data</h2>
           <p className="mt-2">
-            We use privacy-respecting analytics (Vercel Analytics) to understand things like which pages
-            get visited and which categories people search for — this is aggregate and not tied to your
-            identity. We also use automated error monitoring (Sentry) so we notice and fix things that
-            break; this can capture technical details like your browser and device type when something goes
-            wrong, but not the content of anything you typed.
+            We use privacy-respecting analytics to understand things like which pages get visited and
+            which categories people search for — this is aggregate and not tied to your identity. We also
+            use automated error monitoring so we notice and fix things that break; this can capture
+            technical details like your browser and device type when something goes wrong, but not the
+            content of anything you typed.
           </p>
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-slate-900">Services we rely on</h2>
           <p className="mt-2">
-            Running the site means a few outside services handle pieces of it, each only for the purpose
-            described above: Supabase (our database), Vercel (hosting and analytics), Google (maps, address
-            search, and — for older-style requests — a coordination spreadsheet), Sentry (error monitoring),
-            and Cloudflare (spam protection on forms). None of them get access to more than what&rsquo;s
-            needed to do their job here.
+            Running the site means a handful of reputable outside providers handle pieces of it —
+            hosting, our database, map and address lookups, spam protection on forms, and error
+            monitoring. Each one only ever gets access to what it needs to do that specific job, for no
+            purpose beyond what&rsquo;s described on this page.
           </p>
         </section>
 
