@@ -7,6 +7,7 @@ import type {
   ResourceRow,
   ResourceSubmission,
   SubmissionRow,
+  SubmissionStatus,
   EnrichedSubmission,
   CategorySubmissionPayload,
 } from '@/types'
@@ -69,13 +70,24 @@ export async function getSubmissionFunnelStats(): Promise<SubmissionFunnelStats>
 // Pending submissions, newest first, each enriched with the current target row
 // (for update/delete) so the admin UI can show a before → after diff.
 export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {
+  return listSubmissionsByStatus('pending')
+}
+
+// Submissions in a given status, each enriched the same way as
+// listPendingSubmissions — used both by the moderation queue (pending) and
+// the admin's read-only history view (approved/rejected), so someone can see
+// what was decided and when after the fact. Pending has no reviewed_at yet,
+// so it orders by created_at (oldest waiting first isn't the goal here,
+// newest submitted first is); approved/rejected order by reviewed_at, most
+// recently decided first — that's what "what just happened" means.
+export async function listSubmissionsByStatus(status: SubmissionStatus): Promise<EnrichedSubmission[]> {
   const supabase = getAdminClient()
 
   const { data, error } = await supabase
     .from('submission')
     .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+    .eq('status', status)
+    .order(status === 'pending' ? 'created_at' : 'reviewed_at', { ascending: false })
 
   if (error) throw new Error(`Failed to load submissions: ${error.message}`)
   const submissions = data as SubmissionRow[]
