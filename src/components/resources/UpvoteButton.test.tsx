@@ -149,4 +149,55 @@ describe('UpvoteButton', () => {
     render(<UpvoteButton resourceId="r1" count={5} variant="inline" />)
     expect(screen.getByRole('button')).toHaveTextContent('👍5')
   })
+
+  describe('remembered count (cache-lag correction)', () => {
+    // Regression coverage for a real thing a user noticed: vote, leave, come
+    // back — the count briefly shows its pre-vote value because the listing
+    // page is cached (stale-while-revalidate). A count this browser recently
+    // confirmed for itself (straight from the vote response) should win over
+    // a server-passed count that looks older, for a bounded window.
+
+    it('corrects a stale-looking server count to the recently-remembered one after mount', async () => {
+      localStorage.setItem('jpc_vote_counts', JSON.stringify({ r1: { count: 3, at: Date.now() } }))
+      // Server/cache still thinks it's 2 — the exact scenario reported.
+      render(<UpvoteButton resourceId="r1" count={2} />)
+
+      await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument())
+    })
+
+    it('does not override the server count once the remembered one has expired', async () => {
+      const twoHoursAgo = Date.now() - 3 * 60 * 60 * 1000
+      localStorage.setItem('jpc_vote_counts', JSON.stringify({ r1: { count: 3, at: twoHoursAgo } }))
+      render(<UpvoteButton resourceId="r1" count={2} />)
+
+      // Give the correcting effect a tick to (not) fire, then assert the
+      // server's count is still what's shown.
+      await waitFor(() => expect(getMyVotedIds).toHaveBeenCalled())
+      expect(screen.getByText('2')).toBeInTheDocument()
+    })
+
+    it('remembers the confirmed count after a successful vote, for a later mount to pick up', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, count: 6, voted: true }) }),
+      )
+      const user = userEvent.setup()
+      render(<UpvoteButton resourceId="r1" count={5} />)
+
+      await user.click(screen.getByRole('button'))
+      await waitFor(() => expect(screen.getByText('6')).toBeInTheDocument())
+
+      const stored = JSON.parse(localStorage.getItem('jpc_vote_counts') || '{}')
+      expect(stored.r1.count).toBe(6)
+      expect(stored.r1.at).toBeCloseTo(Date.now(), -2) // within ~tens of ms
+    })
+
+    it('leaves an unrelated resource\'s remembered count alone', async () => {
+      localStorage.setItem('jpc_vote_counts', JSON.stringify({ other: { count: 99, at: Date.now() } }))
+      render(<UpvoteButton resourceId="r1" count={2} />)
+
+      await waitFor(() => expect(getMyVotedIds).toHaveBeenCalled())
+      expect(screen.getByText('2')).toBeInTheDocument()
+    })
+  })
 })
