@@ -126,3 +126,42 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   const { data: reloaded } = await supabase.from('submission').select('status').eq('id', submission.id).single()
   expect(reloaded?.status).toBe('rejected')
 })
+
+test('a rejected submission shows up on the Metrics tab\'s Rejected history view', async ({ page }) => {
+  const supabase = getAdminClient()
+  const name = `E2E Admin Write ${randomUUID()}`
+
+  const { data: submission, error } = await supabase
+    .from('submission')
+    .insert({
+      operation: 'create',
+      target_type: 'listing',
+      target_id: null,
+      payload: listingPayload(name),
+      note: null,
+      status: 'pending',
+      submitted_by: { name: 'e2e-admin-write suite' },
+    })
+    .select('id')
+    .single()
+  if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
+  pendingSubmissionIds.push(submission.id)
+
+  await page.goto('/admin')
+  const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
+  await expect(card).toBeVisible()
+  await card.getByRole('button', { name: 'Reject' }).click()
+  await card.getByRole('button', { name: 'Confirm rejection' }).click()
+  await expect(card).not.toBeVisible()
+
+  // The click-through this test actually exists to prove: Metrics' Rejected
+  // tile links to /admin/history/rejected, and the just-rejected submission
+  // is on it — the real-world case is "did I actually reject that?".
+  await page.goto('/admin/metrics')
+  await page.getByRole('link', { name: /Rejected/ }).click()
+  await expect(page).toHaveURL(/\/admin\/history\/rejected/)
+  await expect(page.locator('div.rounded-lg.shadow-sm', { hasText: name })).toBeVisible()
+
+  const { data: reloaded } = await supabase.from('submission').select('status').eq('id', submission.id).single()
+  expect(reloaded?.status).toBe('rejected')
+})

@@ -59,6 +59,7 @@ const {
   approveSubmission,
   getSubmissionFunnelStats,
   listPendingSubmissions,
+  listSubmissionsByStatus,
   rejectSubmission,
   submitGoogleClosure,
   submitListingCreate,
@@ -233,6 +234,47 @@ describe('listPendingSubmissions', () => {
     mockListCategories.mockResolvedValue([])
 
     await expect(listPendingSubmissions()).rejects.toThrow('Failed to load current rows: timeout')
+  })
+})
+
+// ── listSubmissionsByStatus: the admin history view (approved/rejected) ────
+
+describe('listSubmissionsByStatus', () => {
+  it('filters by the given status and orders pending by created_at', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+    mockListCategories.mockResolvedValue([])
+
+    await listSubmissionsByStatus('pending')
+
+    expect(builder.eq).toHaveBeenCalledWith('status', 'pending')
+    expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
+  })
+
+  it('orders approved/rejected by reviewed_at, most recently decided first', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+    mockListCategories.mockResolvedValue([])
+
+    await listSubmissionsByStatus('rejected')
+
+    expect(builder.eq).toHaveBeenCalledWith('status', 'rejected')
+    expect(builder.order).toHaveBeenCalledWith('reviewed_at', { ascending: false })
+  })
+
+  it('enriches results the same way as listPendingSubmissions (category label, current row)', async () => {
+    const sub = baseSubmission({ status: 'approved', target_id: 'res-1', payload: { category: 'synagogue' } })
+    mockFrom.mockImplementation((table: string) =>
+      table === 'submission'
+        ? chainable({ data: [sub], error: null })
+        : chainable({ data: [{ id: 'res-1', category: 'synagogue' }], error: null }),
+    )
+    mockListCategories.mockResolvedValue([{ id: 'synagogue', label: 'Synagogues' }])
+
+    const [result] = await listSubmissionsByStatus('approved')
+
+    expect(result.categoryLabel).toBe('Synagogues')
+    expect(result.current).toEqual({ id: 'res-1', category: 'synagogue' })
   })
 })
 

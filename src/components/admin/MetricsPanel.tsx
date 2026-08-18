@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import type { SubmissionFunnelStats } from '@/lib/submissionStore'
@@ -22,13 +23,22 @@ function formatPercent(rate: number | null): string {
   return `${Math.round(rate * 100)}%`
 }
 
-function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-4">
+function StatTile({ label, value, sub, href }: { label: string; value: string; sub?: string; href?: string }) {
+  const body = (
+    <>
       <p className="text-xs font-medium text-muted">{label}</p>
       <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
       {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
-    </div>
+    </>
+  )
+  const cls = 'bg-white border border-slate-200 rounded-lg shadow-sm p-4'
+  // Only Pending/Approved/Rejected link anywhere — the rate and timing tiles
+  // are derived numbers with no list of their own to show.
+  if (!href) return <div className={cls}>{body}</div>
+  return (
+    <Link href={href} className={`${cls} block hover:border-primary hover:shadow-md transition-shadow`}>
+      {body}
+    </Link>
   )
 }
 
@@ -63,9 +73,9 @@ export default function MetricsPanel({ token }: { token: string }) {
         The submission moderation queue, all time — how much is waiting, and how it&rsquo;s been handled.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatTile label="Pending" value={String(stats.pending)} />
-        <StatTile label="Approved" value={String(stats.approved)} />
-        <StatTile label="Rejected" value={String(stats.rejected)} />
+        <StatTile label="Pending" value={String(stats.pending)} href="/admin" />
+        <StatTile label="Approved" value={String(stats.approved)} href="/admin/history/approved" />
+        <StatTile label="Rejected" value={String(stats.rejected)} href="/admin/history/rejected" />
         <StatTile
           label="Approval rate"
           value={formatPercent(stats.approvalRate)}
