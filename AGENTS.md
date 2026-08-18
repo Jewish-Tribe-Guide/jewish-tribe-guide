@@ -11,10 +11,16 @@ Default to the **local** admin console (`npm run dev`, then `http://localhost:30
 # Tests
 
 ```bash
-npm test          # unit — pure logic, fast, run constantly
-npm run test:e2e  # end-to-end — builds and starts the app, ~1 min
-npm run test:all  # both
+npm test                    # unit — pure logic, fast, run constantly
+npm run test:e2e            # end-to-end — builds and starts the app, ~1 min
+npm run test:integration    # store-level reads/writes against a disposable test Supabase project
+npm run test:cache-roundtrip  # proves an admin save actually reaches the cached page (e2e-cache/)
+npm run test:form-roundtrip   # fills in and submits a real intake wizard (e2e-form/)
+npm run test:admin-write      # signs in and drives /admin for real: approve/reject, category/form CRUD (e2e-admin-write/)
+npm run test:all            # unit + e2e only — the four suites above need TEST_SUPABASE_* and run separately/in CI
 ```
+
+The last four run against a **disposable second Supabase project** (`TEST_SUPABASE_*` env vars), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
 
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 
@@ -57,10 +63,12 @@ The two tests asserting rendered content are marked `test.fail()`. The suite sta
 
 This is the same mechanism as the `/` redirect bug: a Suspense boundary added for Cache Components silently changed what gets delivered, and the test meant to catch it didn't.
 
-## What still has no coverage
+## Coverage that used to be missing (closed — see the suites above)
 
-Worth knowing before trusting a green run:
+These were all real gaps at one point and are named in old commit history / memory. **All three are now closed** — don't re-report any of them without first checking `ls e2e-*` and the `test:*` scripts in `package.json`, since this exact section went stale before and misled a later session:
 
-- **The admin console's actual behaviour** — approving a submission, editing a category, the device preview. Every admin route is covered for *refusing an anonymous caller* (`api.spec.ts`), and the cache invalidation those routes trigger is unit-tested, but nothing signs in and drives the UI. `/api/admin/dev-login` can't help: it refuses when `NODE_ENV === 'production'`, which is exactly what the e2e suite runs.
-- **A real invalidation round-trip** — that an admin's save makes the new content appear. The wiring is tested from both ends; the two have never been observed meeting.
-- **Form submission end-to-end.** The branching DSL that decides which questions get asked is unit-tested (`forms.test.ts`), but nothing fills in a wizard and posts it, because a passing test would leave a real request in someone's inbox.
+- **The admin console's actual behaviour** — closed by `e2e-admin-write/` (`npm run test:admin-write`): signs in as a real disposable admin and drives approve/reject, category create-and-delete, form create-and-delete.
+- **A real invalidation round-trip** — closed by `e2e-cache/` (`npm run test:cache-roundtrip`): a real production build against the test project, proving an admin's save actually reaches the cached page.
+- **Form submission end-to-end** — closed by `e2e-form/` (`npm run test:form-roundtrip`): fills in and submits a real intake wizard against the test project.
+
+**If you close a gap like this, update this section in the same commit** — this file is read as authoritative instructions, so a stale "still missing" claim here is actively worse than no claim at all.
