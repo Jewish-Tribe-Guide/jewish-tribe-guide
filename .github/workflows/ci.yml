@@ -3,12 +3,12 @@ name: CI
 # Runs the whole test suite automatically instead of relying on someone
 # remembering to. `unit` needs no secrets (lint/typecheck/vitest are all pure
 # — no network, no DB) so it always runs. `integration`, `cache-roundtrip`,
-# `form-roundtrip` and `e2e` each need their own Supabase project (see the
-# `env:` block in each job for exactly which repo secrets to add, Settings →
-# Secrets and variables → Actions, before they can pass) — `integration`,
-# `cache-roundtrip` and `form-roundtrip` all write to and delete from the SAME
-# dedicated, disposable test project (see README "Integration tests"), `e2e`
-# only reads from the real one.
+# `form-roundtrip`, `admin-write` and `e2e` each need their own Supabase
+# project (see the `env:` block in each job for exactly which repo secrets to
+# add, Settings → Secrets and variables → Actions, before they can pass) —
+# `integration`, `cache-roundtrip`, `form-roundtrip` and `admin-write` all
+# write to and delete from the SAME dedicated, disposable test project (see
+# README "Integration tests"), `e2e` only reads from the real one.
 #
 # Every job below sets timeout-minutes, well above its normal run time (a
 # few minutes) but far under GitHub's 360-minute default — `e2e` has hung
@@ -121,6 +121,33 @@ jobs:
         with:
           name: playwright-report-form
           path: playwright-report-form/
+          retention-days: 14
+
+  admin-write:
+    name: Admin console write behavior (approve/reject via the real UI)
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Drives a real browser (clicking Approve/Reject in ModerationQueue),
+      # so it needs a browser installed, same as form-roundtrip.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:admin-write
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-admin-write
+          path: playwright-report-admin-write/
           retention-days: 14
 
   e2e:

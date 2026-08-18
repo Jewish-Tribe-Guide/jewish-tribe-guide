@@ -24,6 +24,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:cache-roundtrip": "playwright test --config playwright.cache.config.ts",
     "test:form-roundtrip": "playwright test --config playwright.form.config.ts",
+    "test:admin-write": "playwright test --config playwright.admin-write.config.ts",
     "test:all": "vitest run && playwright test"
   },
   "dependencies": {

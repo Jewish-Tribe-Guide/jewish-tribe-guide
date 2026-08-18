@@ -20,13 +20,16 @@
 /e2e/.auth/
 # Same, for the cache-round-trip suite's test-project admin session.
 /e2e-cache/.auth/
+# Same, for the admin-write suite's test-project admin session.
+/e2e-admin-write/.auth/
 /playwright-report-cache/
 /playwright-report-form/
+/playwright-report-admin-write/
 
 # next.js
 /.next/
 # Test-project e2e suites' own build output (run-test-project-server.mjs),
-# one per port (cache-round-trip: 3211, form-submission: 3212).
+# one per port (cache-round-trip: 3211, form-submission: 3212, admin-write: 3213).
 /.next-e2e-*/
 /out/
 

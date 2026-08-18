@@ -174,9 +174,18 @@ barred from writing to the database):
   landed with the right data, then deletes it. No admin session needed —
   submitting is public.
 
-Both need `TEST_SUPABASE_ANON_KEY` in addition to the integration suite's
-two vars (the cache suite signs in for real; the form suite's build needs it
-to boot even though the test itself doesn't sign in).
+`npm run test:admin-write` uses the same test project to drive the admin
+console's actual write behavior — clicking Approve/Reject on a real
+submission in `ModerationQueue`, the same buttons a human admin clicks —
+rather than calling `approveSubmission()`/`rejectSubmission()` directly (the
+integration suite) or only loading the signed-in UI read-only (the real e2e
+suite's `admin.spec.ts`, which authenticates as the actual production admin
+and is barred from writing for that reason). Seeds a pending submission
+directly, verifies the resulting resource/submission rows, then cleans up.
+
+All three need `TEST_SUPABASE_ANON_KEY` in addition to the integration
+suite's two vars (they sign in for real, or their build needs it to boot
+even when the test itself doesn't sign in).
 
 To set the test project up:
 
