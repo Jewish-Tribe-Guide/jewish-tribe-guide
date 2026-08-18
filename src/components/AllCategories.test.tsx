@@ -24,7 +24,7 @@ describe('AllCategories', () => {
   it('groups categories into their configured sections', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
-    const homeSections: HomeSection[] = [{ id: 'sec-1', title: 'Essentials', sortOrder: 0, cardIds: ['grocery'] }]
+    const homeSections: HomeSection[] = [{ id: 'sec-1', kind: 'section', title: 'Essentials', sortOrder: 0, cardIds: ['grocery'] }]
 
     renderWithProviders(<AllCategories {...handlers} />, {
       content: { categories: [grocery, synagogue], homeSections },

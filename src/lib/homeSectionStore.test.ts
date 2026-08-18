@@ -13,6 +13,7 @@ function chainable(result: unknown) {
     eq: vi.fn(self),
     order: vi.fn(self),
     insert: vi.fn(self),
+    upsert: vi.fn(self),
     update: vi.fn(self),
     delete: vi.fn(self),
     single: vi.fn(self),
@@ -47,6 +48,28 @@ describe('listHomeSectionsUncached', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(listHomeSectionsUncached('philly')).rejects.toThrow('Failed to load home sections: boom')
+  })
+
+  describe('kind', () => {
+    it('defaults a row with no kind column (pre-migration) to "section"', async () => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, kind: undefined }], error: null }))
+      const [section] = await listHomeSectionsUncached('philly')
+      expect(section.kind).toBe('section')
+    })
+
+    it('maps a real kind straight through', async () => {
+      mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, id: 'map', kind: 'map' }], error: null }))
+      const [section] = await listHomeSectionsUncached('philly')
+      expect(section.kind).toBe('map')
+    })
+
+    it('overrides a built-in row’s title with the fixed BUILT_IN_BLOCKS label, ignoring whatever the row holds', async () => {
+      mockFrom.mockReturnValue(
+        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: 'stale saved title' }], error: null }),
+      )
+      const [section] = await listHomeSectionsUncached('philly')
+      expect(section.title).toBe('Zmanim & Shabbos')
+    })
   })
 })
 
@@ -110,6 +133,44 @@ describe('createHomeSection', () => {
       return chainable({ data: null, error: { message: 'boom' } })
     })
     await expect(createHomeSection({ title: 'X' })).rejects.toThrow('Failed to create section: boom')
+  })
+
+  // A built-in block (kind !== 'section') skips the slugify/insert path
+  // entirely — fixed id/title, and upserts rather than inserts, since
+  // "+ Add block" re-adding one has to succeed even if a row for that exact
+  // id already exists (e.g. from the one-time seed-home-blocks.mjs backfill,
+  // or a previous session).
+  describe('built-in blocks (kind set)', () => {
+    it('upserts with the fixed id/title from BUILT_IN_BLOCKS, ignoring the given title/cardIds', async () => {
+      let call = 0
+      const upsertBuilder = chainable({ data: { id: 'map', kind: 'map', title: 'Explore the map', sort_order: 100, card_ids: [] }, error: null })
+      mockFrom.mockImplementation(() => {
+        call += 1
+        if (call === 1) return chainable({ count: 1, error: null, data: null })
+        return upsertBuilder
+      })
+
+      const result = await createHomeSection({ title: 'ignored', cardIds: ['ignored'], kind: 'map' })
+
+      expect(upsertBuilder.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'map', kind: 'map', title: 'Explore the map', card_ids: [] }),
+        { onConflict: 'community_id,id' },
+      )
+      expect(result.id).toBe('map')
+      expect(result.kind).toBe('map')
+    })
+
+    it('throws a message naming the block on failure', async () => {
+      let call = 0
+      mockFrom.mockImplementation(() => {
+        call += 1
+        if (call === 1) return chainable({ count: 0, error: null, data: null })
+        return chainable({ data: null, error: { message: 'boom' } })
+      })
+      await expect(createHomeSection({ title: '', kind: 'zmanim' })).rejects.toThrow(
+        'Failed to add Zmanim & Shabbos: boom',
+      )
+    })
   })
 })
 

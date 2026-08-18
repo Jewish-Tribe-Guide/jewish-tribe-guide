@@ -121,6 +121,24 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const navSections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
+  // The desktop gateway's own block order (admin-editable — see
+  // HomeSectionManager). Category sections don't interleave here — the
+  // gateway never shows them directly (only via this same `homeSections`
+  // list's OWN ordering, one page over, on AllCategories); this is just
+  // "which of the three singleton blocks show, in what order". A community
+  // that's never touched the ordering has all three, in their original
+  // hardcoded order, via seed-home-blocks.mjs — and the same default order
+  // is the fallback here too, for a deployment that hasn't run that script
+  // (or a fixture/test that predates this) so the gateway still shows all
+  // three rather than silently going blank until someone runs a migration.
+  // Known tradeoff: this can't distinguish "never configured" from "an admin
+  // deliberately removed all three" — both look like zero built-in rows —
+  // so the rare case of removing every one of them reverts to the default
+  // set on the next load rather than staying empty. Removing one or two
+  // sticks; only removing all three hits this.
+  const configuredBuiltIns = (homeSections ?? []).filter((s) => s.kind !== 'section').map((s) => s.kind)
+  const builtInOrder = configuredBuiltIns.length > 0 ? configuredBuiltIns : (['featured', 'map', 'zmanim'] as const)
+
   // The card grid shows inline on mobile always, and on desktop only as search
   // results (see the component note above). Expressed as a class rather than a
   // branch: `isMobile` starts false on every render, including on a phone, so
@@ -169,28 +187,61 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-        {/* ── The three featured cards (desktop) — between the search box and
-                the map. Hidden while searching, when the grid below takes
-                over as the answer to what was typed. ───────────────────────── */}
-        {!q && (
-          <div className="hidden sm:block">
-            <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
-          </div>
-        )}
-
-        {/* ── The map — the real full map screen, right on the home screen.
-                Desktop only: mobile reaches the same map via its own tab bar
-                entry, so it's dropped from this scroll to avoid showing it
-                twice. Hidden while searching so results aren't pushed below
-                a full-height map. `scroll-mt` clears the sticky site header, so
-                scrolling this band into view (arriving from a collapsed
-                fullscreen map) doesn't tuck its heading underneath it. ─────── */}
-        {hasMap && !q && (
-          <div ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
-            <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
-          </div>
-        )}
+        {/* ── The desktop gateway's three singleton blocks — featured cards,
+                the embedded map, Zmanim & Shabbos — in the admin-configured
+                order (builtInOrder above). Each keeps its own existing gating
+                (hidden while searching, desktop-only, hasMap/zmanimCategory);
+                only the SEQUENCE they render in is now data-driven instead of
+                hardcoded. ─────────────────────────────────────────────────── */}
+        {builtInOrder.map((kind) => {
+          if (kind === 'featured') {
+            // Hidden while searching, when the grid below takes over as the
+            // answer to what was typed.
+            return !q && (
+              <div key="featured" className="hidden sm:block">
+                <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+              </div>
+            )
+          }
+          if (kind === 'map') {
+            // The real full map screen, right on the home screen. Desktop
+            // only: mobile reaches the same map via its own tab bar entry, so
+            // it's dropped from this scroll to avoid showing it twice. Hidden
+            // while searching so results aren't pushed below a full-height
+            // map. `scroll-mt` clears the sticky site header, so scrolling
+            // this band into view (arriving from a collapsed fullscreen map)
+            // doesn't tuck its heading underneath it.
+            return hasMap && !q && (
+              <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
+                <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
+                <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
+              </div>
+            )
+          }
+          // Zmanim & Shabbos — the full card's content (not a trimmed
+          // preview), contained to the same max-w-6xl width as the map and
+          // category grid above it. Falls back to the community center so it
+          // renders something real before the visitor has set an address.
+          // Still a JS branch, unlike the other two, and deliberately:
+          // ZmanimStrip calls useZmanim, which fetches /api/zmanim —
+          // uncached, straight through to Hebcal. Rendering it and hiding it
+          // with `sm:` would cost every phone visitor a round-trip for a
+          // section they never see. CSS should own a layout difference; it
+          // shouldn't own one that costs a request. The one-frame correction
+          // is the cheaper error here, and nothing above the fold moves when
+          // it happens.
+          return (
+            !isMobile && !q && zmanimCategory && (
+              <ZmanimStrip
+                key="zmanim"
+                coords={coords ?? community.mapCenter}
+                locationLabel={settings.name}
+                title={zmanimCategory.pluralLabel}
+                onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
+              />
+            )
+          )
+        })}
 
         {/* ── The grid — grouped into labeled sections; a search narrows each
                 section's cards and hides any section left empty. ──────────── */}
@@ -215,27 +266,6 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {/* ── Matching places (individual listings within the cards) ─────────── */}
         {placeHits.length > 0 && (
           <PlacesResults hits={placeHits} onOpen={openPlace} />
-        )}
-
-        {/* ── Zmanim & Shabbos (desktop) — the full card's content (not a
-                trimmed preview), contained to the same max-w-6xl width as the
-                map and category grid above it. Falls back to the community
-                center so it renders something real before the visitor has set
-                an address. ──────────────────────────────────────────────── */}
-        {/* Still a JS branch, unlike the featured cards and the grid above, and
-            deliberately: ZmanimStrip calls useZmanim, which fetches /api/zmanim —
-            uncached, straight through to Hebcal. Rendering it and hiding it with
-            `sm:` would cost every phone visitor a round-trip for a section they
-            never see. CSS should own a layout difference; it shouldn't own one
-            that costs a request. The one-frame correction is the cheaper error
-            here, and nothing above the fold moves when it happens. */}
-        {!isMobile && !q && zmanimCategory && (
-          <ZmanimStrip
-            coords={coords ?? community.mapCenter}
-            locationLabel={settings.name}
-            title={zmanimCategory.pluralLabel}
-            onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
-          />
         )}
       </main>
     </>
