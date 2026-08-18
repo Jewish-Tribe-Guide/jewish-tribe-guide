@@ -131,7 +131,22 @@ export default function CategoryFilter({
   // Only matters when `maxVisible` truncates the row — the full/wrap picker
   // (`maxVisible` unset) already shows every chip, so there's nothing to
   // reorder and `order` stays unused.
-  const [order, setOrder] = useState<string[] | null>(null)
+  //
+  // Seeded with the same selected-first sort the resort effect below
+  // computes, not `null` — `lastResortKey` (below) initializes to the same
+  // value as the first render's `resortKey`, so that effect's `!==` check
+  // is trivially false on mount and never fires there. Starting `order` at
+  // `null` meant the very first paint fell back to `options`' plain
+  // default order regardless of `selected` — so a category arrived at via
+  // a deep link (e.g. the map's own `?cat=` URL param) could render behind
+  // "⋯ More" with no indication anything was even selected, until some
+  // later change (category list changing, or `resortToken` bumping)
+  // happened to trigger a resort.
+  const [order, setOrder] = useState<string[] | null>(() =>
+    maxVisible != null
+      ? [...options].sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id))).map((o) => o.id)
+      : null,
+  )
   const optionIds = options.map((o) => o.id).join(',')
   // React's own documented pattern for "recompute state when a prop
   // changes" — compared and (conditionally) set DURING render, not in a

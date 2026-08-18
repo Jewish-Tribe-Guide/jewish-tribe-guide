@@ -15,12 +15,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
     "import": "node --env-file=.env.local scripts/import.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:cache-roundtrip": "playwright test --config playwright.cache.config.ts",
     "test:all": "vitest run && playwright test"
   },
   "dependencies": {

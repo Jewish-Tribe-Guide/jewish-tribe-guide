@@ -2,6 +2,7 @@
 // Vitest's `expect` — imported once here rather than per component test file.
 // A no-op for the plain-function tests that don't render anything.
 import '@testing-library/jest-dom/vitest'
+import { installMockGeolocation } from './src/test/geolocationMock'
 
 // jsdom 30's own window.localStorage isn't reliably wired up through
 // vitest's jsdom environment on this toolchain (Node 26 also defines its own
@@ -33,5 +34,40 @@ if (typeof window !== 'undefined') {
       configurable: true,
       writable: true,
     })
+  }
+
+  // jsdom doesn't implement window.matchMedia at all (not a stub gap, just
+  // absent) — anything using useIsMobile() (SiteHeader, CommunitySwitcher,
+  // ...) throws without this. Always reports `matches: false` (desktop),
+  // matching useIsMobile's own SSR-safe default; a test that specifically
+  // needs the mobile branch should override window.matchMedia itself.
+  if (!window.matchMedia) {
+    window.matchMedia = (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })
+  }
+
+  // jsdom has no navigator.geolocation at all — see geolocationMock.ts for
+  // the full rationale and how to drive a specific success/error path.
+  installMockGeolocation()
+
+  // jsdom has no ResizeObserver either — a no-op stand-in (never fires a
+  // callback) is enough for components that only use it to measure an
+  // element after mount (ResourceMapView's map-box/overlay height tracking);
+  // nothing here depends on a real resize actually being observed.
+  if (!window.ResizeObserver) {
+    class NoopResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    window.ResizeObserver = NoopResizeObserver as unknown as typeof ResizeObserver
   }
 }

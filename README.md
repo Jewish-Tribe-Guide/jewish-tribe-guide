@@ -143,6 +143,49 @@ This repo is set up to be used as a **GitHub template**. To spin up a community:
 3. Stand up Supabase + Google Maps, then `npm run setup`.
 4. Deploy (the Vercel button above, or any Next.js host).
 
+## Testing
+
+`npm test` (unit + component) and `npm run test:e2e` (Playwright, against a
+production build) need no setup beyond `npm ci` — see `AGENTS.md` for how
+they're organized and what each is for.
+
+### Integration tests
+
+`npm run test:integration` exercises real Supabase reads/writes (the
+submit → moderate → live-table pipeline in `src/lib/submissionStore.ts` and
+friends) against a **second, disposable** Supabase project — never your real
+one. It's optional for everyday work; skip it if `TEST_SUPABASE_URL` /
+`TEST_SUPABASE_SERVICE_ROLE_KEY` aren't set.
+
+`npm run test:cache-roundtrip` uses the **same** test project to prove an
+admin's save actually reaches the cached public page — something the real
+e2e suite can't test (it's barred from writing to the database). It boots a
+real production build against the test project (`scripts/run-cache-e2e-server.mjs`),
+signs in as a fixed test-only admin (`cache-roundtrip-admin@test.invalid`,
+created automatically on first run — no seeding needed), saves a setting
+through the real admin API, and polls the public home page until the new
+content appears, then reverts it. This one also needs
+`TEST_SUPABASE_ANON_KEY`, since it signs in for real.
+
+To set the test project up:
+
+1. Create a free Supabase project (same as step 1 above, but a new one —
+   name it something like `<yourapp>-test`).
+2. Apply the schema: `supabase db push` against it, or paste
+   `supabase/migrations/*.sql` into its SQL editor in filename order. No
+   seeding needed — both suites create/delete/edit their own rows.
+3. Add `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, and
+   `TEST_SUPABASE_SERVICE_ROLE_KEY` (all under Project Settings → API on the
+   *test* project) to `.env.local`.
+4. For CI, add the same three as repo secrets (Settings → Secrets and
+   variables → Actions) — see `.github/workflows/ci.yml`'s `integration` and
+   `cache-roundtrip` jobs.
+
+The integration suite cleans up the rows it creates in `afterEach`, tracked
+by id rather than assumed, so a failed assertion still leaves the project
+clean. The cache-round-trip suite reverts the one setting it changes in a
+`finally` block, same guarantee.
+
 ## License
 
 [MIT](LICENSE) — free to fork, adapt, and deploy for your own community.

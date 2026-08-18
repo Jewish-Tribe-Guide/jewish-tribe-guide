@@ -1,0 +1,96 @@
+import { readFileSync } from 'node:fs'
+import { expect, test } from '@playwright/test'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The other half of caching.spec.ts.
+//
+// caching.spec.ts proves pages are served from the cache; unit tests prove the
+// write path invalidates every tag the read path uses. Neither has ever
+// watched the two halves actually meet: an admin saves, and a real visitor's
+// next page load shows the change. This does — against the disposable test
+// Supabase project (see run-cache-e2e-server.mjs), through the real admin API,
+// with a real production build so Cache Components behaves as it does live.
+//
+// This asserts on the <title> tag, not the page body. AGENTS.md documents
+// that [community]/page.tsx's body content sits inside a Suspense boundary
+// that never resolves server-side (a known, separately-tracked bug — the
+// body ships as the literal fallback shell). Running this suite against
+// heroTitle (rendered in the body) first proved that firsthand: the poll
+// below timed out every time, not because revalidation was broken, but
+// because the body text it was looking for is never in the server response
+// at all, cache or no cache. generateMetadata's <title>/OG tags read the
+// same getSiteSettings() + same cacheTag, but render outside that boundary
+// (AGENTS.md: "Titles, metadata and Open Graph tags render server-side too"
+// — this is the test that actually proves that claim, not just states it).
+//
+// This app calls revalidateTag(tag, 'max') (see revalidateContent.ts), which
+// Next's own docs describe as stale-while-revalidate: the tag is marked
+// stale, but the NEXT request after that can still serve the old page while a
+// fresh one regenerates in the background — only a later request is
+// guaranteed fresh. So this polls for the new content rather than asserting
+// it appears on the very next fetch, which would either flake or (worse)
+// pass by accident. If the new content never shows up, that's the actual bug
+// this test exists to catch.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function titleTag(html: string): string | null {
+  return html.match(/<title>([^<]*)<\/title>/)?.[1] ?? null
+}
+
+test('an admin save reaches the cached public page', async ({ request }) => {
+  // Read at test-run time, not module-load time — Playwright loads every
+  // project's test files up front to build its test list, before the
+  // `setup` project (dependencies: ['setup']) has actually run and written
+  // this file. A top-level read here would always see a stale-or-missing
+  // file regardless of project dependency order.
+  const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
+    accessToken: string
+  }
+  const authHeaders = { Authorization: `Bearer ${accessToken}` }
+
+  const initialPage = await request.get('/')
+  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
+  const beforeRes = await request.get('/api/admin/site-settings', { headers: authHeaders })
+  expect(beforeRes.ok(), 'GET /api/admin/site-settings should succeed with the minted admin token').toBe(true)
+  const before = await beforeRes.json()
+  expect(before.ok).toBe(true)
+  const originalName: string = before.settings.name
+
+  const newName = `Cache round-trip check ${Date.now()}`
+  expect(titleTag(await initialPage.text())).not.toBe(newName)
+
+  try {
+    const patchRes = await request.patch('/api/admin/site-settings', {
+      headers: authHeaders,
+      data: { name: newName },
+    })
+    expect(patchRes.ok(), 'PATCH /api/admin/site-settings should succeed').toBe(true)
+    expect((await patchRes.json()).ok).toBe(true)
+
+    // The actual round trip: the admin's save called revalidatePublicContent(),
+    // which should eventually make the home page's cached <title> pick up the
+    // new site name — proving the write path's tags and the read path's tags
+    // are the same tags, not just individually correct in isolation.
+    await expect
+      .poll(
+        async () => {
+          const res = await request.get(`/${community}`)
+          return titleTag(await res.text())
+        },
+        {
+          timeout: 20_000,
+          message: 'waiting for the revalidated home page to serve the new site name in <title>',
+        },
+      )
+      .toBe(newName)
+  } finally {
+    // site_settings is a singleton row, not something this test created — put
+    // it back even if an assertion above failed.
+    await request.patch('/api/admin/site-settings', {
+      headers: authHeaders,
+      data: { name: originalName },
+    })
+  }
+})

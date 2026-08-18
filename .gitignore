@@ -16,9 +16,15 @@
 /playwright-report/
 /blob-report/
 /.playwright/
+# Real admin session tokens minted by e2e/auth.setup.ts — never commit these.
+/e2e/.auth/
+# Same, for the cache-round-trip suite's test-project admin session.
+/e2e-cache/.auth/
+/playwright-report-cache/
 
 # next.js
 /.next/
+/.next-cache-e2e/
 /out/
 
 # production
@@ -39,6 +45,10 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# Supabase CLI local link state (project ref, pooler URL) from `supabase link`/
+# `db push` — local machine state, not something to share via git.
+/supabase/.temp/
 
 # typescript
 *.tsbuildinfo

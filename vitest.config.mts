@@ -18,6 +18,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Integration tests (src/**/*.integration.test.ts) hit a real Supabase
+    // project and need credentials + setup this config doesn't provide — they
+    // run separately via vitest.integration.config.mts / `npm run
+    // test:integration`. Excluding them here isn't just scoping: without it,
+    // this config's real-project SUPABASE_SERVICE_ROLE_KEY would let them
+    // run for real, writing to and deleting from production data.
+    exclude: ['src/**/*.integration.test.ts', 'node_modules/**'],
     setupFiles: ['./vitest.setup.ts'],
     coverage: {
       provider: 'v8',
@@ -26,6 +33,18 @@ export default defineConfig({
       // application code the numbers are meant to describe.
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.d.ts'],
+      // A floor, not a target: `npm run test:coverage` (and so CI) fails if
+      // coverage drops below this. Set a few points under the actual number
+      // (run `npm run test:coverage` to see it) so normal work doesn't
+      // trip it, but a PR that adds a meaningful chunk of untested code
+      // will. Raise these numbers as coverage grows — never lower them to
+      // make a failing PR pass; fix the coverage instead.
+      thresholds: {
+        statements: 29,
+        branches: 26,
+        functions: 29,
+        lines: 29,
+      },
     },
   },
 })

@@ -23,6 +23,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Lets the cache-round-trip e2e suite (scripts/run-cache-e2e-server.mjs)
+  // build into its own directory instead of overwriting whatever `.next` the
+  // real e2e/dev build left behind — it needs its own real production build
+  // (Cache Components only behaves correctly there), just pointed at the
+  // disposable test Supabase project instead of the real one.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     // Shared with the components that render these images, so the config and
     // the "can this be optimized?" check can't drift apart — see
