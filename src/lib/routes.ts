@@ -64,6 +64,8 @@ export const RESERVED_SLUGS = new Set([
   // The service worker's offline fallback, and the worker itself.
   'offline',
   'sw.js',
+  // The site-wide privacy policy.
+  'privacy',
   // Generated app icons.
   'icons',
   // Framework and metadata paths.
