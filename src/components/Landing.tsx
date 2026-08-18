@@ -216,30 +216,28 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
         {placeHits.length > 0 && (
           <PlacesResults hits={placeHits} onOpen={openPlace} />
         )}
-      </main>
 
-      {/* ── Zmanim & Shabbos (desktop) — the full card's content (not a
-              trimmed preview), rendered loose as a full-bleed band matching
-              the footer right below it rather than another boxed card in the
-              stack above. A sibling of <main>, not inside it, so its
-              background can run edge to edge. Falls back to the community
-              center so it renders something real before the visitor has set
-              an address. ──────────────────────────────────────────────────── */}
-      {/* Still a JS branch, unlike the featured cards and the grid above, and
-          deliberately: ZmanimStrip calls useZmanim, which fetches /api/zmanim —
-          uncached, straight through to Hebcal. Rendering it and hiding it with
-          `sm:` would cost every phone visitor a round-trip for a section they
-          never see. CSS should own a layout difference; it shouldn't own one
-          that costs a request. The one-frame correction is the cheaper error
-          here, and nothing above the fold moves when it happens. */}
-      {!isMobile && !q && zmanimCategory && (
-        <ZmanimStrip
-          coords={coords ?? community.mapCenter}
-          locationLabel={settings.name}
-          title={zmanimCategory.pluralLabel}
-          onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
-        />
-      )}
+        {/* ── Zmanim & Shabbos (desktop) — the full card's content (not a
+                trimmed preview), contained to the same max-w-6xl width as the
+                map and category grid above it. Falls back to the community
+                center so it renders something real before the visitor has set
+                an address. ──────────────────────────────────────────────── */}
+        {/* Still a JS branch, unlike the featured cards and the grid above, and
+            deliberately: ZmanimStrip calls useZmanim, which fetches /api/zmanim —
+            uncached, straight through to Hebcal. Rendering it and hiding it with
+            `sm:` would cost every phone visitor a round-trip for a section they
+            never see. CSS should own a layout difference; it shouldn't own one
+            that costs a request. The one-frame correction is the cheaper error
+            here, and nothing above the fold moves when it happens. */}
+        {!isMobile && !q && zmanimCategory && (
+          <ZmanimStrip
+            coords={coords ?? community.mapCenter}
+            locationLabel={settings.name}
+            title={zmanimCategory.pluralLabel}
+            onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
+          />
+        )}
+      </main>
     </>
   )
 }

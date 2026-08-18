@@ -41,12 +41,17 @@ export default function SlugScreen({
     // Pre-checked needs arrive in the query string rather than history state,
     // so a link that opens the form with a need already selected is shareable.
     const preselect = params.get('need')?.split(',').filter(Boolean)
+    // Set by openFlow when the form was opened from the All Categories index
+    // (see useSiteNavigation), so closing the form returns there instead of
+    // always defaulting home — the form has no single fixed parent, since it
+    // can be reached from either screen.
+    const onClose = params.get('from') === 'all' ? () => viewAllCategories() : goHome
 
     // The two built-in forms have bespoke wizards; everything else is an
     // admin-created form rendered by the generic one.
-    if (slug === 'support') return <SupportWizard preselect={preselect} onClose={goHome} />
-    if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={goHome} />
-    return <GenericFormWizard formId={slug} onClose={goHome} />
+    if (slug === 'support') return <SupportWizard preselect={preselect} onClose={onClose} />
+    if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={onClose} />
+    return <GenericFormWizard formId={slug} onClose={onClose} />
   }
 
   return (

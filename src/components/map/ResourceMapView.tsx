@@ -867,6 +867,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // one" by a chip they can't see.
   const hasPinnedChip = ui.map.pins && pinned.length > 0
   const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
+  // The full-screen category picker (mobile "More") lets a visitor uncheck
+  // every box while browsing — see toggleCategoryCheckbox — but leaving the
+  // picker with nothing checked would filter the map down to nothing shown.
+  // Gates Apply/Back there instead of auto-reverting mid-edit.
+  const noneSelected = effectiveSelected.size === 0 && !pinnedSelected
 
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
@@ -979,6 +984,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // tap target, not literally a checkbox), but a real <input type="checkbox">
   // in the picker needs to mean exactly what it shows: checked ⇄ unchecked,
   // full stop — nothing else is defensible for an actual checkbox control.
+  //
+  // Unlike the chip row's `toggle`, this deliberately does NOT auto-revert to
+  // "show all" when the last box is unchecked — the picker is a full screen
+  // with its own Apply button, so a visitor un-checking everything is mid-edit,
+  // not asking to see nothing. The "nothing shown" guard lives at Apply time
+  // instead (see noneSelected / the Apply button below), which also lets the
+  // picker show an explicit "select at least one" note rather than silently
+  // snapping every box back on.
   const toggleCategoryCheckbox = (id: string) => {
     const next = new Set(effectiveSelected)
     if (next.has(id)) {
@@ -986,13 +999,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     } else {
       next.add(id)
       track('category_filter_selected', { category: id, source: 'checkbox' })
-    }
-    // Same revert-to-all as the chip row — unchecking the last box goes
-    // back to everything rather than leaving the picker (and the map behind
-    // it) at "nothing shown".
-    if (next.size === 0 && !pinnedSelected) {
-      showAll()
-      return
     }
     setSelected(next)
   }
@@ -1699,9 +1705,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
           >
             <button
-              onClick={closeCategoriesPicker}
+              onClick={() => !noneSelected && closeCategoriesPicker()}
+              disabled={noneSelected}
               aria-label="Back to map"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 ${noneSelected ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
@@ -1715,12 +1722,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               Show all
             </button>
             <button
-              onClick={closeCategoriesPicker}
-              className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white cursor-pointer"
+              onClick={() => !noneSelected && closeCategoriesPicker()}
+              disabled={noneSelected}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold text-white ${noneSelected ? 'bg-slate-300 cursor-not-allowed' : 'bg-primary cursor-pointer'}`}
             >
               Apply
             </button>
           </div>
+          {noneSelected && (
+            <p className="shrink-0 px-4 pb-2 text-xs text-amber-600">
+              Select at least one category to see results.
+            </p>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <CategoryPickerList
               options={options}

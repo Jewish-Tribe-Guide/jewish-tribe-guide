@@ -60,8 +60,10 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
 export type SiteNavigation = {
   /** The shared NavigateFn every screen takes. */
   navigate: NavigateFn
-  /** Opens a guided form — a category-or-form slug under the community. */
-  openFlow: (kind: string, preselect?: string[]) => void
+  /** Opens a guided form — a category-or-form slug under the community.
+   *  `from: 'all'` marks it as opened from the All Categories index, so the
+   *  form's own close button returns there instead of defaulting to home. */
+  openFlow: (kind: string, preselect?: string[], from?: 'all') => void
   goHome: (opts?: { at?: 'map' }) => void
   viewAllCategories: (section?: string) => void
   viewListing: (categoryId: string, listingId: string) => void
@@ -80,12 +82,17 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const openFlow = useCallback(
-    (kind: string, preselect?: string[]) => {
+    (kind: string, preselect?: string[], from?: 'all') => {
       // A form's pre-checked needs ride in the query string so the link is
       // shareable and survives a reload — they used to live in history.state,
-      // which neither did.
-      const qs = preselect?.length ? `?need=${encodeURIComponent(preselect.join(','))}` : ''
-      router.push(`${routes.slug(community, kind)}${qs}`)
+      // which neither did. `from` rides alongside for the same reason: the
+      // form's own close button (SlugScreen) reads it to return to the All
+      // Categories index instead of always defaulting to home.
+      const params = new URLSearchParams()
+      if (preselect?.length) params.set('need', preselect.join(','))
+      if (from) params.set('from', from)
+      const qs = params.toString()
+      router.push(`${routes.slug(community, kind)}${qs ? `?${qs}` : ''}`)
     },
     [router, community],
   )

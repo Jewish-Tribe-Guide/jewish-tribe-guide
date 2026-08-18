@@ -19,7 +19,7 @@ vi.mock('@/lib/placesAutocomplete', () => ({
   resetAutocompleteSession: mockResetAutocompleteSession,
 }))
 
-function makeSuggestion(overrides: Partial<{ placeId: string; mainText: string; secondaryText: string; placeOverrides: Record<string, unknown> }> = {}) {
+function makeSuggestion(overrides: Partial<{ placeId: string; mainText: string; secondaryText: string; types: string[]; placeOverrides: Record<string, unknown> }> = {}) {
   const placeId = overrides.placeId ?? 'place-1'
   const place = {
     id: placeId,
@@ -30,7 +30,14 @@ function makeSuggestion(overrides: Partial<{ placeId: string; mainText: string; 
     ...overrides.placeOverrides,
   }
   return {
-    prediction: { placeId, toPlace: () => place },
+    // Every Google business/POI result's own types list includes
+    // 'establishment' — see AddressInput's own selectSuggestion, which reads
+    // this to decide whether a preferPlaceName caller should get the place's
+    // name or its formatted address. Defaulted on here since most existing
+    // tests are exercising a business-suggestion scenario ("Test Shul");
+    // tests specifically about the establishment/address distinction pass
+    // their own `types`.
+    prediction: { placeId, types: overrides.types ?? ['establishment'], toPlace: () => place },
     mainText: overrides.mainText ?? 'Test Shul',
     secondaryText: overrides.secondaryText ?? 'Philadelphia, PA',
   }
@@ -117,9 +124,9 @@ describe('AddressInput', () => {
     expect(mockResetAutocompleteSession).toHaveBeenCalled()
   })
 
-  it('with preferPlaceName, fills the place name instead of the formatted address when one exists', async () => {
+  it('with preferPlaceName, fills the place name instead of the formatted address for a business/POI result', async () => {
     const user = userEvent.setup()
-    mockFetchAddressSuggestions.mockResolvedValue([makeSuggestion()])
+    mockFetchAddressSuggestions.mockResolvedValue([makeSuggestion({ types: ['establishment'] })])
     const onChange = vi.fn()
 
     render(<AddressInput value="" onChange={onChange} preferPlaceName />)
@@ -129,6 +136,34 @@ describe('AddressInput', () => {
     await user.click(screen.getByText('Test Shul'))
 
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('Test Shul'))
+  })
+
+  // Regression test: Google's Places API returns a `displayName` for plain
+  // street addresses too, not just businesses — and it can be a shorter,
+  // abbreviated echo of what was typed (e.g. "232 S 15th St") rather than
+  // the full `formattedAddress` ("232 South 15th Street, Philadelphia, PA
+  // 19102, USA"). preferPlaceName used to swap in `displayName` whenever it
+  // was merely present, which silently truncated the address the "Set
+  // location" header control saved. Gating on the prediction's own `types`
+  // (a plain address never includes 'establishment') fixes it.
+  it('with preferPlaceName, still fills the FULL formatted address for a plain address result, even though it has a displayName', async () => {
+    const user = userEvent.setup()
+    mockFetchAddressSuggestions.mockResolvedValue([
+      makeSuggestion({
+        types: ['street_address', 'geocode'],
+        mainText: '232 S 15th St',
+        placeOverrides: { displayName: '232 S 15th St', formattedAddress: '232 South 15th Street, Philadelphia, PA 19102, USA' },
+      }),
+    ])
+    const onChange = vi.fn()
+
+    render(<AddressInput value="" onChange={onChange} preferPlaceName />)
+    await user.type(screen.getByPlaceholderText('Address or location'), '232 S 15th')
+    await waitOutDebounce()
+    await waitFor(() => expect(screen.getByText('232 S 15th St')).toBeInTheDocument())
+    await user.click(screen.getByText('232 S 15th St'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('232 South 15th Street, Philadelphia, PA 19102, USA'))
   })
 
   it('passes structured place details to onPlaceSelect when a business/POI is chosen', async () => {

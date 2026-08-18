@@ -130,10 +130,18 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
       // moment fetchFields ran — see the note in placesAutocomplete.ts.
       resetAutocompleteSession()
 
-      // A plain address has no displayName distinct from its own formatted
-      // address, so this only actually swaps in a name for a business/POI
-      // suggestion — never a name-shaped surprise in a street address field.
-      const label = (preferPlaceName && place.displayName) || place.formattedAddress
+      // Google's Places API returns a `displayName` for plain street
+      // addresses too now, not just businesses — and it can be a shorter,
+      // abbreviated echo of what was typed ("232 S 15th St") rather than the
+      // full address ("232 South 15th Street, Philadelphia, PA 19102, USA")
+      // `formattedAddress` gives. Gating on the prediction's own `types`
+      // (every business/POI result includes 'establishment' — see
+      // https://developers.google.com/maps/documentation/places/web-service/place-types)
+      // keeps the name-swap for an actual business/POI suggestion and never
+      // lets a plain address suggestion resolve to anything shorter than its
+      // full formatted address.
+      const isBusiness = s.prediction.types?.includes('establishment') ?? false
+      const label = (preferPlaceName && isBusiness && place.displayName) || place.formattedAddress
       if (label) onChange(label)
       const loc = place.location
       if (loc) onCoords?.({ lat: loc.lat(), lng: loc.lng() })
