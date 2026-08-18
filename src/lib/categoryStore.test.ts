@@ -92,7 +92,14 @@ describe('listCategoriesUncached', () => {
       hasAddress: false,
       hasPhone: false,
       upvotesEnabled: true,
-      capabilities: { add: false, edit: true, report: true, directorySearch: true, map: true },
+      // map: false despite the raw row not storing it — has_address: false
+      // forces it regardless of what's stored, since nothing in an
+      // addressless category can ever be geocoded onto the map. Regression
+      // coverage for a real case: an admin turned "Has address" off on an
+      // existing category without the (separate, capabilities-section) Map
+      // checkbox ever being touched, and the stale stored `map: true`
+      // still showed a filter chip for a category with zero plottable pins.
+      capabilities: { add: false, edit: true, report: true, directorySearch: true, map: false },
       externalLink: { label: 'Website', url: 'https://example.com' },
       cardImageUrl: 'https://example.com/card.png',
       cardTextColor: '#fff',

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt, serverMarkup } from './helpers'
+import { categories, categoryWithListings, categoryWithMapPoints, defaultCommunity, dismissLocationPrompt, serverMarkup } from './helpers'
 
 // hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
 // sync by hand rather than imported: these are the literal strings the home
@@ -125,7 +125,10 @@ test.describe('URLs', () => {
 
   test('the map carries its filters in the URL', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
+    // Needs a category that actually plots pins (categoryWithListings would
+    // just as happily pick one with real listings but no addresses at all —
+    // see categoryWithMapPoints' own doc comment).
+    const { category } = await categoryWithMapPoints(request, community)
 
     await page.goto(`/${community}/map?cat=${category.id}&open=1`)
 

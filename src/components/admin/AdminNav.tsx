@@ -11,7 +11,11 @@ export default function AdminNav() {
   const pathname = usePathname()
 
   return (
-    <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+    // touch-pan-x: a diagonal-ish swipe on this strip otherwise gets read as
+    // an ambiguous gesture and can scroll the page vertically along with it —
+    // same fix NearbyList's swipeable rows use (touch-pan-y there) for the
+    // opposite direction. Locks touch panning here to horizontal only.
+    <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto touch-pan-x">
       {ADMIN_TABS.map(({ tab, href, label }) => {
         // '/admin' (queue) only matches exactly — every other href starts
         // with it, so a plain startsWith would light up every tab at once.

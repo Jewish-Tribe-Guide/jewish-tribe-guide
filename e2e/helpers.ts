@@ -51,6 +51,31 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
+/** A listing-kind category with at least one listing that actually has map
+ *  coordinates — for map-specific tests. Distinct from categoryWithListings:
+ *  a category can have real listings and still never produce a pin (no
+ *  address collected — some categories turn "Has address" off entirely — so
+ *  there's nothing to geocode). ResourceMapView's `allPoints` silently drops
+ *  any listing missing `geo`, which means its category never gets a filter
+ *  chip either; a map test that picked one of those via categoryWithListings
+ *  would wait forever for a chip that can never render (seen for real: an
+ *  admin added a "Cemetery" category with `hasAddress: false` and CI started
+ *  failing here, not from a bug — see git blame around where this was added). */
+export async function categoryWithMapPoints(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; count: number }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing')) {
+    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const body = await res.json()
+    if (!body.ok) continue
+    const withGeo = (body.resources as { geo?: unknown }[]).filter((r) => r.geo)
+    if (withGeo.length > 0) return { category, count: withGeo.length }
+  }
+  throw new Error('No listing category has any map-plottable (geocoded) listings — cannot test the map')
+}
+
 /** The listing-kind category with the MOST listings — for tests that need a
  *  page long enough to actually scroll. `categoryWithListings` returns the
  *  first one with any at all, which is routinely a 4-entry category whose
