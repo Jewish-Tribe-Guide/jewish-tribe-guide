@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -54,7 +55,7 @@ export default function SiteFooter({
         <div className="mt-8 border-t border-slate-100 pt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
-            on them. © {year} {settings.name}.
+            on them. © {year} {settings.name}. <Link href="/privacy" className="underline hover:text-slate-600">Privacy</Link>
           </p>
           {settings.feedbackEnabled && (
             <FeedbackButton

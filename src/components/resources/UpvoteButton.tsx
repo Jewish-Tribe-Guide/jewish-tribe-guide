@@ -4,6 +4,21 @@ import { useEffect, useState } from 'react'
 import { getVoterToken, getMyVotedIds } from '@/lib/voteToken'
 
 const VOTED_KEY = 'jpc_voted'
+const COUNT_KEY = 'jpc_vote_counts'
+
+// Listing pages are cached for up to an hour (see resourceStore.ts's own
+// comment on listApprovedResources — a deliberate trade, not an oversight),
+// and revalidateTag('max') after a vote is stale-while-revalidate: the very
+// next page load can still serve the pre-vote count while a fresh one
+// regenerates in the background. Nobody but the voter ever notices this —
+// it's only visible to the one person whose own action briefly appears to
+// have been undone. Remembering the count THIS browser last confirmed
+// (straight from the vote response, not the cached page) and preferring it
+// over a fresher-looking-but-actually-older server count fixes that, without
+// touching the caching decision itself. Bounded to a short window so a vote
+// cast from a different device eventually wins once the cache genuinely
+// catches up, rather than this browser disagreeing with reality forever.
+const REMEMBER_WINDOW_MS = 2 * 60 * 60 * 1000 // 2 hours — matches cacheLife('hours')
 
 function getVotedSet(): Set<string> {
   try {
@@ -19,6 +34,21 @@ function rememberVote(id: string, voted: boolean) {
   else s.delete(id)
   localStorage.setItem(VOTED_KEY, JSON.stringify([...s]))
 }
+
+function getRememberedCounts(): Record<string, { count: number; at: number }> {
+  try {
+    return JSON.parse(localStorage.getItem(COUNT_KEY) || '{}') as Record<string, { count: number; at: number }>
+  } catch {
+    return {}
+  }
+}
+
+function rememberCount(id: string, count: number) {
+  const all = getRememberedCounts()
+  all[id] = { count, at: Date.now() }
+  localStorage.setItem(COUNT_KEY, JSON.stringify(all))
+}
+
 
 export default function UpvoteButton({
   resourceId,
@@ -57,6 +87,15 @@ export default function UpvoteButton({
         rememberVote(resourceId, serverVoted)
       }
     })
+
+    // Same idea for the count: prefer a recent, this-browser-confirmed count
+    // over `initialCount`, which can be a cache-stale snapshot from just
+    // before this browser's own last vote (see REMEMBER_WINDOW_MS's comment).
+    const remembered = getRememberedCounts()[resourceId]
+    if (remembered && Date.now() - remembered.at < REMEMBER_WINDOW_MS && remembered.count !== initialCount) {
+      applyCount(remembered.count)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resourceId])
 
   function applyCount(next: number) {
@@ -85,6 +124,7 @@ export default function UpvoteButton({
         applyCount(body.count)
         setVoted(body.voted)
         rememberVote(resourceId, body.voted)
+        rememberCount(resourceId, body.count)
       } else {
         setVoted(prevVoted)
         applyCount(prevCount)

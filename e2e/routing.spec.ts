@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt } from './helpers'
+import { categories, categoryWithListings, defaultCommunity, dismissLocationPrompt, serverMarkup } from './helpers'
 
 // hospitals/eruv/zmanim — see FIXED_VIEW_KINDS in src/lib/routes.ts. Kept in
 // sync by hand rather than imported: these are the literal strings the home
@@ -209,5 +209,27 @@ test.describe('URLs', () => {
     await page.getByRole('button', { name: eruv.pluralLabel }).first().click()
 
     await expect(page).toHaveURL(`/${community}/eruv`)
+  })
+
+  test('the privacy policy is a real, server-rendered top-level page', async ({ request }) => {
+    const res = await request.get('/privacy')
+    expect(res.status()).toBe(200)
+    expect(serverMarkup(await res.text())).toContain('Privacy Policy')
+  })
+
+  test('the privacy policy is linked from the footer', async ({ page, isMobile }) => {
+    // SiteChrome wraps SiteFooter in `hidden sm:block` — mobile relies on the
+    // bottom tab bar instead and has no footer at all, so this link (and
+    // this test) is desktop-only by the same design, not an oversight here.
+    test.skip(isMobile, 'no footer on mobile')
+
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+    await page.getByRole('link', { name: 'Privacy' }).scrollIntoViewIfNeeded()
+    await page.getByRole('link', { name: 'Privacy' }).click()
+
+    await expect(page).toHaveURL('/privacy')
+    await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible()
   })
 })
