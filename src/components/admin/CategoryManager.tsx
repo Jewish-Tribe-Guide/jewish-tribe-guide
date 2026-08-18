@@ -522,7 +522,7 @@ function SingletonRow({
 // A lightweight editor for Map/Zmanim/Eruv/Medical — no fields to change (it's
 // a fixed, code-driven screen), just the card's name, icon, and home-screen
 // photo/text color, reusing the exact same fields as the full category editor.
-function SingletonEditor({
+export function SingletonEditor({
   token,
   category,
   onSaved,
@@ -538,6 +538,11 @@ function SingletonEditor({
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
+  // Map only — kept as a string (not number|null) so the field can sit blank
+  // mid-edit rather than snapping to 0. Parsed back to number|null on save.
+  const [mapZoomRadius, setMapZoomRadius] = useState(
+    category.kind === 'map' && category.mapZoomRadiusMiles != null ? String(category.mapZoomRadiusMiles) : '',
+  )
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
@@ -561,6 +566,9 @@ function SingletonEditor({
             iconImageUrl: iconImageUrl.trim() || null,
             cardImageUrl: cardImageUrl.trim() || null,
             cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+            ...(category.kind === 'map'
+              ? { mapZoomRadiusMiles: mapZoomRadius.trim() === '' ? null : Number(mapZoomRadius) }
+              : {}),
           }),
         },
         'Save failed.',
@@ -586,8 +594,8 @@ function SingletonEditor({
         <span className="ml-2 text-xs font-normal text-muted">{category.id}</span>
       </h2>
       <p className="text-xs text-muted mb-4">
-        This is a fixed, code-driven card — only its name, icon, and home-screen appearance are
-        editable here.
+        This is a fixed, code-driven card — only its name, icon, home-screen appearance
+        {category.kind === 'map' ? ', and zoom behavior are' : ' are'} editable here.
       </p>
 
       <section className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
@@ -609,6 +617,31 @@ function SingletonEditor({
           previewIcon={icon}
           previewTitle={name || category.pluralLabel}
         />
+        {category.kind === 'map' && (
+          <label className="block pt-3 border-t border-slate-100">
+            <span className="block text-xs font-medium text-slate-700 mb-1">Zoom radius</span>
+            <span className="block text-[11px] text-muted mb-2">
+              How far (in miles) a listing can be from the visitor — or the community center, if no
+              location is set — and still count toward the map zooming out to fit everything when a
+              category is selected or searched. A far-off listing (e.g. a delivery-only address) is
+              still shown as a pin either way; this only keeps it from forcing the initial zoom out
+              to include it. Leave blank for no limit.
+            </span>
+            <span className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={mapZoomRadius}
+                onChange={(e) => setMapZoomRadius(e.target.value)}
+                placeholder="No limit"
+                className="w-32 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <span className="text-sm text-muted">miles</span>
+            </span>
+          </label>
+        )}
       </section>
 
       {errors.length > 0 && (

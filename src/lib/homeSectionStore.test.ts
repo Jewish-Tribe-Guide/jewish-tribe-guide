@@ -63,9 +63,17 @@ describe('listHomeSectionsUncached', () => {
       expect(section.kind).toBe('map')
     })
 
-    it('overrides a built-in row’s title with the fixed BUILT_IN_BLOCKS label, ignoring whatever the row holds', async () => {
+    it('respects a built-in row’s own saved title — it’s real admin-renameable data, not fixed', async () => {
       mockFrom.mockReturnValue(
-        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: 'stale saved title' }], error: null }),
+        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: 'Shabbos Times' }], error: null }),
+      )
+      const [section] = await listHomeSectionsUncached('philly')
+      expect(section.title).toBe('Shabbos Times')
+    })
+
+    it('falls back to the BUILT_IN_BLOCKS default label when a built-in row has no title yet', async () => {
+      mockFrom.mockReturnValue(
+        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: '' }], error: null }),
       )
       const [section] = await listHomeSectionsUncached('philly')
       expect(section.title).toBe('Zmanim & Shabbos')

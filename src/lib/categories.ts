@@ -279,6 +279,15 @@ export type CategoryConfig = {
    *  IS an upload (see /api/admin/categories/icon), not just a pasted URL.
    *  `icon` is kept as the fallback if this is null/unset or fails to load. */
   iconImageUrl?: string | null
+  /** Map category only (kind === 'map'). Caps how far (in miles) a point can
+   *  be from the visitor — or the community center, if no location is set —
+   *  and still count toward the map's automatic "fit everything" zoom on
+   *  category select / search. Null means no cap (every point counts, the
+   *  original behavior). A far-off outlier (e.g. a delivery-only address)
+   *  is still plotted as a pin either way; this only keeps it from forcing
+   *  the initial zoom out to include it. See ResourceMap.tsx's own
+   *  zoomRadiusMiles prop. */
+  mapZoomRadiusMiles?: number | null
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

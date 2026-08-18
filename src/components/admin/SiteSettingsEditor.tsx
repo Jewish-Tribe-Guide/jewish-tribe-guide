@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -11,6 +11,7 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
+import DesktopTopicsManager from './DesktopTopicsManager'
 import MobileTabsEditor from './MobileTabsEditor'
 import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 
@@ -55,25 +56,48 @@ export default function SiteSettingsEditor({
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
 
-  // The preview is plain component state, deliberately NOT a history entry.
-  // It used to push one so browser Back would close it, but the preview is now
-  // a navigable iframe: every navigation inside it adds an entry to the tab's
-  // joint session history, so a single history.back() steps the *frame* back
-  // rather than closing the overlay — which made the "Back to editor" button
-  // do nothing visible once you'd clicked past the home screen. Back now means
-  // "back inside the preview", which is what it should mean in something you
-  // can navigate, and the button closes it outright.
+  // The preview iframe is genuinely navigable (real `src` mode — see
+  // DevicePreviewFrame), so its own link clicks add entries to the tab's
+  // joint session history same as any other navigation. That's why the
+  // explicit "Back to editor" button below is plain state, not
+  // history.back(): once the visitor has clicked around inside the preview,
+  // history.back() steps the *iframe's* history instead of closing the
+  // overlay — visibly doing nothing. Deliberately left alone here; fixing
+  // that would need per-navigation bookkeeping this doesn't have.
+  //
+  // Real trackpad/browser Back is a different problem this DOES fix: it's
+  // not a call this component makes, so there's no "reroute it away from
+  // history" option — the only way to catch it is a pushState + popstate
+  // marker (below). One marker entry is pushed on open; any popstate while
+  // `previewing` closes the overlay unconditionally, without inspecting
+  // which entry actually got consumed — an iframe-internal nav quietly
+  // doesn't fire this window's popstate at all (nested browsing contexts
+  // don't), so by the time it does fire here, a top-level entry genuinely
+  // popped and closing is correct. The one tradeoff: closing via the button
+  // instead leaves the marker orphaned on the stack, so a much later,
+  // unrelated Back press silently consumes it once — acceptable next to the
+  // alternative of Back never closing the preview at all.
   function openPreview() {
     // Snapshot the draft BEFORE the frame mounts — the page inside reads it on
     // load, so writing it afterwards would race the iframe and show saved
     // settings instead. See previewDraft.ts.
     if (draft && sectionsDraft) writePreviewDraft({ settings: draft, sections: sectionsDraft })
+    history.pushState({ ...(window.history.state ?? {}), sitePreview: true }, '')
     setPreviewing(true)
   }
 
   function closePreview() {
     setPreviewing(false)
   }
+
+  useEffect(() => {
+    if (!previewing) return
+    function onPopState() {
+      setPreviewing(false)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [previewing])
 
   const load = useCallback(async () => {
     setError(null)
@@ -330,34 +354,14 @@ export default function SiteSettingsEditor({
         </div>
       )}
 
-      {isSite && (
+      {!isSite && device === 'desktop' && (
         <div className="mt-6 max-w-2xl">
-          <label className="block">
-            <span className="block text-sm font-semibold text-slate-800 mb-1">Map zoom radius</span>
-            <span className="block text-[11px] text-muted mb-2">
-              How far (in miles) a listing can be from the visitor — or the community center, if no
-              location is set — and still count toward the map zooming out to fit everything when a
-              category is selected or searched. A far-off listing (e.g. a delivery-only address) is
-              still shown as a pin either way; this only keeps it from forcing the initial zoom out to
-              include it. Leave blank for no limit.
-            </span>
-            <span className="flex items-center gap-2">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                inputMode="numeric"
-                value={draft.mapZoomRadiusMiles ?? ''}
-                onChange={(e) => {
-                  const raw = e.target.value
-                  set('mapZoomRadiusMiles', raw.trim() === '' ? null : Number(raw))
-                }}
-                placeholder="No limit"
-                className={`${inputClass} max-w-[10rem]`}
-              />
-              <span className="text-sm text-muted">miles</span>
-            </span>
-          </label>
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Desktop topics</h3>
+          <p className="text-[11px] text-muted mb-2">
+            Popular right now, Explore the map, and Zmanim &amp; Shabbos — the desktop home screen&rsquo;s
+            three topic blocks. Rename, reorder, or remove any of them.
+          </p>
+          <DesktopTopicsManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
         </div>
       )}
 

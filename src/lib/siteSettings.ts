@@ -46,14 +46,6 @@ export type SiteSettings = {
    *  DEFAULT_MOBILE_TABS, so this never has to be configured. Desktop has no
    *  tab bar and ignores this entirely. */
   mobileTabs: MobileTabConfig[]
-  /** Caps how far (in miles) a point can be from the visitor — or the
-   *  community center, if no location is set — and still count toward the
-   *  map's automatic "fit everything" zoom on category select / search.
-   *  Null means no cap (every point counts, the original behavior). A
-   *  far-off outlier (e.g. a delivery-only address) is still plotted as a
-   *  pin either way; this only keeps it from forcing the initial zoom out
-   *  to include it. See ResourceMap.tsx's own zoomRadiusMiles prop. */
-  mapZoomRadiusMiles: number | null
 }
 
 /** One entry in the mobile bottom tab bar. */
@@ -117,5 +109,4 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   feedbackSuccessMessage: DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
   featuredCardIds: [],
   mobileTabs: DEFAULT_MOBILE_TABS,
-  mapZoomRadiusMiles: null,
 }

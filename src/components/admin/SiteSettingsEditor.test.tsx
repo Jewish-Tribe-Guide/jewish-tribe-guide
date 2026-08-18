@@ -140,34 +140,6 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).not.toBeInTheDocument()
   })
 
-  it('shows the current map zoom radius, blank when unset', async () => {
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: 10 })
-    expect(screen.getByRole('spinbutton')).toHaveValue(10)
-  })
-
-  it('saving an edited map zoom radius sends the number, and blanking it sends null', async () => {
-    const user = userEvent.setup()
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: null })
-
-    await user.type(screen.getByRole('spinbutton'), '10')
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: 10 } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-
-    await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
-    const body = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(body.mapZoomRadiusMiles).toBe(10)
-
-    // Now blank it back out — should send null, not an empty string or NaN.
-    vi.mocked(fetchJson).mockClear()
-    await user.clear(screen.getByRole('spinbutton'))
-    vi.mocked(fetchJson).mockResolvedValue({ settings: { ...SITE_SETTINGS_DEFAULTS, mapZoomRadiusMiles: null } })
-    await user.click(screen.getByRole('button', { name: 'Save changes' }))
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalled())
-    const secondBody = JSON.parse((vi.mocked(fetchJson).mock.calls[0]![1] as RequestInit).body as string)
-    expect(secondBody.mapZoomRadiusMiles).toBeNull()
-  })
-
   it('opens and closes the device preview', async () => {
     const user = userEvent.setup()
     await renderEditor('site')
@@ -176,6 +148,29 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(screen.getByText('DevicePreviewFrame')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Close preview' }))
+    expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
+  })
+
+  // Regression test: real trackpad/browser Back used to do nothing while the
+  // preview was open — opening it never pushed a history entry, so there was
+  // nothing for Back to land on. A popstate (what a real Back gesture fires)
+  // should now close the overlay, the same as clicking "Close preview".
+  it('closes the preview on a real browser/trackpad Back (a popstate event), not just the button', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByText('DevicePreviewFrame')).toBeInTheDocument()
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    await waitFor(() => expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument())
+  })
+
+  it('a popstate before the preview is even open does nothing (no listener registered yet)', async () => {
+    await renderEditor('site')
+
+    expect(() => window.dispatchEvent(new PopStateEvent('popstate'))).not.toThrow()
     expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
   })
 })

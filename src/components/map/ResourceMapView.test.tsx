@@ -366,4 +366,41 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
 
     for (const box of allCheckboxes()) expect(box).toBeChecked()
   })
+
+  // Regression test: picking one of a category's own filters (Kosher,
+  // Denomination, …) inside the picker's expanded row is documented to imply
+  // wanting that category too (see ensureDraftSelected/toggleBoolFieldInPicker
+  // in ResourceMapView) — but that side effect used to land on the LIVE
+  // selection, not the draft the checkboxes actually display, so picking a
+  // filter for an unchecked category left its box looking unchecked (wrong)
+  // and Apply would then silently drop the live change the filter had made.
+  it('picking a category’s own filter in the picker checks that category’s box too', async () => {
+    const user = userEvent.setup()
+    const withFilter = manyCategories.map((c) =>
+      c.id === 'grocery'
+        ? { ...c, detailFields: [{ key: 'kosher', label: 'Kosher', type: 'boolean' as const, filterable: true }] }
+        : c,
+    )
+    renderMobileMap(<ResourceMapView onUp={vi.fn()} />, manyListings, withFilter)
+    await user.click(screen.getByRole('button', { name: '⋯ More' }))
+    const groceryBox = screen.getByRole('checkbox', { name: 'Show Grocery' })
+    await user.click(groceryBox)
+    expect(groceryBox).not.toBeChecked()
+
+    // Expand Grocery's row (the chevron button sharing its row content) and
+    // pick its Kosher filter. Scoped with `expanded: false` — the compact
+    // chip row behind the picker also has a "Grocery" chip in the DOM.
+    await user.click(screen.getByRole('button', { name: /Grocery/, expanded: false }))
+    await user.click(screen.getByRole('button', { name: 'Kosher' }))
+
+    expect(groceryBox).toBeChecked()
+
+    // And Apply actually commits it to the live selection, not just the
+    // draft's own display — reopening the picker re-syncs from live state
+    // (see the "reopening after Back" test above), so Grocery staying
+    // checked there proves Apply carried the filter-triggered check through.
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    await user.click(screen.getByRole('button', { name: '⋯ More' }))
+    expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeChecked()
+  })
 })

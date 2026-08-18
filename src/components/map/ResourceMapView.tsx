@@ -10,7 +10,6 @@ import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
-import { useSiteSettings } from '@/lib/useSiteSettings'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
@@ -140,9 +139,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
-  // drive the map's automatic "fit everything" zoom — see ResourceMap's own
+  // drive the map's automatic "fit everything" zoom — lives on the Map
+  // pseudo-category's own row (edited from its own entry in the admin
+  // Categories tab), not a general site setting. See ResourceMap's own
   // zoomRadiusMiles prop for what this actually changes.
-  const { mapZoomRadiusMiles } = useSiteSettings()
+  const mapZoomRadiusMiles = categories?.find((c) => c.kind === 'map')?.mapZoomRadiusMiles ?? null
   const hospitalsData = useHospitals()
   const { pinned, toggle: togglePinnedListing, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
   const pinnedIds = useMemo(() => new Set(pinned.map((p) => p.id)), [pinned])
@@ -1088,6 +1089,38 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     }
   }
 
+  // Same idea as ensureSelected/toggleBoolField/toggleSelectValue above, but
+  // for the full-screen picker specifically — its checkboxes read from
+  // draftSelected, not the live selection (see openCategoriesPicker), so the
+  // "picking a filter implies wanting the category" side effect has to land
+  // on the draft too. Landing it on live `selected` instead left the
+  // checkbox unchecked (wrong state shown) and got silently overwritten the
+  // moment Apply committed the draft over it. The filter value itself
+  // (boolFields/selectFilters) still applies live either way — only which
+  // state the auto-select touches differs.
+  function ensureDraftSelected(id: string) {
+    setDraftSelected((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
+  }
+  function toggleBoolFieldInPicker(categoryId: string, key: string) {
+    const adding = !boolFields.includes(key)
+    setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
+    if (adding) {
+      ensureDraftSelected(categoryId)
+      track('field_filter_selected', { category: categoryId, field: key })
+    }
+  }
+  function toggleSelectValueInPicker(categoryId: string, key: string, value: string) {
+    const adding = !(selectFilters[key] ?? []).includes(value)
+    setSelectFilters((prev) => {
+      const cur = prev[key] ?? []
+      return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
+    })
+    if (adding) {
+      ensureDraftSelected(categoryId)
+      track('field_filter_selected', { category: categoryId, field: key, value })
+    }
+  }
+
   const loading = listings === null || categories === null
 
   // The place currently shown in the desktop sidebar's detail panel, if
@@ -1794,9 +1827,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               selected={draftSelected}
               onToggle={toggleCategoryCheckbox}
               boolFields={boolFields}
-              onToggleBool={toggleBoolField}
+              onToggleBool={toggleBoolFieldInPicker}
               selectFilters={selectFilters}
-              onToggleSelectValue={toggleSelectValue}
+              onToggleSelectValue={toggleSelectValueInPicker}
             />
           </div>
         </div>

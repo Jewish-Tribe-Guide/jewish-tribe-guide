@@ -14,10 +14,14 @@ import { FEATURED_CARD_COUNT } from '@/lib/siteSettings'
 // Categories page are visually identical — only the size and position change.
 
 export default function FeaturedCards({
+  title,
   cards,
   loading,
   onShowAll,
 }: {
+  /** The section heading — admin-editable (default "Popular right now"), see
+   *  DesktopTopicsManager. */
+  title: string
   cards: CardDef[]
   /** Categories still loading — hold the row's space with skeletons so the
    *  map below doesn't jump up and then back down. */
@@ -33,7 +37,7 @@ export default function FeaturedCards({
           "see all" link) rather than centered on its own line below the
           cards, which read as an unrelated, oddly-placed extra button. */}
       <div className="mb-4 flex items-baseline justify-between gap-4">
-        <h2 className="text-lg font-semibold text-slate-900">Popular right now</h2>
+        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         <button
           onClick={onShowAll}
           className="shrink-0 text-sm font-medium text-primary underline-offset-2 hover:underline cursor-pointer"

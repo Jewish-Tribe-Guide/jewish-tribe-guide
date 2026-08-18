@@ -11,14 +11,20 @@ name: CI
 # README "Integration tests"), `e2e` only reads from the real one.
 #
 # Every job below sets timeout-minutes, well above its normal run time (a
-# few minutes) but far under GitHub's 360-minute default — `e2e` has hung
-# for 20+ minutes and then 1+ hour on two separate runs, both times stuck in
-# `npx playwright install --with-deps chromium`'s `apt-get update`, endlessly
+# few minutes) but far under GitHub's 360-minute default — nothing should
+# silently eat a runner-hour (or make cancelling it someone's job to
+# notice) if something does hang.
+#
+# `form-roundtrip`, `admin-write` and `e2e` all drive a real browser, and
+# used to run `npx playwright install --with-deps chromium` on the bare
+# runner. That repeatedly hung for 20+ minutes, then 1+ hour, then hit the
+# 15-minute timeout outright, always stuck in `apt-get update` endlessly
 # retrying an unreachable azure.archive.ubuntu.com mirror before falling
-# back to the real one. That's a GitHub-hosted-runner networking flake, not
-# a real hang, and not something fixable from here — but nothing should
-# silently eat an hour of a runner (or make cancelling it someone's job to
-# notice) when it does.
+# back to the real one — a GitHub-hosted-runner networking flake. They now
+# run inside Playwright's own Docker image (browsers + OS deps
+# preinstalled, version-matched to package.json's @playwright/test), so no
+# apt-get ever runs in CI and that mirror can't be hit. Keep the image tag
+# in sync with @playwright/test's version in package.json.
 on:
   push:
     branches: [main]
@@ -99,6 +105,7 @@ jobs:
   form-roundtrip:
     name: Form submission (wizard reaches the database)
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -109,8 +116,8 @@ jobs:
           cache: npm
       - run: npm ci
       # Unlike cache-roundtrip, this suite drives a real browser (filling in
-      # and submitting the wizard), so it does need a browser installed.
-      - run: npx playwright install --with-deps chromium
+      # and submitting the wizard). Browsers + OS deps are already in the
+      # container image, so no `playwright install` step is needed here.
       - run: npm run test:form-roundtrip
         env:
           TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
@@ -126,6 +133,7 @@ jobs:
   admin-write:
     name: Admin console write behavior (approve/reject via the real UI)
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -136,8 +144,8 @@ jobs:
           cache: npm
       - run: npm ci
       # Drives a real browser (clicking Approve/Reject in ModerationQueue),
-      # so it needs a browser installed, same as form-roundtrip.
-      - run: npx playwright install --with-deps chromium
+      # same as form-roundtrip — no `playwright install` step needed, see
+      # container image above.
       - run: npm run test:admin-write
         env:
           TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
@@ -153,6 +161,7 @@ jobs:
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -163,9 +172,9 @@ jobs:
           cache: npm
       - run: npm ci
       # Only the two engines the config actually uses (Desktop Chrome + Pixel 7
-      # device emulation are both Chromium) — installing Firefox/WebKit too
-      # would just slow the run down for no coverage gained.
-      - run: npx playwright install --with-deps chromium
+      # device emulation are both Chromium) — no `playwright install` step
+      # needed, see container image above. It ships every engine, but we
+      # only invoke Chromium via test:e2e.
       - run: npm run test:e2e
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

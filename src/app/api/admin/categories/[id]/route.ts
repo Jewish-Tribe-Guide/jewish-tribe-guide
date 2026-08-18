@@ -21,6 +21,8 @@ type PatchBody = {
   cardImageUrl?: string | null
   cardTextColor?: string | null
   iconImageUrl?: string | null
+  /** Map category only (kind === 'map') — see CategoryConfig's own doc. */
+  mapZoomRadiusMiles?: number | null
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
@@ -57,6 +59,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
   if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
     return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
+  }
+  if (
+    body.mapZoomRadiusMiles !== undefined &&
+    body.mapZoomRadiusMiles !== null &&
+    (!Number.isFinite(body.mapZoomRadiusMiles) || body.mapZoomRadiusMiles <= 0)
+  ) {
+    return Response.json({ ok: false, errors: ['The map zoom radius must be a positive number of miles, or left blank.'] }, { status: 400 })
   }
 
   try {

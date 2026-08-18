@@ -21,10 +21,11 @@ function toSection(row: HomeSectionRow): HomeSection {
   return {
     id: row.id,
     kind,
-    // A built-in's title is fixed app-side, not real admin-set data — see
-    // BUILT_IN_BLOCKS. Ignoring whatever the row happens to hold means a
-    // future rename of the built-in label doesn't need a data migration.
-    title: kind === 'section' ? row.title : BUILT_IN_BLOCKS[kind].title,
+    // A built-in's title IS real admin-set data (the admin can rename
+    // "Popular right now" etc. — see DesktopTopicsManager) — only falls back
+    // to the BUILT_IN_BLOCKS default label when the row genuinely has none
+    // yet (blank, or read before the row existed at all).
+    title: row.title || (kind === 'section' ? '' : BUILT_IN_BLOCKS[kind].title),
     sortOrder: row.sort_order,
     cardIds: row.card_ids ?? [],
   }
@@ -115,11 +116,10 @@ export async function createHomeSection(input: {
 }
 
 // Updates a section's title, card membership/order, or sort position. Only the
-// provided keys change. The slug (id) is immutable. title/cardIds patches on
-// a built-in block are accepted but meaningless (toSection always overrides
-// them back to the fixed BUILT_IN_BLOCKS values) — the admin editor simply
-// never offers those controls for one, same as it never offers a "+ Add a
-// card" picker for zmanim/map.
+// provided keys change. The slug (id) is immutable. A built-in block's title
+// is real, admin-renameable data too (see DesktopTopicsManager) — only
+// cardIds is meaningless for one (the admin editor never offers a "+ Add a
+// card" picker for zmanim/map, since they aren't card groups).
 export async function updateHomeSection(
   id: string,
   patch: { title?: string; cardIds?: string[]; sortOrder?: number },

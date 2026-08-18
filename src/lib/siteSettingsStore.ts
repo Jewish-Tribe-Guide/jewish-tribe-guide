@@ -24,7 +24,6 @@ type Row = {
   feedback_success_message: string
   featured_card_ids: string[] | null
   mobile_tabs: unknown
-  map_zoom_radius_miles: number | null
 }
 
 // jsonb comes back as whatever was written, and this column predates nothing —
@@ -59,10 +58,6 @@ function toSettings(row: Row | null): SiteSettings {
     // save) — normalized to [] so callers never have to null-check it.
     featuredCardIds: row.featured_card_ids ?? [],
     mobileTabs: toMobileTabs(row.mobile_tabs),
-    // undefined (column not yet migrated) and null (migrated, never set)
-    // both mean "no cap" — normalized to the same null callers already
-    // treat that way.
-    mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
   }
 }
 
@@ -119,7 +114,6 @@ export async function updateSiteSettings(
         feedback_success_message: merged.feedbackSuccessMessage,
         featured_card_ids: merged.featuredCardIds,
         mobile_tabs: merged.mobileTabs,
-        map_zoom_radius_miles: merged.mapZoomRadiusMiles,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },

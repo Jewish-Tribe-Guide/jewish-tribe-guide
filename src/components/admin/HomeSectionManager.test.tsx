@@ -183,56 +183,53 @@ describe('HomeSectionManager', () => {
   })
 })
 
-describe('HomeSectionManager — built-in blocks', () => {
-  it('shows a built-in block by its fixed label, with no title input or card picker', () => {
+// The desktop-only "topic" blocks (Popular right now / Explore the map /
+// Zmanim & Shabbos) live in the SAME draft array as plain sections (shared
+// save pipeline — see homeSectionsDraft.ts) but are edited from their own
+// place, DesktopTopicsManager — this component must never render, reorder,
+// or lose one of these entries even though they ride along in `sections`.
+describe('HomeSectionManager — ignores built-in topic entries riding along in the draft', () => {
+  it('never renders a built-in entry as a section row', () => {
     const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
     renderManager([map])
 
-    expect(screen.getByText('Explore the map')).toBeInTheDocument()
-    // No rename input — a built-in's title isn't real editable data.
     expect(screen.queryByDisplayValue('Explore the map')).not.toBeInTheDocument()
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
-  it('offers "+ Add" only for built-ins missing from the list, one button per missing kind', () => {
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
-    renderManager([map])
-
-    expect(screen.queryByRole('button', { name: /Add “Explore the map”/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add “Popular right now”/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add “Zmanim & Shabbos”/ })).toBeInTheDocument()
-  })
-
-  it('clicking "+ Add" appends that built-in, fixed id/title, at the end of the list', async () => {
-    const user = userEvent.setup()
-    const onChange = renderManager([])
-
-    await user.click(screen.getByRole('button', { name: /Add “Zmanim & Shabbos”/ }))
-
-    expect(onChange).toHaveBeenCalledWith([{ id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', cardIds: [] }])
-  })
-
-  it('removing a built-in asks for confirmation (without the "cards fall into More" wording) and removes it', async () => {
+  it('adding a section leaves an existing built-in entry untouched, in its original relative position', async () => {
     const user = userEvent.setup()
     const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
     const onChange = renderManager([map])
 
-    await user.click(screen.getByRole('button', { name: 'Remove' }))
+    await user.type(screen.getByPlaceholderText('New section title'), 'Essentials')
+    await user.click(screen.getByRole('button', { name: 'Add section' }))
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Explore the map'))
-    expect(confirm).not.toHaveBeenCalledWith(expect.stringContaining('More'))
-    expect(onChange).toHaveBeenCalledWith([])
+    const [sections] = onChange.mock.calls[0]!
+    expect(sections).toEqual([expect.objectContaining({ title: 'Essentials' }), map])
   })
 
-  it('a built-in reorders alongside a plain section in the same list', async () => {
+  it('reordering sections never moves a built-in entry out of the draft', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [] }
+    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
+    const onChange = renderManager([a, b, map])
+
+    const downButtons = screen.getAllByRole('button', { name: 'Move section down' })
+    await user.click(downButtons[0]!)
+
+    expect(onChange).toHaveBeenCalledWith([b, a, map])
+  })
+
+  it('deleting a section leaves a built-in entry elsewhere in the draft untouched', async () => {
+    const user = userEvent.setup()
+    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Essentials', cardIds: [] }
     const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
     const onChange = renderManager([section, map])
 
-    const downButtons = screen.getAllByRole('button', { name: /Move (section|block) down/ })
-    await user.click(downButtons[0]!)
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
 
-    expect(onChange).toHaveBeenCalledWith([map, section])
+    expect(onChange).toHaveBeenCalledWith([map])
   })
 })
