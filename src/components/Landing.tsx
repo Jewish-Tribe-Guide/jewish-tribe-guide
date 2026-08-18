@@ -14,6 +14,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useLocation } from '@/lib/locationContext'
 import { pickFeaturedCards } from '@/lib/featuredCards'
 import { community } from '@/community.config'
 import type { NavigateFn } from '@/types'
@@ -72,9 +73,14 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
+  const { anchor } = useLocation()
   // The Map pseudo-category still gates whether the map shows at all.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
+  // Same as the real Zmanim & Shabbos category page (FindResources' own
+  // locationLabel) — the visitor's typed address, or the community's region,
+  // never the site's own name.
+  const zmanimLocationLabel = anchor.label || community.region
 
   const resources = resourceCards(onNavigate, categories)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -235,9 +241,8 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
               <ZmanimStrip
                 key="zmanim"
                 coords={coords ?? community.mapCenter}
-                locationLabel={settings.name}
+                locationLabel={zmanimLocationLabel}
                 title={zmanimCategory.pluralLabel}
-                onOpenZmanim={() => onNavigate('patient', 'find', { findView: 'zmanim' })}
               />
             )
           )

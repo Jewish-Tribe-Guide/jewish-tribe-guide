@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
+import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { LocationProvider } from '@/lib/locationContext'
 import Landing from './Landing'
 
 // HomeMap and ZmanimStrip are mocked out — both pull in real network/SDK
@@ -42,10 +44,26 @@ const handlers = {
   },
 }
 
+// Landing now reads useLocation() directly (for the zmanim location label —
+// see zmanimLocationLabel), which throws outside a LocationProvider. Wraps
+// renderWithProviders' own element instead of duplicating its provider
+// stack/options handling.
+function renderLanding(
+  props: Partial<ComponentProps<typeof Landing>> = {},
+  options?: Parameters<typeof renderWithProviders>[1],
+): RenderResult {
+  return renderWithProviders(
+    <LocationProvider>
+      <Landing {...handlers} {...props} />
+    </LocationProvider>,
+    options,
+  )
+}
+
 describe('Landing', () => {
   it('shows the configured hero title/mission and the category grid', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    renderWithProviders(<Landing {...handlers} />, {
+    renderLanding(undefined, {
       content: {
         categories: [grocery],
         settings: { ...SITE_SETTINGS_DEFAULTS, heroTitle: 'Welcome to the directory', mission: 'Everything nearby' },
@@ -61,7 +79,7 @@ describe('Landing', () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
-    renderWithProviders(<Landing {...handlers} />, { content: { categories: [grocery, synagogue] } })
+    renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
     await user.type(screen.getByLabelText('Filter resources'), 'grocery')
 
@@ -71,7 +89,7 @@ describe('Landing', () => {
 
   it('shows a "nothing matches" message for a query with no hits', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<Landing {...handlers} />, { content: { categories: [makeCategory()] } })
+    renderLanding(undefined, { content: { categories: [makeCategory()] } })
 
     await user.type(screen.getByLabelText('Filter resources'), 'xyznotreal')
 
@@ -80,21 +98,21 @@ describe('Landing', () => {
 
   it('renders the map band only when the community has a Map pseudo-category', () => {
     const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    const { unmount } = renderWithProviders(<Landing {...handlers} />, { content: { categories: [withMap] } })
+    const { unmount } = renderLanding(undefined, { content: { categories: [withMap] } })
     expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
     unmount()
 
-    renderWithProviders(<Landing {...handlers} />, { content: { categories: [makeCategory()] } })
+    renderLanding(undefined, { content: { categories: [makeCategory()] } })
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
   })
 
   it('renders the zmanim strip only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
-    const { unmount } = renderWithProviders(<Landing {...handlers} />, { content: { categories: [withZmanim] } })
+    const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
     expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
     unmount()
 
-    renderWithProviders(<Landing {...handlers} />, { content: { categories: [makeCategory()] } })
+    renderLanding(undefined, { content: { categories: [makeCategory()] } })
     expect(screen.queryByTestId('zmanim-strip-stub')).not.toBeInTheDocument()
   })
 
@@ -105,7 +123,7 @@ describe('Landing', () => {
     ]
 
     it('defaults to map before zmanim when nothing is configured (no built-in rows at all)', () => {
-      const { container } = renderWithProviders(<Landing {...handlers} />, {
+      const { container } = renderLanding(undefined, {
         content: { categories: withMapAndZmanim, homeSections: [] },
       })
 
@@ -114,7 +132,7 @@ describe('Landing', () => {
     })
 
     it('follows the admin-configured order — zmanim before map', () => {
-      const { container } = renderWithProviders(<Landing {...handlers} />, {
+      const { container } = renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
@@ -129,7 +147,7 @@ describe('Landing', () => {
     })
 
     it('hides a built-in block that was configured out (removed), even though its category exists', () => {
-      renderWithProviders(<Landing {...handlers} />, {
+      renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [{ id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] }],
@@ -144,9 +162,10 @@ describe('Landing', () => {
   it('calls onViewAllCategories when "Browse all categories" is clicked', async () => {
     const user = userEvent.setup()
     const onViewAllCategories = vi.fn()
-    renderWithProviders(<Landing {...handlers} onViewAllCategories={onViewAllCategories} />, {
-      content: { categories: [makeCategory()] },
-    })
+    renderLanding(
+      { onViewAllCategories },
+      { content: { categories: [makeCategory()] } },
+    )
 
     await user.click(screen.getByRole('button', { name: /Browse all categories/ }))
 

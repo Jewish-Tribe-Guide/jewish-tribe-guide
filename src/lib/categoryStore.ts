@@ -30,6 +30,7 @@ type CategoryRow = {
   card_image_url: string | null
   card_text_color: string | null
   icon_image_url: string | null
+  map_zoom_radius_miles: number | null
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -53,6 +54,10 @@ function toConfig(row: CategoryRow): CategoryConfig {
     cardImageUrl: row.card_image_url,
     cardTextColor: row.card_text_color,
     iconImageUrl: row.icon_image_url,
+    // undefined (column not yet migrated) and null (migrated, never set)
+    // both mean "no cap" — normalized to the same null callers already
+    // treat that way.
+    mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
   }
 }
 
@@ -204,6 +209,7 @@ export async function updateCategory(
     cardImageUrl?: string | null
     cardTextColor?: string | null
     iconImageUrl?: string | null
+    mapZoomRadiusMiles?: number | null
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -226,6 +232,7 @@ export async function updateCategory(
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
   if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
+  if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
 
   // Admin edits are still single-community — see the note in communityStore.
   // Scoping the write by community as well as id means a future second

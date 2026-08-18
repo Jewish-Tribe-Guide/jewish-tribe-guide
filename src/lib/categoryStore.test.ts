@@ -97,6 +97,7 @@ describe('listCategoriesUncached', () => {
       cardImageUrl: 'https://example.com/card.png',
       cardTextColor: '#fff',
       iconImageUrl: null,
+      mapZoomRadiusMiles: null,
     })
   })
 
@@ -270,6 +271,24 @@ describe('updateCategory', () => {
 
     expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
     expect(builder.eq).toHaveBeenCalledWith('id', 'synagogue')
+  })
+
+  it('writes mapZoomRadiusMiles straight through (Map category only, but the store itself is agnostic)', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('map', { mapZoomRadiusMiles: 10 })
+
+    expect(builder.update).toHaveBeenCalledWith({ map_zoom_radius_miles: 10 })
+  })
+
+  it('clears mapZoomRadiusMiles (back to "no limit") when set to null', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('map', { mapZoomRadiusMiles: null })
+
+    expect(builder.update).toHaveBeenCalledWith({ map_zoom_radius_miles: null })
   })
 
   it('clears externalLink entirely when set to null', async () => {

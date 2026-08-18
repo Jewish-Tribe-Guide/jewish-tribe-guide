@@ -49,13 +49,6 @@ export async function PATCH(request: Request) {
   if (body.feedbackSuccessMessage !== undefined && !body.feedbackSuccessMessage.trim()) {
     return Response.json({ ok: false, errors: ['Feedback success message cannot be empty.'] }, { status: 400 })
   }
-  if (
-    body.mapZoomRadiusMiles !== undefined &&
-    body.mapZoomRadiusMiles !== null &&
-    (!Number.isFinite(body.mapZoomRadiusMiles) || body.mapZoomRadiusMiles <= 0)
-  ) {
-    return Response.json({ ok: false, errors: ['The map zoom radius must be a positive number of miles, or left blank.'] }, { status: 400 })
-  }
   if (body.mobileTabs !== undefined) {
     const tabs = body.mobileTabs
     if (!Array.isArray(tabs) || tabs.length === 0) {
