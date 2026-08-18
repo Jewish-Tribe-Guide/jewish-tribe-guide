@@ -12,9 +12,13 @@ import { CACHE_TEST_ADMIN_EMAIL } from '../scripts/cacheE2eAdmin.mjs'
 // rather than driving a browser, so it just saves the access token to a
 // file instead of a full browser storageState.
 //
-// CACHE_TEST_ADMIN_EMAIL doesn't need to exist as a user beforehand —
-// generateLink with type 'magiclink' creates it on first call, which is why
-// this suite needs no seeding beyond the schema migrations.
+// CACHE_TEST_ADMIN_EMAIL doesn't need to exist as a user beforehand — this
+// creates it (idempotently, pre-confirmed) on first run. generateLink with
+// type 'magiclink' alone was tried first and turned out unreliable for a
+// genuinely brand-new email on some Supabase project configs (the returned
+// link failed to redeem with "invalid or has expired" even though it was
+// used within the same second) — explicitly creating the user first removes
+// that ambiguity.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TOKEN_FILE = 'e2e-cache/.auth/token.json'
@@ -31,6 +35,16 @@ setup('mint a cache-test admin session', async () => {
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey)
+
+  const { error: createError } = await admin.auth.admin.createUser({
+    email: CACHE_TEST_ADMIN_EMAIL,
+    email_confirm: true,
+  })
+  // Idempotent: only a genuine failure is fatal, not "this user already exists".
+  if (createError && !/already.*registered|already.*exists/i.test(createError.message)) {
+    throw new Error(`Could not create the cache-test admin user: ${createError.message}`)
+  }
+
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email: CACHE_TEST_ADMIN_EMAIL,

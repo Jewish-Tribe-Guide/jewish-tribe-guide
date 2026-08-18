@@ -26,20 +26,31 @@ if (missing.length) {
     `Missing ${missing.join(', ')} — see README "Integration tests" for how to set up the test project.`,
   )
 }
-if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error(
-    'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the cache-round-trip suite ' +
-      'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project.',
-  )
-}
 
-// e2e-cache/auth.setup.ts runs in this same process and reads these directly
-// — same remap-in-process pattern as src/test/integrationEnv.ts. The
-// webServer's child process (run-cache-e2e-server.mjs) does its own,
-// identical remap for the Next.js server itself.
-process.env.NEXT_PUBLIC_SUPABASE_URL = url
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
-process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey
+// Playwright re-imports this config file fresh in every worker process, and
+// workers inherit process.env from the main process — which has already run
+// this file once and remapped NEXT_PUBLIC_SUPABASE_URL to equal
+// TEST_SUPABASE_URL below. Without this guard, every re-import after the
+// first would compare TEST_SUPABASE_URL against its own already-remapped
+// copy, always "match", and refuse unconditionally — the same class of bug
+// run-cache-e2e-server.mjs's comment warns about, just one process level up.
+if (!process.env.CACHE_E2E_REMAPPED) {
+  if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error(
+      'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the cache-round-trip suite ' +
+        'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project.',
+    )
+  }
+
+  // e2e-cache/auth.setup.ts runs in this same process and reads these
+  // directly — same remap-in-process pattern as src/test/integrationEnv.ts.
+  // The webServer's child process (run-cache-e2e-server.mjs) does its own
+  // remap for the Next.js server itself, independent of this one.
+  process.env.NEXT_PUBLIC_SUPABASE_URL = url
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
+  process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey
+  process.env.CACHE_E2E_REMAPPED = '1'
+}
 
 const PORT = process.env.CACHE_E2E_PORT || '3211'
 const BASE_URL = `http://localhost:${PORT}`

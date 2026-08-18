@@ -5,12 +5,17 @@
 // the cache-round-trip e2e suite (e2e-cache/) can safely write through the
 // real admin API and watch the change reach the cached public page.
 //
-// Never invoke `next build`/`next start` directly for this suite — this
-// script is the only thing that remaps TEST_SUPABASE_* onto the vars the app
-// actually reads, and the only thing that refuses to run if TEST_SUPABASE_URL
-// looks like it might be the real project.
+// The one-time-invoke-the-real-project safety check lives in
+// playwright.cache.config.ts, not here — that config is the actual entry
+// point (`npm run test:cache-roundtrip`), and it runs BEFORE this script is
+// spawned as its webServer child. This script inherits that already-vetted,
+// already-remapped environment; re-checking here would compare
+// TEST_SUPABASE_URL against a NEXT_PUBLIC_SUPABASE_URL the parent has
+// already overwritten to match it, which would always "match" and refuse
+// unconditionally — a real bug this comment is here so nobody reintroduces.
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
+import { createClient } from '@supabase/supabase-js'
 import { CACHE_TEST_ADMIN_EMAIL } from './cacheE2eAdmin.mjs'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
@@ -29,15 +34,48 @@ if (missing.length) {
   process.exit(1)
 }
 
-// Same refusal e2e-cache/auth.setup.ts and src/test/integrationEnv.ts make —
-// this suite writes real data through the real admin API, so pointing it at
-// the actual production project by mistake would mean writing to production.
-if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  console.error(
-    '❌ TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the cache-round-trip ' +
-      'suite against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project.',
-  )
-  process.exit(1)
+// Next's Cache Components require every generateStaticParams to return at
+// least one result at build time — the listing-detail route
+// ([community]/[slug]/[id]) has one, so `next build` hard-fails against a
+// test project with zero approved listings. The integration suite (which
+// shares this project) always cleans up everything it creates, so the
+// project can genuinely be empty by the time this runs. Rather than
+// requiring a separate manual seeding step, ensure one category + one
+// approved listing exist before every build — cheap to check, and it
+// self-heals regardless of what the integration suite left behind.
+async function ensureMinimalContent() {
+  const supabase = createClient(url, serviceRoleKey)
+
+  const { data: existingCategory } = await supabase.from('category').select('id').limit(1).maybeSingle()
+  if (existingCategory) return
+
+  const CATEGORY_ID = 'cache-roundtrip-seed'
+  const { error: categoryError } = await supabase.from('category').upsert({
+    id: CATEGORY_ID,
+    label: 'Cache Round-trip Seed',
+    plural_label: 'Cache Round-trip Seed',
+    icon: '📋',
+    description: 'Minimal content so next build has something to statically generate. Safe to ignore/delete.',
+    fields: [],
+    kind: 'listing',
+    sort_order: 999,
+    upvotes_enabled: false,
+    has_address: true,
+    has_phone: true,
+    capabilities: {},
+  })
+  if (categoryError) throw new Error(`Could not seed minimal category: ${categoryError.message}`)
+
+  const { error: resourceError } = await supabase.from('resource').insert({
+    category: CATEGORY_ID,
+    name: 'Cache Round-trip Seed Listing',
+    address: '1 Test St, Philadelphia, PA',
+    phone: null,
+    details: {},
+    status: 'approved',
+    reviewed_at: new Date().toISOString(),
+  })
+  if (resourceError) throw new Error(`Could not seed minimal listing: ${resourceError.message}`)
 }
 
 const PORT = process.env.CACHE_E2E_PORT || '3211'
@@ -62,6 +100,7 @@ function run(command, args) {
 }
 
 try {
+  await ensureMinimalContent()
   await run('npx', ['next', 'build'])
   await run('npx', ['next', 'start', '--port', PORT])
 } catch (err) {
