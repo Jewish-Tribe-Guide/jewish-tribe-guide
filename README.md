@@ -157,20 +157,34 @@ friends) against a **second, disposable** Supabase project — never your real
 one. It's optional for everyday work; skip it if `TEST_SUPABASE_URL` /
 `TEST_SUPABASE_SERVICE_ROLE_KEY` aren't set.
 
-To set one up:
+`npm run test:cache-roundtrip` uses the **same** test project to prove an
+admin's save actually reaches the cached public page — something the real
+e2e suite can't test (it's barred from writing to the database). It boots a
+real production build against the test project (`scripts/run-cache-e2e-server.mjs`),
+signs in as a fixed test-only admin (`cache-roundtrip-admin@test.invalid`,
+created automatically on first run — no seeding needed), saves a setting
+through the real admin API, and polls the public home page until the new
+content appears, then reverts it. This one also needs
+`TEST_SUPABASE_ANON_KEY`, since it signs in for real.
+
+To set the test project up:
 
 1. Create a free Supabase project (same as step 1 above, but a new one —
    name it something like `<yourapp>-test`).
 2. Apply the schema: `supabase db push` against it, or paste
    `supabase/migrations/*.sql` into its SQL editor in filename order. No
-   seeding needed — the tests create and delete their own rows.
-3. Add `TEST_SUPABASE_URL` and `TEST_SUPABASE_SERVICE_ROLE_KEY` (Project
-   Settings → API on the *test* project) to `.env.local`.
-4. For CI, add the same two as repo secrets (Settings → Secrets and
-   variables → Actions) — see `.github/workflows/ci.yml`'s `integration` job.
+   seeding needed — both suites create/delete/edit their own rows.
+3. Add `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, and
+   `TEST_SUPABASE_SERVICE_ROLE_KEY` (all under Project Settings → API on the
+   *test* project) to `.env.local`.
+4. For CI, add the same three as repo secrets (Settings → Secrets and
+   variables → Actions) — see `.github/workflows/ci.yml`'s `integration` and
+   `cache-roundtrip` jobs.
 
-Every test cleans up the rows it creates in `afterEach`, tracked by id rather
-than assumed, so a failed assertion still leaves the project clean.
+The integration suite cleans up the rows it creates in `afterEach`, tracked
+by id rather than assumed, so a failed assertion still leaves the project
+clean. The cache-round-trip suite reverts the one setting it changes in a
+`finally` block, same guarantee.
 
 ## License
 
