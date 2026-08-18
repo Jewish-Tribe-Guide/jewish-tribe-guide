@@ -98,6 +98,49 @@ describe('Landing', () => {
     expect(screen.queryByTestId('zmanim-strip-stub')).not.toBeInTheDocument()
   })
 
+  describe('the gateway block order (Popular right now / Explore the map / Zmanim & Shabbos)', () => {
+    const withMapAndZmanim = [
+      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
+      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+    ]
+
+    it('defaults to map before zmanim when nothing is configured (no built-in rows at all)', () => {
+      const { container } = renderWithProviders(<Landing {...handlers} />, {
+        content: { categories: withMapAndZmanim, homeSections: [] },
+      })
+
+      const html = container.innerHTML
+      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="zmanim-strip-stub"'))
+    })
+
+    it('follows the admin-configured order — zmanim before map', () => {
+      const { container } = renderWithProviders(<Landing {...handlers} />, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Explore the map', sortOrder: 200, cardIds: [] },
+          ],
+        },
+      })
+
+      const html = container.innerHTML
+      expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+    })
+
+    it('hides a built-in block that was configured out (removed), even though its category exists', () => {
+      renderWithProviders(<Landing {...handlers} />, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [{ id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] }],
+        },
+      })
+
+      expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
+      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    })
+  })
+
   it('calls onViewAllCategories when "Browse all categories" is clicked', async () => {
     const user = userEvent.setup()
     const onViewAllCategories = vi.fn()

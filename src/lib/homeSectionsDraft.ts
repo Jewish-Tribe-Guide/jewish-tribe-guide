@@ -1,4 +1,4 @@
-import type { HomeSection, DraftHomeSection } from './homeSections'
+import type { HomeBlockKind, HomeSection, DraftHomeSection } from './homeSections'
 
 async function patchSection(
   token: string,
@@ -15,11 +15,18 @@ async function patchSection(
   return body.section as HomeSection
 }
 
-async function createSection(token: string, title: string, cardIds: string[]): Promise<HomeSection> {
+async function createSection(
+  token: string,
+  title: string,
+  cardIds: string[],
+  kind: HomeBlockKind,
+): Promise<HomeSection> {
+  // A built-in block's own title/cardIds are fixed server-side (see
+  // createHomeSection) — sent along anyway is harmless, just ignored.
   const res = await fetch('/api/admin/home-sections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ title, cardIds }),
+    body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind }),
   })
   const body = await res.json()
   if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create a section.')
@@ -66,7 +73,7 @@ export async function saveHomeSections(
   for (const d of draft) {
     const existing = originalById.get(d.id)
     if (!existing) {
-      savedInOrder.push(await createSection(token, d.title, d.cardIds))
+      savedInOrder.push(await createSection(token, d.title, d.cardIds, d.kind))
     } else if (changed(existing, d)) {
       savedInOrder.push(await patchSection(token, d.id, { title: d.title, cardIds: d.cardIds }))
     } else {

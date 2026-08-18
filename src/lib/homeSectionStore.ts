@@ -2,19 +2,29 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { slugify } from './categoryStore'
-import type { HomeSection } from './homeSections'
+import { BUILT_IN_BLOCKS, type HomeBlockKind, type HomeSection } from './homeSections'
 
 type HomeSectionRow = {
   id: string
+  kind: string
   title: string
   sort_order: number
   card_ids: string[]
 }
 
+// row.kind ?? 'section': the same "read before this migration ran" fallback
+// every other widened site_settings/home_section column in this codebase
+// uses — a row selected via `select('*')` before the column existed simply
+// won't have the key at all.
 function toSection(row: HomeSectionRow): HomeSection {
+  const kind = (row.kind ?? 'section') as HomeBlockKind
   return {
     id: row.id,
-    title: row.title,
+    kind,
+    // A built-in's title is fixed app-side, not real admin-set data — see
+    // BUILT_IN_BLOCKS. Ignoring whatever the row happens to hold means a
+    // future rename of the built-in label doesn't need a data migration.
+    title: kind === 'section' ? row.title : BUILT_IN_BLOCKS[kind].title,
     sortOrder: row.sort_order,
     cardIds: row.card_ids ?? [],
   }
@@ -46,11 +56,39 @@ export async function listHomeSections(community: string): Promise<HomeSection[]
 
 // Creates a section, picking a unique slug derived from its title. New
 // sections start empty (no cards) and sort last.
+//
+// A built-in block (kind !== 'section') is different: its id/title are fixed
+// (BUILT_IN_BLOCKS), title/cardIds passed in are ignored, and this upserts
+// rather than plain-inserts — "+ Add block" in the admin editor re-adding a
+// previously-removed built-in has to succeed even though a row for that
+// exact id may already exist from an earlier session (or the one-time
+// seed-home-blocks.mjs backfill), not conflict-error.
 export async function createHomeSection(input: {
   title: string
   cardIds?: string[]
+  kind?: HomeBlockKind
 }): Promise<HomeSection> {
   const supabase = getAdminClient()
+  const kind = input.kind ?? 'section'
+
+  if (kind !== 'section') {
+    const { count } = await supabase.from('home_section').select('id', { count: 'exact', head: true })
+    const row = {
+      id: BUILT_IN_BLOCKS[kind].id,
+      kind,
+      title: BUILT_IN_BLOCKS[kind].title,
+      sort_order: ((count ?? 0) + 1) * 100,
+      card_ids: [],
+    }
+    const { data, error } = await supabase
+      .from('home_section')
+      .upsert(row, { onConflict: 'community_id,id' })
+      .select('*')
+      .single()
+    if (error) throw new Error(`Failed to add ${BUILT_IN_BLOCKS[kind].title}: ${error.message}`)
+    return toSection(data as HomeSectionRow)
+  }
+
   const base = slugify(input.title) || 'section'
 
   let id = base
@@ -65,6 +103,7 @@ export async function createHomeSection(input: {
 
   const row = {
     id,
+    kind: 'section',
     title: input.title.trim(),
     sort_order: sortOrder,
     card_ids: input.cardIds ?? [],
@@ -76,7 +115,11 @@ export async function createHomeSection(input: {
 }
 
 // Updates a section's title, card membership/order, or sort position. Only the
-// provided keys change. The slug (id) is immutable.
+// provided keys change. The slug (id) is immutable. title/cardIds patches on
+// a built-in block are accepted but meaningless (toSection always overrides
+// them back to the fixed BUILT_IN_BLOCKS values) — the admin editor simply
+// never offers those controls for one, same as it never offers a "+ Add a
+// card" picker for zmanim/map.
 export async function updateHomeSection(
   id: string,
   patch: { title?: string; cardIds?: string[]; sortOrder?: number },

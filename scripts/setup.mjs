@@ -121,6 +121,7 @@ async function main() {
   run('seed-tags.mjs')
   run('seed-upvotes.mjs')
   run('seed-home-sections.mjs')
+  run('seed-home-blocks.mjs')
 
   const existing = await resourceCount()
   if (existing > 0) {
