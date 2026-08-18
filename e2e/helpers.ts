@@ -129,13 +129,20 @@ export function serverMarkup(html: string): string {
  *  Uses the performance timeline rather than Playwright's network events
  *  because the timeline resets per document. Network events accumulate across
  *  navigations, which produced a false "still fetching" reading during the
- *  server-rendering work. */
+ *  server-rendering work.
+ *
+ *  Scoped to same-origin: Sentry's ingest URL is
+ *  `https://<org>.ingest.<region>.sentry.io/api/<project>/envelope/…` — a
+ *  bare `/api/` substring match (this test's original form) false-positives
+ *  on that once a real `NEXT_PUBLIC_SENTRY_DSN` is configured (Sentry is
+ *  inert without one), since Sentry's own path happens to contain `/api/`
+ *  too, on a completely different domain. */
 export async function apiCallsForThisDocument(page: Page): Promise<string[]> {
   return page.evaluate(() =>
     performance
       .getEntriesByType('resource')
       .map((e) => e.name)
-      .filter((name) => name.includes('/api/'))
+      .filter((name) => name.startsWith(`${location.origin}/api/`))
       .map((name) => name.replace(location.origin, '')),
   )
 }
