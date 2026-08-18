@@ -4,11 +4,10 @@ import type { ZmanimData, ZmanEntry } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
 
 // ── The zmanim content itself — Hebrew date, the daily zmanim grid, and
-// upcoming Shabbos — shared by the full Zmanim & Shabbos page (ZmanimCard,
-// which wraps this in a bordered card) and the desktop home screen's zmanim
-// section (which renders it loose, full-bleed, like the footer). Keeping the
-// rendering in one place means the two can never drift on what a "ready"
-// zmanim view actually shows.
+// upcoming Shabbos — shared by the full Zmanim & Shabbos page (ZmanimCard)
+// and the desktop home screen's zmanim section (ZmanimStrip), both of which
+// wrap this in the same bordered card. Keeping the rendering in one place
+// means the two can never drift on what a "ready" zmanim view actually shows.
 
 export default function ZmanimBody({ data, status }: { data: ZmanimData | null; status: ZmanimStatus }) {
   if (status === 'loading') return <LoadingState />

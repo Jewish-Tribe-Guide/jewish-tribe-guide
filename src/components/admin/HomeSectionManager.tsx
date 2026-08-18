@@ -155,18 +155,31 @@ export default function HomeSectionManager({
               </ul>
             )}
 
-            {unassigned.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => e.target.value && addCard(s.id, e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">+ Add a card…</option>
-                {unassigned.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            )}
+            {/* Every card not already in THIS section — not just the
+                unassigned pool. addCard already pulls a card out of whatever
+                section it's currently in, so this is also how a card moves
+                from one section to another; scoping the list to `unassigned`
+                only meant that once every card had a home, the "+ Add a
+                card" control vanished from every section with no way left to
+                reorganize them short of removing one first. */}
+            {(() => {
+              const availableHere = cardOptions.filter((c) => !s.cardIds.includes(c.id))
+              return availableHere.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && addCard(s.id, e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">+ Add a card…</option>
+                  {availableHere.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                      {!unassigned.includes(c) ? ' (move here)' : ''}
+                    </option>
+                  ))}
+                </select>
+              )
+            })()}
           </div>
         ))}
       </div>

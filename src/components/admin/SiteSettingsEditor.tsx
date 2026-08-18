@@ -330,6 +330,37 @@ export default function SiteSettingsEditor({
         </div>
       )}
 
+      {isSite && (
+        <div className="mt-6 max-w-2xl">
+          <label className="block">
+            <span className="block text-sm font-semibold text-slate-800 mb-1">Map zoom radius</span>
+            <span className="block text-[11px] text-muted mb-2">
+              How far (in miles) a listing can be from the visitor — or the community center, if no
+              location is set — and still count toward the map zooming out to fit everything when a
+              category is selected or searched. A far-off listing (e.g. a delivery-only address) is
+              still shown as a pin either way; this only keeps it from forcing the initial zoom out to
+              include it. Leave blank for no limit.
+            </span>
+            <span className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={draft.mapZoomRadiusMiles ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  set('mapZoomRadiusMiles', raw.trim() === '' ? null : Number(raw))
+                }}
+                placeholder="No limit"
+                className={`${inputClass} max-w-[10rem]`}
+              />
+              <span className="text-sm text-muted">miles</span>
+            </span>
+          </label>
+        </div>
+      )}
+
       {!isSite && device === 'desktop' && (
         <div className="mt-6 max-w-2xl">
           <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>

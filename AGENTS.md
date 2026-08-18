@@ -22,6 +22,8 @@ npm run test:all            # unit + e2e only — the four suites above need TES
 
 The last four run against a **disposable second Supabase project** (`TEST_SUPABASE_*` env vars), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
 
+**When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a visual judgment call), say so explicitly instead of silently skipping coverage.
+
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 
 - `/` silently stopped being an HTTP redirect and became a JavaScript one, so crawlers and WhatsApp link previews saw a blank 200. Caused by wrapping `redirect()` in a `<Suspense>` boundary for Cache Components.

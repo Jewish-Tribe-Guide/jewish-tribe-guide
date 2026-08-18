@@ -15,7 +15,7 @@ export default function AllCategoriesScreen() {
     <div className="flex-1 pt-8">
       <AllCategories
         onNavigate={navigate}
-        onOpenFlow={openFlow}
+        onOpenFlow={(kind, preselect) => openFlow(kind, preselect, 'all')}
         onUp={goHome}
         scrollToSection={params.get('section')}
       />

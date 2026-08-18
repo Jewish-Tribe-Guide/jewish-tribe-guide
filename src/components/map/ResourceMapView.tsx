@@ -10,6 +10,7 @@ import MapPlaceDetail from './MapPlaceDetail'
 import MobileNearbySheet, { type MobileNearbySheetHandle } from './MobileNearbySheet'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCategories } from '@/lib/useCategories'
+import { useSiteSettings } from '@/lib/useSiteSettings'
 import { DEFAULT_CATEGORY_ICON, resolveCapabilities, selectValues } from '@/lib/categories'
 import { haversineMiles } from '@/lib/geo'
 import { useHospitals } from '@/lib/useHospitals'
@@ -138,6 +139,10 @@ const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop
 export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
+  // Admin-configured cap on how far a point can be from the anchor and still
+  // drive the map's automatic "fit everything" zoom — see ResourceMap's own
+  // zoomRadiusMiles prop for what this actually changes.
+  const { mapZoomRadiusMiles } = useSiteSettings()
   const hospitalsData = useHospitals()
   const { pinned, toggle: togglePinnedListing, filterActive: pinnedSelected, setFilterActive: setPinnedSelected } = usePinned()
   const pinnedIds = useMemo(() => new Set(pinned.map((p) => p.id)), [pinned])
@@ -194,6 +199,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // categories plus a trailing "More" chip; tapping it opens this full-screen
   // picker with every category, Google-Maps-style.
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+  // The picker's own working copy of the selection — edited freely by its
+  // checkboxes/Show all, never touching the real `selected` until Apply.
+  // Without this, every checkbox tap live-filtered the map behind the sheet,
+  // and Back had no "previous state" left to return to since there was
+  // nothing else it could have meant except "close" (see closeCategoriesPicker,
+  // which discards this and touches nothing). Only category selection is
+  // drafted this way — the per-category bool/select field filters
+  // (boolFields/selectFilters below) stay live, same as before.
+  const [draftSelected, setDraftSelected] = useState<Set<string>>(new Set())
   // Bumped every time the full-screen picker above closes (Back or Apply) —
   // handed to the compact row as CategoryFilter's `resortToken`, the only
   // signal (besides first mount) that should reorder it: selected categories
@@ -201,6 +215,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // on a chip already in that row must never reorder it — only having been
   // off-screen, on the picker, resets what's worth remembering.
   const [categoryResortToken, setCategoryResortToken] = useState(0)
+  // Back: discard the draft, apply nothing. (openCategoriesPicker/
+  // applyCategoriesPicker live further down, after `effectiveSelected` is
+  // declared — they read it, and defining them up here, ahead of that
+  // useMemo, is exactly what broke React Compiler's ability to preserve it.)
   const closeCategoriesPicker = () => {
     setCategoriesOpen(false)
     setCategoryResortToken((n) => n + 1)
@@ -867,6 +885,30 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // one" by a chip they can't see.
   const hasPinnedChip = ui.map.pins && pinned.length > 0
   const allChipsOn = effectiveSelected.size === options.length && (!hasPinnedChip || pinnedSelected)
+  // The full-screen category picker (mobile "More") lets a visitor uncheck
+  // every box while browsing its own draft (draftSelected) — see
+  // toggleCategoryCheckbox — but leaving with nothing checked would filter
+  // the map down to nothing shown. Gates Apply there instead of
+  // auto-reverting mid-edit; Pinned rides along as an escape hatch exactly
+  // like it does for the compact row, since the picker itself has no Pinned
+  // checkbox of its own to turn off.
+  const draftNoneSelected = draftSelected.size === 0 && !pinnedSelected
+  const draftAllOn = draftSelected.size === options.length
+  // Opens the picker with a fresh snapshot of what's live right now — so
+  // Back (which touches nothing, see closeCategoriesPicker above) truly
+  // restores "the way it was before you entered the page", not whatever
+  // was left over from a previous visit.
+  const openCategoriesPicker = () => {
+    setDraftSelected(new Set(effectiveSelected))
+    setCategoriesOpen(true)
+  }
+  // Apply: commit the draft as the real selection, then close the same way
+  // Back does.
+  const applyCategoriesPicker = () => {
+    setSelected(draftSelected)
+    setSidebarCollapsed(false)
+    closeCategoriesPicker()
+  }
 
   const toggle = (id: string) => {
     // Starting from "everything shown", a tap on a single chip should narrow
@@ -979,22 +1021,34 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // tap target, not literally a checkbox), but a real <input type="checkbox">
   // in the picker needs to mean exactly what it shows: checked ⇄ unchecked,
   // full stop — nothing else is defensible for an actual checkbox control.
+  //
+  // Unlike the chip row's `toggle`, this deliberately does NOT auto-revert to
+  // "show all" when the last box is unchecked — the picker is a full screen
+  // with its own Apply button, so a visitor un-checking everything is mid-edit,
+  // not asking to see nothing. The "nothing shown" guard lives at Apply time
+  // instead (see draftNoneSelected / the Apply button below), which also lets
+  // the picker show an explicit "select at least one" note rather than
+  // silently snapping every box back on. Edits draftSelected, not the real
+  // selection — see openCategoriesPicker/applyCategoriesPicker.
   const toggleCategoryCheckbox = (id: string) => {
-    const next = new Set(effectiveSelected)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      next.add(id)
-      track('category_filter_selected', { category: id, source: 'checkbox' })
-    }
-    // Same revert-to-all as the chip row — unchecking the last box goes
-    // back to everything rather than leaving the picker (and the map behind
-    // it) at "nothing shown".
-    if (next.size === 0 && !pinnedSelected) {
-      showAll()
-      return
-    }
-    setSelected(next)
+    setDraftSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        track('category_filter_selected', { category: id, source: 'checkbox' })
+      }
+      return next
+    })
+  }
+  // The picker's own "Show all" — a toggle, not a one-way reset like the
+  // compact row's version (`showAll` above): with the draft able to sit at
+  // zero while browsing, re-tapping "Show all" from an already-all-checked
+  // draft should clear it back to zero rather than being a no-op, so it
+  // works as both directions of the same shortcut.
+  const toggleDraftShowAll = () => {
+    setDraftSelected(draftAllOn ? new Set() : new Set(options.map((o) => o.id)))
   }
 
   // Adds `id` to the current selection without touching anything else —
@@ -1390,6 +1444,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 selectedId={selectedPointId}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
                 obscuredTopPx={isMobile ? topOverlayHeight : 0}
+                zoomRadiusMiles={mapZoomRadiusMiles}
               />
 
               {/* ── Fullscreen toggle (desktop only) — the map starts as a
@@ -1564,7 +1619,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         onAll={showAll}
                         maxVisible={4}
                         resortToken={categoryResortToken}
-                        onMore={() => setCategoriesOpen(true)}
+                        onMore={openCategoriesPicker}
                                     categories={categories ?? []}
                         points={allPoints}
                         boolFields={boolFields}
@@ -1698,6 +1753,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             className="flex shrink-0 items-center gap-3 px-4 pb-3"
             style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
           >
+            {/* Discards the draft untouched — always enabled, since Back
+                can never leave the map in an invalid state the way Apply
+                could (it just restores whatever was live before the picker
+                opened). */}
             <button
               onClick={closeCategoriesPicker}
               aria-label="Back to map"
@@ -1709,24 +1768,30 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           </div>
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 pb-3">
             <button
-              onClick={showAll}
+              onClick={toggleDraftShowAll}
               className="text-sm font-medium text-primary cursor-pointer"
             >
-              Show all
+              {draftAllOn ? 'Deselect all' : 'Show all'}
             </button>
             <button
-              onClick={closeCategoriesPicker}
-              className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white cursor-pointer"
+              onClick={() => !draftNoneSelected && applyCategoriesPicker()}
+              disabled={draftNoneSelected}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold text-white ${draftNoneSelected ? 'bg-slate-300 cursor-not-allowed' : 'bg-primary cursor-pointer'}`}
             >
               Apply
             </button>
           </div>
+          {draftNoneSelected && (
+            <p className="shrink-0 px-4 pb-2 text-xs text-amber-600">
+              Select at least one category to see results.
+            </p>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <CategoryPickerList
               options={options}
               categories={categories ?? []}
               points={allPoints}
-              selected={effectiveSelected}
+              selected={draftSelected}
               onToggle={toggleCategoryCheckbox}
               boolFields={boolFields}
               onToggleBool={toggleBoolField}

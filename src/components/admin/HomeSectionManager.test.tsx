@@ -140,4 +140,45 @@ describe('HomeSectionManager', () => {
 
     expect(onChange).toHaveBeenCalledWith([b, a])
   })
+
+  // Regression test: the "+ Add a card…" picker used to only list cards from
+  // the global "unassigned" pool, so once every card had a home the whole
+  // control vanished from every section — there was no way left to move a
+  // card from one section to another short of removing it first (making it
+  // unassigned again) and re-adding it elsewhere.
+  it('still offers the picker, listing other sections’ cards, when nothing is unassigned', () => {
+    const a: DraftHomeSection = { id: 'a', title: 'A', cardIds: ['grocery'] }
+    const b: DraftHomeSection = { id: 'b', title: 'B', cardIds: [] }
+    renderManager([a, b])
+
+    // Section B's own picker still offers Section A's card, to move it here
+    // — same combobox count as before (one per section), but grocery is now
+    // reachable from B's dropdown, not just gone until removed from A first.
+    const pickers = screen.getAllByRole('combobox')
+    expect(pickers).toHaveLength(2)
+    expect(screen.getAllByRole('option', { name: 'Grocery Stores (move here)' })).toHaveLength(1)
+  })
+
+  it('picking another section’s card from the picker moves it here, out of its old section', async () => {
+    const user = userEvent.setup()
+    const a: DraftHomeSection = { id: 'a', title: 'A', cardIds: ['grocery'] }
+    const b: DraftHomeSection = { id: 'b', title: 'B', cardIds: [] }
+    const onChange = renderManager([a, b])
+
+    const pickers = screen.getAllByRole('combobox')
+    await user.selectOptions(pickers[1]!, 'grocery')
+
+    expect(onChange).toHaveBeenCalledWith([{ ...a, cardIds: [] }, { ...b, cardIds: ['grocery'] }])
+  })
+
+  it('a section’s own picker never offers a card already in that same section', () => {
+    // Every card option (the two fixed support/volunteer forms plus the one
+    // test category) lives in this single section — nothing left its own
+    // picker could offer, so it should render no picker at all rather than
+    // one listing its own cards back to it.
+    const a: DraftHomeSection = { id: 'a', title: 'A', cardIds: ['support', 'volunteer', 'grocery'] }
+    renderManager([a])
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
 })

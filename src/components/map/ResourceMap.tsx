@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
+import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 
@@ -108,9 +109,29 @@ type Props = {
    *  the top of the map just as surely as the sheet hides the bottom. 0 on
    *  desktop (no floating overlay). */
   obscuredTopPx?: number
+  /** Admin-configured cap (site_settings.map_zoom_radius_miles) on how far
+   *  a point can be from the visitor (or the community center, if no
+   *  location is set) and still count toward the automatic "fit everything"
+   *  framing below. Without this, a single far-off listing — e.g. a
+   *  delivery-only address miles outside town — could force the whole map
+   *  to zoom out to fit it the moment its category was selected. Null/unset
+   *  means no cap (every point counts), the original behavior. Outlier
+   *  points are still plotted as markers either way (see the loop above,
+   *  which is unaffected by this) — they're just excluded from what the
+   *  initial view has to include. */
+  zoomRadiusMiles?: number | null
 }
 
 const DEFAULT_CENTER = community.mapCenter
+
+// Narrows `points` to the ones the automatic "fit everything" framing should
+// actually include — see Props.zoomRadiusMiles. `radiusMiles == null` means
+// no cap (every point counts), which keeps this a no-op wherever the admin
+// hasn't configured one.
+export function pointsWithinZoomRadius(points: LatLng[], anchor: LatLng, radiusMiles: number | null | undefined): LatLng[] {
+  if (radiusMiles == null) return points
+  return points.filter((p) => haversineMiles(anchor, p) <= radiusMiles)
+}
 
 // Builds the info-window content as a real DOM node so we can attach event
 // listeners (e.g. "View listing") without putting callbacks on window.
@@ -298,7 +319,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0 }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -332,6 +353,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const obscuredBottomPxRef = useRef(obscuredBottomPx)
   const obscuredTopPxRef = useRef(obscuredTopPx)
   const onManualDragRef = useRef(onManualDrag)
+  const zoomRadiusMilesRef = useRef(zoomRadiusMiles)
   useEffect(() => { onViewListingRef.current = onViewListing }, [onViewListing])
   useEffect(() => { onSelectPointRef.current = onSelectPoint }, [onSelectPoint])
   useEffect(() => { onDeselectPointRef.current = onDeselectPoint }, [onDeselectPoint])
@@ -345,6 +367,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   useEffect(() => { obscuredBottomPxRef.current = obscuredBottomPx }, [obscuredBottomPx])
   useEffect(() => { obscuredTopPxRef.current = obscuredTopPx }, [obscuredTopPx])
   useEffect(() => { onManualDragRef.current = onManualDrag }, [onManualDrag])
+  useEffect(() => { zoomRadiusMilesRef.current = zoomRadiusMiles }, [zoomRadiusMiles])
   // ── Initialize the map once ──────────────────────────────────────────────
   useEffect(() => {
     if (!MAPS_API_KEY || mapsAuthFailed()) return
@@ -465,7 +488,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     markersRef.current = []
     markersByIdRef.current.clear()
 
-    const bounds = new google.maps.LatLngBounds()
     for (const p of points) {
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map,
@@ -548,7 +570,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       })
       markersRef.current.push(marker)
       markersByIdRef.current.set(p.id, { marker, point: p })
-      bounds.extend({ lat: p.lat, lng: p.lng })
     }
 
     // Don't auto-reframe to the points if the visitor has a location set —
@@ -560,25 +581,35 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // doesn't leave you looking at a result with no idea how far it is from
     // where you are.
     if (userLocationRef.current && searchActiveRef.current) {
-      if (points.length === 0) {
-        // No results to frame — bounds would contain only the user's own
-        // location, a zero-area box fitBounds snaps to max zoom for (same
-        // quirk the points.length === 1 case below already works around).
-        // Just recenter on the user's own location at a sane zoom instead.
-        map.setCenter(userLocationRef.current)
+      const anchor = userLocationRef.current
+      const framed = pointsWithinZoomRadius(points, anchor, zoomRadiusMilesRef.current)
+      if (framed.length === 0) {
+        // No in-radius results to frame (either genuinely no results, or
+        // every match is an outlier the admin's zoom radius excludes) —
+        // bounds would otherwise contain only the user's own location, a
+        // zero-area box fitBounds snaps to max zoom for (same quirk the
+        // points.length === 1 case below already works around). Just
+        // recenter on the user's own location at a sane zoom instead.
+        map.setCenter(anchor)
         map.setZoom(15)
         return
       }
-      bounds.extend(userLocationRef.current)
-      map.fitBounds(bounds, 64)
+      const searchBounds = new google.maps.LatLngBounds()
+      for (const p of framed) searchBounds.extend(p)
+      searchBounds.extend(anchor)
+      map.fitBounds(searchBounds, 64)
       return
     }
     if (userLocationRef.current) return
-    if (points.length === 1) {
-      map.setCenter(bounds.getCenter())
+    const anchor = DEFAULT_CENTER
+    const framed = pointsWithinZoomRadius(points, anchor, zoomRadiusMilesRef.current)
+    if (framed.length === 1) {
+      map.setCenter(framed[0])
       map.setZoom(15)
-    } else if (points.length > 1) {
-      map.fitBounds(bounds, 64)
+    } else if (framed.length > 1) {
+      const framedBounds = new google.maps.LatLngBounds()
+      for (const p of framed) framedBounds.extend(p)
+      map.fitBounds(framedBounds, 64)
     }
     // Rebuild only when the points themselves change — GPS ticks and callback
     // identity are read via refs so an open info window survives them.
