@@ -2,12 +2,23 @@ name: CI
 
 # Runs the whole test suite automatically instead of relying on someone
 # remembering to. `unit` needs no secrets (lint/typecheck/vitest are all pure
-# — no network, no DB) so it always runs. `integration`, `cache-roundtrip` and
-# `e2e` each need their own Supabase project (see the `env:` block in each job
-# for exactly which repo secrets to add, Settings → Secrets and variables →
-# Actions, before they can pass) — `integration` and `cache-roundtrip` both
-# write to and delete from the SAME dedicated, disposable test project (see
-# README "Integration tests"), `e2e` only reads from the real one.
+# — no network, no DB) so it always runs. `integration`, `cache-roundtrip`,
+# `form-roundtrip` and `e2e` each need their own Supabase project (see the
+# `env:` block in each job for exactly which repo secrets to add, Settings →
+# Secrets and variables → Actions, before they can pass) — `integration`,
+# `cache-roundtrip` and `form-roundtrip` all write to and delete from the SAME
+# dedicated, disposable test project (see README "Integration tests"), `e2e`
+# only reads from the real one.
+#
+# Every job below sets timeout-minutes, well above its normal run time (a
+# few minutes) but far under GitHub's 360-minute default — `e2e` has hung
+# for 20+ minutes and then 1+ hour on two separate runs, both times stuck in
+# `npx playwright install --with-deps chromium`'s `apt-get update`, endlessly
+# retrying an unreachable azure.archive.ubuntu.com mirror before falling
+# back to the real one. That's a GitHub-hosted-runner networking flake, not
+# a real hang, and not something fixable from here — but nothing should
+# silently eat an hour of a runner (or make cancelling it someone's job to
+# notice) when it does.
 on:
   push:
     branches: [main]
@@ -24,6 +35,7 @@ jobs:
   unit:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -45,6 +57,7 @@ jobs:
     name: Integration tests (real Supabase reads/writes)
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -61,6 +74,7 @@ jobs:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -82,10 +96,38 @@ jobs:
           path: playwright-report-cache/
           retention-days: 14
 
+  form-roundtrip:
+    name: Form submission (wizard reaches the database)
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Unlike cache-roundtrip, this suite drives a real browser (filling in
+      # and submitting the wizard), so it does need a browser installed.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:form-roundtrip
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-form
+          path: playwright-report-form/
+          retention-days: 14
+
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

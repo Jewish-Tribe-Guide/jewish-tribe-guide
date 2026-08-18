@@ -33,7 +33,7 @@ if (missing.length) {
 // TEST_SUPABASE_URL below. Without this guard, every re-import after the
 // first would compare TEST_SUPABASE_URL against its own already-remapped
 // copy, always "match", and refuse unconditionally — the same class of bug
-// run-cache-e2e-server.mjs's comment warns about, just one process level up.
+// run-test-project-server.mjs's comment warns about, just one process level up.
 if (!process.env.CACHE_E2E_REMAPPED) {
   if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error(
@@ -44,7 +44,7 @@ if (!process.env.CACHE_E2E_REMAPPED) {
 
   // e2e-cache/auth.setup.ts runs in this same process and reads these
   // directly — same remap-in-process pattern as src/test/integrationEnv.ts.
-  // The webServer's child process (run-cache-e2e-server.mjs) does its own
+  // The webServer's child process (run-test-project-server.mjs) does its own
   // remap for the Next.js server itself, independent of this one.
   process.env.NEXT_PUBLIC_SUPABASE_URL = url
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anonKey
@@ -53,6 +53,13 @@ if (!process.env.CACHE_E2E_REMAPPED) {
 }
 
 const PORT = process.env.CACHE_E2E_PORT || '3211'
+// Explicit, not incidental: the webServer child (run-test-project-server.mjs)
+// inherits process.env and has its own independent '3211' fallback — without
+// this it only happened to agree with this file's default by coincidence.
+// playwright.form.config.ts picks a different port and would silently start
+// its server on the wrong one without this same line — that's the bug this
+// comment is here so nobody reintroduces.
+process.env.CACHE_E2E_PORT = PORT
 const BASE_URL = `http://localhost:${PORT}`
 
 export default defineConfig({
@@ -76,7 +83,7 @@ export default defineConfig({
   webServer: {
     // Its own port and its own dist dir (NEXT_DIST_DIR inside the script) —
     // never the real e2e suite's build or its port 3210.
-    command: 'node scripts/run-cache-e2e-server.mjs',
+    command: 'node scripts/run-test-project-server.mjs',
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
