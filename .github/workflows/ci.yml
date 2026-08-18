@@ -9,6 +9,16 @@ name: CI
 # `cache-roundtrip` and `form-roundtrip` all write to and delete from the SAME
 # dedicated, disposable test project (see README "Integration tests"), `e2e`
 # only reads from the real one.
+#
+# Every job below sets timeout-minutes, well above its normal run time (a
+# few minutes) but far under GitHub's 360-minute default — `e2e` has hung
+# for 20+ minutes and then 1+ hour on two separate runs, both times stuck in
+# `npx playwright install --with-deps chromium`'s `apt-get update`, endlessly
+# retrying an unreachable azure.archive.ubuntu.com mirror before falling
+# back to the real one. That's a GitHub-hosted-runner networking flake, not
+# a real hang, and not something fixable from here — but nothing should
+# silently eat an hour of a runner (or make cancelling it someone's job to
+# notice) when it does.
 on:
   push:
     branches: [main]
@@ -25,6 +35,7 @@ jobs:
   unit:
     name: Lint, typecheck, unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -46,6 +57,7 @@ jobs:
     name: Integration tests (real Supabase reads/writes)
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -62,6 +74,7 @@ jobs:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -87,6 +100,7 @@ jobs:
     name: Form submission (wizard reaches the database)
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -113,6 +127,7 @@ jobs:
     name: End-to-end tests
     runs-on: ubuntu-latest
     needs: unit
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
