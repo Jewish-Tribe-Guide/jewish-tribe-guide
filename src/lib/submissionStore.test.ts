@@ -57,6 +57,7 @@ vi.mock('./geo', () => ({
 
 const {
   approveSubmission,
+  getSubmissionFunnelStats,
   listPendingSubmissions,
   rejectSubmission,
   submitGoogleClosure,
@@ -645,5 +646,102 @@ describe('submitListingDelete', () => {
     await submitListingDelete('res-1', null, null)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ payload: {} }))
+  })
+})
+
+describe('getSubmissionFunnelStats', () => {
+  it('counts each status and computes the approval rate against decided submissions only', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          { status: 'pending', created_at: '2026-01-01T00:00:00Z', reviewed_at: null },
+          { status: 'pending', created_at: '2026-01-01T00:00:00Z', reviewed_at: null },
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T02:00:00Z' },
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T04:00:00Z' },
+          { status: 'rejected', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T01:00:00Z' },
+        ],
+        error: null,
+      }),
+    )
+
+    const stats = await getSubmissionFunnelStats()
+
+    expect(stats.pending).toBe(2)
+    expect(stats.approved).toBe(2)
+    expect(stats.rejected).toBe(1)
+    expect(stats.approvalRate).toBeCloseTo(2 / 3)
+  })
+
+  it('computes avg/median approval time in hours from approved rows only', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          // 2 hours, 4 hours, 6 hours → avg 4, median 4
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T02:00:00Z' },
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T04:00:00Z' },
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T06:00:00Z' },
+          // Rejected rows never count toward "time to approval".
+          { status: 'rejected', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T12:00:00Z' },
+        ],
+        error: null,
+      }),
+    )
+
+    const stats = await getSubmissionFunnelStats()
+
+    expect(stats.avgHoursToApproval).toBeCloseTo(4)
+    expect(stats.medianHoursToApproval).toBeCloseTo(4)
+  })
+
+  it('returns null (not 0 or NaN) for rate/timing when there is no data yet', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [], error: null }))
+
+    const stats = await getSubmissionFunnelStats()
+
+    expect(stats).toEqual({
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      approvalRate: null,
+      avgHoursToApproval: null,
+      medianHoursToApproval: null,
+    })
+  })
+
+  it('excludes an approved row with a reviewed_at earlier than created_at (bad data) from timing stats', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          // Clock-skew/bad-data row: reviewed before created.
+          { status: 'approved', created_at: '2026-01-01T05:00:00Z', reviewed_at: '2026-01-01T00:00:00Z' },
+          { status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: '2026-01-01T02:00:00Z' },
+        ],
+        error: null,
+      }),
+    )
+
+    const stats = await getSubmissionFunnelStats()
+
+    // Only the second (valid) row counts — average of just [2], not skewed negative.
+    expect(stats.avgHoursToApproval).toBeCloseTo(2)
+  })
+
+  it('excludes an approved row missing reviewed_at from timing stats without throwing', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [{ status: 'approved', created_at: '2026-01-01T00:00:00Z', reviewed_at: null }],
+        error: null,
+      }),
+    )
+
+    const stats = await getSubmissionFunnelStats()
+
+    expect(stats.avgHoursToApproval).toBeNull()
+    expect(stats.medianHoursToApproval).toBeNull()
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(getSubmissionFunnelStats()).rejects.toThrow('Failed to load submission stats: boom')
   })
 })

@@ -13,6 +13,59 @@ import type {
 
 // ── Reads (admin) ────────────────────────────────────────────────────────────
 
+export type SubmissionFunnelStats = {
+  pending: number
+  approved: number
+  rejected: number
+  /** approved / (approved + rejected) — null when neither has happened yet,
+   *  so callers can render "no data" instead of a misleading 0%. */
+  approvalRate: number | null
+  avgHoursToApproval: number | null
+  medianHoursToApproval: number | null
+}
+
+function median(sorted: number[]): number {
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+// Summary stats for the admin's Metrics tab: how many submissions are
+// waiting, the approve/reject split, and how long an approved one actually
+// sits in the queue before a human acts on it. A full-table scan (every
+// submission, ever) rather than a windowed query — this is a low-traffic
+// community site, so the whole table is cheap, and a rolling window would
+// just add a parameter nobody asked for yet.
+export async function getSubmissionFunnelStats(): Promise<SubmissionFunnelStats> {
+  const { data, error } = await getAdminClient().from('submission').select('status, created_at, reviewed_at')
+  if (error) throw new Error(`Failed to load submission stats: ${error.message}`)
+
+  const rows = data as { status: SubmissionRow['status']; created_at: string; reviewed_at: string | null }[]
+  const pending = rows.filter((r) => r.status === 'pending').length
+  const approved = rows.filter((r) => r.status === 'approved').length
+  const rejected = rows.filter((r) => r.status === 'rejected').length
+  const decided = approved + rejected
+
+  const approvalHours = rows
+    .filter((r) => r.status === 'approved' && r.reviewed_at)
+    .map((r) => (new Date(r.reviewed_at!).getTime() - new Date(r.created_at).getTime()) / 3_600_000)
+    // A reviewed_at earlier than created_at would only ever come from bad
+    // data (clock skew, a manually-edited row) — excluded rather than
+    // letting it drag the average negative.
+    .filter((h) => h >= 0)
+    .sort((a, b) => a - b)
+
+  return {
+    pending,
+    approved,
+    rejected,
+    approvalRate: decided > 0 ? approved / decided : null,
+    avgHoursToApproval: approvalHours.length
+      ? approvalHours.reduce((sum, h) => sum + h, 0) / approvalHours.length
+      : null,
+    medianHoursToApproval: approvalHours.length ? median(approvalHours) : null,
+  }
+}
+
 // Pending submissions, newest first, each enriched with the current target row
 // (for update/delete) so the admin UI can show a before → after diff.
 export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {

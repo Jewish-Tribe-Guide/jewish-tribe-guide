@@ -1,5 +1,6 @@
 'use client'
 
+import { track } from '@vercel/analytics'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ResourceMap, { type MapPoint } from './ResourceMap'
 import CategoryFilter, { type FilterOption } from './CategoryFilter'
@@ -895,6 +896,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       setSelected(new Set([id]))
       setPinnedSelected(false)
       raiseSheet()
+      track('category_filter_selected', { category: id, source: 'chip' })
       return
     }
     const next = new Set(effectiveSelected)
@@ -903,6 +905,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     } else {
       next.add(id)
       raiseSheet()
+      // Only on select, not deselect — mirrors listing_opened's "the
+      // interesting event is choosing something" convention elsewhere.
+      track('category_filter_selected', { category: id, source: 'chip' })
     }
     // Unclicking the last remaining chip goes back to showing everything,
     // same as Google Maps/Too Good To Go's filter rows — there's no
@@ -980,6 +985,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       next.delete(id)
     } else {
       next.add(id)
+      track('category_filter_selected', { category: id, source: 'checkbox' })
     }
     // Same revert-to-all as the chip row — unchecking the last box goes
     // back to everything rather than leaving the picker (and the map behind
@@ -1011,7 +1017,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   function toggleBoolField(categoryId: string, key: string) {
     const adding = !boolFields.includes(key)
     setBoolFields((prev) => (prev.includes(key) ? prev.filter((f) => f !== key) : [...prev, key]))
-    if (adding) ensureSelected(categoryId)
+    if (adding) {
+      ensureSelected(categoryId)
+      track('field_filter_selected', { category: categoryId, field: key })
+    }
   }
   function toggleSelectValue(categoryId: string, key: string, value: string) {
     const adding = !(selectFilters[key] ?? []).includes(value)
@@ -1019,7 +1028,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       const cur = prev[key] ?? []
       return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] }
     })
-    if (adding) ensureSelected(categoryId)
+    if (adding) {
+      ensureSelected(categoryId)
+      track('field_filter_selected', { category: categoryId, field: key, value })
+    }
   }
 
   const loading = listings === null || categories === null

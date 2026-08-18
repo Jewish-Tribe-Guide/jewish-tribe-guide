@@ -9,8 +9,11 @@ import { ListingsProvider } from '@/lib/listingsContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import type { DirectoryResource } from '@/types'
+import { track } from '@vercel/analytics'
 import type { MapPoint } from './ResourceMap'
 import ResourceMapView from './ResourceMapView'
+
+vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
 // ResourceMap.tsx renders a REAL google.maps.Map instance — script-injected
 // SDK, no wrapper library (see loadGoogleMaps.ts) — which jsdom has no
@@ -146,6 +149,39 @@ describe('ResourceMapView — category filtering', () => {
     expect(screen.getByTestId('point-count')).toHaveTextContent('2')
     expect(screen.getByRole('button', { name: 'Select Acme Grocery' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Select Beth Shalom' })).toBeInTheDocument()
+  })
+
+  it('tracks a category_filter_selected event when a chip is selected, but not when deselected', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    // A third category so grocery+synagogue selected isn't "all" — otherwise
+    // re-tapping grocery would hit the allChipsOn "narrow to just this one"
+    // branch (itself a select, and correctly tracked) instead of a plain
+    // deselect.
+    const hotel = makeCategory({ id: 'hotel', pluralLabel: 'Hotels' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery' }),
+        listingWithGeo({ id: 's1', category: 'synagogue' }),
+        listingWithGeo({ id: 'h1', category: 'hotel' }),
+      ],
+      [grocery, synagogue, hotel],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    expect(track).toHaveBeenCalledWith('category_filter_selected', { category: 'grocery', source: 'chip' })
+
+    vi.mocked(track).mockClear()
+    await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+    // Adding a second chip after narrowing — also a select, so it tracks too.
+    expect(track).toHaveBeenCalledWith('category_filter_selected', { category: 'synagogue', source: 'chip' })
+
+    vi.mocked(track).mockClear()
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    // Deselecting an already-selected chip is not a "selection" — no event.
+    expect(track).not.toHaveBeenCalled()
   })
 
   it('starts pre-filtered to initialCategory', () => {
