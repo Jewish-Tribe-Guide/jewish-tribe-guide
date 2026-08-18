@@ -21,7 +21,11 @@ vi.mock('@/components/home/HomeMap', () => ({
   default: () => <div data-testid="home-map-stub" />,
 }))
 vi.mock('@/components/home/ZmanimStrip', () => ({
-  default: () => <div data-testid="zmanim-strip-stub" />,
+  // Renders the real `title` prop (unlike coords/locationLabel, which pull
+  // in the network dependency this mock exists to avoid) — Landing passes
+  // the admin-renamed topic title through here, and a test needs to see it
+  // to prove that wiring, not just that the stub is present.
+  default: ({ title }: { title: string }) => <div data-testid="zmanim-strip-stub">{title}</div>,
 }))
 
 afterEach(() => cleanup())
@@ -144,6 +148,22 @@ describe('Landing', () => {
 
       const html = container.innerHTML
       expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+    })
+
+    it('renders an admin-renamed topic’s own title, not the built-in default', () => {
+      renderLanding(undefined, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'map', kind: 'map', title: 'See it on the map', sortOrder: 100, cardIds: [] },
+            { id: 'zmanim', kind: 'zmanim', title: 'Shabbos Times', sortOrder: 200, cardIds: [] },
+          ],
+        },
+      })
+
+      expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Explore the map' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('zmanim-strip-stub')).toHaveTextContent('Shabbos Times')
     })
 
     it('hides a built-in block that was configured out (removed), even though its category exists', () => {

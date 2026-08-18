@@ -150,6 +150,29 @@ describe('SiteSettingsEditor — the Site tab', () => {
     await user.click(screen.getByRole('button', { name: 'Close preview' }))
     expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
   })
+
+  // Regression test: real trackpad/browser Back used to do nothing while the
+  // preview was open — opening it never pushed a history entry, so there was
+  // nothing for Back to land on. A popstate (what a real Back gesture fires)
+  // should now close the overlay, the same as clicking "Close preview".
+  it('closes the preview on a real browser/trackpad Back (a popstate event), not just the button', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByText('DevicePreviewFrame')).toBeInTheDocument()
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    await waitFor(() => expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument())
+  })
+
+  it('a popstate before the preview is even open does nothing (no listener registered yet)', async () => {
+    await renderEditor('site')
+
+    expect(() => window.dispatchEvent(new PopStateEvent('popstate'))).not.toThrow()
+    expect(screen.queryByText('DevicePreviewFrame')).not.toBeInTheDocument()
+  })
 })
 
 describe('SiteSettingsEditor — the Desktop & mobile tab', () => {

@@ -12,6 +12,7 @@ import ZmanimStrip from '@/components/home/ZmanimStrip'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
+import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useLocation } from '@/lib/locationContext'
@@ -142,8 +143,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   // so the rare case of removing every one of them reverts to the default
   // set on the next load rather than staying empty. Removing one or two
   // sticks; only removing all three hits this.
-  const configuredBuiltIns = (homeSections ?? []).filter((s) => s.kind !== 'section').map((s) => s.kind)
-  const builtInOrder = configuredBuiltIns.length > 0 ? configuredBuiltIns : (['featured', 'map', 'zmanim'] as const)
+  const configuredBuiltIns = (homeSections ?? [])
+    .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
+    .map((s) => ({ kind: s.kind, title: s.title }))
+  const builtInOrder =
+    configuredBuiltIns.length > 0
+      ? configuredBuiltIns
+      : (['featured', 'map', 'zmanim'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
   // The card grid shows inline on mobile always, and on desktop only as search
   // results (see the component note above). Expressed as a class rather than a
@@ -199,13 +205,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 (hidden while searching, desktop-only, hasMap/zmanimCategory);
                 only the SEQUENCE they render in is now data-driven instead of
                 hardcoded. ─────────────────────────────────────────────────── */}
-        {builtInOrder.map((kind) => {
+        {builtInOrder.map(({ kind, title }) => {
           if (kind === 'featured') {
             // Hidden while searching, when the grid below takes over as the
             // answer to what was typed.
             return !q && (
               <div key="featured" className="hidden sm:block">
-                <FeaturedCards cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+                <FeaturedCards title={title} cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
               </div>
             )
           }
@@ -219,7 +225,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             // doesn't tuck its heading underneath it.
             return hasMap && !q && (
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
-                <h2 className="mb-4 text-lg font-semibold text-slate-900">Explore the map</h2>
+                <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
                 <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
               </div>
             )
@@ -242,7 +248,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 key="zmanim"
                 coords={coords ?? community.mapCenter}
                 locationLabel={zmanimLocationLabel}
-                title={zmanimCategory.pluralLabel}
+                title={title}
               />
             )
           )
