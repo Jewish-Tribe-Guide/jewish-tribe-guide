@@ -51,6 +51,29 @@ export async function categoryWithListings(
   throw new Error('No listing category has any listings — cannot test a populated directory')
 }
 
+/** A listing-kind category with an Hours-type field and at least one real
+ *  listing, plus that listing itself — for tests that need to open the edit
+ *  form's Hours editor on a real listing rather than an empty one. */
+export async function categoryWithHoursField(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; item: { id: string; name: string } }> {
+  const res = await request.get(`/api/categories?community=${community}`)
+  const body = await res.json()
+  if (!body.ok) throw new Error('Could not read categories')
+  const withHours = (body.categories as (Category & { detailFields: { type: string }[] })[]).filter(
+    (c) => c.kind === 'listing' && c.detailFields?.some((f) => f.type === 'hours'),
+  )
+  for (const category of withHours) {
+    const listingsRes = await request.get(`/api/resources?category=${category.id}&community=${community}`)
+    const listingsBody = await listingsRes.json()
+    if (listingsBody.ok && listingsBody.resources.length > 0) {
+      return { category, item: listingsBody.resources[0] }
+    }
+  }
+  throw new Error('No listing category with an Hours field has any listings')
+}
+
 /** A listing-kind category with at least one listing that actually has map
  *  coordinates — for map-specific tests. Distinct from categoryWithListings:
  *  a category can have real listings and still never produce a pin (no

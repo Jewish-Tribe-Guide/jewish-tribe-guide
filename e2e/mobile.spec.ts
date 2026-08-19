@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -135,5 +135,46 @@ test.describe('mobile', () => {
 
     await drag(6)
     await expect(header).toHaveClass(/-translate-y-full/)
+  })
+
+  // The edit form's Hours editor laid out each day as a single non-wrapping
+  // row (label + Closed checkbox + two <input type="time">) — real `time`
+  // inputs have a fixed minimum width that can't shrink, so on a phone
+  // screen the row was wider than the card and the close-time input was
+  // silently clipped off the right edge by the wrapping div's
+  // overflow-hidden. Caught for real on Sababa Falafel after an admin edit;
+  // this asserts the close-time input actually lands inside the viewport
+  // rather than trusting a screenshot.
+  test("the edit form's hours editor doesn't clip its time inputs off-screen", async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category, item } = await categoryWithHoursField(request, community)
+
+    await page.goto(`/${community}/${category.id}/${item.id}`)
+    await dismissLocationPrompt(page)
+
+    await page.getByRole('button', { name: /edit/i }).click()
+
+    const hoursToggle = page.getByRole('button', { name: /^Hours/ })
+    await expect(hoursToggle).toBeVisible()
+    await hoursToggle.click()
+
+    // Sunday is guaranteed present regardless of this listing's real hours;
+    // force it open so both time inputs are on screen no matter what data
+    // looks like today.
+    const sundayRow = page.getByText('Sunday', { exact: true }).locator('..')
+    const closedCheckbox = sundayRow.getByRole('checkbox')
+    if (await closedCheckbox.isChecked()) await closedCheckbox.uncheck()
+
+    const closeTimeInput = sundayRow.locator('input[type="time"]').last()
+    await expect(closeTimeInput).toBeVisible()
+
+    const box = await closeTimeInput.boundingBox()
+    if (!box) throw new Error('close-time input has no bounding box')
+    const viewportWidth = page.viewportSize()!.width
+    expect(box.x + box.width).toBeLessThanOrEqual(viewportWidth)
+
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),
+    ).toBe(false)
   })
 })

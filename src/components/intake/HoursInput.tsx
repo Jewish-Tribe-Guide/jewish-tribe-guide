@@ -78,7 +78,7 @@ export default function HoursInput({ label, value, onChange }: Props) {
             const isClosed = day === null
 
             return (
-              <div key={key} className="flex items-center gap-3 px-3 py-2 bg-white">
+              <div key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 bg-white">
                 <span className="text-sm text-slate-700 w-[6.5rem] shrink-0">{dayName}</span>
 
                 <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
