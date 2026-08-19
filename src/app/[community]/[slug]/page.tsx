@@ -152,6 +152,13 @@ export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) 
       : []
 
   return (
+    // Only the 'form' kind actually needs this boundary now — SlugScreen's
+    // form branch (FormScreen) calls useSearchParams() with no boundary of
+    // its own, so this is what satisfies it. The 'category'/'view' branch
+    // doesn't call useSearchParams at this level at all any more (see
+    // SlugScreen's own comment), so this never suspends for it — that path
+    // prerenders for real, with its own narrower boundary further in, around
+    // just the part that does (FindResourcesConnected).
     <Suspense fallback={<main className="flex flex-1 flex-col" />}>
       <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
     </Suspense>

@@ -1,7 +1,8 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import Landing from '@/components/Landing'
+import LandingConnected from '@/components/LandingConnected'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 
@@ -11,24 +12,20 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 export default function HomeScreen() {
   const { coords, liveTracking, controls } = useLocation()
   const { navigate, openFlow, viewAllCategories } = useSiteNavigation()
-  const params = useSearchParams()
+
+  const landingProps = { onNavigate: navigate, onOpenFlow: openFlow, onViewAllCategories: viewAllCategories, coords, liveTracking, controls }
 
   return (
     <div className="flex-1">
-      <Landing
-        onNavigate={navigate}
-        onOpenFlow={openFlow}
-        onViewAllCategories={viewAllCategories}
-        coords={coords}
-        liveTracking={liveTracking}
-        controls={controls}
-        // Set when the visitor got here by collapsing the fullscreen map, so
-        // the collapse reads as zooming out to the map band rather than being
-        // dropped at the top of an unrelated page. A query param rather than
-        // history state: it survives a reload, and it's visible in the URL
-        // instead of hiding in an object only this app can read.
-        scrollTo={params.get('at') === 'map' ? 'map' : null}
-      />
+      {/* The fallback IS Landing — a full, real render of the home screen with
+          no `?at=map`, which is what a plain visit looks like. Nothing in
+          this fallback's own tree calls useSearchParams, so it prerenders
+          for real instead of shipping as an empty shell; only
+          LandingConnected, which supplies the "just collapsed the fullscreen
+          map" scroll behavior once hydrated, needs the boundary. */}
+      <Suspense fallback={<Landing {...landingProps} scrollTo={null} />}>
+        <LandingConnected {...landingProps} />
+      </Suspense>
     </div>
   )
 }

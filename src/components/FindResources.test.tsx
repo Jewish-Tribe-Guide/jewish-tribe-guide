@@ -4,33 +4,23 @@ import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
-import {
-  mockRouter,
-  mockSearchParams,
-  pushSyncingSearchParams,
-  resetMockRouter,
-  setMockSearchParams,
-} from '@/test/nextNavigationMock'
 import type { DirectoryResource, Hospital } from '@/types'
 import FindResources from './FindResources'
 
 // FindResources is a router — which sub-screen renders for a given `view`,
-// and how the URL's ?item=/?q=/?hospital=/?form= params drive it — not a
-// renderer of any one of those screens itself. Every real sub-screen
-// (HospitalsDirectory, AboutYourHospital, EruvInfo, ZmanimCard,
+// and how the searchItem/searchQuery/searchHospital/searchForm props drive
+// it — not a renderer of any one of those screens itself. Every real
+// sub-screen (HospitalsDirectory, AboutYourHospital, EruvInfo, ZmanimCard,
 // ResourceLoader, ListingForm, ReportListing) is its own component with its
 // own concerns and gets mocked out to a stub that surfaces just enough props
 // to assert the routing decision was right — same approach as Landing.test.tsx.
-
-// Real Next.js router.push updates useSearchParams() for the very next
-// render — this component relies on exactly that (its `action` derivation
-// gates on `params.get('form')`, not just its own local state) — hence
-// pushSyncingSearchParams instead of the plain no-op mockRouter.push.
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ ...mockRouter, push: pushSyncingSearchParams }),
-  usePathname: () => '/philly/grocery',
-  useSearchParams: () => mockSearchParams(),
-}))
+//
+// No next/navigation mock here, deliberately: FindResources doesn't call
+// useSearchParams()/useRouter() itself any more — FindResourcesConnected
+// does (see its own test file), and hands the resolved values down as
+// plain props. That split is what lets a plain URL (no query string at all)
+// render this component with zero Dynamic API calls, so it can actually be
+// prerendered — see the comment on FindResources' own searchItem prop.
 
 vi.mock('@/components/resources/HospitalsDirectory', () => ({
   default: ({ onSelect }: { onSelect: (id: string) => void }) => (
@@ -59,11 +49,7 @@ vi.mock('@/components/resources/ListingForm', () => ({
 vi.mock('@/components/resources/ReportListing', () => ({ default: () => <p>ReportListing</p> }))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
 
-afterEach(() => {
-  cleanup()
-  resetMockRouter()
-  setMockSearchParams({})
-})
+afterEach(() => cleanup())
 
 const anchor = { coords: null, label: '' }
 
@@ -72,19 +58,19 @@ function listing(overrides: Partial<DirectoryResource> = {}): DirectoryResource 
 }
 
 describe('FindResources — curated (non-category) views', () => {
-  it('shows the hospitals list, and selecting one pushes ?hospital=<id>', async () => {
+  it('shows the hospitals list, and selecting one reports ?hospital=<id> via onParamsChange', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} />)
+    const onParamsChange = vi.fn()
+    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} onParamsChange={onParamsChange} />)
 
     expect(screen.getByText('HospitalsDirectory')).toBeInTheDocument()
     await user.click(screen.getByText('Select hosp-1'))
 
-    expect(mockRouter.push).toHaveBeenCalledWith('/philly/grocery?hospital=hosp-1')
+    expect(onParamsChange).toHaveBeenCalledWith({ hospital: 'hosp-1' })
   })
 
-  it('shows a hospital’s About page once ?hospital= is set', () => {
-    setMockSearchParams({ hospital: 'hosp-1' })
-    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} />, {
+  it('shows a hospital’s About page once searchHospital is set', () => {
+    renderWithProviders(<FindResources view="hospitals" listings={null} anchor={anchor} onUp={vi.fn()} searchHospital="hosp-1" />, {
       content: { hospitals: [{ id: 'hosp-1', name: 'General Hospital' } as Hospital] },
     })
 
@@ -112,42 +98,43 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
   })
 
-  it('opening Add pushes ?form=create onto the URL and opens the form immediately', async () => {
-    // Unlike edit/report, create has no listing id to deep-link from — see
-    // FindResources' own `deepLinkListing` comment — so a bare ?form=create
-    // in the URL with no in-memory actionSubject does NOT reopen the create
-    // form (confirmed the hard way: an earlier version of this test asserted
-    // exactly that and failed against the real component). The create form
-    // only ever opens through this click, which sets local state in the same
-    // render Add was clicked in.
+  it('opening Add reports ?form=create via onParamsChange', async () => {
+    // `action`'s own derivation (below in this file) gates on searchForm !==
+    // null AND actionSubject — so this click alone can't show ListingForm in
+    // isolation, since a bare onParamsChange spy never feeds an updated
+    // searchForm prop back in the way a real caller does. That full
+    // round-trip (click → onParamsChange → router.push → real
+    // useSearchParams update → searchForm prop updates → form opens, all in
+    // one render thanks to React batching) is FindResourcesConnected's own
+    // job — see its test for "opens the form immediately".
     const user = userEvent.setup()
+    const onParamsChange = vi.fn()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
-    renderWithProviders(<FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} />, {
+    renderWithProviders(<FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} onParamsChange={onParamsChange} />, {
       content: { categories: [grocery] },
     })
 
     await user.click(screen.getByText('Add listing'))
 
-    expect(mockRouter.push).toHaveBeenCalledWith('/philly/grocery?form=create')
-    expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
+    expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' })
   })
 
-  it('resolves a deep-linked edit (?form=edit&item=<id>) to the matching listing, with no explicit openAction call', () => {
-    setMockSearchParams({ form: 'edit', item: 'l1' })
+  it('resolves a deep-linked edit (searchForm="edit", searchItem=<id>) to the matching listing, with no explicit openAction call', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
-    renderWithProviders(<FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} />, {
-      content: { categories: [grocery] },
-    })
+    renderWithProviders(
+      <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />,
+      { content: { categories: [grocery] } },
+    )
 
     expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
   })
 
-  it('shows the report form once ?form=report&item=<id> is set', () => {
-    setMockSearchParams({ form: 'report', item: 'l1' })
+  it('shows the report form once searchForm="report"/searchItem=<id> are set', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
-    renderWithProviders(<FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} />, {
-      content: { categories: [grocery] },
-    })
+    renderWithProviders(
+      <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
+      { content: { categories: [grocery] } },
+    )
 
     expect(screen.getByText('ReportListing')).toBeInTheDocument()
   })

@@ -22,7 +22,7 @@ import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 
-type Props = {
+export type LandingProps = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
@@ -65,7 +65,7 @@ type Props = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: Props) {
+export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: LandingProps) {
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()

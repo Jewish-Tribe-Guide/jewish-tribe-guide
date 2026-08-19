@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { vi } from 'vitest'
 
 // ── A shared next/navigation router mock.
@@ -47,6 +48,20 @@ export function resetMockRouter(): void {
 //   ...
 //   setMockSearchParams({ form: 'create' })
 let searchParams = new URLSearchParams()
+// A plain module variable has no way to tell React it changed — fine as long
+// as the component reading it also re-renders for some other reason on the
+// same change (its own local state updating in the same click, say). That
+// stopped being true once a param change and the component reading it live
+// in different components — a wrapper whose only job is reading search
+// params and handing them to a child as props (see FindResourcesConnected)
+// — so this is a real pub/sub store now, and useMockSearchParams below
+// subscribes to it, matching how useSearchParams() is genuinely reactive to
+// router.push in real Next.js.
+const listeners = new Set<() => void>()
+
+function notify(): void {
+  for (const listener of listeners) listener()
+}
 
 export function mockSearchParams(): URLSearchParams {
   return searchParams
@@ -54,6 +69,30 @@ export function mockSearchParams(): URLSearchParams {
 
 export function setMockSearchParams(params: URLSearchParams | Record<string, string>): void {
   searchParams = params instanceof URLSearchParams ? params : new URLSearchParams(params)
+  notify()
+}
+
+/** A genuinely reactive useSearchParams() stand-in — use this (instead of
+ *  `() => mockSearchParams()`) when the component under test doesn't
+ *  independently re-render for another reason on the same param change.
+ *  Wrapped in an arrow function at the call site, same as every other entry
+ *  here — a bare reference trips up vi.mock's hoisting:
+ *
+ *    import { useMockSearchParams } from '@/test/nextNavigationMock'
+ *    vi.mock('next/navigation', () => ({
+ *      useRouter: () => ({ ...mockRouter, push: pushSyncingSearchParams }),
+ *      usePathname: () => '/test-community',
+ *      useSearchParams: () => useMockSearchParams(),
+ *    })) */
+export function useMockSearchParams(): URLSearchParams {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    mockSearchParams,
+    mockSearchParams,
+  )
 }
 
 // A `router.push` that also updates mockSearchParams from the pushed URL's

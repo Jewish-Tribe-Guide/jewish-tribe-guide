@@ -1,8 +1,10 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { DirectoryResource } from '@/types'
 import FindResources from '@/components/FindResources'
+import FindResourcesConnected from '@/components/FindResourcesConnected'
 import SupportWizard from '@/components/wizard/SupportWizard'
 import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
@@ -35,36 +37,71 @@ export default function SlugScreen({
 }) {
   const { anchor } = useLocation()
   const { goHome, viewAllCategories, viewMapForCategory } = useSiteNavigation()
-  const params = useSearchParams()
 
-  if (kind === 'form') {
-    // Pre-checked needs arrive in the query string rather than history state,
-    // so a link that opens the form with a need already selected is shareable.
-    const preselect = params.get('need')?.split(',').filter(Boolean)
-    // Set by openFlow when the form was opened from the All Categories index
-    // (see useSiteNavigation), so closing the form returns there instead of
-    // always defaulting home — the form has no single fixed parent, since it
-    // can be reached from either screen.
-    const onClose = params.get('from') === 'all' ? () => viewAllCategories() : goHome
+  if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} viewAllCategories={viewAllCategories} />
 
-    // The two built-in forms have bespoke wizards; everything else is an
-    // admin-created form rendered by the generic one.
-    if (slug === 'support') return <SupportWizard preselect={preselect} onClose={onClose} />
-    if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={onClose} />
-    return <GenericFormWizard formId={slug} onClose={onClose} />
+  // Not read directly by this component — see FindResourcesConnected, which
+  // is what actually supplies ?item=/?q=/?hospital=/?form= once hydrated.
+  // Building the shared props once, rather than inline in both JSX spots
+  // below, is what makes the fallback and the live render provably the same
+  // component call with the same props (modulo the query-string ones).
+  const findResourcesProps = {
+    view: slug,
+    listings,
+    anchor,
+    initialItemId,
+    onUp: goHome,
+    onViewAllCategories: () => viewAllCategories(),
+    onViewMap: viewMapForCategory,
   }
 
   return (
     <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
-      <FindResources
-        view={slug}
-        listings={listings}
-        anchor={anchor}
-        initialItemId={initialItemId}
-        onUp={goHome}
-        onViewAllCategories={() => viewAllCategories()}
-        onViewMap={viewMapForCategory}
-      />
+      {/* The fallback IS FindResources — a full, real render of this category
+          with no query-string state, which is exactly what a plain
+          /community/slug visit (no ?item=/?q=/etc.) looks like. That's what
+          lets this prerender for real: nothing in this fallback's own tree
+          calls useSearchParams, so it isn't deferred behind the boundary the
+          way the whole thing used to be — only FindResourcesConnected,
+          which supplies the query-string-driven refinements (an expanded
+          card, an open form, …) once the page has hydrated, is. */}
+      <Suspense fallback={<FindResources {...findResourcesProps} />}>
+        <FindResourcesConnected {...findResourcesProps} />
+      </Suspense>
     </main>
   )
+}
+
+// Reads ?need=/?from= — kept in its own component, rendered only for
+// kind === 'form', rather than at SlugScreen's own top level: calling
+// useSearchParams() there would poison the category/view branch's render
+// too (see useSearchParams' own "Prerendering" docs — it defers the whole
+// Client Component tree from the nearest Suspense boundary down, not just
+// the part that reads it), even though a form and a category never share a
+// request. Still covered by the outer Suspense boundary in page.tsx, same
+// as before — forms aren't part of today's server-rendering fix.
+function FormScreen({
+  slug,
+  goHome,
+  viewAllCategories,
+}: {
+  slug: string
+  goHome: () => void
+  viewAllCategories: () => void
+}) {
+  const params = useSearchParams()
+  // Pre-checked needs arrive in the query string rather than history state,
+  // so a link that opens the form with a need already selected is shareable.
+  const preselect = params.get('need')?.split(',').filter(Boolean)
+  // Set by openFlow when the form was opened from the All Categories index
+  // (see useSiteNavigation), so closing the form returns there instead of
+  // always defaulting home — the form has no single fixed parent, since it
+  // can be reached from either screen.
+  const onClose = params.get('from') === 'all' ? () => viewAllCategories() : goHome
+
+  // The two built-in forms have bespoke wizards; everything else is an
+  // admin-created form rendered by the generic one.
+  if (slug === 'support') return <SupportWizard preselect={preselect} onClose={onClose} />
+  if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={onClose} />
+  return <GenericFormWizard formId={slug} onClose={onClose} />
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
@@ -25,7 +24,7 @@ type ListingAction =
   | { mode: 'edit'; listing: DirectoryResource }
   | { mode: 'report'; listing: DirectoryResource }
 
-type Props = {
+export type FindResourcesProps = {
   /** Which resource view is open — a category id, or one of the curated pages
    *  ('hospitals', 'eruv', 'zmanim'). This is the URL's slug segment, resolved
    *  and validated by the route before this renders.
@@ -61,12 +60,51 @@ type Props = {
   /** Navigate to the map screen pre-filtered to this category, carrying the
    *  directory's active search query and field filters. */
   onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
+  // ── Query-string state, read by the caller (see FindResourcesConnected) ────
+  // Reading it here directly via useSearchParams() used to force this
+  // component's entire render — the whole directory, not just these few
+  // refinements — behind a Suspense boundary that never resolves in the
+  // static HTML a crawler or a no-JS visitor gets (see useSearchParams'
+  // own "Prerendering" docs: it defers everything from the nearest Suspense
+  // boundary down, not just the part that reads it). Taking these as props
+  // instead means a caller with no query string at all (by far the common
+  // case — a plain /community/category visit) can render this component with
+  // no dynamic-API call anywhere in its tree, so it prerenders for real.
+  // FindResourcesConnected supplies the live values once hydrated; the
+  // Suspense fallback around it is this same component called with none of
+  // these set, which is exactly the plain-URL render already needed.
+  /** `?item=` */
+  searchItem?: string | null
+  /** `?q=` */
+  searchQuery?: string | null
+  /** `?hospital=` */
+  searchHospital?: string | null
+  /** `?form=` */
+  searchForm?: string | null
+  /** Pushes a change to these query params, keeping the path — a no-op
+   *  default is safe: nothing in the fallback render (no query string yet)
+   *  can be interacted with before hydration swaps in the real, connected
+   *  version that supplies a real one. */
+  onParamsChange?: (changes: Record<string, string | null>) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
 // a category's listings (with add/edit/report), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form.
-export default function FindResources({ view, listings, anchor, initialItemId, onUp, onViewAllCategories, onViewMap }: Props) {
+export default function FindResources({
+  view,
+  listings,
+  anchor,
+  initialItemId,
+  onUp,
+  onViewAllCategories,
+  onViewMap,
+  searchItem = null,
+  searchQuery = null,
+  searchHospital = null,
+  searchForm = null,
+  onParamsChange = () => {},
+}: FindResourcesProps) {
   // Every "All resources" button below means what it says — the actual list
   // of every resource. On mobile that's still the home grid (onUp). On
   // desktop, home is now a short gateway with just three featured cards, not
@@ -108,29 +146,18 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
   // These were four useStates seeded from history.state and reset by the
   // popstate handler above. As query params they survive a reload, make each
   // sub-view a real shareable link, and get browser back/forward for free.
+  // Supplied by FindResourcesConnected (see searchItem etc.'s own doc above),
+  // not read directly here.
   //
   //   ?item=<id>      expand this listing on arrival
   //   ?q=<text>       pre-fill the category's search box
   //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit/report form is open over the list
-  const params = useSearchParams()
-  const pathname = usePathname()
-  const router = useRouter()
+  const reopenItemId = searchItem ?? initialItemId ?? null
+  const initialSearch = searchQuery
+  const hospitalDetailId = searchHospital
 
-  const reopenItemId = params.get('item') ?? initialItemId ?? null
-  const initialSearch = params.get('q')
-  const hospitalDetailId = params.get('hospital')
-
-  /** Pushes a change to this view's query params, keeping the path. */
-  const setParams = (changes: Record<string, string | null>) => {
-    const next = new URLSearchParams(params)
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === null) next.delete(key)
-      else next.set(key, value)
-    }
-    const qs = next.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
-  }
+  const setParams = onParamsChange
 
   // A form is only open while its param says so, so browser back closes it
   // without this component listening for anything.
@@ -146,7 +173,7 @@ export default function FindResources({ view, listings, anchor, initialItemId, o
   // mount, so the listing named by ?item= is already in hand and edit/report
   // can be resolved from the URL alone, same as reopenItemId already is for
   // the expanded card.
-  const formParam = params.get('form')
+  const formParam = searchForm
   const deepLinkListing =
     (formParam === 'edit' || formParam === 'report') && reopenItemId
       ? (listings?.find((l) => l.id === reopenItemId) ?? null)
