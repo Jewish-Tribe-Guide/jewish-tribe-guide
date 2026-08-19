@@ -50,6 +50,21 @@ function formatDetailValue(v: unknown): string {
 // Low-level send. Reads RESEND_FROM from env (falls back to the sandbox sender).
 // Callers sending to the public must ensure a verified domain is set in
 // RESEND_FROM — the sandbox can only deliver to the account owner's address.
+//
+// Every email this app sends goes through here, so it's the one place to tag
+// a non-production run — local dev now points at the same disposable
+// Supabase project the write-test suites use (see README "Integration
+// tests"), which means a submission/edit/moderation action taken while just
+// clicking around locally fires a REAL email (Resend isn't environment-aware
+// on its own). NODE_ENV !== 'production' mirrors the same signal
+// dev-login/route.ts already uses to gate the local-admin bypass — anything
+// other than a real `next build`/Vercel deploy gets prefixed, so a real
+// inbox can filter/folder on "[DEV]" and know at a glance it's nothing to
+// act on.
+function taggedSubject(subject: string): string {
+  return process.env.NODE_ENV === 'production' ? subject : `[DEV] ${subject}`
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -68,7 +83,7 @@ export async function sendEmail({
   const { error } = await resend.emails.send({
     from,
     to,
-    subject,
+    subject: taggedSubject(subject),
     html,
     ...(replyTo ? { replyTo } : {}),
   })

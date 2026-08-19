@@ -49,6 +49,10 @@ describe('sendEmail', () => {
 
     beforeEach(() => {
       vi.stubEnv('RESEND_API_KEY', 'key_123')
+      // Stubbed to 'production' here so these tests exercise send mechanics
+      // (from/replyTo/errors) independent of the [DEV] tagging behavior,
+      // which has its own dedicated tests below.
+      vi.stubEnv('NODE_ENV', 'production')
       sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
       vi.mocked(Resend).mockImplementation(
         function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend,
@@ -85,6 +89,24 @@ describe('sendEmail', () => {
       await expect(sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' })).rejects.toThrow(
         /Resend email failed/,
       )
+    })
+
+    // A local dev run now points at the same disposable Supabase project the
+    // write-test suites use, so a real Resend send can fire from ordinary
+    // local clicking-around — this is what lets a real inbox filter those out.
+    describe('[DEV] subject tagging', () => {
+      it('sends the subject unprefixed in production', async () => {
+        await sendEmail({ to: 'a@example.com', subject: 'New listing suggestion', html: '<p>hi</p>' })
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: 'New listing suggestion' }))
+      })
+
+      it('prefixes the subject with [DEV] in any non-production environment', async () => {
+        vi.stubEnv('NODE_ENV', 'development')
+        await sendEmail({ to: 'a@example.com', subject: 'New listing suggestion', html: '<p>hi</p>' })
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ subject: '[DEV] New listing suggestion' }),
+        )
+      })
     })
   })
 })
