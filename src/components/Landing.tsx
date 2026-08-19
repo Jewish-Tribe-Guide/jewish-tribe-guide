@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -15,6 +15,7 @@ import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
 import { pickFeaturedCards } from '@/lib/featuredCards'
 import { community } from '@/community.config'
@@ -70,7 +71,17 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
-  const mapBandRef = useRef<HTMLDivElement>(null)
+  // Deferred, not just observed: the embedded map costs a few hundred KB of
+  // Google Maps JS (places/main/util/common/controls/map — see
+  // loadGoogleMaps.ts), loaded the instant HomeMap mounts. Gating the mount
+  // itself on visibility, not just position, means a mobile visitor — where
+  // this whole band is `hidden` via CSS below (mobile reaches the map
+  // through its own tab instead) — never triggers that download at all: a
+  // `display:none` element never intersects, so mapInView never flips for
+  // it. Desktop still gets the map, just once the band is actually about to
+  // be seen instead of on every home-screen load regardless of scroll
+  // position.
+  const [mapBandRef, mapInView] = useInView<HTMLDivElement>()
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
@@ -167,7 +178,10 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
     const el = mapBandRef.current
     if (!el) return
     el.scrollIntoView({ block: 'start' })
-  }, [scrollTo, hasMap])
+    // mapBandRef comes from useInView, a useRef under the hood — stable
+    // across renders, just not visible as such to eslint across the custom
+    // hook boundary. Listed explicitly rather than suppressed.
+  }, [scrollTo, hasMap, mapBandRef])
 
   // Tapping the tab bar's Home button, or the header logo, while already on
   // home doesn't remount this component — see goHome's own note — so it fires
@@ -226,7 +240,15 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             return hasMap && !q && (
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
                 <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
-                <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
+                {mapInView ? (
+                  <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
+                ) : (
+                  // Same footprint as ResourceMapView's own embedded-mode
+                  // container (sm:h-[70vh] sm:min-h-[420px], rounded/ringed
+                  // the same way) so swapping in the real map once mapInView
+                  // flips true doesn't shift anything below it.
+                  <div className="h-[70vh] min-h-[420px] rounded-2xl bg-slate-100 ring-1 ring-slate-900/5" />
+                )}
               </div>
             )
           }

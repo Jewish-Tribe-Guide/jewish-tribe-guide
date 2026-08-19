@@ -3,6 +3,7 @@
 // A no-op for the plain-function tests that don't render anything.
 import '@testing-library/jest-dom/vitest'
 import { installMockGeolocation } from './src/test/geolocationMock'
+import { installMockIntersectionObserver } from './src/test/intersectionObserverMock'
 
 // jsdom 30's own window.localStorage isn't reliably wired up through
 // vitest's jsdom environment on this toolchain (Node 26 also defines its own
@@ -57,6 +58,10 @@ if (typeof window !== 'undefined') {
   // jsdom has no navigator.geolocation at all — see geolocationMock.ts for
   // the full rationale and how to drive a specific success/error path.
   installMockGeolocation()
+
+  // jsdom has no IntersectionObserver either — see intersectionObserverMock.ts
+  // for the full rationale and how to drive a specific "now it's visible" path.
+  installMockIntersectionObserver()
 
   // jsdom has no ResizeObserver either — a no-op stand-in (never fires a
   // callback) is enough for components that only use it to measure an

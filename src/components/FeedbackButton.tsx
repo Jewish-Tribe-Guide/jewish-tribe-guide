@@ -37,7 +37,11 @@ export default function FeedbackButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
+        // -my-1 py-1: grows the tap target to the WCAG-recommended 24px
+        // minimum (this text alone renders at ~21px) without shifting the
+        // footer row's own height — see FeaturedCards' "Browse all
+        // categories" button for the same fix, same reasoning.
+        className="-my-1 py-1 text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
       >
         {buttonLabel} &rarr;
       </button>

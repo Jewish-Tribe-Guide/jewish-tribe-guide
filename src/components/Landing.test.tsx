@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, type RenderResult } from '@testing-library/react'
+import { act, cleanup, screen, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
+import { resetMockIntersectionObserver, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import Landing from './Landing'
 
 // HomeMap and ZmanimStrip are mocked out — both pull in real network/SDK
@@ -28,7 +29,10 @@ vi.mock('@/components/home/ZmanimStrip', () => ({
   default: ({ title }: { title: string }) => <div data-testid="zmanim-strip-stub">{title}</div>,
 }))
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  resetMockIntersectionObserver()
+})
 
 const handlers = {
   onNavigate: vi.fn(),
@@ -101,13 +105,21 @@ describe('Landing', () => {
     expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
   })
 
-  it('renders the map band only when the community has a Map pseudo-category', () => {
+  it('renders the map band only when the community has a Map pseudo-category, deferring HomeMap itself until scrolled near', () => {
     const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withMap] } })
+    // The band exists (a placeholder of the same footprint), but HomeMap
+    // itself — and the Google Maps SDK it pulls in — doesn't mount until
+    // useInView says the band has actually scrolled near. See useInView's
+    // own doc comment for why this matters most on mobile, where the band
+    // is `hidden` outright and never intersects at all.
+    expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    act(() => triggerAllIntersections())
     expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
+    act(() => triggerAllIntersections())
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
   })
 
@@ -131,6 +143,10 @@ describe('Landing', () => {
       const { container } = renderLanding(undefined, {
         content: { categories: withMapAndZmanim, homeSections: [] },
       })
+      // HomeMap itself doesn't mount until the band scrolls near (see
+      // useInView) — irrelevant to this test, which only cares about DOM
+      // order, so just force it in so home-map-stub is there to compare.
+      act(() => triggerAllIntersections())
 
       const html = container.innerHTML
       expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="zmanim-strip-stub"'))
@@ -146,6 +162,7 @@ describe('Landing', () => {
           ],
         },
       })
+      act(() => triggerAllIntersections())
 
       const html = container.innerHTML
       expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
