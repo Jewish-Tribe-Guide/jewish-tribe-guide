@@ -1,13 +1,11 @@
-import { Suspense } from 'react'
 import HomeScreen from './HomeScreen'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { listApprovedResources } from '@/lib/resourceStore'
 
-// The Suspense boundary is what lets this page prerender. HomeScreen reads
-// `?at=map` with useSearchParams, which can't resolve at build time — the
-// boundary means the shell is still static and only the part that needs the
-// query string waits for the request. Same pattern on every screen below that
-// reads search params.
+// No Suspense boundary here — HomeScreen doesn't call useSearchParams()
+// itself (that's isolated inside LandingConnected, with its own narrow
+// boundary right around the one piece that needs it), so nothing in this
+// tree suspends on a Dynamic API and the whole page prerenders for real.
 export default async function HomePage(props: PageProps<'/[community]'>) {
   const { community } = await props.params
   // The home screen's search covers every place, and the embedded map plots
@@ -21,9 +19,7 @@ export default async function HomePage(props: PageProps<'/[community]'>) {
 
   return (
     <ListingsProvider listings={listings}>
-      <Suspense fallback={<div className="flex-1" />}>
-        <HomeScreen />
-      </Suspense>
+      <HomeScreen />
     </ListingsProvider>
   )
 }

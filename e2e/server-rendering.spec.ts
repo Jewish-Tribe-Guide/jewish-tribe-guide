@@ -20,30 +20,29 @@ import {
 // The test that existed to prevent a recurrence of exactly this bug was
 // reporting a green run while the bug was present.
 //
-// Everything below now goes through serverMarkup(), which drops script
-// contents. See the two `test.fail()` cases: the content is NOT in the HTML
-// today, and saying so out loud is the point.
+// Everything below goes through serverMarkup(), which drops script contents,
+// so `expect(markup).toContain(...)` actually means "in the rendered HTML",
+// not "somewhere in the response".
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('content is server-rendered', () => {
-  // KNOWN FAILING — documenting real behaviour, not a flaky test.
+  // Used to be two test.fail() cases here — `[community]/page.tsx` and
+  // `[slug]/page.tsx` wrap their screens in <Suspense> so useSearchParams
+  // doesn't block prerendering, but the whole content subtree ended up
+  // inside the boundary instead of just the part reading the query string,
+  // so the document shipped a shell (`/philly` had no <main> at all; a
+  // category page's <main> was 42 characters of nothing).
   //
-  // `[community]/page.tsx` and `[slug]/page.tsx` wrap their screens in
-  // <Suspense> so `useSearchParams` doesn't block prerendering. The intent was
-  // that only the part reading the query string waits for the request, but the
-  // whole content subtree ended up inside the boundary, so the document ships a
-  // shell: `/philly` has no <main> at all, and a category page's <main> is 42
-  // characters of nothing.
-  //
-  // The data is still loaded on the server and arrives with the document (see
-  // "makes no API calls of its own" below, which genuinely passes) — it just
-  // isn't rendered into HTML. The cost is no-JS clients, first contentful
-  // paint, and lower-tier crawlers; titles and metadata are unaffected.
-  //
-  // test.fail() rather than a deletion or a skip: the suite stays green, the
-  // bug stays visible, and the day someone narrows those boundaries these turn
-  // red to say so.
-  test.fail('a category directory ships its listings in the HTML', async ({ page, request }) => {
+  // Fixed by moving the actual useSearchParams() reads (Landing's `?at=map`,
+  // FindResources' `?item=`/`?q=`/`?hospital=`/`?form=`) out into their own
+  // thin wrapper components (LandingConnected, FindResourcesConnected),
+  // narrowing the Suspense boundary down to just those — everything else
+  // (the category grid, the listing rows) no longer calls a Dynamic API and
+  // prerenders for real. The wrapper's own Suspense fallback is the same
+  // component rendered with no query-string props at all, which is exactly
+  // what a plain URL with no query string looks like — so there's nothing
+  // duplicated between "what ships in the HTML" and "what the fallback is".
+  test('a category directory ships its listings in the HTML', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
 
@@ -60,7 +59,7 @@ test.describe('content is server-rendered', () => {
     expect(markup).toContain(first)
   })
 
-  test.fail('the home screen ships its category cards in the HTML', async ({ page, request }) => {
+  test('the home screen ships its category cards in the HTML', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const cats = await categoryWithListings(request, community)
 
@@ -139,19 +138,20 @@ test.describe('content is server-rendered', () => {
       // Asserts on the rendered page rather than the HTML. This is a pagination
       // claim, not a server-rendering one, and it used to search the raw
       // response — which meant it passed on names found only in the RSC
-      // payload, and would have gone red for a completely unrelated reason the
-      // day the boundaries above get narrowed.
+      // payload, a completely unrelated reason from what this test claims to
+      // check.
       await ready(page)
       await dismissLocationPrompt(page)
       const names: string[] = (await (
         await request.get(`/api/resources?category=${category.id}&community=${community}`)
       ).json()).resources.map((r: { name: string }) => r.name as string)
 
-      // toContainText, not a one-shot innerText() snapshot. Because the content
-      // is client-rendered (see the boundary note at the top of this file),
-      // <main> is an empty fallback for a moment after `ready()` — which waits
-      // on the header, and the header is part of the shell that was there all
-      // along. Reading it once caught the empty string about two runs in three.
+      // toContainText, not a one-shot innerText() snapshot — auto-retrying
+      // assertions cost nothing here and this is exactly the kind of check
+      // ("did the count come out right") that a one-shot read on a page still
+      // settling can catch mid-flight. The content itself now arrives with
+      // the initial HTML (see the top of this file), so <main> isn't the
+      // empty Suspense fallback by the time `ready()` resolves any more.
       const main = page.locator('main')
       for (const name of names) {
         await expect(main, `"${name}" should be on the page`).toContainText(name)

@@ -55,15 +55,17 @@ Cached content reads are wired in three places that have to agree: a `use cache`
 
 Note that `/admin` and `/inbox` **are** prerendered and CDN-cached, correctly — both are `'use client'` shells that fetch their data in the browser with an `Authorization` header. That stops being safe the moment anyone moves one of those fetches to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
 
-## The content is not server-rendered (known, marked `test.fail`)
+## The content is not server-rendered (closed)
 
-`[community]/page.tsx` and `[slug]/page.tsx` wrap their screens in `<Suspense>` so `useSearchParams` doesn't block prerendering. The intent was that only the part reading the query string waits for the request; in practice the whole content subtree sits inside the boundary. What ships is a shell — `/philly`'s `<main>` is `<div class="flex-1"></div>`, the literal fallback, followed by an unresolved `<template id="B:0">`.
+`[community]/page.tsx` and `[slug]/page.tsx` wrap their screens in `<Suspense>` so `useSearchParams` doesn't block prerendering. The intent was that only the part reading the query string waits for the request; for a while, the whole content subtree sat inside the boundary instead. What shipped was a shell — `/philly`'s `<main>` was `<div class="flex-1"></div>`, the literal fallback, followed by an unresolved `<template id="B:0">`.
 
-The data *is* loaded on the server and arrives with the document, so "a category page makes no API calls of its own" genuinely passes — that part of the work stands. Titles, metadata and Open Graph tags render server-side too, so link previews are fine. The cost is no-JS clients, first contentful paint, and lower-tier crawlers.
+Fixed by narrowing the boundary to just the piece that actually calls `useSearchParams()`. `Landing` (home) and `FindResources` (category directories) no longer call it directly — each has a thin `'use client'` wrapper (`LandingConnected`, `FindResourcesConnected`) that does, supplying the query-string-derived values as plain props. The `<Suspense>` around each wrapper uses the *same component with no query-string props* as its fallback, so the static/prerendered render and the "no query string yet" render are provably the same JSX call, not two hand-maintained copies that can drift. Everything else in the tree (the category grid, listing rows, home cards) no longer touches a Dynamic API at all and prerenders for real.
 
-The two tests asserting rendered content are marked `test.fail()`. The suite stays green, the bug stays visible, and **the day someone narrows those boundaries they will turn red** — that is the signal to remove the marker, not a regression.
+The data was already loaded on the server and arriving with the document even before this fix, so "a category page makes no API calls of its own" was passing the whole time — that part of the work always stood. Titles, metadata and Open Graph tags render server-side too, so link previews were fine even during the bug. The fix's actual payoff is no-JS clients, first contentful paint, and lower-tier crawlers, which were the cost of the boundary being too wide.
 
-This is the same mechanism as the `/` redirect bug: a Suspense boundary added for Cache Components silently changed what gets delivered, and the test meant to catch it didn't.
+The two tests that used to assert this were marked `test.fail()`, per the same pattern as the "Coverage that used to be missing" section below — the suite stayed green, the bug stayed visible, and the fix is what turned them into an *unexpected pass*, Playwright's own signal that a `test.fail()` needs its marker removed. Both are plain `test()` now.
+
+This was the same mechanism as the `/` redirect bug: a Suspense boundary added for Cache Components silently changed what gets delivered, and the test meant to catch it didn't — until `serverMarkup()` (stripping the RSC payload from raw HTML) made the check actually mean what it claimed to.
 
 ## Coverage that used to be missing (closed — see the suites above)
 

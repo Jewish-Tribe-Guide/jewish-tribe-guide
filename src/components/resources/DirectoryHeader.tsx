@@ -30,7 +30,14 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
   return (
     <div className="flex items-end justify-between gap-2 mb-2">
       <div>
-        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+        {/* h1, not h2: this is the page's own main heading (every category
+            directory, the synagogue/hospitals directories, all share this
+            component) — every other top-level screen in the app (home,
+            All Categories, Inbox, admin, the error/offline pages) already
+            uses h1 for the same role. A real gap, not a style choice: axe's
+            page-has-heading-one caught every one of these pages having no
+            h1 at all. */}
+        <h1 className="text-xl font-semibold text-slate-800">{title}</h1>
         {anchorLabel ? (
           <p className="text-sm text-muted mt-0.5">
             {anchorLabel}

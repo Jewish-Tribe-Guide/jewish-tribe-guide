@@ -40,7 +40,11 @@ export default function FeaturedCards({
         <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
         <button
           onClick={onShowAll}
-          className="shrink-0 text-sm font-medium text-primary underline-offset-2 hover:underline cursor-pointer"
+          // -my-1 py-1: grows the actual tap target to the WCAG-recommended
+          // 24px minimum (this text alone renders at ~21px) without shifting
+          // the heading row's own height — the negative margin cancels the
+          // padding's effect on surrounding layout, only the hit area grows.
+          className="-my-1 shrink-0 py-1 text-sm font-medium text-primary underline-offset-2 hover:underline cursor-pointer"
         >
           Browse all categories →
         </button>

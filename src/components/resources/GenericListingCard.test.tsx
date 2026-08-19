@@ -54,8 +54,13 @@ describe('GenericListingCard — collapsed', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    const row = screen.getByRole('button', { expanded: false })
-    await user.click(row)
+    // The chevron is the only element carrying aria-expanded (the row
+    // itself is a plain div now — see GenericListingCard's own comment on
+    // why: it holds other real interactive children, so it can't also be
+    // an ARIA button). Clicking it exercises the real accessible path,
+    // not just the row's mouse-only onClick convenience.
+    const toggle = screen.getByRole('button', { expanded: false })
+    await user.click(toggle)
 
     expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
   })

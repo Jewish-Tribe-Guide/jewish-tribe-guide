@@ -67,7 +67,9 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
     return (
       <div>
         <UpButton label={upLabel} onClick={onUp} />
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">{title}</h2>
+        {/* h1, matching DirectoryHeader's real (successfully-loaded) title —
+            this is the same page's heading, just its load-failed state. */}
+        <h1 className="text-xl font-semibold text-slate-800 mb-4">{title}</h1>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">
             We couldn’t load {title.toLowerCase()} just now.

@@ -75,9 +75,13 @@ function ReadyState({ data }: { data: ZmanimData }) {
 
       {/* Upcoming Shabbos */}
       <div className="pt-3 border-t border-slate-100">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+        {/* h3, not h4: both callers (ZmanimCard, ZmanimStrip) put this under
+            their own h2 section heading — h4 skipped a level. Purely
+            semantic; the size/weight come entirely from the className
+            below, not the tag, so this has no visual effect. */}
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
           Upcoming Shabbos
-        </h4>
+        </h3>
         <div className="space-y-1.5">
           <ShabbosRow
             label="Candle Lighting"
