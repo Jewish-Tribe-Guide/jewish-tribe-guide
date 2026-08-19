@@ -9,6 +9,12 @@ type PatchBody = {
   data?: Record<string, unknown>
 }
 
+// Mirrors GET's own scope (see this file's GET and formResponseStore.ts's
+// listFormResponses doc comment): Feedback plus any custom admin-created form.
+// Support/Volunteer/Volunteer-changes rows are /inbox's domain, not admin's —
+// out of scope here even by id, same as they're never fetched by GET.
+const ADMIN_RESPONSE_SCOPE = { requestTypes: ['Feedback'], anyFormId: true }
+
 // PATCH /api/admin/responses/:id — correct a response's contact info and/or
 // submitted data. Admin only. Mirrors /api/inbox/:id exactly, gated by the
 // admin allowlist instead of the inbox one.
@@ -26,7 +32,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const response = await updateFormResponse(id, body)
+    const response = await updateFormResponse(id, body, ADMIN_RESPONSE_SCOPE)
     if (!response) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
@@ -44,7 +50,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   const { id } = await ctx.params
   try {
-    await deleteFormResponse(id)
+    const deleted = await deleteFormResponse(id, ADMIN_RESPONSE_SCOPE)
+    if (!deleted) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true })

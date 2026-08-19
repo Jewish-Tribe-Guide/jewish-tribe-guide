@@ -70,17 +70,43 @@ export async function listFormResponses(
   return (data as FormResponseRow[]).map(toView)
 }
 
+// The same admin/inbox role split GET already enforces (see listFormResponses'
+// doc comment), applied to a single row by id — PATCH/DELETE have no formId/
+// feedback query param to scope by, so the caller's allowed request types (and,
+// for admin, "any custom form") have to be checked against the row itself.
+// `anyFormId` covers admin's per-form tabs: any `form_id` set (not just a
+// specific one), since the id alone doesn't say which form the row belongs to.
+type ResponseScope = { requestTypes?: string[]; anyFormId?: boolean }
+
+async function rowInScope(id: string, scope: ResponseScope): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from('form_response')
+    .select('request_type, form_id')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw new Error(`Failed to load the request: ${error.message}`)
+  if (!data) return false
+  const row = data as Pick<FormResponseRow, 'request_type' | 'form_id'>
+  if (scope.anyFormId && row.form_id) return true
+  return scope.requestTypes?.includes(row.request_type) ?? false
+}
+
 // Corrects a response's contact info and/or submitted data (e.g. a typo'd
 // phone number) — request_id/request_type/status are immutable here, same
-// spirit as a category's id. Only the provided keys change.
+// spirit as a category's id. Only the provided keys change. Returns null both
+// when the id doesn't exist and when it's out of the caller's scope, so the
+// two cases can't be told apart from the response.
 export async function updateFormResponse(
   id: string,
   patch: { contact?: ContactHospitalData; data?: Record<string, unknown> },
+  scope: ResponseScope,
 ): Promise<InboxResponse | null> {
   const row: Record<string, unknown> = {}
   if (patch.contact !== undefined) row.contact = patch.contact
   if (patch.data !== undefined) row.data = patch.data
   if (Object.keys(row).length === 0) return null
+
+  if (!(await rowInScope(id, scope))) return null
 
   const { data, error } = await getAdminClient()
     .from('form_response')
@@ -92,8 +118,12 @@ export async function updateFormResponse(
   return data ? toView(data as FormResponseRow) : null
 }
 
-// Permanently deletes a response.
-export async function deleteFormResponse(id: string): Promise<void> {
+// Permanently deletes a response. Returns false (no-op) both when the id
+// doesn't exist and when it's out of the caller's scope.
+export async function deleteFormResponse(id: string, scope: ResponseScope): Promise<boolean> {
+  if (!(await rowInScope(id, scope))) return false
+
   const { error } = await getAdminClient().from('form_response').delete().eq('id', id)
   if (error) throw new Error(`Failed to delete the request: ${error.message}`)
+  return true
 }

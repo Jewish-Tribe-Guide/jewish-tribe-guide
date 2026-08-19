@@ -35,10 +35,3 @@ export const ui: UiConfig = {
   },
   upvotes: raw.upvotes ?? true,
 }
-
-/** True if any public-contribution path is enabled — the moderation queue / admin
- *  matters only when at least one is on. */
-export const contributionsEnabled =
-  ui.contributions.add ||
-  ui.contributions.edit ||
-  ui.contributions.report
