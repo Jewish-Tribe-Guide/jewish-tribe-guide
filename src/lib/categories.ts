@@ -325,20 +325,17 @@ export function slugifyFieldKey(label: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
-// Category ids whose listings must NOT auto-sync from Google Places. Two kinds:
-//   • community-wide categories (not real map places, e.g. whatsapp — see the
-//     `community` column/CategoryConfig field), and
-//   • categories whose value is hand-curated community info Google doesn't have
-//     (synagogue davening times, mikvah schedules, bikur cholim rooms).
+// Category ids whose listings must NOT auto-sync from Google Places:
+// community-wide categories that aren't real map places (whatsapp) or whose
+// defining field is hand-curated info Google has no concept of at all
+// (bikur cholim rooms). Synagogue and mikvah are NOT excluded — their
+// schedule fields (minyanim, women_s_hours, etc.) aren't in the sync's
+// field whitelist anyway, so they only gain the fields Google actually has
+// (phone, address, businessStatus, and mikvah's generic hours), same
+// ownership rule as everyone else.
 // The place-id backfill skips these, so no placeId is ever assigned and the
-// sync can never overwrite their curated fields. Ids that don't exist are
-// harmless.
-export const SYNC_EXCLUDED_CATEGORY_IDS = new Set<string>([
-  'whatsapp',
-  'synagogue',
-  'mikvah',
-  'bikur-cholim',
-])
+// sync can never touch them. Ids that don't exist are harmless.
+export const SYNC_EXCLUDED_CATEGORY_IDS = new Set<string>(['whatsapp', 'bikur-cholim'])
 
 /** Whether listings in this category are eligible for Google Places auto-sync
  *  (commercial places with real hours: grocery, restaurant, hotel, dentist, …). */

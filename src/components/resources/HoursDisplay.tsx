@@ -1,10 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { formatTodayHours, formatWeekHours } from '@/lib/hours'
 
 type Props = {
   value: unknown
+  /** Trailing content after the today-line, e.g. PlaceDetailBody's "via
+   *  Google" tag — kept as a prop rather than PlaceDetailBody rendering its
+   *  own sibling element so it sits on the same line as "Today: …", the same
+   *  position the phone number's badge takes, instead of on its own row. */
+  badge?: ReactNode
 }
 
 /**
@@ -24,7 +29,7 @@ type Props = {
  * PlaceDetailBody's own closedBadge/syncedNote, shown once per listing
  * regardless of whether it has any hours fields to display.
  */
-export default function HoursDisplay({ value }: Props) {
+export default function HoursDisplay({ value, badge }: Props) {
   const [open, setOpen] = useState(false)
 
   const today = formatTodayHours(value)
@@ -35,29 +40,35 @@ export default function HoursDisplay({ value }: Props) {
     <div className="mt-1">
       {!week && (
         // Legacy text string (no structured breakdown) — show the raw line, no toggle.
-        <p className="text-xs text-slate-600">{today}</p>
+        <p className="flex items-center gap-1.5 text-xs text-slate-600">
+          {today}
+          {badge}
+        </p>
       )}
 
       {week && (
         <>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
-            aria-expanded={open}
-          >
-            <span>{today}</span>
-            <svg
-              className={`w-3 h-3 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-              aria-hidden="true"
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
+              aria-expanded={open}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              <span>{today}</span>
+              <svg
+                className={`w-3 h-3 text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {badge}
+          </div>
 
           {open && (
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 mt-1.5 pl-0.5">
