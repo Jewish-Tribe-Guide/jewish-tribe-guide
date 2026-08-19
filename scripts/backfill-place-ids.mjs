@@ -3,8 +3,8 @@
 // `details.placeId`. The presence of a placeId is what opts a listing into the
 // recurring hours/phone sync (scripts/sync-google-hours.mjs + the cron route).
 //
-// Community / hand-curated categories (whatsapp, synagogue, mikvah, bikur
-// cholim) are skipped — Google doesn't have their key data, so they stay manual.
+// Community-wide / fully hand-curated categories (whatsapp, bikur cholim) are
+// skipped — Google has no data for them at all, so they stay manual.
 //
 // Requires GOOGLE_MAPS_SERVER_KEY (Places API enabled, NOT referrer-restricted).
 // Safe to re-run: skips listings that already have a placeId. Logs the name +
@@ -16,7 +16,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // Mirrors SYNC_EXCLUDED_CATEGORY_IDS in src/lib/categories.ts (scripts can't
 // import the TS module). Keep the two in sync.
-const SYNC_EXCLUDED = new Set(['whatsapp', 'synagogue', 'mikvah', 'bikur-cholim'])
+const SYNC_EXCLUDED = new Set(['whatsapp', 'bikur-cholim'])
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
