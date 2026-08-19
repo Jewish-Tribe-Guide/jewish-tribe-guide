@@ -214,7 +214,13 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       : item.businessStatus === 'CLOSED_TEMPORARILY'
         ? { text: 'Temporarily closed', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
         : null
-  const syncedNote = syncedLabel(item.googleSyncedAt)
+  // Gated on placeId, not just the timestamp: a listing whose Google match
+  // was later cleared (a bad match corrected, say) can't un-sync its own
+  // history, so a stale googleSyncedAt can outlive the placeId that earned
+  // it. Without a live placeId, this listing isn't in the sync's daily
+  // query at all — nothing here is actually syncing, so it shouldn't claim
+  // to be, however up to date the leftover timestamp still looks.
+  const syncedNote = item.placeId ? syncedLabel(item.googleSyncedAt) : null
   // True field ownership (see src/lib/googlePlaces.ts), not a guess — this
   // field's current value came from the last Google sync and will keep
   // refreshing, rather than being something a person typed in. Never true
@@ -380,17 +386,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           <div key={f.key} className="flex items-start gap-3">
             <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0 flex-1">
-              {(hoursFields.length > 1 || synced) && (
-                <p className="text-xs text-muted mb-0.5 flex items-center gap-1.5">
-                  {hoursFields.length > 1 && f.label}
-                  {synced && (
+              {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+              <HoursDisplay
+                value={val}
+                badge={
+                  synced && (
                     <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
                       via Google
                     </span>
-                  )}
-                </p>
-              )}
-              <HoursDisplay value={val} />
+                  )
+                }
+              />
             </div>
           </div>
         )
