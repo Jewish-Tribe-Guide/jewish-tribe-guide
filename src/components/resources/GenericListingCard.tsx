@@ -150,15 +150,22 @@ export function GenericListingCard({
     // collapsed card. Corners stay clean because the header and expanded panel
     // round their own edges below.
     <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
+      {/* Not role="button"/tabIndex any more — the row also contains real
+          interactive children (UpvoteButton, an external-link <a>, the
+          Open/badge Chips), and an ARIA button role can't legally contain
+          other interactive controls (axe's nested-interactive rule: a
+          screen reader can't reliably operate one nested inside another).
+          The onClick below stays as a mouse/touch convenience — "click
+          anywhere on the row" — but the actual accessible, keyboard-operable
+          toggle is now the chevron <button> further down. It carries no
+          onClick of its own; a native button's click (mouse or keyboard)
+          bubbles right up to this handler, so there's exactly one place the
+          toggle logic lives, not two copies to keep in sync. */}
       <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
         onClick={() => setExpanded((p) => {
           if (!p) track('listing_opened', { listing: item.name, category: category.id })
           return !p
         })}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((p) => !p) } }}
         className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         <div className="flex items-center gap-3">
@@ -255,12 +262,27 @@ export function GenericListingCard({
                 {f.linkLabel ?? f.label}
               </a>
             ))}
-            <svg
-              className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-              fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+            {/* The row's actual accessible toggle — see the row div's own
+                comment above. No onClick: relies on the native click a
+                button dispatches on mouse activation or Enter/Space
+                bubbling up to the row's handler, which does the real work. */}
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
+              // -m-2.5 p-2.5: the icon itself is 16px, well under the
+              // 24px WCAG-recommended tap target — padding grows the real
+              // hit area to ~36px without the negative margin's opposite
+              // effect shifting anything in the row around it.
+              className="-m-2.5 cursor-pointer p-2.5"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+              <svg
+                className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
           </div>
         </div>
 

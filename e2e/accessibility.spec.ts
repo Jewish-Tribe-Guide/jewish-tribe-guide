@@ -30,25 +30,20 @@ test.describe('accessibility', () => {
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
   })
 
-  // KNOWN FAILING — documenting a real issue, not a flaky test.
+  // Used to be a documented test.fail() here: GenericListingCard's row was
+  // role="button" (the whole row toggled the card open/closed, including
+  // via keyboard) while also containing genuinely interactive children —
+  // UpvoteButton, an external-link button, the Open/badge Chips. A screen
+  // reader can't reliably operate a control nested inside another one.
   //
-  // GenericListingCard's row is `role="button"` (the whole row toggles the
-  // card open/closed, including via keyboard — see its own onKeyDown), but
-  // it also contains genuinely interactive children: UpvoteButton, an
-  // external-link button for any URL-type field, and the "Open"/badge
-  // Chips. A screen reader can't reliably operate an interactive control
-  // nested inside another one — this is real assistive-tech breakage, not
-  // just an audit nitpick.
-  //
-  // Not fixed here: the row-is-the-whole-tap-target pattern is deliberate
-  // (see the component's own comments) and used on every listing card on
-  // the site, so the fix needs a UX call — e.g. dropping role="button" from
-  // the row and giving keyboard users a real, non-nesting control instead —
-  // not a quick prop tweak. test.fail() rather than a skip: the suite stays
-  // green, the bug stays visible, and the day someone restructures that row
-  // this turns red to say so, the same signal server-rendering.spec.ts's
-  // two cases gave before they were fixed.
-  test.fail('a category directory has no automatically-detectable violations', async ({ page, request }) => {
+  // Fixed by dropping role="button"/tabIndex/aria-expanded from the row —
+  // its onClick stays as a mouse/touch "click anywhere" convenience, but
+  // the chevron is now a real <button> carrying aria-expanded and a label,
+  // with no onClick of its own: a native button's click, from either a
+  // mouse or a keyboard Enter/Space, bubbles straight up to the row's
+  // handler, so there's exactly one place the toggle logic lives. See
+  // GenericListingCard's own comments on both elements.
+  test('a category directory has no automatically-detectable violations', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)
     await page.goto(`/${community}/${category.id}`)
