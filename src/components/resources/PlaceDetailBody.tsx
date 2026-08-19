@@ -178,7 +178,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
   const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key))
-  const anyHoursVal = hoursFields.some((f) => item[f.key] !== undefined)
 
   // Every tags field's chosen values, primary and expanded-only alike — they
   // all render together here, in the one place tags show once a listing is
@@ -216,6 +215,15 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         ? { text: 'Temporarily closed', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
         : null
   const syncedNote = syncedLabel(item.googleSyncedAt)
+  // True field ownership (see src/lib/googlePlaces.ts), not a guess — this
+  // field's current value came from the last Google sync and will keep
+  // refreshing, rather than being something a person typed in. Never true
+  // for 'name' (its googleFields entry only means "matched autofill at
+  // submit time"; showing a live-sync badge on the title would overstate
+  // it) or 'address' (the sync only ever fills it once while blank, never
+  // refreshes it afterward, so it's a one-time autofill, not an ongoing sync).
+  const googleOwnedFields = Array.isArray(item.googleFields) ? (item.googleFields as string[]) : []
+  const isGoogleSynced = (field: 'hours' | 'phone') => !!item.placeId && googleOwnedFields.includes(field)
   const urlButtons = urlFields
     .map((f) => ({ f, href: display(item[f.key]) }))
     .filter((x): x is { f: CategoryField; href: string } => !!x.href)
@@ -353,7 +361,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           <a href={`tel:${item.phone!.replace(/\D/g, '')}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary hover:underline">
             {item.phone}
           </a>
-          {item.placeId && !anyHoursVal && (
+          {isGoogleSynced('phone') && (
             <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
               via Google
             </span>
@@ -364,11 +372,24 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       {hoursFields.map((f) => {
         const val = item[f.key]
         if (val === undefined) return null
+        // Only the generic 'hours' key is ever written by the sync — a
+        // mikvah's women_s_hours/men_s_hours/keilim_hours are always manual,
+        // so they never get the badge even on a fully-synced listing.
+        const synced = f.key === 'hours' && isGoogleSynced('hours')
         return (
           <div key={f.key} className="flex items-start gap-3">
             <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0 flex-1">
-              {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
+              {(hoursFields.length > 1 || synced) && (
+                <p className="text-xs text-muted mb-0.5 flex items-center gap-1.5">
+                  {hoursFields.length > 1 && f.label}
+                  {synced && (
+                    <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
+                      via Google
+                    </span>
+                  )}
+                </p>
+              )}
               <HoursDisplay value={val} />
             </div>
           </div>

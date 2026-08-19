@@ -175,6 +175,11 @@ export type DirectoryResource = {
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
   /** Short editorial description from Google Places (fetched on first sync). */
   googleDescription?: string
+  /** Which fields ('name'|'hours'|'phone'|'address') the sync is allowed to
+   *  keep refreshing — see src/lib/googlePlaces.ts. Drives the "via Google"
+   *  badge; not every listed field here still refreshes going forward (e.g.
+   *  'address' is a one-time autofill, never revisited after). */
+  googleFields?: string[]
   [detailKey: string]: unknown
 }
 
