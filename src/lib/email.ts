@@ -50,6 +50,21 @@ function formatDetailValue(v: unknown): string {
 // Low-level send. Reads RESEND_FROM from env (falls back to the sandbox sender).
 // Callers sending to the public must ensure a verified domain is set in
 // RESEND_FROM — the sandbox can only deliver to the account owner's address.
+//
+// Every email this app sends goes through here, so it's the one place to tag
+// a non-production run — local dev now points at the same disposable
+// Supabase project the write-test suites use (see README "Integration
+// tests"), which means a submission/edit/moderation action taken while just
+// clicking around locally fires a REAL email (Resend isn't environment-aware
+// on its own). NODE_ENV !== 'production' mirrors the same signal
+// dev-login/route.ts already uses to gate the local-admin bypass — anything
+// other than a real `next build`/Vercel deploy gets prefixed, so a real
+// inbox can filter/folder on "[DEV]" and know at a glance it's nothing to
+// act on.
+function taggedSubject(subject: string): string {
+  return process.env.NODE_ENV === 'production' ? subject : `[DEV] ${subject}`
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -68,7 +83,7 @@ export async function sendEmail({
   const { error } = await resend.emails.send({
     from,
     to,
-    subject,
+    subject: taggedSubject(subject),
     html,
     ...(replyTo ? { replyTo } : {}),
   })
@@ -244,7 +259,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription', 'googleFields'])
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
@@ -266,9 +281,15 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           ? 'Suggested edit'
           : 'Removal reported'
     title = payload.name ?? 'a listing'
-    const categoryLabel = payload.category
-      ? (await getCategoryById((await getDefaultCommunity()).slug, payload.category))?.label ?? payload.category
-      : ''
+    const category = payload.category
+      ? await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+      : undefined
+    const categoryLabel = category?.label ?? payload.category ?? ''
+    // Real, human-editable content when the category configured it as a
+    // field (see SubmissionCard.tsx's identical distinction) — otherwise it's
+    // just the sync's own fallback card-subtitle text, not worth an admin's
+    // review email.
+    const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
     subject =
       submission.operation === 'create'
@@ -277,7 +298,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           ? `Edit Listing Suggestion — ${title}${catSuffix}`
           : `Removal Listing Suggestion — ${title}${catSuffix}`
     const detailRows = Object.entries(payload.details ?? {})
-      .filter(([k]) => !DETAIL_SKIP.has(k))
+      .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
       .map(([k, v]) => row(k, formatDetailValue(v)))
       .join('')
     proposedRows =

@@ -16,8 +16,7 @@ few assets, not touching component code.
 - **Next.js** (App Router) · **React** · **Tailwind**
 - **Supabase** — the resource directory + the submit → review → approve pipeline
 - **Google Maps** — address autocomplete and the resource map
-- **Resend** (email) · **Upstash** (rate limiting) · **Cloudflare Turnstile**
-  (spam) · **Google Sheets** (system-of-record for support/volunteer requests)
+- **Resend** (email) · **Upstash** (rate limiting) · **Cloudflare Turnstile** (spam)
 
 ## Local development
 
@@ -205,6 +204,35 @@ The integration suite cleans up the rows it creates in `afterEach`, tracked
 by id rather than assumed, so a failed assertion still leaves the project
 clean. The cache-round-trip and form-submission suites each revert/delete
 the one thing they changed in a `finally` block, same guarantee.
+
+**Using the test project for local dev too.** Supabase's free tier caps at 2
+projects per account (not per organization — a new org doesn't get around
+it), so a solo/small deployment that already has a real prod project and this
+test project has nowhere free to put a separate "click around locally without
+touching prod" dev project. If that's you, point `NEXT_PUBLIC_SUPABASE_URL`/
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` at this same test
+project and set `SHARED_DEV_TEST_PROJECT=1` — otherwise the write-test
+suites' own safety check (which normally refuses to run if `TEST_SUPABASE_URL`
+matches your main project, to stop them from ever touching real prod data)
+refuses unconditionally once they're the same project on purpose. The
+`DEV_ADMIN_BYPASS_SECRET` local-admin shortcut (see `AGENTS.md`) works
+against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to, no changes
+needed there.
+
+**Keeping it from drifting too far from prod.** A shared dev/test project
+starts out empty (or minimal), so `npm run sync-dev-from-prod` pulls the
+admin-configured content schema — categories, tags, forms, home sections,
+site settings, hospitals — from the real production project into whichever
+one `NEXT_PUBLIC_SUPABASE_URL` currently points to. It never touches
+`resource` (listings), `submission`, `form_response`, or `vote` — those are
+real visitor/business data, not config, and stay out of a shared project on
+purpose. Needs `PROD_SUPABASE_URL`/`PROD_SUPABASE_SERVICE_ROLE_KEY` in
+`.env.local` (the real project's own values — nothing else reads them), and
+refuses to run unless the destination genuinely matches `TEST_SUPABASE_URL`,
+so it can never write into prod by mistake. Upsert-only, never deletes — a
+category removed in prod will still need deleting here by hand. Run it
+occasionally, not on every `npm run dev` — there's no harm running it more
+often, it's just rarely worth the wait.
 
 ## License
 

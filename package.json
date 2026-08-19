@@ -20,6 +20,7 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
     "import": "node --env-file=.env.local scripts/import.mjs",
+    "sync-dev-from-prod": "node --env-file=.env.local scripts/sync-dev-from-prod.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:cache-roundtrip": "playwright test --config playwright.cache.config.ts",

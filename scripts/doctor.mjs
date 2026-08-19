@@ -39,7 +39,6 @@ const optional = [
   ['RESEND_API_KEY', 'email notifications + confirmations'],
   ['UPSTASH_REDIS_REST_URL', 'durable rate limiting (falls back to in-memory)'],
   ['NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'CAPTCHA spam protection'],
-  ['GOOGLE_SHEETS_ID', 'logging support/volunteer requests to a sheet'],
 ]
 for (const [key, what] of optional) {
   if (process.env[key] && String(process.env[key]).trim()) ok(`${key} set`)

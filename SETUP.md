@@ -76,9 +76,6 @@ Each is inert until you set it; the app works without them.
   durable rate limiting. Without it a best-effort in-memory limiter is used.
 - **Cloudflare Turnstile** (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
   `TURNSTILE_SECRET_KEY`) — CAPTCHA on public forms.
-- **Google Sheets** (`GOOGLE_SHEETS_ID` + service-account vars) — logs
-  support/volunteer requests to a spreadsheet. Only needed if those patient
-  features are on.
 
 Every variable is documented inline in **`.env.example`** — that file is the
 authoritative list of names and where to find each value.

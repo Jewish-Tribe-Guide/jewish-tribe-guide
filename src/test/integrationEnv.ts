@@ -26,10 +26,19 @@ if (!url || !serviceRoleKey) {
 // TEST_SUPABASE_URL at it by mistake — these tests create and delete real
 // rows, and `resource`/`category`/`submission` are exactly the tables a
 // mistake here would corrupt.
-if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
+//
+// SHARED_DEV_TEST_PROJECT is the one deliberate exception: a solo/small
+// deployment that has hit Supabase's 2-free-projects-per-account cap can
+// legitimately choose to point local dev (NEXT_PUBLIC_SUPABASE_URL) at the
+// very same disposable project these tests already use, rather than pay for
+// a third project — see README "Integration tests". That's a real,
+// considered choice, not the accidental-misconfiguration case this guard
+// exists to catch, so it's opt-in and requires setting the flag explicitly.
+if (url === process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SHARED_DEV_TEST_PROJECT) {
   throw new Error(
     'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run integration tests ' +
-      'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project.',
+      'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project, ' +
+      'or set SHARED_DEV_TEST_PROJECT=1 if you deliberately use the same project for both.',
   )
 }
 

@@ -147,6 +147,65 @@ describe('ModerationQueue — a pending submission', () => {
     expect(screen.getByText('Kosher Bakeries')).toBeInTheDocument()
     expect(screen.getByText('Sweet Treats')).toBeInTheDocument()
   })
+
+  // Some categories configure `googleDescription` as a real, human-editable
+  // "Description" field (see ListingForm.tsx's intake autofill and
+  // googlePlaces.ts's recurring sync) — that's real content worth a
+  // moderator seeing. Others never configure it at all, in which case any
+  // value there is only the sync's own fallback card-subtitle text and
+  // should stay hidden, same as geo/placeId/businessStatus.
+  it('shows the Description field when the category has configured googleDescription', async () => {
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200))
+    vi.mocked(parseOkJson).mockResolvedValue({
+      submissions: [
+        submission({
+          payload: {
+            category: 'grocery',
+            name: 'Acme Grocery',
+            address: '1 Main St',
+            phone: '555-1234',
+            details: { googleDescription: 'A neighborhood grocery store.' },
+          },
+        }),
+      ],
+    })
+    render(
+      <ContentProvider
+        content={makeContent({
+          categories: [
+            makeCategory({
+              id: 'grocery',
+              pluralLabel: 'Grocery Stores',
+              detailFields: [{ key: 'googleDescription', type: 'text', label: 'Description' }],
+            }),
+          ],
+        })}
+      >
+        <ModerationQueue session={session()} />
+      </ContentProvider>,
+    )
+
+    await findTitleText('Acme Grocery')
+    expect(screen.getByText('Description')).toBeInTheDocument()
+    expect(screen.getByText('A neighborhood grocery store.')).toBeInTheDocument()
+  })
+
+  it('hides googleDescription when the category never configured it as a field', async () => {
+    renderQueue([
+      submission({
+        payload: {
+          category: 'grocery',
+          name: 'Acme Grocery',
+          address: '1 Main St',
+          phone: '555-1234',
+          details: { googleDescription: 'Fallback subtitle text only.' },
+        },
+      }),
+    ])
+
+    await findTitleText('Acme Grocery')
+    expect(screen.queryByText('Fallback subtitle text only.')).not.toBeInTheDocument()
+  })
 })
 
 describe('ModerationQueue — moderating', () => {

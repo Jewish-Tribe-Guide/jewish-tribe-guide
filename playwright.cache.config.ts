@@ -35,10 +35,14 @@ if (missing.length) {
 // copy, always "match", and refuse unconditionally — the same class of bug
 // run-test-project-server.mjs's comment warns about, just one process level up.
 if (!process.env.CACHE_E2E_REMAPPED) {
-  if (url === process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  // SHARED_DEV_TEST_PROJECT opts out of this refusal — see
+  // src/test/integrationEnv.ts's comment for why that's a deliberate choice,
+  // not a hole in the check.
+  if (url === process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SHARED_DEV_TEST_PROJECT) {
     throw new Error(
       'TEST_SUPABASE_URL is the same as NEXT_PUBLIC_SUPABASE_URL — refusing to run the cache-round-trip suite ' +
-        'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project.',
+        'against the real Supabase project. Point TEST_SUPABASE_URL at a separate, disposable project, ' +
+        'or set SHARED_DEV_TEST_PROJECT=1 if you deliberately use the same project for both.',
     )
   }
 

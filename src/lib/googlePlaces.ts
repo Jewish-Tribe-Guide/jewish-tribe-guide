@@ -28,6 +28,11 @@ export type PlaceSync = {
   /** Google's formatted address. The sync only fills this in when the listing
    *  has none — it never overwrites a curated address (that would desync `geo`). */
   address: string | null
+  /** Only written when the sync owns the category's Website field — see
+   *  OWNABLE_SYNC_FIELDS. Matched to a listing's own Website detail field by
+   *  label, same convention as ListingForm.tsx's intake autofill (categories
+   *  predate a fixed key convention for this one). */
+  website: string | null
   businessStatus: BusinessStatus | null
   /** Google's editorial summary (short human-readable description). */
   description: string | null
@@ -76,8 +81,12 @@ function serverKey(): string | null {
  *  `name` is tracked per-field like the rest, deliberately: a submitter who
  *  clarifies "Giant" to "Giant (Wynnewood)" is still pointing at the same
  *  business, so the edit protects the name and nothing else — hours and phone
- *  keep following Google. */
-export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address'] as const
+ *  keep following Google.
+ *
+ *  `website` behaves like `phone`/`hours` (submitter-overridable, tracked),
+ *  not like `address` (fill-once-when-empty) — a kosher stand's own site can
+ *  legitimately differ from the parent business Google links. */
+export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address', 'website'] as const
 export type OwnableSyncField = (typeof OWNABLE_SYNC_FIELDS)[number]
 
 /** Nothing there to protect: unset, blank, or an object with no keys. Note that
@@ -164,18 +173,21 @@ type GooglePlaceResult = {
   formatted_address?: string
   opening_hours?: GoogleOpeningHours
   editorial_summary?: { overview?: string }
+  website?: string
 }
 
 /**
- * Fetches current hours/phone/address/status for a known place id. Returns null
- * on any failure (network, bad status, place id gone) so the caller can skip
- * the listing and leave its existing data untouched. Server-side only.
+ * Fetches current hours/phone/address/website/status for a known place id.
+ * Returns null on any failure (network, bad status, place id gone) so the
+ * caller can skip the listing and leave its existing data untouched.
+ * Server-side only.
  */
 export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null> {
   const key = serverKey()
   if (!key) return null
   try {
-    const fields = 'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary'
+    const fields =
+      'name,business_status,formatted_phone_number,formatted_address,opening_hours,editorial_summary,website'
     const url =
       `https://maps.googleapis.com/maps/api/place/details/json` +
       `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${key}`
@@ -189,6 +201,7 @@ export async function fetchPlaceSync(placeId: string): Promise<PlaceSync | null>
       hours: googleHoursToStructured(r.opening_hours),
       phone: r.formatted_phone_number ?? null,
       address: r.formatted_address ?? null,
+      website: r.website ?? null,
       businessStatus: normalizeBusinessStatus(r.business_status),
       description: r.editorial_summary?.overview ?? null,
     }

@@ -63,7 +63,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // which fields the submitter accepted from Google and which they replaced —
   // see googleFieldsForSubmit. Populated by handlePlaceSelect; a ref because
   // nothing renders from it.
-  const autofilled = useRef<{ name?: string; phone?: string; hours?: string }>({})
+  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string }>({})
   // Whatever provenance the listing already carries (edits only). A field stays
   // Google's across an edit unless this edit actually changes it.
   const priorGoogleFields: string[] = Array.isArray(existing?.googleFields)
@@ -124,22 +124,24 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       const hoursField = config.detailFields.find((f) => f.type === 'hours')
       if (hoursField) setDetail(hoursField.key, result.hours)
     }
+    // Matched by label, not key — existing categories' Website fields
+    // predate a fixed key convention (e.g. keyed "w" or "whatsapp"), so
+    // matching on the label people actually see is the reliable signal.
+    const websiteField = config.detailFields.find(
+      (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
+    )
+    if (result.website && websiteField) setDetail(websiteField.key, result.website)
+
     // Remember exactly what autofill put in the syncable fields. Whether these
     // values survive to submit is what tells the recurring Google sync which
-    // fields it owns — see googleFieldsForSubmit below.
+    // fields it owns — see googleFieldsForSubmit below. website is only
+    // recorded when the category actually has a Website field to compare
+    // against (websiteKey there mirrors this same lookup).
     autofilled.current = {
       name: result.name ?? undefined,
       phone: result.phone ? formatPhone(result.phone) : undefined,
       hours: result.hours ? JSON.stringify(result.hours) : undefined,
-    }
-    if (result.website) {
-      // Matched by label, not key — existing categories' Website fields
-      // predate a fixed key convention (e.g. keyed "w" or "whatsapp"), so
-      // matching on the label people actually see is the reliable signal.
-      const websiteField = config.detailFields.find(
-        (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
-      )
-      if (websiteField) setDetail(websiteField.key, result.website)
+      website: result.website && websiteField ? result.website : undefined,
     }
     // Matched by key (the fixed `googleDescription` convention — see
     // src/lib/categories.ts's showInHeader doc), not label, since a category
@@ -171,9 +173,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     const hoursKey = config.detailFields.find((f) => f.type === 'hours')?.key
     const currentHours = hoursKey ? JSON.stringify(details[hoursKey] ?? null) : undefined
     const priorHours = hoursKey ? JSON.stringify((existing?.[hoursKey] as unknown) ?? null) : undefined
+    const websiteKey = config.detailFields.find(
+      (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
+    )?.key
+    const currentWebsite = websiteKey ? ((details[websiteKey] as string | undefined) ?? '') : undefined
+    const priorWebsite = websiteKey ? ((existing?.[websiteKey] as string | undefined) ?? '') : undefined
 
     const decide = (
-      field: 'name' | 'phone' | 'hours',
+      field: 'name' | 'phone' | 'hours' | 'website',
       autofilledValue: string | undefined,
       current: string | undefined,
       prior: string | undefined,
@@ -184,15 +191,17 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
 
     // Pushed in the same order as googlePlaces.ts's own OWNABLE_SYNC_FIELDS
-    // (name, hours, phone, address) — this list gets diffed byte-for-byte
-    // against what the sync cron writes (see nextGoogleFields), so a
-    // same-membership-different-order result there would otherwise show up
-    // as a fabricated "change" in the moderation queue for a submission that
-    // never touched Google-sync ownership at all.
+    // (name, hours, phone, address, website) — this list gets diffed
+    // byte-for-byte against what the sync cron writes (see nextGoogleFields),
+    // so a same-membership-different-order result there would otherwise show
+    // up as a fabricated "change" in the moderation queue for a submission
+    // that never touched Google-sync ownership at all. (address is never
+    // pushed here at all — see syncMayWrite's own address special-case.)
     const out: string[] = []
     if (decide('name', autofilled.current.name, name, existing?.name ?? '')) out.push('name')
     if (hoursKey && decide('hours', autofilled.current.hours, currentHours, priorHours)) out.push('hours')
     if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
+    if (websiteKey && decide('website', autofilled.current.website, currentWebsite, priorWebsite)) out.push('website')
     return out
   }
 

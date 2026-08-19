@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
@@ -7,6 +8,9 @@ import PinButton from '@/components/resources/PinButton'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
+import { routes } from '@/lib/routes'
+import { listingSlug } from '@/lib/listingSlug'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 type Props = {
   item: DirectoryResource
@@ -23,8 +27,13 @@ type Props = {
  * fields, caveat notes), read-only (no filter callbacks — the map has no
  * such filters of its own), plus its own header and back button. Doesn't
  * show Share/Edit/Report/upvote, which stay a tap away in the full listing.
+ * The name itself links to the listing's own canonical page (same URL
+ * ShareButton copies elsewhere) — the map's escape hatch to Edit/Report/
+ * upvote/Share without duplicating all of those actions here.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+  const community = useCommunitySlug()
+  const listingPath = routes.listing(community, category.id, listingSlug(item))
   const iconImageUrl =
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
@@ -79,7 +88,11 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             that made the icon and the name look unaligned in the first
             place. */}
         <div className="min-w-0">
-          <h2 className="text-lg font-bold leading-tight text-slate-900">{item.name}</h2>
+          <h2 className="text-lg font-bold leading-tight text-slate-900">
+            <Link href={listingPath} className="hover:underline">
+              {item.name}
+            </Link>
+          </h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
         {/* self-start + a measured nudge — centered on just the NAME line,

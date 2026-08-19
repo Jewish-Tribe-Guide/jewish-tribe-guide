@@ -1,9 +1,9 @@
 // GET|POST /api/cron/sync-hours
 //
-// Refreshes hours / phone / business status from Google Places for every listing
-// that has a `details.placeId` (assigned by scripts/backfill-place-ids.mjs).
-// This is the hosted equivalent of scripts/sync-google-hours.mjs — point any
-// scheduler at it.
+// Refreshes hours / phone / website / business status from Google Places for
+// every listing that has a `details.placeId` (assigned by
+// scripts/backfill-place-ids.mjs). This is the hosted equivalent of
+// scripts/sync-google-hours.mjs — point any scheduler at it.
 //
 // Host-agnostic scheduling: protect the route with a CRON_SECRET and have your
 // scheduler send it. Works from anything that can make an HTTP request —
@@ -24,6 +24,8 @@ import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField }
 import { submitGoogleClosure } from '@/lib/submissionStore'
 import { sendSubmissionNotification } from '@/lib/email'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { listCategories } from '@/lib/categoryStore'
+import type { CategoryConfig } from '@/lib/categories'
 
 // Does network + DB work, so it's never prerendered or cached — that follows
 // from the work itself now rather than from a `dynamic` export, which Cache
@@ -35,6 +37,25 @@ type SyncedRow = {
   phone: string | null
   address: string | null
   details: Record<string, unknown>
+  category: string
+  community_id: string
+}
+
+// The category's Website field key, matched by label — same convention
+// ListingForm.tsx's intake autofill uses, since categories predate a fixed
+// key convention for this field. Cached per community so a run with many
+// listings across few categories doesn't refetch the same category list once
+// per row.
+const categoriesCache = new Map<string, Promise<CategoryConfig[]>>()
+
+async function websiteFieldKey(communityId: string, categoryId: string): Promise<string | undefined> {
+  let categories = categoriesCache.get(communityId)
+  if (!categories) {
+    categories = listCategories(communityId)
+    categoriesCache.set(communityId, categories)
+  }
+  const category = (await categories).find((c) => c.id === categoryId)
+  return category?.detailFields.find((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')?.key
 }
 
 // Best-effort ping to a dead-man's-switch monitor (e.g. healthchecks.io) so a
@@ -80,7 +101,7 @@ async function runSync(): Promise<NextResponse> {
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from('resource')
-    .select('id,name,phone,address,details')
+    .select('id,name,phone,address,details,category,community_id')
     .eq('status', 'approved')
     .not('details->>placeId', 'is', null)
     // Cap the number of paid Google Place Details calls a single run can make.
@@ -139,6 +160,14 @@ async function runSync(): Promise<NextResponse> {
     if (sync.address && syncMayWrite(row.details, 'address', row.address)) {
       update.address = sync.address
       wrote.push('address')
+    }
+    // Website lives in `details` under a category-specific key (matched by
+    // label, not a fixed key) rather than its own resource column — see
+    // websiteFieldKey above.
+    const websiteKey = await websiteFieldKey(row.community_id, row.category)
+    if (sync.website && websiteKey && syncMayWrite(row.details, 'website', row.details?.[websiteKey])) {
+      details[websiteKey] = sync.website
+      wrote.push('website')
     }
 
     details.googleFields = nextGoogleFields(row.details, wrote)
