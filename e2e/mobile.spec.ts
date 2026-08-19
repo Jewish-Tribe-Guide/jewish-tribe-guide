@@ -160,10 +160,12 @@ test.describe('mobile', () => {
 
     // Sunday is guaranteed present regardless of this listing's real hours;
     // force it open so both time inputs are on screen no matter what data
-    // looks like today.
-    const sundayRow = page.getByText('Sunday', { exact: true }).locator('..')
-    const closedCheckbox = sundayRow.getByRole('checkbox')
+    // looks like today. Found via the checkbox's aria-label ("Sunday
+    // closed"), not the visible day text — that's abbreviated to "Sun" for
+    // layout, but the full name still reaches the accessibility tree.
+    const closedCheckbox = page.getByRole('checkbox', { name: 'Sunday closed' })
     if (await closedCheckbox.isChecked()) await closedCheckbox.uncheck()
+    const sundayRow = closedCheckbox.locator('..').locator('..')
 
     const closeTimeInput = sundayRow.locator('input[type="time"]').last()
     await expect(closeTimeInput).toBeVisible()

@@ -5,8 +5,6 @@ import { type DayKey, type DayHours, type StructuredHours, DAY_KEYS, dayLabel, i
 
 export type { DayKey, DayHours, StructuredHours }
 
-const DAYS = DAY_KEYS.map((key) => ({ key, label: dayLabel(key) }))
-
 function initHours(value: unknown): StructuredHours {
   if (isStructuredHours(value)) return value
   return {}
@@ -73,13 +71,23 @@ export default function HoursInput({ label, value, onChange }: Props) {
 
       {open && (
         <div className="mt-2 border border-slate-200 rounded-md overflow-hidden divide-y divide-slate-100">
-          {DAYS.map(({ key, label: dayName }) => {
+          {DAY_KEYS.map((key) => {
             const day = hours[key] ?? null
             const isClosed = day === null
+            const full = dayLabel(key)
+            // 3-letter abbreviation, not the full name — the full names
+            // varied enough in width (Sun vs Wednesday) that a column wide
+            // enough for the longest one left a wide, odd-looking gap before
+            // the checkbox on every shorter day. All the abbreviations are
+            // the same length, so a narrow fixed column stays aligned
+            // without stranding whitespace. The unabbreviated name still
+            // reaches screen readers via the checkbox's aria-label below,
+            // in case "Sun" reads ambiguously.
+            const short = key.charAt(0).toUpperCase() + key.slice(1)
 
             return (
-              <div key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 bg-white">
-                <span className="text-sm text-slate-700 w-[6.5rem] shrink-0">{dayName}</span>
+              <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2 bg-white">
+                <span className="text-sm text-slate-700 w-9 shrink-0">{short}</span>
 
                 <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
                   <input
@@ -88,6 +96,7 @@ export default function HoursInput({ label, value, onChange }: Props) {
                     onChange={(e) =>
                       setDay(key, e.target.checked ? null : { open: '09:00', close: '17:00' })
                     }
+                    aria-label={`${full} closed`}
                     className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
                   />
                   <span className="text-xs text-slate-500">Closed</span>
