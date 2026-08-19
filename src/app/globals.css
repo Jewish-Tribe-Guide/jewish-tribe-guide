@@ -53,6 +53,16 @@ input[type='date'].date-empty {
   textarea {
     font-size: 16px;
   }
+
+  /* Deliberate exception: HoursInput packs a Closed checkbox + two
+     <input type="time"> onto one dense row, twice a day, seven days. 16px
+     made the boxes look oversized next to the row's small checkbox label,
+     badly enough that a smaller font was worth it here specifically —
+     accepting that tapping one of these two fields on iOS briefly
+     zooms the page, unlike every other input on the site. */
+  input.hours-time-input {
+    font-size: 13px;
+  }
 }
 
 /* With viewport-fit=cover (set in layout's viewport export) content extends to
