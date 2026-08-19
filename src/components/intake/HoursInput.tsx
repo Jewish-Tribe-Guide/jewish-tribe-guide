@@ -101,7 +101,7 @@ export default function HoursInput({ label, value, onChange }: Props) {
                       onChange={(e) =>
                         setDay(key, { open: e.target.value, close: day?.close ?? '17:00' })
                       }
-                      className="rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <span className="text-slate-400 text-xs">–</span>
                     <input
@@ -110,7 +110,7 @@ export default function HoursInput({ label, value, onChange }: Props) {
                       onChange={(e) =>
                         setDay(key, { open: day?.open ?? '09:00', close: e.target.value })
                       }
-                      className="rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="rounded border border-slate-300 px-1.5 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 )}
