@@ -55,8 +55,12 @@ describe('HoursInput', () => {
 
     await user.click(screen.getByRole('button'))
 
-    expect(screen.getByText('Sunday')).toBeInTheDocument()
-    expect(screen.getByText('Saturday')).toBeInTheDocument()
+    // Visible day labels are 3-letter abbreviations (space-constrained —
+    // see HoursInput's own comment on why); the full name still exists via
+    // each checkbox's aria-label, which is what this checks instead of the
+    // (now abbreviated) visible text.
+    expect(screen.getByLabelText('Sunday closed')).toBeInTheDocument()
+    expect(screen.getByLabelText('Saturday closed')).toBeInTheDocument()
     expect(screen.getAllByText('Closed')).toHaveLength(7)
   })
 
@@ -68,9 +72,7 @@ describe('HoursInput', () => {
 
     await user.click(screen.getByRole('button')) // expand
 
-    const mondayRow = screen.getByText('Monday').closest('div')!
-    const closedCheckbox = mondayRow.querySelector('input[type="checkbox"]')!
-    await user.click(closedCheckbox)
+    await user.click(screen.getByLabelText('Monday closed'))
 
     expect(onChange).toHaveBeenCalledWith({ ...value, mon: null })
   })
@@ -83,9 +85,7 @@ describe('HoursInput', () => {
 
     await user.click(screen.getByRole('button')) // expand
 
-    const mondayRow = screen.getByText('Monday').closest('div')!
-    const closedCheckbox = mondayRow.querySelector('input[type="checkbox"]')!
-    await user.click(closedCheckbox)
+    await user.click(screen.getByLabelText('Monday closed'))
 
     expect(onChange).toHaveBeenCalledWith({ ...value, mon: { open: '09:00', close: '17:00' } })
   })
@@ -105,7 +105,7 @@ describe('HoursInput', () => {
     render(<HoursInput value={value} onChange={onChange} />)
     await user.click(screen.getByRole('button')) // expand
 
-    const mondayRow = screen.getByText('Monday').closest('div')!
+    const mondayRow = screen.getByLabelText('Monday closed').closest('div')!
     const timeInputs = mondayRow.querySelectorAll('input[type="time"]')
     expect(timeInputs).toHaveLength(2)
 

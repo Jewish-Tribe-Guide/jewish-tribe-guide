@@ -44,6 +44,21 @@ input[type='date'].date-empty {
   color: color-mix(in oklab, var(--color-slate-900) 50%, transparent);
 }
 
+/* HoursInput packs a day name, a Closed checkbox, and two of these onto one
+   row — every pixel the native calendar/clock icon reserves is pixels the
+   row doesn't have, so it's dropped; tapping the field itself still opens
+   the picker on iOS, Android, and desktop Chrome alike. `display: flex`
+   coaxes the browser into vertically centering the input's internal time
+   segments, which rendered slightly off-center by default once padding
+   got this tight. */
+input.hours-time-input {
+  display: flex;
+  align-items: center;
+}
+input.hours-time-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 /* iOS Safari zooms the whole page when a focused field's font-size is under
    16px. Our inputs are text-sm (14px), so force 16px on phone-width screens to
    prevent that jarring zoom. Desktop keeps the smaller, denser sizing. */
