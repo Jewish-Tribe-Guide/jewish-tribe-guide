@@ -206,6 +206,20 @@ by id rather than assumed, so a failed assertion still leaves the project
 clean. The cache-round-trip and form-submission suites each revert/delete
 the one thing they changed in a `finally` block, same guarantee.
 
+**Using the test project for local dev too.** Supabase's free tier caps at 2
+projects per account (not per organization — a new org doesn't get around
+it), so a solo/small deployment that already has a real prod project and this
+test project has nowhere free to put a separate "click around locally without
+touching prod" dev project. If that's you, point `NEXT_PUBLIC_SUPABASE_URL`/
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` at this same test
+project and set `SHARED_DEV_TEST_PROJECT=1` — otherwise the write-test
+suites' own safety check (which normally refuses to run if `TEST_SUPABASE_URL`
+matches your main project, to stop them from ever touching real prod data)
+refuses unconditionally once they're the same project on purpose. The
+`DEV_ADMIN_BYPASS_SECRET` local-admin shortcut (see `AGENTS.md`) works
+against whichever project `NEXT_PUBLIC_SUPABASE_URL` points to, no changes
+needed there.
+
 ## License
 
 [MIT](LICENSE) — free to fork, adapt, and deploy for your own community.
