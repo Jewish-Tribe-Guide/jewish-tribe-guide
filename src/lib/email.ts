@@ -244,7 +244,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   let title: string
   let proposedRows: string
 
-  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription', 'googleFields'])
+  const DETAIL_SKIP = new Set(['geo', 'legacyId', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
 
   if (submission.target_type === 'category') {
     const payload = submission.payload as CategorySubmissionPayload
@@ -266,9 +266,15 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           ? 'Suggested edit'
           : 'Removal reported'
     title = payload.name ?? 'a listing'
-    const categoryLabel = payload.category
-      ? (await getCategoryById((await getDefaultCommunity()).slug, payload.category))?.label ?? payload.category
-      : ''
+    const category = payload.category
+      ? await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+      : undefined
+    const categoryLabel = category?.label ?? payload.category ?? ''
+    // Real, human-editable content when the category configured it as a
+    // field (see SubmissionCard.tsx's identical distinction) — otherwise it's
+    // just the sync's own fallback card-subtitle text, not worth an admin's
+    // review email.
+    const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
     subject =
       submission.operation === 'create'
@@ -277,7 +283,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           ? `Edit Listing Suggestion — ${title}${catSuffix}`
           : `Removal Listing Suggestion — ${title}${catSuffix}`
     const detailRows = Object.entries(payload.details ?? {})
-      .filter(([k]) => !DETAIL_SKIP.has(k))
+      .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
       .map(([k, v]) => row(k, formatDetailValue(v)))
       .join('')
     proposedRows =

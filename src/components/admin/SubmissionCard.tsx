@@ -61,7 +61,16 @@ function fmt(value: unknown, field?: CategoryField): string {
 // each recompute it independently and can land on the same set of fields in
 // a different order, which would otherwise show up here as a "changed"
 // field a submitter never touched.
-const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleDescription', 'googleFields'])
+//
+// googleDescription is deliberately NOT in here: some categories configure it
+// as a real, human-editable "Description" field (see ListingForm.tsx's
+// intake autofill and googlePlaces.ts's recurring sync) with its own help
+// text — that's real content worth a moderator seeing, same as any other
+// configured field. Only skip it below, in the raw-leftover-details loop,
+// for categories that never configured it as a field at all — there it's
+// nothing but the sync's own fallback card-subtitle text.
+const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
+const SKIP_WHEN_UNCONFIGURED = new Set(['googleDescription'])
 
 type FlatField = { key: string; label: string; value: string }
 
@@ -89,7 +98,7 @@ function flatListing(src: ResourceRow | ResourceSubmission | undefined, fields: 
     out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
   }
   for (const [k, v] of Object.entries(details)) {
-    if (SKIP.has(k) || seen.has(k)) continue
+    if (SKIP.has(k) || SKIP_WHEN_UNCONFIGURED.has(k) || seen.has(k)) continue
     out.push({ key: k, label: k, value: fmt(v) })
   }
   return out
@@ -244,7 +253,7 @@ function CategoryDetails({ payload }: { payload: CategorySubmissionPayload }) {
       {rows.map(([k, v]) => (
         <div key={k} className="flex gap-2">
           <dt className="text-muted w-24 shrink-0">{k}</dt>
-          <dd className="text-slate-800">{v}</dd>
+          <dd className="min-w-0 break-words text-slate-800">{v}</dd>
         </div>
       ))}
     </dl>
@@ -258,7 +267,7 @@ function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: Ca
       {rows.map((r) => (
         <div key={r.key} className="flex gap-2">
           <dt className="text-muted w-28 shrink-0">{r.label}</dt>
-          <dd className="text-slate-800">{r.value}</dd>
+          <dd className="min-w-0 break-words text-slate-800">{r.value}</dd>
         </div>
       ))}
     </dl>
@@ -293,7 +302,7 @@ function Diff({
         return (
           <div key={k} className="flex gap-2">
             <dt className="text-muted w-28 shrink-0">{label}</dt>
-            <dd className={changed ? 'text-slate-800' : 'text-slate-400'}>
+            <dd className={`min-w-0 break-words ${changed ? 'text-slate-800' : 'text-slate-400'}`}>
               {changed ? (
                 <span>
                   <span className="line-through text-red-500">{beforeValue}</span>{' '}
