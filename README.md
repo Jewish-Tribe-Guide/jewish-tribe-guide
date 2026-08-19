@@ -16,8 +16,7 @@ few assets, not touching component code.
 - **Next.js** (App Router) · **React** · **Tailwind**
 - **Supabase** — the resource directory + the submit → review → approve pipeline
 - **Google Maps** — address autocomplete and the resource map
-- **Resend** (email) · **Upstash** (rate limiting) · **Cloudflare Turnstile**
-  (spam) · **Google Sheets** (system-of-record for support/volunteer requests)
+- **Resend** (email) · **Upstash** (rate limiting) · **Cloudflare Turnstile** (spam)
 
 ## Local development
 

@@ -2,17 +2,8 @@ import {
   type SubmissionPayload,
   validateSubmission,
   generateRequestId,
-  buildSheetRow,
-  buildVolunteerSheetRow,
-  VOLUNTEER_SHEET_TAB,
-  buildVolunteerChangeSheetRow,
-  VOLUNTEER_CHANGES_SHEET_TAB,
-  buildFeedbackSheetRow,
-  FEEDBACK_SHEET_TAB,
 } from '@/lib/requests'
-import { appendRow } from '@/lib/sheets'
 import { insertFormResponse } from '@/lib/formResponseStore'
-import { hospitalNameMap } from '@/lib/hospitalStore'
 import { sendNotification } from '@/lib/email'
 import { sendRequestConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
@@ -20,10 +11,9 @@ import { easternTimestamp } from '@/lib/time'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { getDefaultCommunity } from '@/lib/communityStore'
 
 export async function POST(request: Request) {
-  // Writes to Sheets + sends two emails per call — throttle hard.
+  // Sends two emails per call — throttle hard.
   const limited = await enforceRateLimit(request, 'requests', { limit: 5, windowSec: 60 })
   if (limited) return limited
 
@@ -77,27 +67,7 @@ export async function POST(request: Request) {
     )
   }
 
-  // 3. Append to Google Sheets (legacy — best-effort now that the DB write
-  //    above is the system of record, so a Sheets outage no longer blocks a
-  //    submission). Volunteer signups → Volunteers tab; edit/removal
-  //    change-requests → Volunteer Changes tab; all other requests → default
-  //    Requests tab. Resolve hospital ids → names once for the row builders.
-  try {
-    const names = await hospitalNameMap((await getDefaultCommunity()).slug)
-    if (payload.requestType === 'Volunteer') {
-      await appendRow(buildVolunteerSheetRow(payload, requestId, timestamp, names), { tab: VOLUNTEER_SHEET_TAB })
-    } else if (payload.requestType === 'Volunteer Edit' || payload.requestType === 'Volunteer Removal') {
-      await appendRow(buildVolunteerChangeSheetRow(payload, requestId, timestamp, names), { tab: VOLUNTEER_CHANGES_SHEET_TAB })
-    } else if (payload.requestType === 'Feedback') {
-      await appendRow(buildFeedbackSheetRow(payload, requestId, timestamp), { tab: FEEDBACK_SHEET_TAB })
-    } else {
-      await appendRow(buildSheetRow(payload, requestId, timestamp, names))
-    }
-  } catch (err) {
-    console.error('[requests] Sheets append failed (best-effort, not blocking):', err)
-  }
-
-  // 4. Send emails (best-effort — never fail the request)
+  // 3. Send emails (best-effort — never fail the request)
   try {
     await sendNotification(payload, requestId, timestamp)
   } catch (err) {
@@ -109,6 +79,6 @@ export async function POST(request: Request) {
     console.error('[requests] Confirmation email failed:', err)
   }
 
-  // 5. Success
+  // 4. Success
   return Response.json({ ok: true, requestId })
 }
