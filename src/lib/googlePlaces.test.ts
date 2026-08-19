@@ -262,6 +262,7 @@ describe('fetchPlaceSync', () => {
             formatted_address: '123 Main St, Philadelphia, PA',
             opening_hours: { periods: [{ open: { day: 0, time: '0900' }, close: { day: 0, time: '1700' } }] },
             editorial_summary: { overview: 'A local shul.' },
+            website: 'https://someshul.org',
           },
         }),
       }),
@@ -272,6 +273,7 @@ describe('fetchPlaceSync', () => {
       hours: expect.objectContaining({ sun: { open: '09:00', close: '17:00' } }),
       phone: '(215) 555-0100',
       address: '123 Main St, Philadelphia, PA',
+      website: 'https://someshul.org',
       businessStatus: 'OPERATIONAL',
       description: 'A local shul.',
     })
@@ -291,6 +293,7 @@ describe('fetchPlaceSync', () => {
       hours: null,
       phone: null,
       address: null,
+      website: null,
       businessStatus: null,
       description: null,
     })
