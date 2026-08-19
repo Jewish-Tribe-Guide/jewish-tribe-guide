@@ -138,52 +138,102 @@ describe('listFormResponses', () => {
   })
 })
 
+const inScopeCheck = { data: { request_type: rawRow.request_type, form_id: rawRow.form_id }, error: null }
+const outOfScopeCheck = { data: { request_type: 'Feedback', form_id: null }, error: null }
+const missingCheck = { data: null, error: null }
+const supportScope = { requestTypes: ['Direct Support'] }
+
 describe('updateFormResponse', () => {
   it('returns null without touching the database when the patch has no keys set', async () => {
-    const result = await updateFormResponse('resp-1', {})
+    const result = await updateFormResponse('resp-1', {}, supportScope)
     expect(result).toBeNull()
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
   it('only writes the columns present in the patch', async () => {
-    const builder = chainable({ data: rawRow, error: null })
-    mockFrom.mockReturnValue(builder)
+    const scopeBuilder = chainable(inScopeCheck)
+    const updateBuilder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(updateBuilder)
 
-    await updateFormResponse('resp-1', { contact })
+    await updateFormResponse('resp-1', { contact }, supportScope)
 
-    expect(builder.update).toHaveBeenCalledWith({ contact })
+    expect(updateBuilder.update).toHaveBeenCalledWith({ contact })
   })
 
   it('writes both columns when both are patched', async () => {
-    const builder = chainable({ data: rawRow, error: null })
-    mockFrom.mockReturnValue(builder)
+    const scopeBuilder = chainable(inScopeCheck)
+    const updateBuilder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(updateBuilder)
 
-    await updateFormResponse('resp-1', { contact, data: { note: 'y' } })
+    await updateFormResponse('resp-1', { contact, data: { note: 'y' } }, supportScope)
 
-    expect(builder.update).toHaveBeenCalledWith({ contact, data: { note: 'y' } })
+    expect(updateBuilder.update).toHaveBeenCalledWith({ contact, data: { note: 'y' } })
   })
 
   it('returns null when no row matches the id', async () => {
-    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await updateFormResponse('missing', { contact })).toBeNull()
+    mockFrom.mockReturnValue(chainable(missingCheck))
+    expect(await updateFormResponse('missing', { contact }, supportScope)).toBeNull()
+  })
+
+  it('returns null when the row exists but is outside the caller scope, same as a missing id', async () => {
+    const scopeBuilder = chainable(outOfScopeCheck)
+    mockFrom.mockReturnValueOnce(scopeBuilder)
+
+    expect(await updateFormResponse('resp-1', { contact }, supportScope)).toBeNull()
+    expect(scopeBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('is in scope when anyFormId matches a set form_id, regardless of requestTypes', async () => {
+    const scopeBuilder = chainable({ data: { request_type: 'Custom Form Title', form_id: 'my-form' }, error: null })
+    const updateBuilder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(updateBuilder)
+
+    await updateFormResponse('resp-1', { contact }, { requestTypes: ['Feedback'], anyFormId: true })
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ contact })
   })
 
   it('throws with the Supabase error message on failure', async () => {
-    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(updateFormResponse('resp-1', { contact })).rejects.toThrow(
+    const scopeBuilder = chainable(inScopeCheck)
+    const updateBuilder = chainable({ data: null, error: { message: 'boom' } })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(updateBuilder)
+
+    await expect(updateFormResponse('resp-1', { contact }, supportScope)).rejects.toThrow(
       'Failed to update the request: boom',
     )
   })
 })
 
 describe('deleteFormResponse', () => {
-  it('resolves without error on success', async () => {
-    mockFrom.mockReturnValue(chainable({ error: null }))
-    await expect(deleteFormResponse('resp-1')).resolves.toBeUndefined()
+  it('deletes and returns true when the row is in scope', async () => {
+    const scopeBuilder = chainable(inScopeCheck)
+    const deleteBuilder = chainable({ error: null })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(deleteBuilder)
+
+    await expect(deleteFormResponse('resp-1', supportScope)).resolves.toBe(true)
+    expect(deleteBuilder.delete).toHaveBeenCalled()
+  })
+
+  it('returns false without deleting when the row is outside the caller scope', async () => {
+    const scopeBuilder = chainable(outOfScopeCheck)
+    mockFrom.mockReturnValueOnce(scopeBuilder)
+
+    await expect(deleteFormResponse('resp-1', supportScope)).resolves.toBe(false)
+    expect(scopeBuilder.delete).not.toHaveBeenCalled()
+  })
+
+  it('returns false when no row matches the id', async () => {
+    mockFrom.mockReturnValue(chainable(missingCheck))
+    await expect(deleteFormResponse('missing', supportScope)).resolves.toBe(false)
   })
 
   it('throws with the Supabase error message on failure', async () => {
-    mockFrom.mockReturnValue(chainable({ error: { message: 'boom' } }))
-    await expect(deleteFormResponse('resp-1')).rejects.toThrow('Failed to delete the request: boom')
+    const scopeBuilder = chainable(inScopeCheck)
+    const deleteBuilder = chainable({ error: { message: 'boom' } })
+    mockFrom.mockReturnValueOnce(scopeBuilder).mockReturnValueOnce(deleteBuilder)
+
+    await expect(deleteFormResponse('resp-1', supportScope)).rejects.toThrow(
+      'Failed to delete the request: boom',
+    )
   })
 })
