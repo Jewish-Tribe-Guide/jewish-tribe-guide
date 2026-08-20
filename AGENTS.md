@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Local admin access
 
-Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed.
+Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. (`/admin` still works too — it redirects to `/philly/admin`, see next.config.ts.)
 
 # Tests
 

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
 import SubmissionHistory from '@/components/admin/SubmissionHistory'
+import { ADMIN_BASE } from '@/lib/adminNav'
 
 // /admin/history/approved and /admin/history/rejected — what the Metrics
 // tab's tiles link to. 'use client', so the status comes from useParams(),
@@ -23,7 +24,7 @@ export default function AdminHistoryPage() {
       ) : (
         <p className="text-sm text-red-700">
           Unknown status &ldquo;{params.status}&rdquo;.{' '}
-          <Link href="/admin/metrics" className="underline">
+          <Link href={`${ADMIN_BASE}/metrics`} className="underline">
             Back to Metrics
           </Link>
         </p>

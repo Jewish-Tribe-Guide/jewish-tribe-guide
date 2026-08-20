@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import type { SubmissionFunnelStats } from '@/lib/submissionStore'
+import { ADMIN_BASE } from '@/lib/adminNav'
 
 // The 'metrics' tab in /admin: how many submissions are waiting, the
 // approve/reject split, and how long an approved one sits in the queue
@@ -73,9 +74,9 @@ export default function MetricsPanel({ token }: { token: string }) {
         The submission moderation queue, all time — how much is waiting, and how it&rsquo;s been handled.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatTile label="Pending" value={String(stats.pending)} href="/admin" />
-        <StatTile label="Approved" value={String(stats.approved)} href="/admin/history/approved" />
-        <StatTile label="Rejected" value={String(stats.rejected)} href="/admin/history/rejected" />
+        <StatTile label="Pending" value={String(stats.pending)} href={ADMIN_BASE} />
+        <StatTile label="Approved" value={String(stats.approved)} href={`${ADMIN_BASE}/history/approved`} />
+        <StatTile label="Rejected" value={String(stats.rejected)} href={`${ADMIN_BASE}/history/rejected`} />
         <StatTile
           label="Approval rate"
           value={formatPercent(stats.approvalRate)}

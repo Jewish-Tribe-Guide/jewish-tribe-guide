@@ -16,7 +16,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin', '/inbox', '/api/'],
+      // The bare paths still redirect (see next.config.ts), so both the old
+      // and new (canonical, /philly-prefixed) URLs are blocked.
+      disallow: ['/admin', '/inbox', '/philly/admin', '/philly/inbox', '/api/'],
     },
     sitemap: `${base}/sitemap.xml`,
   }
