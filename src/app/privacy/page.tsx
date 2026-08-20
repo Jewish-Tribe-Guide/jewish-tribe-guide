@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   alternates: { canonical: `${siteUrl()}/privacy` },
 }
 
-const CONTACT_EMAIL = 'jewishpatientconnect@gmail.com'
+const CONTACT_EMAIL = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
 const LAST_UPDATED = 'August 18, 2026'
 
 // A plain, top-level page (not under /[community]) — privacy applies to the
