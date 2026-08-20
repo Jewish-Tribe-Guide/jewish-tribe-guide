@@ -50,7 +50,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const config = category
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
-  const syncEligible = isCategorySyncEligible(category.id)
+  const syncEligible = isCategorySyncEligible(category)
 
   const [name, setName] = useState(existing?.name ?? '')
   const [address, setAddress] = useState(existing?.address ?? '')

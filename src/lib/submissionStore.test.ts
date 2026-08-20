@@ -734,6 +734,24 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  it('never resolves googleFields for an address-less category, regardless of its id (no hardcoded id list)', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        category: 'young-professional', // Networking — not on any hardcoded exclusion list
+        details: { placeId: 'place-1', googleAutofill: { phone: '215-555-0100' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue({ ...shulCategory, id: 'young-professional', hasAddress: false })
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toBeUndefined()
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
   it('edit: an unchanged field keeps its prior ownership, with no check at all', async () => {
     const sub = baseSubmission({
       operation: 'update',

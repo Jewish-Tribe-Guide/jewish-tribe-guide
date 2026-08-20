@@ -55,6 +55,10 @@ const whatsappCategory = {
   label: 'WhatsApp Group',
   pluralLabel: 'WhatsApp Groups',
   detailFields: [],
+  // No hardcoded id list any more — eligibility is purely hasAddress (see
+  // isCategorySyncEligible). Real WhatsApp/Networking categories have no
+  // address, which is what actually excludes them.
+  hasAddress: false,
 }
 
 beforeEach(() => {
@@ -85,11 +89,25 @@ describe('getSyncCoverage', () => {
     expect(coverage.failing).toEqual([])
   })
 
-  it('excludes sync-ineligible categories entirely', async () => {
+  it('excludes address-less categories entirely, regardless of id', async () => {
     mockListCategoriesUncached.mockResolvedValue([whatsappCategory])
     mockFrom.mockReturnValue(
       chainable({
         data: [{ id: 'r1', name: 'Some Group', category: 'whatsapp', phone: null, address: null, details: {}, community_id: 'philly' }],
+        error: null,
+      }),
+    )
+
+    const coverage = await getSyncCoverage()
+    expect(coverage.neverSynced).toEqual([])
+  })
+
+  it('excludes any address-less category, not just ones on some hardcoded id list — the actual Networking bug', async () => {
+    const networkingCategory = { ...restaurantCategory, id: 'young-professional', pluralLabel: 'Networking', hasAddress: false }
+    mockListCategoriesUncached.mockResolvedValue([networkingCategory])
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [{ id: 'r1', name: 'Some Meetup', category: 'young-professional', phone: null, address: null, details: {}, community_id: 'philly' }],
         error: null,
       }),
     )
