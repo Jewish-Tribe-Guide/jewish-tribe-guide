@@ -31,6 +31,7 @@ type CategoryRow = {
   card_text_color: string | null
   icon_image_url: string | null
   map_zoom_radius_miles: number | null
+  active: boolean
 }
 
 function toConfig(row: CategoryRow): CategoryConfig {
@@ -58,6 +59,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
     // both mean "no cap" — normalized to the same null callers already
     // treat that way.
     mapZoomRadiusMiles: row.map_zoom_radius_miles ?? null,
+    active: row.active !== false,
   }
 }
 
@@ -79,12 +81,18 @@ export async function listCategoriesUncached(community: string): Promise<Categor
   return (data as CategoryRow[]).map(toConfig)
 }
 
-// Same as listCategoriesUncached, but cached for the public site.
+// Same as listCategoriesUncached, but cached for the public site — and
+// filtered to active categories only. An inactive one is invisible here
+// (and everywhere downstream that resolves a category through this
+// function: the directory grid, search, sitemap, and direct-URL
+// resolution), but still returned by listCategoriesUncached for the admin
+// manager to edit and re-activate.
 export async function listCategories(community: string): Promise<CategoryConfig[]> {
   'use cache'
   cacheTag(TAGS.categories(community))
   cacheLife('days')
-  return listCategoriesUncached(community)
+  const categories = await listCategoriesUncached(community)
+  return categories.filter((c) => c.active !== false)
 }
 
 export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {
@@ -210,6 +218,7 @@ export async function updateCategory(
     cardTextColor?: string | null
     iconImageUrl?: string | null
     mapZoomRadiusMiles?: number | null
+    active?: boolean
   },
 ): Promise<CategoryConfig | null> {
   const supabase = getAdminClient()
@@ -225,6 +234,7 @@ export async function updateCategory(
   if (patch.hasPhone !== undefined) row.has_phone = !!patch.hasPhone
   if (patch.upvotesEnabled !== undefined) row.upvotes_enabled = !!patch.upvotesEnabled
   if (patch.capabilities !== undefined) row.capabilities = patch.capabilities
+  if (patch.active !== undefined) row.active = !!patch.active
   if (patch.externalLink !== undefined) {
     row.external_link_label = patch.externalLink?.label ?? null
     row.external_link_url = patch.externalLink?.url ?? null

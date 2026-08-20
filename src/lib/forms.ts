@@ -88,6 +88,11 @@ export type FormConfig = FormContent & {
   /** Unpublished admin edits (a full copy, so the preview can run the real
    *  Wizard against it), or null/undefined if there are none. */
   draft?: FormContent | null
+  /** Whether this form shows anywhere on the public site — its card, its
+   *  own URL, the sitemap. Defaults true; an admin can turn a form off
+   *  without deleting it, keeping its steps and responses intact for when
+   *  it's turned back on. Applies immediately, independent of draft/publish. */
+  active?: boolean
 }
 
 // The same "name / how can we reach you / preferred contact" block every

@@ -24,6 +24,7 @@ type FormRow = {
   icon: string | null
   card_image_url: string | null
   card_text_color: string | null
+  active: boolean
 }
 
 function toConfig(row: FormRow): FormConfig {
@@ -38,11 +39,15 @@ function toConfig(row: FormRow): FormConfig {
     icon: row.icon ?? '',
     cardImageUrl: row.card_image_url,
     cardTextColor: row.card_text_color,
+    active: row.active !== false,
   }
 }
 
-// Every form, published content only — no drafts. Used by the public
-// GET /api/forms that the live wizards read.
+// Every form, published content only — no drafts — and filtered to active
+// forms. Used by the public GET /api/forms that the live wizards read, and
+// by everything downstream that resolves a form's URL (sitemap, direct-URL
+// resolution). An inactive form is invisible here but still returned by
+// listFormsForAdmin, so the admin manager can edit and re-activate it.
 export async function listPublishedForms(community: string): Promise<Omit<FormConfig, 'draft'>[]> {
   'use cache'
   cacheTag(TAGS.forms(community))
@@ -53,7 +58,7 @@ export async function listPublishedForms(community: string): Promise<Omit<FormCo
     .eq('community_id', community)
     .order('id')
   if (error) throw new Error(`Failed to load forms: ${error.message}`)
-  return (data as FormRow[]).map(toConfig)
+  return (data as FormRow[]).map(toConfig).filter((f) => f.active !== false)
 }
 
 // Every form including drafts, for the admin Forms manager.
@@ -119,6 +124,20 @@ export async function discardDraft(id: string): Promise<FormConfig | null> {
     .select('*')
     .maybeSingle()
   if (error) throw new Error(`Failed to discard draft: ${error.message}`)
+  return data ? toConfig(data as FormRow) : null
+}
+
+// Turns a form's public visibility on/off. Applies immediately to the
+// published row, independent of any pending draft — unlike saveDraft/
+// publishDraft, there's nothing to publish here, just a direct flip.
+export async function setFormActive(id: string, active: boolean): Promise<FormConfig | null> {
+  const { data, error } = await getAdminClient()
+    .from('form')
+    .update({ active })
+    .eq('id', id)
+    .select('*')
+    .maybeSingle()
+  if (error) throw new Error(`Failed to update form: ${error.message}`)
   return data ? toConfig(data as FormRow) : null
 }
 

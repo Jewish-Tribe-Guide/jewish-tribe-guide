@@ -68,6 +68,7 @@ export default function CategoryManager({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addingSingleton, setAddingSingleton] = useState<SingletonKind | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -120,6 +121,54 @@ export default function CategoryManager({
       setError(err instanceof Error ? err.message : 'Could not add it.')
     } finally {
       setAddingSingleton(null)
+    }
+  }
+
+  // Flips a category's (or singleton's) public visibility immediately — no
+  // need to open the full editor. Same PATCH endpoint the editor itself
+  // uses; `active` is just one more field in the patch.
+  async function toggleCategoryActive(id: string, active: boolean) {
+    setError(null)
+    setTogglingId(id)
+    try {
+      await fetchJson(
+        `/api/admin/categories/${id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ active }),
+        },
+        'Could not update visibility.',
+      )
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update visibility.')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  // Same idea as toggleCategoryActive, but forms have their own dedicated
+  // endpoint (see /api/admin/forms/:id/active) since the main forms PATCH
+  // only ever writes a draft, never the published row directly.
+  async function toggleFormActive(id: string, active: boolean) {
+    setError(null)
+    setTogglingId(`${FORM_PREFIX}${id}`)
+    try {
+      await fetchJson(
+        `/api/admin/forms/${id}/active`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ active }),
+        },
+        'Could not update visibility.',
+      )
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update visibility.')
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -297,10 +346,12 @@ export default function CategoryManager({
                 category={e.data}
                 confirmingDelete={confirmDeleteId === e.data.id}
                 deleting={deletingId === e.data.id}
+                toggling={togglingId === e.data.id}
                 onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
                 onAskDelete={() => setConfirmDeleteId(e.data.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteCategory(e.data.id)}
+                onToggleActive={(active) => toggleCategoryActive(e.data.id, active)}
               />
             ) : e.kind === 'category' ? (
               <SingletonRow
@@ -308,10 +359,12 @@ export default function CategoryManager({
                 category={e.data}
                 confirmingDelete={confirmDeleteId === e.data.id}
                 deleting={deletingId === e.data.id}
+                toggling={togglingId === e.data.id}
                 onEdit={() => onOpenEditor(`${CAT_PREFIX}${e.data.id}`)}
                 onAskDelete={() => setConfirmDeleteId(e.data.id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteCategory(e.data.id)}
+                onToggleActive={(active) => toggleCategoryActive(e.data.id, active)}
               />
             ) : (
               <FormRow
@@ -319,10 +372,12 @@ export default function CategoryManager({
                 form={e.data}
                 confirmingDelete={confirmDeleteId === `${FORM_PREFIX}${e.data.id}`}
                 deleting={deletingId === `${FORM_PREFIX}${e.data.id}`}
+                toggling={togglingId === `${FORM_PREFIX}${e.data.id}`}
                 onEdit={() => onOpenEditor(`${FORM_PREFIX}${e.data.id}`)}
                 onAskDelete={() => setConfirmDeleteId(`${FORM_PREFIX}${e.data.id}`)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onConfirmDelete={() => deleteFormEntry(e.data.id)}
+                onToggleActive={(active) => toggleFormActive(e.data.id, active)}
               />
             ),
           )}
@@ -336,22 +391,54 @@ export default function CategoryManager({
 
 const TYPE_BADGE = 'text-[10px] font-medium uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0'
 
+// Flips public visibility right from the list — no need to open the full
+// editor just to hide something. Shared by category, singleton, and form
+// rows alike, since they all patch the same `active` concept.
+function VisibilityToggle({
+  active,
+  toggling,
+  onToggle,
+}: {
+  active: boolean
+  toggling: boolean
+  onToggle: (active: boolean) => void
+}) {
+  return (
+    <button
+      onClick={() => onToggle(!active)}
+      disabled={toggling}
+      title={active ? 'Visible on the site — click to hide' : 'Hidden from the site — click to show'}
+      className={`text-xs font-medium rounded px-3 py-1.5 border transition-colors disabled:opacity-60 cursor-pointer ${
+        active
+          ? 'border-slate-300 text-slate-600 hover:bg-slate-50'
+          : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+      }`}
+    >
+      {toggling ? '…' : active ? 'Visible' : 'Hidden'}
+    </button>
+  )
+}
+
 function CategoryRow({
   category: c,
   confirmingDelete,
   deleting,
+  toggling,
   onEdit,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
+  onToggleActive,
 }: {
   category: CategoryConfig
   confirmingDelete: boolean
   deleting: boolean
+  toggling: boolean
   onEdit: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
+  onToggleActive: (active: boolean) => void
 }) {
   const caps = resolveCapabilities(c.capabilities)
   const on = [
@@ -384,6 +471,7 @@ function CategoryRow({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -446,18 +534,22 @@ function SingletonRow({
   category: c,
   confirmingDelete,
   deleting,
+  toggling,
   onEdit,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
+  onToggleActive,
 }: {
   category: CategoryConfig
   confirmingDelete: boolean
   deleting: boolean
+  toggling: boolean
   onEdit: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
+  onToggleActive: (active: boolean) => void
 }) {
   const kind = c.kind as SingletonKind
   const badgeLabel = SINGLETON_KIND_LABELS[kind]
@@ -473,6 +565,7 @@ function SingletonRow({
           <p className="text-xs text-muted mt-1">{description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <VisibilityToggle active={c.active !== false} toggling={toggling} onToggle={onToggleActive} />
           {SINGLETON_EDITABLE_KINDS.has(kind) && (
             <button
               onClick={onEdit}
@@ -681,18 +774,22 @@ function FormRow({
   form: f,
   confirmingDelete,
   deleting,
+  toggling,
   onEdit,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
+  onToggleActive,
 }: {
   form: FormConfig
   confirmingDelete: boolean
   deleting: boolean
+  toggling: boolean
   onEdit: () => void
   onAskDelete: () => void
   onCancelDelete: () => void
   onConfirmDelete: () => void
+  onToggleActive: (active: boolean) => void
 }) {
   const canDelete = !PROTECTED_FORM_IDS.has(f.id)
   return (
@@ -712,6 +809,7 @@ function FormRow({
           <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <VisibilityToggle active={f.active !== false} toggling={toggling} onToggle={onToggleActive} />
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"

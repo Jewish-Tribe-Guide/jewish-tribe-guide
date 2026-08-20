@@ -39,6 +39,7 @@ vi.mock('./communityStore', () => ({
 
 const {
   listCategoriesUncached,
+  listCategories,
   getCategoryById,
   slugify,
   createCategory,
@@ -70,6 +71,7 @@ const rawRow = {
   card_image_url: 'https://example.com/card.png',
   card_text_color: '#fff',
   icon_image_url: null,
+  active: true,
 }
 
 // ── row → config mapping (toConfig, exercised via the reads) ────────────────
@@ -105,6 +107,7 @@ describe('listCategoriesUncached', () => {
       cardTextColor: '#fff',
       iconImageUrl: null,
       mapZoomRadiusMiles: null,
+      active: true,
     })
   })
 
@@ -134,6 +137,31 @@ describe('listCategoriesUncached', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(listCategoriesUncached('philly')).rejects.toThrow('Failed to load categories: boom')
+  })
+
+  it('defaults active to true when the column is missing/undefined', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, active: undefined }], error: null }))
+    const [config] = await listCategoriesUncached('philly')
+    expect(config.active).toBe(true)
+  })
+
+  it('maps active: false through', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, active: false }], error: null }))
+    const [config] = await listCategoriesUncached('philly')
+    expect(config.active).toBe(false)
+  })
+})
+
+describe('listCategories', () => {
+  it('excludes inactive categories, unlike listCategoriesUncached', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [rawRow, { ...rawRow, id: 'hidden-cat', active: false }],
+        error: null,
+      }),
+    )
+    const categories = await listCategories('philly')
+    expect(categories.map((c) => c.id)).toEqual(['synagogue'])
   })
 })
 
@@ -268,6 +296,15 @@ describe('updateCategory', () => {
     await updateCategory('synagogue', { label: '  New Label  ' })
 
     expect(builder.update).toHaveBeenCalledWith({ label: 'New Label' })
+  })
+
+  it('writes active when present in the patch', async () => {
+    const builder = chainable({ data: rawRow, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await updateCategory('synagogue', { active: false })
+
+    expect(builder.update).toHaveBeenCalledWith({ active: false })
   })
 
   it('scopes the update by both community and id', async () => {

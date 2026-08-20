@@ -23,6 +23,9 @@ type PatchBody = {
   iconImageUrl?: string | null
   /** Map category only (kind === 'map') — see CategoryConfig's own doc. */
   mapZoomRadiusMiles?: number | null
+  /** Whether this category shows on the public site — see CategoryConfig's
+   *  own doc. */
+  active?: boolean
   /** When address/phone is being turned off or a field removed on a category
    *  that already has listings, the editor confirms with the admin (via
    *  field-usage) before including this — it wipes that data from every
