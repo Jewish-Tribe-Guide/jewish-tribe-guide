@@ -33,12 +33,8 @@
 //   node --env-file=.env.local scripts/reconcile-google-provenance.mjs --recheck --apply
 //
 // --recheck --apply is ADDITIVE ONLY — it only ever ADDS a field (name/
-// phone/hours) to the existing googleFields array once verified to match
-// Google today; it never removes or replaces an entry. That matters because
-// this script has never checked `website`, so overwriting an already-
-// recorded array wholesale (the way the no-args backfill path does, for
-// rows with NO prior array) could silently drop a correctly-recorded
-// website ownership. Additive-only means that risk doesn't exist here.
+// phone/hours/website) to the existing googleFields array once verified to
+// match Google today; it never removes or replaces an entry.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -82,7 +78,7 @@ function mapHours(oh) {
 }
 
 async function fetchDetails(placeId) {
-  const fields = 'name,formatted_phone_number,opening_hours'
+  const fields = 'name,formatted_phone_number,opening_hours,website'
   const u =
     `https://maps.googleapis.com/maps/api/place/details/json` +
     `?place_id=${encodeURIComponent(placeId)}&fields=${fields}&key=${mapsKey}`
@@ -97,6 +93,18 @@ async function fetchDetails(placeId) {
  *  always identically — compare digits only. */
 const digits = (v) => (typeof v === 'string' ? v.replace(/\D/g, '') : '')
 
+/** Websites differ in ways that don't matter — http vs https, a leading
+ *  "www.", a trailing slash — so compare host+path only, case-insensitively. */
+function normalizeUrl(v) {
+  if (typeof v !== 'string' || !v.trim()) return ''
+  try {
+    const u = new URL(v.trim())
+    return `${u.hostname.replace(/^www\./, '')}${u.pathname}`.replace(/\/$/, '').toLowerCase()
+  } catch {
+    return v.trim().toLowerCase()
+  }
+}
+
 /** Hours must be compared by value, not by JSON text: stored objects don't
  *  necessarily carry their days in the same key order this script builds them
  *  in, and JSON.stringify is order-sensitive — which made identical schedules
@@ -107,9 +115,21 @@ const isEmpty = (v) =>
   v === null || v === undefined || (typeof v === 'string' && !v.trim()) ||
   (typeof v === 'object' && Object.keys(v).length === 0)
 
+// Website lives in `details` under a category-specific key (matched by a
+// detail field's type+label, same convention as websiteFieldKey in
+// src/app/api/cron/sync-hours/route.ts) rather than its own resource column,
+// so resolving it needs each listing's category fields.
+const { data: categoryRows, error: catError } = await s.from('category').select('id,fields')
+if (catError) throw new Error(catError.message)
+const websiteKeyByCategory = new Map()
+for (const c of categoryRows) {
+  const f = (c.fields ?? []).find((f) => f.type === 'url' && (f.label ?? '').trim().toLowerCase() === 'website')
+  if (f) websiteKeyByCategory.set(c.id, f.key)
+}
+
 const { data: rows, error } = await s
   .from('resource')
-  .select('id,name,phone,details')
+  .select('id,name,phone,details,category')
   .eq('status', 'approved')
   .not('details->>placeId', 'is', null)
 if (error) throw new Error(error.message)
@@ -139,6 +159,11 @@ for (const r of rows) {
 
   const owned = []
   const unclear = []
+  const websiteKey = websiteKeyByCategory.get(r.category)
+  // Only checkable at all when this category has a Website field — a
+  // category without one has nothing for 'website' to mean, same as the
+  // live sync/resolveGoogleFields treat it (see syncCoverage.ts).
+  const checkableFields = websiteKey ? ['name', 'phone', 'hours', 'website'] : ['name', 'phone', 'hours']
 
   // Name — exact match means the submitter kept what autofill supplied.
   const gName = result.name ?? null
@@ -159,6 +184,15 @@ for (const r of rows) {
   else if (gHours && hoursKey(gHours) === hoursKey(stored)) owned.push('hours')
   else if (gHours) unclear.push({ field: 'hours', stored, google: gHours })
 
+  // Website
+  if (websiteKey) {
+    const gWebsite = result.website ?? null
+    const storedWebsite = r.details?.[websiteKey]
+    if (isEmpty(storedWebsite)) owned.push('website')
+    else if (gWebsite && normalizeUrl(gWebsite) === normalizeUrl(storedWebsite)) owned.push('website')
+    else if (gWebsite) unclear.push({ field: 'website', stored: storedWebsite, google: gWebsite })
+  }
+
   if (priorOwned) {
     // Already had provenance recorded — --recheck verifies it against Google
     // today. Only fields that were PROTECTED (absent from the prior array)
@@ -166,7 +200,7 @@ for (const r of rows) {
     // field actually match Google now?
     rechecked++
     const confirmed = []
-    for (const field of ['name', 'phone', 'hours']) {
+    for (const field of checkableFields) {
       if (priorOwned.includes(field)) continue // was already owned — not what we're checking
       if (owned.includes(field)) {
         wouldNowMatch.push({ id: r.id, name: r.name, field })
@@ -216,7 +250,6 @@ if (RECHECK) {
     console.log(`${stillProtected} protected field(s) still genuinely differ. ${wouldNowMatch.length} ${verb}:`)
     for (const w of wouldNowMatch) console.log(`  • ${w.name} — ${w.field}`)
   }
-  console.log('\n(Only checks name/phone/hours — this script has never verified website.)')
 }
 
 if (ambiguous.length === 0) {
