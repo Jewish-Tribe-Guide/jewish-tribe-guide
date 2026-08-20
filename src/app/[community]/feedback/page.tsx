@@ -1,42 +1,17 @@
-'use client'
+import type { Metadata } from 'next'
+import FeedbackScreen from './FeedbackScreen'
+import { siteUrl } from '@/lib/siteUrl'
+import { routes } from '@/lib/routes'
 
-import FeedbackForm from '@/components/FeedbackForm'
-import { useSiteSettings } from '@/lib/useSiteSettings'
-import { useIsMobile } from '@/lib/useIsMobile'
-import { useSiteNavigation } from '@/lib/useSiteNavigation'
+// Self-referencing canonical — see [community]/page.tsx's comment. This file
+// is a thin server wrapper specifically so it can export generateMetadata;
+// FeedbackScreen carries all the actual ('use client') logic, which a client
+// file can't export generateMetadata from.
+export async function generateMetadata(props: PageProps<'/[community]/feedback'>): Promise<Metadata> {
+  const { community } = await props.params
+  return { alternates: { canonical: `${siteUrl()}${routes.feedback(community)}` } }
+}
 
-// Feedback is a real page on mobile (it has its own tab) and a modal over the
-// home screen on desktop (where it doesn't). That split used to be recomputed
-// from `mode` on every render in page.tsx so a desktop/mobile resize couldn't
-// strand the visitor on a bare inline page; it survives here as the same
-// derivation, just against a URL instead of a mode.
 export default function FeedbackPage() {
-  const settings = useSiteSettings()
-  const isMobile = useIsMobile()
-  const { goHome } = useSiteNavigation()
-
-  if (!isMobile) {
-    // Desktop: the modal belongs over the home screen, so send the visitor
-    // there and let the footer's own modal open. Rendering a bare feedback
-    // page at desktop width would be a screen the site otherwise never shows.
-    return (
-      <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-8">
-        <FeedbackForm
-          heading={settings.feedbackHeading}
-          successMessage={settings.feedbackSuccessMessage}
-          onClose={goHome}
-        />
-      </main>
-    )
-  }
-
-  return (
-    <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24">
-      <FeedbackForm
-        variant="inline"
-        heading={settings.feedbackHeading}
-        successMessage={settings.feedbackSuccessMessage}
-      />
-    </main>
-  )
+  return <FeedbackScreen />
 }

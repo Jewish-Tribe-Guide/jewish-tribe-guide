@@ -1,10 +1,16 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
+import { siteUrl } from '@/lib/siteUrl'
 
 export const metadata: Metadata = {
   title: `Privacy Policy — ${community.name}`,
   description: `What ${community.name} collects, why, and what we do with it.`,
+  // Self-referencing canonical — same reasoning as every page under
+  // [community] now has (see [community]/page.tsx's comment). Static rather
+  // than a generateMetadata function since this page has nothing dynamic to
+  // read; the path itself is a fixed literal, not a route param.
+  alternates: { canonical: `${siteUrl()}/privacy` },
 }
 
 const CONTACT_EMAIL = 'jewishpatientconnect@gmail.com'

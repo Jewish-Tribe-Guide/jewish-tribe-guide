@@ -7,6 +7,8 @@ import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { listingSlug, resolveListing } from '@/lib/listingSlug'
+import { routes } from '@/lib/routes'
+import { siteUrl } from '@/lib/siteUrl'
 import SlugScreen from '../SlugScreen'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +72,15 @@ export async function generateMetadata(
   return {
     title,
     description,
+    // Self-referencing canonical, always the friendly-slug form — see
+    // [community]/page.tsx's comment. Matters more here than anywhere else:
+    // resolveListing() also accepts a bare id (a link built before slugs
+    // existed, or from ResourceMap.tsx's "View listing" action), so the same
+    // listing is genuinely reachable at two URLs. This is what tells Google
+    // which one is authoritative instead of leaving it to guess.
+    alternates: {
+      canonical: `${siteUrl()}${routes.listing(community, slug, listingSlug(resolved.item))}`,
+    },
     openGraph: { title, description, siteName, type: 'website' },
     twitter: { card: 'summary', title, description },
   }
