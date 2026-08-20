@@ -160,8 +160,9 @@ export type DirectoryResource = {
   // ── Google Places sync (carried over from `details`, set by the sync job) ──
   /** Stable Google place id; its presence marks a listing as auto-syncing. */
   placeId?: string
-  /** Google place id confirmed (by name+address match) for categories that never
-   *  auto-sync (synagogue/mikvah/bikur-cholim).
+  /** Google place id confirmed (by name+address match), for a listing whose
+   *  own `placeId` match wasn't confident enough to trust for auto-sync but is
+   *  still good enough to disambiguate a map destination.
    *  Unlike `placeId`, this NEVER makes a listing sync-eligible — it exists only
    *  to disambiguate the "Directions" destination, so a listing whose name
    *  Google can't reliably resolve on its own doesn't send someone to a

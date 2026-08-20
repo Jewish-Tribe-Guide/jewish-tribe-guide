@@ -1,7 +1,11 @@
-// Read-only report for the categories Google Places sync has always excluded
-// (synagogue, mikvah, bikur-cholim): unlike scripts/reconcile-google-provenance.mjs,
-// these listings have no `placeId` to look up yet, so this first attempts a
-// name+address match, then diffs whatever it finds against what's stored.
+// Read-only report for synagogue/mikvah/bikur-cholim listings that never got
+// a confident enough Google match to earn a real `placeId` (most in these
+// categories DO have one already and sync normally like anything else — see
+// scripts/reconcile-google-provenance.mjs --recheck for those). For the
+// leftovers, this attempts a looser name+address match and diffs whatever it
+// finds against what's stored, purely to inform a human decision — it never
+// writes `placeId` itself (see scripts/backfill-verified-directions.mjs for
+// the narrower `verifiedPlaceId` it can safely write, for Directions only).
 //
 // Writes nothing — no --apply flag, this is purely for a human to read and
 // decide from. Two things it flags for that review:
@@ -19,7 +23,9 @@
 import { createClient } from '@supabase/supabase-js'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-// Categories this script covers — the ones the auto-sync doesn't touch.
+// Categories this script covers — the ones matching tends to be trickier for
+// (shared buildings, home-based listings), which is why some are still
+// missing a real placeId.
 const CATEGORIES = ['synagogue', 'mikvah', 'bikur-cholim']
 // Only mikvah has a generic `hours` field — synagogue's schedule lives in a
 // `minyanim` field Google has no equivalent for, and bikur-cholim has no
@@ -118,11 +124,16 @@ const isEmpty = (v) =>
   (typeof v === 'object' && Object.keys(v).length === 0)
 
 // ── Run ──────────────────────────────────────────────────────────────────
+// Only listings with no real placeId — anything that already has one goes
+// through the normal pipeline (reconcile-google-provenance.mjs --recheck),
+// which checks the same fields plus website and can actually write a fix.
+// This script's job is narrower: find whatever it can for the leftovers.
 const { data: rows, error } = await s
   .from('resource')
   .select('id,name,phone,address,category,details')
   .eq('status', 'approved')
   .in('category', CATEGORIES)
+  .is('details->>placeId', null)
 if (error) throw new Error(error.message)
 
 let noMatch = 0

@@ -44,8 +44,8 @@ function nameAppearsInAddress(name: string, address: string): boolean {
  *  Google's fuzzy name-matching won't misfire (see nameAppearsInAddress).
  *  Shared by businessUrl and the "Directions" action button.
  *
- *  `alwaysIncludeName` skips that guard. It exists for listings that can
- *  never carry a placeId to disambiguate them instead (synagogues, mikvahs):
+ *  `alwaysIncludeName` skips that guard. It exists for a listing with no
+ *  `placeId` (only `verifiedPlaceId`, or neither) to disambiguate instead:
  *  without it, those listings' names almost
  *  never appear verbatim in their street address, so the guard would drop
  *  the name on nearly every one of them, and with no placeId to fall back on
