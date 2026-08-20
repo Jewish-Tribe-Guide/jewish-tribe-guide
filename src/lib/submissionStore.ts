@@ -1,5 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
+import { isCategorySyncEligible } from './categories'
+import { fetchPlaceSync, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
 import { getDefaultCommunity } from './communityStore'
@@ -303,12 +305,146 @@ export async function rejectSubmission(id: string): Promise<SubmissionRow> {
   return data as SubmissionRow
 }
 
+// ── Google-sync field ownership, decided once at approval time ─────────────
+//
+// Whether the recurring Google sync (src/app/api/cron/sync-hours) is allowed
+// to keep refreshing name/hours/phone/website going forward. The rule: a
+// field is Google's if the value being approved matches what Google actually
+// has — checked, per field, against the free autofill snapshot the form
+// already captured when picking an address ran (see ListingForm.tsx's
+// `googleAutofill`), and only falling back to a live Google Places lookup
+// for a NEW or CHANGED field autofill never touched. An edit's UNCHANGED
+// fields are never re-decided at all — they simply keep whatever ownership
+// they already had, and cost nothing to preserve.
+const CHECKABLE_FIELDS: OwnableSyncField[] = OWNABLE_SYNC_FIELDS.filter((f) => f !== 'address')
+
+function normalizeForCompare(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value).trim()
+}
+
+function isEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (typeof value === 'object') return Object.keys(value as object).length === 0
+  return false
+}
+
+// Best-effort wrapper — a category/Google lookup failing here shouldn't block
+// an approval, same posture as growTagVocabulary's own catch below. Falls
+// back to leaving provenance exactly as it was (existing's own googleFields,
+// or none for a brand-new listing) rather than guessing.
+async function resolveGoogleFields(
+  payload: ResourceSubmission,
+  existing: ResourceRow | null,
+): Promise<string[] | undefined> {
+  if (!isCategorySyncEligible(payload.category)) return undefined
+  try {
+    return await computeGoogleFields(payload, existing)
+  } catch (err) {
+    console.error('[submissions] resolveGoogleFields failed:', err)
+    return Array.isArray(existing?.details?.googleFields) ? (existing.details.googleFields as string[]) : []
+  }
+}
+
+async function computeGoogleFields(
+  payload: ResourceSubmission,
+  existing: ResourceRow | null,
+): Promise<string[]> {
+  const community = (await getDefaultCommunity()).slug
+  const category = await getCategoryById(community, payload.category)
+  const hoursKey = category?.detailFields.find((f) => f.type === 'hours')?.key
+  const websiteKey = category?.detailFields.find(
+    (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
+  )?.key
+
+  const currentOf = (field: OwnableSyncField): unknown => {
+    if (field === 'name') return payload.name
+    if (field === 'phone') return payload.phone
+    if (field === 'hours') return hoursKey ? payload.details?.[hoursKey] : undefined
+    return websiteKey ? payload.details?.[websiteKey] : undefined
+  }
+  const priorOf = (field: OwnableSyncField): unknown => {
+    if (!existing) return undefined
+    if (field === 'name') return existing.name
+    if (field === 'phone') return existing.phone
+    if (field === 'hours') return hoursKey ? existing.details?.[hoursKey] : undefined
+    return websiteKey ? existing.details?.[websiteKey] : undefined
+  }
+  const priorOwned = new Set<OwnableSyncField>(
+    Array.isArray(existing?.details?.googleFields) ? (existing.details.googleFields as OwnableSyncField[]) : [],
+  )
+  // Absent keys mean autofill never ran for that field this session (address
+  // typed by hand, or Google's autocomplete had nothing for it).
+  const autofill = (payload.details?.googleAutofill ?? {}) as Partial<Record<OwnableSyncField, string>>
+
+  const result = new Set<OwnableSyncField>(priorOwned)
+  // Only fields that are new (create) or actually changed (edit) get
+  // (re-)decided — everything else keeps its prior membership untouched.
+  const toDecide = CHECKABLE_FIELDS.filter(
+    (f) => !existing || normalizeForCompare(currentOf(f)) !== normalizeForCompare(priorOf(f)),
+  )
+
+  const needsLiveCheck: OwnableSyncField[] = []
+  for (const field of toDecide) {
+    const current = currentOf(field)
+    if (isEmptyValue(current)) {
+      result.add(field) // nothing there to protect — always fillable.
+      continue
+    }
+    const autofilledValue = autofill[field]
+    if (autofilledValue !== undefined) {
+      if (normalizeForCompare(current) === normalizeForCompare(autofilledValue)) result.add(field)
+      else result.delete(field)
+      continue
+    }
+    needsLiveCheck.push(field)
+  }
+
+  // The one case that costs a live Google API call: a new/changed field with
+  // no autofill snapshot to compare against. Everything else above was free.
+  if (needsLiveCheck.length > 0) {
+    const placeId = payload.details?.placeId
+    const sync = typeof placeId === 'string' && placeId ? await fetchPlaceSync(placeId) : null
+    for (const field of needsLiveCheck) {
+      const googleValue = sync ? sync[field] : null
+      if (googleValue != null && normalizeForCompare(currentOf(field)) === normalizeForCompare(googleValue)) {
+        result.add(field)
+      } else {
+        // Genuinely differs, or Google couldn't be reached to verify —
+        // either way, don't risk claiming ownership we can't back up.
+        result.delete(field)
+      }
+    }
+  }
+
+  return OWNABLE_SYNC_FIELDS.filter((f) => result.has(f))
+}
+
+// Swaps the submission's transient `googleAutofill` hint (only ever useful
+// for the resolveGoogleFields decision above, not worth keeping on the live
+// listing forever) for the resolved `googleFields` list. `googleFields`
+// undefined means the category isn't sync-eligible — details pass through
+// unchanged, exactly as before this existed.
+function withResolvedGoogleFields(
+  details: Record<string, unknown>,
+  googleFields: string[] | undefined,
+): Record<string, unknown> {
+  if (googleFields === undefined) return details
+  const next: Record<string, unknown> = { ...details, googleFields }
+  delete next.googleAutofill
+  return next
+}
+
 async function applyListing(submission: SubmissionRow): Promise<void> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
+    const googleFields = await resolveGoogleFields(payload, null)
+    payload.details = withResolvedGoogleFields(payload.details, googleFields)
     const { error } = await supabase.from('resource').insert({
       ...(await listingColumnsWithGeo(payload)),
       status: 'approved',
@@ -323,6 +459,13 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
   if (submission.operation === 'update') {
     if (!submission.target_id) throw new Error('Update submission missing target_id.')
     const payload = submission.payload as unknown as ResourceSubmission
+    const { data: existingData } = await supabase
+      .from('resource')
+      .select('*')
+      .eq('id', submission.target_id)
+      .maybeSingle()
+    const googleFields = await resolveGoogleFields(payload, existingData as ResourceRow | null)
+    payload.details = withResolvedGoogleFields(payload.details, googleFields)
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })

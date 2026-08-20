@@ -69,7 +69,20 @@ function fmt(value: unknown, field?: CategoryField): string {
 // configured field. Only skip it below, in the raw-leftover-details loop,
 // for categories that never configured it as a field at all — there it's
 // nothing but the sync's own fallback card-subtitle text.
-const SKIP = new Set(['legacyId', 'geo', 'placeId', 'googleSyncedAt', 'businessStatus', 'googleFields'])
+// googleAutofill is the raw per-field autofill snapshot a pending
+// submission still carries (see ListingForm.tsx) — resolved into
+// googleFields and stripped only once approved (submissionStore.ts's
+// withResolvedGoogleFields), so it's still present here for the moderator's
+// view and just as uninteresting as googleFields itself.
+const SKIP = new Set([
+  'legacyId',
+  'geo',
+  'placeId',
+  'googleSyncedAt',
+  'businessStatus',
+  'googleFields',
+  'googleAutofill',
+])
 const SKIP_WHEN_UNCONFIGURED = new Set(['googleDescription'])
 
 type FlatField = { key: string; label: string; value: string }

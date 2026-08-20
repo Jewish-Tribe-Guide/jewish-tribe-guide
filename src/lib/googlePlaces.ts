@@ -51,10 +51,15 @@ function serverKey(): string | null {
 // hours corrected by hand shouldn't be reverted by Google's (sometimes wrong)
 // posted hours.
 //
-// The rule is provenance, tracked per field, and it comes from the submission
-// form: picking an address autofills the name, phone, and hours, and whether
-// each of those SURVIVES to submit unchanged is the signal. Kept as autofilled
-// → Google's, refreshed forever. Typed over → the submitter's, never touched.
+// The rule is provenance, tracked per field, decided once at approval time
+// (submissionStore.ts's resolveGoogleFields): a field is Google's if what's
+// being approved for it actually matches what Google has. Match (or the
+// field is empty) → Google's, refreshed forever. Differs → the submitter's,
+// never touched. The comparison itself is cheap for the common case — the
+// form already captures what picking an address autofilled (see
+// ListingForm.tsx's `googleAutofill`), so most fields are checked against
+// that for free; only a field that's new/changed AND was never autofilled
+// costs a live Google Places lookup to verify.
 //
 // Per field is the whole point. Someone clarifying "Giant" to "Giant
 // (Wynnewood)" is still pointing at the same business: that protects the name
@@ -63,16 +68,16 @@ function serverKey(): string | null {
 // Ownership is recorded as `details.googleFields`, the list of fields Google
 // may write. Two properties make it reliable rather than bookkeeping:
 //
-//   * A human edit releases ownership for free. Approving an edit REPLACES
-//     `details` with the submitted form's values (see listingColumns in
-//     submissionStore.ts), and the form recomputes the list from what it just
-//     compared — so correcting a field by hand hands it back with no extra
+//   * A human edit releases ownership for free. An edit's UNCHANGED fields
+//     keep whatever ownership they already had (no re-check at all); a field
+//     the submitter actually changed is freshly decided against real Google
+//     data, so correcting it by hand hands ownership back with no extra
 //     wiring in the edit path.
 //
-//   * Rows predating the form capturing this were reconciled once by
+//   * Rows predating this mechanism were reconciled once by
 //     scripts/reconcile-google-provenance.mjs, which infers the same answer by
-//     comparing stored values against Google's: an exact match means the
-//     autofill was kept. Anything that differed was left as the submitter's.
+//     comparing stored values against Google's: an exact match means it's
+//     Google's. Anything that differed was left as the submitter's.
 
 /** Fields the sync will only write when it owns them. `businessStatus` and
  *  `googleDescription` are deliberately absent — they're Google-only concepts
