@@ -13,9 +13,23 @@ import HomeSectionManager from './HomeSectionManager'
 // CommunityProvider/router, so this renders directly rather than through
 // renderWithProviders.
 
-function renderManager(sections: DraftHomeSection[], onChange = vi.fn(), categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })]) {
+// support/volunteer only show up as card options when their (published,
+// active) form exists — see useCardOptions in HomeSectionManager.tsx — so
+// tests that rely on those two fixed cards being offered need a forms
+// fixture, not just the default empty one.
+const supportVolunteerForms = [
+  { id: 'support', title: 'Patient & Family Support', steps: [], submitLabel: '', successTitle: '', successMessage: '', icon: '', active: true },
+  { id: 'volunteer', title: 'Volunteer for Patients', steps: [], submitLabel: '', successTitle: '', successMessage: '', icon: '', active: true },
+]
+
+function renderManager(
+  sections: DraftHomeSection[],
+  onChange = vi.fn(),
+  categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+  forms = supportVolunteerForms,
+) {
   render(
-    <ContentProvider content={makeContent({ categories })}>
+    <ContentProvider content={makeContent({ categories, forms })}>
       <HomeSectionManager sections={sections} onChange={onChange} />
     </ContentProvider>,
   )

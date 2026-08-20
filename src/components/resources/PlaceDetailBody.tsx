@@ -221,15 +221,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // query at all — nothing here is actually syncing, so it shouldn't claim
   // to be, however up to date the leftover timestamp still looks.
   const syncedNote = item.placeId ? syncedLabel(item.googleSyncedAt) : null
-  // True field ownership (see src/lib/googlePlaces.ts), not a guess — this
-  // field's current value came from the last Google sync and will keep
-  // refreshing, rather than being something a person typed in. Never true
-  // for 'name' (its googleFields entry only means "matched autofill at
-  // submit time"; showing a live-sync badge on the title would overstate
-  // it) or 'address' (the sync only ever fills it once while blank, never
-  // refreshes it afterward, so it's a one-time autofill, not an ongoing sync).
-  const googleOwnedFields = Array.isArray(item.googleFields) ? (item.googleFields as string[]) : []
-  const isGoogleSynced = (field: 'hours' | 'phone') => !!item.placeId && googleOwnedFields.includes(field)
   const urlButtons = urlFields
     .map((f) => ({ f, href: display(item[f.key]) }))
     .filter((x): x is { f: CategoryField; href: string } => !!x.href)
@@ -367,36 +358,18 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           <a href={`tel:${item.phone!.replace(/\D/g, '')}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary hover:underline">
             {item.phone}
           </a>
-          {isGoogleSynced('phone') && (
-            <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
-              via Google
-            </span>
-          )}
         </div>
       )}
 
       {hoursFields.map((f) => {
         const val = item[f.key]
         if (val === undefined) return null
-        // Only the generic 'hours' key is ever written by the sync — a
-        // mikvah's women_s_hours/men_s_hours/keilim_hours are always manual,
-        // so they never get the badge even on a fully-synced listing.
-        const synced = f.key === 'hours' && isGoogleSynced('hours')
         return (
           <div key={f.key} className="flex items-start gap-3">
             <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0 flex-1">
               {hoursFields.length > 1 && <p className="text-xs text-muted mb-0.5">{f.label}</p>}
-              <HoursDisplay
-                value={val}
-                badge={
-                  synced && (
-                    <span className="text-[10px] font-medium text-slate-400 border border-slate-200 rounded px-1 py-0.5 leading-none">
-                      via Google
-                    </span>
-                  )
-                }
-              />
+              <HoursDisplay value={val} />
             </div>
           </div>
         )

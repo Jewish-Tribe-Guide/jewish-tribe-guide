@@ -24,7 +24,7 @@ type Props = {
 
 // Shown in the footer of every expanded listing card. Lets visitors signal that
 // the community-curated fields (kosher info, tags, hours) are still accurate —
-// separate from the "via Google" synced fields which don't need this.
+// separate from the Google-synced fields which don't need this.
 export default function FreshnessFooter({ resourceId, confirmedAt: initialConfirmedAt }: Props) {
   const [confirmedAt, setConfirmedAt] = useState(initialConfirmedAt)
   // What confirmedAt was right before the most recent confirm — lets a
