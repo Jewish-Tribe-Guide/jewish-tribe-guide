@@ -765,9 +765,10 @@ export function SingletonEditor({
   )
 }
 
-// 'support'/'volunteer' are wired directly into the home screen and their own
-// wizard components — deleting them is blocked server-side (see formStore
-// .deleteForm) and the Delete button is hidden here to match.
+// 'support'/'volunteer' are wired directly into their own wizard components —
+// deleting them is blocked server-side (see formStore.deleteForm) and the
+// Delete button is hidden here to match. They can still be hidden/shown like
+// any other form, via the normal VisibilityToggle below.
 const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
 
 function FormRow({
@@ -809,22 +810,7 @@ function FormRow({
           <p className="text-xs text-muted mt-1">{f.steps.length} step{f.steps.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* Support/Volunteer aren't hideable — their home-screen cards are
-              wired to a code-level feature flag (community.features.
-              patientSupport/volunteer in community.config.ts), not to
-              whether the form itself is active, so turning this off would
-              leave the card showing while breaking the wizard behind it
-              (see the bug this replaced). A real toggle here would lie. */}
-          {canDelete ? (
-            <VisibilityToggle active={f.active !== false} toggling={toggling} onToggle={onToggleActive} />
-          ) : (
-            <span
-              title="Always shown — controlled in code (community.config.ts), not here."
-              className="text-xs font-medium rounded px-3 py-1.5 border border-slate-200 text-muted"
-            >
-              Always visible
-            </span>
-          )}
+          <VisibilityToggle active={f.active !== false} toggling={toggling} onToggle={onToggleActive} />
           <button
             onClick={onEdit}
             className="text-xs font-medium border border-slate-300 text-slate-600 rounded px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"

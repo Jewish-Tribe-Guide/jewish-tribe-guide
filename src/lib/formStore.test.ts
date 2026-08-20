@@ -114,24 +114,18 @@ describe('setFormActive', () => {
     await expect(setFormActive('event-rsvp', true)).rejects.toThrow('Failed to update form: boom')
   })
 
-  it('refuses to hide the built-in support/volunteer forms', async () => {
-    await expect(setFormActive('support', false)).rejects.toThrow(
-      'The Support and Volunteer forms are always visible',
-    )
-    await expect(setFormActive('volunteer', false)).rejects.toThrow(
-      'The Support and Volunteer forms are always visible',
-    )
-    expect(mockFrom).not.toHaveBeenCalled()
-  })
+  it('allows hiding and re-activating the built-in support/volunteer forms', async () => {
+    const hideBuilder = chainable({ data: { ...rawRow, id: 'support', active: false }, error: null })
+    mockFrom.mockReturnValue(hideBuilder)
+    const hideResult = await setFormActive('support', false)
+    expect(hideBuilder.update).toHaveBeenCalledWith({ active: false })
+    expect(hideResult?.active).toBe(false)
 
-  it('allows re-activating support/volunteer (only hiding is blocked)', async () => {
-    const builder = chainable({ data: { ...rawRow, id: 'support', active: true }, error: null })
-    mockFrom.mockReturnValue(builder)
-
-    const result = await setFormActive('support', true)
-
-    expect(builder.update).toHaveBeenCalledWith({ active: true })
-    expect(result?.active).toBe(true)
+    const showBuilder = chainable({ data: { ...rawRow, id: 'volunteer', active: true }, error: null })
+    mockFrom.mockReturnValue(showBuilder)
+    const showResult = await setFormActive('volunteer', true)
+    expect(showBuilder.update).toHaveBeenCalledWith({ active: true })
+    expect(showResult?.active).toBe(true)
   })
 })
 

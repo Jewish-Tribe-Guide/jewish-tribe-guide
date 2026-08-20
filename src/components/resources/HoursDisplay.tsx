@@ -1,15 +1,10 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { formatTodayHours, formatWeekHours } from '@/lib/hours'
 
 type Props = {
   value: unknown
-  /** Trailing content after the today-line, e.g. PlaceDetailBody's "via
-   *  Google" tag — kept as a prop rather than PlaceDetailBody rendering its
-   *  own sibling element so it sits on the same line as "Today: …", the same
-   *  position the phone number's badge takes, instead of on its own row. */
-  badge?: ReactNode
 }
 
 /**
@@ -29,7 +24,7 @@ type Props = {
  * PlaceDetailBody's own closedBadge/syncedNote, shown once per listing
  * regardless of whether it has any hours fields to display.
  */
-export default function HoursDisplay({ value, badge }: Props) {
+export default function HoursDisplay({ value }: Props) {
   const [open, setOpen] = useState(false)
 
   const today = formatTodayHours(value)
@@ -42,7 +37,6 @@ export default function HoursDisplay({ value, badge }: Props) {
         // Legacy text string (no structured breakdown) — show the raw line, no toggle.
         <p className="flex items-center gap-1.5 text-xs text-slate-600">
           {today}
-          {badge}
         </p>
       )}
 
@@ -67,7 +61,6 @@ export default function HoursDisplay({ value, badge }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            {badge}
           </div>
 
           {open && (

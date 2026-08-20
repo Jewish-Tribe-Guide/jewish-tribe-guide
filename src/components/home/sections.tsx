@@ -421,7 +421,7 @@ export function useEntryCards(
   const customForms = (useForms() ?? []).filter((f) => f.id !== 'support' && f.id !== 'volunteer')
 
   return [
-    ...(community.features.patientSupport
+    ...(community.features.patientSupport && supportForm
       ? [{
           title: supportForm?.title ?? 'Patient & Family Support',
           id: 'support',
@@ -439,7 +439,7 @@ export function useEntryCards(
           go: () => onOpenFlow('support'),
         }]
       : []),
-    ...(community.features.volunteer
+    ...(community.features.volunteer && volunteerForm
       ? [{
           title: volunteerForm?.title ?? 'Volunteer for Patients',
           id: 'volunteer',

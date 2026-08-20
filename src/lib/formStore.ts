@@ -127,24 +127,17 @@ export async function discardDraft(id: string): Promise<FormConfig | null> {
   return data ? toConfig(data as FormRow) : null
 }
 
-// Wired directly into the home screen (Landing.tsx) and their own wizard
-// components (SupportWizard/VolunteerWizard) — see setFormActive and
-// deleteForm below, both of which refuse to touch either one.
+// Wired directly into their own wizard components (SupportWizard/
+// VolunteerWizard) — deleteForm below refuses to touch either one, since
+// deleting them would break those wizards outright. Hiding them (active:
+// false) is fine — the home-screen cards check the form's active state via
+// useEntryCards (sections.tsx), same as any other category.
 const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
 
 // Turns a form's public visibility on/off. Applies immediately to the
 // published row, independent of any pending draft — unlike saveDraft/
 // publishDraft, there's nothing to publish here, just a direct flip.
-//
-// 'support'/'volunteer' can never be turned off, same reasoning (and same
-// guard) as deleteForm below: their home-screen cards are wired to a
-// code-level feature flag (community.features.patientSupport/volunteer),
-// not to whether the form is active, so deactivating one would leave the
-// card showing while breaking the wizard behind it.
 export async function setFormActive(id: string, active: boolean): Promise<FormConfig | null> {
-  if (!active && PROTECTED_FORM_IDS.has(id)) {
-    throw new Error('The Support and Volunteer forms are always visible and can’t be hidden.')
-  }
   const { data, error } = await getAdminClient()
     .from('form')
     .update({ active })
