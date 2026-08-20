@@ -22,11 +22,29 @@
 //
 // Without --apply nothing is written. Costs one Places call per listing either
 // way. Safe to re-run: it only ever recomputes from current data.
+//
+// By default this SKIPS any row that already has a `googleFields` array
+// recorded — it exists to backfill rows that predate provenance tracking,
+// not to re-verify rows that already have it. That means "N already had
+// provenance" is not a claim those N are accurate, just that they weren't
+// touched. Pass --recheck to actually verify them against Google today:
+//
+//   node --env-file=.env.local scripts/reconcile-google-provenance.mjs --recheck
+//   node --env-file=.env.local scripts/reconcile-google-provenance.mjs --recheck --apply
+//
+// --recheck --apply is ADDITIVE ONLY — it only ever ADDS a field (name/
+// phone/hours) to the existing googleFields array once verified to match
+// Google today; it never removes or replaces an entry. That matters because
+// this script has never checked `website`, so overwriting an already-
+// recorded array wholesale (the way the no-args backfill path does, for
+// rows with NO prior array) could silently drop a correctly-recorded
+// website ownership. Additive-only means that risk doesn't exist here.
 
 import { createClient } from '@supabase/supabase-js'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const APPLY = process.argv.includes('--apply')
+const RECHECK = process.argv.includes('--recheck')
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -100,9 +118,14 @@ const ambiguous = []
 let updated = 0
 let alreadyRecorded = 0
 let failed = 0
+// --recheck only:
+let rechecked = 0
+let stillProtected = 0
+const wouldNowMatch = []
 
 for (const r of rows) {
-  if (Array.isArray(r.details?.googleFields)) {
+  const priorOwned = Array.isArray(r.details?.googleFields) ? r.details.googleFields : null
+  if (priorOwned && !RECHECK) {
     alreadyRecorded++
     continue
   }
@@ -136,6 +159,33 @@ for (const r of rows) {
   else if (gHours && hoursKey(gHours) === hoursKey(stored)) owned.push('hours')
   else if (gHours) unclear.push({ field: 'hours', stored, google: gHours })
 
+  if (priorOwned) {
+    // Already had provenance recorded — --recheck verifies it against Google
+    // today. Only fields that were PROTECTED (absent from the prior array)
+    // are interesting here: was that decision still right, or does the
+    // field actually match Google now?
+    rechecked++
+    const confirmed = []
+    for (const field of ['name', 'phone', 'hours']) {
+      if (priorOwned.includes(field)) continue // was already owned — not what we're checking
+      if (owned.includes(field)) {
+        wouldNowMatch.push({ id: r.id, name: r.name, field })
+        confirmed.push(field)
+      } else {
+        stillProtected++
+      }
+    }
+    if (APPLY && confirmed.length > 0) {
+      // Additive only — union with what's already there, never drop or
+      // replace an entry (see the top-of-file note on why).
+      const nextOwned = [...new Set([...priorOwned, ...confirmed])]
+      await s.from('resource').update({ details: { ...r.details, googleFields: nextOwned } }).eq('id', r.id)
+      updated++
+    }
+    await sleep(200)
+    continue
+  }
+
   if (unclear.length) ambiguous.push({ id: r.id, name: r.name, unclear })
 
   if (APPLY) {
@@ -153,6 +203,21 @@ const summarizeHours = (h) =>
 
 console.log(`\n${APPLY ? 'APPLIED' : 'DRY RUN'} — ${rows.length} listings, ${alreadyRecorded} already had provenance, ${failed} lookup failures.`)
 if (APPLY) console.log(`Wrote googleFields on ${updated}.`)
+
+if (RECHECK) {
+  console.log(
+    `\nRE-CHECK — verified ${rechecked} already-provenanced listing(s) against Google today` +
+      (APPLY ? ` (wrote confirmed fields on ${updated}).` : ' (nothing written — pass --apply too).'),
+  )
+  if (wouldNowMatch.length === 0) {
+    console.log(`Every currently-protected name/phone/hours field (${stillProtected} of them) still genuinely differs from Google.`)
+  } else {
+    const verb = APPLY ? 'now match Google and were added to googleFields' : 'would now match Google — recorded provenance on these looks stale'
+    console.log(`${stillProtected} protected field(s) still genuinely differ. ${wouldNowMatch.length} ${verb}:`)
+    for (const w of wouldNowMatch) console.log(`  • ${w.name} — ${w.field}`)
+  }
+  console.log('\n(Only checks name/phone/hours — this script has never verified website.)')
+}
 
 if (ambiguous.length === 0) {
   console.log('\nNothing ambiguous — every field either matched Google or was empty.')
