@@ -37,6 +37,7 @@ const {
   discardDraft,
   createForm,
   deleteForm,
+  setFormActive,
 } = await import('./formStore')
 
 afterEach(() => {
@@ -54,6 +55,7 @@ const rawRow = {
   icon: '🆘',
   card_image_url: null,
   card_text_color: null,
+  active: true,
 }
 
 describe('listPublishedForms', () => {
@@ -74,6 +76,43 @@ describe('listPublishedForms', () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(listPublishedForms('philly')).rejects.toThrow('Failed to load forms: boom')
   })
+
+  it('excludes inactive forms', async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: [rawRow, { ...rawRow, id: 'hidden-form', active: false }], error: null }),
+    )
+    const forms = await listPublishedForms('philly')
+    expect(forms.map((f) => f.id)).toEqual(['support'])
+  })
+
+  it('defaults active to true when the column is missing/undefined', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, active: undefined }], error: null }))
+    const [form] = await listPublishedForms('philly')
+    expect(form.active).toBe(true)
+  })
+})
+
+describe('setFormActive', () => {
+  it('writes the active column and returns the mapped form', async () => {
+    const builder = chainable({ data: { ...rawRow, active: false }, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    const result = await setFormActive('support', false)
+
+    expect(builder.update).toHaveBeenCalledWith({ active: false })
+    expect(builder.eq).toHaveBeenCalledWith('id', 'support')
+    expect(result?.active).toBe(false)
+  })
+
+  it('returns null when the form does not exist', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    expect(await setFormActive('missing', true)).toBeNull()
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(setFormActive('support', true)).rejects.toThrow('Failed to update form: boom')
+  })
 })
 
 describe('listFormsForAdmin', () => {
@@ -81,6 +120,12 @@ describe('listFormsForAdmin', () => {
     mockFrom.mockReturnValue(chainable({ data: [rawRow], error: null }))
     const [form] = await listFormsForAdmin()
     expect(form.id).toBe('support')
+  })
+
+  it('includes inactive forms, unlike listPublishedForms', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, id: 'hidden-form', active: false }], error: null }))
+    const [form] = await listFormsForAdmin()
+    expect(form.active).toBe(false)
   })
 })
 

@@ -304,6 +304,12 @@ export type CategoryConfig = {
    *  the initial zoom out to include it. See ResourceMap.tsx's own
    *  zoomRadiusMiles prop. */
   mapZoomRadiusMiles?: number | null
+  /** Whether this category (and everything in it) shows anywhere on the
+   *  public site — the directory grid, the map, search, sitemap, direct
+   *  links. Defaults true; an admin can turn a category off without
+   *  deleting it, keeping its listings and configuration intact for when
+   *  it's turned back on. */
+  active?: boolean
 }
 
 export const DEFAULT_CATEGORY_ICON = '📋'

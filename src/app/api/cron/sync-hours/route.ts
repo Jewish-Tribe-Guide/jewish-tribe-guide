@@ -122,6 +122,20 @@ async function runSync(): Promise<NextResponse> {
     const sync = await fetchPlaceSync(placeId)
     if (!sync) {
       failed++
+      // Persisted (not just counted) so admins can see which specific
+      // listings are failing, not just how many — see the sync-coverage
+      // report in the admin Metrics tab. Cleared on the next successful
+      // sync below, so a stale failure never lingers once Google recovers.
+      await supabase
+        .from('resource')
+        .update({
+          details: {
+            ...row.details,
+            lastSyncError: 'Google Places request failed (network error or bad place id).',
+            lastSyncFailedAt: new Date().toISOString(),
+          },
+        })
+        .eq('id', row.id)
       continue
     }
 
@@ -129,6 +143,8 @@ async function runSync(): Promise<NextResponse> {
       ...row.details,
       googleSyncedAt: new Date().toISOString(),
     }
+    delete details.lastSyncError
+    delete details.lastSyncFailedAt
     // Google-only concepts with no curated counterpart — always refreshed.
     if (sync.businessStatus) details.businessStatus = sync.businessStatus
     if (sync.description && !details.googleDescription) details.googleDescription = sync.description
