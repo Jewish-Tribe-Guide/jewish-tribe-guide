@@ -94,13 +94,13 @@ describe('listPublishedForms', () => {
 
 describe('setFormActive', () => {
   it('writes the active column and returns the mapped form', async () => {
-    const builder = chainable({ data: { ...rawRow, active: false }, error: null })
+    const builder = chainable({ data: { ...rawRow, id: 'event-rsvp', active: false }, error: null })
     mockFrom.mockReturnValue(builder)
 
-    const result = await setFormActive('support', false)
+    const result = await setFormActive('event-rsvp', false)
 
     expect(builder.update).toHaveBeenCalledWith({ active: false })
-    expect(builder.eq).toHaveBeenCalledWith('id', 'support')
+    expect(builder.eq).toHaveBeenCalledWith('id', 'event-rsvp')
     expect(result?.active).toBe(false)
   })
 
@@ -111,7 +111,27 @@ describe('setFormActive', () => {
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(setFormActive('support', true)).rejects.toThrow('Failed to update form: boom')
+    await expect(setFormActive('event-rsvp', true)).rejects.toThrow('Failed to update form: boom')
+  })
+
+  it('refuses to hide the built-in support/volunteer forms', async () => {
+    await expect(setFormActive('support', false)).rejects.toThrow(
+      'The Support and Volunteer forms are always visible',
+    )
+    await expect(setFormActive('volunteer', false)).rejects.toThrow(
+      'The Support and Volunteer forms are always visible',
+    )
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('allows re-activating support/volunteer (only hiding is blocked)', async () => {
+    const builder = chainable({ data: { ...rawRow, id: 'support', active: true }, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    const result = await setFormActive('support', true)
+
+    expect(builder.update).toHaveBeenCalledWith({ active: true })
+    expect(result?.active).toBe(true)
   })
 })
 
