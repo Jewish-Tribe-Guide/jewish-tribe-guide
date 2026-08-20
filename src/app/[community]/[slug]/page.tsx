@@ -6,7 +6,8 @@ import { listApprovedResources } from '@/lib/resourceStore'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
-import { FIXED_VIEW_KINDS, RESERVED_SLUGS } from '@/lib/routes'
+import { FIXED_VIEW_KINDS, RESERVED_SLUGS, routes } from '@/lib/routes'
+import { siteUrl } from '@/lib/siteUrl'
 import { Suspense } from 'react'
 import SlugScreen from './SlugScreen'
 
@@ -91,6 +92,8 @@ export async function generateMetadata(props: PageProps<'/[community]/[slug]'>):
   return {
     title,
     description,
+    // Self-referencing canonical — see [community]/page.tsx's comment.
+    alternates: { canonical: `${siteUrl()}${routes.slug(community, slug)}` },
     openGraph: { title, description, siteName, type: 'website' },
     twitter: { card: 'summary', title, description },
   }

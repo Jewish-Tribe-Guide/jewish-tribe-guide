@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import HomeScreen from './HomeScreen'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { listApprovedResources } from '@/lib/resourceStore'
@@ -7,6 +8,18 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
 import { routes } from '@/lib/routes'
 import { buildJsonLdScript } from '@/lib/jsonLdScript'
+
+// Self-referencing canonical — without one, Google has no signal for which
+// URL is authoritative when it sees near-identical content at more than one
+// (e.g. this page vs. "/" before it settles on the redirect target), and can
+// pick the wrong one — exactly what happened here: Search Console reported
+// this page as "Duplicate without user-selected canonical" and left it
+// unindexed. Every other generateMetadata under [community] needs the same
+// fix — see [slug]/page.tsx, [slug]/[id]/page.tsx, map/page.tsx, all/page.tsx.
+export async function generateMetadata(props: PageProps<'/[community]'>): Promise<Metadata> {
+  const { community } = await props.params
+  return { alternates: { canonical: `${siteUrl()}${routes.home(community)}` } }
+}
 
 // No Suspense boundary here — HomeScreen doesn't call useSearchParams()
 // itself (that's isolated inside LandingConnected, with its own narrow
