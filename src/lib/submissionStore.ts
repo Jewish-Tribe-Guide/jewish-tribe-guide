@@ -339,7 +339,6 @@ async function resolveGoogleFields(
   payload: ResourceSubmission,
   existing: ResourceRow | null,
 ): Promise<string[] | undefined> {
-  if (!isCategorySyncEligible(payload.category)) return undefined
   try {
     return await computeGoogleFields(payload, existing)
   } catch (err) {
@@ -351,11 +350,16 @@ async function resolveGoogleFields(
 async function computeGoogleFields(
   payload: ResourceSubmission,
   existing: ResourceRow | null,
-): Promise<string[]> {
+): Promise<string[] | undefined> {
   const community = (await getDefaultCommunity()).slug
   const category = await getCategoryById(community, payload.category)
-  const hoursKey = category?.detailFields.find((f) => f.type === 'hours')?.key
-  const websiteKey = category?.detailFields.find(
+  // Eligibility depends on hasAddress, which only the fetched category
+  // knows — can't check this before the lookup above. A category that
+  // fails to resolve at all is treated as ineligible too (nothing to
+  // resolve against).
+  if (!category || !isCategorySyncEligible(category)) return undefined
+  const hoursKey = category.detailFields.find((f) => f.type === 'hours')?.key
+  const websiteKey = category.detailFields.find(
     (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
   )?.key
 

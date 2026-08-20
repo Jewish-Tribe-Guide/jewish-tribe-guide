@@ -45,8 +45,8 @@ function nameAppearsInAddress(name: string, address: string): boolean {
  *  Shared by businessUrl and the "Directions" action button.
  *
  *  `alwaysIncludeName` skips that guard. It exists for listings that can
- *  never carry a placeId to disambiguate them instead (synagogues, mikvahs —
- *  see SYNC_EXCLUDED_CATEGORY_IDS): without it, those listings' names almost
+ *  never carry a placeId to disambiguate them instead (synagogues, mikvahs):
+ *  without it, those listings' names almost
  *  never appear verbatim in their street address, so the guard would drop
  *  the name on nearly every one of them, and with no placeId to fall back on
  *  either, Maps has nothing left to label the pin with but the bare address.

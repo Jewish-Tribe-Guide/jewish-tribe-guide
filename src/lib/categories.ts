@@ -331,22 +331,18 @@ export function slugifyFieldKey(label: string): string {
     .replace(/^_+|_+$/g, '')
 }
 
-// Category ids whose listings must NOT auto-sync from Google Places:
-// community-wide categories that aren't real map places (whatsapp) or whose
-// defining field is hand-curated info Google has no concept of at all
-// (bikur cholim rooms). Synagogue and mikvah are NOT excluded — their
-// schedule fields (minyanim, women_s_hours, etc.) aren't in the sync's
-// field whitelist anyway, so they only gain the fields Google actually has
-// (phone, address, businessStatus, and mikvah's generic hours), same
-// ownership rule as everyone else.
-// The place-id backfill skips these, so no placeId is ever assigned and the
-// sync can never touch them. Ids that don't exist are harmless.
-export const SYNC_EXCLUDED_CATEGORY_IDS = new Set<string>(['whatsapp', 'bikur-cholim'])
-
 /** Whether listings in this category are eligible for Google Places auto-sync
- *  (commercial places with real hours: grocery, restaurant, hotel, dentist, …). */
-export function isCategorySyncEligible(categoryId: string): boolean {
-  return !SYNC_EXCLUDED_CATEGORY_IDS.has(categoryId)
+ *  (commercial places with real hours: grocery, restaurant, hotel, dentist, …).
+ *  Pure rule, no id list to keep in sync by hand: a category with no address
+ *  (WhatsApp groups, Networking, …) is structurally never eligible — there's
+ *  no physical place for Google to match against. Previously this was a
+ *  hardcoded `SYNC_EXCLUDED_CATEGORY_IDS` set (whatsapp, bikur-cholim) that
+ *  had to be updated by hand for every new address-less category — it
+ *  missed 'young-professional' (Networking) entirely, which is what surfaced
+ *  this. `hasAddress` already answers the question directly; nothing else
+ *  is needed. */
+export function isCategorySyncEligible(category: { hasAddress?: boolean }): boolean {
+  return category.hasAddress !== false
 }
 
 // Evaluates a field's `showIf` against the current detail values.

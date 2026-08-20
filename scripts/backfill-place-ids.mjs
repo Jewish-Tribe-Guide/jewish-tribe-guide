@@ -3,8 +3,11 @@
 // `details.placeId`. The presence of a placeId is what opts a listing into the
 // recurring hours/phone sync (scripts/sync-google-hours.mjs + the cron route).
 //
-// Community-wide / fully hand-curated categories (whatsapp, bikur cholim) are
-// skipped — Google has no data for them at all, so they stay manual.
+// Address-less listings (WhatsApp groups, Networking, …) are skipped — no
+// address means no physical place for Google to match against, and it's the
+// listing's own `address` column that decides that, not a hand-maintained
+// category id list (see isCategorySyncEligible in src/lib/categories.ts,
+// which used to be exactly that kind of list until it missed a category).
 //
 // Requires GOOGLE_MAPS_SERVER_KEY (Places API enabled, NOT referrer-restricted).
 // Safe to re-run: skips listings that already have a placeId. Logs the name +
@@ -13,10 +16,6 @@
 //   node --env-file=.env.local scripts/backfill-place-ids.mjs
 
 import { createClient } from '@supabase/supabase-js'
-
-// Mirrors SYNC_EXCLUDED_CATEGORY_IDS in src/lib/categories.ts (scripts can't
-// import the TS module). Keep the two in sync.
-const SYNC_EXCLUDED = new Set(['whatsapp', 'bikur-cholim'])
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -109,7 +108,6 @@ let skipped = 0
 let failed = 0
 for (const r of rows) {
   if (r.details?.placeId) { skipped++; continue }
-  if (SYNC_EXCLUDED.has(r.category)) { skipped++; continue }
   if (!r.address) { skipped++; continue }
 
   const match = await findPlace(r.name, r.address)

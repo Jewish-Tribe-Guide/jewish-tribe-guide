@@ -19,9 +19,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-// Categories this script covers — the ones sync has always skipped. Mirrors
-// SYNC_EXCLUDED_CATEGORY_IDS in src/lib/categories.ts minus 'whatsapp' (not a
-// physical place, nothing to match).
+// Categories this script covers — the ones the auto-sync doesn't touch.
 const CATEGORIES = ['synagogue', 'mikvah', 'bikur-cholim']
 // Only mikvah has a generic `hours` field — synagogue's schedule lives in a
 // `minyanim` field Google has no equivalent for, and bikur-cholim has no

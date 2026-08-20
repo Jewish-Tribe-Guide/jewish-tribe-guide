@@ -161,7 +161,7 @@ export type DirectoryResource = {
   /** Stable Google place id; its presence marks a listing as auto-syncing. */
   placeId?: string
   /** Google place id confirmed (by name+address match) for categories that never
-   *  auto-sync (synagogue/mikvah/bikur-cholim — see SYNC_EXCLUDED_CATEGORY_IDS).
+   *  auto-sync (synagogue/mikvah/bikur-cholim).
    *  Unlike `placeId`, this NEVER makes a listing sync-eligible — it exists only
    *  to disambiguate the "Directions" destination, so a listing whose name
    *  Google can't reliably resolve on its own doesn't send someone to a

@@ -129,7 +129,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
 
   for (const row of rows) {
     const category = categoryById.get(row.category)
-    if (!category || !isCategorySyncEligible(row.category)) continue
+    if (!category || !isCategorySyncEligible(category)) continue
 
     const listing: SyncCoverageListing = {
       id: row.id,
