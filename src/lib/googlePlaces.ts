@@ -140,6 +140,27 @@ export function nextGoogleFields(
   return OWNABLE_SYNC_FIELDS.filter((f) => merged.has(f))
 }
 
+// ── Name matching ────────────────────────────────────────────────────────────
+// Mirrored in scripts/backfill-place-ids.mjs (scripts can't import this
+// module) — keep the two in sync.
+
+// Words of 3+ letters, lowercased — short enough to compare loosely across
+// naming variants (dashes, "The", abbreviations) without pulling in noise
+// words like "of"/"the".
+function significantWords(name: string): Set<string> {
+  return new Set(name.toLowerCase().match(/[a-z0-9']{3,}/g) ?? [])
+}
+
+/** True if the two names share at least one non-trivial word. Used to tell
+ *  "this placeId is genuinely for this business" from "this placeId is just
+ *  the venue someone picked before renaming the listing" — see
+ *  resolvePlaceIdOwnership in submissionStore.ts. */
+export function namesOverlap(a: string, b: string): boolean {
+  const wordsA = significantWords(a)
+  for (const w of significantWords(b)) if (wordsA.has(w)) return true
+  return false
+}
+
 // ── Find Place id ───────────────────────────────────────────────────────────
 
 /**

@@ -821,6 +821,83 @@ describe('approveSubmission: Google-sync field ownership', () => {
   })
 })
 
+// ── approveSubmission: mismatched placeId → verifiedPlaceId ────────────────
+
+describe('approveSubmission: placeId vs verifiedPlaceId', () => {
+  function mockCreateFlow(sub: SubmissionRow) {
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const resourceInsertBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      return resourceInsertBuilder
+    })
+    return resourceInsertBuilder
+  }
+
+  it('moves a name-mismatched placeId to verifiedPlaceId and never live-checks it', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'The Kosher Grill',
+        phone: '',
+        details: { placeId: 'place-citizens-bank', googleAutofill: { name: 'Citizens Bank Park' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.placeId).toBeUndefined()
+    expect(written.details.verifiedPlaceId).toBe('place-citizens-bank')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('keeps a placeId whose picked name overlaps the listing name', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'Kosher Grill',
+        phone: '',
+        details: { placeId: 'place-1', googleAutofill: { name: 'The Kosher Grill Philly' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.placeId).toBe('place-1')
+    expect(written.details.verifiedPlaceId).toBeUndefined()
+  })
+
+  it('trusts a placeId with no autofill name captured to compare against', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'Kosher Grill',
+        phone: '',
+        details: { placeId: 'place-1' }, // no googleAutofill at all
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.placeId).toBe('place-1')
+    expect(written.details.verifiedPlaceId).toBeUndefined()
+  })
+})
+
 // ── rejectSubmission ─────────────────────────────────────────────────────────
 
 describe('rejectSubmission', () => {
