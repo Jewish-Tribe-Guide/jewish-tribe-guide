@@ -1,7 +1,7 @@
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible } from './categories'
-import { fetchPlaceSync, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
+import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
 import { getDefaultCommunity } from './communityStore'
@@ -426,6 +426,29 @@ async function computeGoogleFields(
   return OWNABLE_SYNC_FIELDS.filter((f) => result.has(f))
 }
 
+// A placeId only earns sync eligibility if it actually corresponds to the
+// business being listed, not just whatever address was picked. Picking a
+// venue and then renaming the listing (a concession stand inside a stadium,
+// a mikvah housed in a shul) is common and genuinely useful for Directions —
+// verifiedPlaceId still gets it there — but the recurring sync must never
+// compare this listing's fields against a different business's Google data,
+// and must never let that business's businessStatus (which the sync always
+// trusts unconditionally, no ownership gate) mark THIS listing closed.
+// Checked once, here, before resolveGoogleFields ever sees the placeId — a
+// mismatch means the live-check fallback there won't fire for this listing
+// either, which is correct: there's nothing of this business's to verify
+// against a different one's Google data.
+function withResolvedPlaceId(details: Record<string, unknown>, payload: ResourceSubmission): Record<string, unknown> {
+  const placeId = details.placeId
+  if (typeof placeId !== 'string' || !placeId) return details
+  const autofill = details.googleAutofill as Partial<Record<OwnableSyncField, string>> | undefined
+  const pickedName = autofill?.name
+  if (!pickedName || namesOverlap(pickedName, payload.name)) return details
+  const next: Record<string, unknown> = { ...details, verifiedPlaceId: placeId }
+  delete next.placeId
+  return next
+}
+
 // Swaps the submission's transient `googleAutofill` hint (only ever useful
 // for the resolveGoogleFields decision above, not worth keeping on the live
 // listing forever) for the resolved `googleFields` list. `googleFields`
@@ -447,6 +470,7 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
 
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
+    payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     const { error } = await supabase.from('resource').insert({
@@ -468,6 +492,7 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
       .select('*')
       .eq('id', submission.target_id)
       .maybeSingle()
+    payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(payload, existingData as ResourceRow | null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     const { error } = await supabase

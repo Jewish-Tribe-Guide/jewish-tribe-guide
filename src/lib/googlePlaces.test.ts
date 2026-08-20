@@ -3,6 +3,7 @@ import {
   fetchPlaceSync,
   findPlaceId,
   googleHoursToStructured,
+  namesOverlap,
   nextGoogleFields,
   syncMayWrite,
 } from './googlePlaces'
@@ -327,5 +328,25 @@ describe('fetchPlaceSync', () => {
   it('returns null when fetch throws (network failure)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     expect(await fetchPlaceSync('place-123')).toBeNull()
+  })
+})
+
+// ── namesOverlap ─────────────────────────────────────────────────────────────
+
+describe('namesOverlap', () => {
+  it('is true when the names share a significant word', () => {
+    expect(namesOverlap('The Kosher Grill', 'Kosher Grill at Citizens Bank Park')).toBe(true)
+  })
+
+  it('is false for a venue picked, then renamed to something unrelated', () => {
+    expect(namesOverlap('Citizens Bank Park', 'The Kosher Grill')).toBe(false)
+  })
+
+  it('ignores short/common words (under 3 letters)', () => {
+    expect(namesOverlap('The Inn At', 'A Bar On 5th')).toBe(false)
+  })
+
+  it('is case-insensitive', () => {
+    expect(namesOverlap('CITIZENS BANK PARK', 'citizens bank park team store')).toBe(true)
   })
 })
