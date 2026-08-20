@@ -23,6 +23,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title: settings.name,
     description: settings.mission,
     manifest: '/manifest.webmanifest',
+    // Proves ownership to Google Search Console — per-deployment (a template
+    // fork's own site needs its own code), so it's an env var, not hardcoded.
+    // Omitted entirely when unset, same as the icons below.
+    ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+      ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
+      : {}),
     // Standalone "Add to Home Screen" experience on iOS.
     appleWebApp: {
       capable: true,
