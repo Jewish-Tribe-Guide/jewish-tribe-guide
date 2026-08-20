@@ -58,17 +58,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [placeId, setPlaceId] = useState<string | null>(
     typeof existing?.placeId === 'string' ? existing.placeId : null,
   )
-  // What picking an address autofilled into the syncable fields, this session.
-  // Compared against the submitted values so the recurring Google sync learns
-  // which fields the submitter accepted from Google and which they replaced —
-  // see googleFieldsForSubmit. Populated by handlePlaceSelect; a ref because
-  // nothing renders from it.
+  // What picking an address autofilled into the syncable fields, this session
+  // — sent along in the submission (see the payload below) so the server can
+  // tell "matches what Google gave us" from "the submitter typed something
+  // different" without an extra Google API call for the common case where
+  // autofill did run. Populated by handlePlaceSelect; a ref because nothing
+  // renders from it.
   const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string }>({})
-  // Whatever provenance the listing already carries (edits only). A field stays
-  // Google's across an edit unless this edit actually changes it.
-  const priorGoogleFields: string[] = Array.isArray(existing?.googleFields)
-    ? (existing.googleFields as string[])
-    : []
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
   )
@@ -157,54 +153,6 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
   }
 
-  // ── Which fields the Google sync is allowed to keep refreshing ─────────────
-  // The distinction that matters isn't "was this ever edited" — it's whether
-  // the value in the box came from Google or from a person. Picking an address
-  // autofills the phone and hours; most submitters keep them, and those should
-  // track Google forever. Some replace them deliberately — the kosher stand
-  // inside a stadium whose Google phone number is the stadium's switchboard —
-  // and those must never be reverted.
-  //
-  // Per field: if this session autofilled it, it's Google's only if the
-  // submitted value is still byte-identical to what autofill wrote. Otherwise,
-  // on an edit, it keeps whatever it had — unless this edit changed it, which
-  // hands it to the person. On a create with no autofill, it's the person's.
-  function googleFieldsForSubmit(): string[] {
-    const hoursKey = config.detailFields.find((f) => f.type === 'hours')?.key
-    const currentHours = hoursKey ? JSON.stringify(details[hoursKey] ?? null) : undefined
-    const priorHours = hoursKey ? JSON.stringify((existing?.[hoursKey] as unknown) ?? null) : undefined
-    const websiteKey = config.detailFields.find(
-      (f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website',
-    )?.key
-    const currentWebsite = websiteKey ? ((details[websiteKey] as string | undefined) ?? '') : undefined
-    const priorWebsite = websiteKey ? ((existing?.[websiteKey] as string | undefined) ?? '') : undefined
-
-    const decide = (
-      field: 'name' | 'phone' | 'hours' | 'website',
-      autofilledValue: string | undefined,
-      current: string | undefined,
-      prior: string | undefined,
-    ) => {
-      if (autofilledValue !== undefined) return current === autofilledValue
-      if (mode === 'edit') return priorGoogleFields.includes(field) && current === prior
-      return false
-    }
-
-    // Pushed in the same order as googlePlaces.ts's own OWNABLE_SYNC_FIELDS
-    // (name, hours, phone, address, website) — this list gets diffed
-    // byte-for-byte against what the sync cron writes (see nextGoogleFields),
-    // so a same-membership-different-order result there would otherwise show
-    // up as a fabricated "change" in the moderation queue for a submission
-    // that never touched Google-sync ownership at all. (address is never
-    // pushed here at all — see syncMayWrite's own address special-case.)
-    const out: string[] = []
-    if (decide('name', autofilled.current.name, name, existing?.name ?? '')) out.push('name')
-    if (hoursKey && decide('hours', autofilled.current.hours, currentHours, priorHours)) out.push('hours')
-    if (decide('phone', autofilled.current.phone, phone, existing?.phone ?? '')) out.push('phone')
-    if (websiteKey && decide('website', autofilled.current.website, currentWebsite, priorWebsite)) out.push('website')
-    return out
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErrors([])
@@ -252,10 +200,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // Carry the Google place id through so the sync job can pick it up as
         // soon as the listing is approved. Only set for sync-eligible categories.
         ...(syncEligible && placeId ? { placeId } : {}),
-        // Always written (even when empty) for sync-eligible categories: its
-        // presence is what tells the sync this listing has real provenance
-        // rather than being a pre-provenance row it has to guess about.
-        ...(syncEligible ? { googleFields: googleFieldsForSubmit() } : {}),
+        // What autofill put in each syncable field this session, if picking an
+        // address triggered it — free evidence of "this is what Google had"
+        // for whichever fields it covers. The server (submissionStore.ts's
+        // resolveGoogleFields, on approval) compares the submitted value
+        // against this to decide Google-ownership without an API call for the
+        // common case; it only spends a live Google lookup for a
+        // new/changed field that was never autofilled at all.
+        ...(syncEligible ? { googleAutofill: autofilled.current } : {}),
       },
       geo: hasAddress ? coords : null,
     }

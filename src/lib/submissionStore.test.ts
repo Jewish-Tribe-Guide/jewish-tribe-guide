@@ -55,6 +55,12 @@ vi.mock('./geo', () => ({
   geocode: mockGeocode,
 }))
 
+const mockFetchPlaceSync = vi.hoisted(() => vi.fn())
+vi.mock('./googlePlaces', async () => {
+  const actual = await vi.importActual<typeof import('./googlePlaces')>('./googlePlaces')
+  return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
+})
+
 const {
   approveSubmission,
   getSubmissionFunnelStats,
@@ -107,6 +113,7 @@ afterEach(() => {
   mockGetCategoryById.mockReset()
   mockUpsertTags.mockReset()
   mockGeocode.mockReset()
+  mockFetchPlaceSync.mockReset()
   mockGetDefaultCommunity.mockResolvedValue(COMMUNITY)
 })
 
@@ -537,6 +544,262 @@ describe('approveSubmission', () => {
         expect.objectContaining({ details: { geo: { lat: 1, lng: 2 } }, anchor_id: 'hospital-a' }),
       )
     })
+  })
+})
+
+// ── approveSubmission: Google-sync field ownership (resolveGoogleFields) ────
+
+function shulCategory(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'synagogue',
+    label: 'Synagogue',
+    pluralLabel: 'Synagogues',
+    icon: '🕍',
+    description: '',
+    detailFields: [
+      { key: 'hours', label: 'Hours', type: 'hours' as const },
+      { key: 'website', label: 'Website', type: 'url' as const },
+    ],
+    kind: 'listing' as const,
+    hasAddress: true,
+    hasPhone: true,
+    ...overrides,
+  }
+}
+
+function placeSync(overrides: Record<string, unknown> = {}) {
+  return {
+    name: null,
+    hours: null,
+    phone: null,
+    address: null,
+    website: null,
+    businessStatus: 'OPERATIONAL' as const,
+    description: null,
+    ...overrides,
+  }
+}
+
+// chainable() types its builder as Record<string, unknown>, so a mocked
+// method's own .mock.calls needs a cast to read back what it was called
+// with — same shape vi.fn() already is, just not declared that way here.
+function lastCallArg(fn: unknown): { details: Record<string, unknown> } {
+  const calls = (fn as ReturnType<typeof vi.fn>).mock.calls
+  return calls[calls.length - 1][0]
+}
+
+describe('approveSubmission: Google-sync field ownership', () => {
+  function mockCreateFlow(sub: SubmissionRow) {
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const resourceInsertBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      return resourceInsertBuilder
+    })
+    return resourceInsertBuilder
+  }
+
+  it('owns a field whose submitted value matches its autofill snapshot — no Google call needed', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'Test Shul',
+        phone: '', // isolates the assertion to the name field alone
+        details: { placeId: 'place-1', googleAutofill: { name: 'Test Shul' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('name')
+    expect(written.details.googleAutofill).toBeUndefined()
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('does not own a field whose submitted value differs from its autofill snapshot', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: 'Test Shul',
+        phone: '', // isolates the assertion to the name field alone
+        details: { placeId: 'place-1', googleAutofill: { name: 'A Different Name' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).not.toContain('name')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a live Google check for a field that was never autofilled', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        phone: '215-555-0100',
+        details: { placeId: 'place-1' }, // no googleAutofill at all
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+    mockFetchPlaceSync.mockResolvedValue(placeSync({ phone: '215-555-0100' }))
+
+    await approveSubmission('sub-1')
+
+    expect(mockFetchPlaceSync).toHaveBeenCalledWith('place-1')
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('phone')
+  })
+
+  it('does not own a field when the live Google check disagrees', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        phone: '215-555-0100',
+        details: { placeId: 'place-1' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+    mockFetchPlaceSync.mockResolvedValue(placeSync({ phone: '215-555-9999' }))
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).not.toContain('phone')
+  })
+
+  it('does not own a field when Google can’t be reached to verify it', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        phone: '215-555-0100',
+        details: { placeId: 'place-1' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+    mockFetchPlaceSync.mockResolvedValue(null) // Google request failed
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).not.toContain('phone')
+  })
+
+  it('always treats an empty field as fillable, with no check of any kind', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '',
+        phone: '',
+        details: { placeId: 'place-1' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('phone')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('never resolves googleFields for a sync-ineligible category', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        category: 'whatsapp',
+        details: { placeId: 'place-1', googleAutofill: { phone: '215-555-0100' } },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toBeUndefined()
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('edit: an unchanged field keeps its prior ownership, with no check at all', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        phone: '215-555-0100', // same as existing below
+        details: { placeId: 'place-1' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const existingRow = { id: 'res-1', name: 'Test Shul', phone: '215-555-0100', details: { placeId: 'place-1', googleFields: ['phone'] } }
+    const readBuilder = chainable({ data: existingRow, error: null })
+    const updateBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let resourceCalls = 0
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      // First resource call is the existing-row read, second is the write.
+      resourceCalls += 1
+      return resourceCalls === 1 ? readBuilder : updateBuilder
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.googleFields).toContain('phone')
+  })
+
+  it('edit: a changed field is re-checked even without a fresh autofill snapshot', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        phone: '215-555-9999', // changed from existing below
+        details: { placeId: 'place-1' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const existingRow = { id: 'res-1', name: 'Test Shul', phone: '215-555-0100', details: { placeId: 'place-1', googleFields: ['phone'] } }
+    const readBuilder = chainable({ data: existingRow, error: null })
+    const updateBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let resourceCalls = 0
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      resourceCalls += 1
+      return resourceCalls === 1 ? readBuilder : updateBuilder
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+    mockFetchPlaceSync.mockResolvedValue(placeSync({ phone: '215-555-1111' })) // matches neither old nor new
+
+    await approveSubmission('sub-1')
+
+    expect(mockFetchPlaceSync).toHaveBeenCalledWith('place-1')
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.googleFields).not.toContain('phone')
   })
 })
 

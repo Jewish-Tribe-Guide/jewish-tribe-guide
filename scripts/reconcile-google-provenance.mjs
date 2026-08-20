@@ -1,13 +1,14 @@
-// One-off: works out `details.googleFields` for listings that predate the
-// submission form recording it.
+// One-off: works out `details.googleFields` for listings that predate
+// approval-time provenance resolution.
 //
-// The form now captures provenance at the only moment it's knowable — whether
-// the submitter kept what picking an address autofilled, or replaced it. Rows
-// created before that have no such record, so this infers it the only way
-// available: compare what's stored against what Google says today.
+// Every approval now decides this itself (submissionStore.ts's
+// resolveGoogleFields), by comparing the submitted value against Google's own
+// data — same rule this script has always used for legacy rows, just applied
+// going forward instead of after the fact. Rows approved before that existed
+// have no such record, so this infers it the only way available: compare
+// what's stored against what Google says today.
 //
-//   • stored value matches Google  → the submitter almost certainly kept the
-//                                    autofill → Google's, keep it fresh
+//   • stored value matches Google  → Google's, keep it fresh
 //   • stored value is empty        → nothing to protect → Google's
 //   • stored value differs         → AMBIGUOUS. Either someone corrected it
 //                                    (leave it alone) or Google has changed
