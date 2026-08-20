@@ -203,7 +203,7 @@ export async function sendNotification(
   requestId: string,
   timestamp: string,
 ): Promise<void> {
-  const to = process.env.NOTIFICATION_TO || 'jewishpatientconnect@gmail.com'
+  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
   const html = payload.requestType === 'Feedback'
     ? buildFeedbackHtml(payload, requestId, timestamp)
     : buildHtml(payload, requestId, timestamp)
@@ -252,7 +252,7 @@ export async function sendInboxMagicLink(email: string, link: string): Promise<v
 // Notifies the moderator that a new resource was submitted and is awaiting
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
-  const to = process.env.NOTIFICATION_TO || 'jewishpatientconnect@gmail.com'
+  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
 
   let subject: string
   let verb: string
