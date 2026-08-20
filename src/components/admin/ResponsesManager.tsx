@@ -6,6 +6,7 @@ import type { InboxResponse } from '@/lib/inbox'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
+import { INBOX_BASE } from '@/lib/adminNav'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
 // excluded — those are hospital-facing and live in /inbox instead, see
@@ -50,8 +51,8 @@ export default function ResponsesManager({ token }: { token: string }) {
       <p className="text-sm text-muted mb-4">
         Feedback and responses to any custom form you’ve created. Support, Volunteer, and Volunteer
         changes are hospital-facing — those live in{' '}
-        <a href="/inbox" target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          /inbox
+        <a href={INBOX_BASE} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+          {INBOX_BASE}
         </a>{' '}
         instead.
       </p>

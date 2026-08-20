@@ -41,7 +41,13 @@ export function proxy(request: NextRequest) {
   // this used to lose `?preview=1` from the admin's preview frame.
   url.search = request.nextUrl.search
 
-  return NextResponse.redirect(url)
+  // 308 (permanent), not the 307 default: "/" is the single most-linked URL
+  // the site has (every bare-domain backlink and search-engine crawl of the
+  // apex lands here), and the mapping to the default community's path is
+  // permanent in practice. A 307 tells Google the destination might still
+  // change, which withholds full confidence in consolidating ranking signal
+  // onto /philly — a real, if modest, SEO cost for something this central.
+  return NextResponse.redirect(url, 308)
 }
 
 export const config = {

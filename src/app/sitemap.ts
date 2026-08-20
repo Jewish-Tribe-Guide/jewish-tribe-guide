@@ -5,6 +5,7 @@ import { listPublishedForms } from '@/lib/formStore'
 import { listApprovedResources } from '@/lib/resourceStore'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
+import { siteUrl } from '@/lib/siteUrl'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A sitemap only became possible when screens got URLs. Before this the whole
@@ -18,17 +19,8 @@ import { listingSlug } from '@/lib/listingSlug'
 // and index pages whenever any of them do.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function baseUrl(): string {
-  // Vercel provides the production domain; the env var is the override for a
-  // custom domain. Falls back to localhost so `next build` works anywhere.
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL
-  if (explicit) return explicit.replace(/\/$/, '')
-  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
-  return vercel ? `https://${vercel}` : 'http://localhost:3000'
-}
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = baseUrl()
+  const base = siteUrl()
   const communities = await listCommunities().catch(() => [])
   const now = new Date()
 

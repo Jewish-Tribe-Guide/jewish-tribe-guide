@@ -57,6 +57,34 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
+  // /admin and /inbox live outside /[community] (see src/app/admin/layout.tsx's
+  // own comment — no per-community admin yet), but the URL should still read
+  // as /philly/admin and /philly/inbox rather than sitting at the bare root
+  // alongside the public site. A rewrite masks that without literally moving
+  // the files under [community] — which would force them to inherit
+  // [community]/layout.tsx's public SiteChrome (header/nav/footer), wrong for
+  // an internal console. beforeFiles so this always wins over [community]/
+  // [slug] ever trying to resolve "admin"/"inbox" as a category/form slug.
+  //
+  // 'philly' is hardcoded rather than derived from the default community —
+  // same known limitation as admin/inbox not being per-community at all yet;
+  // generalize both together if that ever changes.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/philly/admin/:path*', destination: '/admin/:path*' },
+        { source: '/philly/inbox', destination: '/inbox' },
+      ],
+    };
+  },
+  // Sends the old bare paths (existing bookmarks, and any link that still
+  // hardcodes them) to the new canonical URL, permanently.
+  async redirects() {
+    return [
+      { source: '/admin/:path*', destination: '/philly/admin/:path*', permanent: true },
+      { source: '/inbox', destination: '/philly/inbox', permanent: true },
+    ];
+  },
 };
 
 // Wraps the build to upload source maps to Sentry so stack traces show real

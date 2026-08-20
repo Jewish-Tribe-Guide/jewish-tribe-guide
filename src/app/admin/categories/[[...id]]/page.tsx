@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
 import CategoryManager from '@/components/admin/CategoryManager'
+import { ADMIN_BASE } from '@/lib/adminNav'
 
 // /admin/categories (list) and /admin/categories/<id> (editor), one file via
 // an optional catch-all segment. CategoryManager already treats "which item
@@ -35,8 +36,8 @@ export default function AdminCategoriesPage() {
       <CategoryManager
         token={session.access_token}
         editingId={editingId}
-        onOpenEditor={(id) => router.push(`/admin/categories/${id}`)}
-        onCloseEditor={() => router.push('/admin/categories')}
+        onOpenEditor={(id) => router.push(`${ADMIN_BASE}/categories/${id}`)}
+        onCloseEditor={() => router.push(`${ADMIN_BASE}/categories`)}
       />
     </div>
   )

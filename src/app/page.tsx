@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation'
+import { permanentRedirect } from 'next/navigation'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,5 +22,7 @@ import { getDefaultCommunity } from '@/lib/communityStore'
 // this dynamic either.
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function RootPage() {
-  redirect(`/${(await getDefaultCommunity()).slug}`)
+  // Permanent (308), matching proxy.ts's own — the mapping to the default
+  // community is permanent in practice, not a temporary detour.
+  permanentRedirect(`/${(await getDefaultCommunity()).slug}`)
 }

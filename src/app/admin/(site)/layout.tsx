@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
+import { ADMIN_BASE } from '@/lib/adminNav'
 
 // /admin/site and /admin/home deliberately render the SAME mounted
 // SiteSettingsEditor instance — one draft, one Save button — so switching
@@ -19,7 +20,7 @@ import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
 export default function SiteSettingsLayout() {
   const session = useAdminSession()
   const pathname = usePathname()
-  const section = pathname.startsWith('/admin/home') ? 'home' : 'site'
+  const section = pathname.startsWith(`${ADMIN_BASE}/home`) ? 'home' : 'site'
 
   return (
     <div>

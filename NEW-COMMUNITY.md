@@ -154,7 +154,6 @@ keys to whoever builds the site — they go in a `.env.local` file (see
 ### Conditional — only if you turn the matching feature on
 | What | Needed when | Why |
 |---|---|---|
-| **Google service account + a Google Sheet** | Patient support / volunteer flows are on | Those request forms write to a spreadsheet you own |
 | **Resend account + verified domain** | You want email notifications/confirmations | Emails to submitters + admins |
 
 ### Recommended / optional — safe to skip at first
