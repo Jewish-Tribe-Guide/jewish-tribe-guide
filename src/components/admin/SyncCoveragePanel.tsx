@@ -137,8 +137,17 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
       >
         {coverage.neverSynced.map((l) => (
           <div key={l.id} className="p-3 text-sm">
-            <span className="font-medium text-slate-900">{l.name}</span>{' '}
-            <span className="text-xs text-muted">{l.categoryLabel}</span>
+            <p>
+              <span className="font-medium text-slate-900">{l.name}</span>{' '}
+              <span className="text-xs text-muted">{l.categoryLabel}</span>
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {l.fields.map((f) => (
+                <li key={f.field} className="text-xs text-muted">
+                  <span className="font-medium text-slate-700">{f.label}:</span> {f.ourValue}
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </Section>
