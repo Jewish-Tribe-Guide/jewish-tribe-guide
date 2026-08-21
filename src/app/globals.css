@@ -1,5 +1,18 @@
 @import 'tailwindcss';
 
+/* A phone rotated to landscape is often 700-950px wide — comfortably past the
+ * default `sm` breakpoint (640px) — so anything gated on `sm:` alone (or on
+ * useIsMobile's matching width-only matchMedia query) flips to its desktop
+ * layout the moment the phone turns sideways, even though it's obviously
+ * still a phone. `desktop:` requires height too: a landscape phone's short
+ * side (~375-430px) still fails it, while a real desktop or tablet — whose
+ * height doesn't shrink to phone size just because it's wide — still passes.
+ * Use this (not `sm:`) for anything deciding which whole layout/shell to
+ * show; ordinary width-driven spacing/type-size polish should stay on `sm:`
+ * as before. Keep in sync with useIsMobile.tsx's default query, which
+ * implements the same rule for JS-driven layout decisions. */
+@custom-variant desktop (@media (min-width: 640px) and (min-height: 640px));
+
 /* Nothing in this app is meant to scroll sideways — every horizontal-scroll
  * region (the admin tab bar, a category filter row, the map's chip strip)
  * owns its own `overflow-x-auto` container specifically so the scroll stays

@@ -99,7 +99,7 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           a fallback has to announce itself rather than pass as data. */}
       <ContentFailureNotice />
       {children}
-      <div className="hidden sm:block">
+      <div className="hidden desktop:block">
         <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />
       </div>
       <Suspense fallback={null}>

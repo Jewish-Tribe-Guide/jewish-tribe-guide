@@ -760,7 +760,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           // this same bottom-right corner (see ResourceMapView), doing the
           // same recenter/resume-follow job; showing both here would be two
           // controls for one action.
-          className={`absolute hidden bottom-3 right-3 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:flex ${
+          className={`absolute hidden bottom-3 right-3 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors desktop:flex ${
             follow
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-white text-blue-600 hover:bg-blue-50'

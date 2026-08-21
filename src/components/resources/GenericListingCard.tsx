@@ -222,24 +222,24 @@ export function GenericListingCard({
                 vs. scannable chips). Hidden on mobile: on a narrow card this
                 can run to 2-3 lines, and having it inside the row the trailing
                 chevron/votes/distance column centers against (below) would
-                drag that column down with it. The sm:hidden twin further down
+                drag that column down with it. The desktop:hidden twin further down
                 renders it instead, outside that row, so on mobile the trailing
                 column centers against just the name + address. */}
             {headerTextFields.map(({ f, text }) => (
-              <p key={f.key} className="hidden sm:block truncate text-sm text-slate-600 mt-2">{text}</p>
+              <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
             ))}
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             {(upvotes || travel.length > 0) && (
-              // Stacked on mobile to save horizontal space; side by side from sm
-              // up, each in its own fixed-width column so every row's upvote
-              // count lands in the same spot, and the distance column is
+              // Stacked on mobile to save horizontal space; side by side from
+              // desktop up, each in its own fixed-width column so every row's
+              // upvote count lands in the same spot, and the distance column is
               // left-aligned so the 📍/🚗/🚶 glyphs all line up under each
               // other instead of drifting with how long the mileage text is.
-              <div className="flex flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex flex-col items-end gap-0.5 desktop:flex-row desktop:items-center desktop:gap-4">
                 {upvotes && (
-                  <div className="sm:flex sm:w-10 sm:justify-end">
+                  <div className="desktop:flex desktop:w-10 desktop:justify-end">
                     <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
                   </div>
                 )}
@@ -291,7 +291,7 @@ export function GenericListingCard({
             52px = icon + gap as the badge row below), outside the row the
             chevron/votes/distance column centers against. */}
         {headerTextFields.map(({ f, text }) => (
-          <p key={f.key} className="sm:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
+          <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
         ))}
 
         {/* Badge row — the only chips that survive collapsed: Open and any

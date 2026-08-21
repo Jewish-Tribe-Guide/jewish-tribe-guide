@@ -22,8 +22,9 @@ type Props = {
 // the synagogue, generic, and hospital directories.
 //
 // Mobile density: the listing count is supplementary, so it's hidden on small
-// screens (`hidden sm:*`) to keep the header from crowding next to the location
-// label or the "Set location" prompt. The count always shows on desktop.
+// screens (`hidden desktop:*`) to keep the header from crowding next to the
+// location label or the "Set location" prompt. The count always shows on
+// desktop.
 export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions }: Props) {
   const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
@@ -43,8 +44,8 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
             {anchorLabel}
             {countText && (
               <>
-                <span aria-hidden="true" className="hidden sm:inline mx-1.5">·</span>
-                <span className="hidden sm:inline">{countText}</span>
+                <span aria-hidden="true" className="hidden desktop:inline mx-1.5">·</span>
+                <span className="hidden desktop:inline">{countText}</span>
               </>
             )}
           </p>
@@ -52,13 +53,13 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             <AddressPrompt />
             {countText && (
-              <span className="hidden sm:inline text-sm text-muted">
+              <span className="hidden desktop:inline text-sm text-muted">
                 <span aria-hidden="true" className="mr-1">·</span>{countText}
               </span>
             )}
           </div>
         ) : countText ? (
-          <p className="hidden sm:block text-sm text-muted mt-0.5">
+          <p className="hidden desktop:block text-sm text-muted mt-0.5">
             <span aria-hidden="true" className="mr-1.5">·</span>{countText}
           </p>
         ) : null}

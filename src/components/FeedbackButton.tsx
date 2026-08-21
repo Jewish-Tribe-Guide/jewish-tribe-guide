@@ -11,7 +11,7 @@ type Props = {
   successMessage?: string
   /** Called when this modal is open and the viewport narrows to phone width.
    *  The footer that holds this button is desktop-only (page.tsx renders
-   *  SiteFooter inside a `hidden sm:block`), so without this the open modal
+   *  SiteFooter inside a `hidden desktop:block`), so without this the open modal
    *  would be unmounted mid-sentence and the visitor's typing lost. Hands off
    *  to the full Feedback screen, which is where feedback lives on mobile. */
   onPromoteToPage?: () => void

@@ -624,6 +624,57 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // Regression test for a real prod bug (Cheezy Vegan Cafe): jsonb storage
+  // reorders an object's keys, so by the time approveSubmission re-reads the
+  // submission row, `details.hours` (chronological key order, as the form
+  // built it) no longer matches `googleAutofill.hours` (the same hours,
+  // pre-stringified before ever going into jsonb) byte-for-byte — even
+  // though they're the exact same hours. A plain string comparison wrongly
+  // denied ownership; normalizeForCompare now canonicalizes key order on
+  // both sides before comparing.
+  it('owns an hours field whose value matches its autofill snapshot, even when jsonb has reordered the keys', async () => {
+    const hours = {
+      sun: { open: '08:00', close: '16:00' },
+      mon: { open: '07:00', close: '20:00' },
+      tue: { open: '07:00', close: '20:00' },
+      wed: { open: '07:00', close: '20:00' },
+      thu: { open: '07:00', close: '20:00' },
+      fri: { open: '07:00', close: '21:00' },
+      sat: { open: '08:00', close: '21:00' },
+    }
+    // Alphabetically reordered — what jsonb actually hands back, per the
+    // real prod row this test is modeled on.
+    const hoursAsStoredByJsonb = {
+      fri: hours.fri,
+      mon: hours.mon,
+      sat: hours.sat,
+      sun: hours.sun,
+      thu: hours.thu,
+      tue: hours.tue,
+      wed: hours.wed,
+    }
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '', // isolate the assertion to hours alone
+        phone: '', // (both auto-own via isEmptyValue, no live check needed)
+        details: {
+          placeId: 'place-1',
+          hours: hoursAsStoredByJsonb,
+          googleAutofill: { hours: JSON.stringify(hours) },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('hours')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
   it('does not own a field whose submitted value differs from its autofill snapshot', async () => {
     const sub = baseSubmission({
       operation: 'create',

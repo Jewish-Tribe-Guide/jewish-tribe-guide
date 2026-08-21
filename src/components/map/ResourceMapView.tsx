@@ -104,7 +104,7 @@ type Props = {
   onExitFullscreenToListing?: () => void
   /** Embedded home-screen map only — called when it's sitting expanded and the
    *  viewport narrows to phone width. There's no expanded state to narrow INTO
-   *  on mobile (the whole embedded map is `hidden sm:block` on the home screen,
+   *  on mobile (the whole embedded map is `hidden desktop:block` on the home screen,
    *  and mobile reaches the map through its own tab instead), so without this
    *  the visitor's fullscreen map would just silently vanish behind the card
    *  grid. Hands off to the real map screen, which is where a full-viewport map
@@ -123,7 +123,7 @@ type Props = {
   }
   /** Full address-entry + tracking controls, same object the header pill
    *  reads (see LocationProvider). Only needed on desktop: when the map goes
-   *  fullscreen (`sm:fixed sm:inset-0 sm:z-50` below) it paints over the
+   *  fullscreen (`desktop:fixed desktop:inset-0 desktop:z-50` below) it paints over the
    *  header entirely, taking its LocationControl pill with it, so this
    *  screen surfaces its own copy of the same control while that's the case.
    *  Mobile never loses the header's control this way — its own header is
@@ -322,8 +322,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     setFullscreen(true)
   }, [standalone, visible])
   // The mirror of the above, for the embedded home-screen map: expanded on
-  // desktop, then narrowed to phone width. `sm:fixed` stops applying and the
-  // whole embedded map is `hidden sm:block` on the home screen, so the visitor's
+  // desktop, then narrowed to phone width. `desktop:fixed` stops applying and the
+  // whole embedded map is `hidden desktop:block` on the home screen, so the visitor's
   // full-viewport map would simply disappear behind the card grid. Hand it to
   // the real map screen instead — the same map, on the screen mobile keeps it.
   useEffect(() => {
@@ -1318,10 +1318,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // map filling the rest, both full height, instead of the old stacked/
     // boxed layout. ──────────────────────────────────────────────────────
     <div
-      className={`flex flex-1 min-h-0 flex-col sm:flex-row sm:overflow-hidden ${
+      className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
-          ? 'sm:fixed sm:inset-0 sm:z-50 sm:rounded-none sm:ring-0'
-          : 'sm:relative sm:h-[70vh] sm:min-h-[420px] sm:flex-none sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5'
+          ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
+          : 'desktop:relative desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
       }`}
     >
       {loading ? (
@@ -1341,8 +1341,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   wouldn't animate, it'd just vanish. ────────────────────── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && (
             <aside
-              className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out sm:flex sm:min-h-0 ${
-                sidebarVisible ? 'sm:w-[380px] sm:border-r sm:border-slate-200' : 'sm:w-0'
+              className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out desktop:flex desktop:min-h-0 ${
+                sidebarVisible ? 'desktop:w-[380px] desktop:border-r desktop:border-slate-200' : 'desktop:w-0'
               }`}
             >
               {/* No search/chips header here anymore — the floating bar
@@ -1413,7 +1413,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               aria-label={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
               aria-pressed={!sidebarVisible}
               style={{ left: (sidebarVisible ? 380 : 0) + 8 }}
-              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer sm:flex"
+              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer desktop:flex"
             >
               <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarVisible ? '' : 'rotate-180'}`} />
             </button>
@@ -1431,7 +1431,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             // right-16 (not right-3): leaves clearance so the chip row's
             // scroll area doesn't run under the fullscreen button, which
             // shares this same top-right corner of the map.
-            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 sm:flex">
+            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 desktop:flex">
               <div className="w-72 shrink-0">{desktopSearchForm}</div>
               {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
             </div>
@@ -1446,7 +1446,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   Maps. ────────────────────────────────────────────────────── */}
           <div
             ref={attachMapBox}
-            className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden sm:left-0 sm:min-h-0 sm:w-auto sm:translate-x-0"
+            className="relative left-1/2 flex min-h-[320px] w-screen flex-1 -translate-x-1/2 flex-col overflow-hidden desktop:left-0 desktop:min-h-0 desktop:w-auto desktop:translate-x-0"
           >
               <ResourceMap
                 points={mapPoints}
@@ -1491,7 +1491,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 onClick={() => (fullscreen ? exitFullscreen() : setFullscreen(true))}
                 aria-label={fullscreen ? 'Exit fullscreen' : 'View fullscreen'}
                 aria-pressed={fullscreen}
-                className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer sm:flex"
+                className="absolute right-3 top-3 z-10 hidden h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-md ring-1 ring-slate-900/10 hover:bg-slate-50 cursor-pointer desktop:flex"
               >
                 {fullscreen ? <CollapseIcon className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
               </button>
@@ -1505,7 +1505,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   onClick={() => (tracking ? stop() : handleStart())}
                   aria-label={tracking ? 'Stop tracking my location' : 'Track my location'}
                   aria-pressed={tracking}
-                  className={`absolute bottom-3 left-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer sm:flex ${
+                  className={`absolute bottom-3 left-3 z-10 hidden h-9 w-9 items-center justify-center rounded-full shadow-md ring-1 cursor-pointer desktop:flex ${
                     tracking
                       ? 'bg-blue-600 text-white ring-blue-600 hover:bg-blue-700'
                       : 'bg-white text-slate-600 ring-slate-900/10 hover:bg-slate-50'
@@ -1515,8 +1515,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 </button>
               )}
               {/* ── Address entry (desktop, fullscreen only) — the fullscreen
-                      map (see the `fullscreen` className above) is `sm:fixed
-                      sm:inset-0 sm:z-50`, which paints directly over the site
+                      map (see the `fullscreen` className above) is `desktop:fixed
+                      desktop:inset-0 desktop:z-50`, which paints directly over the site
                       header and, with it, the only other place a visitor can
                       type an address. Below fullscreen the header is still
                       right there above the map, so this would just be a
@@ -1525,7 +1525,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                       it keeps "where should distances be measured from"
                       behaving identically everywhere it appears. ────────── */}
               {!isMobile && fullscreen && controls && (
-                <div className="absolute right-3 top-14 z-20 hidden sm:block">
+                <div className="absolute right-3 top-14 z-20 hidden desktop:block">
                   <LocationControl controls={controls} />
                 </div>
               )}
@@ -1538,7 +1538,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               {ui.search.map && isMobile && (
                 <div
                   ref={setTopOverlayEl}
-                  className="absolute inset-x-0 top-0 z-10 px-3 pb-2 sm:hidden"
+                  className="absolute inset-x-0 top-0 z-10 px-3 pb-2 desktop:hidden"
                   style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
                 >
                   <div className="flex items-center gap-2">
@@ -1729,7 +1729,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     setFollow(true)
                   }}
                   aria-label={!activeLocation ? 'Set your location' : follow ? 'Following your location' : 'Recenter'}
-                  className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors sm:hidden ${
+                  className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors desktop:hidden ${
                     activeLocation && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
                   }`}
                 >
@@ -1783,7 +1783,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               a chevron that expands the row in place to reveal them (see
               CategoryPickerList). ────────────────────────────────────────── */}
       {categoriesOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white sm:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col bg-white desktop:hidden">
           <div
             className="flex shrink-0 items-center gap-3 px-4 pb-3"
             style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
