@@ -7,6 +7,7 @@ import type { MapPoint } from './ResourceMap'
 import CategoryFilterControls, { activeFilterEntries, categoryHasFilterableFields } from './CategoryFilterControls'
 import { ChevronRightIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 
 /** One toggleable filter (a category, or the "Hospitals" pseudo-category). */
 export type FilterOption = {
@@ -341,7 +342,7 @@ export default function CategoryFilter({
                   style={{ backgroundColor: on ? 'rgba(255,255,255,0.9)' : o.color }}
                   aria-hidden="true"
                 />
-                {o.icon && <span aria-hidden="true">{o.icon}</span>}
+                {o.icon && <CategoryGlyph categoryId={o.id} icon={o.icon} className="h-3 w-3 shrink-0" />}
                 <span>{o.label}</span>
                 {/* The count already reflects the active filter (e.g. 71 →
                     5), same as the full-screen picker's own row — a

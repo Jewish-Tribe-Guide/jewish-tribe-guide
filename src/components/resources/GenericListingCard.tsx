@@ -183,6 +183,7 @@ export function GenericListingCard({
               matching box tops the glyph itself starts lower than the icon. */}
           <CategoryIcon
             icon={category.icon}
+            categoryId={category.id}
             iconImageUrl={
               (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
                 ? (item[PHOTO_FIELD_KEY] as string)

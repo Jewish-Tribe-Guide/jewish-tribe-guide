@@ -346,6 +346,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         >
           <CategoryIcon
             icon={p.glyph ?? '📍'}
+            categoryId={p.filterId}
             iconImageUrl={
               (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
                 ? (p.raw[PHOTO_FIELD_KEY] as string)

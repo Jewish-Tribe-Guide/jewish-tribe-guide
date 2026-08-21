@@ -3,6 +3,7 @@
 import type { AppMode } from '@/types'
 import { isBuiltInTabTarget, type MobileTabConfig } from '@/lib/siteSettings'
 import { GridIcon, MapFoldIcon, MessageIcon } from './icons'
+import { CategoryGlyph, hasCategoryIcon } from '@/lib/categoryIcons'
 
 /** Which app screens each built-in target counts as "current" for. Card tabs
  *  don't appear here — they're matched on the open category instead (see
@@ -58,6 +59,13 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
           : mode === 'find' && activeCardId === tab.target
         const Icon = builtIn ? BUILT_IN_ICONS[tab.target] : null
         const emoji = builtIn ? undefined : iconForTarget?.(tab.target)
+        // Only the emoji fallback needs the grayscale/opacity dimming trick
+        // below — a hand-built line icon already takes `currentColor`, so
+        // `text-primary`/`text-slate-400` (set on the button above) already
+        // dims/tints it correctly, same as the built-in SVGs; grayscale-ing
+        // an already-monochrome currentColor icon would just wash out its
+        // active-state color for nothing.
+        const hasLineIcon = !builtIn && hasCategoryIcon(tab.target)
 
         return (
           <button
@@ -71,6 +79,8 @@ export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconF
           >
             {Icon ? (
               <Icon className="h-6 w-6" />
+            ) : hasLineIcon ? (
+              <CategoryGlyph categoryId={tab.target} icon={emoji ?? ''} className="h-6 w-6" />
             ) : (
               // Sized and centered to occupy the same 24px box the SVGs do, so
               // a mixed bar keeps one baseline. Dimmed to match when inactive,

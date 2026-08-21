@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CardSectionDef } from './sections'
 import type { DirectoryResource } from '@/types'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 
 // ── Desktop section tabs ──────────────────────────────────────────────────────
 // One tab per admin-configured home section, each opening a mega-menu of that
@@ -135,9 +136,7 @@ export default function SectionTabs({
                             className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-slate-50"
                           >
                             {card.icon && (
-                              <span className="shrink-0 text-base leading-none" aria-hidden="true">
-                                {card.icon}
-                              </span>
+                              <CategoryGlyph categoryId={card.id} icon={card.icon} className="h-4 w-4 shrink-0" />
                             )}
                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
                               {card.title}
