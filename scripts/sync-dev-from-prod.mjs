@@ -1,23 +1,35 @@
 // Pulls admin-configured CONTENT SCHEMA — categories, tags, forms, home
-// sections, site settings, hospitals, communities — from the real production
-// Supabase project into whatever project NEXT_PUBLIC_SUPABASE_URL currently
-// points to (local dev's disposable test project — see README "Integration
-// tests" → "Using the test project for local dev too"). Run this occasionally
-// so local dev doesn't drift too far from what admins have actually configured
-// in prod (a renamed category, a new field, an edited site tagline, …).
+// sections, site settings, hospitals, communities — plus a read-only copy of
+// approved listings, from the real production Supabase project into whatever
+// project NEXT_PUBLIC_SUPABASE_URL currently points to (local dev's
+// disposable test project — see README "Integration tests" → "Using the test
+// project for local dev too"). Run this occasionally so local dev doesn't
+// drift too far from what admins have actually configured in prod (a
+// renamed category, a new field, an edited site tagline, …), and so there's
+// real, populated content to develop and test against locally instead of an
+// empty directory.
 //
-// Deliberately NEVER touches `resource` (listings), `submission`,
-// `form_response`, or `vote` — those are real visitor/business data, not
-// config, and the write-test suites own creating/cleaning up their own rows
-// in those tables. Copying them here would either leak real submitter PII
-// into a project other tests write-and-delete against, or fight those
-// suites' own seeding.
+// Prod is only ever READ from — this script has no code path that writes
+// anywhere but `dest` (the test project), and the checks below refuse to run
+// at all unless that destination is verifiably the test project, not prod.
 //
-// Upsert-only, never deletes — a category removed in prod will still linger
-// here until you delete it by hand. Safer than a full mirror: a delete pass
-// scoped to this project would risk wiping rows the write-test suites (and
-// their own self-healing seed logic in scripts/run-test-project-server.mjs)
-// depend on existing.
+// Still deliberately NEVER touches `submission`, `form_response`, or `vote`
+// — genuinely private (a pending submission nobody's approved yet, a vote
+// tied to an anonymous visitor) with no reason to leave prod at all. Listings
+// (`resource`) are different: once approved they're public business info
+// already shown on the live site to any visitor, which is why they're synced
+// below — but `submitted_by` (the submitter's own name/email, not the
+// business's) is scrubbed on the way in regardless, since that's a real
+// person's contact info a business submission collects incidentally, not
+// itself public. Only `status = 'approved'` rows are copied, matching what a
+// real visitor actually sees — a pending or rejected submission might carry
+// address/phone info nobody ever vetted.
+//
+// Upsert-only, never deletes — a category (or listing) removed in prod will
+// still linger here until you delete it by hand. Safer than a full mirror: a
+// delete pass scoped to this project would risk wiping rows the write-test
+// suites (and their own self-healing seed logic in
+// scripts/run-test-project-server.mjs) depend on existing.
 //
 //   node --env-file=.env.local scripts/sync-dev-from-prod.mjs
 //
@@ -86,8 +98,30 @@ async function syncTable(table, onConflict) {
   console.log(`  ${table}: synced ${data.length} row(s)`)
 }
 
-console.log(`Syncing config from ${sourceUrl} → ${destUrl}\n`)
+// Only `status = 'approved'` — what a real visitor actually sees; a pending
+// or rejected submission's address/phone was never vetted by an admin.
+// `submitted_by` is scrubbed to null on the way in: unlike the rest of the
+// row (a business's own public name/address/phone, already shown on the live
+// site), that field is the submitter's own name/email — a real person's
+// contact info incidentally collected by the form, not itself public, and
+// with no reason to leave prod. Read-only against `source`; only ever
+// written to `dest` (the test project), same as every other table here.
+async function syncResources() {
+  const { data, error: readError } = await source.from('resource').select('*').eq('status', 'approved')
+  if (readError) throw new Error(`Reading resource from prod failed: ${readError.message}`)
+  if (!data || data.length === 0) {
+    console.log('  resource: 0 approved rows in prod, nothing to copy')
+    return
+  }
+  const scrubbed = data.map((row) => ({ ...row, submitted_by: null }))
+  const { error: writeError } = await dest.from('resource').upsert(scrubbed, { onConflict: 'id' })
+  if (writeError) throw new Error(`Writing resource to the test project failed: ${writeError.message}`)
+  console.log(`  resource: synced ${data.length} row(s) (approved only, submitted_by scrubbed)`)
+}
+
+console.log(`Syncing config + listings from ${sourceUrl} → ${destUrl}\n`)
 for (const [table, onConflict] of TABLES) {
   await syncTable(table, onConflict)
 }
-console.log('\n✓ Done. Never touched: resource, submission, form_response, vote (real visitor/business data).')
+await syncResources()
+console.log('\n✓ Done. Never touched: submission, form_response, vote (private, not public content).')

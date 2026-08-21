@@ -222,17 +222,22 @@ needed there.
 **Keeping it from drifting too far from prod.** A shared dev/test project
 starts out empty (or minimal), so `npm run sync-dev-from-prod` pulls the
 admin-configured content schema — categories, tags, forms, home sections,
-site settings, hospitals — from the real production project into whichever
-one `NEXT_PUBLIC_SUPABASE_URL` currently points to. It never touches
-`resource` (listings), `submission`, `form_response`, or `vote` — those are
-real visitor/business data, not config, and stay out of a shared project on
-purpose. Needs `PROD_SUPABASE_URL`/`PROD_SUPABASE_SERVICE_ROLE_KEY` in
-`.env.local` (the real project's own values — nothing else reads them), and
-refuses to run unless the destination genuinely matches `TEST_SUPABASE_URL`,
-so it can never write into prod by mistake. Upsert-only, never deletes — a
-category removed in prod will still need deleting here by hand. Run it
-occasionally, not on every `npm run dev` — there's no harm running it more
-often, it's just rarely worth the wait.
+site settings, hospitals — plus every approved listing, from the real
+production project into whichever one `NEXT_PUBLIC_SUPABASE_URL` currently
+points to. Prod is only ever read from; the script has no code path that
+writes anywhere but the test project. Listings' `submitted_by` (the
+submitter's own name/email, not the business's) is scrubbed to null on the
+way in — the rest of a listing is public business info already shown on the
+live site, but that one field is a real person's contact info with no reason
+to leave prod. It still never touches `submission`, `form_response`, or
+`vote` — genuinely private, not public content, and stays out of a shared
+project on purpose. Needs `PROD_SUPABASE_URL`/`PROD_SUPABASE_SERVICE_ROLE_KEY`
+in `.env.local` (the real project's own values — nothing else reads them),
+and refuses to run unless the destination genuinely matches
+`TEST_SUPABASE_URL`, so it can never write into prod by mistake. Upsert-only,
+never deletes — a category or listing removed in prod will still need
+deleting here by hand. Run it occasionally, not on every `npm run dev` —
+there's no harm running it more often, it's just rarely worth the wait.
 
 ## License
 
