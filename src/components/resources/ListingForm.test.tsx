@@ -176,12 +176,44 @@ describe('ListingForm', () => {
     const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
     render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
+    await user.type(screen.getByDisplayValue('Old Name'), ' & Deli')
     await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(body.operation).toBe('update')
     expect(body.targetId).toBe('listing-42')
+  })
+
+  it('refuses to submit an edit where nothing about the listing actually changed', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetchOk({ ok: true })
+    const category = makeCategory()
+    const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
+    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+
+    // Only filling in contact info — no listing field touched at all.
+    await user.type(screen.getByLabelText(/Your name/), 'A Neighbor')
+    await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
+
+    expect(await screen.findByText(/haven.t changed anything yet/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses to submit an edit where a field was changed and then changed right back', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetchOk({ ok: true })
+    const category = makeCategory()
+    const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
+    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+
+    const nameInput = screen.getByDisplayValue('Old Name')
+    await user.type(nameInput, 'x')
+    await user.type(nameInput, '{backspace}')
+    await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
+
+    expect(await screen.findByText(/haven.t changed anything yet/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('shows the server-provided errors and stays on the form when the submission is rejected', async () => {
