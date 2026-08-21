@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ExternalIcon, PinIcon } from '@/components/icons'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import { PHOTO_FIELD_KEY } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -346,6 +347,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         >
           <CategoryIcon
             icon={p.glyph ?? '📍'}
+            categoryId={p.filterId}
             iconImageUrl={
               (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
                 ? (p.raw[PHOTO_FIELD_KEY] as string)
@@ -382,10 +384,10 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
           <span
             className="relative flex h-6 w-6 items-center justify-center rounded-full text-xs"
-            style={{ backgroundColor: p.color + '22' }}
+            style={{ backgroundColor: p.color + '22', color: p.color }}
             aria-hidden="true"
           >
-            {p.glyph ?? '📍'}
+            <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-3.5 w-3.5" />
             {/* Same small badge, same blue, as the pinned marker gets on
                 the map itself (see ResourceMap's buildPin) — this row's
                 own category badge is the closest equivalent spot to

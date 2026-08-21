@@ -12,6 +12,7 @@ import { travelCompare } from '@/lib/listingTravel'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 
 export type CardDef = {
   title: string
@@ -88,9 +89,7 @@ export function Card({ card, tint, priority = false }: { card: CardDef; tint: st
             (a color glyph, not a strokable outline) never reads as a clean
             icon, so photo cards go title-only instead. */}
         {card.icon && !hasImage && (
-          <span className="relative text-3xl leading-none" aria-hidden="true">
-            {card.icon}
-          </span>
+          <CategoryGlyph categoryId={card.id} icon={card.icon} className="relative h-8 w-8" />
         )}
         <span
           className={`relative text-[17px] font-semibold leading-snug transition-colors ${

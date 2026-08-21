@@ -6,6 +6,7 @@ import type { MapPoint } from './ResourceMap'
 import { type CategoryConfig } from '@/lib/categories'
 import CategoryFilterControls, { categoryHasFilterableFields, passesFilters } from './CategoryFilterControls'
 import { ChevronRightIcon } from '@/components/icons'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 
 type Props = {
   /** Already sorted (highest count first) by the caller. */
@@ -83,9 +84,7 @@ export default function CategoryPickerList({
               aria-hidden="true"
             />
             {o.icon && (
-              <span className="text-lg" aria-hidden="true">
-                {o.icon}
-              </span>
+              <CategoryGlyph categoryId={o.id} icon={o.icon} className="h-5 w-5 shrink-0" />
             )}
             <span className="flex-1 text-[15px] font-medium text-slate-900">{o.label}</span>
             <span className="text-sm text-slate-400">{filteredCount}</span>

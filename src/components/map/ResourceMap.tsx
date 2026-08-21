@@ -6,6 +6,7 @@ import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLi
 import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
+import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -213,14 +214,24 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     document.head.appendChild(style)
   }
 
+  // Precedence: an uploaded category picture (glyphSrc) first — a category
+  // with an image set still carries its emoji as the CategoryIcon fallback
+  // everywhere else, but on the map itself there's room for only one. Then
+  // a hand-built glyph (see lib/categoryIcons.tsx) — a plain "H" string for
+  // hospitals, an SVG line icon Element for everything else covered there —
+  // which is what most real categories actually get, noticeably cleaner at
+  // pin scale than the plain emoji it replaces. Only a category with none of
+  // the above (a custom admin-created one with no icon set here yet) falls
+  // back to the plain emoji glyph.
+  const glyphIcon = p.glyphSrc ? undefined : glyphTextFor(p.filterId) ?? glyphElementFor(p.filterId)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    // glyphSrc (an uploaded category picture) wins over the plain emoji
-    // glyph when both would otherwise apply — a category with an image set
-    // still carries its emoji as the CategoryIcon fallback everywhere else,
-    // but on the map itself there's room for only one.
-    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : { glyph: p.glyph ?? null }),
+    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : glyphIcon ? { glyph: glyphIcon } : { glyph: p.glyph ?? null }),
+    // Ignored once `glyph` is an SVG Element (glyphElementFor's icons color
+    // themselves white directly) — still applies to a plain-string glyph
+    // (the "H" text, or the plain-emoji fallback), where PinElement really
+    // does read it.
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
   })

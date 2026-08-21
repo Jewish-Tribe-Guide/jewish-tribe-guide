@@ -9,6 +9,7 @@ import ShareButton from '@/components/resources/ShareButton'
 import PinButton from '@/components/resources/PinButton'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -57,6 +58,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         <div className="relative shrink-0 self-start">
           <CategoryIcon
             icon={category.icon}
+            categoryId={category.id}
             iconImageUrl={iconImageUrl}
             color={color}
             className="h-12 w-12 text-2xl"
@@ -72,11 +74,11 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
               "pinned" badge NearbyList overlays on its own icon. */}
           {iconImageUrl && (
             <span
-              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[11px] leading-none"
+              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-white text-[11px] leading-none"
               style={{ backgroundColor: color }}
               aria-hidden="true"
             >
-              {category.icon}
+              <CategoryGlyph categoryId={category.id} icon={category.icon} className="h-3 w-3" />
             </span>
           )}
         </div>
