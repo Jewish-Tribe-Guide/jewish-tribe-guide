@@ -2,7 +2,14 @@ import { getAdminClient } from './supabase/admin'
 import { getDefaultCommunity } from './communityStore'
 import { listCategoriesUncached, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
-import { OWNABLE_SYNC_FIELDS, fetchPlaceSync, syncMayWrite, type OwnableSyncField } from './googlePlaces'
+import {
+  OWNABLE_SYNC_FIELDS,
+  fetchPlaceSync,
+  nextGoogleFields,
+  syncMayWrite,
+  type OwnableSyncField,
+  type PlaceSync,
+} from './googlePlaces'
 import { formatHoursSummary } from './hours'
 
 // ── The admin-visible "sync coverage" report — three answers to "is the
@@ -188,13 +195,21 @@ export type SyncCheckField = {
   matches: boolean
 }
 
-// On-demand only (never pre-computed): fetches this one listing's current
-// Google Places data and compares it against every field the sync is
-// currently declining to write, so an admin can see what a "manually
-// entered" field would become if it were ever handed back to Google —
-// including when Google simply has nothing for it at all.
-export async function checkListingAgainstGoogle(resourceId: string): Promise<SyncCheckField[]> {
-  const { data, error } = await getAdminClient()
+function googleValuesFor(sync: PlaceSync): Record<OwnableSyncField, string> {
+  return {
+    name: sync.name?.trim() || '—',
+    hours: sync.hours ? formatHoursSummary(sync.hours) : '—',
+    phone: sync.phone?.trim() || '—',
+    address: sync.address?.trim() || '—',
+    website: sync.website?.trim() || '—',
+  }
+}
+
+async function loadRowAndCategory(
+  resourceId: string,
+): Promise<{ supabase: ReturnType<typeof getAdminClient>; row: SyncRow; category: CategoryConfig }> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
     .from('resource')
     .select('id,name,category,phone,address,details,community_id')
     .eq('id', resourceId)
@@ -209,21 +224,61 @@ export async function checkListingAgainstGoogle(resourceId: string): Promise<Syn
   const category = await getCategoryById(row.community_id, row.category)
   if (!category) throw new Error('Category not found.')
 
+  return { supabase, row, category }
+}
+
+// On-demand only (never pre-computed): fetches this one listing's current
+// Google Places data and compares it against every field the sync is
+// currently declining to write, so an admin can see what a "manually
+// entered" field would become if it were ever handed back to Google —
+// including when Google simply has nothing for it at all.
+export async function checkListingAgainstGoogle(resourceId: string): Promise<SyncCheckField[]> {
+  const { row, category } = await loadRowAndCategory(resourceId)
+  const placeId = row.details.placeId as string
+
   const sync = await fetchPlaceSync(placeId)
   if (!sync) throw new Error('Could not reach Google Places right now — try again shortly.')
 
   const websiteKey = websiteFieldKey(category)
-  const googleValue: Record<OwnableSyncField, string> = {
-    name: sync.name?.trim() || '—',
-    hours: sync.hours ? formatHoursSummary(sync.hours) : '—',
-    phone: sync.phone?.trim() || '—',
-    address: sync.address?.trim() || '—',
-    website: sync.website?.trim() || '—',
-  }
+  const googleValue = googleValuesFor(sync)
 
   return protectedFieldsFor(row, category).map((f) => {
     const ours = displayValue(f, row, websiteKey)
     const google = googleValue[f]
     return { field: f, label: FIELD_LABELS[f], ours, google, matches: ours === google }
   })
+}
+
+// Hands a hand-edited field back to the sync. Only ever called after "Check
+// against Google" showed a match — but re-verifies live rather than trusting
+// that stale client-held result, since an admin could sit on the check
+// result for a while (or a field could drift) before clicking through.
+// Doesn't touch `details.googleFields` at all when the live values don't
+// actually match, same "don't risk claiming ownership we can't back up"
+// rule computeGoogleFields follows in submissionStore.ts.
+export async function resumeSyncField(resourceId: string, field: OwnableSyncField): Promise<SyncCheckField> {
+  const { supabase, row, category } = await loadRowAndCategory(resourceId)
+  const placeId = row.details.placeId as string
+  if (!protectedFieldsFor(row, category).includes(field)) {
+    throw new Error('This field is already following Google.')
+  }
+
+  const sync = await fetchPlaceSync(placeId)
+  if (!sync) throw new Error('Could not reach Google Places right now — try again shortly.')
+
+  const websiteKey = websiteFieldKey(category)
+  const google = googleValuesFor(sync)[field]
+  const ours = displayValue(field, row, websiteKey)
+  const matches = ours === google
+
+  if (matches) {
+    const googleFields = nextGoogleFields(row.details, [field])
+    const { error: updateError } = await supabase
+      .from('resource')
+      .update({ details: { ...row.details, googleFields } })
+      .eq('id', resourceId)
+    if (updateError) throw new Error(`Failed to update listing: ${updateError.message}`)
+  }
+
+  return { field, label: FIELD_LABELS[field], ours, google, matches }
 }

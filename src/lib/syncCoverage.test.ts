@@ -7,6 +7,7 @@ function chainable(result: unknown) {
     select: vi.fn(self),
     eq: vi.fn(self),
     maybeSingle: vi.fn(self),
+    update: vi.fn(self),
     then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
@@ -35,7 +36,7 @@ vi.mock('./googlePlaces', async () => {
   return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
 })
 
-const { getSyncCoverage, checkListingAgainstGoogle } = await import('./syncCoverage')
+const { getSyncCoverage, checkListingAgainstGoogle, resumeSyncField } = await import('./syncCoverage')
 
 const restaurantCategory = {
   id: 'restaurant',
@@ -280,5 +281,79 @@ describe('checkListingAgainstGoogle', () => {
   it('throws when the listing does not exist', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
     await expect(checkListingAgainstGoogle('missing')).rejects.toThrow('Listing not found.')
+  })
+})
+
+describe('resumeSyncField', () => {
+  const matchingHours = { sun: null, mon: { open: '07:00', close: '20:00' }, tue: null, wed: null, thu: null, fri: null, sat: null }
+  const row = {
+    id: 'r1',
+    name: 'Cheezy Vegan',
+    category: 'restaurant',
+    phone: '215-555-1234',
+    address: '1 Main St',
+    details: { placeId: 'abc123', googleFields: ['name', 'phone', 'website'], hours: matchingHours },
+    community_id: 'philly',
+  }
+
+  it('hands the field back to Google when the live value matches, merging into googleFields', async () => {
+    const updateBuilder = chainable({ error: null })
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? chainable({ data: row, error: null }) : updateBuilder
+    })
+    mockGetCategoryById.mockResolvedValue(restaurantCategory)
+    mockFetchPlaceSync.mockResolvedValue({
+      name: 'Cheezy Vegan',
+      hours: matchingHours,
+      phone: '215-555-1234',
+      address: '1 Main St',
+      website: null,
+      businessStatus: 'OPERATIONAL',
+      description: null,
+    })
+
+    const result = await resumeSyncField('r1', 'hours')
+
+    expect(result.matches).toBe(true)
+    expect(updateBuilder.update).toHaveBeenCalledWith({
+      details: { ...row.details, googleFields: ['name', 'hours', 'phone', 'website'] },
+    })
+  })
+
+  it('leaves googleFields untouched when the live value no longer matches', async () => {
+    const updateBuilder = chainable({ error: null })
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? chainable({ data: row, error: null }) : updateBuilder
+    })
+    mockGetCategoryById.mockResolvedValue(restaurantCategory)
+    mockFetchPlaceSync.mockResolvedValue({
+      name: 'Cheezy Vegan',
+      hours: { sun: null, mon: { open: '09:00', close: '17:00' }, tue: null, wed: null, thu: null, fri: null, sat: null },
+      phone: '215-555-1234',
+      address: '1 Main St',
+      website: null,
+      businessStatus: 'OPERATIONAL',
+      description: null,
+    })
+
+    const result = await resumeSyncField('r1', 'hours')
+
+    expect(result.matches).toBe(false)
+    expect(updateBuilder.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses to resume a field that already follows Google', async () => {
+    mockFrom.mockReturnValue(chainable({ data: row, error: null }))
+    mockGetCategoryById.mockResolvedValue(restaurantCategory)
+    await expect(resumeSyncField('r1', 'phone')).rejects.toThrow('This field is already following Google.')
+  })
+
+  it('throws when the listing has no place id', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...row, details: {} }, error: null }))
+    await expect(resumeSyncField('r1', 'hours')).rejects.toThrow('This listing has no Google place id.')
   })
 })
