@@ -405,7 +405,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
               <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
                 ~{t}
               </Chip>
-              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden desktop:block z-10">
                 not always in stock
               </span>
             </span>
@@ -413,7 +413,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         ]}
       </ClampedChipRow>
       {tagsSometimes.length > 0 && (
-        <p className="text-[11px] text-amber-700 sm:hidden">~not always in stock — call ahead</p>
+        <p className="text-[11px] text-amber-700 desktop:hidden">~not always in stock — call ahead</p>
       )}
     </div>
   )

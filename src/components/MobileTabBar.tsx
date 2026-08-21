@@ -45,7 +45,7 @@ type Props = {
 export default function MobileTabBar({ mode, tabs, onSelect, activeCardId, iconForTarget }: Props) {
   return (
     <nav
-      className="sm:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200/80 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
+      className="desktop:hidden fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200/80 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]"
       aria-label="Primary"
     >
       {tabs.map((tab) => {

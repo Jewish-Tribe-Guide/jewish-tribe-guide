@@ -20,11 +20,18 @@ export function ForcedViewport({ isMobile, children }: { isMobile: boolean; chil
   return <ForcedViewportContext.Provider value={isMobile}>{children}</ForcedViewportContext.Provider>
 }
 
-// Reports whether the viewport is phone-width. SSR-safe: starts false (desktop)
+// Reports whether the viewport is phone-sized. SSR-safe: starts false (desktop)
 // so server and first client render agree, then updates after mount. Use for
 // small presentational tweaks like shorter placeholder text — not for anything
 // that must be correct on the very first paint.
-export function useIsMobile(query = '(max-width: 640px)'): boolean {
+//
+// Mobile means width OR height is small (matches globals.css's `desktop:`
+// variant, which requires BOTH to be roomy) — not just width alone. A phone
+// rotated to landscape is often 700-950px wide, well past a plain
+// `max-width: 640px` check, but its short side is still only ~375-430px; a
+// width-only query would call that "desktop" the instant the phone turns
+// sideways. Keep this in sync with globals.css's `@custom-variant desktop`.
+export function useIsMobile(query = '(max-width: 639px), (max-height: 639px)'): boolean {
   const forced = useContext(ForcedViewportContext)
   const [isMobile, setIsMobile] = useState(false)
 

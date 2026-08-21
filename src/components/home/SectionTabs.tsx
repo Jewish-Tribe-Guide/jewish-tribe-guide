@@ -81,7 +81,7 @@ export default function SectionTabs({
     <nav
       ref={navRef}
       aria-label="Categories"
-      className="relative hidden border-b border-slate-200 sm:block"
+      className="relative hidden border-b border-slate-200 desktop:block"
       onMouseLeave={scheduleClose}
     >
       <ul className="mx-auto flex max-w-6xl items-stretch gap-1 px-4 sm:px-6">

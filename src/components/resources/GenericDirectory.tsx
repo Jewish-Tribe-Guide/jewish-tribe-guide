@@ -308,8 +308,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               <button
                 onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                 /* Desktop only — on mobile the Map button moves into the filter/sort
-                   row (next to Filters) to keep the header uncluttered. */
-                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                   row (next to Filters) to keep the header uncluttered. `desktop:`
+                   not `sm:` so a landscape phone doesn't lose it from here only to
+                   not have it in the mobile row either — see globals.css. */
+                className="hidden desktop:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
                 🗺️ Map
               </button>
@@ -357,7 +359,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         {hasFilterRow && (
           <>
             {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
-            <div className="flex items-center gap-1.5 sm:hidden">
+            <div className="flex items-center gap-1.5 desktop:hidden">
               {hasActualFilters && (
                 <button
                   onClick={() => setFiltersOpen((v) => !v)}
@@ -447,7 +449,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               className={[
                 'gap-2 flex-nowrap overflow-x-auto pb-1',
                 filtersOpen ? 'flex' : 'hidden',
-                'sm:flex',
+                'desktop:flex',
               ].join(' ')}
               style={{ scrollbarWidth: 'none' }}
             >
@@ -518,7 +520,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   href={category.externalLink.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hidden sm:inline-flex sm:ml-auto shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  className="hidden desktop:inline-flex desktop:ml-auto shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
                 >
                   {category.externalLink.label} ↗
                 </a>
@@ -527,8 +529,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 <button
                   onClick={() => setDaveningModalOpen(true)}
                   className={[
-                    'hidden sm:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
-                    !upvotes && !category.externalLink ? 'sm:ml-auto' : '',
+                    'hidden desktop:inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
+                    !upvotes && !category.externalLink ? 'desktop:ml-auto' : '',
                   ].join(' ')}
                 >
                   <ClockIcon className="h-4 w-4" />
@@ -538,8 +540,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               {upvotes && (
                 <div
                   className={[
-                    'hidden sm:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
-                    !hasMinyanim && !category.externalLink ? 'sm:ml-auto' : '',
+                    'hidden desktop:flex rounded-md border border-slate-300 overflow-hidden shrink-0',
+                    !hasMinyanim && !category.externalLink ? 'desktop:ml-auto' : '',
                   ].join(' ')}
                 >
                   {[{ v: true, label: 'Popularity' }, { v: false, label: 'Distance' }].map((opt) => (

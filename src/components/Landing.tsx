@@ -167,8 +167,9 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   // branch: `isMobile` starts false on every render, including on a phone, so
   // branching here meant a phone laid out the desktop home screen on its first
   // React render and corrected itself a frame later. The media query is right
-  // the first time, so there is no correction to see.
-  const inlineGridClass = q ? '' : ' sm:hidden'
+  // the first time, so there is no correction to see. `desktop:` (not `sm:`)
+  // so a phone rotated to landscape doesn't lose the grid — see globals.css.
+  const inlineGridClass = q ? '' : ' desktop:hidden'
 
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
@@ -224,7 +225,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             // Hidden while searching, when the grid below takes over as the
             // answer to what was typed.
             return !q && (
-              <div key="featured" className="hidden sm:block">
+              <div key="featured" className="hidden desktop:block">
                 <FeaturedCards title={title} cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
               </div>
             )
@@ -238,13 +239,13 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             // this band into view (arriving from a collapsed fullscreen map)
             // doesn't tuck its heading underneath it.
             return hasMap && !q && (
-              <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 sm:block">
+              <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
                 <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
                 {mapInView ? (
                   <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
                 ) : (
                   // Same footprint as ResourceMapView's own embedded-mode
-                  // container (sm:h-[70vh] sm:min-h-[420px], rounded/ringed
+                  // container (desktop:h-[70vh] desktop:min-h-[420px], rounded/ringed
                   // the same way) so swapping in the real map once mapInView
                   // flips true doesn't shift anything below it.
                   <div className="h-[70vh] min-h-[420px] rounded-2xl bg-slate-100 ring-1 ring-slate-900/5" />
