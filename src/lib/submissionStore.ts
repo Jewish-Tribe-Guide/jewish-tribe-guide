@@ -318,10 +318,49 @@ export async function rejectSubmission(id: string): Promise<SubmissionRow> {
 // they already had, and cost nothing to preserve.
 const CHECKABLE_FIELDS: OwnableSyncField[] = OWNABLE_SYNC_FIELDS.filter((f) => f !== 'address')
 
+// Recursively sorts object keys before stringifying, so two structurally
+// identical values compare equal regardless of what order their keys happen
+// to be in — which otherwise isn't guaranteed to survive a round trip.
+// Concretely: `hours` is the one OWNABLE_SYNC_FIELDS value that's an object
+// rather than a string, and Postgres's jsonb storage does NOT preserve key
+// order (it canonicalizes on write). A submission's `details.hours` is built
+// client-side in DAY_KEYS' chronological order, but by the time
+// approveSubmission re-reads it back out of the `submission` table, jsonb
+// has already reordered its keys alphabetically — while `googleAutofill`'s
+// per-field snapshot (a pre-stringified JSON *string*, not jsonb) survives
+// that same round trip untouched. A plain JSON.stringify comparison between
+// the two would then see two different strings for the exact same hours,
+// and wrongly conclude the submitter's value "differs from Google's" —
+// silently denying sync ownership for something that was never actually
+// hand-edited. This is exactly what happened to a real listing (Cheezy
+// Vegan Cafe): its hours matched Google's at approval time, but still
+// landed as "hand-edited" in the Sync Coverage report.
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  const keys = Object.keys(value as Record<string, unknown>).sort()
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`
+}
+
 function normalizeForCompare(value: unknown): string {
   if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value).trim()
+  if (typeof value === 'object') return stableStringify(value)
+  const str = String(value).trim()
+  // A string holding JSON-encoded structured data — e.g. googleAutofill's
+  // `hours` snapshot, captured as JSON.stringify'd text specifically so it
+  // survives in a jsonb column as an opaque string rather than another
+  // object subject to the same reordering. Parse-then-stably-restringify it
+  // too, so it's compared on equal footing with an object-shaped `hours`
+  // value from the other side (see stableStringify's comment above).
+  if (str.startsWith('{') || str.startsWith('[')) {
+    try {
+      return stableStringify(JSON.parse(str))
+    } catch {
+      // Not actually JSON — an ordinary string that happens to start with
+      // '{' or '['. Fall through and compare it as plain text.
+    }
+  }
+  return str
 }
 
 function isEmptyValue(value: unknown): boolean {
