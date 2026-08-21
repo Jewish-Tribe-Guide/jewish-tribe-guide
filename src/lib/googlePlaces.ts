@@ -151,11 +151,17 @@ function significantWords(name: string): Set<string> {
   return new Set(name.toLowerCase().match(/[a-z0-9']{3,}/g) ?? [])
 }
 
-/** True if the two names share at least one non-trivial word. Used to tell
- *  "this placeId is genuinely for this business" from "this placeId is just
- *  the venue someone picked before renaming the listing" — see
- *  resolvePlaceIdOwnership in submissionStore.ts. */
+/** True if the two names share at least one non-trivial word — or are the
+ *  same name outright. The exact/substring check matters on its own: a name
+ *  made entirely of short words or initials ("P.S. & Co.") has no word 3+
+ *  letters long, so the word-overlap check alone can't even match it against
+ *  itself. Used to tell "this placeId is genuinely for this business" from
+ *  "this placeId is just the venue someone picked before renaming the
+ *  listing" — see resolvePlaceIdOwnership in submissionStore.ts. */
 export function namesOverlap(a: string, b: string): boolean {
+  const na = a.trim().toLowerCase()
+  const nb = b.trim().toLowerCase()
+  if (na && nb && (na === nb || na.includes(nb) || nb.includes(na))) return true
   const wordsA = significantWords(a)
   for (const w of significantWords(b)) if (wordsA.has(w)) return true
   return false

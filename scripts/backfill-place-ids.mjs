@@ -62,6 +62,9 @@ function significantWords(name) {
 // what catches "right address, wrong organization" (e.g. a mikvah's address
 // query returning the synagogue it's housed inside).
 function namesOverlap(a, b) {
+  const na = a.trim().toLowerCase()
+  const nb = b.trim().toLowerCase()
+  if (na && nb && (na === nb || na.includes(nb) || nb.includes(na))) return true
   const wordsA = significantWords(a)
   for (const w of significantWords(b)) if (wordsA.has(w)) return true
   return false
