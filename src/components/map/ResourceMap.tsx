@@ -6,6 +6,7 @@ import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLi
 import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
+import { glyphElementFor } from './mapPinIcons'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -213,14 +214,22 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
     document.head.appendChild(style)
   }
 
+  // Precedence: an uploaded category picture (glyphSrc) first — a category
+  // with an image set still carries its emoji as the CategoryIcon fallback
+  // everywhere else, but on the map itself there's room for only one. Then
+  // a hand-built flat-white line icon (see mapPinIcons.ts), which is what
+  // most real categories actually get — noticeably cleaner at pin scale
+  // than the plain emoji it replaces. Only a category with neither (a
+  // custom admin-created one with no icon set here yet) falls back to the
+  // plain emoji glyph.
+  const glyphIcon = p.glyphSrc ? undefined : glyphElementFor(p.filterId)
   const pin = new google.maps.marker.PinElement({
     background: p.color,
     borderColor: '#ffffff',
-    // glyphSrc (an uploaded category picture) wins over the plain emoji
-    // glyph when both would otherwise apply — a category with an image set
-    // still carries its emoji as the CategoryIcon fallback everywhere else,
-    // but on the map itself there's room for only one.
-    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : { glyph: p.glyph ?? null }),
+    ...(p.glyphSrc ? { glyphSrc: p.glyphSrc } : glyphIcon ? { glyph: glyphIcon } : { glyph: p.glyph ?? null }),
+    // Ignored once `glyph` is an Element (glyphIcon colors itself white
+    // directly) — still needed for the plain-emoji fallback path, where
+    // PinElement really does read it.
     glyphColor: '#ffffff',
     scale: isSelected ? 1.6 : 1,
   })
