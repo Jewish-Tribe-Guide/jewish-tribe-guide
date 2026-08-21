@@ -31,6 +31,20 @@ describe('MapPlaceDetail', () => {
     expect(link).toHaveAttribute('href', '/test-community/grocery/goldi-market-abc123')
   })
 
+  it('shows the same FreshnessFooter/Share bottom section the category directory\'s expanded card shows', () => {
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Share/ })).toBeInTheDocument()
+  })
+
   it('calls onBack when the back button is clicked', async () => {
     const onBack = vi.fn()
     const { default: userEvent } = await import('@testing-library/user-event')

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
+import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
 import TagsInput from './TagsInput'
 import ImageUploadField from '@/components/ImageUploadField'
@@ -167,6 +168,25 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         if (field.type === 'tags') {
           visibleDetails[field.key + '_sometimes'] = details[field.key + '_sometimes'] ?? []
         }
+      }
+    }
+
+    // Nothing to review if the edit doesn't actually propose any change —
+    // whether nothing was touched at all, or a field was edited and then
+    // edited right back to its original value. Skipped in the admin
+    // preview, which builds a resource locally rather than submitting a
+    // real edit for review. See hasListingChanged's own comment for why
+    // this can't be fooled by only filling in submitter name/email — those
+    // never enter `visibleDetails`/`payload` at all.
+    if (!onPreviewSubmit && mode === 'edit') {
+      const unchanged = !hasListingChanged(
+        existing,
+        { name, address: hasAddress ? address : '', phone: hasPhone ? phone : '', details: visibleDetails },
+        config.detailFields,
+      )
+      if (unchanged) {
+        setErrors(['You haven’t changed anything yet — edit a field before submitting.'])
+        return
       }
     }
 

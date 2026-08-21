@@ -47,7 +47,69 @@ function Section({
   )
 }
 
-function CheckAgainstGoogle({ token, resourceId }: { token: string; resourceId: string }) {
+// One field's "Resume syncing" action — only ever shown once a check has
+// already reported a match, but resumeSyncField re-verifies live anyway
+// (see its own comment), so a stale match by the time this is clicked just
+// comes back as `matches: false` and the row quietly stays protected.
+function ResumeSyncButton({
+  token,
+  resourceId,
+  field,
+  onResumed,
+}: {
+  token: string
+  resourceId: string
+  field: SyncCheckField['field']
+  onResumed: (field: SyncCheckField['field'], matched: boolean) => void
+}) {
+  const [resuming, setResuming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function resume() {
+    setResuming(true)
+    setError(null)
+    try {
+      const body = await fetchJson<{ result: SyncCheckField }>(
+        '/api/admin/sync-coverage/resume',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: resourceId, field }),
+        },
+        'Could not resume syncing this field.',
+      )
+      onResumed(field, body.result.matches)
+      if (!body.result.matches) setError('No longer matches Google — still protected.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not resume syncing this field.')
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      <button
+        onClick={resume}
+        disabled={resuming}
+        className="text-xs font-medium text-primary hover:underline disabled:opacity-60 cursor-pointer"
+      >
+        {resuming ? 'Resuming…' : 'Resume syncing'}
+      </button>
+      {error && <span className="text-xs text-red-700">{error}</span>}
+    </span>
+  )
+}
+
+function CheckAgainstGoogle({
+  token,
+  resourceId,
+  onFieldResumed,
+}: {
+  token: string
+  resourceId: string
+  onFieldResumed: (field: SyncCheckField['field']) => void
+}) {
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<SyncCheckField[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -80,6 +142,19 @@ function CheckAgainstGoogle({ token, resourceId }: { token: string; resourceId: 
           <p key={f.field} className={f.matches ? 'text-muted' : 'text-amber-700'}>
             <span className="font-medium">{f.label}:</span> Google says {f.google}
             {f.matches ? ' (matches)' : ' (different from ours)'}
+            {f.matches && (
+              <>
+                {' — '}
+                <ResumeSyncButton
+                  token={token}
+                  resourceId={resourceId}
+                  field={f.field}
+                  onResumed={(field, matched) => {
+                    if (matched) onFieldResumed(field)
+                  }}
+                />
+              </>
+            )}
           </p>
         ))}
       </div>
@@ -170,7 +245,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
                 </li>
               ))}
             </ul>
-            <CheckAgainstGoogle token={token} resourceId={l.id} />
+            <CheckAgainstGoogle token={token} resourceId={l.id} onFieldResumed={() => load()} />
           </div>
         ))}
       </Section>

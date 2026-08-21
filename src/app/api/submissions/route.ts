@@ -13,6 +13,7 @@ import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
 import { normalizeUrl } from '@/lib/validation'
+import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
 import { getDefaultCommunity } from '@/lib/communityStore'
@@ -94,16 +95,16 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: ['Missing listing details.'] }, { status: 400 })
   }
 
+  // Fetched once and reused below both for the per-category capability gate
+  // and (for an update) the "did this actually change anything" check —
+  // rather than hitting the resource table twice for the same row.
+  const existingResource = targetId ? await getResourceById(targetId) : null
+
   // Per-category gate: on top of the global `ui.contributions` check above, the
   // target category can independently turn add/edit/report off. Resolve the
   // category from the payload (create) or the existing listing (update/delete),
   // so a disabled per-category button can't be bypassed by posting directly.
-  const categoryId =
-    operation === 'create'
-      ? payload?.category
-      : targetId
-        ? (await getResourceById(targetId))?.category
-        : undefined
+  const categoryId = operation === 'create' ? payload?.category : existingResource?.category
   if (categoryId) {
     const cat = await getCategoryById((await getDefaultCommunity()).slug, categoryId)
     if (cat) {
@@ -135,6 +136,13 @@ export async function POST(request: Request) {
       }
     }
     const errors = validateSubmission(payload, category)
+    // The authoritative version of the same guard ListingForm.tsx already
+    // runs client-side — this one can't be bypassed by posting directly.
+    // Only for 'update': a 'create' has no `existingResource` to compare
+    // against (hasListingChanged treats that as always "a change" anyway).
+    if (operation === 'update' && !hasListingChanged(existingResource, payload, category?.detailFields ?? [])) {
+      errors.push('No changes were made to this listing — nothing to submit.')
+    }
     if (errors.length > 0) {
       return Response.json({ ok: false, errors }, { status: 400 })
     }
