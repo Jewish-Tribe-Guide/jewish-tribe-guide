@@ -349,4 +349,12 @@ describe('namesOverlap', () => {
   it('is case-insensitive', () => {
     expect(namesOverlap('CITIZENS BANK PARK', 'citizens bank park team store')).toBe(true)
   })
+
+  it('matches an exact name made entirely of short words/initials — no 3+ letter word to compare, but it is the same name', () => {
+    expect(namesOverlap('P.S. & Co.', 'P.S. & Co.')).toBe(true)
+  })
+
+  it('matches when one short name is a substring of the other', () => {
+    expect(namesOverlap('P.S. & Co.', 'P.S. & Co. Deli')).toBe(true)
+  })
 })

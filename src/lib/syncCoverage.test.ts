@@ -84,7 +84,20 @@ describe('getSyncCoverage', () => {
     )
 
     const coverage = await getSyncCoverage()
-    expect(coverage.neverSynced).toEqual([{ id: 'r1', name: 'Kosher Bite', category: 'restaurant', categoryLabel: 'Restaurants' }])
+    expect(coverage.neverSynced).toEqual([
+      {
+        id: 'r1',
+        name: 'Kosher Bite',
+        category: 'restaurant',
+        categoryLabel: 'Restaurants',
+        fields: [
+          { field: 'name', label: 'Name', ourValue: 'Kosher Bite' },
+          { field: 'hours', label: 'Hours', ourValue: '—' },
+          { field: 'phone', label: 'Phone', ourValue: '215-555-0000' },
+          { field: 'website', label: 'Website', ourValue: '—' },
+        ],
+      },
+    ])
     expect(coverage.protectedFields).toEqual([])
     expect(coverage.failing).toEqual([])
   })

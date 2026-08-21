@@ -43,9 +43,10 @@ export type SyncCoverageListing = {
   categoryLabel: string
 }
 
-export type ProtectedFieldReport = SyncCoverageListing & {
-  fields: { field: OwnableSyncField; label: string; ourValue: string }[]
-}
+export type FieldValue = { field: OwnableSyncField; label: string; ourValue: string }
+
+export type NeverSyncedReport = SyncCoverageListing & { fields: FieldValue[] }
+export type ProtectedFieldReport = SyncCoverageListing & { fields: FieldValue[] }
 
 export type FailingSyncReport = SyncCoverageListing & {
   lastSyncError: string
@@ -53,7 +54,7 @@ export type FailingSyncReport = SyncCoverageListing & {
 }
 
 export type SyncCoverage = {
-  neverSynced: SyncCoverageListing[]
+  neverSynced: NeverSyncedReport[]
   protectedFields: ProtectedFieldReport[]
   failing: FailingSyncReport[]
 }
@@ -108,6 +109,19 @@ function protectedFieldsFor(row: SyncRow, category: CategoryConfig): OwnableSync
   )
 }
 
+// Every field this category actually has, with its current value — no
+// ownership concept to filter by here, since a listing with no placeId was
+// never compared against anything. Used for the "Never synced" report so an
+// admin can review what's actually on file without opening each listing.
+function allFieldsFor(row: SyncRow, category: CategoryConfig): FieldValue[] {
+  const websiteKey = websiteFieldKey(category)
+  return REPORTABLE_FIELDS.filter((f) => categoryHasField(f, category, websiteKey)).map((f) => ({
+    field: f,
+    label: FIELD_LABELS[f],
+    ourValue: displayValue(f, row, websiteKey),
+  }))
+}
+
 export async function getSyncCoverage(): Promise<SyncCoverage> {
   const community = (await getDefaultCommunity()).slug
   const [categories, { data, error }] = await Promise.all([
@@ -123,7 +137,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
   const categoryById = new Map(categories.map((c) => [c.id, c]))
   const rows = (data ?? []) as SyncRow[]
 
-  const neverSynced: SyncCoverageListing[] = []
+  const neverSynced: NeverSyncedReport[] = []
   const protectedFields: ProtectedFieldReport[] = []
   const failing: FailingSyncReport[] = []
 
@@ -140,7 +154,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
 
     const placeId = row.details?.placeId
     if (typeof placeId !== 'string' || !placeId) {
-      neverSynced.push(listing)
+      neverSynced.push({ ...listing, fields: allFieldsFor(row, category) })
       continue
     }
 
