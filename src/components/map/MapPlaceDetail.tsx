@@ -4,6 +4,8 @@ import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
+import FreshnessFooter from '@/components/resources/FreshnessFooter'
+import ShareButton from '@/components/resources/ShareButton'
 import PinButton from '@/components/resources/PinButton'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ChevronLeftIcon } from '@/components/icons'
@@ -25,11 +27,13 @@ type Props = {
  * directory. Renders the same `PlaceDetailBody` the category directory's
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
- * such filters of its own), plus its own header and back button. Doesn't
- * show Share/Edit/Report/upvote, which stay a tap away in the full listing.
- * The name itself links to the listing's own canonical page (same URL
- * ShareButton copies elsewhere) — the map's escape hatch to Edit/Report/
- * upvote/Share without duplicating all of those actions here.
+ * such filters of its own), plus its own header, back button, and the same
+ * FreshnessFooter/ShareButton bottom section GenericListingCard shows once
+ * expanded — so a place reads the same whether you found it here or in the
+ * category directory. Still doesn't show Edit/Report/upvote inline: those
+ * open a form the map page has no modal plumbing for, so they stay a tap
+ * away via the name link to the listing's own canonical page instead of
+ * duplicating that flow here.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
   const community = useCommunitySlug()
@@ -112,6 +116,11 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
       </div>
 
       <PlaceDetailBody item={item} category={category} />
+
+      <div className="pt-2 border-t border-slate-200 space-y-2">
+        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+        <ShareButton path={listingPath} title={item.name} />
+      </div>
     </div>
   )
 }
