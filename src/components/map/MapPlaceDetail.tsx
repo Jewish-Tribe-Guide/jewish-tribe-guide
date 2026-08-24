@@ -1,14 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
-import { PHOTO_FIELD_KEY, type CategoryConfig } from '@/lib/categories'
+import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ShareButton from '@/components/resources/ShareButton'
 import PinButton from '@/components/resources/PinButton'
+import ListingForm from '@/components/resources/ListingForm'
+import ReportListing from '@/components/resources/ReportListing'
 import CategoryIcon from '@/components/CategoryIcon'
-import { ChevronLeftIcon } from '@/components/icons'
+import { ChevronLeftIcon, PencilIcon, FlagIcon } from '@/components/icons'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
@@ -29,12 +32,12 @@ type Props = {
  * expanded listing card does (hours, tags, badges, davening times, freeform
  * fields, caveat notes), read-only (no filter callbacks — the map has no
  * such filters of its own), plus its own header, back button, and the same
- * FreshnessFooter/ShareButton bottom section GenericListingCard shows once
- * expanded — so a place reads the same whether you found it here or in the
- * category directory. Still doesn't show Edit/Report/upvote inline: those
- * open a form the map page has no modal plumbing for, so they stay a tap
- * away via the name link to the listing's own canonical page instead of
- * duplicating that flow here.
+ * FreshnessFooter/Share/Edit/Report bottom section GenericListingCard shows
+ * once expanded — so a place reads (and can be corrected) the same whether
+ * you found it here or in the category directory. Still doesn't show
+ * upvote inline: that's a directory-list affordance (ranking search
+ * results against each other), which doesn't mean anything for a single
+ * place already selected on the map.
  */
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
   const community = useCommunitySlug()
@@ -43,6 +46,26 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
       : category.iconImageUrl) ?? undefined
+  // Edit/Report swap this whole detail view for the same forms the category
+  // directory uses (ListingForm/ReportListing), same as GenericListingCard —
+  // just scoped to this one component instead of the whole screen, since the
+  // map has no separate "form view" of its own to navigate to. Returns to
+  // this same place's detail (not the list) on cancel or submit, since
+  // that's what was on screen before Edit/Report was tapped.
+  const [action, setAction] = useState<'edit' | 'report' | null>(null)
+  const caps = resolveCapabilities(category.capabilities)
+  const canEdit = ui.contributions.edit && caps.edit
+  const canReport = ui.contributions.report && caps.report
+
+  if (action === 'edit') {
+    return <ListingForm category={category} mode="edit" existing={item} onUp={() => setAction(null)} onSubmitted={() => setAction(null)} />
+  }
+  if (action === 'report') {
+    return (
+      <ReportListing listing={item} upLabel={category.pluralLabel} onUp={() => setAction(null)} onSubmitted={() => setAction(null)} />
+    )
+  }
+
   return (
     <div className="space-y-4 pb-2">
       <button
@@ -121,7 +144,25 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-        <ShareButton path={listingPath} title={item.name} />
+        <div className="flex gap-3">
+          <ShareButton path={listingPath} title={item.name} />
+          {canEdit && (
+            <button
+              onClick={() => setAction('edit')}
+              className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"
+            >
+              <PencilIcon className="h-3.5 w-3.5" /> Edit
+            </button>
+          )}
+          {canReport && (
+            <button
+              onClick={() => setAction('report')}
+              className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"
+            >
+              <FlagIcon className="h-3.5 w-3.5" /> Report
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
