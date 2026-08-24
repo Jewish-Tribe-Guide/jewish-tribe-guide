@@ -313,6 +313,26 @@ function panToVisibleCenter(
   map.panTo(shiftedLatLng ?? point)
 }
 
+// Shifts the map's center by a pixel offset with NO animation — same
+// projection math `panToVisibleCenter` uses, but `setCenter` instead of
+// `panTo`. Used for the sub-pixel-perfect "nudge" a selection does right
+// after its own real (animated) pan/fitBounds already landed roughly in
+// place: that nudge is a small correction, not a second destination, and
+// animating it too reads as the map moving twice for one tap instead of
+// settling once — see the selection-highlight effect's own comment.
+function panByInstant(map: google.maps.Map, deltaY: number) {
+  const projection = map.getProjection()
+  const center = map.getCenter()
+  const zoom = map.getZoom()
+  if (!projection || !center || zoom == null) return
+  const worldPoint = projection.fromLatLngToPoint(center)
+  if (!worldPoint) return
+  const scale = 2 ** zoom
+  const shifted = new google.maps.Point(worldPoint.x, worldPoint.y + deltaY / scale)
+  const shiftedLatLng = projection.fromPointToLatLng(shifted)
+  if (shiftedLatLng) map.setCenter(shiftedLatLng)
+}
+
 // The "you are here" dot: a solid blue marker with a white ring and an
 // expanding pulse so it's unmistakable against the category pins. Keyframes are
 // injected once, app-wide.
@@ -704,6 +724,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           // rest of the way so the pin graphic — what a person actually
           // looks at — lands centered in the visible strip, not just its
           // invisible anchor point.
+          //
+          // Instant (panByInstant), not animated: the fitBounds/pan above
+          // already did the one real, visible "move to this place" motion —
+          // this is a few-pixel correction on top of where that already
+          // landed, not a second destination. Animating it too used to make
+          // every single selection visibly move the map twice (three times
+          // when the zoom-floor branch below also fires), which reads as
+          // the map hunting for its spot rather than settling once.
           const nudgeMarkerIntoView = () => {
             const markerEl = current.marker as unknown as HTMLElement
             const mapEl = containerRef.current
@@ -713,7 +741,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
             const targetCenterY = mapRect.top + obscuredTop + (mapRect.height - obscured - obscuredTop) / 2
             const actualCenterY = markerRect.top + markerRect.height / 2
             const deltaY = actualCenterY - targetCenterY
-            if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
+            if (Math.abs(deltaY) > 2) panByInstant(map, deltaY)
           }
           if (userLocationRef.current) {
             const bounds = new google.maps.LatLngBounds()
