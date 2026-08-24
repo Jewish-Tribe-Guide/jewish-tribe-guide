@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRef } from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import type { MapPoint } from './ResourceMap'
@@ -114,6 +114,39 @@ describe('MobileNearbySheet', () => {
 
     expect(screen.queryByText('detail for Goldi Market')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /select Goldi Market/ })).toBeInTheDocument()
+  })
+
+  it('does not commit a snap-point change when a drag is cancelled (e.g. an edge-swipe taken over for back-navigation) instead of released', () => {
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const content = container.querySelector('.overscroll-contain')!
+
+    // A real release with this much vertical movement WOULD change the snap
+    // point (see the sibling "release" test below) — this is the same drag,
+    // interrupted by a cancel instead of a pointerup. Before the fix,
+    // onPointerCancel was wired to the exact same handler as onPointerUp, so
+    // the interrupted drag still got resolved into a snap change here —
+    // which is what made a swiped-away edit sheet land at a different
+    // height than a plain "Back to list" tap leaves it at.
+    fireEvent.pointerDown(content, { clientY: 400 })
+    fireEvent.pointerMove(content, { clientY: 100 })
+    fireEvent.pointerCancel(content)
+
+    expect(screen.getByRole('button', { name: 'Expand nearby list' })).toBeInTheDocument()
+  })
+
+  it('for comparison: the same drag, released instead of cancelled, does commit a snap-point change', () => {
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const content = container.querySelector('.overscroll-contain')!
+
+    fireEvent.pointerDown(content, { clientY: 400 })
+    fireEvent.pointerMove(content, { clientY: 100 })
+    fireEvent.pointerUp(content)
+
+    expect(screen.getByRole('button', { name: 'Drag to resize nearby list' })).toBeInTheDocument()
   })
 
   it('closes via history.back(), not a direct state reset, when "Back to list" is tapped', async () => {

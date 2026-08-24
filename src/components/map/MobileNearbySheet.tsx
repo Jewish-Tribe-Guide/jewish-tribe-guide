@@ -264,6 +264,21 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setDragHeight(null)
   }
 
+  // A cancel is not a completed gesture — the browser is saying it took the
+  // touch over for something else (most commonly: recognizing an edge swipe
+  // as its own back-navigation, mid-drag). Committing it the same way a real
+  // release commits — cycling the snap point on what onPointerUp would read
+  // as "just a tap", or resolving a partial vertical wobble into a snap
+  // change — is what used to make swiping back visibly jump the sheet to
+  // a different height than a plain "Back to list" tap leaves it at, even
+  // though both end up clearing the same selection afterward. Just drop the
+  // drag instead: `snap` (and so the sheet's rendered height) never changed,
+  // so leaving dragHeight null lands it back exactly where it started.
+  function onPointerCancel() {
+    dragRef.current = null
+    setDragHeight(null)
+  }
+
   /** Google Maps' bottom sheet swallows all vertical drags until it's fully
    *  expanded — dragging over the list just grows the sheet instead of
    *  scrolling it. Only once full does the list scroll normally, and even
@@ -311,6 +326,17 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setDragHeight(null)
   }
 
+  // Same reasoning as the drag-handle's own onPointerCancel: a cancel means
+  // the browser took the touch over mid-gesture (an edge swipe recognized as
+  // back-navigation is the common case here, since this content area spans
+  // right up to the screen edge) — drop the drag without resolving it into a
+  // snap change, so the sheet's height is untouched by a gesture that never
+  // actually completed as a resize.
+  function onContentPointerCancel() {
+    contentDragRef.current = null
+    setDragHeight(null)
+  }
+
   const selectedCategory = selected ? categories.find((c) => c.id === selected.filterId) : undefined
 
   return (
@@ -325,7 +351,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={onPointerCancel}
         className="flex shrink-0 touch-none cursor-grab flex-col items-center gap-1.5 py-2.5 active:cursor-grabbing"
         role="button"
         aria-label={snap === 'peek' ? 'Expand nearby list' : 'Drag to resize nearby list'}
@@ -342,7 +368,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerDown={onContentPointerDown}
         onPointerMove={onContentPointerMove}
         onPointerUp={onContentPointerUp}
-        onPointerCancel={onContentPointerUp}
+        onPointerCancel={onContentPointerCancel}
         style={{ touchAction: snap === 'full' ? 'pan-y' : 'none' }}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       >
