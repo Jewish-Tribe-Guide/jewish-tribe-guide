@@ -39,8 +39,10 @@ type Props = {
   containerHeight: number
   /** Reports the currently-selected place (or null) upward — ResourceMapView
    *  forwards this to ResourceMap so it can highlight the matching marker,
-   *  making it clear which listing on the map the sheet is showing. */
-  onSelectionChange?: (point: Point | null) => void
+   *  making it clear which listing on the map the sheet is showing. `frame`
+   *  says whether this selection should also reframe the map's camera (a
+   *  list row tap) or leave it where it was (a pin tapped on the map). */
+  onSelectionChange?: (point: Point | null, frame?: boolean) => void
   /** Reports the sheet's current (target, not mid-drag) px height upward —
    *  ResourceMapView forwards this to ResourceMap so it can center a newly
    *  selected pin within the visible strip of map ABOVE the sheet, instead of
@@ -52,8 +54,9 @@ export type MobileNearbySheetHandle = {
   /** Selects a place, raising the sheet to 'half' only if it's currently
    *  collapsed — called when a marker is tapped directly on the map, so a
    *  pin tap and a list-row tap land in the same spot (see ResourceMapView's
-   *  onSelectPoint wiring to ResourceMap). */
-  selectPoint: (point: Point) => void
+   *  onSelectPoint wiring to ResourceMap). `frame` defaults to true; pass
+   *  false for a pin tapped on the map, so the camera stays put. */
+  selectPoint: (point: Point, frame?: boolean) => void
   /** Clears the selected place without touching the snap point — called when
    *  a second tap lands on the pin that's already selected, so the sheet
    *  falls back to the nearby list at whatever height it was already at
@@ -108,8 +111,12 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // render that happens to pass a new inline function identity.
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange }, [onSelectionChange])
+  // Set synchronously by selectPlace, just before setSelected — by the time
+  // this effect runs (after the resulting commit), it already holds the
+  // frame decision for whichever selection just landed.
+  const selectedFrameRef = useRef(true)
   useEffect(() => {
-    onSelectionChangeRef.current?.(selected)
+    onSelectionChangeRef.current?.(selected, selectedFrameRef.current)
   }, [selected])
 
   const heights: Record<Snap, number> = {
@@ -139,7 +146,8 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, containerHeight])
 
-  function selectPlace(point: Point) {
+  function selectPlace(point: Point, frame = true) {
+    selectedFrameRef.current = frame
     setSelected(point)
     // Only raise a collapsed sheet — if it's already half or full (the
     // visitor deliberately expanded it, e.g. browsing the full list), picking

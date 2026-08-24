@@ -99,6 +99,15 @@ type Props = {
    *  marker gets drawn larger so it's clear which listing the sheet is
    *  showing (see the selection-highlight effect below). */
   selectedId?: string
+  /** Bumped by the parent only when the current `selectedId` change should
+   *  reframe the map (fit user location + the selected pin in view) — a
+   *  listing picked from the bottom sheet/sidebar list bumps it, a pin
+   *  tapped directly on the map does not, so tapping a pin just highlights
+   *  it without moving the camera the visitor already positioned themselves.
+   *  Compared against the previously-consumed value, not just truthiness, so
+   *  a legitimate reframe request isn't dropped when it happens to repeat
+   *  the same number. */
+  frameToken?: number
   /** Current px height of the mobile nearby sheet covering the bottom of the
    *  map, if any — a newly-selected pin centers within the remaining visible
    *  strip above it instead of the whole container's center (which the sheet
@@ -330,7 +339,7 @@ function buildUserDot(): HTMLElement {
 /** The interactive Google map: one advanced marker per point, a distinct "you
  *  are here" marker for the visitor, an info window on click, and a viewport
  *  auto-fit to whatever points are currently shown. */
-export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles }: Props) {
+export default function ResourceMap({ points, userLocation, directionsOrigin, follow = true, onResumeFollow, onManualDrag, fallbackCenter = DEFAULT_CENTER, onViewListing, onSelectPoint, onDeselectPoint, onBackgroundClick, onMapLongPress, onLongPressPoint, searchActive, selectedId, frameToken, obscuredBottomPx = 0, obscuredTopPx = 0, zoomRadiusMiles }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([])
@@ -631,6 +640,12 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // swaps just the two markers involved (old selection back to normal, new
   // one enlarged) instead of rebuilding the whole marker set on every tap.
   const prevSelectedIdRef = useRef<string | undefined>(undefined)
+  // Tracks the last frameToken this effect actually acted on, so a
+  // selection change only reframes the camera when the parent bumped
+  // frameToken alongside it (a list/sidebar pick) — not when it left it
+  // untouched (a pin tapped directly on the map, which should just
+  // highlight in place without moving the view the visitor already set).
+  const consumedFrameTokenRef = useRef(frameToken)
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
@@ -643,51 +658,80 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)
-        const obscured = obscuredBottomPxRef.current
-        const obscuredTop = obscuredTopPxRef.current
-        // Frame the selected place alongside the visitor's own location, same
-        // as a search result — so picking a listing from the sheet (or a pin
-        // that wasn't already selected) shows how far it is from "you are
-        // here" instead of just centering on the pin alone. The mobile sheet
-        // covers the bottom of the map (and the floating search bar/category
-        // chips cover the top), so both are reserved as extra padding —
-        // otherwise "centered" bounds would land the pin behind (or right at
-        // the edge of) one of them instead of the visible strip between.
-        if (userLocationRef.current) {
-          const bounds = new google.maps.LatLngBounds()
-          bounds.extend(userLocationRef.current)
-          bounds.extend({ lat: current.point.lat, lng: current.point.lng })
-          map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
-        } else {
-          // No location set to frame alongside it — just center the pin
-          // itself, but still account for the sheet and the top overlay:
-          // instead of the whole container's center (which they mostly
-          // cover), aim for the middle of the strip still visible between them.
-          panToVisibleCenter(map, current.point, obscured, obscuredTop)
+        const shouldFrame = frameToken !== consumedFrameTokenRef.current
+        consumedFrameTokenRef.current = frameToken
+        if (shouldFrame) {
+          // obscuredBottomPx/obscuredTopPx come from three independent
+          // ResizeObservers (the map box, the top search/filter overlay, and
+          // the sheet height derived from the map box) that don't all settle
+          // in the same tick — most visibly right after a phone rotates,
+          // where the container briefly reports the OLD (portrait) height
+          // while these still hold values sized for it. Left unclamped, that
+          // stale padding can exceed the map's actual current height, and
+          // fitBounds has no visible room left to fit into — it zooms out as
+          // far as it can instead. Capping combined padding to a fraction of
+          // the container's real, live-measured height (not the refs' last
+          // reported one) keeps a reframe from ever zooming out further than
+          // the geometry can actually justify, no matter how stale the
+          // padding inputs are.
+          const liveContainerHeight = containerRef.current?.getBoundingClientRect().height ?? 0
+          const rawBottom = obscuredBottomPxRef.current
+          const rawTop = obscuredTopPxRef.current
+          let obscured = rawBottom
+          let obscuredTop = rawTop
+          const rawTotal = rawBottom + rawTop
+          const maxTotal = liveContainerHeight * 0.7
+          if (liveContainerHeight > 0 && rawTotal > maxTotal) {
+            const scale = maxTotal / rawTotal
+            obscured = rawBottom * scale
+            obscuredTop = rawTop * scale
+          }
+          // Frame the selected place alongside the visitor's own location,
+          // same as a search result — so picking a listing from the sheet
+          // (or the sidebar list) shows how far it is from "you are here"
+          // instead of just centering on the pin alone. The mobile sheet
+          // covers the bottom of the map (and the floating search bar/
+          // category chips cover the top), so both are reserved as extra
+          // padding — otherwise "centered" bounds would land the pin behind
+          // (or right at the edge of) one of them instead of the visible
+          // strip between.
+          if (userLocationRef.current) {
+            const bounds = new google.maps.LatLngBounds()
+            bounds.extend(userLocationRef.current)
+            bounds.extend({ lat: current.point.lat, lng: current.point.lng })
+            map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
+          } else {
+            // No location set to frame alongside it — just center the pin
+            // itself, but still account for the sheet and the top overlay:
+            // instead of the whole container's center (which they mostly
+            // cover), aim for the middle of the strip still visible between them.
+            panToVisibleCenter(map, current.point, obscured, obscuredTop)
+          }
+          // The above gets the map roughly right, but a pin's geographic
+          // anchor is its bottom TIP, not its visual middle — the balloon
+          // shape (plus the selected halo) extends well above that point, so
+          // centering the anchor alone leaves the pin itself looking
+          // noticeably too high. Once the pan/zoom actually settles, measure
+          // where the marker's own DOM element really rendered and nudge the
+          // rest of the way so the pin graphic — what a person actually
+          // looks at — lands centered in the visible strip, not just its
+          // invisible anchor point.
+          google.maps.event.addListenerOnce(map, 'idle', () => {
+            const markerEl = current.marker as unknown as HTMLElement
+            const mapEl = containerRef.current
+            if (!markerEl?.getBoundingClientRect || !mapEl) return
+            const markerRect = markerEl.getBoundingClientRect()
+            const mapRect = mapEl.getBoundingClientRect()
+            const targetCenterY = mapRect.top + obscuredTop + (mapRect.height - obscured - obscuredTop) / 2
+            const actualCenterY = markerRect.top + markerRect.height / 2
+            const deltaY = actualCenterY - targetCenterY
+            if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
+          })
         }
-        // The above gets the map roughly right, but a pin's geographic anchor
-        // is its bottom TIP, not its visual middle — the balloon shape (plus
-        // the selected halo) extends well above that point, so centering the
-        // anchor alone leaves the pin itself looking noticeably too high.
-        // Once the pan/zoom actually settles, measure where the marker's own
-        // DOM element really rendered and nudge the rest of the way so the
-        // pin graphic — what a person actually looks at — lands centered in
-        // the visible strip, not just its invisible anchor point.
-        google.maps.event.addListenerOnce(map, 'idle', () => {
-          const markerEl = current.marker as unknown as HTMLElement
-          const mapEl = containerRef.current
-          if (!markerEl?.getBoundingClientRect || !mapEl) return
-          const markerRect = markerEl.getBoundingClientRect()
-          const mapRect = mapEl.getBoundingClientRect()
-          const targetCenterY = mapRect.top + obscuredTop + (mapRect.height - obscured - obscuredTop) / 2
-          const actualCenterY = markerRect.top + markerRect.height / 2
-          const deltaY = actualCenterY - targetCenterY
-          if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
-        })
       }
     }
     prevSelectedIdRef.current = selectedId
-  }, [selectedId, ready])
+  }, [selectedId, ready, frameToken])
 
   // ── The visitor's "you are here" marker, centered on when set ─────────────
   useEffect(() => {
