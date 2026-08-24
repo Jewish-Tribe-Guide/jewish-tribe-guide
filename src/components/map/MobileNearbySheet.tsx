@@ -146,8 +146,27 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap, containerHeight])
 
+  // Selecting a place gets its own history entry, so a swipe-back/browser-
+  // back gesture returns to the list instead of leaving the map screen
+  // entirely — same pattern the admin category editor's preview mode uses
+  // (see CategoryEditor's openPreview/closePreview). Only pushed on the
+  // null → selected transition: tapping a DIFFERENT place while one's
+  // already open swaps it in place, it doesn't stack a second entry —
+  // "back" means "back to the list", one step, not "back through every
+  // place visited". MapPlaceDetail's own Edit/Report forms push a second,
+  // nested entry the same way, so a swipe back from there lands on this
+  // place's detail, not the list.
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      if (!(e.state as { mapSheetOpen?: boolean } | null)?.mapSheetOpen) setSelected(null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   function selectPlace(point: Point, frame = true) {
     selectedFrameRef.current = frame
+    if (selected === null) history.pushState({ ...(window.history.state ?? {}), mapSheetOpen: true }, '')
     setSelected(point)
     // Only raise a collapsed sheet — if it's already half or full (the
     // visitor deliberately expanded it, e.g. browsing the full list), picking
@@ -155,12 +174,22 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
+  // Leaving the selected-place state undoes the history entry selectPlace
+  // pushed instead of clearing `selected` directly — history.back() is what
+  // fires the popstate listener above, which is the one place that actually
+  // clears it, so a real swipe-back and tapping "Back to list" go through
+  // the exact same path and can't drift apart from each other.
+  function clearSelection() {
+    if ((window.history.state as { mapSheetOpen?: boolean } | null)?.mapSheetOpen) history.back()
+    else setSelected(null)
+  }
+
   function deselectPoint() {
-    setSelected(null)
+    clearSelection()
   }
 
   function collapse() {
-    setSelected(null)
+    clearSelection()
     setSnap('peek')
   }
 
@@ -172,7 +201,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     // Clears any previously-selected place — a new search that resolves to
     // several results should show that list, not leave an old place's card
     // sitting on screen from before this search started.
-    setSelected(null)
+    clearSelection()
     setSnap((prev) => (prev === 'peek' ? 'half' : prev))
   }
 
@@ -322,7 +351,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
             item={selected.raw}
             category={selectedCategory}
             color={selected.color}
-            onBack={() => setSelected(null)}
+            onBack={clearSelection}
           />
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />
