@@ -743,23 +743,32 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
             const deltaY = actualCenterY - targetCenterY
             if (Math.abs(deltaY) > 2) panByInstant(map, deltaY)
           }
-          if (userLocationRef.current) {
+          // Fitting the visitor's own location alongside the pin only pays
+          // off when the two are close enough to both land somewhere
+          // readable on one small screen — otherwise the bounds between them
+          // is mostly just the geography in between (a highway corridor, a
+          // river crossing, open county) with neither place actually
+          // legible, and on top of that fitBounds may compute too low a
+          // zoom to be useful at all (see the zoom-floor correction below,
+          // which this sidesteps entirely for a far pick — one motion,
+          // never two, and never a frame centered on nothing in particular).
+          // Reuses the admin's own "how far still counts as nearby" radius
+          // (site_settings.map_zoom_radius_miles) rather than a separate
+          // threshold, falling back to a flat 15mi where that's unset.
+          const maxFitBothMiles = zoomRadiusMilesRef.current ?? 15
+          const isFar =
+            userLocationRef.current && haversineMiles(userLocationRef.current, current.point) > maxFitBothMiles
+          if (userLocationRef.current && !isFar) {
             const bounds = new google.maps.LatLngBounds()
             bounds.extend(userLocationRef.current)
             bounds.extend({ lat: current.point.lat, lng: current.point.lng })
             map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
             google.maps.event.addListenerOnce(map, 'idle', () => {
-              // fitBounds picks the lowest zoom that fits both padded edges
-              // into whatever height is left — on a short mobile-landscape
-              // viewport (search bar + chips on top, the sheet on the
-              // bottom, leaving very little of an already-short screen),
-              // that can be a far lower zoom than the actual distance
-              // between the two points would ever need on a normal screen —
-              // a 10-mile trip zooming out to a three-state view. Below this
-              // floor the framing stops being useful, so give up on fitting
-              // the user's own location in and just re-center on the
-              // selected pin at a sane minimum zoom instead — same floor
-              // the "follow my location" effect below uses.
+              // Safety net for the rare case even a within-range pair still
+              // resolves too low a zoom (a short mobile-landscape viewport
+              // leaves very little padded room to fit into — see the
+              // padding-clamp above) — same floor the "follow my location"
+              // effect below uses.
               if ((map.getZoom() ?? 0) < 13) {
                 panToVisibleCenter(map, current.point, obscured, obscuredTop)
                 map.setZoom(14)
@@ -769,11 +778,19 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
               nudgeMarkerIntoView()
             })
           } else {
-            // No location set to frame alongside it — just center the pin
-            // itself, but still account for the sheet and the top overlay:
-            // instead of the whole container's center (which they mostly
-            // cover), aim for the middle of the strip still visible between them.
+            // Either no location set, or the pick is far enough that fitting
+            // both wouldn't be useful — just center the pin itself, but
+            // still account for the sheet and the top overlay: instead of
+            // the whole container's center (which they mostly cover), aim
+            // for the middle of the strip still visible between them.
             panToVisibleCenter(map, current.point, obscured, obscuredTop)
+            // A far pick needs a real zoom-in (it's arriving from whatever
+            // the map happened to be showing before, which could be
+            // anything) — same single-point convention used elsewhere in
+            // this file. No location set at all is different: nothing about
+            // this selection implies the visitor's chosen zoom is wrong, so
+            // that case leaves it alone rather than forcing one.
+            if (isFar) map.setZoom(15)
             google.maps.event.addListenerOnce(map, 'idle', nudgeMarkerIntoView)
           }
         }
