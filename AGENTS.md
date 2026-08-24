@@ -76,3 +76,15 @@ These were all real gaps at one point and are named in old commit history / memo
 - **Form submission end-to-end** — closed by `e2e-form/` (`npm run test:form-roundtrip`): fills in and submits a real intake wizard against the test project.
 
 **If you close a gap like this, update this section in the same commit** — this file is read as authoritative instructions, so a stale "still missing" claim here is actively worse than no claim at all.
+
+# Sentry
+
+```bash
+npm run sentry:check   # read-only — lists unresolved production errors
+```
+
+**Run `npm run sentry:check` before calling a change done, same as the test suites above.** Investigate and fix what turns up alongside whatever you're already touching, rather than leaving it for later — that's how this turns into tech debt. If a listed error is ambiguous (needs a product decision, or you can't reproduce it), say so explicitly and describe it instead of guessing at a fix.
+
+Needs `SENTRY_API_TOKEN` in `.env.local` — a separate, read-only personal auth token (org:read, project:read, event:read; see `.env.example`), distinct from `SENTRY_AUTH_TOKEN` which is build-only and can't read issues. Without it the script just skips itself, so it's safe to run unconditionally.
+
+Sentry only reports from the real Vercel production deployment (`VERCEL_ENV === 'production'`) — `npm run dev`, a local `npm run build && npm run start`, and every suite above run against the exact same DSN in `.env.local` but never report anything, so an unresolved issue here is a real visitor, not local noise. If that ever stops being true — a "ReferenceError: X is not defined" for an `X` that plainly exists in current source, or an event tagged `environment: development` or a `localhost` URL — the gate in `src/instrumentation.ts`/`src/instrumentation-client.ts` regressed; fix that before chasing the phantom bug.
