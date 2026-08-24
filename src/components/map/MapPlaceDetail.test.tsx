@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -21,15 +21,25 @@ vi.mock('next/navigation', () => ({
 // one with the right listing, not to re-exercise their internals (which
 // pull in the real Google Maps address widget, Turnstile, etc.).
 vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode, existing }: { mode: string; existing?: DirectoryResource }) => (
-    <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
+  default: ({ mode, existing, onUp }: { mode: string; existing?: DirectoryResource; onUp: () => void }) => (
+    <div>
+      <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
+      <button onClick={onUp}>stub cancel</button>
+    </div>
   ),
 }))
 vi.mock('@/components/resources/ReportListing', () => ({
   default: ({ listing }: { listing: DirectoryResource }) => <p>ReportListing stub — {listing.name}</p>,
 }))
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  // The push/pop history tests leave real entries behind (jsdom's History
+  // is a live, module-level object, not reset between tests) — back to a
+  // clean slate so one test's pushState can't leak into the next one's
+  // "was anything pushed" assertions.
+  window.history.replaceState(null, '')
+})
 
 describe('MapPlaceDetail', () => {
   it('links the name to the listing\'s own canonical category-page URL', () => {
@@ -125,6 +135,70 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('button', { name: /Report/ })).not.toBeInTheDocument()
     // Share stays available regardless — it isn't a contribution capability.
     expect(screen.getByRole('button', { name: /Share/ })).toBeInTheDocument()
+  })
+
+  it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+
+    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'edit' }), '')
+  })
+
+  it('returns to the place detail (not the list, not off the map) when a swipe-back fires while the edit form is open', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+    expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
+
+    // Simulates what a real swipe-back/browser-back delivers: a popstate
+    // whose state no longer carries mapSheetForm, because history.back()
+    // popped past the entry openAction pushed.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+    })
+
+    expect(screen.queryByText(/ListingForm stub/)).not.toBeInTheDocument()
+    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+  })
+
+  it('closes the edit form via history.back(), not a direct state reset, so cancelling and swiping back behave identically', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'stub cancel' }))
+
+    expect(backSpy).toHaveBeenCalled()
+    // Mocked no-op above, so no popstate actually fired — the form staying
+    // put confirms the component didn't ALSO reset its own state directly,
+    // only delegated to the browser.
+    expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
   })
 
   it('calls onBack when the back button is clicked', async () => {

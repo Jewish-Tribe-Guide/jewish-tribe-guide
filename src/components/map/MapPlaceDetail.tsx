@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
@@ -52,17 +52,37 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   // map has no separate "form view" of its own to navigate to. Returns to
   // this same place's detail (not the list) on cancel or submit, since
   // that's what was on screen before Edit/Report was tapped.
+  //
+  // Gets its own history entry, nested on top of the one MobileNearbySheet's
+  // selectPlace already pushed for this place — so a swipe-back/browser-back
+  // out of the form lands on this place's detail, not the list underneath
+  // it or off the map entirely. Same pattern as that one; see its own
+  // comment for why (and CategoryEditor's openPreview/closePreview, the
+  // precedent both follow).
   const [action, setAction] = useState<'edit' | 'report' | null>(null)
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const state = e.state as { mapSheetForm?: 'edit' | 'report' } | null
+      setAction(state?.mapSheetForm ?? null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+  const openAction = (mode: 'edit' | 'report') => {
+    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
+    setAction(mode)
+  }
+  const closeAction = () => history.back()
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
 
   if (action === 'edit') {
-    return <ListingForm category={category} mode="edit" existing={item} onUp={() => setAction(null)} onSubmitted={() => setAction(null)} />
+    return <ListingForm category={category} mode="edit" existing={item} onUp={closeAction} onSubmitted={closeAction} />
   }
   if (action === 'report') {
     return (
-      <ReportListing listing={item} upLabel={category.pluralLabel} onUp={() => setAction(null)} onSubmitted={() => setAction(null)} />
+      <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeAction} onSubmitted={closeAction} />
     )
   }
 
@@ -148,7 +168,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           <ShareButton path={listingPath} title={item.name} />
           {canEdit && (
             <button
-              onClick={() => setAction('edit')}
+              onClick={() => openAction('edit')}
               className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"
             >
               <PencilIcon className="h-3.5 w-3.5" /> Edit
@@ -156,7 +176,7 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           )}
           {canReport && (
             <button
-              onClick={() => setAction('report')}
+              onClick={() => openAction('report')}
               className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"
             >
               <FlagIcon className="h-3.5 w-3.5" /> Report
