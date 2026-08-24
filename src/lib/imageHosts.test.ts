@@ -84,4 +84,22 @@ describe('isOptimizableImage', () => {
     expect(isOptimizableImage('https://images.unsplash.com.evil.test/photo')).toBe(false)
     expect(isOptimizableImage('https://evil-images.unsplash.com/photo')).toBe(false)
   })
+
+  // The emergency kill switch for Vercel's Image Optimization usage — every
+  // call site already falls back to `unoptimized` for a host this returns
+  // false for, so forcing false here (regardless of host) is the one place
+  // that needs to know about the switch at all.
+  it('rejects everything, even an otherwise-allowed host, once NEXT_PUBLIC_IMAGES_UNOPTIMIZED is set', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    expect(
+      isOptimizableImage('https://abcdefg.supabase.co/storage/v1/object/public/logos/logo.png'),
+    ).toBe(false)
+    expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(false)
+  })
+
+  it('is unaffected by any other value of NEXT_PUBLIC_IMAGES_UNOPTIMIZED', () => {
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '0')
+    expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(true)
+  })
 })

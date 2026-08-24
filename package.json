@@ -19,6 +19,7 @@
     "setup": "node --env-file=.env.local scripts/setup.mjs",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "doctor": "node --env-file=.env.local scripts/doctor.mjs",
+    "sentry:check": "node --env-file=.env.local scripts/sentry-check.mjs",
     "import": "node --env-file=.env.local scripts/import.mjs",
     "sync-dev-from-prod": "node --env-file=.env.local scripts/sync-dev-from-prod.mjs",
     "test:e2e": "playwright test",

@@ -695,18 +695,6 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           // padding — otherwise "centered" bounds would land the pin behind
           // (or right at the edge of) one of them instead of the visible
           // strip between.
-          if (userLocationRef.current) {
-            const bounds = new google.maps.LatLngBounds()
-            bounds.extend(userLocationRef.current)
-            bounds.extend({ lat: current.point.lat, lng: current.point.lng })
-            map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
-          } else {
-            // No location set to frame alongside it — just center the pin
-            // itself, but still account for the sheet and the top overlay:
-            // instead of the whole container's center (which they mostly
-            // cover), aim for the middle of the strip still visible between them.
-            panToVisibleCenter(map, current.point, obscured, obscuredTop)
-          }
           // The above gets the map roughly right, but a pin's geographic
           // anchor is its bottom TIP, not its visual middle — the balloon
           // shape (plus the selected halo) extends well above that point, so
@@ -716,7 +704,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           // rest of the way so the pin graphic — what a person actually
           // looks at — lands centered in the visible strip, not just its
           // invisible anchor point.
-          google.maps.event.addListenerOnce(map, 'idle', () => {
+          const nudgeMarkerIntoView = () => {
             const markerEl = current.marker as unknown as HTMLElement
             const mapEl = containerRef.current
             if (!markerEl?.getBoundingClientRect || !mapEl) return
@@ -726,7 +714,40 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
             const actualCenterY = markerRect.top + markerRect.height / 2
             const deltaY = actualCenterY - targetCenterY
             if (Math.abs(deltaY) > 2) map.panBy(0, deltaY)
-          })
+          }
+          if (userLocationRef.current) {
+            const bounds = new google.maps.LatLngBounds()
+            bounds.extend(userLocationRef.current)
+            bounds.extend({ lat: current.point.lat, lng: current.point.lng })
+            map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
+            google.maps.event.addListenerOnce(map, 'idle', () => {
+              // fitBounds picks the lowest zoom that fits both padded edges
+              // into whatever height is left — on a short mobile-landscape
+              // viewport (search bar + chips on top, the sheet on the
+              // bottom, leaving very little of an already-short screen),
+              // that can be a far lower zoom than the actual distance
+              // between the two points would ever need on a normal screen —
+              // a 10-mile trip zooming out to a three-state view. Below this
+              // floor the framing stops being useful, so give up on fitting
+              // the user's own location in and just re-center on the
+              // selected pin at a sane minimum zoom instead — same floor
+              // the "follow my location" effect below uses.
+              if ((map.getZoom() ?? 0) < 13) {
+                panToVisibleCenter(map, current.point, obscured, obscuredTop)
+                map.setZoom(14)
+                google.maps.event.addListenerOnce(map, 'idle', nudgeMarkerIntoView)
+                return
+              }
+              nudgeMarkerIntoView()
+            })
+          } else {
+            // No location set to frame alongside it — just center the pin
+            // itself, but still account for the sheet and the top overlay:
+            // instead of the whole container's center (which they mostly
+            // cover), aim for the middle of the strip still visible between them.
+            panToVisibleCenter(map, current.point, obscured, obscuredTop)
+            google.maps.event.addListenerOnce(map, 'idle', nudgeMarkerIntoView)
+          }
         }
       }
     }
