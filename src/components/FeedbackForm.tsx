@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Honeypot from './Honeypot'
-import TurnstileWidget from './TurnstileWidget'
+import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
 import type { ContactHospitalData } from '@/types'
 
@@ -24,6 +24,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   const [turnstileToken, setTurnstileToken] = useState('')
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [error, setError] = useState('')
+  const turnstileRef = useRef<TurnstileHandle>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +46,19 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
       setError(err instanceof Error ? err.message : 'Something went wrong.')
       setStatus('error')
     }
+  }
+
+  // Clears the form back to a blank slate — used by the inline variant's
+  // "Send another message" (the modal variant just closes instead, since
+  // reopening it already starts fresh). Turnstile tokens are single-use, so
+  // the widget needs an explicit reset too, not just a cleared token.
+  const resetForm = () => {
+    setMessage('')
+    setEmail('')
+    setTurnstileToken('')
+    setError('')
+    setStatus('idle')
+    turnstileRef.current?.reset()
   }
 
   const wrap = (children: React.ReactNode) =>
@@ -69,12 +83,19 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
       <>
         <h3 className="text-lg font-semibold text-slate-900">Thanks for your note!</h3>
         <p className="mt-2 text-sm text-slate-600">{successMessage}</p>
-        {variant === 'modal' && (
+        {variant === 'modal' ? (
           <button
             onClick={onClose}
             className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             Close
+          </button>
+        ) : (
+          <button
+            onClick={resetForm}
+            className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Send another message
           </button>
         )}
       </>
@@ -134,7 +155,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
             />
           </div>
 
-          <TurnstileWidget onVerify={setTurnstileToken} />
+          <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} />
 
           {status === 'error' && (
             <p className="text-sm text-red-600">{error}</p>
