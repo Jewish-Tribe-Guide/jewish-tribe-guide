@@ -281,6 +281,12 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // passed to ResourceMap as selectedId so it can highlight the matching
   // marker, making it clear which listing on the map the sheet is showing.
   const [selectedPointId, setSelectedPointId] = useState<string | undefined>(undefined)
+  // Bumped only when the current selectedPointId change should reframe the
+  // map's camera (a listing picked from the sheet/sidebar list) — left alone
+  // for a pin tapped directly on the map, so that tap just highlights the
+  // marker without moving a view the visitor already positioned themselves.
+  // See ResourceMap's own frameToken prop doc for how it's consumed.
+  const [frameToken, setFrameToken] = useState(0)
   // Desktop's equivalent of MobileNearbySheet's own `selected` state — the
   // place currently shown in the sidebar's detail panel (MapPlaceDetail)
   // instead of its results list. Mobile keeps its own copy of this inside
@@ -382,12 +388,17 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Selecting a place — from a marker tap, the sidebar's results list, or a
   // search suggestion — routes to whichever "show this place's details"
   // surface the current platform actually has: mobile's bottom sheet, or
-  // desktop's sidebar detail panel.
-  const selectPlace = (p: SelectablePoint) => {
-    if (isMobile) nearbySheetRef.current?.selectPoint(p)
+  // desktop's sidebar detail panel. `frame` (default true) says whether this
+  // selection should also reframe the map camera; every caller here is a
+  // list/sidebar/search pick, so it stays on unless a caller opts out — see
+  // the pin-tap handler passed to ResourceMap below, which is the one place
+  // that does.
+  const selectPlace = (p: SelectablePoint, frame = true) => {
+    if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
     else {
       setDesktopSelected(p)
       setSidebarCollapsed(false)
+      if (frame) setFrameToken((t) => t + 1)
     }
   }
   const deselectPlace = () => {
@@ -1465,7 +1476,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     setEditingDroppedId(sp.id.slice(DROPPED_PREFIX.length))
                     return
                   }
-                  selectPlace(sp)
+                  // A pin tapped directly on the map is already visible right
+                  // where it is — reframing to fit it alongside the visitor's
+                  // location (like a list pick does) would yank the view the
+                  // visitor just tapped into, which reads as disorienting.
+                  selectPlace(sp, false)
                 }}
                 onDeselectPoint={deselectPlace}
                 // Tapping empty map while a place's card is showing counts as
@@ -1477,6 +1492,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 onLongPressPoint={ui.map.pins ? handleLongPressPoint : undefined}
                 searchActive={searchActive}
                 selectedId={selectedPointId}
+                frameToken={frameToken}
                 obscuredBottomPx={isMobile ? sheetHeightPx : 0}
                 obscuredTopPx={isMobile ? topOverlayHeight : 0}
                 zoomRadiusMiles={mapZoomRadiusMiles}
@@ -1754,7 +1770,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   onViewListing={onViewListing}
                   categories={categories ?? []}
                   containerHeight={mapBoxHeight}
-                  onSelectionChange={(point) => setSelectedPointId(point?.id)}
+                  onSelectionChange={(point, frame) => {
+                    setSelectedPointId(point?.id)
+                    if (point && frame !== false) setFrameToken((t) => t + 1)
+                  }}
                   onHeightChange={setSheetHeightPx}
                 />
               )}

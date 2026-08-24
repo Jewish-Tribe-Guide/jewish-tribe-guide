@@ -38,13 +38,16 @@ vi.mock('./ResourceMap', () => ({
     points,
     onSelectPoint,
     onLongPressPoint,
+    frameToken,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
     onLongPressPoint?: (p: MapPoint) => void
+    frameToken?: number
   }) => (
     <div data-testid="resource-map">
       <p data-testid="point-count">{points.length}</p>
+      <p data-testid="frame-token">{frameToken ?? 0}</p>
       {points.map((p) => (
         <div key={p.id}>
           <button onClick={() => onSelectPoint?.(p)}>Select {p.name}</button>
@@ -237,6 +240,47 @@ describe('ResourceMapView — selecting a place', () => {
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
 
     expect(await screen.findByText('1 Main St')).toBeInTheDocument()
+  })
+
+  // A pin tapped directly on the map is already visible right where it is —
+  // reframing to fit it alongside the visitor's location would yank the view
+  // they just tapped into. A listing picked from the sidebar list, on the
+  // other hand, isn't necessarily on screen at all, so that one should still
+  // reframe. ResourceMap itself only decides whether to actually move the
+  // camera (mocked away here, see the vi.mock above) — this asserts the
+  // frameToken signal ResourceMapView sends it distinguishes the two.
+  it('bumps frameToken for a sidebar list pick but not for a map pin tap', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }), listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' })],
+      [grocery, synagogue],
+    )
+
+    // Narrow to both categories so the sidebar shows a real (unmocked)
+    // results list instead of auto-selecting a single match.
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+
+    const initialFrameToken = screen.getByTestId('frame-token').textContent
+
+    // A pin tap (the mocked ResourceMap's own "Select" button, standing in
+    // for onSelectPoint) opens the detail panel but must not bump the token.
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(screen.getByTestId('frame-token').textContent).toBe(initialFrameToken)
+
+    // Back to the list, then pick the OTHER listing from the real sidebar
+    // row — that one should bump the token.
+    await user.click(screen.getByRole('button', { name: 'Back to list' }))
+    // MobileNearbySheet stays mounted (CSS-hidden, not unmounted) even on
+    // desktop, so its own copy of this row exists in the DOM too — the
+    // sidebar's own row is the first of the two.
+    await user.click(screen.getAllByRole('button', { name: /^Beth Shalom/ })[0]!)
+    expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
+    expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
   })
 })
 
