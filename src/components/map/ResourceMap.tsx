@@ -38,6 +38,9 @@ export type MapPoint = {
 }
 
 const HOSPITALS_FILTER_ID = '__hospitals__'
+// How long the selection-reframe logic waits for a real 'idle' event before
+// giving up and proceeding anyway — see onIdleOrTimeout's own comment.
+const IDLE_FALLBACK_MS = 1500
 
 type Props = {
   points: MapPoint[]
@@ -289,6 +292,32 @@ function buildPin(p: MapPoint, isSelected: boolean): HTMLElement {
 // (rare — the overlay alone is normally much shorter than the sheet) would
 // push it down instead. Falls back to a plain center (no offset) if the
 // projection isn't ready yet, rather than not moving at all.
+// Same as addListenerOnce(map, 'idle', cb), but cb is guaranteed to run
+// within `timeoutMs` even if 'idle' never fires — a real device fires it
+// well under a second after a pan/zoom settles, but nothing here can prove
+// that always holds (a tile request that stalls, a background tab getting
+// starved of rendering time), and the reframe logic below depends on 'idle'
+// to know when it's safe to start its NEXT queued camera move. Without a
+// fallback, one 'idle' that never arrives would leave every reframe after
+// it waiting forever — picking a place would just stop moving the map at
+// all, silently, which is worse than the corrupted-position bug this exists
+// to prevent.
+function onIdleOrTimeout(map: google.maps.Map, timeoutMs: number, cb: () => void) {
+  let done = false
+  const timer = setTimeout(() => {
+    if (done) return
+    done = true
+    google.maps.event.removeListener(listener)
+    cb()
+  }, timeoutMs)
+  const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
+    if (done) return
+    done = true
+    clearTimeout(timer)
+    cb()
+  })
+}
+
 function panToVisibleCenter(
   map: google.maps.Map,
   point: { lat: number; lng: number },
@@ -669,14 +698,26 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // Bumped every time a reframe actually starts, so the deferred `idle`
   // callbacks below (registered via addListenerOnce, which Google Maps
   // never cancels) can tell whether they're still the most recent reframe
-  // by the time they fire. Without this, picking a second place before the
-  // map finishes settling from the first leaves BOTH selections' idle
-  // callbacks queued for the same next idle event — the stale one still
-  // fires, using its own (old marker, old padding) closure, and can yank
-  // the camera toward the OLD pin or nudge it using the NEW pin's
-  // not-yet-repainted marker position. Either way the final camera lands
-  // somewhere that's neither pin — a corrupted blend of two selections.
+  // by the time they fire. Without this, a stale callback from a
+  // superseded selection could still act using its own (old marker, old
+  // padding) closure once it finally gets a turn.
   const reframeTokenRef = useRef(0)
+  // True while a reframe's own fitBounds/panTo animation is still in
+  // flight (until ITS 'idle' fires). panTo/fitBounds animate over many
+  // internal, self-scheduling requestAnimationFrame steps, and the Maps
+  // JS API exposes no way to cancel one already running — calling
+  // setCenter to "interrupt" it only changes where the map is at that
+  // instant, it doesn't stop the OLDER animation's already-queued frames
+  // from continuing to fire and calling setCenter again later with ITS
+  // OWN (now stale) target. Confirmed live: picking a second place before
+  // the first one's animation had finished let the first one's raw target
+  // coordinates fire minutes later, well after the second selection had
+  // already settled, snapping the camera back toward the first pin.
+  // The only reliable fix is to never let two of these animations be in
+  // flight on the same map at once — a reframe that starts while the map
+  // is still busy from a previous one queues itself for the next idle
+  // instead of calling fitBounds/panTo immediately.
+  const mapBusyRef = useRef(false)
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
@@ -772,42 +813,88 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           const maxFitBothMiles = zoomRadiusMilesRef.current ?? 15
           const isFar =
             userLocationRef.current && haversineMiles(userLocationRef.current, current.point) > maxFitBothMiles
-          if (userLocationRef.current && !isFar) {
-            const bounds = new google.maps.LatLngBounds()
-            bounds.extend(userLocationRef.current)
-            bounds.extend({ lat: current.point.lat, lng: current.point.lng })
-            map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
-            google.maps.event.addListenerOnce(map, 'idle', () => {
-              if (reframeTokenRef.current !== myReframeToken) return
-              // Safety net for the rare case even a within-range pair still
-              // resolves too low a zoom (a short mobile-landscape viewport
-              // leaves very little padded room to fit into — see the
-              // padding-clamp above) — same floor the "follow my location"
-              // effect below uses.
-              if ((map.getZoom() ?? 0) < 13) {
-                panToVisibleCenter(map, current.point, obscured, obscuredTop)
-                map.setZoom(14)
-                google.maps.event.addListenerOnce(map, 'idle', nudgeMarkerIntoView)
-                return
-              }
-              nudgeMarkerIntoView()
-            })
-          } else {
-            // Either no location set, or the pick is far enough that fitting
-            // both wouldn't be useful — just center the pin itself, but
-            // still account for the sheet and the top overlay: instead of
-            // the whole container's center (which they mostly cover), aim
-            // for the middle of the strip still visible between them.
-            panToVisibleCenter(map, current.point, obscured, obscuredTop)
-            // A far pick needs a real zoom-in (it's arriving from whatever
-            // the map happened to be showing before, which could be
-            // anything) — same single-point convention used elsewhere in
-            // this file. No location set at all is different: nothing about
-            // this selection implies the visitor's chosen zoom is wrong, so
-            // that case leaves it alone rather than forcing one.
-            if (isFar) map.setZoom(15)
-            google.maps.event.addListenerOnce(map, 'idle', nudgeMarkerIntoView)
+          // Gates the actual fitBounds/panTo calls below so only one of
+          // this effect's animated camera moves is ever in flight on the
+          // map at a time. A reframe that starts while a previous one is
+          // still animating queues itself for the next idle instead of
+          // calling fitBounds/panTo right away — seeing mapBusyRef go
+          // false again is what tells it the map is actually free, not
+          // just that this particular call returned (fitBounds/panTo
+          // return immediately; the animation keeps running well after).
+          const runReframe = () => {
+            if (reframeTokenRef.current !== myReframeToken) return
+            if (mapBusyRef.current) {
+              onIdleOrTimeout(map, IDLE_FALLBACK_MS, runReframe)
+              return
+            }
+            mapBusyRef.current = true
+            if (userLocationRef.current && !isFar) {
+              const bounds = new google.maps.LatLngBounds()
+              bounds.extend(userLocationRef.current)
+              bounds.extend({ lat: current.point.lat, lng: current.point.lng })
+              map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
+              onIdleOrTimeout(map, IDLE_FALLBACK_MS, () => {
+                mapBusyRef.current = false
+                if (reframeTokenRef.current !== myReframeToken) return
+                // Safety net for the rare case even a within-range pair still
+                // resolves too low a zoom (a short mobile-landscape viewport
+                // leaves very little padded room to fit into — see the
+                // padding-clamp above) — same floor the "follow my location"
+                // effect below uses. <=, not < — a real pair (a Center City
+                // anchor and a place a couple miles out, with the mobile
+                // sheet's 'half' height plus the top overlay eating well
+                // over half the viewport as padding) fit to EXACTLY 13,
+                // not below it. At that padding ratio, fitBounds fitting the
+                // pair into the thin unobscured strip at the top pushes the
+                // camera's own center well past both points to keep them
+                // inside it — geometrically correct, but with neither pin
+                // anywhere near the visible strip. `< 13` let that exact
+                // boundary slip through uncorrected.
+                if ((map.getZoom() ?? 0) <= 13) {
+                  mapBusyRef.current = true
+                  // Zoom BEFORE computing the offset, not after — panToVisibleCenter
+                  // converts the sheet/overlay's pixel padding into a geographic
+                  // shift using whatever zoom is active when it's called. Called
+                  // at the old, much-lower fitBounds zoom (the very thing this
+                  // branch exists to correct), the same pixel padding translates
+                  // to a real-world distance many times too large — at a low
+                  // zoom, each pixel covers far more ground — landing the camera
+                  // over a mile from the pin instead of nudging it into view.
+                  map.setZoom(14)
+                  panToVisibleCenter(map, current.point, obscured, obscuredTop)
+                  onIdleOrTimeout(map, IDLE_FALLBACK_MS, () => {
+                    mapBusyRef.current = false
+                    nudgeMarkerIntoView()
+                  })
+                  return
+                }
+                nudgeMarkerIntoView()
+              })
+            } else {
+              // A far pick needs a real zoom-in (it's arriving from whatever
+              // the map happened to be showing before, which could be
+              // anything) — same single-point convention used elsewhere in
+              // this file. No location set at all is different: nothing about
+              // this selection implies the visitor's chosen zoom is wrong, so
+              // that case leaves it alone rather than forcing one. Set BEFORE
+              // panToVisibleCenter, not after — see the zoom-floor branch
+              // above for why computing the offset at the OLD zoom (instead
+              // of the one it's about to jump to) turns a small padding
+              // correction into a real-world offset of a mile or more.
+              if (isFar) map.setZoom(15)
+              // Either no location set, or the pick is far enough that fitting
+              // both wouldn't be useful — just center the pin itself, but
+              // still account for the sheet and the top overlay: instead of
+              // the whole container's center (which they mostly cover), aim
+              // for the middle of the strip still visible between them.
+              panToVisibleCenter(map, current.point, obscured, obscuredTop)
+              onIdleOrTimeout(map, IDLE_FALLBACK_MS, () => {
+                mapBusyRef.current = false
+                nudgeMarkerIntoView()
+              })
+            }
           }
+          runReframe()
         }
       }
     }
@@ -850,7 +937,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // their dot still moves in the background.
     if (follow) {
       map.panTo(userLocation)
-      if ((map.getZoom() ?? 0) < 13) map.setZoom(14)
+      // <=, not < — kept in sync with the selection-reframe floor above.
+      if ((map.getZoom() ?? 0) <= 13) map.setZoom(14)
     }
   }, [userLocation, follow, ready])
 
