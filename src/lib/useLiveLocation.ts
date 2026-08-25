@@ -6,6 +6,16 @@ import { useWatchPosition } from './useWatchPosition'
 
 const ENABLED_KEY = 'jpc:live-tracking-enabled'
 
+// Placeholder `address` a live GPS tick stores alongside the real coords (see
+// the effect below) — a human-readable label, not a real address, so nothing
+// that needs an actual geocodable string (directionsOrigin, most obviously)
+// should ever treat it as one. Stopping tracking doesn't clear it: that's
+// what lets a visitor "share live location" just long enough to capture a
+// fix, then stop, and keep a readable "Current location" label on the frozen
+// spot instead of raw coordinates — see locationContext's directionsOrigin
+// for the one place that already needs to tell the two apart.
+export const CURRENT_LOCATION_LABEL = 'Current location'
+
 /** Site-wide live location: layers a continuously-updating GPS watch
  *  (useWatchPosition) on top of the persisted address/coords
  *  (useStoredLocation), so once a visitor shares their location every GPS
@@ -76,7 +86,7 @@ export function useLiveLocation() {
   useEffect(() => {
     if (!watch.position) return
     stored.setCoords({ lat: watch.position.lat, lng: watch.position.lng })
-    stored.setAddress('Current location')
+    stored.setAddress(CURRENT_LOCATION_LABEL)
     // stored.setCoords/setAddress are stable useCallback setters — omitting
     // them avoids re-running this on unrelated `stored` identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps

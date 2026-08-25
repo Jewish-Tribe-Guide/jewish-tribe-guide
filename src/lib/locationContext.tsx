@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, useRef } from 'react'
 import type { DirectoryAnchor } from '@/types'
 import type { LocationControls } from '@/components/home/LocationControl'
 import type { Coords, StoredLocation } from './useStoredLocation'
-import { useLiveLocation } from './useLiveLocation'
+import { CURRENT_LOCATION_LABEL, useLiveLocation } from './useLiveLocation'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The visitor's location, shared by every screen.
@@ -47,9 +47,13 @@ type LocationContextValue = {
   /** Ready-to-use origin for a Maps "Directions" link — the visitor's typed
    *  address or a listing's name (anchor.label) when either is set, since
    *  Maps renders a bare lat/lng origin as an anonymous "Dropped pin" rather
-   *  than a recognizable place. Live GPS falls back to raw coords instead:
-   *  its label is the literal string "Current location" (see
-   *  useLiveLocation), which doesn't geocode to anything. */
+   *  than a recognizable place. Live GPS (and a live fix frozen by stopping
+   *  tracking — see useLiveLocation's CURRENT_LOCATION_LABEL) falls back to
+   *  raw coords instead: sending Google Maps the literal text "Current
+   *  location" doesn't geocode to anything — worse, Maps' own URL API treats
+   *  that exact string as "use my device's live GPS right now," silently
+   *  substituting wherever the visitor's phone actually is at that moment
+   *  for the spot they deliberately froze. */
   directionsOrigin: string | { lat: number; lng: number } | null
   /** The listing the anchor currently points at, if the visitor set it by
    *  tapping "I'm here" on one. Null for a typed address or a GPS fix.
@@ -123,7 +127,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       anchor: { coords, label: coords ? address : '' },
       coords,
       liveTracking: { tracking, error: geoError, errorSilent: geoErrorSilent, resumingSilently, start, stop },
-      directionsOrigin: !tracking && coords && address ? address : coords,
+      directionsOrigin: !tracking && coords && address && address !== CURRENT_LOCATION_LABEL ? address : coords,
       anchorListingId: listingId,
       setListingAnchor: (listing) => {
         // Remember what's being displaced, but only a typed address is worth
