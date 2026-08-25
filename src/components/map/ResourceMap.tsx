@@ -666,6 +666,17 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   // untouched (a pin tapped directly on the map, which should just
   // highlight in place without moving the view the visitor already set).
   const consumedFrameTokenRef = useRef(frameToken)
+  // Bumped every time a reframe actually starts, so the deferred `idle`
+  // callbacks below (registered via addListenerOnce, which Google Maps
+  // never cancels) can tell whether they're still the most recent reframe
+  // by the time they fire. Without this, picking a second place before the
+  // map finishes settling from the first leaves BOTH selections' idle
+  // callbacks queued for the same next idle event — the stale one still
+  // fires, using its own (old marker, old padding) closure, and can yank
+  // the camera toward the OLD pin or nudge it using the NEW pin's
+  // not-yet-repainted marker position. Either way the final camera lands
+  // somewhere that's neither pin — a corrupted blend of two selections.
+  const reframeTokenRef = useRef(0)
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
@@ -681,6 +692,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         const shouldFrame = frameToken !== consumedFrameTokenRef.current
         consumedFrameTokenRef.current = frameToken
         if (shouldFrame) {
+          reframeTokenRef.current += 1
+          const myReframeToken = reframeTokenRef.current
           // obscuredBottomPx/obscuredTopPx come from three independent
           // ResizeObservers (the map box, the top search/filter overlay, and
           // the sheet height derived from the map box) that don't all settle
@@ -733,6 +746,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           // when the zoom-floor branch below also fires), which reads as
           // the map hunting for its spot rather than settling once.
           const nudgeMarkerIntoView = () => {
+            if (reframeTokenRef.current !== myReframeToken) return
             const markerEl = current.marker as unknown as HTMLElement
             const mapEl = containerRef.current
             if (!markerEl?.getBoundingClientRect || !mapEl) return
@@ -764,6 +778,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
             bounds.extend({ lat: current.point.lat, lng: current.point.lng })
             map.fitBounds(bounds, { top: 64 + obscuredTop, left: 64, right: 64, bottom: 64 + obscured })
             google.maps.event.addListenerOnce(map, 'idle', () => {
+              if (reframeTokenRef.current !== myReframeToken) return
               // Safety net for the rare case even a within-range pair still
               // resolves too low a zoom (a short mobile-landscape viewport
               // leaves very little padded room to fit into — see the
