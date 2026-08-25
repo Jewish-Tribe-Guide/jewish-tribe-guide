@@ -16,6 +16,25 @@ export function escapeHtml(value: unknown): string {
     .replace(/"/g, '&quot;')
 }
 
+// The deployment these admin-notification links should point to. Deliberately
+// NOT the same rule as siteUrl() (sitemap/robots/JSON-LD) — those want the
+// stable production domain even from a preview build, so a crawler never
+// associates canonical content with an ephemeral preview origin. An email
+// telling someone to go review a submission needs the opposite: a link to
+// THIS specific deployment, since a preview submission approved from a link
+// that pointed at production would land the reviewer on a site with no idea
+// the submission exists (see the preview/prod Supabase split this exists
+// alongside). VERCEL_URL is Vercel's own per-deployment URL — already
+// correct for preview without any config — so it's preferred there; APP_URL
+// is the explicit override for when that's not right (a custom domain in
+// production, where VERCEL_URL is only the vercel.app alias).
+export function adminAppUrl(): string | undefined {
+  if (process.env.VERCEL_ENV !== 'production' && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  return process.env.APP_URL?.replace(/\/$/, '')
+}
+
 function row(label: string, value: string): string {
   return `<tr>
     <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
@@ -102,7 +121,7 @@ export async function sendEmail({
 // because it happens to be the default) — this links to the right SCREEN,
 // not a further-selected tab within it.
 function appLinkFor(payload: SubmissionPayload): string | null {
-  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const appUrl = adminAppUrl()
   if (!appUrl) return null
   return payload.formId ? `${appUrl}/admin/responses` : `${appUrl}/inbox`
 }
@@ -183,7 +202,7 @@ function buildFeedbackHtml(
   // refactor) rather than /admin. Feedback is that tab's default sub-tab
   // (see ResponsesManager's FEEDBACK_KEY), so no query param is needed to
   // land there directly.
-  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const appUrl = adminAppUrl()
   const adminLink = appUrl
     ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin/responses" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in admin →</a></p>`
     : ''
@@ -311,7 +330,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
            ${detailRows}`
   }
 
-  const appUrl = process.env.APP_URL?.replace(/\/$/, '')
+  const appUrl = adminAppUrl()
   const adminLink = appUrl
     ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Review in admin →</a></p>`
     : ''

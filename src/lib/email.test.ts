@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
-import { escapeHtml, sendEmail } from './email'
+import { adminAppUrl, escapeHtml, sendEmail } from './email'
 
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
@@ -25,6 +25,43 @@ describe('escapeHtml', () => {
     expect(escapeHtml(true)).toBe('true')
     expect(escapeHtml(null)).toBe('null')
     expect(escapeHtml(undefined)).toBe('undefined')
+  })
+})
+
+// A preview deployment's admin-notification link used to always point at
+// APP_URL (the production domain), because a Vercel Preview build submits to
+// a separate Supabase project — a reviewer clicking that link lands on
+// production admin, which has no idea the submission exists. VERCEL_URL is
+// Vercel's own per-deployment URL, correct for preview without any config.
+describe('adminAppUrl', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('prefers VERCEL_URL over APP_URL when not running in production', () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    vi.stubEnv('VERCEL_URL', 'my-app-git-branch-team.vercel.app')
+    vi.stubEnv('APP_URL', 'https://production.example.org')
+    expect(adminAppUrl()).toBe('https://my-app-git-branch-team.vercel.app')
+  })
+
+  it('prefers APP_URL over VERCEL_URL in production, for a custom domain', () => {
+    vi.stubEnv('VERCEL_ENV', 'production')
+    vi.stubEnv('VERCEL_URL', 'my-app.vercel.app')
+    vi.stubEnv('APP_URL', 'https://production.example.org')
+    expect(adminAppUrl()).toBe('https://production.example.org')
+  })
+
+  it('falls back to APP_URL when VERCEL_URL is unset (local dev)', () => {
+    vi.stubEnv('VERCEL_ENV', '')
+    vi.stubEnv('VERCEL_URL', '')
+    vi.stubEnv('APP_URL', 'https://production.example.org')
+    expect(adminAppUrl()).toBe('https://production.example.org')
+  })
+
+  it('returns a falsy value when neither is set, so the email link is omitted', () => {
+    vi.stubEnv('VERCEL_ENV', '')
+    vi.stubEnv('VERCEL_URL', '')
+    vi.stubEnv('APP_URL', '')
+    expect(adminAppUrl()).toBeFalsy()
   })
 })
 
