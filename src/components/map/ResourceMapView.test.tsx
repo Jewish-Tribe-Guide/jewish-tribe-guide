@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { makeCategory, makeCommunity, makeContent, makeListing } from '@/test/providerFixtures'
+import { CommunityProvider } from '@/lib/communityContext'
+import { ContentProvider } from '@/lib/contentContext'
 import { ListingsProvider } from '@/lib/listingsContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
@@ -228,6 +230,59 @@ describe('ResourceMapView — category filtering', () => {
 
     expect(screen.getByTestId('point-count')).toHaveTextContent('1')
     expect(screen.getByRole('button', { name: 'Select Acme Grocery' })).toBeInTheDocument()
+  })
+
+  it('re-syncs to a NEW initialCategory on a later prop change, not just its own first mount', async () => {
+    // Regression test: this screen stays mounted (not remounted) across an
+    // in-app navigation away and back — see next.config.ts's cacheComponents
+    // note — so a visitor who toggles a chip on the map, browses to a
+    // different category directory, and taps THAT category's own "Map"
+    // button used to keep seeing whatever they'd toggled last: the new
+    // initialCategory prop arrived, but `selected` was only ever set from a
+    // useState initializer, which React runs once and never again.
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    const listings = [
+      listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+      listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' }),
+    ]
+    const categories = [grocery, synagogue]
+    const community = makeCommunity()
+    const content = makeContent({ categories })
+    // Built by hand (not the renderMap/renderWithProviders helpers) so
+    // `rerender` below can pass a brand-new initialCategory through the
+    // EXACT SAME provider tree — renderWithProviders' own `rerender` would
+    // otherwise replace the whole tree with a bare <ResourceMapView>, losing
+    // CommunityProvider/ContentProvider and throwing on the very hooks this
+    // test needs to re-render through.
+    const wrap = (ui: ReactElement) => (
+      <CommunityProvider community={community} communities={[community]}>
+        <ContentProvider content={content}>
+          <PinnedProvider>
+            <DroppedPinsProvider>
+              <ListingsProvider listings={listings}>{ui}</ListingsProvider>
+            </DroppedPinsProvider>
+          </PinnedProvider>
+        </ContentProvider>
+      </CommunityProvider>
+    )
+    const { rerender } = render(wrap(<ResourceMapView onUp={vi.fn()} initialCategory="grocery" />))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Select Acme Grocery' })).toBeInTheDocument()
+
+    // Manually narrow to a THIRD state (both categories) — standing in for
+    // the visitor toggling chips on the map itself before navigating away.
+    await user.click(screen.getByRole('button', { name: /Synagogues/ }))
+    expect(screen.getByTestId('point-count')).toHaveTextContent('2')
+
+    // Same component instance, but a new initialCategory — what a real
+    // navigation back via a different category's "Map" button delivers.
+    rerender(wrap(<ResourceMapView onUp={vi.fn()} initialCategory="synagogue" />))
+
+    expect(screen.getByTestId('point-count')).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: 'Select Beth Shalom' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Acme Grocery' })).not.toBeInTheDocument()
   })
 })
 
