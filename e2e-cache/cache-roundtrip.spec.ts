@@ -94,3 +94,53 @@ test('an admin save reaches the cached public page', async ({ request }) => {
     })
   }
 })
+
+// Same shape of proof, for the `page` table (About/Privacy) added alongside
+// this test: its cache tag (TAGS.pages) is global rather than per-community,
+// invalidated by the admin route calling revalidateTag directly instead of
+// going through revalidatePublicContent — a different enough code path from
+// site-settings above that a bug in one wouldn't show up in the other.
+test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
+  const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
+    accessToken: string
+  }
+  const authHeaders = { Authorization: `Bearer ${accessToken}` }
+
+  const beforeRes = await request.get('/api/admin/pages', { headers: authHeaders })
+  expect(beforeRes.ok(), 'GET /api/admin/pages should succeed with the minted admin token').toBe(true)
+  const before = await beforeRes.json()
+  expect(before.ok).toBe(true)
+  const aboutPage = before.pages.find((p: { slug: string }) => p.slug === 'about')
+  expect(aboutPage, 'the seed migration should have created an "about" row').toBeTruthy()
+  const originalBody: string = aboutPage.body
+
+  const newBody = `Cache round-trip check ${Date.now()}`
+  expect(await (await request.get('/about')).text()).not.toContain(newBody)
+
+  try {
+    const patchRes = await request.patch('/api/admin/pages/about', {
+      headers: authHeaders,
+      data: { body: newBody },
+    })
+    expect(patchRes.ok(), 'PATCH /api/admin/pages/about should succeed').toBe(true)
+    expect((await patchRes.json()).ok).toBe(true)
+
+    await expect
+      .poll(
+        async () => {
+          const res = await request.get('/about')
+          return (await res.text()).includes(newBody)
+        },
+        {
+          timeout: 20_000,
+          message: 'waiting for the revalidated /about page to serve the new body',
+        },
+      )
+      .toBe(true)
+  } finally {
+    await request.patch('/api/admin/pages/about', {
+      headers: authHeaders,
+      data: { body: originalBody },
+    })
+  }
+})
