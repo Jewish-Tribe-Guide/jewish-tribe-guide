@@ -16,7 +16,7 @@ export const INBOX_BASE = '/philly/inbox'
 // map plus a separately-maintained render-order array) that could drift
 // apart, which is exactly what happened before this: TAB_LABELS' own key
 // order didn't match the array AdminTabs actually rendered from.
-export type AdminTab = 'queue' | 'categories' | 'responses' | 'archived' | 'site' | 'home' | 'metrics'
+export type AdminTab = 'queue' | 'categories' | 'responses' | 'archived' | 'site' | 'home' | 'metrics' | 'pages'
 
 export const ADMIN_TABS: { tab: AdminTab; href: string; label: string }[] = [
   { tab: 'queue', href: ADMIN_BASE, label: 'Moderation queue' },
@@ -24,6 +24,7 @@ export const ADMIN_TABS: { tab: AdminTab; href: string; label: string }[] = [
   { tab: 'responses', href: `${ADMIN_BASE}/responses`, label: 'Responses' },
   { tab: 'archived', href: `${ADMIN_BASE}/archived`, label: 'Archived' },
   { tab: 'site', href: `${ADMIN_BASE}/site`, label: 'Site' },
+  { tab: 'pages', href: `${ADMIN_BASE}/pages`, label: 'Pages' },
   // Not "Home page" any more — what's left here is whatever exists on exactly
   // one of the two devices, and the mobile tab bar shows on every phone screen,
   // not just the home one.

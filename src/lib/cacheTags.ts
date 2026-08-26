@@ -12,6 +12,10 @@
 
 export const TAGS = {
   communities: 'communities',
+  // Global, not per-community — see supabase/migrations/20240101000032_pages.sql.
+  // Not part of allCommunityTags below; the pages admin route invalidates it
+  // directly instead of going through revalidatePublicContent.
+  pages: 'pages',
   categories: (community: string) => `categories:${community}`,
   resources: (community: string) => `resources:${community}`,
   siteSettings: (community: string) => `site-settings:${community}`,
