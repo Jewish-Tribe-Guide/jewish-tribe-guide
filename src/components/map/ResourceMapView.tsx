@@ -22,9 +22,17 @@ import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components
 import { getCategoryColor } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
+import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
 import DroppedPinEditor from './DroppedPinEditor'
 import type { DirectoryResource, MapFilters } from '@/types'
+
+// Shared by the initial useState below and the resync effect further down
+// (see its own comment) — one place for the initialSelectedCategories-vs-
+// initialCategory precedence so the two can't drift apart.
+function resolveInitialSelected(categories: string[] | undefined, category: string | undefined): Set<string> | null {
+  return categories !== undefined ? new Set(categories) : category ? new Set([category]) : null
+}
 
 const HOSPITALS_ID = '__hospitals__'
 const HOSPITAL_COLOR = '#dc2626'
@@ -196,7 +204,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // the admin's category-preview map, which has no LocationProvider and
   // supplies `controls`/`liveTracking` as plain props instead.
   const directionsOrigin: string | LatLng | null =
-    !tracking && controls?.coords && controls.address ? controls.address : activeLocation
+    !tracking && controls?.coords && controls.address && controls.address !== CURRENT_LOCATION_LABEL
+      ? controls.address
+      : activeLocation
 
   // Mobile only — the quick chip row over the map shows a handful of
   // categories plus a trailing "More" chip; tapping it opens this full-screen
@@ -556,11 +566,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // browser back) takes precedence over initialCategory (the single-category
   // arrival case from a directory's "Map" button).
   const [selected, setSelected] = useState<Set<string> | null>(
-    initialSelectedCategories !== undefined
-      ? new Set(initialSelectedCategories)
-      : initialCategory
-        ? new Set([initialCategory])
-        : null,
+    resolveInitialSelected(initialSelectedCategories, initialCategory),
   )
   const effectiveSelected = useMemo(
     () => selected ?? new Set(options.map((o) => o.id)),
@@ -701,6 +707,54 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // categories load.
   const [boolFields, setBoolFields] = useState<string[]>(initialFilters?.bool ?? [])
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>(initialFilters?.select ?? {})
+
+  // Re-applies the query-string-derived view (selected chips, search text,
+  // bool/select filters) whenever a NEW navigation actually changes it — a
+  // category directory's own "Map" button (or any shared map link) carries
+  // its filter as a query param specifically so the map it opens matches
+  // what was clicked, per this component's whole initial*-props design (see
+  // MapScreen's own top comment). But every one of those props above is only
+  // ever read by a useState *initializer*, which React runs once, on this
+  // component's very first mount — and since Cache Components keeps this
+  // screen mounted (not remounted) across navigations away and back (see
+  // next.config.ts's cacheComponents note), a visitor who toggles a chip on
+  // the map, leaves for a category directory, and clicks that category's own
+  // "Map" button back kept seeing whatever they'd toggled last: the new
+  // props arrived, but nothing ever re-read them.
+  //
+  // Keyed off a plain string built from the props themselves, not the props
+  // directly — MapScreen recomputes initialSelectedCategories/initialFilters
+  // as new array/object literals from parseMapQuery() on every one of ITS
+  // renders even when the URL hasn't changed, so comparing by reference would
+  // treat every unrelated re-render as a fresh navigation and stomp on
+  // whatever the visitor had just toggled. Comparing by value (via the ref
+  // below) only re-syncs when the URL's own filter actually changed.
+  const categoriesKey =
+    initialSelectedCategories !== undefined
+      ? `set:${[...initialSelectedCategories].sort().join(',')}`
+      : initialCategory
+        ? `one:${initialCategory}`
+        : 'all'
+  const initialViewKey = [
+    categoriesKey,
+    initialQueryText,
+    [...(initialFilters?.bool ?? [])].sort().join(','),
+    Object.entries(initialFilters?.select ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${[...v].sort().join('|')}`)
+      .join(';'),
+  ].join('::')
+  const appliedInitialViewKeyRef = useRef(initialViewKey)
+  useEffect(() => {
+    if (initialViewKey === appliedInitialViewKeyRef.current) return
+    appliedInitialViewKeyRef.current = initialViewKey
+    setSelected(resolveInitialSelected(initialSelectedCategories, initialCategory))
+    setInput(initialQueryText)
+    setCommittedQuery(initialQueryText)
+    setBoolFields(initialFilters?.bool ?? [])
+    setSelectFilters(initialFilters?.select ?? {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialViewKey])
 
   // Filterable hours-field keys per category, for the open-now predicate.
   const hoursKeysByCat = useMemo(() => {
