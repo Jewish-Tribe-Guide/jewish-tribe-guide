@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import UpButton from '@/components/UpButton'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { siteUrl } from '@/lib/siteUrl'
@@ -21,9 +21,11 @@ export default async function AboutPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
-      <Link href="/" className="text-sm text-muted hover:text-slate-700 underline">
-        ← Back to {community.name}
-      </Link>
+      {/* The same control every other second-level screen uses, saying the
+          same word. This used to be a bespoke underlined "← Back to
+          {community.name}" link, which named its destination differently from
+          the rest of the app for no reason anyone could point at. */}
+      <UpButton href="/" label="Home" className="mb-0" />
 
       <h1 className="mt-6 text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
 
