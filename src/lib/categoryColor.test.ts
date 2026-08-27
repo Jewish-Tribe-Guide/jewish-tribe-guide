@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCategoryColor } from './categoryColor'
+import { categoryTint, getCategoryColor } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -66,5 +66,34 @@ describe('getCategoryColor', () => {
   it('depends only on position in the list it was given', () => {
     const reordered = [...categories].reverse()
     expect(getCategoryColor(reordered, 'mikvah')).toBe(getCategoryColor(categories, 'synagogue'))
+  })
+
+  // The palette was pulled back in chroma to quiet the map down, which is a
+  // knob someone will reach for again. Every pin has a white glyph drawn on
+  // top of it, so there is a floor on how light these can get before the
+  // glyph stops being readable — this is that floor, stated once rather than
+  // rediscovered by squinting at a screenshot.
+  it('stays dark enough for the white glyph on top of every pin to read', () => {
+    const channel = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    const contrastWithWhite = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(hex.slice(i, i + 2), 16) / 255))
+      return 1.05 / (0.2126 * r + 0.7152 * g + 0.0722 * b + 0.05)
+    }
+    const many = Array.from({ length: 25 }, (_, i) => cat(`c${i}`))
+    for (const c of many) {
+      expect(contrastWithWhite(getCategoryColor(many, c.id))).toBeGreaterThan(3)
+    }
+  })
+})
+
+describe('categoryTint', () => {
+  it('produces a color a browser will parse, not a truncated hex', () => {
+    // '#2657bf' + a two-digit alpha — an 8-digit hex. Getting this wrong
+    // yields a string CSS silently ignores, i.e. an invisible avatar.
+    expect(categoryTint('#2657bf')).toMatch(/^#[0-9a-f]{8}$/i)
+  })
+
+  it("keeps the pin's own color as the base, so the two still read as one thing", () => {
+    expect(categoryTint('#2657bf').startsWith('#2657bf')).toBe(true)
   })
 })

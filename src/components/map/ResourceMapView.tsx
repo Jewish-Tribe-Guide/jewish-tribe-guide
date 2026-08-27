@@ -19,7 +19,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
-import { getCategoryColor } from '@/lib/categoryColor'
+import { categoryTint, getCategoryColor } from '@/lib/categoryColor'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
@@ -35,7 +35,13 @@ function resolveInitialSelected(categories: string[] | undefined, category: stri
 }
 
 const HOSPITALS_ID = '__hospitals__'
-const HOSPITAL_COLOR = '#dc2626'
+// red-600 pulled back the same way as the category palette (see
+// categoryColor.ts) — a hospital pin still needs to read as the urgent one,
+// but at full chroma it was the single loudest thing on a screen that already
+// has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
+// stays as-is: there is only ever a handful of those, they're the visitor's
+// own transient marks, and standing out is the entire point of one.
+const HOSPITAL_COLOR = '#b6302b'
 const HOSPITAL_ICON = '🏥'
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
@@ -1293,7 +1299,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             >
               <span
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                style={{ backgroundColor: p.color + '22' }}
+                style={{ backgroundColor: categoryTint(p.color) }}
                 aria-hidden="true"
               >
                 {p.glyph ?? '📍'}
@@ -1753,7 +1759,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         >
                           <span
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
-                            style={{ backgroundColor: p.color + '22' }}
+                            style={{ backgroundColor: categoryTint(p.color) }}
                             aria-hidden="true"
                           >
                             {p.glyph ?? '📍'}

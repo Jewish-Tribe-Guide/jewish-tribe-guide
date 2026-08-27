@@ -2,6 +2,7 @@ import { revalidateTag } from 'next/cache'
 import { getAdminUser } from '@/lib/adminAuth'
 import { TAGS } from '@/lib/cacheTags'
 import { PAGE_SLUGS, updatePage, type PageSlug } from '@/lib/pagesStore'
+import { sanitizeRichText } from '@/lib/richText'
 
 function isPageSlug(slug: string): slug is PageSlug {
   return (PAGE_SLUGS as string[]).includes(slug)
@@ -31,7 +32,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   }
 
   try {
-    const page = await updatePage(slug, body)
+    // Sanitized here, not only in the editor: the body ends up in
+    // dangerouslySetInnerHTML on a page every visitor loads, and this route is
+    // reachable with nothing but an admin token and curl. The client
+    // sanitizes too, so that the value it holds matches what comes back — but
+    // that copy is a convenience, and this one is the control.
+    const page = await updatePage(slug, {
+      ...body,
+      ...(body.body !== undefined ? { body: sanitizeRichText(body.body) } : {}),
+    })
     // The public /about and /privacy routes cache this content; drop it so
     // the edit shows up. 'max' keeps serving the stale value while the fresh
     // one regenerates, same as revalidatePublicContent.
