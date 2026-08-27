@@ -278,6 +278,18 @@ export default function SiteSettingsEditor({
             Shown under the home screen heading, and reused as the footer blurb.
           </span>
         </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Contribution line</span>
+          <input
+            value={draft.contributionNote}
+            onChange={(e) => set('contributionNote', e.target.value)}
+            className={inputClass}
+          />
+          <span className="block text-[11px] text-muted mt-1">
+            Under the home screen search box, after the listing count, followed by a
+            &ldquo;How this works&rdquo; link to the About page. Leave empty to hide the line.
+          </span>
+        </label>
         <div className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
           <div className="flex items-center gap-3">

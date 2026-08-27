@@ -220,11 +220,30 @@ test.describe('URLs', () => {
     expect(serverMarkup(await res.text())).toContain('Privacy Policy')
   })
 
+  // The reachability guarantee that actually matters, and the one that was
+  // broken: SiteChrome renders the footer on desktop only, so for as long as
+  // the footer held the only /privacy link in the app, a phone visitor typing
+  // their email into a form had no route to the policy at all. PrivacyNote
+  // put the link at the point of collection instead — which is better
+  // placement on every device, and is the reason the footer staying
+  // desktop-only is now a layout choice rather than a hole. Deliberately not
+  // skipped on mobile: mobile is the case this exists for.
+  test('the privacy policy is reachable from a form that collects personal data', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}/feedback`)
+    await dismissLocationPrompt(page)
+
+    const link = page.getByRole('link', { name: /privacy policy/i })
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute('href', '/privacy')
+  })
+
   test('the privacy policy is linked from the footer', async ({ page, isMobile }) => {
-    // SiteChrome wraps SiteFooter in `hidden sm:block` — mobile relies on the
-    // bottom tab bar instead and has no footer at all, so this link (and
-    // this test) is desktop-only by the same design, not an oversight here.
-    test.skip(isMobile, 'no footer on mobile')
+    // Desktop-only by design — a phone here is an app shell with a bottom tab
+    // bar, and a document footer under one reads as a website. Mobile reaches
+    // the policy through PrivacyNote instead (see the test above), which is
+    // what makes this skip legitimate rather than a hole.
+    test.skip(isMobile, 'no footer on mobile — see the PrivacyNote test above')
 
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)

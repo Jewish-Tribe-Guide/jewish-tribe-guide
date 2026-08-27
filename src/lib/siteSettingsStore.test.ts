@@ -60,6 +60,23 @@ describe('getSiteSettingsUncached', () => {
     expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
   })
 
+  // An un-migrated deployment returns a row with no contribution_note at all.
+  // '' is a meaningful value here — it's how an admin switches the home
+  // screen's contribution line OFF — so a null must not collapse into it, or
+  // deploying ahead of the migration silently hides the line with no way to
+  // tell that from a deliberate choice.
+  it('falls back to the default contribution note when the column is missing, not to empty', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, contribution_note: null }, error: null }))
+    const settings = await getSiteSettingsUncached('philly')
+    expect(settings.contributionNote).toBe(SITE_SETTINGS_DEFAULTS.contributionNote)
+    expect(settings.contributionNote).not.toBe('')
+  })
+
+  it('keeps an empty contribution note an admin set on purpose', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, contribution_note: '' }, error: null }))
+    expect((await getSiteSettingsUncached('philly')).contributionNote).toBe('')
+  })
+
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(getSiteSettingsUncached('philly')).rejects.toThrow('Failed to load site settings: boom')

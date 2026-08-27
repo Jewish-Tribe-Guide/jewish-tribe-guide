@@ -99,6 +99,17 @@ function Chrome({ children, year }: { children: React.ReactNode; year: number })
           a fallback has to announce itself rather than pass as data. */}
       <ContentFailureNotice />
       {children}
+      {/* Desktop only, deliberately. A phone here is an app shell with a
+          fixed bottom tab bar, and a document footer under one reads as a
+          website — native apps put this material behind a More/Settings
+          destination instead, and burying Feedback (the action we actually
+          want) in such a menu to carry two links wasn't worth it.
+          Everything the footer says has a mobile home already: the mission
+          and the "you can fix this" invitation are in the hero's
+          contribution line, Feedback is its own tab, /about is the hero
+          line's "How this works" link, and /privacy is linked from the
+          forms that collect personal data (which is where it belongs on
+          every device — see PrivacyNote). */}
       <div className="hidden desktop:block">
         <SiteFooter onPromoteFeedbackToPage={() => navigate(null, 'feedback')} year={year} />
       </div>

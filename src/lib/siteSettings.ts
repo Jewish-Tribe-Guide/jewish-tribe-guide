@@ -24,6 +24,10 @@ export type SiteSettings = {
   heroTitle: string
   /** Shown under the home screen heading, and reused as the footer blurb. */
   mission: string
+  /** The "you can edit this" line under the home screen's search box, shown
+   *  with a live listing count and a link to the About page. Empty hides the
+   *  line — the escape hatch for a community that doesn't want it. */
+  contributionNote: string
   /** A pasted image URL shown in the header instead of the built-in Star of
    *  David mark. Null/empty keeps the default mark. */
   logoUrl: string | null
@@ -91,6 +95,11 @@ export const FEATURED_CARD_COUNT = 3
 
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
 
+/** Deliberately says what a visitor *can do*, not what the site *is*. "A
+ *  community project" is a fact about us; "anyone can add a place" is an
+ *  invitation, and the invitation is the point of the line. */
+export const DEFAULT_CONTRIBUTION_NOTE = 'Community-maintained — anyone can add a place or suggest a fix.'
+
 export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the site? Send a note'
 export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
 export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
@@ -102,6 +111,7 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   tagline: community.tagline,
   heroTitle: DEFAULT_HERO_TITLE,
   mission: community.mission,
+  contributionNote: DEFAULT_CONTRIBUTION_NOTE,
   logoUrl: null,
   feedbackEnabled: true,
   feedbackButtonLabel: DEFAULT_FEEDBACK_BUTTON_LABEL,

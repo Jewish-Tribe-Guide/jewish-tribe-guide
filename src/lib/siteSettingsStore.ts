@@ -17,6 +17,7 @@ type Row = {
   tagline: string
   hero_title: string
   mission: string
+  contribution_note: string | null
   logo_url: string | null
   feedback_enabled: boolean
   feedback_button_label: string
@@ -49,6 +50,10 @@ function toSettings(row: Row | null): SiteSettings {
     tagline: row.tagline,
     heroTitle: row.hero_title,
     mission: row.mission,
+    // Null until this column's migration has been run — falls back to the
+    // code default rather than to '', which is the "hide the line" value and
+    // would silently switch the invitation off on an un-migrated deployment.
+    contributionNote: row.contribution_note ?? SITE_SETTINGS_DEFAULTS.contributionNote,
     logoUrl: row.logo_url,
     feedbackEnabled: row.feedback_enabled,
     feedbackButtonLabel: row.feedback_button_label,
@@ -107,6 +112,7 @@ export async function updateSiteSettings(
         tagline: merged.tagline,
         hero_title: merged.heroTitle,
         mission: merged.mission,
+        contribution_note: merged.contributionNote,
         logo_url: merged.logoUrl,
         feedback_enabled: merged.feedbackEnabled,
         feedback_button_label: merged.feedbackButtonLabel,
