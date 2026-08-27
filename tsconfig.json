@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -21,14 +25,18 @@
     // No `baseUrl` — TypeScript 6 deprecates it (hard error in 7). `paths`
     // must be relative (`./src/*`, not `src/*`) once baseUrl is gone.
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     // Explicit, because TypeScript 7 stopped auto-discovering ambient
     // `@types/*` packages that are never `import`ed anywhere (google.maps
     // is one — a pure `declare namespace google.maps {...}` ambient file,
     // never imported by name). Harmless to list explicitly on TS5/6 too,
     // so this doesn't need revisiting on the next TypeScript bump.
-    "types": ["google.maps"]
+    "types": [
+      "google.maps"
+    ]
   },
   "include": [
     "next-env.d.ts",
@@ -36,7 +44,15 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-e2e-3213/types/**/*.ts",
+    ".next-e2e-3213/dev/types/**/*.ts",
+    ".next-e2e-3211/types/**/*.ts",
+    ".next-e2e-3211/dev/types/**/*.ts",
+    ".next-e2e-3212/types/**/*.ts",
+    ".next-e2e-3212/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
