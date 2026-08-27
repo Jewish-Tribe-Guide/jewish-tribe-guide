@@ -22,6 +22,37 @@ npm run test:all            # unit + e2e only — the four suites above need TES
 
 The last four run against a **disposable second Supabase project** (`TEST_SUPABASE_*` env vars), specifically so they're free to write and delete real rows — unlike everything in `e2e/`. See each suite's own `e2e-*/auth.setup.ts` for the mechanism.
 
+## Which suite covers what you just touched
+
+`test:all` is unit + e2e **only**. The four `TEST_SUPABASE_*` suites are not in
+it, not in `npm test`, and not in `test:e2e` — so a change to something they
+cover passes everything you'd normally run and fails in CI. That has already
+happened: the Pages tab got a rich-text editor, every local check was green,
+and `test:admin-write` broke on a locator the editor had made ambiguous.
+
+Look up what you edited before calling it done:
+
+| If you touched | Run |
+| --- | --- |
+| `src/components/admin/**`, `src/app/admin/**`, `src/app/api/admin/**` | `test:admin-write` |
+| The moderation queue, category editor, form editor, Pages tab specifically | `test:admin-write` |
+| `src/components/wizard/**`, `src/components/intake/**`, form submission or its API | `test:form-roundtrip` |
+| `src/lib/cacheTags.ts`, anything `use cache` or `revalidateTag`, a store's cached read | `test:cache-roundtrip` |
+| `src/lib/submissionStore.ts` (the only store with an `*.integration.test.ts` today) | `test:integration` |
+| `src/app/about/**`, `src/app/privacy/**`, `src/lib/pagesStore.ts`, `src/lib/richText.ts` | `test:admin-write` **and** `test:cache-roundtrip` (they split the `page` singletons between them — admin-write owns `privacy`, cache-roundtrip owns `about`) |
+| Routing, data loading, caching, metadata, page shells | `test:e2e` (see below) |
+
+Running one locally needs `TEST_SUPABASE_*` set, and `SHARED_DEV_TEST_PROJECT=1`
+if your `.env.local` points dev at that same project. All four refuse to run
+otherwise, rather than risk writing to the real database — the guard is in each
+`playwright.*.config.ts` for the three Playwright suites, and in
+`src/test/integrationEnv.ts` for `test:integration`.
+
+One caveat when you do run them: `cache-roundtrip` polls a rebuilt production
+server and its first run after a cold build can exhaust the 20s poll while
+being perfectly correct. Re-run before believing a failure there; a real
+caching bug fails every time, not once.
+
 **When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a visual judgment call), say so explicitly instead of silently skipping coverage.
 
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
