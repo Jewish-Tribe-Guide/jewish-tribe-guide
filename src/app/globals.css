@@ -45,6 +45,12 @@ body {
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
   --color-accent: #d97706;
   --color-accent-dark: #b45309;
+  /* Plain slate-50. Tried tinting this with a few percent of the community's
+     brand color to make the page feel less neutral; at desktop widths, where
+     a lot of the surface shows at once, it read as the whole site having gone
+     faintly blue rather than as warmth, so it's back to grey. If this gets
+     revisited, the tint needs to be well under 5% — or applied to a band
+     rather than to every screen. */
   --color-surface: #f8fafc;
   --color-muted: #64748b;
 }
@@ -128,4 +134,61 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Admin-authored page copy (About, Privacy) — see lib/richText.ts. Tailwind's
+ * preflight resets headings and lists to look like body text, which is right
+ * everywhere the app builds its own markup with utility classes and wrong for
+ * the one place the markup arrives as an opaque HTML string with nowhere to
+ * hang a class. Scoped to .rich-text so it can't leak into the rest of the
+ * app, and applied to the editor's contenteditable as well as to the rendered
+ * page, so what an admin sees while typing is what a visitor gets. Sizes are
+ * relative (em) because the two contexts set different base sizes. */
+.rich-text > :first-child {
+  margin-top: 0;
+}
+.rich-text > :last-child {
+  margin-bottom: 0;
+}
+.rich-text p {
+  margin: 1em 0;
+}
+.rich-text h2,
+.rich-text h3 {
+  font-weight: 600;
+  color: var(--color-slate-900);
+  margin: 1.75em 0 0.5em;
+}
+.rich-text h2 {
+  font-size: 1.25em;
+}
+.rich-text h3 {
+  font-size: 1.1em;
+}
+.rich-text ul,
+.rich-text ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+.rich-text ul {
+  list-style: disc;
+}
+.rich-text ol {
+  list-style: decimal;
+}
+.rich-text li {
+  margin: 0.35em 0;
+}
+.rich-text blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--color-slate-200);
+  color: var(--color-slate-500);
+}
+.rich-text a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.rich-text strong {
+  font-weight: 600;
 }

@@ -13,6 +13,7 @@ import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
+import PrivacyNote from '@/components/PrivacyNote'
 
 // Whether the Turnstile challenge is actually active for this deploy — mirrors
 // TurnstileWidget's own check. When it's not configured, the widget renders
@@ -479,6 +480,8 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
                 ? 'Submit edit for review'
                 : 'Submit for review'}
         </button>
+
+        <PrivacyNote />
       </form>
       </div>
     </div>

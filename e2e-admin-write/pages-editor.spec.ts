@@ -38,13 +38,73 @@ test('editing a page through the real Pages tab saves to the database', async ({
     await page.goto('/admin/pages')
     await page.getByRole('button', { name: 'Privacy Policy', exact: true }).click()
 
-    const bodyField = page.getByLabel('Body')
+    // getByRole, not getByLabel('Body'): the body field is a WYSIWYG now, and
+    // its toolbar is labelled "Page body formatting" — which getByLabel
+    // matches on substring, so 'Body' resolved to both the toolbar and the
+    // editor and failed strict mode. Addressing the textbox by role says what
+    // this actually wants and can't be broadened by a future sibling control.
+    const bodyField = page.getByRole('textbox', { name: 'Page body' })
     await bodyField.fill(newBody)
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByText('Saved.')).toBeVisible({ timeout: 10_000 })
 
     const { data: after } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
-    expect(after!.body).toBe(newBody)
+    // Not toBe(newBody): the Pages tab stores sanitized HTML now rather than
+    // the raw string the old <textarea> saved, so typing a line into the
+    // contenteditable arrives as "<p>…</p>". What this test is for is that
+    // what was typed reached the database through the real UI — so it asserts
+    // the text is there and that it arrived as markup, without pinning the
+    // exact wrapper a browser chooses to put around a typed line.
+    expect(after!.body).toContain(newBody)
+    expect(after!.body).toMatch(/^<p>/)
+  } finally {
+    await supabase.from('page').update({ body: originalBody }).eq('slug', 'privacy')
+  }
+})
+
+// The half the test above doesn't reach. Editing the body as plain text goes
+// through the WYSIWYG without exercising any of it — the stored value comes
+// back as the same plain string it went in as, which is exactly what the old
+// <textarea> did too. So that test kept passing while the whole point of the
+// editor went unverified, and it's how a strict-mode break in the Pages tab
+// reached CI unnoticed.
+//
+// This drives the real toolbar and asserts on what lands in the database,
+// which is the only place the full chain shows up: contenteditable produces
+// <b>, the client sanitizer rewrites it to <strong>, the PATCH route
+// sanitizes again, and the row has to end up holding markup rather than the
+// styled spans a browser might have emitted.
+test('formatting applied in the Pages tab survives the save', async ({ page }) => {
+  const supabase = getAdminClient()
+  const { data: before } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
+  const originalBody = before!.body as string
+
+  const text = `Bold ${randomUUID().slice(0, 8)}`
+
+  try {
+    await page.goto('/admin/pages')
+    await page.getByRole('button', { name: 'Privacy Policy', exact: true }).click()
+
+    const bodyField = page.getByRole('textbox', { name: 'Page body' })
+    await bodyField.fill(text)
+    // Select what was just typed, then bold it through the actual toolbar
+    // button rather than a keyboard shortcut — the button is the thing that
+    // has to keep the selection alive (it preventDefaults mousedown for
+    // exactly that reason), and a shortcut would route around the bug that
+    // would break.
+    await bodyField.press('ControlOrMeta+a')
+    await page.getByRole('button', { name: 'Bold (⌘B)' }).click()
+
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByText('Saved.')).toBeVisible({ timeout: 10_000 })
+
+    const { data: after } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
+    const saved = after!.body as string
+    expect(saved).toContain(text)
+    // <strong>, not <b>: the sanitizer canonicalises what contenteditable
+    // emits, and storing <b> would mean it had been bypassed.
+    expect(saved).toMatch(/<strong>/)
+    expect(saved).not.toMatch(/<b>/)
   } finally {
     await supabase.from('page').update({ body: originalBody }).eq('slug', 'privacy')
   }

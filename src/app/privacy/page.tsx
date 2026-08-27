@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { siteUrl } from '@/lib/siteUrl'
 import { getPage } from '@/lib/pagesStore'
+import { pageBodyToHtml } from '@/lib/richText'
 
 export const metadata: Metadata = {
   title: `Privacy Policy — ${community.name}`,
@@ -27,7 +28,6 @@ const CONTACT_EMAIL = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.co
 // text does, defeating the point of making this admin-editable at all.
 export default async function PrivacyPage() {
   const page = await getPage('privacy')
-  const paragraphs = (page?.body ?? '').split(/\n\s*\n/).filter((p) => p.trim())
   const lastUpdated = page
     ? new Date(page.updatedAt).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -48,10 +48,13 @@ export default async function PrivacyPage() {
       </h1>
       {lastUpdated && <p className="mt-1 text-sm text-muted">Last updated: {lastUpdated}</p>}
 
-      <div className="mt-8 space-y-4 text-sm leading-relaxed text-slate-700">
-        {paragraphs.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
+      {/* Admin-authored rich text — see the same note on /about. */}
+      <div
+        className="rich-text mt-8 text-sm leading-relaxed text-slate-700"
+        dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
+      />
+
+      <div className="rich-text text-sm leading-relaxed text-slate-700">
         <p>
           Questions about this policy, or want us to delete information you&rsquo;ve previously sent us?
           Email{' '}

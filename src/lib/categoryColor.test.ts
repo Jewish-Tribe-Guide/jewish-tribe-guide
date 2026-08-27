@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCategoryColor } from './categoryColor'
+import { categoryTint, getCategoryColor } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -59,6 +59,67 @@ describe('getCategoryColor', () => {
     }
   })
 
+  // The bug this is here for: the palette held ten colours, the site had
+  // sixteen categories, and `index % PALETTE.length` handed the eleventh
+  // category the first one's colour byte-for-byte. Restaurants and Synagogues
+  // came out #257d96 both, which on a map full of pins is simply wrong rather
+  // than merely tight. The old version of this file only ever checked five
+  // categories, so it passed the entire time.
+  //
+  // Twenty, not "the palette length": the number that matters is how many
+  // categories a real deployment has (sixteen when this was found), and
+  // asserting against PALETTE.length would let someone shrink the palette and
+  // still be green.
+  it('gives twenty categories twenty different colours, since real sites have more than ten', () => {
+    const many = Array.from({ length: 20 }, (_, i) => cat(`c${i}`))
+    const colors = many.map((c) => getCategoryColor(many, c.id))
+    expect(new Set(colors).size).toBe(20)
+  })
+
+  // The subtler half of the same bug, and the one the first fix walked into:
+  // making the back half of the palette the same hues again, darker, gives
+  // category n and category n+10 a matched light/dark pair — Restaurants and
+  // Synagogues came out cyan and dark cyan, which on a map still reads as one
+  // colour. Distinct-hex was true and useless. So this measures actual
+  // perceptual distance (OKLab) rather than inequality.
+  //
+  // 0.08 is chosen against the palette's own worst case: green/lime sit 0.047
+  // apart and are the tightest pair anyone has accepted here, so a pair that
+  // the wrap creates on purpose should be comfortably looser than that.
+  it('keeps a category and the one ten later far apart, not the same hue twice', () => {
+    const oklab = (hex: string) => {
+      const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+      const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255))
+      const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+      const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+      const s2 = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+      return [
+        0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s2,
+        1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s2,
+        0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s2,
+      ]
+    }
+    const distance = (a: string, b: string) => {
+      const [x, y] = [oklab(a), oklab(b)]
+      return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+    }
+
+    const many = Array.from({ length: 20 }, (_, i) => cat(`c${i}`))
+    const colors = many.map((c) => getCategoryColor(many, c.id))
+    for (let i = 0; i + 10 < colors.length; i += 1) {
+      expect(distance(colors[i], colors[i + 10]), `categories ${i} and ${i + 10}`).toBeGreaterThan(0.08)
+    }
+  })
+
+  // Past the palette it does wrap, and that's accepted — but the wrap has to
+  // be far enough out that no plausible category list reaches it.
+  it('does not repeat a colour until well past any realistic category count', () => {
+    const many = Array.from({ length: 40 }, (_, i) => cat(`c${i}`))
+    const colors = many.map((c) => getCategoryColor(many, c.id))
+    const firstRepeat = colors.findIndex((c, i) => colors.indexOf(c) !== i)
+    expect(firstRepeat).toBeGreaterThanOrEqual(20)
+  })
+
   // Reordering the category list reassigns colours — that's inherent to a
   // positional palette, and it's fine (the pin and the card move together).
   // What must not happen is a category's colour depending on which *screen*
@@ -66,5 +127,34 @@ describe('getCategoryColor', () => {
   it('depends only on position in the list it was given', () => {
     const reordered = [...categories].reverse()
     expect(getCategoryColor(reordered, 'mikvah')).toBe(getCategoryColor(categories, 'synagogue'))
+  })
+
+  // The palette was pulled back in chroma to quiet the map down, which is a
+  // knob someone will reach for again. Every pin has a white glyph drawn on
+  // top of it, so there is a floor on how light these can get before the
+  // glyph stops being readable — this is that floor, stated once rather than
+  // rediscovered by squinting at a screenshot.
+  it('stays dark enough for the white glyph on top of every pin to read', () => {
+    const channel = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    const contrastWithWhite = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(hex.slice(i, i + 2), 16) / 255))
+      return 1.05 / (0.2126 * r + 0.7152 * g + 0.0722 * b + 0.05)
+    }
+    const many = Array.from({ length: 25 }, (_, i) => cat(`c${i}`))
+    for (const c of many) {
+      expect(contrastWithWhite(getCategoryColor(many, c.id))).toBeGreaterThan(3)
+    }
+  })
+})
+
+describe('categoryTint', () => {
+  it('produces a color a browser will parse, not a truncated hex', () => {
+    // '#2657bf' + a two-digit alpha — an 8-digit hex. Getting this wrong
+    // yields a string CSS silently ignores, i.e. an invisible avatar.
+    expect(categoryTint('#2657bf')).toMatch(/^#[0-9a-f]{8}$/i)
+  })
+
+  it("keeps the pin's own color as the base, so the two still read as one thing", () => {
+    expect(categoryTint('#2657bf').startsWith('#2657bf')).toBe(true)
   })
 })

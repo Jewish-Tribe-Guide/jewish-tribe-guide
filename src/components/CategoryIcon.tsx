@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import { categoryTint } from '@/lib/categoryColor'
 
 type Props = {
   icon: string
@@ -37,7 +38,7 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
   return (
     <span
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}
-      style={{ backgroundColor: color + '22', color }}
+      style={{ backgroundColor: categoryTint(color), color }}
       aria-hidden="true"
     >
       {hasImage ? (

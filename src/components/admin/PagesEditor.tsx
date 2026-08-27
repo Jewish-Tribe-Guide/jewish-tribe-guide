@@ -3,17 +3,29 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
+import RichTextEditor from '@/components/admin/RichTextEditor'
+import { pageBodyToHtml, sanitizeRichText } from '@/lib/richText'
 import type { PageSlug, StaticPage } from '@/lib/pagesStore'
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 // The admin Pages tab: edit the title and body of the site's standalone
-// content pages (About, Privacy). Plain text — a blank line starts a new
-// paragraph on the public page, same as every other admin-editable body of
-// copy in this app. One page is open for editing at a time; switching pages
-// discards an unsaved edit on the one you're leaving, same as the rest of
-// the admin console does for unsaved drafts elsewhere.
+// content pages (About, Privacy). The body is a small WYSIWYG (bold, italic,
+// underline, headings, lists, links) rather than the plain textarea it started
+// as — these are the two pages on the site that are genuinely *documents*, and
+// a privacy policy with no headings or lists is unreadable.
+//
+// Bodies written before the editor existed are plain text with blank lines
+// between paragraphs. `pageBodyToHtml` converts one to the equivalent markup
+// on the way into the editor and is also what the public pages render with,
+// so a legacy page reads identically whether or not anyone has re-saved it —
+// and `editorHtml` below compares the draft against that same converted form,
+// so merely opening a legacy page doesn't count as an edit.
+//
+// One page is open for editing at a time; switching pages discards an unsaved
+// edit on the one you're leaving, same as the rest of the admin console does
+// for unsaved drafts elsewhere.
 export default function PagesEditor({ token }: { token: string }) {
   const [pages, setPages] = useState<StaticPage[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +53,7 @@ export default function PagesEditor({ token }: { token: string }) {
 
   function selectPage(page: StaticPage) {
     setActiveSlug(page.slug)
-    setDraft({ title: page.title, body: page.body })
+    setDraft({ title: page.title, body: pageBodyToHtml(page.body) })
     setSavedNotice(false)
     setError(null)
   }
@@ -56,7 +68,11 @@ export default function PagesEditor({ token }: { token: string }) {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(draft),
+          // Sanitized here as well as in the route: this strips the styled
+          // spans and stray tags a paste leaves behind, so what comes back
+          // from the server matches the draft and the form settles as clean
+          // rather than staying dirty against its own saved value.
+          body: JSON.stringify({ title: draft.title, body: sanitizeRichText(draft.body) }),
         },
         'Save failed.',
       )
@@ -77,14 +93,17 @@ export default function PagesEditor({ token }: { token: string }) {
   }
 
   const active = pages.find((p) => p.slug === activeSlug) ?? null
-  const current = draft ?? (active ? { title: active.title, body: active.body } : null)
-  const dirty = !!active && !!draft && (draft.title !== active.title || draft.body !== active.body)
+  const savedBody = active ? pageBodyToHtml(active.body) : ''
+  const current = draft ?? (active ? { title: active.title, body: savedBody } : null)
+  const dirty =
+    !!active && !!draft && (draft.title !== active.title || sanitizeRichText(draft.body) !== savedBody)
 
   return (
     <div>
       <p className="text-sm text-muted mb-4">
         The site&rsquo;s standalone pages — About and Privacy — linked from the footer rather than the
-        main navigation. Plain text: leave a blank line between paragraphs.
+        main navigation. Formatting is limited to what the toolbar offers; pasted text comes in
+        unformatted on purpose.
       </p>
 
       {error && (
@@ -115,15 +134,14 @@ export default function PagesEditor({ token }: { token: string }) {
               className={inputClass}
             />
           </label>
-          <label className="block">
+          <div>
             <span className="block text-xs font-medium text-slate-700 mb-1">Body</span>
-            <textarea
-              rows={16}
+            <RichTextEditor
               value={current.body}
-              onChange={(e) => setDraft({ ...current, body: e.target.value })}
-              className={`${inputClass} font-mono`}
+              onChange={(body) => setDraft({ ...current, body })}
+              ariaLabel="Page body"
             />
-          </label>
+          </div>
         </div>
       )}
 

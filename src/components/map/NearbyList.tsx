@@ -5,6 +5,7 @@ import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
 import { ExternalIcon, PinIcon } from '@/components/icons'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import { categoryTint } from '@/lib/categoryColor'
 import { PHOTO_FIELD_KEY } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -384,7 +385,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
           <span
             className="relative flex h-6 w-6 items-center justify-center rounded-full text-xs"
-            style={{ backgroundColor: p.color + '22', color: p.color }}
+            style={{ backgroundColor: categoryTint(p.color), color: p.color }}
             aria-hidden="true"
           >
             <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-3.5 w-3.5" />

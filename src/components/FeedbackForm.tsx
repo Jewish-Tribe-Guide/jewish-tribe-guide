@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Honeypot from './Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
+import PrivacyNote from '@/components/PrivacyNote'
 import type { ContactHospitalData } from '@/types'
 
 type Props = {
@@ -168,6 +169,8 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
           >
             {status === 'submitting' ? 'Sending...' : 'Send feedback'}
           </button>
+
+          <PrivacyNote />
       </form>
     </>
   )

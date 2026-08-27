@@ -6,6 +6,7 @@ import { formatPhone, isValidPhone } from '@/lib/validation'
 import { stepIsVisible, type StepCondition } from '@/lib/forms'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import PrivacyNote from '@/components/PrivacyNote'
 
 // ── Step config ───────────────────────────────────────────────────────────────
 // A wizard is a flat list of steps. Each step shows ONE question. `when` gates a
@@ -354,6 +355,11 @@ export default function Wizard({
             )}
           </div>
         )}
+
+        {/* Last step only — that's where the answers actually leave the
+            device, and repeating it on every step of a long form would read
+            as a warning rather than as a reassurance. */}
+        {isLast && <PrivacyNote className="mt-5" />}
         {step.kind === 'single' && step.optional && (
           <button
             onClick={() => goToStep(Math.min(clampedIdx + 1, visible.length - 1))}
