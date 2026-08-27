@@ -45,15 +45,13 @@ body {
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
   --color-accent: #d97706;
   --color-accent-dark: #b45309;
-  /* slate-50 with a few percent of the community's own brand color mixed in,
-     rather than flat slate. The site is mostly white cards on this surface,
-     so a neutral gray reads as unfinished at desktop widths where there's a
-     lot of it showing; a tint this faint isn't consciously visible as color
-     but is enough for the page to feel like it belongs to the brand. Derived
-     from --color-primary (injected per community in layout.tsx), so a new
-     community gets a surface matching its own color for free instead of
-     inheriting Philadelphia's blue. */
-  --color-surface: color-mix(in oklab, var(--color-primary) 5%, #f8fafc);
+  /* Plain slate-50. Tried tinting this with a few percent of the community's
+     brand color to make the page feel less neutral; at desktop widths, where
+     a lot of the surface shows at once, it read as the whole site having gone
+     faintly blue rather than as warmth, so it's back to grey. If this gets
+     revisited, the tint needs to be well under 5% — or applied to a band
+     rather than to every screen. */
+  --color-surface: #f8fafc;
   --color-muted: #64748b;
 }
 
