@@ -199,8 +199,37 @@ function DistanceDirections({
  * shacharis / mincha / maariv never appear inline). Drive + walk time sit
  * under the shul name.
  */
+// Persisted across visits, same as the other "prompts you've already
+// dismissed" state this site keeps locally (see LiveLocationPrompt) — this
+// component fully unmounts on close (`if (!isOpen) return null` below), so
+// in-memory state alone wouldn't survive even a single close/reopen, let
+// alone a repeat visit. Reading it in the initializer rather than an effect
+// is safe here specifically because this component never renders anything
+// until a real client-side interaction (opening the modal) has already
+// happened — unlike page content, there's no SSR pass of this markup for a
+// synchronous localStorage read to mismatch against.
+const CALC_DISCLAIMER_DISMISSED_KEY = 'davening-calc-disclaimer-dismissed'
+
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
+  const [calcDisclaimerDismissed, setCalcDisclaimerDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return localStorage.getItem(CALC_DISCLAIMER_DISMISSED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  function dismissCalcDisclaimer() {
+    setCalcDisclaimerDismissed(true)
+    try {
+      localStorage.setItem(CALC_DISCLAIMER_DISMISSED_KEY, '1')
+    } catch {
+      // Storage can throw (private browsing, quota) — dismissal still holds
+      // for the rest of this session via the state above, just not future ones.
+    }
+  }
   // Empty = no day filter (show every day). Multiple days can be selected at
   // once; clicking an already-selected chip deselects just that one.
   const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>([])
@@ -359,11 +388,22 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
         </div>
 
         {/* One-time disclaimer, not per-row — only shown when at least one
-            visible row is a calculated (not shul-confirmed) time. */}
-        {hasCalculatedRows && (
-          <p className="px-5 py-1.5 text-[11px] text-muted bg-slate-50 border-b border-slate-100 shrink-0">
-            Times marked ≈ are calculated from today&apos;s sunset/candle-lighting and may not exactly match the shul&apos;s posted time.
-          </p>
+            visible row is a calculated (not shul-confirmed) time, and only
+            until the visitor dismisses it (sticks across visits). */}
+        {hasCalculatedRows && !calcDisclaimerDismissed && (
+          <div className="flex items-start gap-2 pl-5 pr-3 py-1.5 bg-slate-50 border-b border-slate-100 shrink-0">
+            <p className="flex-1 text-[11px] text-muted">
+              Times marked ≈ are calculated from today&apos;s sunset/candle-lighting and may not exactly match the shul&apos;s posted time.
+            </p>
+            <button
+              type="button"
+              onClick={dismissCalcDisclaimer}
+              aria-label="Dismiss"
+              className="shrink-0 text-muted hover:text-slate-700 cursor-pointer leading-none p-0.5 -mt-0.5"
+            >
+              ✕
+            </button>
+          </div>
         )}
 
         {/* ── Content — grouped by day, each day sub-grouped by tefillah ──── */}
