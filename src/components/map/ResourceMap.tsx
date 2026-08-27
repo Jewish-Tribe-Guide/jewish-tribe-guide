@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { loadGoogleMaps, MAPS_API_KEY, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
+import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
@@ -456,7 +456,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         mapRef.current = new google.maps.Map(containerRef.current, {
           center: fallbackCenter,
           zoom: 12,
-          mapId: 'resource_map',
+          mapId: MAPS_MAP_ID,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,

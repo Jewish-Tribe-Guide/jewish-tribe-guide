@@ -9,6 +9,27 @@
 
 export const MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
+// A Cloud-console Map ID. Two things depend on it:
+//
+//   1. AdvancedMarkerElement — every pin on the resource map — formally
+//      requires one.
+//   2. Basemap styling. With a Map ID set, the `styles` option is ignored and
+//      the style is whatever is attached to that ID in the Cloud console. So
+//      this is the only route to a desaturated basemap; there is no code-level
+//      alternative while advanced markers are in use.
+//
+// The fallback is the literal string this shipped with for a long time, and it
+// is NOT a real Map ID — Google's own mapConfigs response for it reads "Map ID
+// not found. Map capabilities are currently enabled but this behavior may
+// change in a future release." In other words the markers currently work on
+// Google's forbearance rather than by right. Kept as the fallback anyway so
+// nothing changes for a deployment that hasn't set the variable yet; the fix
+// is to create a real Map ID (Cloud console → Map Management, vector,
+// JavaScript) and set NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID to the value it
+// generates. Once that's set, styling the map is a console-only change with
+// no deploy.
+export const MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'resource_map'
+
 // Set to true if Google rejects the key (invalid key, API/billing not enabled,
 // referrer not allowed). Callers read this to degrade gracefully instead of
 // leaving a broken Google widget on the page.
