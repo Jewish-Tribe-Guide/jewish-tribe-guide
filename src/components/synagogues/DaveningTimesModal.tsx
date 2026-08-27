@@ -391,7 +391,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
             visible row is a calculated (not shul-confirmed) time, and only
             until the visitor dismisses it (sticks across visits). */}
         {hasCalculatedRows && !calcDisclaimerDismissed && (
-          <div className="flex items-start gap-2 pl-5 pr-3 py-1.5 bg-slate-50 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-2 pl-5 pr-3 py-1.5 bg-slate-50 border-b border-slate-100 shrink-0">
             <p className="flex-1 text-[11px] text-muted">
               Times marked ≈ are calculated from today&apos;s sunset/candle-lighting and may not exactly match the shul&apos;s posted time.
             </p>
@@ -399,7 +399,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
               type="button"
               onClick={dismissCalcDisclaimer}
               aria-label="Dismiss"
-              className="shrink-0 text-[11px] text-muted hover:text-slate-700 cursor-pointer leading-none p-0.5 -mt-0.5"
+              className="shrink-0 text-[11px] text-muted hover:text-slate-700 cursor-pointer leading-none p-0.5"
             >
               ✕
             </button>
