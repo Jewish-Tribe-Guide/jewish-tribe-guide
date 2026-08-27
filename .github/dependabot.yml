@@ -19,3 +19,5 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+# no-op touch: editing this file makes Dependabot re-check both ecosystems
+# immediately instead of waiting for the weekly schedule.
