@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -19,9 +18,17 @@
         "name": "next"
       }
     ],
+    // No `baseUrl` — TypeScript 6 deprecates it (hard error in 7). `paths`
+    // must be relative (`./src/*`, not `src/*`) once baseUrl is gone.
     "paths": {
-      "@/*": ["*"]
-    }
+      "@/*": ["./src/*"]
+    },
+    // Explicit, because TypeScript 7 stopped auto-discovering ambient
+    // `@types/*` packages that are never `import`ed anywhere (google.maps
+    // is one — a pure `declare namespace google.maps {...}` ambient file,
+    // never imported by name). Harmless to list explicitly on TS5/6 too,
+    // so this doesn't need revisiting on the next TypeScript bump.
+    "types": ["google.maps"]
   },
   "include": [
     "next-env.d.ts",

@@ -16,6 +16,9 @@ let observed: Observed[] = []
 class MockIntersectionObserver implements IntersectionObserver {
   readonly root = null
   readonly rootMargin = ''
+  // Required by the DOM lib TypeScript 6+ ships (absent from TS5's) — same
+  // unused-in-practice default as rootMargin above, not a real behavior.
+  readonly scrollMargin = ''
   readonly thresholds: ReadonlyArray<number> = []
   private callback: IntersectionObserverCallback
 
