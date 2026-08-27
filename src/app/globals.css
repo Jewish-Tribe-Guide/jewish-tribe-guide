@@ -159,8 +159,21 @@ body {
   color: var(--color-slate-900);
   margin: 1.75em 0 0.5em;
 }
+/* A hairline above each top-level section. Without it the About and Privacy
+   pages read as one slab: their section titles carry weight but nothing marks
+   where one section ends and the next begins, which is most of what made those
+   pages look flat. Only h2 — h3 is a sub-heading inside a section and a rule
+   there would imply a break that isn't one. */
 .rich-text h2 {
-  font-size: 1.25em;
+  font-size: 1.15em;
+  margin-top: 2.25em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--color-slate-200);
+}
+.rich-text > h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 .rich-text h3 {
   font-size: 1.1em;
@@ -192,3 +205,4 @@ body {
 .rich-text strong {
   font-weight: 600;
 }
+
