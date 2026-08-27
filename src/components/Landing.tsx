@@ -212,7 +212,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
-        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} listingCount={listings?.length ?? null} />
+        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
         {/* ── The desktop gateway's three singleton blocks — featured cards,
                 the embedded map, Zmanim & Shabbos — in the admin-configured

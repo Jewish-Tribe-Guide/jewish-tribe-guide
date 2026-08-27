@@ -1,17 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
-  settings: Pick<SiteSettings, 'heroTitle' | 'mission' | 'contributionNote'>
-  /** How many listings the directory currently holds — shown in the
-   *  contribution line as evidence that the "community-maintained" claim is
-   *  real. Null while listings are still loading, which drops the count and
-   *  keeps the rest of the sentence rather than flashing "0 listings". */
-  listingCount?: number | null
+  settings: Pick<SiteSettings, 'heroTitle' | 'mission'>
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the search box inert (nothing to filter in a
@@ -29,9 +23,8 @@ type Props = {
 // The home screen's heading, mission, filter box, and "View Map" button — its
 // own component so the admin Site preview can render the exact same markup
 // the live home screen does, fed by a draft instead of the saved settings.
-export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap, listingCount }: Props) {
+export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap }: Props) {
   const isMobile = useIsMobile()
-  const note = settings.contributionNote?.trim()
 
   return (
     <section className="pt-12 sm:pt-16 text-center">
@@ -68,31 +61,6 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
           </div>
         </div>
       )}
-      {/* The "this is yours to correct" line. Every listing already carries
-          Add / Edit / Report, but only once it's been expanded, in the
-          quietest text on the card — so without this a visitor can use the
-          whole site and never find out. Placed directly under the search box
-          because that's the one element every visitor looks at, and because
-          the message has to land before someone drills into a category, not
-          after. Quiet by design: it's an invitation, not a call to action
-          competing with the search box above it. */}
-      {note && (
-        <p className="mt-4 text-[13px] text-slate-500">
-          {listingCount != null && listingCount > 0 && (
-            <span className="font-medium text-slate-600">{listingCount.toLocaleString()} listings</span>
-          )}
-          {listingCount != null && listingCount > 0 && ' · '}
-          {note}{' '}
-          {/* A real <Link>, not a button: /about is a top-level page outside
-              the community segment, and this is the route by which anyone
-              actually reaches it now that the footer explaining all of this
-              is no longer the only signpost. */}
-          <Link href="/about" className="whitespace-nowrap font-medium text-primary underline underline-offset-2 hover:no-underline">
-            How this works →
-          </Link>
-        </p>
-      )}
-
       {mapIcon != null && (
         <button
           onClick={onViewMap}
