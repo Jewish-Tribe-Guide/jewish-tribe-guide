@@ -399,7 +399,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
               type="button"
               onClick={dismissCalcDisclaimer}
               aria-label="Dismiss"
-              className="shrink-0 text-muted hover:text-slate-700 cursor-pointer leading-none p-0.5 -mt-0.5"
+              className="shrink-0 text-[11px] text-muted hover:text-slate-700 cursor-pointer leading-none p-0.5 -mt-0.5"
             >
               ✕
             </button>
