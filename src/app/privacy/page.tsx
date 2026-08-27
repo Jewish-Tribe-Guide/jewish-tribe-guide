@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import UpButton from '@/components/UpButton'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { siteUrl } from '@/lib/siteUrl'
@@ -39,30 +39,46 @@ export default async function PrivacyPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
-      <Link href="/" className="text-sm text-muted hover:text-slate-700 underline">
-        ← Back to {community.name}
-      </Link>
+      {/* The same control every other second-level screen uses, saying the
+          same word. This used to be a bespoke underlined "← Back to
+          {community.name}" link, which named its destination differently from
+          the rest of the app for no reason anyone could point at. */}
+      <UpButton href="/" label="Home" className="mb-0" />
 
-      <h1 className="mt-6 text-2xl font-bold tracking-tight text-slate-900">
+      <h1 className="mt-6 text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
         {page?.title ?? 'Privacy Policy'}
       </h1>
       {lastUpdated && <p className="mt-1 text-sm text-muted">Last updated: {lastUpdated}</p>}
 
+      {/* One card around the whole document, using the app's own card token —
+          the same one the admin panels and listing rows use, so these pages
+          read as part of the site rather than as text on a bare background.
+          Deliberately ONE card and not one per section: a card says "discrete,
+          self-contained item", which is true of a listing and false of a
+          document you read top to bottom.
+          The 16px inside it is a departure from the app's text-sm default on
+          purpose — everywhere else is dense UI, this is prose read end to
+          end. */}
       {/* Admin-authored rich text — see the same note on /about. */}
-      <div
-        className="rich-text mt-8 text-sm leading-relaxed text-slate-700"
-        dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
-      />
+      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div
+          className="rich-text text-[16px] leading-[1.75] text-slate-700"
+          dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
+        />
 
-      <div className="rich-text text-sm leading-relaxed text-slate-700">
-        <p>
+        {/* Inside the same card, not below it: this is the policy's closing
+            paragraph, and it only lives in code because the mailto has to be a
+            live link. Splitting it out would read as a separate document. */}
+        <div className="rich-text text-[16px] leading-[1.75] text-slate-700">
+          <p>
           Questions about this policy, or want us to delete information you&rsquo;ve previously sent us?
           Email{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary underline">
-            {CONTACT_EMAIL}
-          </a>{' '}
-          and we&rsquo;ll take care of it.
-        </p>
+              {CONTACT_EMAIL}
+            </a>{' '}
+            and we&rsquo;ll take care of it.
+          </p>
+        </div>
       </div>
     </main>
   )
