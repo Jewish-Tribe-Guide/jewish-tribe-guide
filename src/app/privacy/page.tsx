@@ -15,16 +15,27 @@ export const metadata: Metadata = {
 }
 
 const CONTACT_EMAIL = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
-const LAST_UPDATED = 'August 18, 2026'
 
 // A plain, top-level page (not under /[community]) — privacy applies to the
 // whole site, not one community, same reasoning as /offline and /admin
 // living outside that segment. Content is admin-editable (see /admin's Pages
 // tab); this component fetches it and appends the contact line, which stays
 // code (a live mailto: link, not something to retype into the admin editor).
+//
+// "Last updated" reads the row's own updated_at rather than a hardcoded
+// string — a hand-maintained date would need a code change every time the
+// text does, defeating the point of making this admin-editable at all.
 export default async function PrivacyPage() {
   const page = await getPage('privacy')
   const paragraphs = (page?.body ?? '').split(/\n\s*\n/).filter((p) => p.trim())
+  const lastUpdated = page
+    ? new Date(page.updatedAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: community.timezone,
+      })
+    : null
 
   return (
     <main className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
@@ -35,7 +46,7 @@ export default async function PrivacyPage() {
       <h1 className="mt-6 text-2xl font-bold tracking-tight text-slate-900">
         {page?.title ?? 'Privacy Policy'}
       </h1>
-      <p className="mt-1 text-sm text-muted">Last updated: {LAST_UPDATED}</p>
+      {lastUpdated && <p className="mt-1 text-sm text-muted">Last updated: {lastUpdated}</p>}
 
       <div className="mt-8 space-y-4 text-sm leading-relaxed text-slate-700">
         {paragraphs.map((p, i) => (
