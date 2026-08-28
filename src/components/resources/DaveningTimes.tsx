@@ -34,6 +34,16 @@ export default function DaveningTimes({
   return null
 }
 
+/** Makes the spaces *inside* a day name unbreakable, leaving the ones after a
+ *  comma as the only wrap points. `formatDays` builds these labels as a
+ *  comma-joined list ("Mon, Thu, Rosh Chodesh"), so the commas are the only
+ *  places a break reads as intentional — without this, a capped column breaks
+ *  wherever the last word stopped fitting and gives you "Mon, Thu, Rosh" over
+ *  "Chodesh". */
+function breakOnlyAtCommas(label: string): string {
+  return label.replace(/(?<!,) /g, '\u00a0')
+}
+
 /**
  * Renders structured minyanim grouped by tefillah for a single listing.
  * Each group: label header + day/time grid. The official rule text (e.g.
@@ -60,7 +70,17 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
     // immediately, and a card of four groups had four different left edges on
     // its values. A reader parses this block as a table, and a ragged column
     // of times is what made it look disordered.
-    <div className="grid grid-cols-[auto_1fr] gap-x-4">
+    //
+    // `fit-content`, not `auto`, for the day column: shared columns mean the
+    // single widest label sets where every time starts, and one
+    // "Mon, Thu, Rosh Chodesh" row — an ordinary shul schedule, not an edge
+    // case — was pushing all four groups' times ~45px right on its own. The
+    // cap lets that one label wrap to two lines and leaves every other row
+    // tighter. It sits just above the width of "Rosh Chodesh", which
+    // breakOnlyAtCommas keeps as a single unbreakable token, so the wrap
+    // lands after a comma. Labels narrower than the cap still size to their
+    // content, so a card without a long one loses nothing.
+    <div className="grid grid-cols-[fit-content(5.5rem)_1fr] gap-x-4">
       {groups.map((group, gi) => (
         <div key={group.tefillah} className={`col-span-2 grid grid-cols-subgrid ${gi > 0 ? 'mt-3' : ''}`}>
           <p className="col-span-2 text-xs font-semibold text-muted mb-1">{group.label}</p>
@@ -68,8 +88,8 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
             {mergeSameDayTimes(group.rows).flatMap((row, i) => {
               const calc = resolveAnchorTime(row, anchors)
               return [
-                <dt key={`d${i}`} className="text-xs text-muted whitespace-nowrap">
-                  {row.daysLabel || 'Daily'}
+                <dt key={`d${i}`} className="text-xs text-muted">
+                  {breakOnlyAtCommas(row.daysLabel || 'Daily')}
                 </dt>,
                 <dd key={`v${i}`} className="text-xs font-medium text-slate-800">
                   {row.time}
