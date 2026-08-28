@@ -5,7 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorker from '@/components/ServiceWorker'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
-import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { iconVersion, SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import './globals.css'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
@@ -45,8 +45,12 @@ export async function generateMetadata(): Promise<Metadata> {
     ...(hasLogo
       ? {
           icons: {
-            icon: [{ url: '/icons/32', sizes: '32x32', type: 'image/png' }],
-            apple: [{ url: '/icons/180', sizes: '180x180', type: 'image/png' }],
+            // ?v= so a new logo is a new URL — see iconVersion. iOS in
+            // particular caches apple-touch-icon hard once the site has been
+            // added to a home screen, so without this the icon there stays
+            // whatever it was on the day it was added.
+            icon: [{ url: `/icons/32?v=${iconVersion(settings.logoUrl)}`, sizes: '32x32', type: 'image/png' }],
+            apple: [{ url: `/icons/180?v=${iconVersion(settings.logoUrl)}`, sizes: '180x180', type: 'image/png' }],
           },
         }
       : {}),

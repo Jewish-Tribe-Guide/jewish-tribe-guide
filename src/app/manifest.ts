@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { community } from '@/community.config'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
-import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import { iconVersion, SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
 // Web app manifest — enables "Add to Home Screen" with an app-like standalone
@@ -16,6 +16,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     () => SITE_SETTINGS_DEFAULTS,
   )
   const hasLogo = !!settings.logoUrl?.trim()
+  // See iconVersion: without this a new logo keeps the old home-screen icon.
+  const v = iconVersion(settings.logoUrl)
 
   return {
     name: settings.name,
@@ -31,14 +33,14 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     // someone's home screen is worse than the OS's own generic placeholder.
     icons: hasLogo
       ? [
-          { src: '/icons/192', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/512', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: `/icons/192?v=${v}`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: `/icons/512?v=${v}`, sizes: '512x512', type: 'image/png', purpose: 'any' },
           // A separate, padded rendering. Android crops a maskable icon to the
           // launcher's shape and only the middle ~80% is guaranteed to
           // survive, so declaring the full-bleed image here would clip the
           // logo's edges on a circular launcher.
           {
-            src: '/icons/512?maskable=1',
+            src: `/icons/512?maskable=1&v=${v}`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
