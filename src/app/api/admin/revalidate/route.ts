@@ -5,6 +5,11 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 
 // POST /api/admin/revalidate — throw away the cached public content. Admin only.
 //
+// Deliberately has no button in the admin. It briefly did, and that was a
+// mistake: an admin saving anything already revalidates as a side effect, so
+// there is no situation an actual admin reaches where they need this. Putting
+// it on screen only invited the question "what is this for?", correctly.
+//
 // Every other admin write revalidates as a side effect of saving. This exists
 // for the writes that don't go through the admin at all: the one-off scripts
 // that talk to Supabase directly (promote-page-headings, sync-dev-from-prod, a

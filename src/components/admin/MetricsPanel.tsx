@@ -47,33 +47,6 @@ function StatTile({ label, value, sub, href }: { label: string; value: string; s
 export default function MetricsPanel({ token }: { token: string }) {
   const [stats, setStats] = useState<SubmissionFunnelStats | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  const [refreshed, setRefreshed] = useState<'ok' | 'error' | null>(null)
-
-  /** Drop the site's cached copy of its content.
-   *
-   *  Saving anything in the admin already does this. The button is for the
-   *  case where the data changed WITHOUT going through the admin — a migration
-   *  script, a bulk edit run straight against Supabase — which the site has no
-   *  way of noticing, so it keeps serving what it cached for up to a day. That
-   *  looks identical to the script having failed, and was mistaken for exactly
-   *  that more than once before this existed. */
-  async function refreshCache() {
-    setRefreshing(true)
-    setRefreshed(null)
-    try {
-      await fetchJson(
-        '/api/admin/revalidate',
-        { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
-        'Could not refresh.',
-      )
-      setRefreshed('ok')
-    } catch {
-      setRefreshed('error')
-    } finally {
-      setRefreshing(false)
-    }
-  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -119,31 +92,6 @@ export default function MetricsPanel({ token }: { token: string }) {
         <SyncCoveragePanel token={token} />
       </div>
 
-      {/* Housekeeping rather than a metric, but this is the tab an admin is on
-          when they're checking whether something actually took effect, which is
-          exactly when they need it. */}
-      <div className="pt-2">
-        <h3 className="text-sm font-semibold text-slate-800 mb-2">Refresh cached content</h3>
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <span className="block text-[11px] text-muted">
-            The site keeps a copy of its content and reuses it, so a change made outside this
-            console — a migration script, an edit run straight against the database — can take up
-            to a day to appear. This drops that copy immediately. Saving anything in the admin
-            already does it; you only need this after a change made elsewhere.
-          </span>
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              onClick={refreshCache}
-              disabled={refreshing}
-              className="text-sm font-medium border border-slate-300 text-slate-700 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-            >
-              {refreshing ? 'Refreshing…' : 'Refresh now'}
-            </button>
-            {refreshed === 'ok' && <span className="text-sm text-green-700">Refreshed.</span>}
-            {refreshed === 'error' && <span className="text-sm text-red-700">Could not refresh.</span>}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
