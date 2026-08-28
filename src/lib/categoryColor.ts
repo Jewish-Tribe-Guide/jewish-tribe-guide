@@ -113,3 +113,44 @@ export function categoryTint(color: string): string {
 export function isValidPinColor(value: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(value.trim())
 }
+
+/** One category already occupying a colour — enough for the picker to name it
+ *  and draw its glyph. */
+export type ColorUser = { id: string; label: string; icon: string; automatic: boolean }
+
+/** Which categories currently resolve to each colour, keyed by lowercase hex.
+ *
+ *  For the editor's swatch row: picking a colour blind is how two categories
+ *  end up indistinguishable on the map, and the admin had no way to see it
+ *  short of opening the preview and comparing pins by eye.
+ *
+ *  Resolved through getCategoryColor rather than read off `pinColor`, so a
+ *  category still on "Automatic" counts as occupying whatever the positional
+ *  palette gives it — that colour is just as taken on the map as an explicit
+ *  one. `automatic` says which it was, since a clash with an automatic colour
+ *  is the softer kind: it moves on its own when the list changes.
+ *
+ *  Only `listing` categories, and only visible ones: the pseudo-categories
+ *  (map/zmanim/eruv/medical) draw no pins or avatars, and a hidden category is
+ *  not on the map to clash with. */
+export function categoryColorUsage(
+  categories: CategoryConfig[] | null | undefined,
+  excludeId?: string,
+): Map<string, ColorUser[]> {
+  const usage = new Map<string, ColorUser[]>()
+  for (const c of categories ?? []) {
+    if (c.kind !== 'listing' || c.active === false) continue
+    if (excludeId && c.id === excludeId) continue
+    const key = getCategoryColor(categories, c.id).toLowerCase()
+    const user: ColorUser = {
+      id: c.id,
+      label: c.pluralLabel,
+      icon: c.icon,
+      automatic: !c.pinColor?.trim(),
+    }
+    const existing = usage.get(key)
+    if (existing) existing.push(user)
+    else usage.set(key, [user])
+  }
+  return usage
+}

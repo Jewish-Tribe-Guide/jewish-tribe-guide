@@ -122,6 +122,15 @@ None of those show up in `tsc`, `eslint`, or a passing build. Several looked fin
 - **Check that a new test fails.** Several here would have passed against a broken app: an offline test passes when the page is simply still online, and a "not cached" assertion passes when the header is absent for an unrelated reason. Break the thing on purpose, watch it go red, put it back.
 - **Never assert content against the raw HTML string.** A React Server Components response serializes every listing name into a `<script>`, so `expect(html).toContain(name)` passes on a page that rendered nothing — which is how the server-rendering tests came to certify the exact bug they were written to prevent. Use `serverMarkup()` from the helpers, which strips script contents.
 - **The content is client-rendered, so `<main>` is empty for a moment.** `ready()` waits for the header, and the header is part of the shell that was always there. A one-shot `innerText()` read after it caught an empty string roughly two runs in three. Use auto-retrying assertions (`await expect(locator).toContainText(...)`) instead of snapshotting text.
+- **The `warmup` project runs first, and everything depends on it.** Every
+  public content read is `use cache` with `cacheLife('days')`, so it costs one
+  real Supabase round trip against the freshly-started `next start` CI uses and
+  microseconds thereafter. Without the warm-up, a dozen parallel tests reach for
+  `/api/categories` at the same instant, all wait behind the same in-flight
+  miss, and the round trip gets charged to whichever test ran out of its 30s
+  budget first — which is exactly how `pins.spec.ts` failed in CI while the test
+  beside it, calling the same helper, passed. `e2e/warmup.setup.ts` pays that
+  read once, with its own 120s budget. It is not a retry: it re-runs nothing.
 - **Run a new e2e test several times before trusting it**, and under the full suite rather than alone — the parallel run is where the timing-dependent ones fall over. Both flakes found here passed in isolation.
 
 ## Caching

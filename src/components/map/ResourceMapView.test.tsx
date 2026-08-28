@@ -11,6 +11,8 @@ import { ListingsProvider } from '@/lib/listingsContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ForcedViewport } from '@/lib/useIsMobile'
+import { HeaderCollapseProvider } from '@/lib/headerVisibility'
+import type { LocationControls } from '@/components/home/LocationControl'
 import type { DirectoryResource } from '@/types'
 import { track } from '@vercel/analytics'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -512,5 +514,83 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }))
     await user.click(screen.getByRole('button', { name: '⋯ More' }))
     expect(screen.getByRole('checkbox', { name: 'Show Grocery' })).toBeChecked()
+  })
+})
+
+// The desktop map carries its own copy of the header's location control. It
+// started out fullscreen-only — fullscreen paints over the header, taking the
+// header's pill with it — but "set a location" is decided while looking at the
+// map, so the boxed state has it too. Both copies drive the SAME controls
+// object the header does (see LocationProvider), which is what makes an
+// address typed here apply to the whole site rather than to this screen.
+describe('ResourceMapView — the map’s own location control', () => {
+  function mapControls(overrides: Partial<LocationControls> = {}): LocationControls {
+    return {
+      address: '',
+      coords: null,
+      onAddressChange: vi.fn(),
+      onCoords: vi.fn(),
+      tracking: false,
+      geoError: null,
+      geoErrorSilent: false,
+      onStartTracking: vi.fn(),
+      onStopTracking: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  // The boxed state is the default for the embedded (non-standalone) map —
+  // `fullscreen` only starts true for the standalone map screen.
+  function renderBoxed(controls?: LocationControls) {
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} controls={controls} />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ category: 'grocery' })],
+    )
+  }
+
+  it('shows the control on the boxed desktop map, not only fullscreen', () => {
+    renderBoxed(mapControls())
+    expect(screen.getByRole('button', { name: 'Set location' })).toBeInTheDocument()
+  })
+
+  it('drives the site-wide controls, so an address set here is set everywhere', async () => {
+    const user = userEvent.setup()
+    const controls = mapControls()
+    renderBoxed(controls)
+
+    await user.click(screen.getByRole('button', { name: 'Set location' }))
+    await user.click(screen.getByRole('button', { name: /Share my live location/ }))
+
+    expect(controls.onStartTracking).toHaveBeenCalled()
+  })
+
+  it('reads the location already set elsewhere rather than keeping its own', () => {
+    renderBoxed(mapControls({ address: '1 Main St', coords: { lat: 40, lng: -75 } }))
+    expect(screen.getByRole('button', { name: '1 Main St' })).toBeInTheDocument()
+  })
+
+  it('renders nothing for a caller with no location to set (the admin preview map)', () => {
+    renderBoxed(undefined)
+    expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
+  })
+
+  it('stays off mobile, where the header is collapsed rather than covered', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <DroppedPinsProvider>
+          <ListingsProvider listings={[listingWithGeo({ category: 'grocery' })]}>
+            <ForcedViewport isMobile>
+              <HeaderCollapseProvider>
+                <ResourceMapView onUp={vi.fn()} controls={mapControls()} />
+              </HeaderCollapseProvider>
+            </ForcedViewport>
+          </ListingsProvider>
+        </DroppedPinsProvider>
+      </PinnedProvider>,
+      { content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] } },
+    )
+    expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
   })
 })
