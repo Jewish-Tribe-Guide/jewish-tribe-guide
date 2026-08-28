@@ -156,7 +156,14 @@ async function main() {
 
   if (!changed) console.log('\nNothing to do.')
   else if (!APPLY) console.log('\nRead the list above, then re-run with --apply.')
-  else console.log('\nDone. The public pages cache for a day — an admin save, or a redeploy, refreshes them.')
+  else {
+    console.log('\nDone.')
+    console.log('The site caches its content, and a write made straight to the database')
+    console.log('like this one is invisible to it — so the pages will keep showing the old')
+    console.log('text for up to a day unless you tell it otherwise. Either:')
+    console.log('  • admin → Site → "Refresh cached content" → Refresh now, or')
+    console.log('  • redeploy (a build regenerates everything anyway)')
+  }
 
 }
 
