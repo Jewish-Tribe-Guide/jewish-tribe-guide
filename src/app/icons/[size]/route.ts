@@ -27,6 +27,26 @@ import { TAGS } from '@/lib/cacheTags'
  *  404s rather than letting a URL trigger arbitrary resizing work. */
 const ALLOWED_SIZES = [32, 180, 192, 512]
 
+/** How much of a home-screen icon the artwork should occupy.
+ *
+ *  A logo that fills its tile edge to edge looks oversized on a home screen —
+ *  next to Waze, Maps or Roku, which all sit around 60-70%, it reads as
+ *  shouting. iOS masks the corners but never scales artwork down, so the
+ *  breathing room has to be in the image.
+ *
+ *  Done here rather than by asking for a pre-padded upload, because the same
+ *  logo is also the site header's mark, where a tight crop is exactly right at
+ *  36px. One upload, and each place insets it to suit itself.
+ *
+ *  0.72 for maskable rather than 0.70: Android crops it to the launcher's
+ *  shape and only the middle ~80% survives, so this still clears that, and the
+ *  extra couple of percent offsets how much the crop visually shrinks it.
+ *
+ *  The browser tab favicon is excluded entirely — at 32px, padding spends
+ *  pixels there is no room for, and a favicon filling its frame is normal. */
+const ARTWORK_FRACTION = { plain: 0.7, maskable: 0.72 }
+const FAVICON_SIZE = 32
+
 /** The logo's own background colour, read from its top-left pixel.
  *
  *  A logo is conventionally drawn on a flat backdrop with the artwork inset,
@@ -61,13 +81,22 @@ async function renderIcon(size: number, maskable: boolean): Promise<ArrayBuffer 
 
     // Android crops a maskable icon to whatever shape the launcher uses — a
     // circle, a squircle, a rounded square — and only the middle ~80% is
-    // guaranteed to survive. The logo has to be inset inside that safe zone,
-    // or the bell loses its edges on a circular launcher. A plain icon fills
-    // the frame as normal.
+    // guaranteed to survive, which is why it gets its own fraction above.
+    //
+    // The uploaded file's own whitespace is removed first, so the result
+    // depends on the artwork rather than on how the logo happened to be
+    // exported. Without this a fixed inset gives a different final size for
+    // every upload — a tightly-cropped logo comes out large, a generously
+    // padded one comes out tiny. Verified against three very differently
+    // padded versions of this logo: all three land at 70%. `trim` is a no-op
+    // on an image with no uniform border, which degrades to the old behaviour.
+    const artwork = size === FAVICON_SIZE ? source : await sharp(source).trim().toBuffer().catch(() => source)
+
+    const fraction = size === FAVICON_SIZE ? 1 : maskable ? ARTWORK_FRACTION.maskable : ARTWORK_FRACTION.plain
     // Padding is derived first and the inner size from it, so the result is
     // exactly `size` on both axes. Rounding the inner size instead produced a
     // 513×513 icon for a manifest entry that declares 512×512.
-    const pad = maskable ? Math.round(size * 0.14) : 0
+    const pad = Math.round((size * (1 - fraction)) / 2)
     const inner = size - pad * 2
 
     // Match the padding to the logo's own background rather than assuming
@@ -77,7 +106,7 @@ async function renderIcon(size: number, maskable: boolean): Promise<ArrayBuffer 
     // coloured background.
     const backdrop = await backgroundOf(source)
 
-    const png = await sharp(source)
+    const png = await sharp(artwork)
       // `contain` rather than `cover`: a logo cropped to fill a square loses
       // its edges, and these are usually wordmarks or emblems where that's the
       // whole design. Padding keeps it intact.
