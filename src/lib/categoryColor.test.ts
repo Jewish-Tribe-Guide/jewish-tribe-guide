@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { categoryTint, getCategoryColor, isValidPinColor, PIN_COLORS } from './categoryColor'
+import { categoryColorUsage, categoryTint, getCategoryColor, isValidPinColor, PIN_COLORS } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -229,5 +229,54 @@ describe('the migration backfill', () => {
     const sql = readFileSync('supabase/migrations/20240101000034_category_pin_color.sql', 'utf-8')
     const inSql = [...sql.matchAll(/'(#[0-9a-f]{6})'/gi)].map((m) => m[1].toLowerCase())
     expect(inSql).toEqual(PIN_COLORS.map((c) => c.toLowerCase()))
+  })
+})
+describe('categoryColorUsage', () => {
+  function listing(id: string, overrides: Partial<CategoryConfig> = {}): CategoryConfig {
+    return { ...cat(id), kind: 'listing', ...overrides }
+  }
+
+  it('reports the category holding an explicitly-set colour', () => {
+    const list = [listing('a', { pinColor: '#123456' }), listing('b')]
+    expect(categoryColorUsage(list, 'b')?.get('#123456')?.map((u) => u.id)).toEqual(['a'])
+  })
+
+  it('counts a category still on Automatic — its colour is just as taken', () => {
+    const list = [listing('a'), listing('b')]
+    const usage = categoryColorUsage(list, 'b')
+    const holder = usage.get(getCategoryColor(list, 'a').toLowerCase())
+    expect(holder?.map((u) => u.id)).toEqual(['a'])
+    expect(holder?.[0].automatic).toBe(true)
+  })
+
+  it('excludes the category being edited, so its own colour never reads as taken', () => {
+    const list = [listing('a', { pinColor: '#123456' })]
+    expect(categoryColorUsage(list, 'a').get('#123456')).toBeUndefined()
+  })
+
+  it('ignores hidden categories and pseudo-categories — neither draws a pin', () => {
+    const list = [
+      listing('hidden', { pinColor: '#123456', active: false }),
+      listing('map-card', { pinColor: '#654321', kind: 'map' }),
+      listing('real', { pinColor: '#abcdef' }),
+    ]
+    const usage = categoryColorUsage(list)
+    expect(usage.get('#123456')).toBeUndefined()
+    expect(usage.get('#654321')).toBeUndefined()
+    expect(usage.get('#abcdef')?.map((u) => u.id)).toEqual(['real'])
+  })
+
+  it('lists every holder when a colour is already doubled up', () => {
+    const list = [listing('a', { pinColor: '#123456' }), listing('b', { pinColor: '#123456' })]
+    expect(categoryColorUsage(list).get('#123456')?.map((u) => u.id)).toEqual(['a', 'b'])
+  })
+
+  it('matches case-insensitively on the stored hex', () => {
+    const list = [listing('a', { pinColor: '#ABCDEF' })]
+    expect(categoryColorUsage(list).get('#abcdef')?.map((u) => u.id)).toEqual(['a'])
+  })
+
+  it('is empty for a null list, so a still-loading editor renders plain swatches', () => {
+    expect(categoryColorUsage(null).size).toBe(0)
   })
 })

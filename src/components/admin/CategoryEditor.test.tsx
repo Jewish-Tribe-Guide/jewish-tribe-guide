@@ -348,3 +348,38 @@ describe('pin colour', () => {
     expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBeNull()
   })
 })
+
+// A colour picked blind is how two categories end up with matching pins, which
+// the admin could previously only discover by opening the preview and
+// comparing them by eye. The swatch row names who already holds each colour.
+describe('CategoryEditor — pin colour clashes', () => {
+  const siblings = [
+    baseCategory(),
+    baseCategory({ id: 'shul', label: 'Synagogue', pluralLabel: 'Synagogues', pinColor: '#2c8c47' }),
+  ]
+
+  it('labels a swatch another category already holds', () => {
+    render(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole('button', { name: '#2c8c47 — already used by Synagogues' })).toBeInTheDocument()
+    // A free one keeps the bare hex, so "taken" is what stands out.
+    expect(screen.getByRole('button', { name: '#7a36bf' })).toBeInTheDocument()
+  })
+
+  it('warns after picking a colour that is already taken, and stops once a free one is picked', async () => {
+    const user = userEvent.setup()
+    render(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /^#2c8c47 —/ }))
+    expect(screen.getByText(/Same colour as Synagogues/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '#7a36bf' }))
+    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
+  })
+
+  it('never reports the category being edited as clashing with itself', () => {
+    const self = baseCategory({ pinColor: '#2657bf' })
+    render(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
+  })
+})

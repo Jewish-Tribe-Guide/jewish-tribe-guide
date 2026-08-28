@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
+import { useMemo, useState } from 'react'
+import { DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
 import CategoryIcon from '@/components/CategoryIcon'
-import { PIN_COLORS } from '@/lib/categoryColor'
+import { categoryColorUsage, PIN_COLORS, type ColorUser } from '@/lib/categoryColor'
 
 // ── Shared form-field building blocks used by CategoryEditor and
 // SingletonEditor (in CategoryManager.tsx), and by FormEditor. ──
@@ -253,6 +253,7 @@ export function PinColorField({
   icon,
   categoryId,
   iconImageUrl,
+  siblings,
 }: {
   value: string
   onChange: (value: string) => void
@@ -261,8 +262,15 @@ export function PinColorField({
   icon: string
   categoryId?: string
   iconImageUrl?: string
+  /** Every category, so each swatch can say who already has it. Null while
+   *  they're still loading — the row then just renders plain, as before. */
+  siblings?: CategoryConfig[] | null
 }) {
   const active = value || fallback
+  // Who already has each colour. Keyed on `siblings` (a stable array from the
+  // manager, not rebuilt per keystroke) so typing a name doesn't recompute it.
+  const takenBy = useMemo(() => categoryColorUsage(siblings, categoryId), [siblings, categoryId])
+  const clash = takenBy.get(active.toLowerCase()) ?? []
   return (
     <div className="pt-1">
       <span className="block text-xs font-medium text-slate-700 mb-1">Pin colour</span>
@@ -286,22 +294,45 @@ export function PinColorField({
             >
               Automatic
             </button>
-            {PIN_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => onChange(c)}
-                aria-label={c}
-                title={c}
-                className={`h-6 w-6 rounded-full border transition-transform cursor-pointer ${
-                  value.toLowerCase() === c.toLowerCase()
-                    ? 'border-slate-900 scale-110'
-                    : 'border-slate-300 hover:scale-110'
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
+            {PIN_COLORS.map((c) => {
+              const owners = takenBy.get(c.toLowerCase()) ?? []
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => onChange(c)}
+                  aria-label={owners.length > 0 ? `${c} — already used by ${ownerNames(owners)}` : c}
+                  title={owners.length > 0 ? `${c} — already used by ${ownerNames(owners)}` : c}
+                  className={`relative h-6 w-6 rounded-full border transition-transform cursor-pointer ${
+                    value.toLowerCase() === c.toLowerCase()
+                      ? 'border-slate-900 scale-110'
+                      : 'border-slate-300 hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: c }}
+                >
+                  {/* The owner's own glyph, sitting on the swatch — the whole
+                      point is to answer "is this one taken, and by what?"
+                      without opening the preview and comparing pins by eye. */}
+                  {owners.length > 0 && (
+                    <span
+                      className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] leading-none"
+                      aria-hidden="true"
+                    >
+                      {owners.length > 1 ? '•' : owners[0].icon || DEFAULT_CATEGORY_ICON}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
+          {clash.length > 0 && (
+            <span className="block text-[11px] text-amber-700 mt-1.5">
+              Same colour as {ownerNames(clash)}
+              {clash.every((o) => o.automatic) ? ' (automatic — it may move on its own)' : ''}. Pins
+              and listing icons for {clash.length > 1 ? 'them' : 'both'} will look alike; a swatch
+              with no glyph on it is free.
+            </span>
+          )}
           <span className="block text-[11px] text-muted mt-1.5">
             Used for this category&rsquo;s map pins and the round icon on its listings.{' '}
             {value ? (
@@ -317,4 +348,12 @@ export function PinColorField({
       </div>
     </div>
   )
+}
+
+/** "Synagogues", or "Synagogues and Hotels", or "Synagogues, Hotels and 2 more" —
+ *  short enough for a swatch tooltip. */
+function ownerNames(owners: ColorUser[]): string {
+  if (owners.length === 1) return owners[0].label
+  if (owners.length === 2) return `${owners[0].label} and ${owners[1].label}`
+  return `${owners[0].label}, ${owners[1].label} and ${owners.length - 2} more`
 }

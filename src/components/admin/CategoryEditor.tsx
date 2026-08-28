@@ -195,6 +195,7 @@ export function CategoryEditor({
             icon={draft.icon}
             categoryId={initial?.id}
             iconImageUrl={draft.iconImageUrl}
+            siblings={siblings}
           />
           <CardBackgroundField
             cardImageUrl={draft.cardImageUrl}
