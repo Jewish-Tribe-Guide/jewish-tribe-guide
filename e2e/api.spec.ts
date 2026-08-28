@@ -43,6 +43,10 @@ const ADMIN_ROUTES: Guarded[] = [
   { method: 'post', path: '/api/admin/forms' },
   { method: 'post', path: '/api/admin/home-sections' },
   { method: 'post', path: '/api/admin/site-settings/logo' },
+  // Unauthenticated this is a free cache-flush for anyone who finds the URL —
+  // not destructive, but a trivial way to make the site refetch everything on
+  // demand, so it belongs behind the same wall as the rest.
+  { method: 'post', path: '/api/admin/revalidate' },
   { method: 'patch', path: '/api/admin/site-settings' },
   { method: 'patch', path: `/api/admin/submissions/${NO_SUCH_ID}` },
   { method: 'patch', path: `/api/admin/responses/${NO_SUCH_ID}` },
