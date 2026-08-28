@@ -27,6 +27,22 @@ function getAdminClient() {
   return createClient(url, serviceRoleKey)
 }
 
+/** Put the row into a known shape before driving the editor.
+ *
+ *  Both tests type into the body and then assert on what was stored, which
+ *  quietly assumed the editor opens with the caret in a paragraph. It stopped
+ *  being true the moment the real privacy copy grew section headings: the body
+ *  now begins "<h2>Privacy Policy</h2>", Playwright's fill() replaces the text
+ *  without leaving that first block, and everything typed came back as
+ *  "<h2>…</h2>". Chrome's execCommand('bold') inside a heading is a no-op too —
+ *  headings are already bold — so the formatting test lost its <strong> as
+ *  well. Two failures, one cause, neither of them a bug in the app.
+ *
+ *  Seeding a single plain paragraph makes both tests independent of whatever
+ *  the page happens to contain, which is the same rule the rest of the suite
+ *  follows: don't depend on content an admin can edit. */
+const SEED_BODY = '<p>Seed paragraph for the admin-write pages test.</p>'
+
 test('editing a page through the real Pages tab saves to the database', async ({ page }) => {
   const supabase = getAdminClient()
   const { data: before } = await supabase.from('page').select('title,body').eq('slug', 'privacy').single()
@@ -40,6 +56,7 @@ test('editing a page through the real Pages tab saves to the database', async ({
   const newBody = `E2E Admin Write ${randomUUID().slice(0, 8)}`
 
   try {
+    await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
     await page.goto('/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
@@ -88,6 +105,7 @@ test('formatting applied in the Pages tab survives the save', async ({ page }) =
   const text = `Bold ${randomUUID().slice(0, 8)}`
 
   try {
+    await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
     await page.goto('/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
