@@ -161,7 +161,7 @@ async function main() {
     console.log('The site caches its content, and a write made straight to the database')
     console.log('like this one is invisible to it — so the pages will keep showing the old')
     console.log('text for up to a day unless you tell it otherwise. Either:')
-    console.log('  • admin → Site → "Refresh cached content" → Refresh now, or')
+    console.log('  • admin → Metrics → "Refresh cached content" → Refresh now, or')
     console.log('  • redeploy (a build regenerates everything anyway)')
   }
 

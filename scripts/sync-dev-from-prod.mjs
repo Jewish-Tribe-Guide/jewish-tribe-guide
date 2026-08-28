@@ -135,6 +135,6 @@ console.log('\n✓ Done. Never touched: submission, form_response, vote (private
 // Same caveat as every direct-to-database write in this repo: the running app
 // has no idea this happened and will keep serving its cached copy. Locally
 // that usually sorts itself out on the next dev-server restart; against a
-// deployed instance, use admin → Site → "Refresh cached content".
+// deployed instance, use admin → Metrics → "Refresh cached content".
 console.log('\nDone. If a site is running against this project, refresh its cached content:')
-console.log('  admin → Site → "Refresh cached content" → Refresh now')
+console.log('  admin → Metrics → "Refresh cached content" → Refresh now')
