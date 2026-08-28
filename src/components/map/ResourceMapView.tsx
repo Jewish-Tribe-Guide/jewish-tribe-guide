@@ -136,12 +136,14 @@ type Props = {
     stop: () => void
   }
   /** Full address-entry + tracking controls, same object the header pill
-   *  reads (see LocationProvider). Only needed on desktop: when the map goes
-   *  fullscreen (`desktop:fixed desktop:inset-0 desktop:z-50` below) it paints over the
-   *  header entirely, taking its LocationControl pill with it, so this
-   *  screen surfaces its own copy of the same control while that's the case.
-   *  Mobile never loses the header's control this way — its own header is
-   *  merely collapsed, not covered, and its pin FAB already reopens the same
+   *  reads (see LocationProvider) — so an address set from the map's own copy
+   *  of the control is set for the whole site, not just this screen. Desktop
+   *  only: the map surfaces the control in both its boxed and fullscreen
+   *  states (fullscreen is `desktop:fixed desktop:inset-0 desktop:z-50` below and paints
+   *  over the header entirely, taking the header's pill with it; boxed keeps
+   *  it because choosing where distances are measured from is a decision made
+   *  while looking at the map). Mobile has no such copy — its header is merely
+   *  collapsed rather than covered, and its pin FAB already reopens the same
    *  popover. Omitted by callers with nowhere to set an address anyway (the
    *  admin category-preview map), which just means no control renders. */
   controls?: LocationControls
@@ -1590,17 +1592,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   <span aria-hidden="true">📍</span>
                 </button>
               )}
-              {/* ── Address entry (desktop, fullscreen only) — the fullscreen
-                      map (see the `fullscreen` className above) is `desktop:fixed
-                      desktop:inset-0 desktop:z-50`, which paints directly over the site
-                      header and, with it, the only other place a visitor can
-                      type an address. Below fullscreen the header is still
-                      right there above the map, so this would just be a
-                      redundant second copy of the same control. Same
-                      component the header uses, not a bespoke one — reusing
-                      it keeps "where should distances be measured from"
-                      behaving identically everywhere it appears. ────────── */}
-              {!isMobile && fullscreen && controls && (
+              {/* ── Address entry (desktop) — necessary when fullscreen (the
+                      map is `desktop:fixed desktop:inset-0 desktop:z-50`, painting
+                      directly over the site header and, with it, the only
+                      other place a visitor can type an address), and kept in
+                      the boxed state too. It was fullscreen-only at first, on
+                      the reasoning that the header pill is still right there
+                      above a boxed map — but "set a location" is a thing you
+                      decide while looking AT the map and its distances, and
+                      having to go find a control outside the thing you're
+                      looking at is the friction. A second copy of the same
+                      control is the point, not a bug: it's the header's own
+                      component driving the header's own `controls`, so
+                      setting an address here sets it for the whole site —
+                      directory distances, search sorting, the header pill's
+                      own label — exactly as if it had been typed up there.
+                      Same component, not a bespoke one, so "where should
+                      distances be measured from" behaves identically
+                      everywhere it appears. ─────────────────────────────── */}
+              {!isMobile && controls && (
                 <div className="absolute right-3 top-14 z-20 hidden desktop:block">
                   <LocationControl controls={controls} />
                 </div>
