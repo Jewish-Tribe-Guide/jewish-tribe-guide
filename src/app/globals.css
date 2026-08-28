@@ -34,7 +34,21 @@
  * so it never actually extends past the viewport edge either. */
 html,
 body {
+  /* `clip`, not `hidden`, and the difference is load-bearing on iOS.
+   * Per CSS Overflow 3, an axis specified `visible` alongside a non-visible,
+   * non-clip axis computes to `auto` — so `overflow-x: hidden` here silently
+   * turned `overflow-y` into `auto` and made <body> a real scroll container
+   * nested inside the viewport. iOS Safari repositions `position: fixed`
+   * children of that setup on the main thread while momentum scrolling runs
+   * on the compositor, so a fast flick left the fixed MobileTabBar painted
+   * partway up the screen until the scroll settled. `clip` pairs legally with
+   * `visible`, so overflow-y stays `visible`, <body> is not a scroll box, and
+   * the bar stays pinned — while the horizontal clipping this rule exists for
+   * is unchanged. `hidden` first as the fallback for Safari < 16, which
+   * ignores `clip`: those get today's behaviour, not a page that drags
+   * sideways. */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @theme {
