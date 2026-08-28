@@ -15,6 +15,7 @@ import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ListingsProvider } from '@/lib/listingsContext'
+import { PreviewCategoryProvider } from '@/lib/contentContext'
 import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the real directory page for a category — the exact same
@@ -24,9 +25,12 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 // straight into the preview list instead of posting to /api/submissions, so
 // the admin can see a new listing "appear" without persisting anything.
 // Report similarly shows its confirmation screen without actually filing one.
-// The Map button opens the real site-wide map, pre-filtered to this category —
-// it reads live, already-saved data (the map has no notion of an unpublished
-// draft), same as clicking Map from the live directory would.
+// The Map button opens the real site-wide map, pre-filtered to this category.
+// Its *listings* are live, already-saved data — the map has no notion of an
+// unpublished listing — but the category itself is the draft: everything below
+// reads the categories list through PreviewCategoryProvider, so the pin
+// colour, icon and chip label are the ones the editor is showing rather than
+// the ones still in the database.
 
 type Action =
   | { mode: 'create' }
@@ -172,27 +176,35 @@ export default function CategoryPreview({
 
   return (
     <DevicePreviewFrame onClose={onClose}>
-      {/* Same provider stack SiteChrome wraps every real screen in (minus
-          LocationProvider — this preview tracks its own address/coords above
-          and hands them to SiteHeader directly, no context needed) — the Map
-          action renders the real ResourceMapView, and PinButton shows up
-          inside its own place detail, and both reach for PinnedProvider/
-          DroppedPinsProvider the same way they do on the live site. Missing
-          either here is invisible until an admin actually clicks Map or a
-          pin from inside this preview, at which point it throws instead of
-          just rendering wrong. */}
-      <PinnedProvider>
-        <DroppedPinsProvider>
-          <HeaderCollapseProvider>
-            <SiteHeader
-              onGoHome={onClose}
-              location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
-            />
-            <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
-            <SiteFooter year={new Date().getFullYear()} />
-          </HeaderCollapseProvider>
-        </DroppedPinsProvider>
-      </PinnedProvider>
+      {/* The draft category, standing in for its saved row for everything
+          below. Colour and icon are resolved from the shared categories list
+          (getCategoryColor) by the map's pins/chips and by every listing
+          avatar — not from the `category` prop threaded down here — so
+          without this the preview showed the saved colour while the editor
+          showed the new one. */}
+      <PreviewCategoryProvider category={category}>
+        {/* Same provider stack SiteChrome wraps every real screen in (minus
+            LocationProvider — this preview tracks its own address/coords above
+            and hands them to SiteHeader directly, no context needed) — the Map
+            action renders the real ResourceMapView, and PinButton shows up
+            inside its own place detail, and both reach for PinnedProvider/
+            DroppedPinsProvider the same way they do on the live site. Missing
+            either here is invisible until an admin actually clicks Map or a
+            pin from inside this preview, at which point it throws instead of
+            just rendering wrong. */}
+        <PinnedProvider>
+          <DroppedPinsProvider>
+            <HeaderCollapseProvider>
+              <SiteHeader
+                onGoHome={onClose}
+                location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
+              />
+              <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
+              <SiteFooter year={new Date().getFullYear()} />
+            </HeaderCollapseProvider>
+          </DroppedPinsProvider>
+        </PinnedProvider>
+      </PreviewCategoryProvider>
     </DevicePreviewFrame>
   )
 }
