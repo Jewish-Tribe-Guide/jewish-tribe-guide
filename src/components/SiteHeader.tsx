@@ -7,7 +7,6 @@ import CommunitySwitcher from '@/components/CommunitySwitcher'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { isOptimizableImage } from '@/lib/imageHosts'
 import { nextHeaderVisible, useHeaderCollapsed } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -155,10 +154,25 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
                 fill
                 sizes="36px"
                 className="object-cover"
-                // The logo is usually a Supabase upload, but it's a free text
-                // field — a pasted URL from anywhere must not throw and take
-                // the header down with it. See imageHosts.ts.
-                unoptimized={!isOptimizableImage(settings.logoUrl)}
+                // Always unoptimized, unlike the card photos.
+                //
+                // Two reasons, one of which has already bitten. It renders at
+                // 36px from a file measured in kilobytes, so the optimizer
+                // saves close to nothing on it — and routing it through a
+                // metered service means the site's own logo is the thing that
+                // breaks when the month's Image Optimization quota runs out.
+                // That is exactly what happened: uploading a new logo put a
+                // fresh URL in front of an exhausted optimizer, /_next/image
+                // returned 402, and the header rendered a broken-image icon
+                // while every already-cached listing photo carried on fine.
+                //
+                // A broken logo is a worse failure than an unresized one, and
+                // this is a single small asset on every page rather than a
+                // grid of photos, so it opts out permanently. The card photos
+                // still go through the optimizer (see imageHosts.ts, and the
+                // NEXT_PUBLIC_IMAGES_UNOPTIMIZED switch for when quota is the
+                // problem across the board).
+                unoptimized
               />
             </span>
           ) : (
