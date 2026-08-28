@@ -15,13 +15,18 @@ export const metadata: Metadata = {
   alternates: { canonical: `${siteUrl()}/privacy` },
 }
 
-const CONTACT_EMAIL = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
-
 // A plain, top-level page (not under /[community]) — privacy applies to the
 // whole site, not one community, same reasoning as /offline and /admin
 // living outside that segment. Content is admin-editable (see /admin's Pages
-// tab); this component fetches it and appends the contact line, which stays
-// code (a live mailto: link, not something to retype into the admin editor).
+// tab); this component only renders it.
+//
+// The closing "questions about this policy — email us" paragraph used to be
+// appended here in code, on the grounds that a live mailto: link couldn't be
+// expressed in the admin editor. That stopped being true when the Pages tab
+// got a rich-text editor with link support, and the cost of leaving it was
+// real: an admin looking at the Privacy page in the console saw text on the
+// public page that was nowhere in the field they were editing. It lives in the
+// body now, like every other sentence on the page.
 //
 // "Last updated" reads the row's own updated_at rather than a hardcoded
 // string — a hand-maintained date would need a code change every time the
@@ -59,20 +64,6 @@ export default async function PrivacyPage() {
           className="rich-text mt-7 text-[16px] leading-[1.75] text-slate-700"
           dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
         />
-
-        {/* Inside the same card, not below it: this is the policy's closing
-            paragraph, and it only lives in code because the mailto has to be a
-            live link. Splitting it out would read as a separate document. */}
-        <div className="rich-text text-[16px] leading-[1.75] text-slate-700">
-          <p>
-          Questions about this policy, or want us to delete information you&rsquo;ve previously sent us?
-          Email{' '}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary underline">
-              {CONTACT_EMAIL}
-            </a>{' '}
-            and we&rsquo;ll take care of it.
-          </p>
-        </div>
       </div>
     </main>
   )
