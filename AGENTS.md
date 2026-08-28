@@ -48,10 +48,25 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `playwright.*.config.ts` for the three Playwright suites, and in
 `src/test/integrationEnv.ts` for `test:integration`.
 
-One caveat when you do run them: `cache-roundtrip` polls a rebuilt production
-server and its first run after a cold build can exhaust the 20s poll while
-being perfectly correct. Re-run before believing a failure there; a real
-caching bug fails every time, not once.
+One caveat when you do run them: `cache-roundtrip`'s `/about` test fails
+roughly one run in thirty, and it is not a caching bug. The invalidation was
+instrumented by reading `x-nextjs-cache` on every poll — the transition is
+STALE → HIT on every observed run, in 15/15 repeated saves against a warm
+server (median 453ms), 3/3 against a freshly booted one (~950ms), and 5/5 full
+cold runs of the suite (1.2–1.6s). An earlier version of this note blamed cold
+starts; that was wrong, and cold is under a second.
+
+The residue is stale-while-revalidate: `revalidateTag(…, 'max')` serves the
+stale entry while regenerating behind it, so one failed regeneration — a
+transient Supabase timeout while four CI jobs share a single test project —
+leaves the old body served rather than retrying immediately. Hence the shape:
+every success under two seconds, the rare failure never landing at all. The
+poll allows 60s to absorb a retry, which costs nothing against a real bug,
+since a genuine invalidation failure lasts `cacheLife('days')` and fails at any
+timeout.
+
+So: re-run before believing a failure there — but if it fails twice, believe
+it, because the measurements above say it should essentially never fail.
 
 **When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a visual judgment call), say so explicitly instead of silently skipping coverage.
 
