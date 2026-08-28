@@ -157,12 +157,11 @@ async function main() {
   if (!changed) console.log('\nNothing to do.')
   else if (!APPLY) console.log('\nRead the list above, then re-run with --apply.')
   else {
-    console.log('\nDone.')
-    console.log('The site caches its content, and a write made straight to the database')
-    console.log('like this one is invisible to it — so the pages will keep showing the old')
-    console.log('text for up to a day unless you tell it otherwise. Either:')
-    console.log('  • admin → Site → "Refresh cached content" → Refresh now, or')
-    console.log('  • redeploy (a build regenerates everything anyway)')
+    console.log('\nDone — but the running site does not know yet.')
+    console.log('It caches its content, and this wrote straight to the database, so the')
+    console.log('pages keep showing the old text for up to a day. Clear it with either:')
+    console.log('  • a redeploy (a build regenerates everything), or')
+    console.log('  • POST /api/admin/revalidate with an admin token')
   }
 
 }

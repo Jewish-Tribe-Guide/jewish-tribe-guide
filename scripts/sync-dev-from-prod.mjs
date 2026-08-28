@@ -133,8 +133,8 @@ await syncResources()
 console.log('\n✓ Done. Never touched: submission, form_response, vote (private, not public content).')
 
 // Same caveat as every direct-to-database write in this repo: the running app
-// has no idea this happened and will keep serving its cached copy. Locally
-// that usually sorts itself out on the next dev-server restart; against a
-// deployed instance, use admin → Site → "Refresh cached content".
-console.log('\nDone. If a site is running against this project, refresh its cached content:')
-console.log('  admin → Site → "Refresh cached content" → Refresh now')
+// has no idea this happened and will keep serving its cached copy. Locally a
+// dev-server restart sorts it out; against a deployed instance, redeploy or
+// POST /api/admin/revalidate.
+console.log('\nDone. A site already running against this project will keep serving its')
+console.log('cached copy until it is restarted, redeployed, or sent POST /api/admin/revalidate.')

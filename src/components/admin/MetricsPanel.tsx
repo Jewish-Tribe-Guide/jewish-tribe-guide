@@ -91,6 +91,7 @@ export default function MetricsPanel({ token }: { token: string }) {
         <h3 className="text-sm font-semibold text-slate-800 mb-2">Google sync coverage</h3>
         <SyncCoveragePanel token={token} />
       </div>
+
     </div>
   )
 }
