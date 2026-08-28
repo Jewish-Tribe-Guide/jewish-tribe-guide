@@ -84,18 +84,25 @@ test('editing a page through the real Pages tab saves to the database', async ({
   }
 })
 
-// The half the test above doesn't reach. Editing the body as plain text goes
-// through the WYSIWYG without exercising any of it — the stored value comes
-// back as the same plain string it went in as, which is exactly what the old
-// <textarea> did too. So that test kept passing while the whole point of the
-// editor went unverified, and it's how a strict-mode break in the Pages tab
-// reached CI unnoticed.
+// What this covers, and — measured, not assumed — what it does not.
 //
-// This drives the real toolbar and asserts on what lands in the database,
-// which is the only place the full chain shows up: contenteditable produces
-// <b>, the client sanitizer rewrites it to <strong>, the PATCH route
-// sanitizes again, and the row has to end up holding markup rather than the
-// styled spans a browser might have emitted.
+// COVERS: that the Bold button is wired to something that actually formats
+// text, and that the result travels through the save to the database. The
+// test above cannot show this; a plain string goes in and comes back
+// unchanged, exactly as the old <textarea> behaved, so it passed throughout
+// the period when the editor itself was unverified.
+//
+// DOES NOT COVER, despite looking like it should: the toolbar button not
+// stealing the caret when pressed (the onMouseDown preventDefault in
+// RichTextEditor). That was checked directly — the line was removed and this
+// test still passed, because Playwright's click doesn't move focus the way a
+// real mouse press does. So do not rely on this test to protect that line;
+// nothing currently does.
+//
+// ALSO NOT HERE FOR: the <b> → <strong> conversion. That's a pure function,
+// covered faster and more thoroughly in src/lib/richText.test.ts. The
+// assertions below check it only as a cheap side effect of already having the
+// stored value in hand.
 test('formatting applied in the Pages tab survives the save', async ({ page }) => {
   const supabase = getAdminClient()
   const { data: before } = await supabase.from('page').select('title,body').eq('slug', 'privacy').single()
