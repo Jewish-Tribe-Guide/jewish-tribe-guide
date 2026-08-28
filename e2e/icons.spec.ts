@@ -16,12 +16,15 @@ test.describe('app icons', () => {
     // iOS reads this, not the manifest, for "Add to Home Screen" — the manifest
     // alone left iPhones falling back to the favicon.
     const html = await (await request.get('/')).text()
-    expect(html).toMatch(/<link rel="apple-touch-icon"[^>]*href="\/icons\/180"/)
+    // The ?v= is part of the contract, not incidental: iOS caches this icon
+    // hard once the site is on a home screen, so a logo change has to change
+    // the URL or the phone keeps the old picture forever. See iconVersion.
+    expect(html).toMatch(/<link rel="apple-touch-icon"[^>]*href="\/icons\/180\?v=[^"]+"/)
   })
 
   test('the browser tab icon points at the generated set', async ({ request }) => {
     const html = await (await request.get('/')).text()
-    expect(html).toMatch(/<link rel="icon"[^>]*href="\/icons\/32"/)
+    expect(html).toMatch(/<link rel="icon"[^>]*href="\/icons\/32\?v=[^"]+"/)
   })
 
   test('the manifest advertises real icon sizes', async ({ request }) => {
@@ -29,6 +32,11 @@ test.describe('app icons', () => {
 
     expect(manifest.icons.length).toBeGreaterThan(0)
     expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === 'maskable')).toBe(true)
+    // Same reason as the apple-touch-icon above — an unversioned icon URL is
+    // one a CDN and a launcher will both keep serving after a logo change.
+    for (const icon of manifest.icons as { src: string }[]) {
+      expect(icon.src, icon.src).toMatch(/[?&]v=/)
+    }
   })
 
   test('every icon the manifest and metadata reference actually resolves', async ({ request }) => {

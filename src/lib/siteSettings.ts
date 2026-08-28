@@ -110,3 +110,28 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   featuredCardIds: [],
   mobileTabs: DEFAULT_MOBILE_TABS,
 }
+
+/** A short token that changes whenever the logo does.
+ *
+ *  The icon endpoints (/icons/192, /icons/512, …) render from the admin's
+ *  uploaded logo, and their URLs never varied — so uploading a new logo left
+ *  every cache in the chain serving the old picture: the CDN for an hour under
+ *  the route's own Cache-Control, and a phone's home screen indefinitely,
+ *  since an OS bakes that icon in when the site is added and has no reason to
+ *  refetch a URL that hasn't changed. Which is exactly what happened: the new
+ *  logo appeared on the site immediately and the home-screen icon stayed the
+ *  old one.
+ *
+ *  Appending this to the icon URLs makes a new logo a new URL, so nothing can
+ *  serve a stale one. Derived from the URL rather than random, so it's stable
+ *  across builds and requests — a value that changed per deploy would defeat
+ *  the caching entirely. */
+export function iconVersion(logoUrl: string | null | undefined): string {
+  const value = logoUrl?.trim()
+  if (!value) return '0'
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash).toString(36)
+}
