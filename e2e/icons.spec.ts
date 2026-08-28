@@ -1,3 +1,4 @@
+import sharp from 'sharp'
 import { expect, test } from '@playwright/test'
 
 // The home-screen icon was the Next.js logo for the life of the project,
@@ -72,5 +73,36 @@ test.describe('app icons', () => {
     // The route resizes on demand, so the allowed set is bounded deliberately.
     const res = await request.get('/icons/9999')
     expect(res.status()).toBe(404)
+  })
+
+  // The home-screen icons inset the logo; the favicon does not. Both halves
+  // matter: an icon that fills its tile looms next to real apps on a home
+  // screen, and a favicon that doesn't fill its tile wastes pixels it hasn't
+  // got at 32px. Measured as "how much of the tile is not background", which
+  // is coarse but enough to catch the inset being dropped or applied to the
+  // wrong sizes.
+  test('home-screen icons leave breathing room, the favicon does not', async ({ request }) => {
+    const coverage = async (path: string) => {
+      const buf = Buffer.from(await (await request.get(path)).body())
+      const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const { width, height, channels } = info
+      let top = height
+      let bottom = 0
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * channels
+          if (data[i] < 200 || data[i + 1] < 200 || data[i + 2] < 200) {
+            if (y < top) top = y
+            if (y > bottom) bottom = y
+            break
+          }
+        }
+      }
+      return bottom < top ? 0 : (bottom - top + 1) / height
+    }
+
+    expect(await coverage('/icons/192'), 'home-screen icon should be inset').toBeLessThan(0.8)
+    expect(await coverage('/icons/192'), 'but still be the dominant thing on the tile').toBeGreaterThan(0.55)
+    expect(await coverage('/icons/32'), 'favicon should fill its frame').toBeGreaterThan(0.8)
   })
 })
