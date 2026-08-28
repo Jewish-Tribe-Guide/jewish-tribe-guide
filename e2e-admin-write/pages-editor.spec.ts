@@ -29,14 +29,19 @@ function getAdminClient() {
 
 test('editing a page through the real Pages tab saves to the database', async ({ page }) => {
   const supabase = getAdminClient()
-  const { data: before } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
+  const { data: before } = await supabase.from('page').select('title,body').eq('slug', 'privacy').single()
   const originalBody = before!.body as string
+  // The tab's buttons are labelled with the page's own title, which an admin
+  // can rename — the same hardcoding broke e2e/routing.spec.ts once a page
+  // was retitled "Privacy Policy and Terms of Use". Read it rather than
+  // assume it.
+  const title = before!.title as string
 
   const newBody = `E2E Admin Write ${randomUUID().slice(0, 8)}`
 
   try {
     await page.goto('/admin/pages')
-    await page.getByRole('button', { name: 'Privacy Policy', exact: true }).click()
+    await page.getByRole('button', { name: title, exact: true }).click()
 
     // getByRole, not getByLabel('Body'): the body field is a WYSIWYG now, and
     // its toolbar is labelled "Page body formatting" — which getByLabel
@@ -76,14 +81,15 @@ test('editing a page through the real Pages tab saves to the database', async ({
 // styled spans a browser might have emitted.
 test('formatting applied in the Pages tab survives the save', async ({ page }) => {
   const supabase = getAdminClient()
-  const { data: before } = await supabase.from('page').select('body').eq('slug', 'privacy').single()
+  const { data: before } = await supabase.from('page').select('title,body').eq('slug', 'privacy').single()
   const originalBody = before!.body as string
+  const title = before!.title as string
 
   const text = `Bold ${randomUUID().slice(0, 8)}`
 
   try {
     await page.goto('/admin/pages')
-    await page.getByRole('button', { name: 'Privacy Policy', exact: true }).click()
+    await page.getByRole('button', { name: title, exact: true }).click()
 
     const bodyField = page.getByRole('textbox', { name: 'Page body' })
     await bodyField.fill(text)

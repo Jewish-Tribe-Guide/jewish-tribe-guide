@@ -217,7 +217,11 @@ test.describe('URLs', () => {
   test('the privacy policy is a real, server-rendered top-level page', async ({ request }) => {
     const res = await request.get('/privacy')
     expect(res.status()).toBe(200)
-    expect(serverMarkup(await res.text())).toContain('Privacy Policy')
+    // Assert the page rendered its own body, not that it contains a
+    // particular phrase: the title and the section headings are admin-edited
+    // content, and hardcoding either is how this file broke once already.
+    // A server-rendered <h1> with text in it is the actual claim.
+    expect(serverMarkup(await res.text())).toMatch(/<h1[^>]*>\s*\S/)
   })
 
   // The reachability guarantee that actually matters, and the one that was
@@ -252,6 +256,13 @@ test.describe('URLs', () => {
     await page.getByRole('link', { name: 'Privacy' }).click()
 
     await expect(page).toHaveURL('/privacy')
-    await expect(page.getByRole('heading', { name: 'Privacy Policy' })).toBeVisible()
+    // By level, not by name. This asserted `name: 'Privacy Policy'` until an
+    // admin renamed the page to "Privacy Policy and Terms of Use" and gave
+    // its body a "Privacy Policy" section — getByRole matches accessible
+    // names on substring, so one heading became two and the test died on a
+    // strict-mode violation. Nothing was broken; the page had been edited.
+    // AGENTS.md says to derive expectations from the running app rather than
+    // hardcode content, and a page title is content.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   })
 })
