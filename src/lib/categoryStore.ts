@@ -29,6 +29,7 @@ type CategoryRow = {
   external_link_url: string | null
   card_image_url: string | null
   card_text_color: string | null
+  pin_color: string | null
   icon_image_url: string | null
   map_zoom_radius_miles: number | null
   active: boolean
@@ -54,6 +55,7 @@ function toConfig(row: CategoryRow): CategoryConfig {
         : null,
     cardImageUrl: row.card_image_url,
     cardTextColor: row.card_text_color,
+    pinColor: row.pin_color,
     iconImageUrl: row.icon_image_url,
     // undefined (column not yet migrated) and null (migrated, never set)
     // both mean "no cap" — normalized to the same null callers already
@@ -142,6 +144,7 @@ export async function createCategory(input: {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  pinColor?: string | null
   iconImageUrl?: string | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
@@ -182,6 +185,7 @@ export async function createCategory(input: {
     external_link_url: input.externalLink?.url ?? null,
     card_image_url: input.cardImageUrl?.trim() || null,
     card_text_color: input.cardTextColor?.trim() || null,
+    pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
   }
 
@@ -216,6 +220,7 @@ export async function updateCategory(
     externalLink?: { label: string; url: string } | null
     cardImageUrl?: string | null
     cardTextColor?: string | null
+    pinColor?: string | null
     iconImageUrl?: string | null
     mapZoomRadiusMiles?: number | null
     active?: boolean
@@ -241,6 +246,7 @@ export async function updateCategory(
   }
   if (patch.cardImageUrl !== undefined) row.card_image_url = patch.cardImageUrl?.trim() || null
   if (patch.cardTextColor !== undefined) row.card_text_color = patch.cardTextColor?.trim() || null
+  if (patch.pinColor !== undefined) row.pin_color = patch.pinColor?.trim() || null
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
 

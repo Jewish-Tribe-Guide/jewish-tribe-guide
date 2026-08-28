@@ -1,10 +1,19 @@
 import type { CategoryConfig } from '@/lib/categories'
 
-// Categories don't carry their own color — it's assigned by position in the
-// shared category list so every category gets a distinct, stable color
-// without an admin having to pick one. Shared by the map (pins, NearbyList)
-// and the category-tab listing cards (icon avatar) so the same place always
-// reads as the same color everywhere.
+// A category's colour is stored on the category (CategoryConfig.pinColor,
+// editable in the category editor). Shared by the map (pins, NearbyList) and
+// the category-tab listing cards (icon avatar) so the same place always reads
+// as the same colour everywhere.
+//
+// The positional palette below is now only the FALLBACK, for a category with
+// nothing stored yet. It used to be the whole mechanism, and the reason that
+// changed is worth keeping: the colour was derived from a category's index in
+// the active list sorted by plural label, so renaming a category moved it
+// alphabetically and silently changed both its own colour and that of every
+// category it passed; hiding one shifted everything after it; and production
+// and the test project, having different category lists, drew different
+// coloured pins from identical code. Colour is identity here — teal means
+// Grocery — and identity cannot depend on what a neighbouring row is called.
 // Each entry is the Tailwind-600 hue it's named for, pulled back in OKLCH:
 // chroma x0.80 and lightness -0.06. A category directory shows one of these at
 // a time and could carry the raw -600s fine; the map shows a hundred and fifty
@@ -67,14 +76,23 @@ const PALETTE = [
 
 const FALLBACK_COLOR = '#64748b'
 
-/** The color assigned to `categoryId` by its position in `categories` — same
- *  algorithm the map uses, so a category's listing-card icon and its map pin
- *  always match. Falls back to a neutral slate when the category isn't found
- *  (categories still loading, or a stale/deleted id). */
+/** This category's colour: the one stored on it, or — for a category that has
+ *  never had one set — the positional fallback described above. Falls back to
+ *  a neutral slate when the category isn't found at all (categories still
+ *  loading, or a stale/deleted id), since a missing colour renders an
+ *  invisible pin, which reads as a broken map rather than as loading. */
 export function getCategoryColor(categories: CategoryConfig[] | null | undefined, categoryId: string): string {
-  const index = (categories ?? []).findIndex((c) => c.id === categoryId)
-  return index === -1 ? FALLBACK_COLOR : PALETTE[index % PALETTE.length]
+  const list = categories ?? []
+  const index = list.findIndex((c) => c.id === categoryId)
+  if (index === -1) return FALLBACK_COLOR
+  const stored = list[index].pinColor?.trim()
+  return stored || PALETTE[index % PALETTE.length]
 }
+
+/** The palette offered in the category editor's colour picker. Exported so the
+ *  admin shows the same twenty the fallback draws from, rather than a second
+ *  hand-maintained list that can drift from it. */
+export const PIN_COLORS: readonly string[] = PALETTE
 
 /** The faint fill behind a category glyph — the same color as the pin, at low
  *  alpha. Every avatar-shaped thing in the app (listing rows, the map's nearby
@@ -85,4 +103,13 @@ export function getCategoryColor(categories: CategoryConfig[] | null | undefined
  *  doing its job. One function so raising it raises all four together. */
 export function categoryTint(color: string): string {
   return color + '2e' // ≈18% alpha
+}
+
+/** Whether a value is a colour this app will store for a pin. Deliberately
+ *  strict — a six-digit hex and nothing else. The value ends up in an inline
+ *  `style` on the map pin and the listing avatar, so anything looser is both a
+ *  rendering risk and a way to end up with an invisible pin. Empty/null is
+ *  handled by the caller and means "no colour chosen". */
+export function isValidPinColor(value: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(value.trim())
 }

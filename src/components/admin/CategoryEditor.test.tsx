@@ -42,14 +42,14 @@ afterEach(() => {
 
 describe('CategoryEditor — new category', () => {
   it('shows "New category" and offers templates', () => {
-    render(<CategoryEditor token="t" initial={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText('New category')).toBeInTheDocument()
     expect(screen.getByText(CATEGORY_TEMPLATES[0]!.label)).toBeInTheDocument()
   })
 
   it('blocks save without a name', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
@@ -60,7 +60,7 @@ describe('CategoryEditor — new category', () => {
   it('creates the category via POST once a name is given', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(<CategoryEditor token="tok" initial={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
@@ -78,7 +78,7 @@ describe('CategoryEditor — new category', () => {
 
   it('applies a template\'s fields and name when none are set yet', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByText(CATEGORY_TEMPLATES[0]!.label))
 
@@ -89,7 +89,7 @@ describe('CategoryEditor — new category', () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('Name already in use.'))
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
@@ -102,7 +102,7 @@ describe('CategoryEditor — new category', () => {
 describe('CategoryEditor — the "every listing also has" checkboxes', () => {
   it('Hours/Website/Photo toggles add and remove a managed field', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     const hours = screen.getByLabelText('Hours')
     expect(hours).not.toBeChecked()
@@ -119,6 +119,7 @@ describe('CategoryEditor — editing an existing category', () => {
       <CategoryEditor
         token="t"
         initial={baseCategory()}
+        siblings={null}
         hasMapCategory={false}
         onSaved={vi.fn()}
         onCancel={vi.fn()}
@@ -131,7 +132,7 @@ describe('CategoryEditor — editing an existing category', () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
     render(
-      <CategoryEditor token="t" initial={baseCategory()} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
     await user.click(screen.getByRole('button', { name: /save changes/i }))
@@ -154,7 +155,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       render(
-        <CategoryEditor token="t" initial={baseCategory()} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -175,7 +176,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       render(
-        <CategoryEditor token="t" initial={baseCategory()} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -192,7 +193,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       render(
-        <CategoryEditor token="t" initial={baseCategory()} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -212,7 +213,7 @@ describe('CategoryEditor — editing an existing category', () => {
       const onSaved = vi.fn()
       const user = userEvent.setup()
       render(
-        <CategoryEditor token="t" initial={baseCategory()} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+        <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
       await user.click(screen.getByLabelText('An address'))
@@ -249,6 +250,7 @@ describe('CategoryEditor — editing an existing category', () => {
         <CategoryEditor
           token="t"
           initial={categoryWithSelectField()}
+          siblings={null}
           hasMapCategory={false}
           onSaved={vi.fn()}
           onCancel={vi.fn()}
@@ -279,6 +281,7 @@ describe('CategoryEditor — editing an existing category', () => {
         <CategoryEditor
           token="t"
           initial={categoryWithSelectField()}
+          siblings={null}
           hasMapCategory={false}
           onSaved={onSaved}
           onCancel={vi.fn()}
@@ -299,5 +302,49 @@ describe('CategoryEditor — editing an existing category', () => {
       const body = JSON.parse((secondCall[1] as RequestInit).body as string)
       expect(body.applyOptionRenames).toBeUndefined()
     })
+  })
+})
+
+describe('pin colour', () => {
+  // Regression: the field was wired into the preview object rather than the
+  // save payload, so the picker rendered, previewed correctly, and the PATCH
+  // went out with no pinColor at all — returning 200 and silently keeping the
+  // old colour. Asserting on the request body is the only thing that catches
+  // that; the UI looked entirely correct.
+  it('sends the chosen colour in the save request', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '#b63167' }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
+    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBe('#b63167')
+  })
+
+  it('sends null for Automatic, so the positional fallback applies', async () => {
+    const onSaved = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <CategoryEditor
+        token="t"
+        initial={{ ...baseCategory(), pinColor: '#b63167' }}
+        siblings={null}
+        hasMapCategory={false}
+        onSaved={onSaved}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Automatic' }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    const call = vi.mocked(fetchJson).mock.calls.at(-1)!
+    expect(JSON.parse((call[1] as RequestInit).body as string).pinColor).toBeNull()
   })
 })

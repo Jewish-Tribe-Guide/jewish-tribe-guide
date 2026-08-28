@@ -2,6 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { isHttpUrl } from '@/lib/validation'
+import { isValidPinColor } from '@/lib/categoryColor'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
@@ -37,6 +38,7 @@ type CreateBody = {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  pinColor?: string | null
 }
 
 // POST /api/admin/categories — create a category directly (the admin equivalent
@@ -61,6 +63,11 @@ export async function POST(request: Request) {
   if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
     return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
   }
+  // Validated here rather than trusted from the picker: the value is rendered
+  // into an inline style on every pin and avatar for this category.
+  if (body.pinColor && !isValidPinColor(body.pinColor)) {
+    return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
+  }
 
   try {
     const category = await createCategory({
@@ -78,6 +85,7 @@ export async function POST(request: Request) {
       externalLink: body.externalLink,
       cardImageUrl: body.cardImageUrl,
       cardTextColor: body.cardTextColor,
+      pinColor: body.pinColor,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

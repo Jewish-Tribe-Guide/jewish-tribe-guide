@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
+import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryPreview from './CategoryPreview'
-import { CardBackgroundField, IconField, inputClass } from './CategoryFormFields'
+import { CardBackgroundField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm } from './CategorySaveConfirmations'
 import { CAPABILITY_LABELS, mergeFieldsWithHidden, normalizeField } from './categoryEditorLogic'
@@ -14,12 +15,17 @@ import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 export function CategoryEditor({
   token,
   initial,
+  siblings,
   hasMapCategory,
   onSaved,
   onCancel,
 }: {
   token: string
   initial: CategoryConfig | null
+  /** Every category, only so the pin-colour field can show what "Automatic"
+   *  currently resolves to — that fallback is positional, so it can only be
+   *  computed against the whole list. Null while they're still loading. */
+  siblings: CategoryConfig[] | null
   /** Whether a Map pseudo-category currently exists — the "Map button"
    *  capability only makes sense (and is only offered) when there's a map for
    *  it to send this category's listings to. */
@@ -29,6 +35,11 @@ export function CategoryEditor({
 }) {
   const isNew = initial === null
   const [previewing, setPreviewing] = useState(false)
+  // What the positional rule would give this category, previewed under
+  // "Automatic". For a category being created there is no id in the list yet,
+  // so it lands on the neutral fallback — accurate enough, since its real
+  // position isn't known until it's saved.
+  const fallbackPinColor = getCategoryColor(siblings, initial?.id ?? '')
 
   const {
     draft,
@@ -107,6 +118,7 @@ export function CategoryEditor({
           : null,
       cardImageUrl: draft.cardImageUrl.trim() || null,
       cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
+      pinColor: draft.pinColor || null,
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
   }
@@ -176,6 +188,14 @@ export function CategoryEditor({
               Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.
             </span>
           </label>
+          <PinColorField
+            value={draft.pinColor}
+            onChange={(v) => set('pinColor', v)}
+            fallback={fallbackPinColor}
+            icon={draft.icon}
+            categoryId={initial?.id}
+            iconImageUrl={draft.iconImageUrl}
+          />
           <CardBackgroundField
             cardImageUrl={draft.cardImageUrl}
             onCardImageUrl={(v) => set('cardImageUrl', v)}

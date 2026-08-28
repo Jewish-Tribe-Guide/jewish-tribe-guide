@@ -217,6 +217,7 @@ export default function CategoryManager({
       <CategoryEditor
         token={token}
         initial={null}
+        siblings={categories}
         hasMapCategory={hasMap}
         onSaved={() => {
           onCloseEditor()
@@ -250,6 +251,7 @@ export default function CategoryManager({
       <CategoryEditor
         token={token}
         initial={initial}
+        siblings={categories}
         hasMapCategory={hasMap}
         onSaved={() => {
           onCloseEditor()
