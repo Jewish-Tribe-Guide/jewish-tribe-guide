@@ -20,8 +20,12 @@
 export const community = {
   /** Full name — page title, header, footer, and PWA manifest. */
   name: 'Philadelphia Jewish Community',
-  /** Short name for the iOS/Android home-screen icon (keep it ~12 chars). */
-  shortName: 'PJC',
+  /** Short name for the iOS/Android home-screen icon (keep it ~12 chars).
+   *  This is the label under the icon once someone adds the site to their home
+   *  screen — Android reads it as the manifest's short_name, iOS as
+   *  appleWebApp.title — and it is NOT the admin-editable site name, which is
+   *  why renaming the site in the console left home screens still saying PJC. */
+  shortName: 'Philly Guide',
   /** Subtitle shown under the name in the header. */
   tagline: 'Guide for residents, visitors, and patients',
   /** One-line mission — the hero subtitle, footer blurb, and <meta description>. */
