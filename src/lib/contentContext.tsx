@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, useSyncExternalStore } from 'react'
 import type { CommunityContent, ContentKey } from './loadCommunityContent'
 import { draftSectionsAsHomeSections, readPreviewDraft, type PreviewDraft } from './previewDraft'
 import { withIconOverrides } from './categoryFallback'
+import type { CategoryConfig } from './categories'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server-loaded community content, handed to the client tree.
@@ -114,4 +115,46 @@ export function useForm(id: string) {
 
 export function useHospitals() {
   return useContent().hospitals
+}
+
+/** The admin category editor's unsaved draft, spliced into the category list
+ *  the wrapped subtree reads.
+ *
+ *  CategoryPreview renders the real screens in-process (not the iframe the
+ *  home-screen preview uses, so `previewDraft` doesn't apply), and hands the
+ *  draft down as a `category` prop. But colour isn't read from that prop
+ *  anywhere it matters: the map pins and the listing-card avatars both call
+ *  `getCategoryColor(useCategories(), id)`, which resolved to the SAVED row
+ *  and so showed the old colour while the editor showed the new one. Same
+ *  for anything else those components read off the shared list — icon,
+ *  labels — and for the map's own category chips.
+ *
+ *  Replaced in place rather than appended so the positional colour fallback
+ *  ("no colour chosen") lands on the same index the saved category has; a
+ *  brand-new, never-saved category isn't in the list at all and goes on the
+ *  end, which is where it will be once saved anyway. */
+export function PreviewCategoryProvider({
+  category,
+  children,
+}: {
+  category: CategoryConfig
+  children: React.ReactNode
+}) {
+  const content = useContent()
+  // Keyed on the draft's contents, not its identity: the editor rebuilds the
+  // CategoryConfig on every render, and a fresh categories array each time
+  // would break the referential equality the map's effects depend on (see
+  // useCategories above).
+  const key = JSON.stringify(category)
+  const merged = useMemo(() => {
+    const draft = JSON.parse(key) as CategoryConfig
+    const found = content.categories.some((c) => c.id === draft.id)
+    return {
+      ...content,
+      categories: found
+        ? content.categories.map((c) => (c.id === draft.id ? draft : c))
+        : [...content.categories, draft],
+    }
+  }, [content, key])
+  return <ContentContext.Provider value={merged}>{children}</ContentContext.Provider>
 }
