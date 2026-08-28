@@ -17,7 +17,12 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // scripts/ is in here as well as src/ because the one-off migration
+    // scripts rewrite production data with no undo, and at least one of them
+    // duplicates logic from src/lib that would otherwise be free to drift.
+    // Coverage thresholds below still describe src/ only — a migration script
+    // isn't application code and shouldn't move that number either way.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
     // Integration tests (src/**/*.integration.test.ts) hit a real Supabase
     // project and need credentials + setup this config doesn't provide — they
     // run separately via vitest.integration.config.mts / `npm run
