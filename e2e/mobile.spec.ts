@@ -46,6 +46,37 @@ test.describe('mobile', () => {
     await expect(bar).toBeVisible()
   })
 
+  // The fixed tab bar drifted up the screen mid-flick on iOS. The cause was
+  // `overflow-x: hidden` on <html>/<body> in globals.css: an axis specified
+  // `visible` next to a non-visible, non-clip axis computes to `auto`, so that
+  // one declaration made <body> a scroll container and iOS then repositioned
+  // its fixed children a frame behind the momentum scroll. `overflow-x: clip`
+  // pairs legally with `visible` and leaves <body> unscrollable.
+  //
+  // The visual glitch itself is an iOS compositor behaviour no browser here
+  // reproduces, so this asserts the CSS contract underneath it instead — which
+  // is the part that can silently regress the next time someone reaches for
+  // `overflow-hidden` to stop something dragging sideways.
+  test('the body is not a scroll container, but still clips sideways', async ({ page }) => {
+    const community = await defaultCommunity(page)
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+
+    const overflow = await page.evaluate(() => {
+      const s = getComputedStyle(document.body)
+      return { x: s.overflowX, y: s.overflowY }
+    })
+    expect(overflow.y).toBe('visible')
+    expect(overflow.x).toBe('clip')
+
+    // The horizontal backstop the rule exists for is still in force.
+    const widths = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }))
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client)
+  })
+
   test('the home screen renders its card grid inline', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)

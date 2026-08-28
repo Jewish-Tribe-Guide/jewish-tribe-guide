@@ -52,11 +52,19 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
   if (groups.length === 0) return null
 
   return (
-    <div className="space-y-3">
-      {groups.map((group) => (
-        <div key={group.tefillah}>
-          <p className="text-xs font-semibold text-muted mb-1">{group.label}</p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+    // One grid for the whole card, with each group's rows as a `subgrid` so
+    // every tefillah shares the same two columns. Each group used to own its
+    // own `grid-cols-[auto_1fr]`, which sized the day column to that group's
+    // longest label — so Shacharis (sized to "Mon, Thu, Rosh Chodesh") started
+    // its times far right while Mincha (sized to "Sat") started them
+    // immediately, and a card of four groups had four different left edges on
+    // its values. A reader parses this block as a table, and a ragged column
+    // of times is what made it look disordered.
+    <div className="grid grid-cols-[auto_1fr] gap-x-4">
+      {groups.map((group, gi) => (
+        <div key={group.tefillah} className={`col-span-2 grid grid-cols-subgrid ${gi > 0 ? 'mt-3' : ''}`}>
+          <p className="col-span-2 text-xs font-semibold text-muted mb-1">{group.label}</p>
+          <dl className="col-span-2 grid grid-cols-subgrid gap-y-1">
             {mergeSameDayTimes(group.rows).flatMap((row, i) => {
               const calc = resolveAnchorTime(row, anchors)
               return [
@@ -65,15 +73,27 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
                 </dt>,
                 <dd key={`v${i}`} className="text-xs font-medium text-slate-800">
                   {row.time}
-                  {row.notes && (
-                    <span className="ml-1 font-normal text-muted">({row.notes})</span>
-                  )}
-                  {calc && (
-                    <span
-                      className="ml-1.5 font-normal text-primary/80"
-                      title={`Calculated from today's ${anchorNoun(row.anchor!)} — confirm with the shul.`}
-                    >
-                      ≈ {calc} today
+                  {/* Notes and the calculated time drop to their own line
+                      rather than trailing the value. Aligning the columns
+                      globally means the widest day label now sets where every
+                      time starts, which leaves a long rule like "15 min before
+                      Sunset" less room — and these are secondary information
+                      that was also doing its own share of the visual noise.
+                      No parentheses: they were there to fence the note off
+                      from the time inline, and a separate muted line already
+                      does that job. */}
+                  {(row.notes || calc) && (
+                    <span className="block font-normal">
+                      {row.notes && <span className="text-muted">{row.notes}</span>}
+                      {row.notes && calc && <span className="text-muted"> · </span>}
+                      {calc && (
+                        <span
+                          className="text-primary/80"
+                          title={`Calculated from today's ${anchorNoun(row.anchor!)} — confirm with the shul.`}
+                        >
+                          ≈ {calc} today
+                        </span>
+                      )}
                     </span>
                   )}
                 </dd>,
