@@ -111,7 +111,20 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   mobileTabs: DEFAULT_MOBILE_TABS,
 }
 
-/** A short token that changes whenever the logo does.
+/** Bump when the icon RENDERING changes — the inset, the trim, the padding
+ *  colour, anything that alters the generated PNG for an unchanged logo.
+ *
+ *  Learned the hard way. The first version of iconVersion keyed only on the
+ *  logo URL, which is correct for "the admin uploaded a new logo" and useless
+ *  for "we changed how the icon is drawn": the URL stays identical, so the CDN
+ *  and every phone keep serving the previously-rendered PNG and the change is
+ *  invisible no matter how many times it deploys. The token has to describe
+ *  what the icon LOOKS like, and that depends on the renderer as much as the
+ *  source. */
+const ICON_RENDER_VERSION = 2
+
+/** A short token that changes whenever the logo — or the way it is rendered —
+ *  does.
  *
  *  The icon endpoints (/icons/192, /icons/512, …) render from the admin's
  *  uploaded logo, and their URLs never varied — so uploading a new logo left
@@ -128,10 +141,10 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
  *  the caching entirely. */
 export function iconVersion(logoUrl: string | null | undefined): string {
   const value = logoUrl?.trim()
-  if (!value) return '0'
+  if (!value) return `0-${ICON_RENDER_VERSION}`
   let hash = 0
   for (let i = 0; i < value.length; i += 1) {
     hash = (hash * 31 + value.charCodeAt(i)) | 0
   }
-  return Math.abs(hash).toString(36)
+  return `${Math.abs(hash).toString(36)}-${ICON_RENDER_VERSION}`
 }
