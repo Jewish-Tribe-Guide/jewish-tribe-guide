@@ -289,6 +289,13 @@ export type CategoryConfig = {
    *  image so the title/icon stay legible regardless of the photo. Ignored
    *  when there's no image. */
   cardTextColor?: string | null
+  /** The colour of this category's map pin and listing avatar (a hex string).
+   *  Null/unset falls back to a colour derived from the category's position in
+   *  the list — see getCategoryColor. That fallback used to be the only
+   *  mechanism, which meant renaming or hiding ANY category silently
+   *  reassigned the colours of others; storing it makes the colour a property
+   *  of the category, as it always should have been. */
+  pinColor?: string | null
   /** An uploaded image shown in place of the emoji `icon`, wherever this
    *  category's circular avatar/pin renders (listing rows, map pins/chips,
    *  the nearby list) — the icon equivalent of `cardImageUrl`, but this one

@@ -47,6 +47,8 @@ export type Draft = {
   cardImageUrl: string
   /** Text color over the card image (a hex string). */
   cardTextColor: string
+  /** '' means "no colour chosen" — see getCategoryColor's positional fallback. */
+  pinColor: string
 }
 
 export const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
@@ -117,6 +119,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     externalLinkUrl: c?.externalLink?.url ?? '',
     cardImageUrl: c?.cardImageUrl ?? '',
     cardTextColor: c?.cardTextColor || '#ffffff',
+    pinColor: c?.pinColor || '',
   }
 }
 

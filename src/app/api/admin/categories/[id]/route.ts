@@ -5,6 +5,7 @@ import { updateCategory, deleteCategory } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
+import { isValidPinColor } from '@/lib/categoryColor'
 
 type PatchBody = {
   label?: string
@@ -20,6 +21,7 @@ type PatchBody = {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  pinColor?: string | null
   iconImageUrl?: string | null
   /** Map category only (kind === 'map') — see CategoryConfig's own doc. */
   mapZoomRadiusMiles?: number | null
@@ -72,6 +74,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
+    if (body.pinColor && !isValidPinColor(body.pinColor)) {
+      return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
+    }
     const category = await updateCategory(id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })

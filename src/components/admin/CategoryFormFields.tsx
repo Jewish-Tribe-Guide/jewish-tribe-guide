@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { DEFAULT_CATEGORY_ICON } from '@/lib/categories'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
+import CategoryIcon from '@/components/CategoryIcon'
+import { PIN_COLORS } from '@/lib/categoryColor'
 
 // ── Shared form-field building blocks used by CategoryEditor and
 // SingletonEditor (in CategoryManager.tsx), and by FormEditor. ──
@@ -226,6 +228,91 @@ export function CardBackgroundField({
             }}
             tint={TINTS[0]}
           />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The category's pin colour — the swatch its map pins and listing avatars are
+ *  drawn in.
+ *
+ *  Offers the twenty-colour palette rather than a free colour input: these are
+ *  chosen to stay apart from each other and to keep the white glyph on a pin
+ *  legible, and a free picker invites a pale yellow that makes the icon
+ *  vanish. `#RRGGBB` typed by hand is still accepted by the API for anyone who
+ *  needs an exact brand colour.
+ *
+ *  "Automatic" is a real option, not an empty state — it clears the stored
+ *  value and lets getCategoryColor fall back to the positional palette, which
+ *  is what every category did before colours were stored. */
+export function PinColorField({
+  value,
+  onChange,
+  fallback,
+  icon,
+  categoryId,
+  iconImageUrl,
+}: {
+  value: string
+  onChange: (value: string) => void
+  /** What the positional rule would pick, previewed under "Automatic". */
+  fallback: string
+  icon: string
+  categoryId?: string
+  iconImageUrl?: string
+}) {
+  const active = value || fallback
+  return (
+    <div className="pt-1">
+      <span className="block text-xs font-medium text-slate-700 mb-1">Pin colour</span>
+      <div className="flex items-start gap-3">
+        <CategoryIcon
+          icon={icon || '📍'}
+          categoryId={categoryId}
+          iconImageUrl={iconImageUrl?.trim() || undefined}
+          color={active}
+          className="h-11 w-11 text-2xl"
+          sizePx={44}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                value ? 'text-slate-600 hover:bg-slate-100' : 'bg-slate-900 text-white'
+              }`}
+            >
+              Automatic
+            </button>
+            {PIN_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onChange(c)}
+                aria-label={c}
+                title={c}
+                className={`h-6 w-6 rounded-full border transition-transform cursor-pointer ${
+                  value.toLowerCase() === c.toLowerCase()
+                    ? 'border-slate-900 scale-110'
+                    : 'border-slate-300 hover:scale-110'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <span className="block text-[11px] text-muted mt-1.5">
+            Used for this category&rsquo;s map pins and the round icon on its listings.{' '}
+            {value ? (
+              <>Set explicitly, so it stays put when categories are renamed or hidden.</>
+            ) : (
+              <>
+                Automatic picks one by position in the category list — which means renaming or
+                hiding another category can change it. Choose a swatch to pin it down.
+              </>
+            )}
+          </span>
         </div>
       </div>
     </div>
