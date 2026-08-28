@@ -8,6 +8,35 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. (`/admin` still works too — it redirects to `/philly/admin`, see next.config.ts.)
 
+# Never write to production without being told to, every time
+
+`.env.local` carries `PROD_SUPABASE_URL` and `PROD_SUPABASE_SERVICE_ROLE_KEY`
+so `sync-dev-from-prod` can READ production. They also grant full write access
+to the live database, and nothing technical stops that being used.
+
+So the rule is behavioural, and it is absolute: **do not write to production
+without an explicit go-ahead in the same exchange.** That covers running a
+migration script with `--prod --apply`, editing rows through the Supabase
+client, and any "while I'm here" follow-up to a write that was approved
+earlier. Approval is per-action, never standing. Show the dry run, say plainly
+what will change, and wait.
+
+Reversibility is not authorisation. Taking a backup first is right and does not
+substitute for asking — that mistake has already been made here: a category
+colour rewrite and three edits to the live privacy policy went out on inferred
+intent because a backup existed and the change looked obviously wanted.
+
+Two failure modes worth naming, both of which have happened:
+
+- **Ordering.** Content written for code that hasn't deployed yet renders as
+  raw markup on the live site. Deploy first, verify, then migrate the content.
+- **Invalidation.** A write made straight to the database bypasses the cache
+  invalidation every admin save performs, so the site keeps serving the old
+  copy for a day and it looks like the write silently failed. Redeploy, or
+  `POST /api/admin/revalidate`.
+
+Reads are fine. Dry runs are fine. The moment it writes, ask.
+
 # Tests
 
 ```bash
