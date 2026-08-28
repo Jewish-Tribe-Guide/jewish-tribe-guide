@@ -32,23 +32,30 @@
  * map's edge-to-edge band, `w-screen` + `left-1/2` + `-translate-x-1/2` in
  * ResourceMapView) — that trick centers an element that's exactly 100vw wide,
  * so it never actually extends past the viewport edge either. */
-html,
-body {
-  /* `clip`, not `hidden`, and the difference is load-bearing on iOS.
-   * Per CSS Overflow 3, an axis specified `visible` alongside a non-visible,
-   * non-clip axis computes to `auto` — so `overflow-x: hidden` here silently
-   * turned `overflow-y` into `auto` and made <body> a real scroll container
-   * nested inside the viewport. iOS Safari repositions `position: fixed`
-   * children of that setup on the main thread while momentum scrolling runs
-   * on the compositor, so a fast flick left the fixed MobileTabBar painted
-   * partway up the screen until the scroll settled. `clip` pairs legally with
-   * `visible`, so overflow-y stays `visible`, <body> is not a scroll box, and
-   * the bar stays pinned — while the horizontal clipping this rule exists for
-   * is unchanged. `hidden` first as the fallback for Safari < 16, which
-   * ignores `clip`: those get today's behaviour, not a page that drags
-   * sideways. */
+html {
+  /* On <html> only, and `hidden` deliberately — both halves are load-bearing.
+   *
+   * `html`, because the root element's overflow is what propagates to the
+   * viewport; that propagation is the whole mechanism by which this rule stops
+   * the page dragging sideways. The same declaration on <body> did no
+   * additional clipping and cost a real bug: per CSS Overflow 3 an axis
+   * specified `visible` alongside a non-visible, non-clip axis computes to
+   * `auto`, so `overflow-x` on <body> silently turned its `overflow-y` into
+   * `auto` and made it a scroll container nested in the viewport. iOS then
+   * repositioned the fixed MobileTabBar on the main thread while momentum
+   * scrolling ran on the compositor, and a fast flick left the bar painted
+   * partway up the screen.
+   *
+   * `hidden`, not `clip`, because the viewport inherits whichever one is used
+   * here. With `hidden` the viewport is still a scroll port that simply can't
+   * scroll horizontally, so a trackpad swipe arrives unconsumed and the
+   * browser gives it to the back-navigation gesture. With `clip` there is no
+   * horizontal scroll port to overscroll and the gesture never arms — which is
+   * how that gesture broke, for the second time (see d6261b6, where a stray
+   * overscroll-behavior-x:none had disabled it). This pairing — hidden, on the
+   * root only — is the configuration trackpad-back was verified working
+   * against. */
   overflow-x: hidden;
-  overflow-x: clip;
 }
 
 @theme {
