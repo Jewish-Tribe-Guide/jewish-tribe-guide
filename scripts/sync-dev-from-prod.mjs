@@ -1,6 +1,6 @@
 // Pulls admin-configured CONTENT SCHEMA — categories, tags, forms, home
-// sections, site settings, hospitals, communities — plus a read-only copy of
-// approved listings, from the real production Supabase project into whatever
+// sections, site settings, hospitals, communities, static pages — plus a
+// read-only copy of approved listings, from the real production Supabase project into whatever
 // project NEXT_PUBLIC_SUPABASE_URL currently points to (local dev's
 // disposable test project — see README "Integration tests" → "Using the test
 // project for local dev too"). Run this occasionally so local dev doesn't
@@ -84,6 +84,12 @@ const TABLES = [
   ['home_section', 'community_id,id'],
   ['site_settings', 'community_id'],
   ['hospital', 'id'],
+  // Global rather than per-community (see the pages migration), so keyed by
+  // slug alone. Added later than the rest of this list and initially missed,
+  // which is how local dev ended up showing a different About and Privacy
+  // from production — including a different page TITLE, which then made the
+  // two environments disagree about what the <h1> said.
+  ['page', 'slug'],
 ]
 
 async function syncTable(table, onConflict) {
