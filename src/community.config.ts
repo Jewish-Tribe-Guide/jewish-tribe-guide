@@ -25,7 +25,7 @@ export const community = {
    *  screen — Android reads it as the manifest's short_name, iOS as
    *  appleWebApp.title — and it is NOT the admin-editable site name, which is
    *  why renaming the site in the console left home screens still saying PJC. */
-  shortName: 'PJG',
+  shortName: 'Philly Guide',
   /** Subtitle shown under the name in the header. */
   tagline: 'Guide for residents, visitors, and patients',
   /** One-line mission — the hero subtitle, footer blurb, and <meta description>. */
