@@ -31,12 +31,12 @@ describe('DaveningTimes', () => {
     for (const dl of lists) {
       expect(dl.className).toContain('grid-cols-subgrid')
       // No group may define columns of its own — that's what made them differ.
-      expect(dl.className).not.toContain('grid-cols-[auto_1fr]')
+      expect(dl.className).not.toContain('fit-content')
     }
 
     // Both subgrids resolve to the same ancestor that actually defines the
     // columns, which is what makes the widths shared rather than coincidental.
-    const roots = lists.map((dl) => dl.closest('.grid-cols-\\[auto_1fr\\]'))
+    const roots = lists.map((dl) => dl.closest('[class*="fit-content"]'))
     expect(roots[0]).not.toBeNull()
     expect(roots[0]).toBe(roots[1])
   })
@@ -54,5 +54,25 @@ describe('DaveningTimes', () => {
     const line = note.parentElement!
     expect(line.className).toContain('block')
     expect(line.closest('dd')!.textContent).toContain('12:20pm')
+  })
+
+  // The shared column is sized by the widest label across every group, so one
+  // "Mon, Thu, Rosh Chodesh" row would otherwise push all four tefillos' times
+  // right on its own. The column is capped and the label wraps instead — but
+  // only at its commas: the space inside a day's own name is a non-breaking
+  // one, so the break can't land as "Mon, Thu, Rosh" over "Chodesh".
+  it('lets a long day label wrap, but only after a comma', () => {
+    const { container } = render(<DaveningTimes minyanim={minyanim} geo={null} />)
+
+    const root = container.querySelector('[class*="fit-content"]')!
+    expect(root).not.toBeNull()
+
+    const long = [...root.querySelectorAll('dt')].find((el) => el.textContent!.includes('Rosh'))!
+    // Breakable after each comma...
+    expect(long.textContent).toContain(', ')
+    // ...and not inside the day's own name.
+    expect(long.textContent).toContain('Rosh\u00a0Chodesh')
+    // A capped column can only wrap if the label is allowed to.
+    expect(long.className).not.toContain('whitespace-nowrap')
   })
 })
