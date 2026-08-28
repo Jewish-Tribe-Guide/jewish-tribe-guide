@@ -46,21 +46,27 @@ export default defineConfig({
   },
 
   projects: [
+    // Pays the one cold Supabase read every `use cache` content store needs,
+    // before the parallel workers all pile onto it inside their own 30s test
+    // budgets — see e2e/warmup.setup.ts for the CI failure that motivated it.
+    // Everything below depends on it.
+    { name: 'warmup', testMatch: /warmup\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },
     // testIgnore: admin.spec.ts needs the signed-in storageState only the
     // `admin` project below supplies — it doesn't belong to the anonymous-
-    // visitor suite these two run. (auth.setup.ts doesn't need excluding —
-    // Playwright's default testMatch only picks up *.spec.ts/*.test.ts.)
-    { name: 'desktop', testIgnore: /admin\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    // visitor suite these two run. (auth.setup.ts and warmup.setup.ts don't
+    // need excluding — Playwright's default testMatch only picks up
+    // *.spec.ts/*.test.ts.)
+    { name: 'desktop', testIgnore: /admin\.spec\.ts/, dependencies: ['warmup'], use: { ...devices['Desktop Chrome'] } },
     // The mobile tab bar and the inline card grid only exist below the `sm`
     // breakpoint, so they can't be covered by the desktop project at all.
-    { name: 'mobile', testIgnore: /admin\.spec\.ts/, use: { ...devices['Pixel 7'] } },
+    { name: 'mobile', testIgnore: /admin\.spec\.ts/, dependencies: ['warmup'], use: { ...devices['Pixel 7'] } },
     // Mints a real admin session (via the service-role key, same mechanism
     // /api/admin/dev-login uses — see that route's own comments — just
     // reproduced here since dev-login refuses outright against this
     // project's production build) and saves it to ADMIN_AUTH_FILE. Runs
     // before the `admin` project below, which reuses that session instead of
     // signing in fresh for every spec file.
-    { name: 'setup', testMatch: /auth\.setup\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'setup', testMatch: /auth\.setup\.ts/, dependencies: ['warmup'], use: { ...devices['Desktop Chrome'] } },
     // Signed-in admin console coverage — read-only (see e2e/admin.spec.ts's
     // own note on why: this authenticates as the real production admin
     // address, and nothing in e2e may write to the database).
