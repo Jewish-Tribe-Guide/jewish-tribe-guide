@@ -125,6 +125,28 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     expect(patchRes.ok(), 'PATCH /api/admin/pages/about should succeed').toBe(true)
     expect((await patchRes.json()).ok).toBe(true)
 
+    // 60s, not 20s, and the reason is measured rather than guessed — a
+    // timeout raised on a hunch is how a real caching bug gets buried.
+    //
+    // This test failed intermittently in CI (roughly one run in thirty). The
+    // invalidation itself was instrumented by reading x-nextjs-cache on every
+    // poll, and it is not the problem: the transition is STALE → HIT on every
+    // observed run, in 15/15 repeated saves against a warm server (median
+    // 453ms), 3/3 single saves against a freshly booted one (~950ms), and 5/5
+    // full cold runs of this suite (1.2–1.6s). Cold start is under a second,
+    // so the earlier theory that this needed warm-up time was simply wrong.
+    //
+    // What is left is stale-while-revalidate: revalidateTag(…, 'max') serves
+    // the stale entry while regenerating behind it, so a single failed
+    // regeneration — a transient Supabase timeout while four CI jobs share one
+    // test project — leaves the old body being served rather than retrying at
+    // once. That matches the shape of the failure exactly: every success lands
+    // in well under two seconds and the rare failure never lands at all.
+    //
+    // Which is also why 60s does not weaken this test. A genuine invalidation
+    // bug is unbounded, not slow: the entry would live for cacheLife('days'),
+    // so it fails at 60s as surely as at 20s. The extra headroom only covers a
+    // regeneration that had to be retried.
     await expect
       .poll(
         async () => {
@@ -132,7 +154,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
           return (await res.text()).includes(newBody)
         },
         {
-          timeout: 20_000,
+          timeout: 60_000,
           message: 'waiting for the revalidated /about page to serve the new body',
         },
       )

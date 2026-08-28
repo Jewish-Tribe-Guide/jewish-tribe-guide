@@ -45,24 +45,18 @@ export default async function PrivacyPage() {
           the rest of the app for no reason anyone could point at. */}
       <UpButton href="/" label="Home" className="mb-0" />
 
-      <h1 className="mt-6 text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
-        {page?.title ?? 'Privacy Policy'}
-      </h1>
-      {lastUpdated && <p className="mt-1 text-sm text-muted">Last updated: {lastUpdated}</p>}
+      {/* One card holding the whole document — title included. See the same
+          note on /about for why the h1 sits inside rather than above it, and
+          why the back link doesn't. */}
+      <div className="mt-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+        <h1 className="text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
+          {page?.title ?? 'Privacy Policy'}
+        </h1>
+        {lastUpdated && <p className="mt-1.5 text-sm text-muted">Last updated: {lastUpdated}</p>}
 
-      {/* One card around the whole document, using the app's own card token —
-          the same one the admin panels and listing rows use, so these pages
-          read as part of the site rather than as text on a bare background.
-          Deliberately ONE card and not one per section: a card says "discrete,
-          self-contained item", which is true of a listing and false of a
-          document you read top to bottom.
-          The 16px inside it is a departure from the app's text-sm default on
-          purpose — everywhere else is dense UI, this is prose read end to
-          end. */}
-      {/* Admin-authored rich text — see the same note on /about. */}
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        {/* Admin-authored rich text — see the same note on /about. */}
         <div
-          className="rich-text text-[16px] leading-[1.75] text-slate-700"
+          className="rich-text mt-7 text-[16px] leading-[1.75] text-slate-700"
           dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
         />
 

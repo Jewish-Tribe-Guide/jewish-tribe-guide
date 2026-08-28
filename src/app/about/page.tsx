@@ -27,24 +27,30 @@ export default async function AboutPage() {
           the rest of the app for no reason anyone could point at. */}
       <UpButton href="/" label="Home" className="mb-0" />
 
-      <h1 className="mt-6 text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">{title}</h1>
-
-      {/* One card around the whole document, using the app's own card token —
-          the same one the admin panels and listing rows use, so these pages
-          read as part of the site rather than as text on a bare background.
+      {/* One card holding the whole document — title included. The h1 sits
+          inside rather than above because these two pages are documents, not
+          lists: the heading-above-cards pattern comes from the category
+          screens, where one heading introduces MANY cards, and borrowing it
+          for a single card leaves the title floating over a container instead
+          of belonging to it. The back link stays outside, since that's
+          navigation rather than part of the document.
           Deliberately ONE card and not one per section: a card says "discrete,
           self-contained item", which is true of a listing and false of a
           document you read top to bottom.
-          The 16px inside it is a departure from the app's text-sm default on
-          purpose — everywhere else is dense UI, this is prose read end to
-          end. */}
-      {/* The body is admin-authored rich text. dangerouslySetInnerHTML is
-          load-bearing here and safe only because pageBodyToHtml sanitizes
-          against an allowlist — see lib/richText.ts. Never render page.body
-          directly. */}
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          Padding grows on desktop rather than the column — 16px prose at this
+          width is already ~80 characters a line, which is the upper limit of
+          comfortable, so "bigger" has to mean more margin, not longer lines. */}
+      <div className="mt-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+        <h1 className="text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
+          {title}
+        </h1>
+
+        {/* The body is admin-authored rich text. dangerouslySetInnerHTML is
+            load-bearing here and safe only because pageBodyToHtml sanitizes
+            against an allowlist — see lib/richText.ts. Never render
+            page.body directly. */}
         <div
-          className="rich-text text-[16px] leading-[1.75] text-slate-700"
+          className="rich-text mt-7 text-[16px] leading-[1.75] text-slate-700"
           dangerouslySetInnerHTML={{ __html: pageBodyToHtml(page?.body) }}
         />
       </div>
