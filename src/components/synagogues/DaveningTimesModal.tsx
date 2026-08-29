@@ -11,11 +11,11 @@ import {
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
   ALL_MINYAN_DAYS,
-  ALL_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import { useZmanim } from '@/lib/useZmanim'
 import { useNow } from '@/lib/useNow'
+import { calendarDaysFor } from '@/lib/calendarDays'
 import { community } from '@/community.config'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
@@ -217,29 +217,24 @@ const CALC_DISCLAIMER_DISMISSED_KEY = 'davening-calc-disclaimer-dismissed'
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /**
- * What the "Today" pill selects: today's weekday, plus BOTH pseudo-days.
+ * What the "Today" pill selects: today's weekday, plus whichever pseudo-days
+ * the calendar actually says apply — see calendarDays.ts, which owns that
+ * judgement and the rule that it never narrows on missing data.
  *
- * Over-inclusive on purpose. Nothing in the app evaluates whether today is
- * actually Rosh Chodesh or a holiday — those exist as labels on a minyan and
- * nothing more (see MinyanDayKey) — so a Today filter that selected the
- * weekday alone would hide a real minyan: Mekor Habracha's "Mon, Thu, Rosh
- * Chodesh" 6:45am wouldn't appear on a Rosh Chodesh that fell on a Tuesday,
- * and the visitor would have no way to know it had been dropped.
- *
- * Including them means the row shows up under its own "Rosh Chodesh" heading
- * with the label intact, and the visitor decides whether it applies. That is
- * exactly what the app knows and no more. When the calendar conditions
- * eventually do get evaluated, this narrows from "might apply today" to
- * "does apply today" — a strict improvement on the same rows, rather than a
- * correction of something that had been quietly wrong.
+ * This used to include both pseudo-days unconditionally, because nothing
+ * evaluated them; it now includes Rosh Chodesh only on Rosh Chodesh and
+ * Holiday only on a secular holiday, and still falls back to including Rosh
+ * Chodesh whenever Hebcal hasn't answered. Rows that do appear keep their own
+ * "Rosh Chodesh" / "Holiday" heading, so what's being claimed stays visible
+ * either way.
  */
-function todaysDayKeys(now: number): MinyanDayKey[] {
-  return [ALL_DAYS[new Date(now).getDay()], 'rosh_chodesh', 'holiday']
-}
-
-function sameDaySelection(a: MinyanDayKey[], b: MinyanDayKey[]): boolean {
-  return a.length === b.length && a.every((d) => b.includes(d))
-}
+/** Today is a MODE, not a seeded selection. It has to re-derive, because what
+ *  counts as today changes underneath it twice: when Hebcal answers on Rosh
+ *  Chodesh (narrowing the fallback), and at midnight on a tab left open. A
+ *  selection captured once would go stale on both and, worse, would leave the
+ *  pill reading "off" for a filter the visitor never touched. `custom` holds
+ *  an explicit list — empty means no day filter, i.e. the full week. */
+type DayFilter = { mode: 'today' } | { mode: 'custom'; days: MinyanDayKey[] }
 
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
@@ -264,7 +259,6 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // Live clock, so the Today pill still means today on a tab left open across
   // midnight rather than whatever day the modal was first mounted on.
   const now = useNow()
-  const todayKeys = todaysDayKeys(now)
 
   // Hebrew date + parsha for the header's context line. Keyed to the community
   // centre rather than the visitor's own location: this is a calendar fact,
@@ -272,10 +266,16 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // blank for someone who never set a location. Passing null while closed
   // keeps it from fetching for a modal nobody has opened.
   const { data: zmanim } = useZmanim(isOpen ? community.mapCenter : null)
+  const today = calendarDaysFor(now, zmanim)
   // One joined string rather than nested spans: it reads as a single line, so
   // it should be a single text node — a reader (or a test) shouldn't have to
   // reassemble it across elements.
-  const todayContext = [WEEKDAY_NAMES[new Date(now).getDay()], zmanim?.hebrewDate, zmanim?.parsha]
+  const todayContext = [
+    WEEKDAY_NAMES[new Date(now).getDay()],
+    zmanim?.hebrewDate,
+    ...today.labels,
+    zmanim?.parsha,
+  ]
     .filter(Boolean)
     .join(' · ')
 
@@ -288,7 +288,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // full view one tap behind. Seeded in the initializer rather than reset on
   // each open, so the deliberate choice documented below — that the day filter
   // persists across opens while denomination doesn't — still holds.
-  const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>(() => todaysDayKeys(Date.now()))
+  const [dayFilter, setDayFilter] = useState<DayFilter>({ mode: 'today' })
   // Which row's "how far / directions" panel is open — accordion-style, one
   // at a time. Keyed by day+tefillah+index since the same shul can appear in
   // more than one row across the modal.
@@ -320,15 +320,23 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
+  // Touching any individual day takes the filter off Today and into an
+  // explicit list, starting from whatever was on screen — so clicking Mon
+  // while Today is active reads as "today, and also Mondays", which is what
+  // the highlighted pills then show.
   const toggleDay = (d: MinyanDayKey) => {
-    setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+    setDayFilter((prev) => {
+      const base = prev.mode === 'today' ? today.dayKeys : prev.days
+      return { mode: 'custom', days: base.includes(d) ? base.filter((x) => x !== d) : [...base, d] }
+    })
   }
 
-  const todayActive = sameDaySelection(selectedDays, todayKeys)
+  const todayActive = dayFilter.mode === 'today'
+  const selectedDays = todayActive ? today.dayKeys : dayFilter.days
   // Toggles like every other pill: on turns the day filter off entirely (empty
   // = every day), which is also the route back to the full reference table now
   // that it isn't the default any more.
-  const toggleToday = () => setSelectedDays(todayActive ? [] : todayKeys)
+  const toggleToday = () => setDayFilter(todayActive ? { mode: 'custom', days: [] } : { mode: 'today' })
 
   const allShuls = isOpen ? shulsFromItems(items) : []
   const denominations = Array.from(

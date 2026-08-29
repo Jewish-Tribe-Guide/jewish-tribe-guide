@@ -52,6 +52,17 @@ const ZMANIM_RESPONSE: { ok: true; data: ZmanimData } = {
 // clock so waitFor and userEvent still resolve.
 const SUNDAY = new Date('2026-08-30T09:00:00')
 
+/** Re-stub /api/zmanim with extra fields on top of ZMANIM_RESPONSE. */
+function stubZmanim(extra: Partial<ZmanimData>) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, data: { ...ZMANIM_RESPONSE.data, ...extra } }),
+    }) as unknown as Response),
+  )
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.setSystemTime(SUNDAY)
@@ -131,27 +142,68 @@ describe('DaveningTimesModal', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Tuesday' })).toBeInTheDocument()
   })
 
-  // The trap this pill was designed around. Nothing evaluates whether today is
-  // actually Rosh Chodesh, so a Today filter that selected the weekday alone
-  // would silently drop a "Mon, Thu, Rosh Chodesh" minyan that may well be
-  // running — and the visitor would have no way to tell it had been dropped.
-  // Over-including is what the app actually knows; the label lets the reader
-  // adjudicate.
-  it('keeps Rosh Chodesh and Holiday minyanim visible under Today', () => {
+  // The rule behind all three of these: never narrow on missing data. A wrong
+  // "yes" shows a minyan the reader can discount from its own heading; a wrong
+  // "no" hides one, with nothing on screen to discount.
+  it('keeps Rosh Chodesh visible while the calendar answer has not arrived', () => {
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'rc', days: ['mon', 'thu', 'rosh_chodesh'], time: '6:45am' })],
+    })
+    // ZMANIM_RESPONSE carries no isRoshChodesh — the shape an older
+    // deployment's cached payload has. Unknown, so the row stays.
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Rosh Chodesh' })).toBeInTheDocument()
+    expect(screen.getByText('6:45am')).toBeInTheDocument()
+  })
+
+  it('drops the Rosh Chodesh group once Hebcal says today is not', async () => {
+    stubZmanim({ isRoshChodesh: false })
     const listing = makeListing({
       name: 'Test Shul',
       minyanim: [
-        clockMinyan({ id: 'rc', days: ['mon', 'thu', 'rosh_chodesh'], time: '6:45am' }),
-        clockMinyan({ id: 'h', days: ['holiday'], time: '8:00am' }),
+        clockMinyan({ id: 'rc', days: ['rosh_chodesh'], time: '6:45am' }),
+        clockMinyan({ id: 'sun', days: ['sun'], time: '8:00am' }),
       ],
     })
     render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
 
-    // Neither is a Sunday minyan, yet both are shown — under their own
-    // headings, so what's being claimed stays visible.
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { level: 3, name: 'Rosh Chodesh' })).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('8:00am')).toBeInTheDocument()
+  })
+
+  it('shows the Rosh Chodesh group, and names it in the header, when it is', async () => {
+    stubZmanim({ isRoshChodesh: true, holidays: ['Rosh Chodesh Elul'] })
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'rc', days: ['rosh_chodesh'], time: '6:45am' })],
+    })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Rosh Chodesh Elul/)).toBeInTheDocument()
+    })
     expect(screen.getByRole('heading', { level: 3, name: 'Rosh Chodesh' })).toBeInTheDocument()
+  })
+
+  // Secular holidays are computed locally, so unlike Rosh Chodesh the answer
+  // is never pending and can always be trusted to narrow.
+  it('shows the Holiday group only on an actual secular holiday', () => {
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'h', days: ['holiday'], time: '8:00am' })],
+    })
+    const { unmount } = render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+    expect(screen.queryByRole('heading', { level: 3, name: 'Holiday' })).not.toBeInTheDocument()
+    unmount()
+
+    vi.setSystemTime(new Date('2026-11-26T09:00:00')) // Thanksgiving
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
     expect(screen.getByRole('heading', { level: 3, name: 'Holiday' })).toBeInTheDocument()
-    expect(screen.getByText('6:45am')).toBeInTheDocument()
+    expect(screen.getByText(/Thanksgiving/)).toBeInTheDocument()
   })
 
   it('names the day the app thinks it is, with the Hebrew date and parsha once they load', async () => {
