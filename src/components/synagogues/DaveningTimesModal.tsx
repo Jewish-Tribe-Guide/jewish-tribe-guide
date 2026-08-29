@@ -11,11 +11,13 @@ import {
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
   ALL_MINYAN_DAYS,
+  SEASON_LABELS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
 import { useZmanim } from '@/lib/useZmanim'
 import { useNow } from '@/lib/useNow'
 import { calendarDaysFor } from '@/lib/calendarDays'
+import { currentSeason, isOutOfSeason } from '@/lib/season'
 import { community } from '@/community.config'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
@@ -267,6 +269,10 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // keeps it from fetching for a modal nobody has opened.
   const { data: zmanim } = useZmanim(isOpen ? community.mapCenter : null)
   const today = calendarDaysFor(now, zmanim)
+  // Out-of-season rows are dimmed here too, and for the same reason they are
+  // on the listing card — see DaveningTimes.tsx and season.ts. Never filtered:
+  // this is the view people come to precisely to see everything.
+  const season = currentSeason(now, community.timezone)
   // One joined string rather than nested spans: it reads as a single line, so
   // it should be a single text node — a reader (or a test) shouldn't have to
   // reassemble it across elements.
@@ -555,8 +561,9 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                               const rowKey = `${group.day}|${sub.tefillah}|${i}`
                               const rowOpen = openRowKey === rowKey
                               const info = shulInfoByName.get(row.shul)
+                              const dim = isOutOfSeason(row.season, season)
                               return (
-                              <div key={i} className="py-1.5 first:pt-0">
+                              <div key={i} className={`py-1.5 first:pt-0${dim ? ' opacity-45' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={() => setOpenRowKey((k) => (k === rowKey ? null : rowKey))}
@@ -570,8 +577,12 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                                     {row.denomination && (
                                       <p className="text-xs text-muted">{row.denomination}</p>
                                     )}
-                                    {row.notes && (
-                                      <p className="text-xs text-slate-500 italic">{row.notes}</p>
+                                    {(row.season || row.notes) && (
+                                      <p className="text-xs text-slate-500 italic">
+                                        {[row.season && SEASON_LABELS[row.season], row.notes]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </p>
                                     )}
                                     <TravelLine driveMinutes={row.driveMinutes} walkMinutes={row.walkMinutes} />
                                   </div>

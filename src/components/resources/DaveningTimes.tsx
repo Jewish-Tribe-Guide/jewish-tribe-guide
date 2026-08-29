@@ -1,8 +1,11 @@
 'use client'
 
-import { isMinyanim, groupByTefillah, mergeSameDayTimes } from '@/lib/davening'
+import { isMinyanim, groupByTefillah, mergeSameDayTimes, SEASON_LABELS } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime, anchorNoun } from '@/lib/useZmanAnchors'
+import { currentSeason, isOutOfSeason } from '@/lib/season'
+import { useNow } from '@/lib/useNow'
+import { community } from '@/community.config'
 
 // Shared davening-times display for any listing with a `minyanim`-type detail
 // field (today, just Synagogues) — used by the generic listing card so shuls
@@ -58,6 +61,14 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
   const resolvedGeo = hasAnchorRows ? geoOrCommunityDefault(geo) : null
   const anchorMap = useZmanAnchors(resolvedGeo ? [resolvedGeo] : [])
   const anchors = resolvedGeo ? anchorMap[geoKey(resolvedGeo)] : undefined
+  // Dimmed, never dropped. A row the shul only runs in the other half of the
+  // year is still the answer to "when is mincha in the summer?", which this
+  // view is also read for — and if the derived season is wrong, a dimmed row
+  // that still says "Winter only" is something a reader can see and discount,
+  // where a missing one is not. See season.ts for why the boundary is derived
+  // rather than configured, and why being occasionally wrong is affordable
+  // precisely because this is the only thing done with the answer.
+  const season = currentSeason(useNow(), community.timezone)
 
   if (groups.length === 0) return null
 
@@ -87,11 +98,12 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
           <dl className="col-span-2 grid grid-cols-subgrid gap-y-1">
             {mergeSameDayTimes(group.rows).flatMap((row, i) => {
               const calc = resolveAnchorTime(row, anchors)
+              const dim = isOutOfSeason(row.season, season)
               return [
-                <dt key={`d${i}`} className="text-xs text-muted">
+                <dt key={`d${i}`} className={`text-xs text-muted${dim ? ' opacity-45' : ''}`}>
                   {breakOnlyAtCommas(row.daysLabel || 'Daily')}
                 </dt>,
-                <dd key={`v${i}`} className="text-xs font-medium text-slate-800">
+                <dd key={`v${i}`} className={`text-xs font-medium text-slate-800${dim ? ' opacity-45' : ''}`}>
                   {row.time}
                   {/* Notes and the calculated time drop to their own line
                       rather than trailing the value. Aligning the columns
@@ -102,8 +114,10 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
                       No parentheses: they were there to fence the note off
                       from the time inline, and a separate muted line already
                       does that job. */}
-                  {(row.notes || calc) && (
+                  {(row.notes || calc || row.season) && (
                     <span className="block font-normal">
+                      {row.season && <span className="text-muted">{SEASON_LABELS[row.season]}</span>}
+                      {row.season && (row.notes || calc) && <span className="text-muted"> · </span>}
                       {row.notes && <span className="text-muted">{row.notes}</span>}
                       {row.notes && calc && <span className="text-muted"> · </span>}
                       {calc && (
