@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatTodayHours, formatWeekHours } from '@/lib/hours'
+import { useNow } from '@/lib/useNow'
 
 type Props = {
   value: unknown
@@ -26,10 +27,13 @@ type Props = {
  */
 export default function HoursDisplay({ value }: Props) {
   const [open, setOpen] = useState(false)
+  // Which day "today" is, so a tab open across midnight moves the highlight
+  // and today's line with it instead of showing yesterday's.
+  const now = new Date(useNow())
 
-  const today = formatTodayHours(value)
+  const today = formatTodayHours(value, now)
   if (!today) return null
-  const week = formatWeekHours(value)
+  const week = formatWeekHours(value, now)
 
   return (
     <div className="mt-1">

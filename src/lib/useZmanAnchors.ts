@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useToday } from '@/lib/useNow'
 import { community } from '@/community.config'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
@@ -16,7 +17,13 @@ type Geo = { lat: number; lng: number }
 
 // Module-level so every mount within the same page load shares one fetch per
 // location instead of re-hitting /api/zmanim — zmanim for a given spot don't
-// change within a session, and the route itself is already cached upstream.
+// change within a day, and the route itself is already cached upstream.
+//
+// Within a DAY, note, which is why the cache key carries the date. It used to
+// be geo alone, on the reasoning that they don't change "within a session" —
+// but a session here is a phone in someone's pocket, and a tab opened on
+// Thursday evening was still captioning Friday's mincha with Thursday's
+// sunset, under the word "today". Keyed by date, midnight simply misses.
 const cache = new Map<string, AnchorTimes>()
 const inFlight = new Map<string, Promise<void>>()
 
@@ -24,13 +31,20 @@ function geoKey({ lat, lng }: Geo): string {
   return `${lat.toFixed(3)},${lng.toFixed(3)}`
 }
 
-async function loadOne(key: string, geo: Geo): Promise<void> {
+/** The cache/in-flight key. Distinct from `geoKey`, which stays the public
+ *  lookup key callers index the returned record with — they shouldn't have to
+ *  know the cache is date-scoped. */
+function dayScopedKey(day: string, key: string): string {
+  return `${day}|${key}`
+}
+
+async function loadOne(cacheKey: string, geo: Geo): Promise<void> {
   try {
     const res = await fetch(`/api/zmanim?lat=${geo.lat}&lng=${geo.lng}`)
     const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
     if (json.ok && json.data) {
       const sunset = json.data.dailyZmanim.find((z) => z.label === 'Sunset')
-      cache.set(key, {
+      cache.set(cacheKey, {
         sunsetIso: sunset?.iso,
         candleLightingIso: json.data.shabbos.candleLighting?.iso,
         havdalahIso: json.data.shabbos.havdalah?.iso,
@@ -52,6 +66,10 @@ async function loadOne(key: string, geo: Geo): Promise<void> {
  */
 export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<string, AnchorTimes> {
   const [, setVersion] = useState(0)
+  // Re-runs the effect when the date rolls over, which misses the whole cache
+  // for the new day and refetches. useToday rather than useNow so this is a
+  // once-a-day change, not a once-a-minute one.
+  const day = useToday()
 
   const keyed = coords.filter((c): c is Geo => !!c).map((c) => [geoKey(c), c] as const)
   const depKey = keyed.map(([k]) => k).sort().join('|')
@@ -63,25 +81,27 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
     // already cached; otherwise still await whichever promise is in flight
     // (starting a fresh one only when nobody else has), or this component
     // would never re-render once that shared fetch resolves.
-    const pending = keyed.filter(([key]) => !cache.has(key))
+    const pending = keyed
+      .map(([key, geo]) => [dayScopedKey(day, key), geo] as const)
+      .filter(([cacheKey]) => !cache.has(cacheKey))
     if (pending.length === 0) return
     let cancelled = false
-    for (const [key, geo] of pending) {
-      if (!inFlight.has(key)) {
-        const p = loadOne(key, geo).finally(() => inFlight.delete(key))
-        inFlight.set(key, p)
+    for (const [cacheKey, geo] of pending) {
+      if (!inFlight.has(cacheKey)) {
+        const p = loadOne(cacheKey, geo).finally(() => inFlight.delete(cacheKey))
+        inFlight.set(cacheKey, p)
       }
     }
-    Promise.all(pending.map(([key]) => inFlight.get(key) ?? Promise.resolve())).then(() => {
+    Promise.all(pending.map(([cacheKey]) => inFlight.get(cacheKey) ?? Promise.resolve())).then(() => {
       if (!cancelled) setVersion((v) => v + 1)
     })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depKey])
+  }, [depKey, day])
 
   const result: Record<string, AnchorTimes> = {}
   for (const [key] of keyed) {
-    const hit = cache.get(key)
+    const hit = cache.get(dayScopedKey(day, key))
     if (hit) result[key] = hit
   }
   return result
