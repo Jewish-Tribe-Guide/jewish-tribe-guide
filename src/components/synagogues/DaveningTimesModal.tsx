@@ -11,8 +11,12 @@ import {
   TEFILLAH_ORDER,
   TEFILLAH_LABELS,
   ALL_MINYAN_DAYS,
+  ALL_DAYS,
 } from '@/lib/davening'
 import { useZmanAnchors, geoKey, geoOrCommunityDefault, resolveAnchorTime } from '@/lib/useZmanAnchors'
+import { useZmanim } from '@/lib/useZmanim'
+import { useNow } from '@/lib/useNow'
+import { community } from '@/community.config'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -210,6 +214,33 @@ function DistanceDirections({
 // synchronous localStorage read to mismatch against.
 const CALC_DISCLAIMER_DISMISSED_KEY = 'davening-calc-disclaimer-dismissed'
 
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * What the "Today" pill selects: today's weekday, plus BOTH pseudo-days.
+ *
+ * Over-inclusive on purpose. Nothing in the app evaluates whether today is
+ * actually Rosh Chodesh or a holiday — those exist as labels on a minyan and
+ * nothing more (see MinyanDayKey) — so a Today filter that selected the
+ * weekday alone would hide a real minyan: Mekor Habracha's "Mon, Thu, Rosh
+ * Chodesh" 6:45am wouldn't appear on a Rosh Chodesh that fell on a Tuesday,
+ * and the visitor would have no way to know it had been dropped.
+ *
+ * Including them means the row shows up under its own "Rosh Chodesh" heading
+ * with the label intact, and the visitor decides whether it applies. That is
+ * exactly what the app knows and no more. When the calendar conditions
+ * eventually do get evaluated, this narrows from "might apply today" to
+ * "does apply today" — a strict improvement on the same rows, rather than a
+ * correction of something that had been quietly wrong.
+ */
+function todaysDayKeys(now: number): MinyanDayKey[] {
+  return [ALL_DAYS[new Date(now).getDay()], 'rosh_chodesh', 'holiday']
+}
+
+function sameDaySelection(a: MinyanDayKey[], b: MinyanDayKey[]): boolean {
+  return a.length === b.length && a.every((d) => b.includes(d))
+}
+
 export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
   const [calcDisclaimerDismissed, setCalcDisclaimerDismissed] = useState(() => {
@@ -230,9 +261,34 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
       // for the rest of this session via the state above, just not future ones.
     }
   }
+  // Live clock, so the Today pill still means today on a tab left open across
+  // midnight rather than whatever day the modal was first mounted on.
+  const now = useNow()
+  const todayKeys = todaysDayKeys(now)
+
+  // Hebrew date + parsha for the header's context line. Keyed to the community
+  // centre rather than the visitor's own location: this is a calendar fact,
+  // not a zman, so it doesn't vary across a city, and the header shouldn't go
+  // blank for someone who never set a location. Passing null while closed
+  // keeps it from fetching for a modal nobody has opened.
+  const { data: zmanim } = useZmanim(isOpen ? community.mapCenter : null)
+  // One joined string rather than nested spans: it reads as a single line, so
+  // it should be a single text node — a reader (or a test) shouldn't have to
+  // reassemble it across elements.
+  const todayContext = [WEEKDAY_NAMES[new Date(now).getDay()], zmanim?.hebrewDate, zmanim?.parsha]
+    .filter(Boolean)
+    .join(' · ')
+
   // Empty = no day filter (show every day). Multiple days can be selected at
   // once; clicking an already-selected chip deselects just that one.
-  const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>([])
+  //
+  // Seeded to today rather than empty: someone opening this is overwhelmingly
+  // asking "where can I daven now", not reading a week's reference table, and
+  // HoursDisplay already sets the precedent of defaulting to today with the
+  // full view one tap behind. Seeded in the initializer rather than reset on
+  // each open, so the deliberate choice documented below — that the day filter
+  // persists across opens while denomination doesn't — still holds.
+  const [selectedDays, setSelectedDays] = useState<MinyanDayKey[]>(() => todaysDayKeys(Date.now()))
   // Which row's "how far / directions" panel is open — accordion-style, one
   // at a time. Keyed by day+tefillah+index since the same shul can appear in
   // more than one row across the modal.
@@ -267,6 +323,12 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   const toggleDay = (d: MinyanDayKey) => {
     setSelectedDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
   }
+
+  const todayActive = sameDaySelection(selectedDays, todayKeys)
+  // Toggles like every other pill: on turns the day filter off entirely (empty
+  // = every day), which is also the route back to the full reference table now
+  // that it isn't the default any more.
+  const toggleToday = () => setSelectedDays(todayActive ? [] : todayKeys)
 
   const allShuls = isOpen ? shulsFromItems(items) : []
   const denominations = Array.from(
@@ -326,7 +388,16 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
-          <h2 className="text-lg font-semibold text-slate-900">All Davening Times</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">All Davening Times</h2>
+            {/* What the app believes today is. Pure context, no filtering
+                depends on it — but it's the thing that lets a visitor catch
+                the app being wrong once the Today pill above starts making
+                claims on their behalf. Weekday comes from their own device so
+                it's always there; the Hebrew date and parsha are Hebcal's and
+                simply don't render if that fetch hasn't landed or failed. */}
+            <p className="text-xs text-muted mt-0.5">{todayContext}</p>
+          </div>
           <button
             onClick={onClose}
             className="text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
@@ -362,6 +433,20 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
             selected chip again clears just that one, and any number can be
             active at once. ──────────────────────────────────────────────── */}
         <div className="flex items-center gap-1.5 pl-5 py-2 border-b border-slate-100 shrink-0 overflow-x-auto">
+          <button
+            onClick={toggleToday}
+            aria-pressed={todayActive}
+            className={[
+              'shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap',
+              todayActive ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+            ].join(' ')}
+          >
+            Today
+          </button>
+          {/* Hairline between the Today shortcut and the days it's a shortcut
+              for — they're the same control, but Today sets a selection while
+              the rest toggle within one. */}
+          <span aria-hidden className="shrink-0 self-stretch w-px bg-slate-200 mx-0.5" />
           {ALL_MINYAN_DAYS.map((d) => {
             const active = selectedDays.includes(d)
             return (
