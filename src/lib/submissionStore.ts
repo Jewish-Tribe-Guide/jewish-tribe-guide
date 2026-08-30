@@ -499,6 +499,77 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
   return next
 }
 
+/**
+ * Keys in `details` that belong to the sync and the admin console, never to a
+ * submitter — and which therefore have to survive an edit.
+ *
+ * An edit's payload is built from the category's configured `detailFields`
+ * only (see ListingForm's `details` initializer), so none of these are in it,
+ * and applying an update REPLACES `details` wholesale. Every approved edit was
+ * therefore wiping the listing's sync state: when it last synced, what Google
+ * said about it, the transition history — and an admin's business-status
+ * override, silently undoing a correction someone had deliberately made.
+ *
+ * `placeId`, `geo` and `googleAutofill` are absent on purpose: the form and
+ * listingColumnsWithGeo carry those explicitly, and an edit is allowed to
+ * change them. `googleFields` too — resolveGoogleFields recomputes it.
+ */
+const SUBMITTER_CANNOT_TOUCH = [
+  'googleSyncedAt',
+  'lastSyncError',
+  'lastSyncFailedAt',
+  'businessStatus',
+  'businessStatusBefore',
+  'businessStatusChangedAt',
+  'businessStatusOverride',
+  'googleDescription',
+  'verifiedPlaceId',
+  'legacyId',
+] as const
+
+function withPreservedInternals(
+  details: Record<string, unknown>,
+  existing: ResourceRow | null,
+): Record<string, unknown> {
+  const before = (existing?.details as Record<string, unknown> | undefined) ?? {}
+  const next = { ...details }
+  for (const key of SUBMITTER_CANNOT_TOUCH) {
+    // `in`, not a truthiness check: an edit that legitimately supplies one of
+    // these (the intake now captures businessStatus) must still win.
+    if (!(key in next) && key in before) next[key] = before[key]
+  }
+  return next
+}
+
+/**
+ * Drops `googleSyncedAt` when an edit points the listing at a DIFFERENT Google
+ * place — someone correcting a bad match.
+ *
+ * Saying "last synced at 3am" is only meaningful about the place that was
+ * synced. Once the match changes, everything the old sync wrote — hours,
+ * phone, business status — describes a different business, and the timestamp
+ * is claiming a freshness the row no longer has.
+ *
+ * It also makes one condition do all the work downstream: the post-approval
+ * sync just asks whether `googleSyncedAt` is missing. That's true for a new
+ * listing, for a corrected match, and for anything whose first sync failed —
+ * which is every case that needs syncing now rather than tonight, and none of
+ * the ones that don't. An edit to a note or a tag leaves the timestamp alone
+ * and spends no Google call.
+ */
+function withClearedSyncOnNewPlaceId(
+  details: Record<string, unknown>,
+  existing: ResourceRow | null,
+): Record<string, unknown> {
+  const before = (existing?.details as Record<string, unknown> | undefined)?.placeId
+  if (!details.placeId || details.placeId === before) return details
+  const next = { ...details }
+  delete next.googleSyncedAt
+  delete next.lastSyncError
+  delete next.lastSyncFailedAt
+  return next
+}
+
 // Swaps the submission's transient `googleAutofill` hint (only ever useful
 // for the resolveGoogleFields decision above, not worth keeping on the live
 // listing forever) for the resolved `googleFields` list. `googleFields`
@@ -552,6 +623,8 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(payload, existingData as ResourceRow | null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
+    payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
+    payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })

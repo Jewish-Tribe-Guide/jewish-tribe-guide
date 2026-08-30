@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { approveSubmission, rejectSubmission } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
+import { sendStatusChangeDigest } from '@/lib/email'
 import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
 
 // PATCH /api/admin/submissions/:id
@@ -47,14 +48,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     console.error('[admin/submissions/:id] Decision email failed:', err),
   )
 
-  // Sync the listing against Google the moment it goes live, rather than
-  // leaving it for tonight's cron.
+  // Sync the listing against Google when there's something new to learn.
   //
-  // Approval is the first moment the data is public, and until now a listing
-  // with a place id could sit up to a day never having synced at all — a state
-  // that fell through every section of the sync-coverage report, that the
-  // business-status override couldn't reach, and that showed a shop Google had
-  // marked closed as open in the meantime.
+  // That's exactly "the row has no googleSyncedAt": a newly created listing, a
+  // listing whose edit repointed it at a different Google place (approval
+  // clears the timestamp then — see withClearedSyncOnNewPlaceId), or one whose
+  // earlier sync never landed. An ordinary edit to a note or a tag leaves the
+  // timestamp in place and spends no Google call; tonight's run covers it, the
+  // same as it always did.
   //
   // AFTER approveSubmission, deliberately, not inside it: approval is what
   // resolves `googleFields` from the submission's googleAutofill (see
@@ -62,23 +63,30 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // sync is allowed to overwrite. Run first and it would write against the
   // wrong ownership set and could stomp what the submitter typed.
   //
-  // Awaited rather than fired off, so the revalidate below publishes the
-  // synced values too — but never allowed to fail the approval, which has
-  // already happened by this point and must not be reported as failed because
-  // Google was unreachable. It's just late instead: tonight's run picks it up.
-  // Adds and edits both — an edit is the other moment a listing's Google match
-  // can change (someone correcting a bad one), and the ownership resolution
-  // above already protects whatever the submitter typed by hand.
-  //
   // Not removals. Approving one archives the listing, and syncing it then
   // would ask Google about a place that's just been taken down; a
   // CLOSED_PERMANENTLY answer would file a fresh removal submission and put it
   // straight back in the queue. loadSyncableListing filters on `approved` as
   // well, so this holds even if another caller forgets.
+  //
+  // Awaited rather than fired off, so the revalidate below publishes the
+  // synced values too — but never allowed to fail the approval, which has
+  // already happened by this point and must not be reported as failed because
+  // Google was unreachable. It's just late instead: tonight's run picks it up.
   if (decision === 'approved' && submission.operation !== 'delete') {
     try {
       const row = await loadSyncableListing(submission.target_id ?? '')
-      if (row) await syncOneListing(row)
+      if (row && !row.details.googleSyncedAt) {
+        const result = await syncOneListing(row)
+        // The cron digests these for a whole run; a sync that happens here
+        // would otherwise discover a closure and tell nobody. A permanent one
+        // still files its own submission from inside syncOneListing.
+        if (result.outcome === 'synced' && result.statusChange) {
+          await sendStatusChangeDigest([result.statusChange]).catch((err) =>
+            console.error('[admin/submissions/:id] Status digest failed:', err),
+          )
+        }
+      }
     } catch (err) {
       console.error('[admin/submissions/:id] Post-approval sync failed:', err)
     }
