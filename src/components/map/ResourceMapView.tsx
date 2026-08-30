@@ -16,7 +16,7 @@ import { useHospitals } from '@/lib/useHospitals'
 import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
-import { hoursOpenNow } from '@/lib/hours'
+import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
@@ -901,6 +901,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return allPoints
       .filter((p) => {
         if (!p.raw) return true
+        // See GenericDirectory's copy of this: a closed business is never open,
+        // whatever hours it still has saved.
+        if (businessClosure(p.raw as unknown as Record<string, unknown>)) return false
         const keys = hoursKeysByCat.get(p.raw.category)
         return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
       })

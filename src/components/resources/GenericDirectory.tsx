@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
-import { hoursOpenNow } from '@/lib/hours'
+import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
@@ -213,6 +213,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         if (chosen?.length && !selectValues(item[f.key]).some((v) => chosen.includes(v))) return false
       }
       if (openNow && hasFilterableHours) {
+        // Closed businesses are never open, whatever hours they still have
+        // saved — a temporarily-closed shop kept passing this filter on last
+        // season's hours.
+        if (businessClosure(item as unknown as Record<string, unknown>)) return false
         // Item must be open right now according to at least one filterable hours field.
         const isOpen = hoursFields
           .filter((f) => f.filterable)

@@ -120,6 +120,58 @@ describe('GenericListingCard — collapsed', () => {
     }
   })
 
+  // Google keeps a temporarily-closed place's posted hours exactly as they
+  // were, so before this the card read those hours, showed a green "Open"
+  // chip, and gave no hint the shop was shut — the closure notice existed only
+  // once you expanded the card.
+  it('shows a closure on the collapsed card, and never an Open badge with it', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-08-31T12:00:00')) // a Monday, midday
+      const category = makeCategory({
+        detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
+      })
+      const item = makeListing({
+        hours: { mon: { open: '09:00', close: '17:00' } },
+        businessStatus: 'CLOSED_TEMPORARILY',
+      })
+
+      renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      )
+
+      expect(screen.getByText('Temporarily closed')).toBeInTheDocument()
+      expect(screen.queryByText('Open')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Nothing is remembered between syncs — businessStatus is rewritten on every
+  // run — so the badge has to disappear on its own the day Google reopens it.
+  it('goes back to a plain Open badge once the status is OPERATIONAL again', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-08-31T12:00:00'))
+      const category = makeCategory({
+        detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
+      })
+      const item = makeListing({
+        hours: { mon: { open: '09:00', close: '17:00' } },
+        businessStatus: 'OPERATIONAL',
+      })
+
+      renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      )
+
+      expect(screen.getByText('Open')).toBeInTheDocument()
+      expect(screen.queryByText('Temporarily closed')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('calls onNameClick instead of expanding when the name itself is clicked, in a mixed-category list', async () => {
     const user = userEvent.setup()
     const onNameClick = vi.fn()
