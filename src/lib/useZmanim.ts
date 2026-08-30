@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { ZmanimData } from '@/types'
 import { community } from '@/community.config'
+import { useToday } from '@/lib/useNow'
 
 /** 'no-location' means no coords were passed at all — a distinct state from
  *  'error', since the fix is the visitor entering an address rather than a
@@ -28,6 +29,11 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
   // render for something already knowable at render time.
   const [fetchStatus, setFetchStatus] = useState<'loading' | 'error' | 'ready'>('loading')
   const hasCoords = coords?.lat != null && coords?.lng != null
+  // Re-fetches when the date rolls over. These are today's zmanim and this
+  // week's candle lighting, fetched once per location — so without the date in
+  // the deps, a tab left open overnight goes on presenting yesterday's sunset
+  // as today's.
+  const day = useToday()
 
   useEffect(() => {
     let cancelled = false
@@ -53,7 +59,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
     return () => {
       cancelled = true
     }
-  }, [coords?.lat, coords?.lng])
+  }, [coords?.lat, coords?.lng, day])
 
   return { data, status: hasCoords ? fetchStatus : 'no-location' }
 }

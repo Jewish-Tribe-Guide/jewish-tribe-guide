@@ -46,8 +46,15 @@ export type ZmanimData = {
   /** The week's parsha, e.g. "Parashat Shelach" — populated by lib/zmanim.ts
    *  from Hebcal's `parashat` item; absent on weeks it doesn't return one. */
   parsha?: string
-  // ── Future-friendly slots (not yet populated) ──
+  /** Jewish-calendar events for today, parsha excluded — e.g.
+   *  ["Rosh Chodesh Elul"]. Populated from the same Hebcal converter call
+   *  that supplies `hebrewDate`. */
   holidays?: string[]
+  /** Whether today is Rosh Chodesh. Derived from `holidays` in lib/zmanim so
+   *  callers never have to string-match Hebcal's naming — see the note there
+   *  about Erev Rosh Chodesh. */
+  isRoshChodesh?: boolean
+  // ── Future-friendly slots (not yet populated) ──
   fastDay?: { label: string; start: string; end: string } | null
 }
 

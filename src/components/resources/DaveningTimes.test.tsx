@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { Minyan } from '@/lib/davening'
 import DaveningTimes from './DaveningTimes'
@@ -74,5 +74,60 @@ describe('DaveningTimes', () => {
     expect(long.textContent).toContain('Rosh\u00a0Chodesh')
     // A capped column can only wrap if the label is allowed to.
     expect(long.className).not.toContain('whitespace-nowrap')
+  })
+})
+
+// Seasons: dimmed and labelled, never dropped. The row is still the answer to
+// "when is mincha in the summer?" asked in January, and if the derived season
+// is wrong a dimmed row that still reads "Winter only" is something a visitor
+// can see and discount — a missing one is not.
+describe('DaveningTimes — seasons', () => {
+  const seasonal: Minyan[] = [
+    { id: 'w', tefillah: 'maariv', days: ['sun'], time: '6:30pm', season: 'winter' },
+    { id: 's', tefillah: 'maariv', days: ['sun'], time: '8:45pm', season: 'summer' },
+  ]
+
+  function renderInJuly() {
+    vi.setSystemTime(new Date('2026-07-15T12:00:00'))
+    return render(<DaveningTimes minyanim={seasonal} geo={null} />)
+  }
+
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('shows both seasons, labelled, and dims only the one out of season', () => {
+    const { container } = renderInJuly()
+
+    // Both times present — nothing is filtered out.
+    expect(screen.getByText('6:30pm')).toBeInTheDocument()
+    expect(screen.getByText('8:45pm')).toBeInTheDocument()
+    expect(screen.getByText('Winter only')).toBeInTheDocument()
+    expect(screen.getByText('Summer only')).toBeInTheDocument()
+
+    // In July the winter row is the dim one.
+    const dimmed = [...container.querySelectorAll('dd')].filter((el) =>
+      el.className.includes('opacity-45'),
+    )
+    expect(dimmed).toHaveLength(1)
+    expect(dimmed[0].textContent).toContain('6:30pm')
+  })
+
+  it('dims the other one in January', () => {
+    vi.setSystemTime(new Date('2026-01-15T12:00:00'))
+    const { container } = render(<DaveningTimes minyanim={seasonal} geo={null} />)
+
+    const dimmed = [...container.querySelectorAll('dd')].filter((el) =>
+      el.className.includes('opacity-45'),
+    )
+    expect(dimmed).toHaveLength(1)
+    expect(dimmed[0].textContent).toContain('8:45pm')
+  })
+
+  // Merging two same-day rows into "6:30pm, 8:45pm" would lose the only thing
+  // that says which applies when.
+  it('does not merge a winter row into a summer one', () => {
+    const { container } = renderInJuly()
+    const values = [...container.querySelectorAll('dd')].map((el) => el.textContent)
+    expect(values.some((v) => v?.includes('6:30pm') && v?.includes('8:45pm'))).toBe(false)
   })
 })

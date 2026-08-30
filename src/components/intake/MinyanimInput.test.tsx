@@ -181,6 +181,25 @@ describe('MinyanimInput', () => {
     expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })])
   })
 
+  // Season as a field rather than prose in Notes, which is where "Winter only"
+  // has always been typed and where nothing could act on it. The changeover
+  // itself is never asked for — it's derived from the community timezone (see
+  // lib/season.ts) — so this is the only input a shul ever gives.
+  it('sets a season on a row, and clears it back to all year', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<MinyanimInput value={[row({ id: 'a', tefillah: 'maariv' })]} onChange={onChange} />)
+
+    await user.selectOptions(screen.getByLabelText('Season'), 'winter')
+    expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ season: 'winter' })])
+
+    onChange.mockClear()
+    render(<MinyanimInput value={[row({ id: 'a', tefillah: 'maariv', season: 'winter' })]} onChange={onChange} />)
+    await user.selectOptions(screen.getAllByLabelText('Season')[1], '')
+    // Absent, not the empty string — "all year" is the absence of a season.
+    expect(onChange.mock.calls.at(-1)![0][0].season).toBeUndefined()
+  })
+
   it('renders a label when provided', () => {
     render(<MinyanimInput label="Minyan Schedule" value={[]} onChange={vi.fn()} />)
     expect(screen.getByText('Minyan Schedule')).toBeInTheDocument()

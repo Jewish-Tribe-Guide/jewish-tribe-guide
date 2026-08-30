@@ -60,4 +60,42 @@ describe('AllCategories', () => {
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.queryByText('Essentials')).not.toBeInTheDocument()
   })
+
+  // Clicking a heading on the home screen sends you here with ?section=X and
+  // this scrolls to it. It used to work exactly once per mounted instance: a
+  // single latched ref, never cleared. The App Router keeps this segment's
+  // client state cached, so going back and clicking a second heading could
+  // reuse the same instance with the ref spent, and the page just sat at the
+  // top. A rerender of the same instance with a new section is that situation.
+  it('scrolls again when a new section is requested of the same instance', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    const homeSections: HomeSection[] = [
+      { id: 'sec-1', kind: 'section', title: 'Essentials', sortOrder: 0, cardIds: ['grocery'] },
+      { id: 'sec-2', kind: 'section', title: 'Community', sortOrder: 1, cardIds: ['synagogue'] },
+    ]
+    const scrolled: string[] = []
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function () {
+      scrolled.push((this as HTMLElement).id)
+    }
+
+    try {
+      const { rerenderWithProviders } = renderWithProviders(
+        <AllCategories {...handlers} scrollToSection="Essentials" />,
+        { content: { categories: [grocery, synagogue], homeSections } },
+      )
+      expect(scrolled).toEqual(['section-essentials'])
+
+      rerenderWithProviders(<AllCategories {...handlers} scrollToSection="Community" />)
+      expect(scrolled).toEqual(['section-essentials', 'section-community'])
+
+      // Still only once per request, though — sections arriving late must not
+      // yank the page back from wherever the visitor has since scrolled.
+      rerenderWithProviders(<AllCategories {...handlers} scrollToSection="Community" />)
+      expect(scrolled).toEqual(['section-essentials', 'section-community'])
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
 })

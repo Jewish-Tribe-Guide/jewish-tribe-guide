@@ -17,6 +17,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import type { LatLng } from '@/lib/googleMapsLinks'
 import { listingSearchText } from '@/lib/searchListing'
 import { hoursOpenNow } from '@/lib/hours'
+import { useNow } from '@/lib/useNow'
 import { ui } from '@/lib/uiConfig'
 import { ChevronLeftIcon, ExpandIcon, CollapseIcon, PinIcon } from '@/components/icons'
 import { categoryTint, getCategoryColor } from '@/lib/categoryColor'
@@ -883,7 +884,32 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     )
   }, [committedQuery, selected, openNowActive, boolFields, selectFilters])
 
+  // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
+  // should drop off a filtered map at 6pm, not when the visitor next reloads.
+  // But visiblePoints' identity is load-bearing (see mapPoints just below: a
+  // new array re-fits the map's bounds), so a minute tick must not produce a
+  // new array when the same places are still open.
+  //
+  // Hence the id string rather than a Set or an array: it's a primitive, so an
+  // unchanged result is `===` to the last one and the memo below doesn't
+  // recompute at all. When the chip is off this is the empty string forever
+  // and the clock reaches nothing.
+  const clock = useNow()
+  const openNowIds = useMemo(() => {
+    if (!openNowActive) return ''
+    const now = new Date(clock)
+    return allPoints
+      .filter((p) => {
+        if (!p.raw) return true
+        const keys = hoursKeysByCat.get(p.raw.category)
+        return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k], now) === true)
+      })
+      .map((p) => p.id)
+      .join('|')
+  }, [openNowActive, clock, allPoints, hoursKeysByCat])
+
   const visiblePoints = useMemo(() => {
+    const openNow = openNowActive ? new Set(openNowIds.split('|')) : null
     return allPoints
       // Pinned is a UNION with the category chips, not a replacement — a
       // pinned place shows up whether or not its own category chip happens
@@ -892,12 +918,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       .filter((p) => effectiveSelected.has(p.filterId) || (pinnedSelected && p.pinned))
       .filter((p) => activeTerms.every((t) => stripApostrophes(p.searchText).includes(t)))
       .filter((p) => !p.raw || filterChips.every((c) => c.test(p.raw as DirectoryResource)))
-      .filter((p) => {
-        if (!openNowActive || !p.raw) return true
-        const keys = hoursKeysByCat.get(p.raw.category)
-        return !keys?.length || keys.some((k) => hoursOpenNow(p.raw![k]) === true)
-      })
-  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, hoursKeysByCat, pinnedSelected])
+      .filter((p) => !openNow || openNow.has(p.id))
+  }, [allPoints, effectiveSelected, activeTerms, filterChips, openNowActive, openNowIds, pinnedSelected])
   // A plain `[...visiblePoints, ...droppedMapPoints]` spread inline in the
   // JSX below would build a fresh array on every ResourceMapView render —
   // including ones that don't touch either input, e.g. a background tap

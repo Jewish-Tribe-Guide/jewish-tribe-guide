@@ -1,5 +1,12 @@
 // Shared types and helpers for the structured `hours` category field.
 //
+// Every function that depends on the current time takes it as an argument,
+// defaulting to `new Date()`. Components pass `useNow()` instead, so a badge
+// re-evaluates when the tab comes back rather than staying frozen at whatever
+// moment the page happened to render — see useNow.ts. The default keeps
+// non-component callers (and tests, which drive these with vi.useFakeTimers)
+// working unchanged.
+//
 // Value shape stored in Supabase details JSONB:
 //   { sun: { open: "HH:MM", close: "HH:MM" } | null, mon: ..., ... }
 // Days absent from the object are treated as closed.
@@ -48,10 +55,10 @@ export function fmt12(hhmm: string): string {
  * Returns null when `v` is not structured hours (legacy text value or missing).
  * Returns false when today's hours are null (explicitly closed) or absent.
  */
-export function hoursOpenNow(v: unknown): boolean | null {
+export function hoursOpenNow(v: unknown, now: Date = new Date()): boolean | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const today = new Date()
+  const today = now
   const dayKey = DAY_KEYS[today.getDay()]
   const day = hours[dayKey]
   if (day === null || day === undefined) return false
@@ -76,10 +83,10 @@ export function hoursOpenNow(v: unknown): boolean | null {
 export function hoursClosing(
   v: unknown,
   withinMins = 60,
+  now: Date = new Date(),
 ): { closesSoon: boolean; closeLabel: string } | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const now = new Date()
   const day = hours[DAY_KEYS[now.getDay()]]
   if (!day || !day.open || !day.close) return null
   const nowMins = now.getHours() * 60 + now.getMinutes()
@@ -103,12 +110,13 @@ export function hoursClosing(
 export function getOpenStatus(
   item: Record<string, unknown>,
   hoursFieldKeys: string[],
+  now: Date = new Date(),
 ): { isOpen: boolean; closing: { closesSoon: boolean; closeLabel: string } | null } {
   const openVal = hoursFieldKeys
     .map((k) => item[k])
-    .find((v) => v !== undefined && hoursOpenNow(v) === true && isStructuredHours(v))
+    .find((v) => v !== undefined && hoursOpenNow(v, now) === true && isStructuredHours(v))
   const isOpen = openVal !== undefined
-  return { isOpen, closing: isOpen ? hoursClosing(openVal) : null }
+  return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now) : null }
 }
 
 /** "2026-06-07T…" → "Synced from Google · updated 3d ago" / "… updated today".
@@ -131,12 +139,12 @@ export function syncedLabel(iso?: string): string | null {
  *  - Legacy text string → the raw string (unchanged)
  *  - Missing/empty → null
  */
-export function formatTodayHours(v: unknown): string | null {
+export function formatTodayHours(v: unknown, now: Date = new Date()): string | null {
   if (!v && v !== false) return null
   if (typeof v === 'string') return v || null
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const dayKey = DAY_KEYS[new Date().getDay()]
+  const dayKey = DAY_KEYS[now.getDay()]
   const day = hours[dayKey]
   if (day === null || day === undefined) return 'Closed today'
   if (!day.open || !day.close) return null
@@ -150,10 +158,11 @@ export function formatTodayHours(v: unknown): string | null {
  */
 export function formatWeekHours(
   v: unknown,
+  now: Date = new Date(),
 ): Array<{ key: DayKey; label: string; text: string; isToday: boolean }> | null {
   if (!isStructuredHours(v)) return null
   const hours = v as Record<string, DayHours>
-  const todayKey = DAY_KEYS[new Date().getDay()]
+  const todayKey = DAY_KEYS[now.getDay()]
   return DAY_KEYS.map((key) => {
     const day = hours[key] ?? null
     const text = day ? `${fmt12(day.open)} – ${fmt12(day.close)}` : 'Closed'

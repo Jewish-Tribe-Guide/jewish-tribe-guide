@@ -7,9 +7,11 @@
 // Day key types are re-used from hours.ts to avoid duplication.
 
 import type { DayKey } from './hours'
+import type { Season } from './season'
 import { DAY_KEYS } from './hours'
 
 export type { DayKey }
+export type { Season }
 // Alias so callers can import ALL_DAYS from here instead of hours.
 export { DAY_KEYS as ALL_DAYS }
 
@@ -116,6 +118,17 @@ export type Minyan = {
   anchor?: ZmanAnchor
   /** Signed minutes from `anchor`: negative = before, positive = after. */
   offsetMinutes?: number
+  /** Set when a shul only runs this minyan in one half of the year — the
+   *  structured form of the "Winter only" / "Summer only" that used to be
+   *  typed into `notes` by hand. Which half it currently is gets derived from
+   *  the community's timezone (lib/season.ts), never configured; out-of-season
+   *  rows are dimmed and labelled, never hidden. Absent means all year. */
+  season?: Season
+}
+
+export const SEASON_LABELS: Record<Season, string> = {
+  winter: 'Winter only',
+  summer: 'Summer only',
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -211,6 +224,7 @@ export type ByTefillahGroup = {
     walkMinutes?: number | null
     anchor?: ZmanAnchor
     offsetMinutes?: number
+    season?: Season
   }>
 }
 
@@ -228,6 +242,7 @@ export type ByDayGroup = {
     walkMinutes?: number | null
     anchor?: ZmanAnchor
     offsetMinutes?: number
+    season?: Season
   }>
 }
 
@@ -250,6 +265,7 @@ export function groupByTefillah(shuls: ShulInfo[]): ByTefillahGroup[] {
         walkMinutes: shul.walkMinutes,
         anchor: m.anchor,
         offsetMinutes: m.offsetMinutes,
+        season: m.season,
       })
     }
   }
@@ -278,7 +294,11 @@ export function mergeSameDayTimes(rows: ByTefillahGroup['rows']): ByTefillahGrou
   const merged: ByTefillahGroup['rows'] = []
   for (const row of rows) {
     const prev = merged[merged.length - 1]
-    if (prev && prev.daysLabel === row.daysLabel && prev.notes === row.notes) {
+    // Season is part of the identity, not a detail: a shul that runs 6:30pm in
+    // winter and sunset-anchored in summer has two minyanim for the same days,
+    // and merging them into "6:30pm, 15 min before Sunset" would lose the only
+    // thing that says when each applies.
+    if (prev && prev.daysLabel === row.daysLabel && prev.notes === row.notes && prev.season === row.season) {
       // Joining two rows' `time` into one string means neither row's anchor
       // maps to it anymore — drop anchor/offsetMinutes so callers don't try
       // to show a calculated time for a merged multi-time string.
@@ -313,6 +333,7 @@ export function groupByDay(shuls: ShulInfo[]): ByDayGroup[] {
           walkMinutes: shul.walkMinutes,
           anchor: m.anchor,
           offsetMinutes: m.offsetMinutes,
+          season: m.season,
         })
       }
     }

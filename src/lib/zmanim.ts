@@ -39,6 +39,10 @@ type HebcalConverter = {
   hy: number
   hm: string
   hd: number
+  /** Jewish-calendar events falling on this date — "Rosh Chodesh Elul",
+   *  "Parashat Ki Tavo", "Erev Rosh Chodesh Sivan", yom tov names. Already in
+   *  the response this call has always made; nothing extra is fetched for it. */
+  events?: string[]
 }
 
 const WEEKDAY_INDEX = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -150,5 +154,20 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     },
     // Future-friendly: already available from Hebcal, exposed for later UI use.
     parsha: parshaItem?.title,
+    // Everything the Hebrew calendar says about today, minus the parsha (which
+    // has its own field above and is a property of the week, not the day).
+    holidays: (converter.events ?? []).filter((e) => !e.startsWith('Parashat')),
+    // Matched on the prefix rather than an exact name because Hebcal qualifies
+    // it with the month — "Rosh Chodesh Elul". Deliberately excludes "Erev
+    // Rosh Chodesh": this drives which minyanim show for TODAY, and a minyan
+    // tagged Rosh Chodesh means the day itself.
+    //
+    // Known edge: the Jewish day begins at sunset, so a maariv tagged Rosh
+    // Chodesh on erev Rosh Chodesh is already Rosh Chodesh while this still
+    // says false. Not chased here — the converter is queried for the daytime
+    // date, which is right for shacharis and mincha, and being late by an
+    // evening errs toward showing a row rather than hiding one only after the
+    // fallback in useCalendarDays has already been resolved.
+    isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
   }
 }

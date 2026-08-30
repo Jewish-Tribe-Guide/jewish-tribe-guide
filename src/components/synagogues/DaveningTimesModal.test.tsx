@@ -20,7 +20,7 @@ function anchorMinyan(overrides: Partial<Minyan> = {}): Minyan {
   return {
     id: 'm2',
     tefillah: 'mincha',
-    days: ['fri'],
+    days: ['sun'],
     time: formatAnchorRule('sunset', -18),
     anchor: 'sunset',
     offsetMinutes: -18,
@@ -40,12 +40,32 @@ const ZMANIM_RESPONSE: { ok: true; data: ZmanimData } = {
     dayOfWeek: 5,
     isFriday: true,
     isShabbos: false,
+    parsha: 'Parashat Tzav',
     dailyZmanim: [{ label: 'Sunset', time: '7:30 PM', iso: '2026-08-28T23:30:00.000Z' }],
     shabbos: { candleLighting: null, havdalah: null },
   },
 }
 
+// The modal now defaults its day filter to today, so what it renders depends
+// on the date it runs on. Pinned to a Sunday, which is the day the fixtures
+// above use. `shouldAdvanceTime` keeps real time moving underneath the fake
+// clock so waitFor and userEvent still resolve.
+const SUNDAY = new Date('2026-08-30T09:00:00')
+
+/** Re-stub /api/zmanim with extra fields on top of ZMANIM_RESPONSE. */
+function stubZmanim(extra: Partial<ZmanimData>) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, data: { ...ZMANIM_RESPONSE.data, ...extra } }),
+    }) as unknown as Response),
+  )
+}
+
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.setSystemTime(SUNDAY)
   localStorage.clear()
   vi.stubGlobal(
     'fetch',
@@ -55,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('DaveningTimesModal', () => {
@@ -79,7 +100,10 @@ describe('DaveningTimesModal', () => {
     })
     render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
 
-    expect(screen.getByText('Sunday')).toBeInTheDocument()
+    // By role: the header's context line ("Sunday · 1 Nisan 5786 · …") also
+    // says Sunday, deliberately — that line is what tells a visitor which day
+    // the app thinks it is. The day group is the <h3>.
+    expect(screen.getByRole('heading', { level: 3, name: 'Sunday' })).toBeInTheDocument()
     expect(screen.getByText('Shacharis')).toBeInTheDocument()
     expect(screen.getByText('Test Shul')).toBeInTheDocument()
     expect(screen.getByText('7:00am')).toBeInTheDocument()
@@ -90,10 +114,106 @@ describe('DaveningTimesModal', () => {
     const listing = makeListing({ name: 'Sunday Shul', minyanim: [clockMinyan({ days: ['sun'] })] })
     render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
 
+    // Today (a Sunday) is on by default, so clear it before selecting another
+    // day — otherwise this would be asserting on "Sunday plus Monday".
+    await user.click(screen.getByRole('button', { name: 'Today' }))
     await user.click(screen.getByRole('button', { name: 'Mon' }))
 
     expect(screen.getByText('No davening times on Mon.')).toBeInTheDocument()
     expect(screen.queryByText('Sunday Shul')).not.toBeInTheDocument()
+  })
+
+  // Someone opening this is overwhelmingly asking "where can I daven now", not
+  // reading a week's reference table — and HoursDisplay already sets the
+  // precedent of defaulting to today with the full view one tap behind.
+  it('defaults to today, and toggling Today off returns the full week', async () => {
+    const user = userEvent.setup()
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'a', days: ['sun'] }), clockMinyan({ id: 'b', days: ['tue'] })],
+    })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 3, name: 'Sunday' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 3, name: 'Tuesday' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.getByRole('heading', { level: 3, name: 'Tuesday' })).toBeInTheDocument()
+  })
+
+  // The rule behind all three of these: never narrow on missing data. A wrong
+  // "yes" shows a minyan the reader can discount from its own heading; a wrong
+  // "no" hides one, with nothing on screen to discount.
+  it('keeps Rosh Chodesh visible while the calendar answer has not arrived', () => {
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'rc', days: ['mon', 'thu', 'rosh_chodesh'], time: '6:45am' })],
+    })
+    // ZMANIM_RESPONSE carries no isRoshChodesh — the shape an older
+    // deployment's cached payload has. Unknown, so the row stays.
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Rosh Chodesh' })).toBeInTheDocument()
+    expect(screen.getByText('6:45am')).toBeInTheDocument()
+  })
+
+  it('drops the Rosh Chodesh group once Hebcal says today is not', async () => {
+    stubZmanim({ isRoshChodesh: false })
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [
+        clockMinyan({ id: 'rc', days: ['rosh_chodesh'], time: '6:45am' }),
+        clockMinyan({ id: 'sun', days: ['sun'], time: '8:00am' }),
+      ],
+    })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { level: 3, name: 'Rosh Chodesh' })).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('8:00am')).toBeInTheDocument()
+  })
+
+  it('shows the Rosh Chodesh group, and names it in the header, when it is', async () => {
+    stubZmanim({ isRoshChodesh: true, holidays: ['Rosh Chodesh Elul'] })
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'rc', days: ['rosh_chodesh'], time: '6:45am' })],
+    })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Rosh Chodesh Elul/)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('heading', { level: 3, name: 'Rosh Chodesh' })).toBeInTheDocument()
+  })
+
+  // Secular holidays are computed locally, so unlike Rosh Chodesh the answer
+  // is never pending and can always be trusted to narrow.
+  it('shows the Holiday group only on an actual secular holiday', () => {
+    const listing = makeListing({
+      name: 'Test Shul',
+      minyanim: [clockMinyan({ id: 'h', days: ['holiday'], time: '8:00am' })],
+    })
+    const { unmount } = render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+    expect(screen.queryByRole('heading', { level: 3, name: 'Holiday' })).not.toBeInTheDocument()
+    unmount()
+
+    vi.setSystemTime(new Date('2026-11-26T09:00:00')) // Thanksgiving
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+    expect(screen.getByRole('heading', { level: 3, name: 'Holiday' })).toBeInTheDocument()
+    expect(screen.getByText(/Thanksgiving/)).toBeInTheDocument()
+  })
+
+  it('names the day the app thinks it is, with the Hebrew date and parsha once they load', async () => {
+    const listing = makeListing({ name: 'Test Shul', minyanim: [clockMinyan()] })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    // The weekday comes from the visitor's own device, so it's there at once.
+    await waitFor(() => {
+      expect(screen.getByText(/Sunday · 1 Nisan 5786 · Parashat Tzav/)).toBeInTheDocument()
+    })
   })
 
   it('filters by denomination when more than one is present', async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -83,6 +83,41 @@ describe('GenericListingCard — collapsed', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
     expect(screen.queryByText('Open')).not.toBeInTheDocument()
+  })
+
+  // The Open badge is the most time-sensitive thing on the card, and it used
+  // to be computed once from `new Date()` during render and never revisited —
+  // nothing in the app ticked, and nothing listened for the tab coming back.
+  // A phone backgrounded in a hospital corridor at 4pm and looked at again at
+  // 10pm still showed "Open" for a shop that had closed at 5.
+  it('drops the "Open" badge once the listing has closed, when the tab comes back', () => {
+    vi.useFakeTimers()
+    try {
+      // A Friday, mid-afternoon, for a place open 09:00–17:00 that day.
+      vi.setSystemTime(new Date('2026-08-28T14:00:00'))
+      const category = makeCategory({
+        detailFields: [{ key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' }],
+      })
+      const item = makeListing({ hours: { fri: { open: '09:00', close: '17:00' } } })
+
+      renderWithProviders(
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      )
+      expect(screen.getByText('Open')).toBeInTheDocument()
+
+      // Away past closing time. A hidden tab doesn't tick, so this has to be
+      // the visibilitychange that corrects it, not an interval.
+      Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+      act(() => void vi.advanceTimersByTime(5 * 60 * 60 * 1000))
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+      act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+      expect(screen.queryByText('Open')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+      vi.useRealTimers()
+    }
   })
 
   it('calls onNameClick instead of expanding when the name itself is clicked, in a mixed-category list', async () => {

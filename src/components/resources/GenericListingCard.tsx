@@ -5,6 +5,7 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus } from '@/lib/hours'
+import { useNow } from '@/lib/useNow'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -98,7 +99,10 @@ export function GenericListingCard({
   })
 
   // A listing is "Open" if ANY of its hours fields say so — see getOpenStatus.
-  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key))
+  // Against useNow rather than the render's own clock: this badge is the most
+  // time-sensitive thing on the card, and it ships inside HTML that can be
+  // served from the CDN or the service worker's cache long after it was built.
+  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
   const travel = travelParts(item)
 
   // url fields explicitly opted into the collapsed row (showInHeader) — a

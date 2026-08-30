@@ -5,6 +5,7 @@ import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { getOpenStatus, syncedLabel } from '@/lib/hours'
+import { useNow } from '@/lib/useNow'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
@@ -177,7 +178,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const legacyDavening = item.davening as string | undefined
   const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
-  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key))
+  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
 
   // Every tags field's chosen values, primary and expanded-only alike — they
   // all render together here, in the one place tags show once a listing is

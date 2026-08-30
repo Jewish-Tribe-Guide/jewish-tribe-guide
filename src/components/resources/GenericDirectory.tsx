@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow } from '@/lib/hours'
+import { useNow } from '@/lib/useNow'
 import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
@@ -56,6 +57,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [openNow, setOpenNow] = useState(false)
+  // Drives the "Open now" filter below. Without it the filter answers for the
+  // moment the page rendered, so a list narrowed to what's open at 4pm still
+  // shows those places at 10pm.
+  const now = new Date(useNow())
   // Distance is meaningless with nothing to measure from, so this tracks the
   // anchor automatically — Popular while there's none, Distance the instant
   // one exists — until the visitor makes an explicit choice below, which
@@ -211,7 +216,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // Item must be open right now according to at least one filterable hours field.
         const isOpen = hoursFields
           .filter((f) => f.filterable)
-          .some((f) => hoursOpenNow(item[f.key]) === true)
+          .some((f) => hoursOpenNow(item[f.key], now) === true)
         if (!isOpen) return false
       }
       return true

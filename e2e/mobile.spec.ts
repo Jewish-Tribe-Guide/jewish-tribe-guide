@@ -47,27 +47,37 @@ test.describe('mobile', () => {
   })
 
   // The fixed tab bar drifted up the screen mid-flick on iOS. The cause was
-  // `overflow-x: hidden` on <html>/<body> in globals.css: an axis specified
-  // `visible` next to a non-visible, non-clip axis computes to `auto`, so that
-  // one declaration made <body> a scroll container and iOS then repositioned
-  // its fixed children a frame behind the momentum scroll. `overflow-x: clip`
-  // pairs legally with `visible` and leaves <body> unscrollable.
+  // `overflow-x: hidden` on <body> in globals.css: an axis specified `visible`
+  // next to a non-visible, non-clip axis computes to `auto`, so that one
+  // declaration made <body> a scroll container and iOS then repositioned its
+  // fixed children a frame behind the momentum scroll.
   //
-  // The visual glitch itself is an iOS compositor behaviour no browser here
-  // reproduces, so this asserts the CSS contract underneath it instead — which
-  // is the part that can silently regress the next time someone reaches for
+  // The rule now sits on <html> alone, which is the element whose overflow
+  // propagates to the viewport and so the only one that was ever doing the
+  // clipping. Switching it to `overflow-x: clip` instead was tried first and
+  // broke the trackpad back-navigation gesture — the viewport inherits the
+  // value, and `clip` leaves no horizontal scroll port to overscroll, so the
+  // gesture never arms. Hence: `hidden`, on the root only.
+  //
+  // Neither the iOS drift nor the trackpad gesture is reproducible in a
+  // headless browser, so this asserts the CSS contract underneath both — which
+  // is the part that regresses the next time someone reaches for
   // `overflow-hidden` to stop something dragging sideways.
-  test('the body is not a scroll container, but still clips sideways', async ({ page }) => {
+  test('the body is not a scroll container, but the page still clips sideways', async ({ page }) => {
     const community = await defaultCommunity(page)
     await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
 
     const overflow = await page.evaluate(() => {
-      const s = getComputedStyle(document.body)
-      return { x: s.overflowX, y: s.overflowY }
+      const body = getComputedStyle(document.body)
+      const root = getComputedStyle(document.documentElement)
+      return { bodyX: body.overflowX, bodyY: body.overflowY, rootX: root.overflowX }
     })
-    expect(overflow.y).toBe('visible')
-    expect(overflow.x).toBe('clip')
+    // Nothing on <body>: any value here drags `overflow-y` to `auto` with it.
+    expect(overflow.bodyX).toBe('visible')
+    expect(overflow.bodyY).toBe('visible')
+    // `hidden`, not `clip` — `clip` on the root disables trackpad swipe-back.
+    expect(overflow.rootX).toBe('hidden')
 
     // The horizontal backstop the rule exists for is still in force.
     const widths = await page.evaluate(() => ({

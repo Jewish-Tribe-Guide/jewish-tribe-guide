@@ -10,8 +10,10 @@ import {
   TEFILLAH_LABELS,
   ZMAN_ANCHOR_LABELS,
   ALL_MINYAN_DAYS,
+  SEASON_LABELS,
   formatAnchorRule,
   isMinyanim,
+  type Season,
 } from '@/lib/davening'
 
 const ZMAN_ANCHOR_ORDER: ZmanAnchor[] = ['sunset', 'candle_lighting', 'havdalah']
@@ -288,6 +290,28 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                   <span className="text-xs text-muted italic">→ {row.time}</span>
                 </>
               )}
+
+              {/* Season as a field rather than something typed into Notes.
+                  Shuls have always written "Winter only" there as prose, which
+                  nothing could act on; structured, the app can dim the row
+                  when it doesn't currently apply. Which half of the year it is
+                  gets derived from the community's timezone — nobody sets a
+                  changeover date, here or in the admin (see lib/season.ts). */}
+              <select
+                value={row.season ?? ''}
+                onChange={(e) =>
+                  updateRow(row.id, { season: (e.target.value || undefined) as Season | undefined })
+                }
+                aria-label="Season"
+                className={`${inputClass} shrink-0`}
+              >
+                <option value="">All year</option>
+                {(Object.keys(SEASON_LABELS) as Season[]).map((season) => (
+                  <option key={season} value={season}>
+                    {SEASON_LABELS[season]}
+                  </option>
+                ))}
+              </select>
 
               <input
                 type="text"
