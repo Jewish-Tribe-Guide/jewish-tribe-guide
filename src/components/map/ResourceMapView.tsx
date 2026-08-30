@@ -138,15 +138,16 @@ type Props = {
   }
   /** Full address-entry + tracking controls, same object the header pill
    *  reads (see LocationProvider) — so an address set from the map's own copy
-   *  of the control is set for the whole site, not just this screen. Desktop
-   *  only: the map surfaces the control in both its boxed and fullscreen
-   *  states (fullscreen is `desktop:fixed desktop:inset-0 desktop:z-50` below and paints
-   *  over the header entirely, taking the header's pill with it; boxed keeps
-   *  it because choosing where distances are measured from is a decision made
-   *  while looking at the map). Mobile has no such copy — its header is merely
-   *  collapsed rather than covered, and its pin FAB already reopens the same
-   *  popover. Omitted by callers with nowhere to set an address anyway (the
-   *  admin category-preview map), which just means no control renders. */
+   *  of the control is set for the whole site, not just this screen. Desktop,
+   *  fullscreen only: fullscreen is `desktop:fixed desktop:inset-0 desktop:z-50`
+   *  below and paints over the header entirely, taking the header's pill with
+   *  it, so this is the only place left to set an address. The boxed state
+   *  doesn't need its own copy — the header is `sticky top-0` (SiteHeader.tsx)
+   *  and stays visible above a boxed map. Mobile has no such copy either — its
+   *  header is merely collapsed rather than covered, and its pin FAB already
+   *  reopens the same popover. Omitted by callers with nowhere to set an
+   *  address anyway (the admin category-preview map), which just means no
+   *  control renders. */
   controls?: LocationControls
 }
 
@@ -1617,25 +1618,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   <span aria-hidden="true">📍</span>
                 </button>
               )}
-              {/* ── Address entry (desktop) — necessary when fullscreen (the
-                      map is `desktop:fixed desktop:inset-0 desktop:z-50`, painting
-                      directly over the site header and, with it, the only
-                      other place a visitor can type an address), and kept in
-                      the boxed state too. It was fullscreen-only at first, on
-                      the reasoning that the header pill is still right there
-                      above a boxed map — but "set a location" is a thing you
-                      decide while looking AT the map and its distances, and
-                      having to go find a control outside the thing you're
-                      looking at is the friction. A second copy of the same
-                      control is the point, not a bug: it's the header's own
-                      component driving the header's own `controls`, so
-                      setting an address here sets it for the whole site —
-                      directory distances, search sorting, the header pill's
-                      own label — exactly as if it had been typed up there.
-                      Same component, not a bespoke one, so "where should
-                      distances be measured from" behaves identically
-                      everywhere it appears. ─────────────────────────────── */}
-              {!isMobile && controls && (
+              {/* ── Address entry (desktop, fullscreen only) — necessary because
+                      the map is `desktop:fixed desktop:inset-0 desktop:z-50`,
+                      painting directly over the site header and, with it, the
+                      only other place a visitor can type an address. Not shown
+                      in the boxed state: the header is `sticky top-0` (see
+                      SiteHeader.tsx) and stays visible above a boxed map, so
+                      its own LocationControl pill is already reachable there
+                      and a second copy would be redundant. ─────────────────── */}
+              {!isMobile && fullscreen && controls && (
                 <div className="absolute right-3 top-14 z-20 hidden desktop:block">
                   <LocationControl controls={controls} />
                 </div>

@@ -517,12 +517,15 @@ describe('ResourceMapView — mobile full-screen category picker', () => {
   })
 })
 
-// The desktop map carries its own copy of the header's location control. It
-// started out fullscreen-only — fullscreen paints over the header, taking the
-// header's pill with it — but "set a location" is decided while looking at the
-// map, so the boxed state has it too. Both copies drive the SAME controls
-// object the header does (see LocationProvider), which is what makes an
-// address typed here apply to the whole site rather than to this screen.
+// The desktop map carries its own copy of the header's location control, but
+// only in fullscreen — fullscreen paints over the header (desktop:fixed
+// desktop:inset-0 desktop:z-50), taking the header's pill with it, so the map
+// is the only place left to set an address. The boxed state relies on the
+// header instead, since the header is `sticky top-0` and stays visible above
+// a boxed map — a second copy there would be redundant. Both copies (map and
+// header) drive the SAME controls object (see LocationProvider), which is
+// what makes an address typed here apply to the whole site rather than to
+// this screen.
 describe('ResourceMapView — the map’s own location control', () => {
   function mapControls(overrides: Partial<LocationControls> = {}): LocationControls {
     return {
@@ -550,15 +553,32 @@ describe('ResourceMapView — the map’s own location control', () => {
     )
   }
 
-  it('shows the control on the boxed desktop map, not only fullscreen', () => {
-    renderBoxed(mapControls())
+  // `standalone` forces fullscreen on mount (see ResourceMapView's own
+  // `useState(!!standalone)`), which is the only way this suite reaches the
+  // fullscreen-only control without driving the fullscreen-toggle button.
+  function renderFullscreen(controls?: LocationControls) {
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible controls={controls} />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ category: 'grocery' })],
+    )
+  }
+
+  it('shows the control on the fullscreen desktop map', () => {
+    renderFullscreen(mapControls())
     expect(screen.getByRole('button', { name: 'Set location' })).toBeInTheDocument()
+  })
+
+  it('does not show the control on the boxed desktop map, where the sticky header pill already covers it', () => {
+    renderBoxed(mapControls())
+    expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
   })
 
   it('drives the site-wide controls, so an address set here is set everywhere', async () => {
     const user = userEvent.setup()
     const controls = mapControls()
-    renderBoxed(controls)
+    renderFullscreen(controls)
 
     await user.click(screen.getByRole('button', { name: 'Set location' }))
     await user.click(screen.getByRole('button', { name: /Share my live location/ }))
@@ -567,12 +587,12 @@ describe('ResourceMapView — the map’s own location control', () => {
   })
 
   it('reads the location already set elsewhere rather than keeping its own', () => {
-    renderBoxed(mapControls({ address: '1 Main St', coords: { lat: 40, lng: -75 } }))
+    renderFullscreen(mapControls({ address: '1 Main St', coords: { lat: 40, lng: -75 } }))
     expect(screen.getByRole('button', { name: '1 Main St' })).toBeInTheDocument()
   })
 
   it('renders nothing for a caller with no location to set (the admin preview map)', () => {
-    renderBoxed(undefined)
+    renderFullscreen(undefined)
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
   })
 
@@ -583,7 +603,7 @@ describe('ResourceMapView — the map’s own location control', () => {
           <ListingsProvider listings={[listingWithGeo({ category: 'grocery' })]}>
             <ForcedViewport isMobile>
               <HeaderCollapseProvider>
-                <ResourceMapView onUp={vi.fn()} controls={mapControls()} />
+                <ResourceMapView onUp={vi.fn()} standalone visible controls={mapControls()} />
               </HeaderCollapseProvider>
             </ForcedViewport>
           </ListingsProvider>
