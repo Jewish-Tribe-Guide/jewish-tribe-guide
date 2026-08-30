@@ -206,6 +206,29 @@ describe('DaveningTimesModal', () => {
     expect(screen.getByText(/Thanksgiving/)).toBeInTheDocument()
   })
 
+  // The location popover lives on the site header's pill, which sits behind
+  // this modal and under its backdrop-blur — so opening it from in here used
+  // to look like nothing happened, with the panel the visitor asked for
+  // blurred out somewhere behind the sheet.
+  it('closes itself on the way to opening the location popover', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-location', opened)
+    try {
+      const listing = makeListing({ name: 'Test Shul', minyanim: [clockMinyan()], address: '1 Main St' })
+      render(<DaveningTimesModal items={[listing]} isOpen onClose={onClose} />)
+
+      await user.click(screen.getByText('Test Shul'))
+      await user.click(await screen.findByRole('button', { name: /Set your location/ }))
+
+      expect(onClose).toHaveBeenCalled()
+      await vi.waitFor(() => expect(opened).toHaveBeenCalled())
+    } finally {
+      document.removeEventListener('jpc:open-location', opened)
+    }
+  })
+
   it('names the day the app thinks it is, with the Hebrew date and parsha once they load', async () => {
     const listing = makeListing({ name: 'Test Shul', minyanim: [clockMinyan()] })
     render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)

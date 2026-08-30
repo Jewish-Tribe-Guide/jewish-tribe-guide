@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { EnrichedSubmission, ResourceRow, ResourceSubmission, CategorySubmissionPayload } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
-import { isMinyanim, TEFILLAH_LABELS } from '@/lib/davening'
+import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
@@ -37,20 +37,35 @@ function resolveOptionLabel(field: CategoryField | undefined, value: unknown): s
 function fmt(value: unknown, field?: CategoryField): string {
   if (value === undefined || value === null || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-  // Structured hours object → human-readable multi-day summary instead of [object Object].
-  if (isStructuredHours(value)) return formatHoursSummary(value)
-  // Structured minyanim array → "5 minyanim: Shacharis, Kabbalas Shabbos, Mincha, Maariv".
-  // isMinyanim([]) is vacuously true (every callsite elsewhere guards this the
-  // same way), so an empty non-minyanim array (any other array-valued field
-  // with nothing picked) doesn't misrender as "0 minyanim:".
-  if (isMinyanim(value) && value.length > 0) {
-    const count = value.length
-    const tefillot = [...new Set(value.map((m) => TEFILLAH_LABELS[m.tefillah]))]
-    return `${count} minyan${count !== 1 ? 'im' : ''}: ${tefillot.join(', ')}`
+
+  // Keyed on the configured type where there is one, with shape-detection only
+  // as the fallback for the raw-leftover loop below (a renamed or removed field
+  // arrives with no CategoryField to consult). isStructuredHours is a loose
+  // check — any non-array object satisfies it — so without the type check a
+  // future object-valued field type would be quietly rendered as if it were
+  // opening hours.
+  const structured = !field
+  if (field?.type === 'hours' || (structured && isStructuredHours(value))) {
+    return formatHoursSummary(value)
   }
+  // One line per minyan, not a count. See formatMinyanimSummary: the summary
+  // this replaced collapsed every minyan to a count plus the distinct tefillos,
+  // so an edit that changed a time, a day, a note or the season rendered an
+  // identical string and the diff below reported the field as unchanged.
+  if (field?.type === 'minyanim' || (structured && isMinyanim(value) && value.length > 0)) {
+    return isMinyanim(value) ? formatMinyanimSummary(value) : String(value)
+  }
+
   if (Array.isArray(value)) return value.map((v) => resolveOptionLabel(field, v)).join(', ') || '—'
   if (field?.type === 'select') return resolveOptionLabel(field, value)
-  return String(value)
+
+  const text = String(value)
+  // Last resort. A moderator seeing "[object Object]" learns nothing about
+  // what is being proposed, which is the one thing this whole card exists to
+  // show — so fall back to the raw JSON, which is at least readable and
+  // diffable. Reaching this means a new field type needs a branch above;
+  // SubmissionCard.test.tsx fails on it rather than letting it ship.
+  return text === '[object Object]' ? JSON.stringify(value) : text
 }
 
 // Internal bookkeeping the admin never authors directly (Google-sync
@@ -280,7 +295,7 @@ function ProposedDetails({ src, fields }: { src: ResourceSubmission; fields?: Ca
       {rows.map((r) => (
         <div key={r.key} className="flex gap-2">
           <dt className="text-muted w-28 shrink-0">{r.label}</dt>
-          <dd className="min-w-0 break-words text-slate-800">{r.value}</dd>
+          <dd className="min-w-0 break-words whitespace-pre-line text-slate-800">{r.value}</dd>
         </div>
       ))}
     </dl>
@@ -315,7 +330,10 @@ function Diff({
         return (
           <div key={k} className="flex gap-2">
             <dt className="text-muted w-28 shrink-0">{label}</dt>
-            <dd className={`min-w-0 break-words ${changed ? 'text-slate-800' : 'text-slate-400'}`}>
+            {/* whitespace-pre-line: the hours and minyanim summaries are
+                multi-line, and collapsing them to one run-on line is what made
+                a davening-times change unreadable even once it was diffable. */}
+            <dd className={`min-w-0 break-words whitespace-pre-line ${changed ? 'text-slate-800' : 'text-slate-400'}`}>
               {changed ? (
                 <span>
                   <span className="line-through text-red-500">{beforeValue}</span>{' '}

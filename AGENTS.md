@@ -64,6 +64,7 @@ Look up what you edited before calling it done:
 | If you touched | Run |
 | --- | --- |
 | `src/components/admin/**`, `src/app/admin/**`, `src/app/api/admin/**` | `test:admin-write` |
+| `SubmissionCard`, `fmt()`, `FieldType`, the `Minyan` type — anything changing what the moderation queue renders | `npx vitest run src/components/admin/SubmissionCard.test.tsx` (see below) |
 | The moderation queue, category editor, form editor, Pages tab specifically | `test:admin-write` |
 | `src/components/wizard/**`, `src/components/intake/**`, form submission or its API | `test:form-roundtrip` |
 | `src/lib/cacheTags.ts`, anything `use cache` or `revalidateTag`, a store's cached read | `test:cache-roundtrip` |
@@ -98,6 +99,30 @@ So: re-run before believing a failure there — but if it fails twice, believe
 it, because the measurements above say it should essentially never fail.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
+
+## The moderation queue must show what an edit actually proposes
+
+The queue is how an admin sees what the public is suggesting, so a field it
+renders *identically* before and after is a change someone approves blind.
+That has already happened: minyanim were summarised as
+`"5 minyanim: Shacharis, Mincha"`, so editing a time, a day, a note — or the
+`season` field added later — produced a byte-identical string and the diff
+reported the field as unchanged.
+
+`SubmissionCard.test.tsx` is keyed on `Record<FieldType, …>` and
+`Record<keyof Minyan, …>`, so **adding a field type or a minyan property is a
+compile error until you classify it there**. That is deliberate, and it is the
+guarantee — not a convention anyone has to remember. When it fails:
+
+- a new `FieldType` needs a before/after sample in `SAMPLES`, and usually a
+  branch in `SubmissionCard`'s `fmt()`; the test asserts the change renders as
+  a change, stays readable, and never comes out as `[object Object]`.
+- a new `Minyan` property needs an entry in `MINYAN_FIELD_VISIBILITY` — either
+  `shown` (add it to `formatMinyanimSummary` and to `MINYAN_CHANGES`) or
+  `deliberately-hidden` with the reason in a comment.
+
+Don't satisfy the compiler by marking something hidden to make the build pass.
+Anything a person authored is content a moderator needs to see.
 
 **When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a visual judgment call), say so explicitly instead of silently skipping coverage.
 
