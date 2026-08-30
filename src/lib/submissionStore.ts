@@ -275,8 +275,9 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
 
   const submission = sub as SubmissionRow
 
+  let affectedResourceId: string | null = null
   if (submission.target_type === 'listing') {
-    await applyListing(submission)
+    affectedResourceId = await applyListing(submission)
   } else if (submission.target_type === 'category') {
     await applyCategory(submission)
   } else {
@@ -286,7 +287,17 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
 
   const { data, error } = await supabase
     .from('submission')
-    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+    .update({
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+      // A `create` arrives with no target_id — there was nothing to point at
+      // yet. Recording it now makes the submission point at the listing it
+      // produced, which is what lets the caller sync that listing against
+      // Google right away instead of leaving it for the nightly run. The
+      // moderation card branches on `operation`, so a create still renders as
+      // proposed details rather than turning into a diff.
+      ...(submission.target_id ? {} : affectedResourceId ? { target_id: affectedResourceId } : {}),
+    })
     .eq('id', id)
     .select('*')
     .single()
@@ -503,7 +514,10 @@ function withResolvedGoogleFields(
   return next
 }
 
-async function applyListing(submission: SubmissionRow): Promise<void> {
+/** Returns the id of the listing the approval affected, so the caller can act
+ *  on it — a `create` submission has no target_id until now, which left the
+ *  newly published listing unreachable to anything downstream. */
+async function applyListing(submission: SubmissionRow): Promise<string | null> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
 
@@ -512,15 +526,19 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
-    const { error } = await supabase.from('resource').insert({
-      ...(await listingColumnsWithGeo(payload)),
-      status: 'approved',
-      submitted_by: submission.submitted_by,
-      reviewed_at: now,
-    })
+    const { data: created, error } = await supabase
+      .from('resource')
+      .insert({
+        ...(await listingColumnsWithGeo(payload)),
+        status: 'approved',
+        submitted_by: submission.submitted_by,
+        reviewed_at: now,
+      })
+      .select('id')
+      .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
     await growTagVocabulary(payload)
-    return
+    return (created as { id: string } | null)?.id ?? null
   }
 
   if (submission.operation === 'update') {
@@ -540,7 +558,7 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
     await growTagVocabulary(payload)
-    return
+    return submission.target_id
   }
 
   if (submission.operation === 'delete') {
@@ -551,7 +569,10 @@ async function applyListing(submission: SubmissionRow): Promise<void> {
       .update({ status: 'archived', reviewed_at: now })
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to archive listing: ${error.message}`)
+    return submission.target_id
   }
+
+  return null
 }
 
 // When a listing with tag fields is approved, add any newly-typed tags to the

@@ -72,8 +72,18 @@ export type ClosureReport = SyncCoverageListing & {
   changedAt: string | null
 }
 
+/** Has a place id, so the sync is expected to cover it — but no run has ever
+ *  touched it. Should be an empty list: a listing is synced the moment it's
+ *  approved (see the admin submissions route), so anything here arrived some
+ *  other way — a backfill script, a direct database edit — or was approved
+ *  while Google was unreachable. Surfaced rather than assumed away, because
+ *  this is precisely the state that used to fall through every section here:
+ *  no status to report, so nothing to correct, on a listing that is live. */
+export type PendingFirstSyncReport = SyncCoverageListing & { addedStatus: BusinessStatus | null }
+
 export type SyncCoverage = {
   neverSynced: NeverSyncedReport[]
+  pendingFirstSync: PendingFirstSyncReport[]
   protectedFields: ProtectedFieldReport[]
   failing: FailingSyncReport[]
   closures: ClosureReport[]
@@ -161,6 +171,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
   const protectedFields: ProtectedFieldReport[] = []
   const failing: FailingSyncReport[] = []
   const closures: ClosureReport[] = []
+  const pendingFirstSync: PendingFirstSyncReport[] = []
 
   for (const row of rows) {
     const category = categoryById.get(row.category)
@@ -195,6 +206,10 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
       continue
     }
 
+    if (!row.details?.googleSyncedAt) {
+      pendingFirstSync.push({ ...listing, addedStatus: googleStatus })
+    }
+
     const websiteKey = websiteFieldKey(category)
     const fields = protectedFieldsFor(row, category).map((f) => ({
       field: f,
@@ -214,7 +229,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
     }
   }
 
-  return { neverSynced, protectedFields, failing, closures }
+  return { neverSynced, pendingFirstSync, protectedFields, failing, closures }
 }
 
 /**

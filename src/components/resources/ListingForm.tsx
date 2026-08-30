@@ -60,6 +60,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [placeId, setPlaceId] = useState<string | null>(
     typeof existing?.placeId === 'string' ? existing.placeId : null,
   )
+  const [businessStatus, setBusinessStatus] = useState<PlaceSelectResult['businessStatus']>(
+    typeof existing?.businessStatus === 'string'
+      ? (existing.businessStatus as PlaceSelectResult['businessStatus'])
+      : null,
+  )
   // What picking an address autofilled into the syncable fields, this session
   // — sent along in the submission (see the payload below) so the server can
   // tell "matches what Google gave us" from "the submitter typed something
@@ -118,6 +123,11 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
   function handlePlaceSelect(result: PlaceSelectResult) {
     if (syncEligible) setPlaceId(result.placeId)
+    // Carried through so the listing is never published with no status at all.
+    // The sync overwrites this on its first run either way — this just covers
+    // the window between someone submitting and a moderator approving, during
+    // which the queue can show that Google already reports the place closed.
+    if (syncEligible) setBusinessStatus(result.businessStatus)
     // Always overwrite — if you switch from "Trader Joe's" to "Giant", all
     // auto-filled fields should update to match the new selection.
     if (result.name) setName(result.name)
@@ -225,6 +235,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // Carry the Google place id through so the sync job can pick it up as
         // soon as the listing is approved. Only set for sync-eligible categories.
         ...(syncEligible && placeId ? { placeId } : {}),
+        ...(syncEligible && businessStatus ? { businessStatus } : {}),
         // What autofill put in each syncable field this session, if picking an
         // address triggered it — free evidence of "this is what Google had"
         // for whichever fields it covers. The server (submissionStore.ts's

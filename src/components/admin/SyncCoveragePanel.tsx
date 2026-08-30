@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
-import type { SyncCoverage, SyncCheckField, ClosureReport } from '@/lib/syncCoverage'
+import type { SyncCoverage, SyncCheckField, ClosureReport, PendingFirstSyncReport } from '@/lib/syncCoverage'
 import type { BusinessStatus } from '@/lib/hours'
 
 // The Metrics tab's Google Places sync coverage report — three questions an
@@ -367,6 +367,21 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
               <p className="text-xs text-muted">Since {new Date(l.lastSyncFailedAt).toLocaleString()}</p>
             )}
           </div>
+        ))}
+      </Section>
+
+      <Section
+        title="Awaiting a first sync"
+        description="Have a place id but no sync has ever touched them. Should normally be empty — a listing syncs the moment it's approved."
+        count={coverage.pendingFirstSync.length}
+      >
+        {coverage.pendingFirstSync.map((l: PendingFirstSyncReport) => (
+          <ClosureRow
+            key={l.id}
+            listing={{ ...l, googleStatus: l.addedStatus, override: null, changedAt: null }}
+            token={token}
+            onChanged={() => load()}
+          />
         ))}
       </Section>
 

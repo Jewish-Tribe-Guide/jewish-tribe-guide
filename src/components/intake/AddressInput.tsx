@@ -16,6 +16,12 @@ export type PlaceSelectResult = {
   /** Google's own short editorial summary, when it has one (see the
    *  `googleDescription` field key convention — src/lib/categories.ts). */
   description: string | null
+  /** Whether Google currently considers the business to be trading. Comes
+   *  along free with the fetchFields call already being made, and matters
+   *  early: it lets a moderator see "Google says this is temporarily closed"
+   *  while deciding whether to approve, and stops a brand-new listing sitting
+   *  with no status at all until the nightly sync first reaches it. */
+  businessStatus: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | null
 }
 
 type Props = {
@@ -121,7 +127,7 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
     try {
       const place = s.prediction.toPlace()
       const extraFields = onPlaceSelect
-        ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI', 'editorialSummary']
+        ? ['id', 'displayName', 'nationalPhoneNumber', 'regularOpeningHours', 'websiteURI', 'editorialSummary', 'businessStatus']
         : preferPlaceName
           ? ['displayName']
           : []
@@ -157,6 +163,16 @@ export default function AddressInput({ value, onChange, placeholder = 'Address o
           hours: periods ? placesApiHoursToStructured(periods) : null,
           website: p.websiteURI ?? null,
           description: typeof p.editorialSummary === 'string' ? p.editorialSummary : null,
+          // Places (new) spells these OPERATIONAL / CLOSED_TEMPORARILY /
+          // CLOSED_PERMANENTLY, same as the server-side Details call the sync
+          // makes — anything else is treated as "not stated" rather than
+          // guessed at.
+          businessStatus:
+            p.businessStatus === 'OPERATIONAL' ||
+            p.businessStatus === 'CLOSED_TEMPORARILY' ||
+            p.businessStatus === 'CLOSED_PERMANENTLY'
+              ? p.businessStatus
+              : null,
         })
       }
     } finally {
