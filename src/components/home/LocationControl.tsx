@@ -53,13 +53,17 @@ export default function LocationControl({ controls }: Props) {
   // trigger pill (this component's `ref` below) is invisible on this screen
   // and has no real position to hang a `top-full` popover from.
   const [mapAnchor, setMapAnchor] = useState<HTMLElement | null>(null)
+  // Handed to useScrollLock so a touch drag that starts inside the popover
+  // still works while the page behind it is locked — its own content can be
+  // scrolled and the address field used as normal.
+  const popoverRef = useRef<HTMLDivElement>(null)
 
   // The popover is anchored (absolute/fixed), not part of normal page flow,
   // so nothing stops the page or map behind it from still scrolling while
   // it's open — it would drift out from under an address the visitor is
   // mid-type into. Locked for as long as it's open, on every screen this
   // renders on, not just the collapsed map case.
-  useScrollLock(open)
+  useScrollLock(open, popoverRef)
 
   // Close when tapping/clicking anywhere outside the popover. Listens during
   // the CAPTURE phase, not bubble — the Google Map (mobile's Map tab) runs its
@@ -309,13 +313,17 @@ export default function LocationControl({ controls }: Props) {
         // but nothing should render off-screen if one appears later).
         collapsed ? (
           <div
+            ref={popoverRef}
             className="visible fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
             style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8 }}
           >
             {popoverBody}
           </div>
         ) : (
-          <div className="visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10">
+          <div
+            ref={popoverRef}
+            className="visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
+          >
             {popoverBody}
           </div>
         )

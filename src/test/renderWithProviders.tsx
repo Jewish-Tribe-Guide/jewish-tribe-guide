@@ -39,10 +39,20 @@ export function renderWithProviders(ui: ReactElement, options: Overrides & Omit<
   const resolvedContent = makeContent(content)
   const resolvedCommunities = communities ?? [resolvedCommunity]
 
-  return render(
+  const wrap = (node: ReactElement) => (
     <CommunityProvider community={resolvedCommunity} communities={resolvedCommunities}>
-      <ContentProvider content={resolvedContent}>{ui}</ContentProvider>
-    </CommunityProvider>,
-    renderOptions,
+      <ContentProvider content={resolvedContent}>{node}</ContentProvider>
+    </CommunityProvider>
   )
+
+  const view = render(wrap(ui), renderOptions)
+
+  // RTL's own `rerender` replaces the whole tree with exactly what it's given,
+  // which drops the providers and throws "Content hooks must be used inside a
+  // ContentProvider". This re-wraps in the SAME resolved providers, so the
+  // component under test keeps its identity — and therefore its state and
+  // refs — across the rerender. That's what makes it possible to test how a
+  // component reacts to a prop changing on an instance that isn't remounting,
+  // which is the situation the App Router's segment cache creates.
+  return { ...view, rerenderWithProviders: (node: ReactElement) => view.rerender(wrap(node)) }
 }

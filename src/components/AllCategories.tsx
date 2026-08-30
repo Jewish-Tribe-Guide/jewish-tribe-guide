@@ -42,16 +42,32 @@ export default function AllCategories({
   const allCards = resources ? [...entryCards, ...resources] : null
   const sections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
 
-  // Scroll once, after the sections that hold the target actually exist —
-  // categories load async, so scrolling on mount would find nothing. Tracked
-  // with a ref rather than a dep so re-renders don't yank the page back after
-  // the visitor has scrolled somewhere themselves.
-  const scrolled = useRef(false)
+  // Scroll once per REQUESTED SECTION, after the sections that hold the target
+  // actually exist — categories load async, so scrolling on mount would find
+  // nothing.
+  //
+  // "Per requested section" is the part that was wrong. This used to latch a
+  // single boolean ref to true and never clear it, which is only correct if
+  // the component remounts for every visit. It doesn't always: the App Router
+  // keeps this segment's client state cached, so going back to the home screen
+  // and clicking a second heading could reuse the same instance with the ref
+  // already spent — the page then just sat at the top of /all, which is the
+  // bug this fixes.
+  //
+  // Keyed on the section name instead, so a new request always gets its scroll
+  // while a re-render for the same one never re-fires. That still matters:
+  // `sections.length` grows as categories arrive, and scrolling again then
+  // would yank the page back from wherever the visitor has since moved to.
+  const handledFor = useRef<string | null>(null)
   useEffect(() => {
-    if (scrolled.current || !scrollToSection || sections.length === 0) return
+    if (!scrollToSection) {
+      handledFor.current = null
+      return
+    }
+    if (handledFor.current === scrollToSection || sections.length === 0) return
     const el = document.getElementById(sectionAnchorId(scrollToSection))
     if (!el) return
-    scrolled.current = true
+    handledFor.current = scrollToSection
     el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [scrollToSection, sections.length])
 
