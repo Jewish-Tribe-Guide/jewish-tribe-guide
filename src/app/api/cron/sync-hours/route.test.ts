@@ -34,7 +34,11 @@ vi.mock('@/lib/googlePlaces', async () => {
 })
 
 vi.mock('@/lib/submissionStore', () => ({ submitGoogleClosure: vi.fn() }))
-vi.mock('@/lib/email', () => ({ sendSubmissionNotification: vi.fn() }))
+const mockDigest = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/email', () => ({
+  sendSubmissionNotification: vi.fn(),
+  sendStatusChangeDigest: mockDigest,
+}))
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: vi.fn() }))
 vi.mock('@/lib/categoryStore', () => ({ listCategories: vi.fn().mockResolvedValue([]) }))
 
@@ -46,6 +50,10 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV }
   delete process.env.CRON_SECRET
   vi.stubEnv('NODE_ENV', 'test')
+  // The route awaits this and attaches a .catch, so the default must be a
+  // promise — a bare vi.fn() returns undefined and blows up before the
+  // assertion the test is actually about.
+  mockDigest.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -53,7 +61,30 @@ afterEach(() => {
   vi.unstubAllEnvs()
   mockFrom.mockReset()
   mockFetchPlaceSync.mockReset()
+  mockDigest.mockReset()
 })
+
+const OPERATIONAL = {
+  name: null,
+  hours: null,
+  phone: null,
+  address: null,
+  website: null,
+  businessStatus: 'OPERATIONAL' as const,
+  description: null,
+}
+
+/** Wires the read + write builders the route expects, returning the write one. */
+function stubTable(rows: unknown[]) {
+  const readBuilder = chainable({ data: rows, error: null })
+  const writeBuilder = chainable({ data: null, error: null })
+  let call = 0
+  mockFrom.mockImplementation(() => {
+    call += 1
+    return call === 1 ? readBuilder : writeBuilder
+  })
+  return writeBuilder
+}
 
 const row = {
   id: 'r1',
@@ -125,5 +156,74 @@ describe('GET /api/cron/sync-hours', () => {
     }
     expect(updateArg.details.lastSyncError).toBeUndefined()
     expect(updateArg.details.lastSyncFailedAt).toBeUndefined()
+  })
+
+  // businessStatus used to be overwritten with no record of what it replaced,
+  // so nothing downstream could tell that a listing had just closed or just
+  // reopened — no notification was possible, and a two-day-old closure looked
+  // identical to a two-year-old one.
+  it('records the transition and digests it when the status changes', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_TEMPORARILY' })
+    const writeBuilder = stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'OPERATIONAL' } }])
+
+    const body = await (await runGet()).json()
+
+    expect(body).toMatchObject({ ok: true, statusChanged: 1 })
+    expect(writeBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          businessStatus: 'CLOSED_TEMPORARILY',
+          businessStatusBefore: 'OPERATIONAL',
+          businessStatusChangedAt: expect.any(String),
+        }),
+      }),
+    )
+    expect(mockDigest).toHaveBeenCalledWith([
+      { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY' },
+    ])
+  })
+
+  // Reopenings matter as much as closures — that's the direction nobody would
+  // otherwise hear about, since it needs no approval and fixes itself.
+  it('digests a reopening too', async () => {
+    mockFetchPlaceSync.mockResolvedValue(OPERATIONAL)
+    stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'CLOSED_TEMPORARILY' } }])
+
+    await runGet()
+
+    expect(mockDigest).toHaveBeenCalledWith([
+      expect.objectContaining({ from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL' }),
+    ])
+  })
+
+  it('says nothing on a run where no status moved', async () => {
+    mockFetchPlaceSync.mockResolvedValue(OPERATIONAL)
+    const writeBuilder = stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'OPERATIONAL' } }])
+
+    const body = await (await runGet()).json()
+
+    expect(body).toMatchObject({ statusChanged: 0 })
+    // Called with an empty list, which sendStatusChangeDigest itself no-ops on
+    // — a quiet week must not produce a "0 listings changed" email.
+    expect(mockDigest).toHaveBeenCalledWith([])
+    // And no stale transition marker is written onto an unchanged listing.
+    // chainable() is loosely typed (Record<string, unknown>), so the mock needs
+    // naming before its calls can be read.
+    const update = writeBuilder.update as ReturnType<typeof vi.fn>
+    const written = update.mock.calls.at(-1)?.[0] as { details: Record<string, unknown> }
+    expect(written.details).not.toHaveProperty('businessStatusChangedAt')
+  })
+
+  // A dead email provider must not turn a successful sync into a failed cron:
+  // the listings are already updated by the time the digest is attempted.
+  it('still reports success when the digest fails to send', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_TEMPORARILY' })
+    stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'OPERATIONAL' } }])
+    mockDigest.mockRejectedValue(new Error('provider down'))
+
+    const res = await runGet()
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, synced: 1 })
   })
 })

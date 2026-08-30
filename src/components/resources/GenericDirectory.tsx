@@ -225,11 +225,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       }
       return true
     })
-    .sort((a, b) =>
-      upvotes && sortByPopular
+    .sort((a, b) => {
+      // Closed businesses sink to the bottom, ahead of every other sort key.
+      // They stay in the list deliberately — the person most likely to walk to
+      // a closed shop is the one who already knows it exists, and hiding it is
+      // the one thing that guarantees they can't be warned — but they
+      // shouldn't compete for attention with places that are actually
+      // trading. Anyone who wants them gone entirely has the "Open now" filter.
+      const closedDiff =
+        Number(!!businessClosure(a as unknown as Record<string, unknown>)) -
+        Number(!!businessClosure(b as unknown as Record<string, unknown>))
+      if (closedDiff !== 0) return closedDiff
+      return upvotes && sortByPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
-        : travelCompare(a, b),
-    )
+        : travelCompare(a, b)
+    })
 
   // Log searches that match no listing in this category — by the search text
   // alone, so an active filter (open-now, cert, etc.) doesn't look like a miss.

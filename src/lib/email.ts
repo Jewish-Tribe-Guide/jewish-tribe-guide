@@ -348,3 +348,63 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
 
   await sendEmail({ to, subject, html })
 }
+
+/** One row of the business-status digest below. */
+export type StatusChange = {
+  name: string
+  category: string
+  from: string
+  to: string
+}
+
+const STATUS_WORDS: Record<string, string> = {
+  OPERATIONAL: 'open',
+  CLOSED_TEMPORARILY: 'temporarily closed',
+  CLOSED_PERMANENTLY: 'permanently closed',
+  UNKNOWN: 'not yet known',
+}
+
+function statusWord(v: string): string {
+  return STATUS_WORDS[v] ?? v
+}
+
+/**
+ * One digest per sync run listing every business whose Google status changed —
+ * in either direction, reopenings included.
+ *
+ * Deliberately a notification and not a moderation-queue entry. A temporary
+ * closure resolves itself: the sync rewrites businessStatus every run, so the
+ * badge appears and clears with no admin action, and a queue entry would need
+ * approving twice for something nobody has to decide. A permanent closure is
+ * different — that one is destructive (the listing leaves the directory) and
+ * still files a `delete` submission for review, separately from this.
+ *
+ * Sent only when something actually changed, so a quiet week is silent.
+ */
+export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<void> {
+  if (changes.length === 0) return
+  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+  const rows = changes
+    .map(
+      (c) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(c.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;">${escapeHtml(c.category)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${escapeHtml(statusWord(c.from))} &rarr; <strong>${escapeHtml(statusWord(c.to))}</strong></td>
+      </tr>`,
+    )
+    .join('')
+  const admin = adminAppUrl()
+  await sendEmail({
+    to,
+    subject:
+      changes.length === 1
+        ? `${changes[0].name} is now ${statusWord(changes[0].to)}`
+        : `${changes.length} listings changed status on Google`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;font-size:18px;">Google status changes</h2>
+      <p style="color:#334155;font-size:14px;">The daily sync saw these change. Nothing needs approving — the listings already show the new status, and it will clear itself if Google changes its mind. This is here so a mistake in the job can't go unnoticed.</p>
+      <table style="border-collapse:collapse;font-size:14px;width:100%;">${rows}</table>
+      ${admin ? `<p style="font-size:13px;"><a href="${admin}" style="color:#1d4ed8;">Open the admin console</a></p>` : ''}
+    </div>`,
+  })
+}

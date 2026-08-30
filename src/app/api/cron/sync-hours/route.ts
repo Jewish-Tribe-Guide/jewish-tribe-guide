@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
 import { fetchPlaceSync, nextGoogleFields, syncMayWrite, type OwnableSyncField } from '@/lib/googlePlaces'
 import { submitGoogleClosure } from '@/lib/submissionStore'
-import { sendSubmissionNotification } from '@/lib/email'
+import { sendSubmissionNotification, sendStatusChangeDigest, type StatusChange } from '@/lib/email'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { listCategories } from '@/lib/categoryStore'
 import type { CategoryConfig } from '@/lib/categories'
@@ -116,6 +116,7 @@ async function runSync(): Promise<NextResponse> {
   let synced = 0
   let failed = 0
   let flaggedClosed = 0
+  const statusChanges: StatusChange[] = []
 
   for (const row of rows) {
     const placeId = String(row.details.placeId)
@@ -146,7 +147,27 @@ async function runSync(): Promise<NextResponse> {
     delete details.lastSyncError
     delete details.lastSyncFailedAt
     // Google-only concepts with no curated counterpart — always refreshed.
-    if (sync.businessStatus) details.businessStatus = sync.businessStatus
+    //
+    // The transition is recorded alongside the value, which it wasn't before:
+    // businessStatus was simply overwritten, so there was no way to know a
+    // listing had just closed (or just reopened), no way to notify on it, and
+    // no way to tell a two-day-old closure from a two-year-old one. Everything
+    // downstream — the digest below, and anything that ever wants to surface
+    // "recently closed" — needs this to exist.
+    if (sync.businessStatus) {
+      const previous = typeof row.details.businessStatus === 'string' ? row.details.businessStatus : 'UNKNOWN'
+      if (previous !== sync.businessStatus) {
+        details.businessStatusBefore = previous
+        details.businessStatusChangedAt = new Date().toISOString()
+        statusChanges.push({
+          name: row.name,
+          category: row.category,
+          from: previous,
+          to: sync.businessStatus,
+        })
+      }
+      details.businessStatus = sync.businessStatus
+    }
     if (sync.description && !details.googleDescription) details.googleDescription = sync.description
 
     // Everything else is written only where Google owns the field: one it
@@ -212,8 +233,22 @@ async function runSync(): Promise<NextResponse> {
   // hour after the very sync meant to keep it current.
   if (synced > 0) await revalidatePublicContent()
 
+  // One digest for the whole run, closures and reopenings alike. Never fails
+  // the sync: the listings are already updated by this point, and an email
+  // provider hiccup must not turn a successful sync into a failed cron.
+  await sendStatusChangeDigest(statusChanges).catch((err) =>
+    console.error('[sync-hours] status digest failed:', err),
+  )
+
   await pingHealthcheck(true)
-  return NextResponse.json({ ok: true, total: rows.length, synced, failed, flaggedClosed })
+  return NextResponse.json({
+    ok: true,
+    total: rows.length,
+    synced,
+    failed,
+    flaggedClosed,
+    statusChanged: statusChanges.length,
+  })
 }
 
 // Catches anything runSync itself doesn't (a thrown error, not just its own
