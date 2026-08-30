@@ -124,7 +124,13 @@ guarantee — not a convention anyone has to remember. When it fails:
 Don't satisfy the compiler by marking something hidden to make the build pass.
 Anything a person authored is content a moderator needs to see.
 
-**When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a visual judgment call), say so explicitly instead of silently skipping coverage.
+**When you fix a bug or change behavior, add or update a test that would have caught it, in the same change.** Not a separate follow-up, not only when asked — the default. If the behavior genuinely can't be automated (an OS-level gesture, a real trackpad swipe, a visual judgment call), say so explicitly instead of silently skipping coverage.
+
+**And confirm it goes red first.** A test written against code that already works proves only that the code still works — it does not prove the test would have caught anything. Put the old behaviour back (a `sed` on the one line, a scratch copy of the file), watch the new test fail, restore, watch it pass. Say in the commit how many failed against the old code.
+
+This is not a formality. Tests that would have passed against the broken thing have shipped here more than once — see the e2e notes below, where an offline test passed because the page was simply still online, and the server-rendering tests certified the exact bug they were written to prevent. Both looked green the whole time.
+
+Do NOT use `git stash` to swap the old behaviour back in. Pathspec `git stash push` silently stashes nothing when the paths are untracked, and an unconditional `git stash pop` after it then pops whatever unrelated stash was on top — which has already happened here, applying someone's months-old work-in-progress into a clean tree as a merge conflict. Copy the file aside and copy it back.
 
 **Run `npm run test:e2e` before calling any change to routing, data loading, caching, or metadata done.** That is where the expensive mistakes have been, and every test in `e2e/` exists because something actually broke:
 

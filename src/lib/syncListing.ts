@@ -54,12 +54,19 @@ async function websiteFieldKey(communityId: string, categoryId: string): Promise
 }
 
 /** Loads one listing in the shape syncOneListing needs. Null when it doesn't
- *  exist or has no place id to sync against. */
+ *  exist, isn't live, or has no place id to sync against.
+ *
+ *  The `approved` filter matches the nightly run's own query, and is not
+ *  incidental: syncing an archived listing would ask Google about a place
+ *  that's already been taken down, and a CLOSED_PERMANENTLY answer would file
+ *  a fresh removal submission for it — putting a listing an admin just
+ *  archived straight back into the moderation queue. */
 export async function loadSyncableListing(resourceId: string): Promise<SyncedRow | null> {
   const { data } = await getAdminClient()
     .from('resource')
     .select('id,name,phone,address,details,category,community_id')
     .eq('id', resourceId)
+    .eq('status', 'approved')
     .maybeSingle()
   const row = data as SyncedRow | null
   if (!row) return null

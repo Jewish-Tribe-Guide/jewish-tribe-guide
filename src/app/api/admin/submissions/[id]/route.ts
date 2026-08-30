@@ -66,7 +66,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   // synced values too — but never allowed to fail the approval, which has
   // already happened by this point and must not be reported as failed because
   // Google was unreachable. It's just late instead: tonight's run picks it up.
-  if (decision === 'approved') {
+  // Adds and edits both — an edit is the other moment a listing's Google match
+  // can change (someone correcting a bad one), and the ownership resolution
+  // above already protects whatever the submitter typed by hand.
+  //
+  // Not removals. Approving one archives the listing, and syncing it then
+  // would ask Google about a place that's just been taken down; a
+  // CLOSED_PERMANENTLY answer would file a fresh removal submission and put it
+  // straight back in the queue. loadSyncableListing filters on `approved` as
+  // well, so this holds even if another caller forgets.
+  if (decision === 'approved' && submission.operation !== 'delete') {
     try {
       const row = await loadSyncableListing(submission.target_id ?? '')
       if (row) await syncOneListing(row)

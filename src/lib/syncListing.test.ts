@@ -126,4 +126,17 @@ describe('loadSyncableListing', () => {
     mockFrom.mockReturnValue(chainable({ data: row }))
     expect(await loadSyncableListing('r1')).toMatchObject({ id: 'r1' })
   })
+
+  // Approving a removal archives the listing. Syncing it then would ask Google
+  // about a place that's just been taken down, and a CLOSED_PERMANENTLY answer
+  // would file a fresh removal submission — putting a listing an admin had
+  // just archived straight back into the moderation queue.
+  it('will not load an archived listing to sync', async () => {
+    const builder = chainable({ data: null })
+    mockFrom.mockReturnValue(builder)
+
+    expect(await loadSyncableListing('r1')).toBeNull()
+    const eq = builder.eq as ReturnType<typeof vi.fn>
+    expect(eq).toHaveBeenCalledWith('status', 'approved')
+  })
 })
