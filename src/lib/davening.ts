@@ -349,3 +349,49 @@ export function groupByDay(shuls: ShulInfo[]): ByDayGroup[] {
     ),
   }))
 }
+
+/**
+ * Every minyan, one per line, in the app's own display order:
+ *
+ *   Shacharis · Mon, Thu, Rosh Chodesh · 6:45am
+ *   Mincha · Sat · 12:20pm · Winter only · following Kiddush
+ *
+ * For the moderation queue, where the whole point is seeing exactly what an
+ * edit proposes. The summary it replaced was "5 minyanim: Shacharis, Mincha"
+ * — a count and the distinct tefillos — so changing a time, a day, a note or
+ * the season produced a byte-identical string and the diff reported the field
+ * as unchanged. A moderator approving a davening-times edit could not see
+ * what they were approving.
+ *
+ * Sorted rather than left in array order, so merely reordering the rows isn't
+ * reported as a change. Sorting can only remove that noise; it can't hide a
+ * real difference in content, which is the direction that matters here.
+ *
+ * `anchor`/`offsetMinutes` aren't printed: `time` is generated from them by
+ * formatAnchorRule and kept in sync by the intake form, so it already reads
+ * "15 min before Sunset". `id` is bookkeeping. Both are asserted as
+ * deliberate exclusions in davening.test.ts, which fails if a new field is
+ * added to Minyan without deciding whether a moderator should see it.
+ */
+export function formatMinyanimSummary(minyanim: Minyan[]): string {
+  if (minyanim.length === 0) return '—'
+  return [...minyanim]
+    .sort(
+      (a, b) =>
+        TEFILLAH_ORDER.indexOf(a.tefillah) - TEFILLAH_ORDER.indexOf(b.tefillah) ||
+        parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time) ||
+        formatDays(a.days).localeCompare(formatDays(b.days)),
+    )
+    .map((m) =>
+      [
+        TEFILLAH_LABELS[m.tefillah],
+        formatDays(m.days) || 'Daily',
+        m.time,
+        m.season && SEASON_LABELS[m.season],
+        m.notes,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    )
+    .join('\n')
+}

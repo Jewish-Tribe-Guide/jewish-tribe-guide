@@ -100,23 +100,74 @@ export function hoursClosing(
   }
 }
 
+/** Google's own verdict on whether the business is trading at all, which
+ *  outranks its posted hours. A place marked temporarily closed usually still
+ *  has last season's hours saved, so reading hours alone had every one of them
+ *  showing a green "Open" badge — and passing the "Open now" filter — right
+ *  through the closure. `businessStatus` is refreshed on every sync and needs
+ *  no admin action either way, so this clears itself the day Google flips the
+ *  place back to OPERATIONAL. */
+export type Closure = 'temporary' | 'permanent'
+
+export type BusinessStatus = 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+
+/**
+ * What the app should treat this listing's status as: an admin's override
+ * where one is set, otherwise whatever Google last said.
+ *
+ * The override exists because `businessStatus` is rewritten on every sync and
+ * is deliberately outside OWNABLE_SYNC_FIELDS, which left three states with no
+ * way out: Google stops returning a status at all (the write is skipped and
+ * the old badge persists), the listing's sync starts failing, or its placeId
+ * is cleared and it leaves the sync query entirely. In each, a wrong badge was
+ * frozen on a live listing with nothing able to clear it.
+ *
+ * Google's own answer is never discarded — it keeps being recorded in
+ * `businessStatus` — so the admin console can show the disagreement, and
+ * clearing the override returns the listing to reality rather than to a
+ * remembered guess.
+ */
+export function effectiveBusinessStatus(item: Record<string, unknown>): unknown {
+  return item.businessStatusOverride ?? item.businessStatus
+}
+
+export function businessClosure(item: Record<string, unknown>): Closure | null {
+  const status = effectiveBusinessStatus(item)
+  if (status === 'CLOSED_TEMPORARILY') return 'temporary'
+  if (status === 'CLOSED_PERMANENTLY') return 'permanent'
+  return null
+}
+
+export const CLOSURE_LABELS: Record<Closure, string> = {
+  temporary: 'Temporarily closed',
+  permanent: 'Permanently closed',
+}
+
 /**
  * A listing's "Open"/"Closes Soon" status, from whichever of its hours
  * fields (there can be more than one — e.g. Mikvah's separate men's/women's/
  * keilim hours) says it's open right now. Shared by the collapsed listing
  * card's Open badge and the full detail body's status row, so the two can
  * never disagree about whether a place is open.
+ *
+ * A closed business is never open, whatever its saved hours say.
  */
 export function getOpenStatus(
   item: Record<string, unknown>,
   hoursFieldKeys: string[],
   now: Date = new Date(),
-): { isOpen: boolean; closing: { closesSoon: boolean; closeLabel: string } | null } {
+): {
+  isOpen: boolean
+  closing: { closesSoon: boolean; closeLabel: string } | null
+  closure: Closure | null
+} {
+  const closure = businessClosure(item)
+  if (closure) return { isOpen: false, closing: null, closure }
   const openVal = hoursFieldKeys
     .map((k) => item[k])
     .find((v) => v !== undefined && hoursOpenNow(v, now) === true && isStructuredHours(v))
   const isOpen = openVal !== undefined
-  return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now) : null }
+  return { isOpen, closing: isOpen ? hoursClosing(openVal, 60, now) : null, closure: null }
 }
 
 /** "2026-06-07T…" → "Synced from Google · updated 3d ago" / "… updated today".

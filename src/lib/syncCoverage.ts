@@ -10,7 +10,7 @@ import {
   type OwnableSyncField,
   type PlaceSync,
 } from './googlePlaces'
-import { formatHoursSummary } from './hours'
+import { formatHoursSummary, type BusinessStatus } from './hours'
 
 // ── The admin-visible "sync coverage" report — three answers to "is the
 // Google Places auto-sync doing what I think it's doing":
@@ -60,10 +60,23 @@ export type FailingSyncReport = SyncCoverageListing & {
   lastSyncFailedAt: string | null
 }
 
+/** A listing Google says isn't trading, or one an admin has overruled. Listed
+ *  together because they're the same question — "is what the public sees about
+ *  this business right?" — seen from either side. */
+export type ClosureReport = SyncCoverageListing & {
+  /** What Google last said. */
+  googleStatus: BusinessStatus | null
+  /** The admin's correction, when one is set. */
+  override: BusinessStatus | null
+  /** ISO timestamp of the last time Google's answer changed. */
+  changedAt: string | null
+}
+
 export type SyncCoverage = {
   neverSynced: NeverSyncedReport[]
   protectedFields: ProtectedFieldReport[]
   failing: FailingSyncReport[]
+  closures: ClosureReport[]
 }
 
 export const FIELD_LABELS: Record<OwnableSyncField, string> = {
@@ -147,6 +160,7 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
   const neverSynced: NeverSyncedReport[] = []
   const protectedFields: ProtectedFieldReport[] = []
   const failing: FailingSyncReport[] = []
+  const closures: ClosureReport[] = []
 
   for (const row of rows) {
     const category = categoryById.get(row.category)
@@ -157,6 +171,22 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
       name: row.name,
       category: row.category,
       categoryLabel: category.pluralLabel,
+    }
+
+    // Before the placeId check below, deliberately: a listing whose placeId
+    // was cleared while it was closed has left the sync query entirely, so its
+    // badge can never clear on its own. That's exactly the case an admin needs
+    // to find here, and `continue` would have skipped it.
+    const googleStatus = asStatus(row.details?.businessStatus)
+    const override = asStatus(row.details?.businessStatusOverride)
+    if ((googleStatus && googleStatus !== 'OPERATIONAL') || override) {
+      const changedAt = row.details?.businessStatusChangedAt
+      closures.push({
+        ...listing,
+        googleStatus,
+        override,
+        changedAt: typeof changedAt === 'string' ? changedAt : null,
+      })
     }
 
     const placeId = row.details?.placeId
@@ -184,7 +214,42 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
     }
   }
 
-  return { neverSynced, protectedFields, failing }
+  return { neverSynced, protectedFields, failing, closures }
+}
+
+/**
+ * Sets or clears an admin's business-status override.
+ *
+ * Only the override is written — Google's own `businessStatus` is left exactly
+ * as the sync last recorded it, so the console keeps showing the disagreement
+ * and clearing the override drops the listing back to reality rather than to a
+ * remembered guess.
+ */
+export async function setBusinessStatusOverride(
+  resourceId: string,
+  status: BusinessStatus | null,
+): Promise<void> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from('resource')
+    .select('details')
+    .eq('id', resourceId)
+    .single()
+  if (error || !data) throw new Error(`Listing not found: ${error?.message ?? resourceId}`)
+
+  const details = { ...((data.details ?? {}) as Record<string, unknown>) }
+  if (status) details.businessStatusOverride = status
+  else delete details.businessStatusOverride
+
+  const { error: updateError } = await supabase
+    .from('resource')
+    .update({ details })
+    .eq('id', resourceId)
+  if (updateError) throw new Error(`Failed to save override: ${updateError.message}`)
+}
+
+function asStatus(v: unknown): BusinessStatus | null {
+  return v === 'OPERATIONAL' || v === 'CLOSED_TEMPORARILY' || v === 'CLOSED_PERMANENTLY' ? v : null
 }
 
 export type SyncCheckField = {

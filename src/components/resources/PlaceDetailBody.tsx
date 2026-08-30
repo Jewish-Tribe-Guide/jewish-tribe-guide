@@ -4,7 +4,7 @@ import { Fragment, useLayoutEffect, useRef, useState, type MouseEvent, type Reac
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { getOpenStatus, syncedLabel } from '@/lib/hours'
+import { getOpenStatus, syncedLabel, CLOSURE_LABELS } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
@@ -178,7 +178,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const legacyDavening = item.davening as string | undefined
   const showDavening = hasDaveningTimes(minyanimValue, legacyDavening)
 
-  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
+  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
 
   // Every tags field's chosen values, primary and expanded-only alike — they
   // all render together here, in the one place tags show once a listing is
@@ -209,12 +209,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // job (see sync-hours/route.ts), so these show regardless of whether
   // hoursFields is empty. Used to live inside HoursDisplay, which meant they
   // never appeared for exactly the listings without hours to show.
-  const closedBadge =
-    item.businessStatus === 'CLOSED_PERMANENTLY'
-      ? { text: 'Permanently closed', cls: 'bg-red-50 text-red-700 border-red-200' }
-      : item.businessStatus === 'CLOSED_TEMPORARILY'
-        ? { text: 'Temporarily closed', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
-        : null
+  // Same source of truth as the Open badge above it and as the collapsed
+  // card's, so the two can't disagree about whether a place is trading.
+  const closedBadge = closure
+    ? {
+        text: CLOSURE_LABELS[closure],
+        cls:
+          closure === 'permanent'
+            ? 'bg-red-50 text-red-700 border-red-200'
+            : 'bg-amber-50 text-amber-700 border-amber-200',
+      }
+    : null
   // Gated on placeId, not just the timestamp: a listing whose Google match
   // was later cleared (a bad match corrected, say) can't un-sync its own
   // history, so a stale googleSyncedAt can outlive the placeId that earned

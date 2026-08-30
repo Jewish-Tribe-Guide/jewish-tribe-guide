@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
-import { getOpenStatus } from '@/lib/hours'
+import { getOpenStatus, CLOSURE_LABELS } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useCategories } from '@/lib/useCategories'
@@ -102,7 +102,7 @@ export function GenericListingCard({
   // Against useNow rather than the render's own clock: this badge is the most
   // time-sensitive thing on the card, and it ships inside HTML that can be
   // served from the CDN or the service worker's cache long after it was built.
-  const { isOpen, closing } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
+  const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
   const travel = travelParts(item)
 
   // url fields explicitly opted into the collapsed row (showInHeader) — a
@@ -310,8 +310,17 @@ export function GenericListingCard({
             own left edge — padding, not the icon's own width, so the divider
             above stays untouched. On mobile the chips sit flush left instead,
             since the narrower width makes the indent crowd them into wrapping. */}
-        {(isOpen || headerBadges.length > 0) && (
+        {(isOpen || closure || headerBadges.length > 0) && (
           <div className="mt-2 pt-2 pl-0 sm:pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+            {/* Closure outranks everything: it used to appear only once the
+                card was expanded, so a temporarily-closed shop was
+                indistinguishable from an open one in a directory list — worse,
+                its saved hours still earned it a green "Open" chip. Not a
+                filter chip like the others; there is nothing useful to filter
+                to here. */}
+            {closure && (
+              <Chip tone={closure === 'permanent' ? 'red' : 'amber'}>{CLOSURE_LABELS[closure]}</Chip>
+            )}
             {isOpen && (closing?.closesSoon ? (
               <span className="relative group/tip">
                 <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>

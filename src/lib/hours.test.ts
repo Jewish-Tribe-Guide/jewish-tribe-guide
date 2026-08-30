@@ -1,17 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  fmt12,
-  formatHoursSummary,
-  formatTodayHours,
-  formatWeekHours,
-  getOpenStatus,
-  hoursClosing,
-  hoursOpenNow,
-  isStructuredHours,
-  placesApiHoursToStructured,
-  syncedLabel,
-  type StructuredHours,
-} from './hours'
+import { businessClosure, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -325,5 +313,102 @@ describe('syncedLabel', () => {
   it('counts multiple days', () => {
     const fiveDaysAgo = new Date(2026, 5, 19, 12)
     expect(syncedLabel(fiveDaysAgo.toISOString())).toBe('Synced from Google · updated 5d ago')
+  })
+})
+
+// Google marks a business CLOSED_TEMPORARILY (a shop shut for renovations, a
+// restaurant closed for the season) while its posted hours stay exactly as they
+// were. Reading hours alone therefore had every one of them showing a green
+// "Open" badge, and passing the "Open now" filter, right through the closure.
+describe('business closures outrank posted hours', () => {
+  const openNow = { mon: { open: '00:00', close: '23:59' } }
+  const item = (status?: string) => ({
+    hours: openNow,
+    ...(status ? { businessStatus: status } : {}),
+  })
+  // A Monday, midday — the hours above say open.
+  const monday = new Date(2026, 7, 31, 12, 0)
+
+  it('reports a trading business as open', () => {
+    const status = getOpenStatus(item('OPERATIONAL'), ['hours'], monday)
+    expect(status.isOpen).toBe(true)
+    expect(status.closure).toBeNull()
+  })
+
+  it('never reports a temporarily closed business as open', () => {
+    const status = getOpenStatus(item('CLOSED_TEMPORARILY'), ['hours'], monday)
+    expect(status.isOpen).toBe(false)
+    expect(status.closure).toBe('temporary')
+    // No "Closes at …" either — there is nothing to close.
+    expect(status.closing).toBeNull()
+  })
+
+  it('never reports a permanently closed business as open', () => {
+    const status = getOpenStatus(item('CLOSED_PERMANENTLY'), ['hours'], monday)
+    expect(status.isOpen).toBe(false)
+    expect(status.closure).toBe('permanent')
+  })
+
+  // The sync rewrites businessStatus on every run and needs no admin action
+  // either way, so the badge has to clear itself the day Google reopens the
+  // place. Nothing is remembered between runs; this is that property.
+  it('goes back to open the moment the status flips back', () => {
+    expect(getOpenStatus(item('CLOSED_TEMPORARILY'), ['hours'], monday).isOpen).toBe(false)
+    expect(getOpenStatus(item('OPERATIONAL'), ['hours'], monday).isOpen).toBe(true)
+    // And for a listing Google never gave a status at all.
+    expect(getOpenStatus(item(), ['hours'], monday).isOpen).toBe(true)
+  })
+
+  it('classifies closures for display', () => {
+    expect(businessClosure({ businessStatus: 'CLOSED_TEMPORARILY' })).toBe('temporary')
+    expect(businessClosure({ businessStatus: 'CLOSED_PERMANENTLY' })).toBe('permanent')
+    expect(businessClosure({ businessStatus: 'OPERATIONAL' })).toBeNull()
+    expect(businessClosure({})).toBeNull()
+  })
+})
+
+// businessStatus is rewritten on every sync and sits outside
+// OWNABLE_SYNC_FIELDS, which left three states with no way out: Google stops
+// returning a status (the write is skipped, the old badge persists), the
+// listing's sync starts failing, or its place id is cleared so it leaves the
+// sync query entirely. In each, a wrong badge was frozen on a live listing
+// with nothing able to clear it.
+describe('an admin override outranks Google', () => {
+  it('reopens a listing Google still calls closed', () => {
+    const item = { businessStatus: 'CLOSED_TEMPORARILY', businessStatusOverride: 'OPERATIONAL' }
+    expect(businessClosure(item)).toBeNull()
+    expect(effectiveBusinessStatus(item)).toBe('OPERATIONAL')
+  })
+
+  it('can close a listing Google still calls open', () => {
+    const item = { businessStatus: 'OPERATIONAL', businessStatusOverride: 'CLOSED_TEMPORARILY' }
+    expect(businessClosure(item)).toBe('temporary')
+  })
+
+  // The override is stored on its own key rather than by writing over
+  // businessStatus, so Google's answer keeps updating underneath it — that's
+  // what lets the console show the disagreement, and what makes clearing the
+  // override return the listing to reality rather than to a remembered guess.
+  it('leaves Google’s own answer intact underneath', () => {
+    const item = { businessStatus: 'CLOSED_PERMANENTLY', businessStatusOverride: 'OPERATIONAL' }
+    expect(item.businessStatus).toBe('CLOSED_PERMANENTLY')
+    expect(businessClosure(item)).toBeNull()
+    // Clearing it hands the listing straight back to Google.
+    expect(businessClosure({ businessStatus: 'CLOSED_PERMANENTLY' })).toBe('permanent')
+  })
+
+  it('does nothing when unset', () => {
+    expect(businessClosure({ businessStatus: 'CLOSED_TEMPORARILY', businessStatusOverride: undefined }))
+      .toBe('temporary')
+  })
+
+  it('keeps a closed-by-override listing out of Open', () => {
+    const status = getOpenStatus(
+      { hours: { mon: { open: '00:00', close: '23:59' } }, businessStatusOverride: 'CLOSED_TEMPORARILY' },
+      ['hours'],
+      new Date(2026, 7, 31, 12, 0),
+    )
+    expect(status.isOpen).toBe(false)
+    expect(status.closure).toBe('temporary')
   })
 })

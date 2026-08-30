@@ -228,12 +228,12 @@ describe('ListingForm', () => {
     expect(screen.queryByText('Thank you!')).not.toBeInTheDocument()
   })
 
-  it('re-verifies and asks for a resubmit, rather than losing the form, on an expired-token (403) response', async () => {
+  it('re-verifies and asks for a resubmit, rather than losing the form, on an expired-token response', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 403,
-      json: async () => ({ ok: false, errors: ['Verification expired.'] }),
+      json: async () => ({ ok: false, code: 'turnstile', errors: ['Verification failed.'] }),
     })
     vi.stubGlobal('fetch', fetchMock)
     const category = makeCategory()
@@ -243,6 +243,46 @@ describe('ListingForm', () => {
 
     expect(await screen.findByText(/We’ve refreshed it — please tap Submit again/)).toBeInTheDocument()
     expect(screen.queryByText('Thank you!')).not.toBeInTheDocument()
+  })
+
+  // /api/submissions answers 403 for several unrelated refusals — a
+  // contribution type disabled site-wide, a category with edits turned off.
+  // Treating those as a stale challenge produced an endless "we've refreshed
+  // it, tap Submit again" that no amount of tapping could clear, and hid the
+  // reason the server actually gave.
+  it('shows the server’s own message for a 403 that is not about verification', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ ok: false, errors: ['This action is not available for this category.'] }),
+    }))
+    render(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+
+    await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    expect(await screen.findByText('This action is not available for this category.')).toBeInTheDocument()
+    expect(screen.queryByText(/tap Submit again/)).not.toBeInTheDocument()
+  })
+
+  // A fresh token failing too means staleness was never the problem, and
+  // repeating the same hopeful message is the loop being reported.
+  it('stops promising a retry once a refreshed challenge fails as well', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ ok: false, code: 'turnstile', errors: ['Verification failed.'] }),
+    }))
+    render(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+
+    const submit = screen.getByRole('button', { name: 'Submit for review' })
+    await user.click(submit)
+    expect(await screen.findByText(/tap Submit again/)).toBeInTheDocument()
+
+    await user.click(submit)
+    expect(await screen.findByText(/Verification keeps failing/)).toBeInTheDocument()
+    expect(screen.queryByText(/tap Submit again/)).not.toBeInTheDocument()
   })
 
   it('calls onPreviewSubmit with a built resource instead of posting, when provided', async () => {

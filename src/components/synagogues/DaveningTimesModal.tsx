@@ -140,6 +140,7 @@ function DistanceDirections({
   driveMinutes,
   walkMinutes,
   verifiedPlaceId,
+  onRequestLocation,
 }: {
   name: string
   address?: string
@@ -154,6 +155,9 @@ function DistanceDirections({
    *  risking Google fuzzy-matching the name to a same-named place elsewhere
    *  (see destinationQuery's own doc). */
   verifiedPlaceId?: string
+  /** Closes this modal on the way to opening the location popover — see the
+   *  button's own note below. */
+  onRequestLocation: () => void
 }) {
   const dest = address
     ? destinationQuery(name, address, { alwaysIncludeName: !!verifiedPlaceId })
@@ -189,7 +193,15 @@ function DistanceDirections({
       ) : (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); document.dispatchEvent(new CustomEvent('jpc:open-location')) }}
+          // Closes the modal first. The location popover hangs off the pill in
+          // the site header, which sits *behind* this modal and under its
+          // backdrop-blur — so opening it from in here used to look like
+          // nothing had happened at all, with the panel the visitor asked for
+          // sitting blurred out somewhere behind the sheet. Raising it above
+          // the modal wouldn't help much either: it would still be anchored to
+          // a trigger nobody can see. The day filter survives a close, so
+          // reopening lands them back where they were, now with distances.
+          onClick={(e) => { e.stopPropagation(); onRequestLocation() }}
           className="ml-auto text-xs text-primary hover:underline cursor-pointer"
         >
           Set your location to see distance
@@ -343,6 +355,14 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // = every day), which is also the route back to the full reference table now
   // that it isn't the default any more.
   const toggleToday = () => setDayFilter(todayActive ? { mode: 'custom', days: [] } : { mode: 'today' })
+
+  // Close, then open the header's location popover on the next tick — the
+  // modal's own scroll lock and focus handling need to have unwound before
+  // something else tries to take over the screen.
+  const requestLocation = () => {
+    onClose()
+    setTimeout(() => document.dispatchEvent(new CustomEvent('jpc:open-location')), 0)
+  }
 
   const allShuls = isOpen ? shulsFromItems(items) : []
   const denominations = Array.from(
@@ -610,6 +630,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                                     driveMinutes={row.driveMinutes}
                                     walkMinutes={row.walkMinutes}
                                     verifiedPlaceId={info?.verifiedPlaceId}
+                                    onRequestLocation={requestLocation}
                                   />
                                 )}
                               </div>

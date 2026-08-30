@@ -55,8 +55,14 @@ export async function POST(request: Request) {
 
   // CAPTCHA — no-op until TURNSTILE_SECRET_KEY is configured.
   if (!(await verifyTurnstile(body.turnstileToken, clientIp(request)))) {
+    // `code`, not just the status: this route returns 403 for several
+    // unrelated refusals (a disabled contribution type, a category with edits
+    // turned off), and the client can only offer "we refreshed the challenge,
+    // tap Submit again" for THIS one. Without a code it was offering it for
+    // all of them, which loops forever on a refusal no retry can fix, and
+    // hides the server's real explanation while it does.
     return Response.json(
-      { ok: false, errors: ['Verification failed. Please refresh and try again.'] },
+      { ok: false, code: 'turnstile', errors: ['Verification failed. Please refresh and try again.'] },
       { status: 403 },
     )
   }
