@@ -214,7 +214,13 @@ async function runSync(): Promise<NextResponse> {
 
     // Route permanent closures through the moderation queue so an admin can
     // review and approve before the listing is removed from the public directory.
-    if (sync.businessStatus === 'CLOSED_PERMANENTLY') {
+    //
+    // Skipped entirely when an admin has overridden the status: they have
+    // already looked at this listing and said Google is wrong about it, so
+    // filing a removal — and emailing about it — every single run would be
+    // arguing with them daily. Google's answer is still recorded above, and
+    // clearing the override lets this fire on the next run.
+    if (sync.businessStatus === 'CLOSED_PERMANENTLY' && !row.details.businessStatusOverride) {
       try {
         const submission = await submitGoogleClosure(row.id)
         if (submission) {

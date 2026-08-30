@@ -181,6 +181,14 @@ export type DirectoryResource = {
   confirmedAt?: string
   /** 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' from Google. */
   businessStatus?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+  /** An admin's correction, which wins over `businessStatus` everywhere the
+   *  app decides whether a place is trading — see effectiveBusinessStatus.
+   *  Google's own answer keeps updating underneath it, so the console can show
+   *  the disagreement and clearing this returns the listing to reality. */
+  businessStatusOverride?: 'OPERATIONAL' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY'
+  /** What `businessStatus` was before the sync last changed it, and when. */
+  businessStatusBefore?: string
+  businessStatusChangedAt?: string
   /** Short editorial description from Google Places (fetched on first sync). */
   googleDescription?: string
   /** Which fields ('name'|'hours'|'phone'|'address') the sync is allowed to

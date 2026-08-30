@@ -3,7 +3,8 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
-import type { SyncCoverage, SyncCheckField } from '@/lib/syncCoverage'
+import type { SyncCoverage, SyncCheckField, ClosureReport } from '@/lib/syncCoverage'
+import type { BusinessStatus } from '@/lib/hours'
 
 // The Metrics tab's Google Places sync coverage report — three questions an
 // admin can't answer today without reading raw `details` JSON:
@@ -175,6 +176,106 @@ function CheckAgainstGoogle({
   )
 }
 
+const STATUS_WORDS: Record<BusinessStatus, string> = {
+  OPERATIONAL: 'Open',
+  CLOSED_TEMPORARILY: 'Temporarily closed',
+  CLOSED_PERMANENTLY: 'Permanently closed',
+}
+
+/**
+ * Corrects what the public sees about one listing when Google has it wrong.
+ *
+ * This is the only exit from three states that were otherwise permanent:
+ * Google stops returning a status (the sync skips the write and the old badge
+ * persists), the listing's sync starts failing, or its place id is cleared so
+ * it leaves the sync query altogether. In each, a wrong badge was frozen on a
+ * live listing with nothing able to clear it.
+ *
+ * "Follow Google again" clears the override rather than writing Google's
+ * current answer into it — the difference matters, because the listing then
+ * keeps tracking Google going forward instead of freezing on today's value.
+ */
+function ClosureRow({
+  listing,
+  token,
+  onChanged,
+}: {
+  listing: ClosureReport
+  token: string
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(status: BusinessStatus | null) {
+    setBusy(true)
+    setError(null)
+    try {
+      await fetchJson('/api/admin/sync-coverage/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: listing.id, status }),
+      }, 'Could not save the override.')
+      onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const shown = listing.override ?? listing.googleStatus
+
+  return (
+    <div className="p-3 text-sm">
+      <p>
+        <span className="font-medium text-slate-900">{listing.name}</span>{' '}
+        <span className="text-xs text-muted">{listing.categoryLabel}</span>
+      </p>
+      <p className="text-xs text-muted mt-0.5">
+        Google says{' '}
+        <span className="font-medium text-slate-700">
+          {listing.googleStatus ? STATUS_WORDS[listing.googleStatus] : 'nothing'}
+        </span>
+        {listing.changedAt && <> · changed {new Date(listing.changedAt).toLocaleDateString()}</>}
+      </p>
+      {listing.override ? (
+        <p className="text-xs text-amber-700 mt-0.5">
+          Overridden — visitors see <span className="font-medium">{STATUS_WORDS[listing.override]}</span>
+        </p>
+      ) : (
+        <p className="text-xs text-muted mt-0.5">
+          Visitors see <span className="font-medium text-slate-700">{shown ? STATUS_WORDS[shown] : '—'}</span>
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {(Object.keys(STATUS_WORDS) as BusinessStatus[]).map((status) => (
+          <button
+            key={status}
+            type="button"
+            disabled={busy || listing.override === status}
+            onClick={() => save(status)}
+            className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-default cursor-pointer"
+          >
+            Show as {STATUS_WORDS[status].toLowerCase()}
+          </button>
+        ))}
+        {listing.override && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => save(null)}
+            className="rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-40 cursor-pointer"
+          >
+            Follow Google again
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-700 mt-1">{error}</p>}
+    </div>
+  )
+}
+
 export default function SyncCoveragePanel({ token }: { token: string }) {
   const [coverage, setCoverage] = useState<SyncCoverage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -266,6 +367,16 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
               <p className="text-xs text-muted">Since {new Date(l.lastSyncFailedAt).toLocaleString()}</p>
             )}
           </div>
+        ))}
+      </Section>
+
+      <Section
+        title="Closed or overridden"
+        description="Google reports these as closed, or an admin has overruled what it says. Listed together because they're the same question seen from either side."
+        count={coverage.closures.length}
+      >
+        {coverage.closures.map((l) => (
+          <ClosureRow key={l.id} listing={l} token={token} onChanged={() => load()} />
         ))}
       </Section>
     </div>

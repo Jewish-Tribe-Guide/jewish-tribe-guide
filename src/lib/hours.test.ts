@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -364,5 +364,51 @@ describe('business closures outrank posted hours', () => {
     expect(businessClosure({ businessStatus: 'CLOSED_PERMANENTLY' })).toBe('permanent')
     expect(businessClosure({ businessStatus: 'OPERATIONAL' })).toBeNull()
     expect(businessClosure({})).toBeNull()
+  })
+})
+
+// businessStatus is rewritten on every sync and sits outside
+// OWNABLE_SYNC_FIELDS, which left three states with no way out: Google stops
+// returning a status (the write is skipped, the old badge persists), the
+// listing's sync starts failing, or its place id is cleared so it leaves the
+// sync query entirely. In each, a wrong badge was frozen on a live listing
+// with nothing able to clear it.
+describe('an admin override outranks Google', () => {
+  it('reopens a listing Google still calls closed', () => {
+    const item = { businessStatus: 'CLOSED_TEMPORARILY', businessStatusOverride: 'OPERATIONAL' }
+    expect(businessClosure(item)).toBeNull()
+    expect(effectiveBusinessStatus(item)).toBe('OPERATIONAL')
+  })
+
+  it('can close a listing Google still calls open', () => {
+    const item = { businessStatus: 'OPERATIONAL', businessStatusOverride: 'CLOSED_TEMPORARILY' }
+    expect(businessClosure(item)).toBe('temporary')
+  })
+
+  // The override is stored on its own key rather than by writing over
+  // businessStatus, so Google's answer keeps updating underneath it — that's
+  // what lets the console show the disagreement, and what makes clearing the
+  // override return the listing to reality rather than to a remembered guess.
+  it('leaves Google’s own answer intact underneath', () => {
+    const item = { businessStatus: 'CLOSED_PERMANENTLY', businessStatusOverride: 'OPERATIONAL' }
+    expect(item.businessStatus).toBe('CLOSED_PERMANENTLY')
+    expect(businessClosure(item)).toBeNull()
+    // Clearing it hands the listing straight back to Google.
+    expect(businessClosure({ businessStatus: 'CLOSED_PERMANENTLY' })).toBe('permanent')
+  })
+
+  it('does nothing when unset', () => {
+    expect(businessClosure({ businessStatus: 'CLOSED_TEMPORARILY', businessStatusOverride: undefined }))
+      .toBe('temporary')
+  })
+
+  it('keeps a closed-by-override listing out of Open', () => {
+    const status = getOpenStatus(
+      { hours: { mon: { open: '00:00', close: '23:59' } }, businessStatusOverride: 'CLOSED_TEMPORARILY' },
+      ['hours'],
+      new Date(2026, 7, 31, 12, 0),
+    )
+    expect(status.isOpen).toBe(false)
+    expect(status.closure).toBe('temporary')
   })
 })

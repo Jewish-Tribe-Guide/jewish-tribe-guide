@@ -33,7 +33,8 @@ vi.mock('@/lib/googlePlaces', async () => {
   return { ...actual, fetchPlaceSync: mockFetchPlaceSync }
 })
 
-vi.mock('@/lib/submissionStore', () => ({ submitGoogleClosure: vi.fn() }))
+const mockSubmitClosure = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/submissionStore', () => ({ submitGoogleClosure: mockSubmitClosure }))
 const mockDigest = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/email', () => ({
   sendSubmissionNotification: vi.fn(),
@@ -54,6 +55,7 @@ beforeEach(() => {
   // promise — a bare vi.fn() returns undefined and blows up before the
   // assertion the test is actually about.
   mockDigest.mockResolvedValue(undefined)
+  mockSubmitClosure.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -62,6 +64,7 @@ afterEach(() => {
   mockFrom.mockReset()
   mockFetchPlaceSync.mockReset()
   mockDigest.mockReset()
+  mockSubmitClosure.mockReset()
 })
 
 const OPERATIONAL = {
@@ -225,5 +228,38 @@ describe('GET /api/cron/sync-hours', () => {
 
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true, synced: 1 })
+  })
+
+  // An admin who has overruled Google has already looked at this listing and
+  // said Google is wrong. Filing a removal — and emailing about it — on every
+  // run would be arguing with them daily.
+  it('does not file a removal for a permanent closure an admin has overridden', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_PERMANENTLY' })
+    stubTable([
+      {
+        ...row,
+        details: {
+          placeId: 'abc123',
+          businessStatus: 'CLOSED_PERMANENTLY',
+          businessStatusOverride: 'OPERATIONAL',
+        },
+      },
+    ])
+
+    const body = await (await runGet()).json()
+
+    expect(mockSubmitClosure).not.toHaveBeenCalled()
+    expect(body).toMatchObject({ flaggedClosed: 0 })
+  })
+
+  it('still files one when no override is set', async () => {
+    mockFetchPlaceSync.mockResolvedValue({ ...OPERATIONAL, businessStatus: 'CLOSED_PERMANENTLY' })
+    mockSubmitClosure.mockResolvedValue({ id: 'sub1' })
+    stubTable([{ ...row, details: { placeId: 'abc123', businessStatus: 'CLOSED_PERMANENTLY' } }])
+
+    const body = await (await runGet()).json()
+
+    expect(mockSubmitClosure).toHaveBeenCalledWith('r1')
+    expect(body).toMatchObject({ flaggedClosed: 1 })
   })
 })
