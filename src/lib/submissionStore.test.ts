@@ -837,6 +837,129 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(written.details.googleFields).toContain('phone')
   })
 
+  /** An edit whose existing row and payload you control, returning the write. */
+  function mockUpdateFlow(sub: SubmissionRow, existingRow: Record<string, unknown>) {
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const readBuilder = chainable({ data: existingRow, error: null })
+    const updateBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let resourceCalls = 0
+    let submissionCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionCalls += 1
+        return submissionCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      resourceCalls += 1
+      return resourceCalls === 1 ? readBuilder : updateBuilder
+    })
+    return updateBuilder
+  }
+
+  // An edit's payload is built from the category's configured detailFields
+  // only, and applying an update replaces `details` wholesale — so every
+  // approved edit was wiping the listing's sync state along with it. The one
+  // that actually bites: an admin's business-status override, silently undone
+  // by the next edit anyone submitted.
+  it('edit: keeps sync state and an admin override the submitter never sees', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ details: { placeId: 'place-1' } }) as unknown as Record<string, unknown>,
+    })
+    const updateBuilder = mockUpdateFlow(sub, {
+      id: 'res-1',
+      name: 'Test Shul',
+      details: {
+        placeId: 'place-1',
+        googleSyncedAt: '2026-08-01T03:00:00.000Z',
+        businessStatus: 'CLOSED_TEMPORARILY',
+        businessStatusOverride: 'OPERATIONAL',
+        businessStatusChangedAt: '2026-07-30T03:00:00.000Z',
+        googleDescription: 'A neighbourhood shul.',
+      },
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.businessStatusOverride).toBe('OPERATIONAL')
+    expect(written.details.businessStatus).toBe('CLOSED_TEMPORARILY')
+    expect(written.details.businessStatusChangedAt).toBe('2026-07-30T03:00:00.000Z')
+    expect(written.details.googleDescription).toBe('A neighbourhood shul.')
+  })
+
+  // ...but an edit that legitimately supplies one still wins. The intake form
+  // now captures businessStatus when someone picks the place from Google.
+  it('edit: a value the submission does supply beats the preserved one', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({
+        details: { placeId: 'place-1', businessStatus: 'CLOSED_TEMPORARILY' },
+      }) as unknown as Record<string, unknown>,
+    })
+    const updateBuilder = mockUpdateFlow(sub, {
+      id: 'res-1',
+      name: 'Test Shul',
+      details: { placeId: 'place-1', businessStatus: 'OPERATIONAL' },
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    expect(lastCallArg(updateBuilder.update).details.businessStatus).toBe('CLOSED_TEMPORARILY')
+  })
+
+  // "Last synced at 3am" is only a claim about the place that was synced. Once
+  // an edit repoints the listing at a different Google place, everything the
+  // old sync wrote describes a different business, and the timestamp is
+  // asserting a freshness the row no longer has. Clearing it is also what
+  // tells the post-approval sync there is something new to fetch — the
+  // alternative was comparing before/after place ids in the route, where the
+  // old value is already gone by then.
+  it('edit: repointing at a different Google place clears the sync timestamp', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ details: { placeId: 'place-CORRECTED' } }) as unknown as Record<string, unknown>,
+    })
+    const updateBuilder = mockUpdateFlow(sub, {
+      id: 'res-1',
+      name: 'Test Shul',
+      details: { placeId: 'place-WRONG', googleSyncedAt: '2026-08-01T03:00:00.000Z' },
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.googleSyncedAt).toBeUndefined()
+  })
+
+  // The common case, and the one that should cost nothing: a note or a tag
+  // changes, the Google match doesn't, so the timestamp stands and no Google
+  // call is spent on approval.
+  it('edit: an ordinary change leaves the sync timestamp alone', async () => {
+    const sub = baseSubmission({
+      operation: 'update',
+      target_id: 'res-1',
+      payload: listingPayload({ details: { placeId: 'place-1' } }) as unknown as Record<string, unknown>,
+    })
+    const updateBuilder = mockUpdateFlow(sub, {
+      id: 'res-1',
+      name: 'Test Shul',
+      details: { placeId: 'place-1', googleSyncedAt: '2026-08-01T03:00:00.000Z' },
+    })
+    mockGetCategoryById.mockResolvedValue(shulCategory())
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(updateBuilder.update)
+    expect(written.details.googleSyncedAt).toBe('2026-08-01T03:00:00.000Z')
+  })
+
   it('edit: a changed field is re-checked even without a fresh autofill snapshot', async () => {
     const sub = baseSubmission({
       operation: 'update',
