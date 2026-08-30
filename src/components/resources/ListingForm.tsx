@@ -97,6 +97,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
   }
 
+  // Whether we've already refreshed the challenge once for this form. A second
+  // failure means retrying is not the answer, so stop telling the visitor it is
+  // — see handleSubmit.
+  const [retriedVerification, setRetriedVerification] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
@@ -257,20 +261,42 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // Turnstile tokens are single-use and expire after ~5 min — on a form
         // with this many fields (especially editing, reviewing everything
         // already filled in) it's easy to take longer than that before
-        // hitting Submit. The server's message tells the visitor to refresh
-        // the page, which would lose everything they just filled in — instead,
-        // silently re-run the challenge for a fresh token so a plain second
-        // tap on Submit (no reload needed) just works.
-        if (res.status === 403) {
+        // hitting Submit. The server's own message says to refresh the page,
+        // which would lose everything just filled in — so re-run the challenge
+        // for a fresh token instead and let a second tap on Submit work.
+        //
+        // Gated on `code`, not on the 403 alone. This route answers 403 for
+        // several unrelated refusals — a contribution type disabled site-wide,
+        // a category with edits turned off — and treating those as an expired
+        // challenge produced an endless "we've refreshed it, tap Submit again"
+        // that no amount of tapping could clear, while hiding the real reason
+        // the server gave.
+        if (body.code === 'turnstile') {
+          // And only offer the retry once. If a fresh token fails too, the
+          // problem isn't staleness, and repeating the same hopeful message is
+          // exactly the loop this is meant to end.
+          if (retriedVerification) {
+            setErrors([
+              'Verification keeps failing. Please reload the page and try again — your details will need re-entering, sorry.',
+            ])
+            return
+          }
           resetTurnstile()
+          setRetriedVerification(true)
           setErrors(['Verification expired. We’ve refreshed it — please tap Submit again.'])
           return
         }
+        // Any other outcome clears the flag: it means "the attempt just before
+        // this one ended in a challenge refresh", so a genuine expiry twenty
+        // minutes and several edits later still gets its own free retry.
+        setRetriedVerification(false)
         setErrors(body.errors ?? ['Something went wrong. Please try again.'])
         return
       }
+      setRetriedVerification(false)
       setDone(true)
     } catch {
+      setRetriedVerification(false)
       setErrors(['Network error. Please check your connection and try again.'])
     } finally {
       setSubmitting(false)
