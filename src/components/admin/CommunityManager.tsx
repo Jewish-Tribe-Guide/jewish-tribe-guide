@@ -7,6 +7,11 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import type { Community } from '@/lib/communityStore'
 
+// GET /api/admin/communities adds adminEmail on top of the plain Community
+// shape (see that route's own comment) — never on Community itself, since
+// that type also feeds the public GET /api/communities.
+type CommunityWithAdminEmail = Community & { adminEmail: string | null }
+
 // ── The 'communities' tab: lists every community this site hosts, and lets
 // an admin create a new one — either starting empty or cloning an existing
 // community's categories + home sections as a starting shape. Superadmin
@@ -81,7 +86,7 @@ export default function CommunityManager({ token }: { token: string }) {
   // vi.stubEnv — Next.js inlines NEXT_PUBLIC_ vars at build time either way,
   // so this makes no difference to the real deployed behavior.
   const deletionDisabled = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
-  const [communities, setCommunities] = useState<Community[] | null>(null)
+  const [communities, setCommunities] = useState<CommunityWithAdminEmail[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Managing every community (browsing the list, creating a new one) is a
   // superadmin action, not something scoped to whichever one community this
@@ -113,7 +118,7 @@ export default function CommunityManager({ token }: { token: string }) {
         setForbidden(true)
         return
       }
-      const body = await parseOkJson<{ communities: Community[] }>(res, 'Failed to load communities.')
+      const body = await parseOkJson<{ communities: CommunityWithAdminEmail[] }>(res, 'Failed to load communities.')
       setCommunities(body.communities)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -419,6 +424,14 @@ export default function CommunityManager({ token }: { token: string }) {
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
                   /{c.slug} · {c.region}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Admin login:{' '}
+                  {c.adminEmail ? (
+                    <span className="font-mono">{c.adminEmail}</span>
+                  ) : (
+                    <span className="italic">not set — falls back to the superadmin list (ADMIN_EMAILS)</span>
+                  )}
                 </p>
               </a>
               {/* The default community can't be deleted at all (see

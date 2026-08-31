@@ -162,6 +162,21 @@ export async function getCommunityAdminEmail(slug: string): Promise<string | nul
   return (data as { admin_email: string | null } | null)?.admin_email ?? null
 }
 
+/** Every community's configured admin_email, keyed by slug — same
+ *  server-only, uncached reasoning as getCommunityAdminEmail above, just for
+ *  all communities at once. Used by the superadmin communities list
+ *  (GET /api/admin/communities) so /admin can show which login email governs
+ *  each community, without ever putting emails on the public
+ *  /api/communities payload that listCommunities()/Community feeds. */
+export async function listCommunityAdminEmails(): Promise<Record<string, string | null>> {
+  const { data } = await getAdminClient().from('community').select('slug, admin_email')
+  const out: Record<string, string | null> = {}
+  for (const row of (data ?? []) as { slug: string; admin_email: string | null }[]) {
+    out[row.slug] = row.admin_email
+  }
+  return out
+}
+
 /** Reads the requested community slug off an incoming request. Query param
  *  only for now — the URL/subdomain shape is still undecided, and keeping the
  *  read in one place means changing it later touches this function alone. */

@@ -39,6 +39,7 @@ const {
   createCommunity,
   deleteCommunity,
   getCommunityAdminEmail,
+  listCommunityAdminEmails,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
 
@@ -381,6 +382,29 @@ describe('getCommunityAdminEmail', () => {
   it('returns null when the community does not exist', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
     expect(await getCommunityAdminEmail('nonexistent')).toBeNull()
+  })
+})
+
+describe('listCommunityAdminEmails', () => {
+  it('keys admin_email by slug for every community', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          { slug: 'philly', admin_email: 'phillyjewishguide@gmail.com' },
+          { slug: 'ues', admin_email: null },
+        ],
+        error: null,
+      }),
+    )
+    expect(await listCommunityAdminEmails()).toEqual({
+      philly: 'phillyjewishguide@gmail.com',
+      ues: null,
+    })
+  })
+
+  it('returns an empty object when the table read fails', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    expect(await listCommunityAdminEmails()).toEqual({})
   })
 })
 
