@@ -7,10 +7,10 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import type { Community } from '@/lib/communityStore'
 
-// GET /api/admin/communities adds adminEmail on top of the plain Community
-// shape (see that route's own comment) — never on Community itself, since
-// that type also feeds the public GET /api/communities.
-type CommunityWithAdminEmail = Community & { adminEmail: string | null }
+// GET /api/admin/communities adds adminEmail/previewToken on top of the
+// plain Community shape (see that route's own comment) — never on Community
+// itself, since that type also feeds the public GET /api/communities.
+type CommunityWithAdminEmail = Community & { adminEmail: string | null; previewToken: string | null }
 
 // ── The 'communities' tab: lists every community this site hosts, and lets
 // an admin create a new one — either starting empty or cloning an existing
@@ -32,6 +32,13 @@ function slugify(label: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+// Matches ACCESS_PARAM/previewCookieName in src/proxy.ts — that's what
+// actually enforces this link being required for a hidden community.
+function previewLink(slug: string, token: string): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/${slug}?access=${token}`
 }
 
 const DEFAULT_THEME_COLOR = '#1d4ed8'
@@ -112,6 +119,10 @@ export default function CommunityManager({ token }: { token: string }) {
   // a busy state without a separate boolean per row.
   const [togglingSlug, setTogglingSlug] = useState<string | null>(null)
   const [toggleError, setToggleError] = useState<string | null>(null)
+  // Which community's preview link was just copied, so the button can say
+  // so briefly instead of leaving no feedback for an action with no other
+  // visible effect.
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -229,6 +240,19 @@ export default function CommunityManager({ token }: { token: string }) {
       setToggleError(err instanceof Error ? err.message : 'Could not update visibility.')
     } finally {
       setTogglingSlug(null)
+    }
+  }
+
+  async function copyPreviewLink(slug: string, token: string) {
+    try {
+      await navigator.clipboard.writeText(previewLink(slug, token))
+      setCopiedSlug(slug)
+      setTimeout(() => setCopiedSlug((s) => (s === slug ? null : s)), 2000)
+    } catch {
+      // Clipboard access can be denied (permissions, non-HTTPS, etc.) — the
+      // input field next to the button is still there to select and copy by
+      // hand, so this fails quietly rather than surfacing an error banner
+      // for something this low-stakes.
     }
   }
 
@@ -468,7 +492,7 @@ export default function CommunityManager({ token }: { token: string }) {
                 </p>
                 {!c.visible && (
                   <p className="text-xs text-amber-700 mt-1">
-                    Not on the switcher or sitemap yet — still reachable at {adminBase(c.slug)} and /{c.slug}.
+                    Not on the switcher or sitemap, and the plain URL 404s for anyone without the link below.
                   </p>
                 )}
               </a>
@@ -493,6 +517,23 @@ export default function CommunityManager({ token }: { token: string }) {
                 )}
               </div>
             </div>
+
+            {!c.visible && c.previewToken && (
+              <div className="mt-3 border-t border-slate-200 pt-3 flex items-center gap-2">
+                <input
+                  readOnly
+                  value={previewLink(c.slug, c.previewToken)}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 min-w-0 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-mono text-slate-600"
+                />
+                <button
+                  onClick={() => copyPreviewLink(c.slug, c.previewToken!)}
+                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                >
+                  {copiedSlug === c.slug ? 'Copied!' : 'Copy link'}
+                </button>
+              </div>
+            )}
 
             {deletingSlug === c.slug && (
               <div className="mt-3 border-t border-slate-200 pt-3">

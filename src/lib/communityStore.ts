@@ -186,6 +186,36 @@ export async function listCommunityAdminEmails(): Promise<Record<string, string 
   return out
 }
 
+/** Every community's visibility + preview token, keyed by slug — the shape
+ *  src/proxy.ts needs to decide whether a hidden community's request should
+ *  be let through. Deliberately its own function rather than reusing
+ *  listCommunities()/Community: the token must never ride on the public
+ *  /api/communities payload (same reasoning as admin_email), and proxy.ts
+ *  runs outside the request-cache lifecycle 'use cache' assumes, so this
+ *  stays a plain uncached read like getCommunityAdminEmail. */
+export async function listCommunityVisibility(): Promise<
+  Record<string, { visible: boolean; previewToken: string }>
+> {
+  const { data } = await getAdminClient().from('community').select('slug, visible, preview_token')
+  const out: Record<string, { visible: boolean; previewToken: string }> = {}
+  for (const row of (data ?? []) as { slug: string; visible: boolean; preview_token: string }[]) {
+    out[row.slug] = { visible: row.visible, previewToken: row.preview_token }
+  }
+  return out
+}
+
+/** Every community's preview token, keyed by slug — what CommunityManager
+ *  needs to show a superadmin the shareable link for a hidden community.
+ *  Same server-only/uncached reasoning as listCommunityAdminEmails. */
+export async function listCommunityPreviewTokens(): Promise<Record<string, string>> {
+  const { data } = await getAdminClient().from('community').select('slug, preview_token')
+  const out: Record<string, string> = {}
+  for (const row of (data ?? []) as { slug: string; preview_token: string }[]) {
+    out[row.slug] = row.preview_token
+  }
+  return out
+}
+
 /** Reads the requested community slug off an incoming request. Query param
  *  only for now — the URL/subdomain shape is still undecided, and keeping the
  *  read in one place means changing it later touches this function alone. */

@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { createCommunity, listCommunities, listCommunityAdminEmails } from '@/lib/communityStore'
+import { createCommunity, listCommunities, listCommunityAdminEmails, listCommunityPreviewTokens } from '@/lib/communityStore'
 import { cloneCommunityContent } from '@/lib/communityCloning'
 
 // GET /api/admin/communities — the same data as the public GET
@@ -18,12 +18,21 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const [communities, adminEmails] = await Promise.all([listCommunities(), listCommunityAdminEmails()])
-    // adminEmail rides along here (superadmin-only route) but never on
-    // Community/listCommunities() itself — that object is also served by
-    // the public GET /api/communities, which has no business exposing it.
-    const withAdminEmail = communities.map((c) => ({ ...c, adminEmail: adminEmails[c.slug] ?? null }))
-    return Response.json({ ok: true, communities: withAdminEmail })
+    const [communities, adminEmails, previewTokens] = await Promise.all([
+      listCommunities(),
+      listCommunityAdminEmails(),
+      listCommunityPreviewTokens(),
+    ])
+    // adminEmail/previewToken ride along here (superadmin-only route) but
+    // never on Community/listCommunities() itself — that object is also
+    // served by the public GET /api/communities, which has no business
+    // exposing either.
+    const withExtras = communities.map((c) => ({
+      ...c,
+      adminEmail: adminEmails[c.slug] ?? null,
+      previewToken: previewTokens[c.slug] ?? null,
+    }))
+    return Response.json({ ok: true, communities: withExtras })
   } catch (err) {
     console.error('[admin/communities] GET failed:', err)
     return Response.json({ ok: false, errors: ['Could not load communities.'] }, { status: 502 })

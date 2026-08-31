@@ -408,6 +408,49 @@ describe('CommunityManager — deleting a community', () => {
   })
 })
 
+describe('CommunityManager — the hidden-community preview link', () => {
+  function stubClipboard(writeText: (text: string) => Promise<void>) {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  }
+
+  afterEach(() => {
+    delete (navigator as { clipboard?: unknown }).clipboard
+  })
+
+  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
+  const ues = {
+    ...makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false }),
+    previewToken: 'super-secret-token',
+  }
+
+  it('shows no preview link for a visible community', async () => {
+    await renderAndWaitForList([philly, { ...ues, visible: true }])
+    expect(screen.queryByDisplayValue(/access=/)).not.toBeInTheDocument()
+  })
+
+  it('shows the ?access= link for a hidden community', async () => {
+    await renderAndWaitForList([philly, ues])
+    const input = screen.getByDisplayValue(/\/ues\?access=super-secret-token$/) as HTMLInputElement
+    expect(input).toHaveAttribute('readOnly')
+  })
+
+  it('copies the link and shows confirmation on click', async () => {
+    // userEvent.setup() installs its own clipboard stub (for its paste/copy
+    // simulation), so stubClipboard has to run AFTER it or user-event's
+    // stub silently wins — same trap useShareLink.test.tsx avoids by using
+    // fireEvent instead of userEvent for its clipboard tests.
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    stubClipboard(writeText)
+    await renderAndWaitForList([philly, ues])
+
+    await user.click(screen.getByRole('button', { name: /copy link/i }))
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/ues\?access=super-secret-token$/))
+    expect(await screen.findByRole('button', { name: /copied!/i })).toBeInTheDocument()
+  })
+})
+
 describe('CommunityManager — publishing a community', () => {
   const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
   const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false })

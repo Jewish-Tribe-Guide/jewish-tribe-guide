@@ -42,6 +42,8 @@ const {
   getCommunityAdminEmail,
   listCommunityAdminEmails,
   setCommunityVisibility,
+  listCommunityVisibility,
+  listCommunityPreviewTokens,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
 
@@ -429,6 +431,47 @@ describe('setCommunityVisibility', () => {
     await expect(setCommunityVisibility('baltimore', false)).rejects.toThrow(
       'Failed to update "baltimore"\'s visibility: boom',
     )
+  })
+})
+
+describe('listCommunityVisibility', () => {
+  it('keys visible + previewToken by slug for every community', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          { slug: 'philly', visible: true, preview_token: 'philly-token' },
+          { slug: 'blatimore', visible: false, preview_token: 'blatimore-token' },
+        ],
+        error: null,
+      }),
+    )
+    expect(await listCommunityVisibility()).toEqual({
+      philly: { visible: true, previewToken: 'philly-token' },
+      blatimore: { visible: false, previewToken: 'blatimore-token' },
+    })
+  })
+
+  it('returns an empty object when the table read fails', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    expect(await listCommunityVisibility()).toEqual({})
+  })
+})
+
+describe('listCommunityPreviewTokens', () => {
+  it('keys preview_token by slug for every community', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          { slug: 'philly', preview_token: 'philly-token' },
+          { slug: 'blatimore', preview_token: 'blatimore-token' },
+        ],
+        error: null,
+      }),
+    )
+    expect(await listCommunityPreviewTokens()).toEqual({
+      philly: 'philly-token',
+      blatimore: 'blatimore-token',
+    })
   })
 })
 
