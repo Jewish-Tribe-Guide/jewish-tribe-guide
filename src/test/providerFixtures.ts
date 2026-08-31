@@ -39,6 +39,7 @@ export function makeCommunity(overrides: Partial<Community> = {}): Community {
     ui: {},
     sortOrder: 0,
     isDefault: true,
+    visible: true,
     ...overrides,
   }
 }

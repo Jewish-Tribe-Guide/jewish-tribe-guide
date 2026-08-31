@@ -41,6 +41,7 @@ function makeCommunity(overrides: Partial<Community> = {}): Community {
     ui: {},
     sortOrder: 0,
     isDefault: true,
+    visible: true,
     ...overrides,
   }
 }
@@ -404,5 +405,64 @@ describe('CommunityManager — deleting a community', () => {
 
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
     expect(screen.getByText(/deleting a community isn.t available in production/i)).toBeInTheDocument()
+  })
+})
+
+describe('CommunityManager — publishing a community', () => {
+  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
+  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false })
+
+  function rowFor(name: RegExp): HTMLElement {
+    return screen.getByRole('link', { name }).parentElement!
+  }
+
+  it('labels a visible community "Live" and a hidden one "Hidden"', async () => {
+    await renderAndWaitForList([philly, ues])
+
+    expect(within(rowFor(/philadelphia/i)).getByText('Live')).toBeInTheDocument()
+    expect(within(rowFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
+  })
+
+  it('shows the still-reachable-by-URL note only for a hidden community', async () => {
+    await renderAndWaitForList([philly, ues])
+
+    expect(within(rowFor(/philadelphia/i)).queryByText(/not on the switcher or sitemap/i)).not.toBeInTheDocument()
+    expect(within(rowFor(/upper east side/i)).getByText(/not on the switcher or sitemap/i)).toBeInTheDocument()
+  })
+
+  it('offers "Publish" for a hidden community and "Unpublish" for a visible one', async () => {
+    await renderAndWaitForList([philly, ues])
+
+    expect(within(rowFor(/philadelphia/i)).getByRole('button', { name: /^unpublish$/i })).toBeInTheDocument()
+    expect(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+  })
+
+  it('PATCHes visible:true and flips the row to "Live" on Publish', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+    vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true })
+
+    await user.click(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
+
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
+    const call = vi.mocked(fetchJson).mock.calls[0]!
+    expect(call[0]).toBe('/api/admin/communities/ues')
+    const init = call[1] as RequestInit
+    expect(init.method).toBe('PATCH')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    expect(JSON.parse(init.body as string)).toEqual({ visible: true })
+
+    expect(await within(rowFor(/upper east side/i)).findByText('Live')).toBeInTheDocument()
+  })
+
+  it('shows a server-side error inline and leaves the community\'s visibility unchanged', async () => {
+    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update visibility.'))
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+
+    await user.click(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
+
+    expect(await screen.findByText('Could not update visibility.')).toBeInTheDocument()
+    expect(within(rowFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
   })
 })

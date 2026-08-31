@@ -18,6 +18,7 @@ function chainable(result: unknown) {
     order: vi.fn(self),
     eq: vi.fn(self),
     insert: vi.fn(self),
+    update: vi.fn(self),
     delete: vi.fn(self),
     single: vi.fn(self),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
@@ -40,6 +41,7 @@ const {
   deleteCommunity,
   getCommunityAdminEmail,
   listCommunityAdminEmails,
+  setCommunityVisibility,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
 
@@ -215,7 +217,7 @@ describe('createCommunity', () => {
     await expect(createCommunity({ ...validInput, name: '   ' })).rejects.toThrow('Community name is required.')
   })
 
-  it('inserts with sortOrder one past the current max, is_default false, and maps the returned row', async () => {
+  it('inserts with sortOrder one past the current max, is_default and visible false, and maps the returned row', async () => {
     const insertedRow = {
       slug: 'baltimore',
       name: 'Baltimore Jewish Community',
@@ -232,6 +234,7 @@ describe('createCommunity', () => {
       ui: {},
       sort_order: 10,
       is_default: false,
+      visible: false,
     }
     const listBuilder = chainable({ data: [philly], error: null })
     const insertBuilder = chainable({ data: insertedRow, error: null })
@@ -240,11 +243,12 @@ describe('createCommunity', () => {
     const result = await createCommunity(validInput)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: 'baltimore', sort_order: 10, is_default: false }),
+      expect.objectContaining({ slug: 'baltimore', sort_order: 10, is_default: false, visible: false }),
     )
     expect(result.slug).toBe('baltimore')
     expect(result.sortOrder).toBe(10)
     expect(result.isDefault).toBe(false)
+    expect(result.visible).toBe(false)
   })
 
   it('throws with the Supabase error message on insert failure', async () => {
@@ -405,6 +409,26 @@ describe('listCommunityAdminEmails', () => {
   it('returns an empty object when the table read fails', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     expect(await listCommunityAdminEmails()).toEqual({})
+  })
+})
+
+describe('setCommunityVisibility', () => {
+  it('updates visible and maps the returned row', async () => {
+    const updateBuilder = chainable({ data: { ...baltimore, visible: true }, error: null })
+    mockFrom.mockReturnValue(updateBuilder)
+
+    const result = await setCommunityVisibility('baltimore', true)
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ visible: true })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'baltimore')
+    expect(result.visible).toBe(true)
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(setCommunityVisibility('baltimore', false)).rejects.toThrow(
+      'Failed to update "baltimore"\'s visibility: boom',
+    )
   })
 })
 

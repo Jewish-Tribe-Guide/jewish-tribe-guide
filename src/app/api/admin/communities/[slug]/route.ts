@@ -1,7 +1,41 @@
 import type { NextRequest } from 'next/server'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { deleteCommunity } from '@/lib/communityStore'
+import { deleteCommunity, setCommunityVisibility } from '@/lib/communityStore'
+
+// PATCH /api/admin/communities/:slug  body: { visible: boolean }
+// Publishes or unpublishes a community — see the visibility migration's own
+// comment. Superadmin only, same as everything else in this file. Unlike
+// DELETE below, this IS available in production — publishing a
+// built-out-but-hidden community is the entire point of visibility existing.
+export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
+  const admin = await getAdminUser(request)
+  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+
+  const { slug } = await ctx.params
+
+  let body: { visible?: unknown }
+  try {
+    body = (await request.json()) as { visible?: unknown }
+  } catch {
+    return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
+  }
+  if (typeof body.visible !== 'boolean') {
+    return Response.json({ ok: false, errors: ['"visible" must be a boolean.'] }, { status: 400 })
+  }
+
+  try {
+    const community = await setCommunityVisibility(slug, body.visible)
+    // Publishing/unpublishing changes the public switcher and sitemap
+    // immediately, same as any other public-content admin save.
+    await revalidatePublicContent()
+    return Response.json({ ok: true, community })
+  } catch (err) {
+    console.error('[admin/communities/:slug] PATCH failed:', err)
+    const message = err instanceof Error ? err.message : 'Could not update visibility.'
+    return Response.json({ ok: false, errors: [message] }, { status: 502 })
+  }
+}
 
 // DELETE /api/admin/communities/:slug  body: { confirmSlug: string }
 // Permanently deletes a community and everything in it. Superadmin only —

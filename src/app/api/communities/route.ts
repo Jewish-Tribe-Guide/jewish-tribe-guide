@@ -10,7 +10,12 @@ import { listCommunities } from '@/lib/communityStore'
 
 export async function GET() {
   try {
-    const communities = await listCommunities()
+    // Invisible communities (still being built out — see the visibility
+    // migration's own comment) aren't offered here, though their own pages
+    // still work by direct URL. The admin-only GET (/api/admin/communities)
+    // shows every community, visible or not, so a superadmin can find and
+    // publish one.
+    const communities = (await listCommunities()).filter((c) => c.visible)
     return Response.json({ ok: true, communities })
   } catch (err) {
     console.error('[communities] GET failed:', err)

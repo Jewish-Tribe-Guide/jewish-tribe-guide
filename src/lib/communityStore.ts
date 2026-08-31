@@ -38,6 +38,12 @@ export type Community = {
   ui: Record<string, unknown>
   sortOrder: number
   isDefault: boolean
+  /** Whether this community appears on the public switcher (GET
+   *  /api/communities) and in sitemap.ts. Direct URLs to its own pages and
+   *  admin console work regardless — see the migration's own comment for
+   *  why. A superadmin toggles this from CommunityManager once a community
+   *  is ready to go live. */
+  visible: boolean
 }
 
 type Row = {
@@ -56,6 +62,7 @@ type Row = {
   ui: Record<string, unknown> | null
   sort_order: number
   is_default: boolean
+  visible: boolean
 }
 
 function toCommunity(row: Row): Community {
@@ -75,6 +82,7 @@ function toCommunity(row: Row): Community {
     ui: row.ui ?? {},
     sortOrder: row.sort_order,
     isDefault: row.is_default,
+    visible: row.visible,
   }
 }
 
@@ -99,6 +107,7 @@ function communityFromConfig(): Community {
     ui: {},
     sortOrder: 0,
     isDefault: true,
+    visible: true,
   }
 }
 
@@ -255,6 +264,11 @@ export async function createCommunity(input: {
       admin_email: input.adminEmail?.trim() || null,
       sort_order: sortOrder,
       is_default: false,
+      // Starts hidden from the switcher/sitemap — see the visibility
+      // migration's own comment. Its own pages and admin console work
+      // immediately by direct URL; a superadmin publishes it explicitly
+      // once it's ready (setCommunityVisibility below).
+      visible: false,
     })
     .select('*')
     .single()
@@ -272,6 +286,17 @@ export async function createCommunity(input: {
     }
     throw new Error(`Failed to create community: ${error.message}`)
   }
+  return toCommunity(data as Row)
+}
+
+/** Flips whether a community shows up in the public switcher/sitemap
+ *  (see the visibility migration's own comment). Superadmin-only action —
+ *  gated by the same GET/POST /api/admin/communities check, not any one
+ *  community's own admin, since publishing a community isn't scoped to
+ *  itself any more than creating one is. */
+export async function setCommunityVisibility(slug: string, visible: boolean): Promise<Community> {
+  const { data, error } = await getAdminClient().from('community').update({ visible }).eq('slug', slug).select('*').single()
+  if (error) throw new Error(`Failed to update "${slug}"'s visibility: ${error.message}`)
   return toCommunity(data as Row)
 }
 

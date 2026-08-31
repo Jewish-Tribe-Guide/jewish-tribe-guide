@@ -108,6 +108,10 @@ export default function CommunityManager({ token }: { token: string }) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Which community's publish toggle is mid-flight, so its button can show
+  // a busy state without a separate boolean per row.
+  const [togglingSlug, setTogglingSlug] = useState<string | null>(null)
+  const [toggleError, setToggleError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -202,6 +206,29 @@ export default function CommunityManager({ token }: { token: string }) {
       setFormErrors([err instanceof Error ? err.message : 'Could not create community.'])
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function toggleVisibility(slug: string, nextVisible: boolean) {
+    setTogglingSlug(slug)
+    setToggleError(null)
+    try {
+      await fetchJson(
+        `/api/admin/communities/${slug}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ visible: nextVisible }),
+        },
+        'Could not update visibility.',
+      )
+      // Unlike delete, this isn't destructive — patch the row in place
+      // instead of a full reload.
+      setCommunities((cs) => cs?.map((c) => (c.slug === slug ? { ...c, visible: nextVisible } : c)) ?? cs)
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : 'Could not update visibility.')
+    } finally {
+      setTogglingSlug(null)
     }
   }
 
@@ -410,6 +437,7 @@ export default function CommunityManager({ token }: { token: string }) {
       {deletionDisabled && (
         <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
       )}
+      {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
 
       <div className="space-y-3">
         {communities.map((c) => (
@@ -420,6 +448,11 @@ export default function CommunityManager({ token }: { token: string }) {
                   <p className="font-semibold text-slate-900 text-sm">{c.name}</p>
                   {c.isDefault && (
                     <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">Default</span>
+                  )}
+                  {c.visible ? (
+                    <span className="text-xs font-medium bg-green-100 text-green-700 rounded-full px-2 py-0.5">Live</span>
+                  ) : (
+                    <span className="text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">Hidden</span>
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
@@ -433,18 +466,32 @@ export default function CommunityManager({ token }: { token: string }) {
                     <span className="italic">not set — falls back to the superadmin list (ADMIN_EMAILS)</span>
                   )}
                 </p>
+                {!c.visible && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    Not on the switcher or sitemap yet — still reachable at {adminBase(c.slug)} and /{c.slug}.
+                  </p>
+                )}
               </a>
-              {/* The default community can't be deleted at all (see
-                  deleteCommunity's own doc) — no button rather than one
-                  that always fails. */}
-              {!c.isDefault && !deletionDisabled && (
+              <div className="flex items-center gap-3 shrink-0">
                 <button
-                  onClick={() => startDeleting(c.slug)}
-                  className="text-xs font-medium text-red-600 hover:underline cursor-pointer shrink-0"
+                  onClick={() => toggleVisibility(c.slug, !c.visible)}
+                  disabled={togglingSlug === c.slug}
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer disabled:opacity-60"
                 >
-                  Delete
+                  {togglingSlug === c.slug ? 'Saving…' : c.visible ? 'Unpublish' : 'Publish'}
                 </button>
-              )}
+                {/* The default community can't be deleted at all (see
+                    deleteCommunity's own doc) — no button rather than one
+                    that always fails. */}
+                {!c.isDefault && !deletionDisabled && (
+                  <button
+                    onClick={() => startDeleting(c.slug)}
+                    className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
 
             {deletingSlug === c.slug && (
