@@ -2,7 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { publishDraft } from '@/lib/formStore'
-import { adminCommunityFromRequest } from '@/lib/adminCommunity'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // POST /api/admin/forms/:id/publish — promotes a form's draft to published
 // content (what the live wizard reads) and clears the draft. Admin only.
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/f
 
   const { id } = await ctx.params
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     const form = await publishDraft(community.slug, id)
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.

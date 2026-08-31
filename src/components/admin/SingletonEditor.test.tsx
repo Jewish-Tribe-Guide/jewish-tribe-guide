@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SingletonEditor } from './CategoryManager'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson } from '@/lib/fetchJson'
 import type { CategoryConfig } from '@/lib/categories'
 
@@ -14,6 +16,11 @@ import type { CategoryConfig } from '@/lib/categories'
 // CategoryEditor.test.tsx gives for testing that sibling editor standalone.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 function mapCategory(overrides: Partial<CategoryConfig> = {}): CategoryConfig {
   return {
@@ -53,23 +60,23 @@ afterEach(() => {
 
 describe('SingletonEditor — Map zoom radius', () => {
   it('shows the zoom radius field, blank when unset, only for the Map category', () => {
-    render(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('spinbutton')).toHaveValue(null)
   })
 
   it('does not show the field for a non-Map singleton (e.g. Zmanim)', () => {
-    render(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
   })
 
   it('pre-fills the current value when already set', () => {
-    render(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('spinbutton')).toHaveValue(10)
   })
 
   it('saving sends the entered number in the PATCH body, for Map only', async () => {
     const user = userEvent.setup()
-    render(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={mapCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.type(screen.getByRole('spinbutton'), '10')
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -81,7 +88,7 @@ describe('SingletonEditor — Map zoom radius', () => {
 
   it('blanking the field back out sends null, not an empty string or NaN', async () => {
     const user = userEvent.setup()
-    render(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={mapCategory({ mapZoomRadiusMiles: 10 })} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.clear(screen.getByRole('spinbutton'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -93,7 +100,7 @@ describe('SingletonEditor — Map zoom radius', () => {
 
   it('never sends mapZoomRadiusMiles for a non-Map singleton', async () => {
     const user = userEvent.setup()
-    render(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<SingletonEditor token="t" category={zmanimCategory()} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
 

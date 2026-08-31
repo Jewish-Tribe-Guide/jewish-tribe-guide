@@ -57,31 +57,47 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
-  // /admin and /inbox live outside /[community] (see src/app/admin/layout.tsx's
-  // own comment — no per-community admin yet), but the URL should still read
-  // as /philly/admin and /philly/inbox rather than sitting at the bare root
-  // alongside the public site. A rewrite masks that without literally moving
-  // the files under [community] — which would force them to inherit
-  // [community]/layout.tsx's public SiteChrome (header/nav/footer), wrong for
-  // an internal console. beforeFiles so this always wins over [community]/
-  // [slug] ever trying to resolve "admin"/"inbox" as a category/form slug.
+  // /admin and /inbox live outside /[community] (see
+  // src/app/admin/[community]/layout.tsx's own comment), but the URL should
+  // still read as /{community}/admin and /philly/inbox rather than sitting
+  // at the bare root alongside the public site. A rewrite masks that without
+  // literally moving the files under [community] — which would force them
+  // to inherit [community]/layout.tsx's public SiteChrome (header/nav/
+  // footer), wrong for an internal console. beforeFiles so this always wins
+  // over [community]/[slug] ever trying to resolve "admin"/"inbox" as a
+  // category/form slug.
   //
-  // 'philly' is hardcoded rather than derived from the default community —
-  // same known limitation as admin/inbox not being per-community at all yet;
-  // generalize both together if that ever changes.
+  // Admin is per-community now (src/app/admin/[community]/...): the
+  // internal route order is /admin/{community}/..., reversed from the
+  // external /{community}/admin/... — this rewrite is what reconciles the
+  // two. /inbox stays hardcoded to 'philly' — same known limitation as
+  // before, it's a single hospital-facing queue, not per-community.
+  //
+  // `:community((?!api\b).*)` — NOT plain `:community` — because 'api' is a
+  // syntactically valid community slug shape (looksLikeCommunitySlug would
+  // accept it) and /api/admin/submissions etc. are real, unrelated routes
+  // that happen to match "/:anything/admin/:path*" too. Without this
+  // exclusion the rewrite silently ate every /api/admin/* request and
+  // rewrote it to a nonexistent /admin/api/... route — 404 in place of every
+  // admin API call, caught by e2e/api.spec.ts's anonymous-caller coverage
+  // (which expects 401, not 404) the first time this ran against a full
+  // build rather than just typecheck/unit tests.
   async rewrites() {
     return {
       beforeFiles: [
-        { source: '/philly/admin/:path*', destination: '/admin/:path*' },
+        { source: '/:community((?!api\\b).*)/admin/:path*', destination: '/admin/:community/:path*' },
         { source: '/philly/inbox', destination: '/inbox' },
       ],
     };
   },
   // Sends the old bare paths (existing bookmarks, and any link that still
-  // hardcodes them) to the new canonical URL, permanently.
+  // hardcodes them) to the default community's canonical URL, permanently.
+  // Only the root of each — there's no way to guess which community an old
+  // deep link (e.g. /admin/categories) meant, so those 404 rather than
+  // silently landing on the wrong community's admin.
   async redirects() {
     return [
-      { source: '/admin/:path*', destination: '/philly/admin/:path*', permanent: true },
+      { source: '/admin', destination: '/philly/admin', permanent: true },
       { source: '/inbox', destination: '/philly/inbox', permanent: true },
     ];
   },

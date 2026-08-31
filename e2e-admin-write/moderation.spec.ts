@@ -72,7 +72,7 @@ test('clicking Approve on a pending listing makes it live', async ({ page }) => 
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/admin')
+  await page.goto('/philly/admin')
   const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
   await expect(card).toBeVisible()
 
@@ -110,7 +110,7 @@ test('clicking Reject with a reason marks the submission rejected and creates no
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/admin')
+  await page.goto('/philly/admin')
   const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
   await expect(card).toBeVisible()
 
@@ -147,7 +147,7 @@ test('a rejected submission shows up on the Metrics tab\'s Rejected history view
   if (error || !submission) throw new Error(`Could not seed the pending submission: ${error?.message}`)
   pendingSubmissionIds.push(submission.id)
 
-  await page.goto('/admin')
+  await page.goto('/philly/admin')
   const card = page.locator('div.rounded-lg.shadow-sm', { hasText: name })
   await expect(card).toBeVisible()
   await card.getByRole('button', { name: 'Reject' }).click()
@@ -157,7 +157,7 @@ test('a rejected submission shows up on the Metrics tab\'s Rejected history view
   // The click-through this test actually exists to prove: Metrics' Rejected
   // tile links to /admin/history/rejected, and the just-rejected submission
   // is on it — the real-world case is "did I actually reject that?".
-  await page.goto('/admin/metrics')
+  await page.goto('/philly/admin/metrics')
   await page.getByRole('link', { name: /Rejected/ }).click()
   await expect(page).toHaveURL(/\/admin\/history\/rejected/)
   await expect(page.locator('div.rounded-lg.shadow-sm', { hasText: name })).toBeVisible()

@@ -5,6 +5,8 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { parseOkJson } from '@/lib/fetchJson'
 import type { EnrichedSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 
 const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = {
@@ -17,6 +19,7 @@ const COPY: Record<'approved' | 'rejected', { title: string; empty: string }> = 
 // link here so an admin can answer "what did we approve" or "did I actually
 // reject that" without going into Supabase directly.
 export default function SubmissionHistory({ token, status }: { token: string; status: 'approved' | 'rejected' }) {
+  const community = useCommunitySlug()
   const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const categoriesById = new Map(useCategories().map((c) => [c.id, c]))
@@ -25,7 +28,7 @@ export default function SubmissionHistory({ token, status }: { token: string; st
     setError(null)
     setItems(null)
     try {
-      const res = await fetch(`/api/admin/submissions?status=${status}`, {
+      const res = await fetch(withCommunity(`/api/admin/submissions?status=${status}`, community), {
         headers: { Authorization: `Bearer ${token}` },
       })
       const body = await parseOkJson<{ submissions: EnrichedSubmission[] }>(res, 'Failed to load.')
@@ -33,7 +36,7 @@ export default function SubmissionHistory({ token, status }: { token: string; st
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, status])
+  }, [token, status, community])
 
   useLoadOnMount(load)
 

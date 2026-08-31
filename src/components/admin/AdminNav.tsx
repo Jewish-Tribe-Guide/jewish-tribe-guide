@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ADMIN_BASE, ADMIN_TABS } from '@/lib/adminNav'
+import { adminBase, adminTabs } from '@/lib/adminNav'
+import { useCommunitySlug } from '@/lib/communityContext'
 import AdminCommunitySwitcher from './AdminCommunitySwitcher'
 
 /** Real per-tab underline, driven by the URL instead of the pushState-shim
@@ -10,6 +11,9 @@ import AdminCommunitySwitcher from './AdminCommunitySwitcher'
  *  &lt;Link&gt;, so Back/Forward/refresh/sharing all just work. */
 export default function AdminNav() {
   const pathname = usePathname()
+  const community = useCommunitySlug()
+  const base = adminBase(community)
+  const tabs = adminTabs(community)
 
   return (
     // touch-pan-x: a diagonal-ish swipe on this strip otherwise gets read as
@@ -18,13 +22,13 @@ export default function AdminNav() {
     // opposite direction. Locks touch panning here to horizontal only.
     <div className="flex items-center justify-between gap-3 mb-5 border-b border-slate-200">
       <div className="flex gap-1 overflow-x-auto touch-pan-x">
-        {ADMIN_TABS.map(({ tab, href, label }) => {
-        // ADMIN_BASE (queue) only matches exactly — every other href starts
-        // with it, so a plain startsWith would light up every tab at once.
-        // '/philly/admin/categories' also covers the editor
-        // (/philly/admin/categories/cat:<id>), which should still read as
-        // "on the Categories tab" while you're inside it.
-          const active = href === ADMIN_BASE ? pathname === ADMIN_BASE : pathname.startsWith(href)
+        {tabs.map(({ tab, href, label }) => {
+          // base (queue) only matches exactly — every other href starts with
+          // it, so a plain startsWith would light up every tab at once.
+          // '/philly/admin/categories' also covers the editor
+          // (/philly/admin/categories/cat:<id>), which should still read as
+          // "on the Categories tab" while you're inside it.
+          const active = href === base ? pathname === base : pathname.startsWith(href)
           return (
             <Link
               key={tab}

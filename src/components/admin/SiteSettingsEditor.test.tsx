@@ -122,7 +122,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
 
     await waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
     expect(fetchJson).toHaveBeenCalledWith(
-      '/api/admin/site-settings',
+      '/api/admin/site-settings?community=philly',
       expect.objectContaining({ method: 'PATCH', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }),
       'Save failed.',
     )

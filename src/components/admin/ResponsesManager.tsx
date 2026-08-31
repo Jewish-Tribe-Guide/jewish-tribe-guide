@@ -7,6 +7,8 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
 import { INBOX_BASE } from '@/lib/adminNav'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
 // excluded — those are hospital-facing and live in /inbox instead, see
@@ -20,13 +22,14 @@ const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
 const FEEDBACK_KEY = '__feedback__'
 
 export default function ResponsesManager({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [formsError, setFormsError] = useState<string | null>(null)
   const [activeKey, setActiveKey] = useState<string>(FEEDBACK_KEY)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/admin/forms', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(withCommunity('/api/admin/forms', community), { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((body) => {
         if (cancelled) return
@@ -39,7 +42,7 @@ export default function ResponsesManager({ token }: { token: string }) {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, community])
 
   const tabs: { key: string; label: string }[] = [
     { key: FEEDBACK_KEY, label: 'Feedback' },

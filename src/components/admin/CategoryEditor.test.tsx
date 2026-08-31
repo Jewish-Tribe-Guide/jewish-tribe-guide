@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CategoryEditor } from './CategoryEditor'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { fetchJson } from '@/lib/fetchJson'
 import type { CategoryConfig } from '@/lib/categories'
@@ -17,6 +19,11 @@ import type { CategoryConfig } from '@/lib/categories'
 // does, out of scope here — see the memory note on the provider-harness gap.
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 function baseCategory(overrides: Partial<CategoryConfig> = {}): CategoryConfig {
   return {
@@ -42,14 +49,14 @@ afterEach(() => {
 
 describe('CategoryEditor — new category', () => {
   it('shows "New category" and offers templates', () => {
-    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText('New category')).toBeInTheDocument()
     expect(screen.getByText(CATEGORY_TEMPLATES[0]!.label)).toBeInTheDocument()
   })
 
   it('blocks save without a name', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
@@ -60,14 +67,14 @@ describe('CategoryEditor — new category', () => {
   it('creates the category via POST once a name is given', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="tok" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(fetchJson).toHaveBeenCalledWith(
-      '/api/admin/categories',
+      '/api/admin/categories?community=test-community',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ Authorization: 'Bearer tok' }),
@@ -78,7 +85,7 @@ describe('CategoryEditor — new category', () => {
 
   it('applies a template\'s fields and name when none are set yet', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByText(CATEGORY_TEMPLATES[0]!.label))
 
@@ -89,7 +96,7 @@ describe('CategoryEditor — new category', () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('Name already in use.'))
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />)
 
     await user.type(screen.getByLabelText(/^name \*/i), 'Pharmacies')
     await user.click(screen.getByRole('button', { name: /create category/i }))
@@ -102,7 +109,7 @@ describe('CategoryEditor — new category', () => {
 describe('CategoryEditor — the "every listing also has" checkboxes', () => {
   it('Hours/Website/Photo toggles add and remove a managed field', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={null} siblings={null} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     const hours = screen.getByLabelText('Hours')
     expect(hours).not.toBeChecked()
@@ -115,7 +122,7 @@ describe('CategoryEditor — the "every listing also has" checkboxes', () => {
 
 describe('CategoryEditor — editing an existing category', () => {
   it('shows the category name in the heading', () => {
-    render(
+    renderWithProviders(
       <CategoryEditor
         token="t"
         initial={baseCategory()}
@@ -131,7 +138,7 @@ describe('CategoryEditor — editing an existing category', () => {
   it('saves via PATCH with no confirmation step when nothing destructive changed', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(
+    renderWithProviders(
       <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
@@ -139,7 +146,7 @@ describe('CategoryEditor — editing an existing category', () => {
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
     expect(fetchJson).toHaveBeenCalledWith(
-      '/api/admin/categories/grocery',
+      '/api/admin/categories/grocery?community=test-community',
       expect.objectContaining({ method: 'PATCH' }),
       'Save failed.',
     )
@@ -154,7 +161,7 @@ describe('CategoryEditor — editing an existing category', () => {
       vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
@@ -165,7 +172,7 @@ describe('CategoryEditor — editing an existing category', () => {
       expect(screen.getByText(/Address — 3 listings/)).toBeInTheDocument()
       expect(onSaved).not.toHaveBeenCalled()
       expect(fetchJson).toHaveBeenCalledWith(
-        '/api/admin/categories/grocery/field-usage',
+        '/api/admin/categories/grocery/field-usage?community=test-community',
         expect.objectContaining({ method: 'POST' }),
         'Could not check existing listings.',
       )
@@ -175,7 +182,7 @@ describe('CategoryEditor — editing an existing category', () => {
       vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 0, phone: 0, fields: {} } })
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
@@ -192,7 +199,7 @@ describe('CategoryEditor — editing an existing category', () => {
         .mockResolvedValueOnce({ ok: true })
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
@@ -212,7 +219,7 @@ describe('CategoryEditor — editing an existing category', () => {
       vi.mocked(fetchJson).mockResolvedValueOnce({ usage: { address: 3, phone: 0, fields: {} } })
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
       )
 
@@ -246,7 +253,7 @@ describe('CategoryEditor — editing an existing category', () => {
         usage: [{ fieldKey: 'type', oldValue: 'Kosher', newValue: 'Glatt Kosher', count: 2 }],
       })
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor
           token="t"
           initial={categoryWithSelectField()}
@@ -265,7 +272,7 @@ describe('CategoryEditor — editing an existing category', () => {
 
       expect(await screen.findByText('Update existing listings to match this rename?')).toBeInTheDocument()
       expect(fetchJson).toHaveBeenCalledWith(
-        '/api/admin/categories/grocery/option-usage',
+        '/api/admin/categories/grocery/option-usage?community=test-community',
         expect.objectContaining({ method: 'POST' }),
         'Could not check existing listings.',
       )
@@ -277,7 +284,7 @@ describe('CategoryEditor — editing an existing category', () => {
         .mockResolvedValueOnce({ ok: true })
       const onSaved = vi.fn()
       const user = userEvent.setup()
-      render(
+      renderWithProviders(
         <CategoryEditor
           token="t"
           initial={categoryWithSelectField()}
@@ -314,7 +321,7 @@ describe('pin colour', () => {
   it('sends the chosen colour in the save request', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(
+    renderWithProviders(
       <CategoryEditor token="t" initial={baseCategory()} siblings={null} hasMapCategory={false} onSaved={onSaved} onCancel={vi.fn()} />,
     )
 
@@ -329,7 +336,7 @@ describe('pin colour', () => {
   it('sends null for Automatic, so the positional fallback applies', async () => {
     const onSaved = vi.fn()
     const user = userEvent.setup()
-    render(
+    renderWithProviders(
       <CategoryEditor
         token="t"
         initial={{ ...baseCategory(), pinColor: '#b63167' }}
@@ -359,7 +366,7 @@ describe('CategoryEditor — pin colour clashes', () => {
   ]
 
   it('labels a swatch another category already holds', () => {
-    render(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('button', { name: '#2c8c47 — already used by Synagogues' })).toBeInTheDocument()
     // A free one keeps the bare hex, so "taken" is what stands out.
     expect(screen.getByRole('button', { name: '#7a36bf' })).toBeInTheDocument()
@@ -367,7 +374,7 @@ describe('CategoryEditor — pin colour clashes', () => {
 
   it('warns after picking a colour that is already taken, and stops once a free one is picked', async () => {
     const user = userEvent.setup()
-    render(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={siblings[0]} siblings={siblings} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: /^#2c8c47 —/ }))
     expect(screen.getByText(/Same colour as Synagogues/)).toBeInTheDocument()
@@ -378,7 +385,7 @@ describe('CategoryEditor — pin colour clashes', () => {
 
   it('never reports the category being edited as clashing with itself', () => {
     const self = baseCategory({ pinColor: '#2657bf' })
-    render(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
+    renderWithProviders(<CategoryEditor token="t" initial={self} siblings={[self, siblings[1]]} hasMapCategory={false} onSaved={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByText(/Same colour as/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '#2657bf' })).toBeInTheDocument()
   })

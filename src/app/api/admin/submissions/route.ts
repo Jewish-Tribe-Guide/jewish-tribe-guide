@@ -1,6 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listSubmissionsByStatus } from '@/lib/submissionStore'
-import { adminCommunityFromRequest } from '@/lib/adminCommunity'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { SubmissionStatus } from '@/types'
 
 const VALID_STATUSES: SubmissionStatus[] = ['pending', 'approved', 'rejected']
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     const submissions = await listSubmissionsByStatus(community.slug, requested as SubmissionStatus)
     return Response.json({ ok: true, submissions })
   } catch (err) {

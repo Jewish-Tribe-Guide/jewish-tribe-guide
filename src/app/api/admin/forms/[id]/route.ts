@@ -4,7 +4,7 @@ import { getAdminUser } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { FormStep } from '@/lib/forms'
-import { adminCommunityFromRequest } from '@/lib/adminCommunity'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   title?: string
@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     const form = await saveDraft(community.slug, id, {
       title: body.title,
       submitLabel: body.submitLabel || 'Submit',
@@ -76,7 +76,7 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   const { id } = await ctx.params
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     const { responses } = await deleteForm(community.slug, id)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

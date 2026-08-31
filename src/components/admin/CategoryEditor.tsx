@@ -11,6 +11,7 @@ import { CleanupConfirm, RenameConfirm } from './CategorySaveConfirmations'
 import { CAPABILITY_LABELS, mergeFieldsWithHidden, normalizeField } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 export function CategoryEditor({
   token,
@@ -34,6 +35,7 @@ export function CategoryEditor({
   onCancel: () => void
 }) {
   const isNew = initial === null
+  const community = useCommunitySlug()
   const [previewing, setPreviewing] = useState(false)
   // What the positional rule would give this category, previewed under
   // "Automatic". For a category being created there is no id in the list yet,
@@ -72,6 +74,7 @@ export function CategoryEditor({
     initial,
     isNew,
     token,
+    community,
     onSaved,
   })
 

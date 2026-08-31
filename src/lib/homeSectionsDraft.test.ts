@@ -22,11 +22,11 @@ describe('saveHomeSections', () => {
     const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ ok: true }))
     vi.stubGlobal('fetch', fetchSpy)
 
-    await saveHomeSections('token', original, draft)
+    await saveHomeSections('token', 'philly', original, draft)
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/admin/home-sections/b',
+      '/api/admin/home-sections/b?community=philly',
       expect.objectContaining({ method: 'DELETE' }),
     )
   })
@@ -45,10 +45,10 @@ describe('saveHomeSections', () => {
     })
     vi.stubGlobal('fetch', fetchSpy)
 
-    const result = await saveHomeSections('token', original, draft)
+    const result = await saveHomeSections('token', 'philly', original, draft)
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/admin/home-sections',
+      '/api/admin/home-sections?community=philly',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ title: 'New Section', cardIds: ['x'] }),
@@ -66,10 +66,10 @@ describe('saveHomeSections', () => {
     )
     vi.stubGlobal('fetch', fetchSpy)
 
-    await saveHomeSections('token', original, draft)
+    await saveHomeSections('token', 'philly', original, draft)
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/admin/home-sections',
+      '/api/admin/home-sections?community=philly',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'map' }) }),
     )
   })
@@ -83,10 +83,10 @@ describe('saveHomeSections', () => {
     )
     vi.stubGlobal('fetch', fetchSpy)
 
-    await saveHomeSections('token', original, draft)
+    await saveHomeSections('token', 'philly', original, draft)
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/admin/home-sections/a',
+      '/api/admin/home-sections/a?community=philly',
       expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ title: 'New Title', cardIds: ['x'] }),
@@ -101,7 +101,7 @@ describe('saveHomeSections', () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
 
-    const result = await saveHomeSections('token', original, draft)
+    const result = await saveHomeSections('token', 'philly', original, draft)
 
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(result).toEqual(original)
@@ -118,15 +118,18 @@ describe('saveHomeSections', () => {
     const patchCalls: string[] = []
     const fetchSpy = vi.fn().mockImplementation((url: string, opts: RequestInit) => {
       patchCalls.push(url)
-      const id = url.split('/').pop()!
+      const id = url.split('/').pop()!.split('?')[0]
       const sortOrder = JSON.parse(opts.body as string).sortOrder
       return Promise.resolve(jsonResponse({ ok: true, section: section({ id, sortOrder }) }))
     })
     vi.stubGlobal('fetch', fetchSpy)
 
-    const result = await saveHomeSections('token', original, draft)
+    const result = await saveHomeSections('token', 'philly', original, draft)
 
-    expect(patchCalls).toEqual(['/api/admin/home-sections/b', '/api/admin/home-sections/a'])
+    expect(patchCalls).toEqual([
+      '/api/admin/home-sections/b?community=philly',
+      '/api/admin/home-sections/a?community=philly',
+    ])
     expect(result.map((s) => [s.id, s.sortOrder])).toEqual([
       ['b', 100],
       ['a', 200],
@@ -139,7 +142,7 @@ describe('saveHomeSections', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false, errors: ['Not authorized.'] }, false)))
 
-    await expect(saveHomeSections('token', original, draft)).rejects.toThrow('Not authorized.')
+    await expect(saveHomeSections('token', 'philly', original, draft)).rejects.toThrow('Not authorized.')
   })
 
   it('falls back to a generic message when the server gives no errors array', async () => {
@@ -148,6 +151,6 @@ describe('saveHomeSections', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false }, false)))
 
-    await expect(saveHomeSections('token', original, draft)).rejects.toThrow('Could not save a section.')
+    await expect(saveHomeSections('token', 'philly', original, draft)).rejects.toThrow('Could not save a section.')
   })
 })

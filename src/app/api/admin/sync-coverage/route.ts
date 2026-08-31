@@ -1,6 +1,6 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { getSyncCoverage } from '@/lib/syncCoverage'
-import { adminCommunityFromRequest } from '@/lib/adminCommunity'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/sync-coverage — the Metrics tab's Google sync coverage
 // report: listings never synced (no place id), listings with fields the
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     const coverage = await getSyncCoverage(community.slug)
     return Response.json({ ok: true, coverage })
   } catch (err) {

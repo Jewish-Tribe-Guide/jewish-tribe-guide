@@ -1,7 +1,7 @@
 import { getAdminUser } from '@/lib/adminAuth'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { adminCommunityFromRequest } from '@/lib/adminCommunity'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/archived-listings — every soft-deleted listing (an approved
 // removal report leaves the row as status='archived' rather than dropping
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await adminCommunityFromRequest(request)
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     // listArchivedResources() is not yet scoped by community (see
     // resourceStore.ts) — every community's archived listings show up mixed
     // together here, labeled against whichever community the admin is

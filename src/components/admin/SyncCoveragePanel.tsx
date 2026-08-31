@@ -3,6 +3,8 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import type { SyncCoverage, SyncCheckField, ClosureReport, PendingFirstSyncReport } from '@/lib/syncCoverage'
 import type { BusinessStatus } from '@/lib/hours'
 
@@ -277,6 +279,7 @@ function ClosureRow({
 }
 
 export default function SyncCoveragePanel({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [coverage, setCoverage] = useState<SyncCoverage | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -284,7 +287,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
     setError(null)
     try {
       const body = await fetchJson<{ coverage: SyncCoverage }>(
-        '/api/admin/sync-coverage',
+        withCommunity('/api/admin/sync-coverage', community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load sync coverage.',
       )
@@ -292,7 +295,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 

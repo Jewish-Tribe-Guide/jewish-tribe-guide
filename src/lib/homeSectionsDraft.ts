@@ -1,11 +1,13 @@
 import type { HomeBlockKind, HomeSection, DraftHomeSection } from './homeSections'
+import { withCommunity } from './useCommunityData'
 
 async function patchSection(
   token: string,
+  community: string,
   id: string,
   patch: Partial<Pick<HomeSection, 'title' | 'cardIds' | 'sortOrder'>>,
 ): Promise<HomeSection> {
-  const res = await fetch(`/api/admin/home-sections/${id}`, {
+  const res = await fetch(withCommunity(`/api/admin/home-sections/${id}`, community), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(patch),
@@ -17,13 +19,14 @@ async function patchSection(
 
 async function createSection(
   token: string,
+  community: string,
   title: string,
   cardIds: string[],
   kind: HomeBlockKind,
 ): Promise<HomeSection> {
   // A built-in block's own title/cardIds are fixed server-side (see
   // createHomeSection) — sent along anyway is harmless, just ignored.
-  const res = await fetch('/api/admin/home-sections', {
+  const res = await fetch(withCommunity('/api/admin/home-sections', community), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind }),
@@ -33,8 +36,8 @@ async function createSection(
   return body.section as HomeSection
 }
 
-async function deleteSection(token: string, id: string): Promise<void> {
-  const res = await fetch(`/api/admin/home-sections/${id}`, {
+async function deleteSection(token: string, community: string, id: string): Promise<void> {
+  const res = await fetch(withCommunity(`/api/admin/home-sections/${id}`, community), {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -59,6 +62,7 @@ function changed(original: HomeSection, draft: DraftHomeSection): boolean {
  *  Returns the saved sections, ready to become the new original + draft. */
 export async function saveHomeSections(
   token: string,
+  community: string,
   original: HomeSection[],
   draft: DraftHomeSection[],
 ): Promise<HomeSection[]> {
@@ -66,16 +70,16 @@ export async function saveHomeSections(
 
   const removed = original.filter((o) => !draft.some((d) => d.id === o.id))
   for (const s of removed) {
-    await deleteSection(token, s.id)
+    await deleteSection(token, community, s.id)
   }
 
   const savedInOrder: HomeSection[] = []
   for (const d of draft) {
     const existing = originalById.get(d.id)
     if (!existing) {
-      savedInOrder.push(await createSection(token, d.title, d.cardIds, d.kind))
+      savedInOrder.push(await createSection(token, community, d.title, d.cardIds, d.kind))
     } else if (changed(existing, d)) {
-      savedInOrder.push(await patchSection(token, d.id, { title: d.title, cardIds: d.cardIds }))
+      savedInOrder.push(await patchSection(token, community, d.id, { title: d.title, cardIds: d.cardIds }))
     } else {
       savedInOrder.push(existing)
     }
@@ -84,7 +88,7 @@ export async function saveHomeSections(
   const final: HomeSection[] = []
   for (const [i, s] of savedInOrder.entries()) {
     const sortOrder = (i + 1) * 100
-    final.push(s.sortOrder === sortOrder ? s : await patchSection(token, s.id, { sortOrder }))
+    final.push(s.sortOrder === sortOrder ? s : await patchSection(token, community, s.id, { sortOrder }))
   }
 
   return final

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Session } from '@supabase/supabase-js'
-import { ContentProvider } from '@/lib/contentContext'
-import { makeCategory, makeContent } from '@/test/providerFixtures'
+import { makeCategory } from '@/test/providerFixtures'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { getBrowserClient } from '@/lib/supabase/client'
 import type { EnrichedSubmission } from '@/types'
@@ -12,6 +13,11 @@ import ModerationQueue from './ModerationQueue'
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ getBrowserClient: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 function fakeResponse(status: number): Response {
   return { status, ok: status >= 200 && status < 300 } as Response
@@ -60,11 +66,9 @@ async function findTitleText(name: string) {
 function renderQueue(items: EnrichedSubmission[], sess = session()) {
   vi.mocked(fetch).mockResolvedValue(fakeResponse(200))
   vi.mocked(parseOkJson).mockResolvedValue({ submissions: items })
-  return render(
-    <ContentProvider content={makeContent({ categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] })}>
-      <ModerationQueue session={sess} />
-    </ContentProvider>,
-  )
+  return renderWithProviders(<ModerationQueue session={sess} />, {
+    content: { categories: [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })] },
+  })
 }
 
 beforeEach(() => {
@@ -87,11 +91,7 @@ describe('ModerationQueue — loading and empty states', () => {
 
   it('shows an unauthorized message on a 401, without treating it as an empty queue silently', async () => {
     vi.mocked(fetch).mockResolvedValue(fakeResponse(401))
-    render(
-      <ContentProvider content={makeContent()}>
-        <ModerationQueue session={session({ user: { email: 'notadmin@example.com' } } as never)} />
-      </ContentProvider>,
-    )
+    renderWithProviders(<ModerationQueue session={session({ user: { email: 'notadmin@example.com' } } as never)} />)
 
     expect(await screen.findByText(/not an authorized admin/)).toBeInTheDocument()
   })
@@ -170,21 +170,17 @@ describe('ModerationQueue — a pending submission', () => {
         }),
       ],
     })
-    render(
-      <ContentProvider
-        content={makeContent({
-          categories: [
-            makeCategory({
-              id: 'grocery',
-              pluralLabel: 'Grocery Stores',
-              detailFields: [{ key: 'googleDescription', type: 'text', label: 'Description' }],
-            }),
-          ],
-        })}
-      >
-        <ModerationQueue session={session()} />
-      </ContentProvider>,
-    )
+    renderWithProviders(<ModerationQueue session={session()} />, {
+      content: {
+        categories: [
+          makeCategory({
+            id: 'grocery',
+            pluralLabel: 'Grocery Stores',
+            detailFields: [{ key: 'googleDescription', type: 'text', label: 'Description' }],
+          }),
+        ],
+      },
+    })
 
     await findTitleText('Acme Grocery')
     expect(screen.getByText('Description')).toBeInTheDocument()

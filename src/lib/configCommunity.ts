@@ -6,14 +6,6 @@
  *  absent and every visitor was sent to the default. */
 export const COMMUNITY_COOKIE = 'jpc_community'
 
-/** Which community the admin console is editing. Separate from COMMUNITY_COOKIE
- *  (the public "/" redirect hint) because the two are unrelated: an admin
- *  browsing /ues on the public site and editing Philly in another tab is a
- *  normal, expected split. There is one shared /admin console (no per-community
- *  admin route yet — see admin/layout.tsx), and this cookie is what tells it
- *  which community's content to load and write to. */
-export const ADMIN_COMMUNITY_COOKIE = 'jpc_admin_community'
-
 /** The implicit single community a database with no `community` rows behaves
  *  as, and the slug "/" falls back to when nothing better is known.
  *

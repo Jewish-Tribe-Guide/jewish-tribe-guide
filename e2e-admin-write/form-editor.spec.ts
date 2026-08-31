@@ -44,7 +44,7 @@ test('creating and publishing a form through the real editor makes it live, and 
   // pre-navigation page can otherwise make these locators ambiguous.
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
-  await page.goto('/admin/categories')
+  await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ Add Form' })).click()
 
   const titleInput = visible(page.getByLabel('Title', { exact: true }))

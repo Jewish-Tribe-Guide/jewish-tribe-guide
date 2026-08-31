@@ -10,6 +10,7 @@ import { saveHomeSections } from '@/lib/homeSectionsDraft'
 import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import MobileTabsEditor from './MobileTabsEditor'
@@ -103,8 +104,12 @@ export default function SiteSettingsEditor({
     setError(null)
     try {
       const [settingsRes, sectionsRes] = await Promise.all([
-        fetch('/api/admin/site-settings', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/admin/home-sections', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/site-settings', community.slug), {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(withCommunity('/api/admin/home-sections', community.slug), {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ])
       const settingsBody = await parseOkJson<{ settings: SiteSettings }>(settingsRes, 'Failed to load.')
       const sectionsBody = await parseOkJson<{ sections: HomeSection[] }>(sectionsRes, 'Failed to load.')
@@ -116,7 +121,7 @@ export default function SiteSettingsEditor({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community.slug])
 
   useLoadOnMount(load)
 
@@ -168,7 +173,7 @@ export default function SiteSettingsEditor({
     try {
       if (JSON.stringify(settings) !== JSON.stringify(draft)) {
         const body = await fetchJson<{ settings: SiteSettings }>(
-          '/api/admin/site-settings',
+          withCommunity('/api/admin/site-settings', community.slug),
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -181,7 +186,7 @@ export default function SiteSettingsEditor({
       }
 
       if (!sectionsEqual(sections, sectionsDraft)) {
-        const saved = await saveHomeSections(token, sections, sectionsDraft)
+        const saved = await saveHomeSections(token, community.slug, sections, sectionsDraft)
         setSections(saved)
         setSectionsDraft(saved)
       }
