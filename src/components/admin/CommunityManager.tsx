@@ -497,7 +497,8 @@ export default function CommunityManager({ token }: { token: string }) {
                 </p>
                 {!c.visible && (
                   <p className="text-xs text-amber-700 mt-1">
-                    Not on the switcher or sitemap, and the plain URL 404s for anyone without the link below.
+                    Not on the switcher or sitemap, and the public site 404s for anyone without the link below. The
+                    admin console works normally regardless — sign in any time to keep building it out.
                   </p>
                 )}
               </a>

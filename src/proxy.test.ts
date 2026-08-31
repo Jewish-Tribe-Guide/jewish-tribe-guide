@@ -90,13 +90,20 @@ describe('proxy — hidden-community gating', () => {
     expect(res.headers.get('set-cookie')).toBeNull()
   })
 
-  it('gates the community admin console the same as the public site', async () => {
+  it('never gates the community admin console, even while hidden and with no token', async () => {
+    // The admin console is already behind real auth (adminAuth.ts checking
+    // admin_email) — Publish only controls the public site. Without this,
+    // an admin couldn't sign in to build a brand-new community out at all.
     mockListCommunityVisibility.mockResolvedValue({ blatimore: { visible: false, previewToken: 'secret-token' } })
-    const denied = await proxy(req('/blatimore/admin'))
-    expect(denied.status).toBe(404)
+    const res = await proxy(req('/blatimore/admin'))
+    expect(res.status).toBe(200)
+    expect(mockListCommunityVisibility).not.toHaveBeenCalled()
+  })
 
-    const allowed = await proxy(req('/blatimore/admin?access=secret-token'))
-    expect(allowed.status).toBe(200)
+  it('never gates a sub-route under the community admin console either', async () => {
+    mockListCommunityVisibility.mockResolvedValue({ blatimore: { visible: false, previewToken: 'secret-token' } })
+    const res = await proxy(req('/blatimore/admin/categories'))
+    expect(res.status).toBe(200)
   })
 
   it('fails open (never throws) when listCommunityVisibility rejects', async () => {

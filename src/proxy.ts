@@ -52,15 +52,24 @@ function redirectRoot(request: NextRequest) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gating a hidden community's own URL.
+// Gating a hidden community's PUBLIC URL — not its admin console.
 //
 // visible=false (see the community-visibility migration) only ever removed a
-// community from the switcher/sitemap — the plain /slug and /slug/admin URLs
-// still rendered normally for anyone who had them, which isn't obscure enough
-// to build a community out on the real database before announcing it. This
-// makes the URL itself not work without `?access=<token>` (or the cookie that
-// sets), for anyone but a holder of the link CommunityManager shows a
-// superadmin.
+// community from the switcher/sitemap — the plain /slug URL still rendered
+// normally for anyone who had it, which isn't obscure enough to build a
+// community out on the real database before announcing it. This makes /slug
+// (and everything under it) not work without `?access=<token>` (or the
+// cookie that sets), for anyone but a holder of the link CommunityManager
+// shows a superadmin.
+//
+// /slug/admin is deliberately EXEMPT: unlike the public site, it's already
+// behind real authentication (the community's own admin_email, checked by
+// adminAuth.ts once someone actually signs in) — a second, obscurity-based
+// gate in front of it would only add friction for the admin building the
+// community out, not real protection, since anyone who could pass it would
+// still need real admin credentials to do anything. "Publish" is meant to
+// answer one question — is this on the public site yet — not to also decide
+// whether its own admin can reach the console that builds it.
 //
 // This DOES reach the database, unlike the root redirect above — a real
 // departure from this file's original "proxy never touches the database"
@@ -110,8 +119,14 @@ function previewCookieName(slug: string): string {
 // them outright, since a community slug can never collide with either
 // (assertUsableSlug's reserved-word list blocks that at creation time).
 async function gateCommunityPath(request: NextRequest) {
-  const segment = request.nextUrl.pathname.slice(1).split('/', 1)[0]
+  const pathname = request.nextUrl.pathname
+  const segment = pathname.slice(1).split('/', 1)[0]
   if (!looksLikeCommunitySlug(segment)) return null
+
+  // /slug/admin (and everything under it) is real routes rewritten from
+  // /admin/[community]/... (see next.config.ts's own rewrite) — always
+  // reachable regardless of visibility; see this section's comment above.
+  if (pathname === `/${segment}/admin` || pathname.startsWith(`/${segment}/admin/`)) return null
 
   const entry = await getVisibility(segment)
   if (!entry || entry.visible) return null // unknown slug: let the route 404 itself
