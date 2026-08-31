@@ -99,6 +99,20 @@ describe('proxy — hidden-community gating', () => {
     expect(allowed.status).toBe(200)
   })
 
+  it('fails open (never throws) when listCommunityVisibility rejects', async () => {
+    // getAdminClient() throws synchronously on a missing Supabase env var —
+    // a real failure mode on a freshly-created preview deployment, and it
+    // broke every path on the site (not just a hidden community's) before
+    // this was caught. A visible community, a hidden one, and an unknown
+    // slug should all still resolve to a normal response.
+    mockListCommunityVisibility.mockRejectedValue(new Error('Missing required environment variable'))
+
+    const philly = await proxy(req('/philly'))
+    const unknown = await proxy(req('/not-a-real-community'))
+    expect(philly.status).toBe(200)
+    expect(unknown.status).toBe(200)
+  })
+
   it('never blocks /admin or /inbox even if the matcher somehow let them through', async () => {
     // config.matcher is what actually keeps these paths from reaching
     // proxy() in production (Next applies it before invoking the function,

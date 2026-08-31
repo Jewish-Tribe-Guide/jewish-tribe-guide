@@ -83,7 +83,21 @@ let visibilityCache: { at: number; bySlug: Record<string, { visible: boolean; pr
 async function getVisibility(slug: string) {
   const now = Date.now()
   if (!visibilityCache || now - visibilityCache.at > VISIBILITY_CACHE_MS) {
-    visibilityCache = { at: now, bySlug: await listCommunityVisibility() }
+    try {
+      visibilityCache = { at: now, bySlug: await listCommunityVisibility() }
+    } catch {
+      // getAdminClient() throws synchronously on a missing Supabase env var
+      // (see supabase/admin.ts) — a real thing that happens on a fresh
+      // preview deployment before its env is fully configured. That
+      // exception was reaching all the way out of the proxy uncaught,
+      // which broke EVERY path on the site (ERR_INVALID_RESPONSE), not
+      // just a hidden community's — the one thing this gate must never do
+      // is take down traffic it isn't even meant to affect. Fail open
+      // instead: treat every slug as unresolvable this cycle, same as an
+      // unknown one, and let the route render (or 404) normally. A
+      // misconfigured deployment loses the visibility gate, not the site.
+      visibilityCache = { at: now, bySlug: {} }
+    }
   }
   return visibilityCache.bySlug[slug] ?? null
 }
