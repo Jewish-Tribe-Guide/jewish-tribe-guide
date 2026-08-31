@@ -24,7 +24,16 @@ export const INBOX_BASE = '/philly/inbox'
 // map plus a separately-maintained render-order array) that could drift
 // apart, which is exactly what happened before this: TAB_LABELS' own key
 // order didn't match the array AdminTabs actually rendered from.
-export type AdminTab = 'queue' | 'categories' | 'responses' | 'archived' | 'site' | 'home' | 'metrics' | 'pages'
+export type AdminTab =
+  | 'queue'
+  | 'categories'
+  | 'responses'
+  | 'archived'
+  | 'site'
+  | 'home'
+  | 'metrics'
+  | 'pages'
+  | 'communities'
 
 export function adminTabs(community: string): { tab: AdminTab; href: string; label: string }[] {
   const base = adminBase(community)
@@ -40,5 +49,10 @@ export function adminTabs(community: string): { tab: AdminTab; href: string; lab
     // phone screen, not just the home one.
     { tab: 'home', href: `${base}/home`, label: 'Desktop & mobile' },
     { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+    // Cross-community: creating a new community isn't an action scoped to
+    // whichever one you're currently editing, but this tab still lives
+    // under the current community's console — there's no community-less
+    // admin route to put it on instead.
+    { tab: 'communities', href: `${base}/communities`, label: 'Communities' },
   ]
 }

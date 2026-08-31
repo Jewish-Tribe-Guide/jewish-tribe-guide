@@ -3,6 +3,8 @@ import { CONFIG_COMMUNITY_SLUG } from './configCommunity'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { community as configCommunity } from '@/community.config'
+import { assertUsableSlug } from './routes'
+import { isValidPinColor } from './categoryColor'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Communities — the tenant this site is currently showing.
@@ -150,4 +152,83 @@ export async function resolveCommunity(slug: string | null | undefined): Promise
  *  read in one place means changing it later touches this function alone. */
 export function communitySlugFromRequest(request: Request): string | null {
   return new URL(request.url).searchParams.get('community')
+}
+
+/** True if a valid IANA zone — `new Intl.DateTimeFormat` throws on anything
+ *  else. Same check community.config.ts's own bootstrap validator uses. */
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Creates a new community — the "New Community" admin flow's write path.
+ *
+ *  Validates the slug the same way a category/form slug is validated
+ *  (assertUsableSlug — shape + the reserved-word list, since a community
+ *  slug is a first-path-segment exactly like `admin`/`inbox`/`api`), plus a
+ *  live uniqueness check against existing communities, since assertUsableSlug
+ *  only knows about the fixed reserved words, not what's already taken.
+ *
+ *  `sortOrder` is one past whatever the highest existing value is, so a new
+ *  community always lands at the end of the switcher rather than needing an
+ *  explicit position. `isDefault` is never settable here — the community
+ *  served for a bare "/" stays a deliberate, single admin action elsewhere,
+ *  not a side effect of creating a new one. */
+export async function createCommunity(input: {
+  slug: string
+  name: string
+  tagline: string
+  mission: string
+  region: string
+  timezone: string
+  mapCenter: { lat: number; lng: number }
+  themeColor: string
+  backgroundColor: string
+  adminEmail?: string
+}): Promise<Community> {
+  const slug = input.slug.trim().toLowerCase()
+  assertUsableSlug(slug)
+
+  const existing = await listCommunities()
+  if (existing.some((c) => c.slug === slug)) {
+    throw new Error(`"${slug}" is already in use by another community.`)
+  }
+
+  if (!input.name.trim()) throw new Error('Community name is required.')
+  if (!isValidPinColor(input.themeColor)) throw new Error('Brand color must be a hex value like #1d4ed8.')
+  if (!isValidPinColor(input.backgroundColor)) throw new Error('Background color must be a hex value like #f8fafc.')
+  if (!isValidTimezone(input.timezone)) throw new Error(`"${input.timezone}" is not a valid timezone.`)
+  const { lat, lng } = input.mapCenter
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new Error('Map center latitude must be between -90 and 90.')
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) throw new Error('Map center longitude must be between -180 and 180.')
+
+  const sortOrder = existing.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 10
+
+  const { data, error } = await getAdminClient()
+    .from('community')
+    .insert({
+      slug,
+      name: input.name.trim(),
+      short_name: input.name.trim().slice(0, 20),
+      tagline: input.tagline.trim(),
+      mission: input.mission.trim(),
+      manifest_description: input.mission.trim(),
+      region: input.region.trim(),
+      timezone: input.timezone,
+      map_center: input.mapCenter,
+      theme_color: input.themeColor,
+      background_color: input.backgroundColor,
+      admin_email: input.adminEmail?.trim() || null,
+      sort_order: sortOrder,
+      is_default: false,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new Error(`Failed to create community: ${error.message}`)
+  return toCommunity(data as Row)
 }

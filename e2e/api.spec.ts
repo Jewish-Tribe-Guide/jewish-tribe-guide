@@ -40,6 +40,7 @@ const ADMIN_ROUTES: Guarded[] = [
   { method: 'get', path: '/api/admin/archived-listings' },
   { method: 'get', path: '/api/admin/metrics' },
   { method: 'post', path: '/api/admin/categories' },
+  { method: 'post', path: '/api/admin/communities' },
   { method: 'post', path: '/api/admin/forms' },
   { method: 'post', path: '/api/admin/home-sections' },
   { method: 'post', path: '/api/admin/site-settings/logo' },

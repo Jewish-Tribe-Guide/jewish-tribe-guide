@@ -16,6 +16,9 @@ function chainable(result: unknown) {
   Object.assign(builder, {
     select: vi.fn(self),
     order: vi.fn(self),
+    eq: vi.fn(self),
+    insert: vi.fn(self),
+    single: vi.fn(self),
     then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
@@ -26,8 +29,14 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
-const { listCommunities, getDefaultCommunity, resolveCommunity, communitySlugFromRequest, CONFIG_COMMUNITY_SLUG } =
-  await import('./communityStore')
+const {
+  listCommunities,
+  getDefaultCommunity,
+  resolveCommunity,
+  communitySlugFromRequest,
+  createCommunity,
+  CONFIG_COMMUNITY_SLUG,
+} = await import('./communityStore')
 
 afterEach(() => {
   mockFrom.mockReset()
@@ -133,6 +142,112 @@ describe('resolveCommunity', () => {
     mockFrom.mockReturnValue(chainable({ data: [philly, baltimore], error: null }))
     const result = await resolveCommunity(null)
     expect(result.slug).toBe('philly')
+  })
+})
+
+describe('createCommunity', () => {
+  const validInput = {
+    slug: 'baltimore',
+    name: 'Baltimore Jewish Community',
+    tagline: 'Guide for residents & visitors',
+    mission: 'A guide to Jewish Baltimore.',
+    region: 'Baltimore',
+    timezone: 'America/New_York',
+    mapCenter: { lat: 39.369, lng: -76.715 },
+    themeColor: '#1d4ed8',
+    backgroundColor: '#f8fafc',
+  }
+
+  it('rejects a slug that collides with a reserved route', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, slug: 'admin' })).rejects.toThrow()
+  })
+
+  it('rejects a slug already used by another community', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, slug: 'philly' })).rejects.toThrow(
+      '"philly" is already in use by another community.',
+    )
+  })
+
+  it('rejects an invalid brand color', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, themeColor: 'blue' })).rejects.toThrow(
+      'Brand color must be a hex value',
+    )
+  })
+
+  it('rejects an invalid background color', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, backgroundColor: 'not-a-color' })).rejects.toThrow(
+      'Background color must be a hex value',
+    )
+  })
+
+  it('rejects an invalid timezone', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, timezone: 'Mars/Olympus_Mons' })).rejects.toThrow(
+      'is not a valid timezone',
+    )
+  })
+
+  it('rejects an out-of-range latitude', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, mapCenter: { lat: 200, lng: 0 } })).rejects.toThrow(
+      'latitude must be between -90 and 90',
+    )
+  })
+
+  it('rejects an out-of-range longitude', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, mapCenter: { lat: 0, lng: 200 } })).rejects.toThrow(
+      'longitude must be between -180 and 180',
+    )
+  })
+
+  it('rejects a blank name', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly], error: null }))
+    await expect(createCommunity({ ...validInput, name: '   ' })).rejects.toThrow('Community name is required.')
+  })
+
+  it('inserts with sortOrder one past the current max, is_default false, and maps the returned row', async () => {
+    const insertedRow = {
+      slug: 'baltimore',
+      name: 'Baltimore Jewish Community',
+      short_name: 'Baltimore Jewish Community',
+      tagline: 'Guide for residents & visitors',
+      mission: 'A guide to Jewish Baltimore.',
+      manifest_description: 'A guide to Jewish Baltimore.',
+      region: 'Baltimore',
+      timezone: 'America/New_York',
+      map_center: { lat: 39.369, lng: -76.715 },
+      theme_color: '#1d4ed8',
+      background_color: '#f8fafc',
+      features: {},
+      ui: {},
+      sort_order: 10,
+      is_default: false,
+    }
+    const listBuilder = chainable({ data: [philly], error: null })
+    const insertBuilder = chainable({ data: insertedRow, error: null })
+    mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
+
+    const result = await createCommunity(validInput)
+
+    expect(insertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: 'baltimore', sort_order: 10, is_default: false }),
+    )
+    expect(result.slug).toBe('baltimore')
+    expect(result.sortOrder).toBe(10)
+    expect(result.isDefault).toBe(false)
+  })
+
+  it('throws with the Supabase error message on insert failure', async () => {
+    const listBuilder = chainable({ data: [philly], error: null })
+    const insertBuilder = chainable({ data: null, error: { message: 'unique violation' } })
+    mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
+
+    await expect(createCommunity(validInput)).rejects.toThrow('Failed to create community: unique violation')
   })
 })
 
