@@ -1,6 +1,6 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { CACHE_TEST_ADMIN_EMAIL } from '../scripts/cacheE2eAdmin.mjs'
+import { resolveDefaultCommunityAdminEmail } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mints a real, full-browser admin session against the disposable test
@@ -9,10 +9,12 @@ import { CACHE_TEST_ADMIN_EMAIL } from '../scripts/cacheE2eAdmin.mjs'
 // is all e2e-cache/auth.setup.ts's sibling needed for its own suite. Same
 // mechanism as e2e/auth.setup.ts (generateLink + verifyOtp, reproducing
 // /api/admin/dev-login's approach without its production-build refusal —
-// see that file's own comments for the full why), but against
-// CACHE_TEST_ADMIN_EMAIL instead of the real ADMIN_EMAILS, and with an
-// explicit createUser step first (same as e2e-cache/auth.setup.ts — a
-// brand-new email's magic link was unreliable to redeem without it).
+// see that file's own comments for the full why), against whichever email
+// resolveDefaultCommunityAdminEmail resolves (see its own comment — not
+// always CACHE_TEST_ADMIN_EMAIL, once philly/[default community] gets a
+// real admin_email configured on a shared project), and with an explicit
+// createUser step first (a brand-new email's magic link was unreliable to
+// redeem without it).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const authFile = 'e2e-admin-write/.auth/admin.json'
@@ -28,10 +30,11 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
     )
   }
 
+  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey)
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
   const { error: createError } = await admin.auth.admin.createUser({
-    email: CACHE_TEST_ADMIN_EMAIL,
+    email: testAdminEmail,
     email_confirm: true,
   })
   // Idempotent: only a genuine failure is fatal, not "this user already exists".
@@ -41,7 +44,7 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
 
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: 'magiclink',
-    email: CACHE_TEST_ADMIN_EMAIL,
+    email: testAdminEmail,
   })
   if (linkError || !linkData.properties?.hashed_token) {
     throw new Error(`Could not generate a magic link: ${linkError?.message ?? 'no hashed_token returned'}`)
@@ -68,7 +71,7 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
   // console now (src/app/admin/page.tsx), a different page with no
   // "Signed in as" moderation-queue text to wait for.
   await page.goto(`${baseURL}/philly/admin#${hash.toString()}`)
-  await page.getByText(`Signed in as ${CACHE_TEST_ADMIN_EMAIL}`).waitFor()
+  await page.getByText(`Signed in as ${testAdminEmail}`).waitFor()
 
   await page.context().storageState({ path: authFile })
 })

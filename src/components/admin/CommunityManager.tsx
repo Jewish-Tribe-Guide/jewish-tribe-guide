@@ -417,20 +417,29 @@ export default function CommunityManager({ token }: { token: string }) {
           </div>
         )}
 
-        <label className={labelClass}>
-          City, State
-          <AddressInput
-            value={draft.cityQuery}
-            onChange={setCityQuery}
-            onCoords={setCityCoords}
-            includedPrimaryTypes={['locality']}
-            placeholder="e.g. Baltimore, MD"
-          />
-          <span className="block text-xs text-muted mt-1">
+        <div>
+          {/* The helper text below is deliberately OUTSIDE the <label> —
+              nested inside, it becomes part of the field's accessible name
+              (every other label/caption pair here does this fine, but this
+              one's own caption happens to contain the word "name", which
+              made getByLabel('Name') match this field too — a real
+              e2e/community-editor.spec.ts failure, not just a style
+              nit). */}
+          <label className={labelClass}>
+            City, State
+            <AddressInput
+              value={draft.cityQuery}
+              onChange={setCityQuery}
+              onCoords={setCityCoords}
+              includedPrimaryTypes={['locality']}
+              placeholder="e.g. Baltimore, MD"
+            />
+          </label>
+          <p className="text-xs text-muted mt-1">
             Fills in the name, URL, region, timezone and map center below — pick one from the dropdown rather than
             just typing, so those actually get set.
-          </span>
-        </label>
+          </p>
+        </div>
 
         <label className={labelClass}>
           Name
