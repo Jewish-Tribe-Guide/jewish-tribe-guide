@@ -2,9 +2,11 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import tzLookup from 'tz-lookup'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
+import AddressInput from '@/components/intake/AddressInput'
 import type { Community } from '@/lib/communityStore'
 
 // GET /api/admin/communities adds adminEmail/previewToken on top of the
@@ -44,14 +46,23 @@ function previewLink(slug: string, token: string): string {
 const DEFAULT_THEME_COLOR = '#1d4ed8'
 const DEFAULT_BACKGROUND_COLOR = '#f8fafc'
 const DEFAULT_ADMIN_EMAIL = 'phillyjewishguide@gmail.com'
+const DEFAULT_TIMEZONE = 'America/New_York'
 
 type Draft = {
+  // The "City, State" picker's own controlled value (e.g. "Baltimore, MD,
+  // USA") — kept separate from `name`/`region` since it drives both of
+  // those, but isn't itself submitted.
+  cityQuery: string
   name: string
+  nameTouched: boolean
   slug: string
   slugTouched: boolean
   tagline: string
+  taglineTouched: boolean
   mission: string
+  missionTouched: boolean
   region: string
+  regionTouched: boolean
   timezone: string
   lat: string
   lng: string
@@ -63,13 +74,18 @@ type Draft = {
 
 function emptyDraft(): Draft {
   return {
+    cityQuery: '',
     name: '',
+    nameTouched: false,
     slug: '',
     slugTouched: false,
     tagline: '',
+    taglineTouched: false,
     mission: '',
+    missionTouched: false,
     region: '',
-    timezone: 'America/New_York',
+    regionTouched: false,
+    timezone: DEFAULT_TIMEZONE,
     lat: '',
     lng: '',
     themeColor: DEFAULT_THEME_COLOR,
@@ -77,6 +93,14 @@ function emptyDraft(): Draft {
     adminEmail: DEFAULT_ADMIN_EMAIL,
     cloneFrom: '',
   }
+}
+
+// Google's `formattedAddress` for a locality reads "Baltimore, MD, USA" —
+// the part before the first comma is what a name/region/tagline actually
+// wants ("Baltimore"), not the full string. Good enough for the common case;
+// everything it feeds stays editable if a city's real name needs adjusting.
+function cityShortName(cityQuery: string): string {
+  return cityQuery.split(',')[0]?.trim() || cityQuery.trim()
 }
 
 export default function CommunityManager({ token }: { token: string }) {
@@ -107,6 +131,13 @@ export default function CommunityManager({ token }: { token: string }) {
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [draft, setDraft] = useState<Draft>(emptyDraft())
+  // Tagline/mission/region/timezone/map center/brand colors — everything
+  // the city picker fills in, or that's editable later from the admin
+  // console (tagline/mission via Site Settings) and so isn't worth blocking
+  // creation on. Collapsed by default; opens on its own if lat/lng end up
+  // missing at submit time (no city picked, e.g. Places unavailable) so the
+  // manual fallback is never hidden from someone who actually needs it.
+  const [detailsOpen, setDetailsOpen] = useState(false)
   // Which community's delete-confirmation panel is open, if any — and what
   // the admin has typed into its "retype the slug" field so far. Only one
   // open at a time (opening a second closes whichever was open), same
@@ -145,6 +176,7 @@ export default function CommunityManager({ token }: { token: string }) {
   function startCreating() {
     setDraft(emptyDraft())
     setFormErrors([])
+    setDetailsOpen(false)
     setCreating(true)
   }
 
@@ -153,11 +185,58 @@ export default function CommunityManager({ token }: { token: string }) {
   }
 
   function setName(name: string) {
-    setDraft((d) => ({ ...d, name, slug: d.slugTouched ? d.slug : slugify(name) }))
+    setDraft((d) => ({ ...d, name, nameTouched: true, slug: d.slugTouched ? d.slug : slugify(name) }))
   }
 
   function setSlug(slug: string) {
     setDraft((d) => ({ ...d, slug, slugTouched: true }))
+  }
+
+  function setRegion(region: string) {
+    setDraft((d) => ({ ...d, region, regionTouched: true }))
+  }
+
+  function setTagline(tagline: string) {
+    setDraft((d) => ({ ...d, tagline, taglineTouched: true }))
+  }
+
+  function setMission(mission: string) {
+    setDraft((d) => ({ ...d, mission, missionTouched: true }))
+  }
+
+  // The City/State field's own value — cleared coordinates (via
+  // setCityCoords(null), which AddressInput calls on every keystroke after a
+  // prior selection) mean whatever was picked before no longer matches what's
+  // typed, same as AddressInput's own free-typed-address behavior elsewhere.
+  function setCityQuery(cityQuery: string) {
+    setDraft((d) => ({ ...d, cityQuery }))
+  }
+
+  // Fires when a suggestion is picked (AddressInput's onCoords), after
+  // setCityQuery has already landed the chosen city's text — see that
+  // function's own note on why reading d.cityQuery here is safe. Auto-fills
+  // everything a real address would otherwise make an admin hunt down by
+  // hand (map center, timezone, region, a starting name/slug/tagline/
+  // mission), without overwriting anything already edited by hand.
+  function setCityCoords(coords: { lat: number; lng: number } | null) {
+    setDraft((d) => {
+      if (!coords) return { ...d, lat: '', lng: '' }
+      const city = cityShortName(d.cityQuery)
+      const name = d.nameTouched ? d.name : `${city} Jewish Community`
+      return {
+        ...d,
+        lat: String(coords.lat),
+        lng: String(coords.lng),
+        timezone: tzLookup(coords.lat, coords.lng),
+        region: d.regionTouched ? d.region : city,
+        name,
+        slug: d.slugTouched ? d.slug : slugify(name),
+        tagline: d.taglineTouched ? d.tagline : 'Guide for residents & visitors',
+        mission: d.missionTouched
+          ? d.mission
+          : `A guide to Jewish ${city} — community resources for residents and visitors.`,
+      }
+    })
   }
 
   async function submit() {
@@ -168,14 +247,15 @@ export default function CommunityManager({ token }: { token: string }) {
     const errs: string[] = []
     if (!draft.name.trim()) errs.push('Name is required.')
     if (!draft.slug.trim()) errs.push('URL slug is required.')
-    if (!draft.region.trim()) errs.push('Region is required.')
-    if (!draft.tagline.trim()) errs.push('Tagline is required.')
-    if (!draft.mission.trim()) errs.push('Mission is required.')
+    // region/lat/lng normally arrive together from picking a city — missing
+    // any of them means that never happened (no city picked, or Places
+    // unavailable) and nothing was typed in manually either.
+    if (!draft.region.trim()) errs.push('Region is required — pick a city above, or fill it in under "More details".')
     if (draft.lat.trim() === '' || !Number.isFinite(lat) || lat < -90 || lat > 90) {
-      errs.push('Map center latitude must be a number between -90 and 90.')
+      errs.push('Map center latitude must be a number between -90 and 90 — pick a city above, or set it manually.')
     }
     if (draft.lng.trim() === '' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-      errs.push('Map center longitude must be a number between -180 and 180.')
+      errs.push('Map center longitude must be a number between -180 and 180 — pick a city above, or set it manually.')
     }
     if (!/^#[0-9a-fA-F]{6}$/.test(draft.themeColor.trim())) errs.push('Brand color must be a hex value like #1d4ed8.')
     if (!/^#[0-9a-fA-F]{6}$/.test(draft.backgroundColor.trim())) {
@@ -183,6 +263,7 @@ export default function CommunityManager({ token }: { token: string }) {
     }
     if (errs.length) {
       setFormErrors(errs)
+      setDetailsOpen(true) // every field these errors point at lives in there
       return
     }
 
@@ -196,8 +277,12 @@ export default function CommunityManager({ token }: { token: string }) {
           body: JSON.stringify({
             slug: draft.slug.trim(),
             name: draft.name.trim(),
-            tagline: draft.tagline.trim(),
-            mission: draft.mission.trim(),
+            // Never required — see the "More details" disclosure — so a
+            // blank field (cleared by hand, or never auto-filled because no
+            // city was picked) still needs something real to submit rather
+            // than an empty string admin-visible copy would render as.
+            tagline: draft.tagline.trim() || 'Guide for residents & visitors',
+            mission: draft.mission.trim() || `A guide to the ${draft.region.trim() || draft.name.trim()} Jewish community.`,
             region: draft.region.trim(),
             timezone: draft.timezone.trim(),
             mapCenter: { lat, lng },
@@ -333,6 +418,21 @@ export default function CommunityManager({ token }: { token: string }) {
         )}
 
         <label className={labelClass}>
+          City, State
+          <AddressInput
+            value={draft.cityQuery}
+            onChange={setCityQuery}
+            onCoords={setCityCoords}
+            includedPrimaryTypes={['locality']}
+            placeholder="e.g. Baltimore, MD"
+          />
+          <span className="block text-xs text-muted mt-1">
+            Fills in the name, URL, region, timezone and map center below — pick one from the dropdown rather than
+            just typing, so those actually get set.
+          </span>
+        </label>
+
+        <label className={labelClass}>
           Name
           <input
             className={inputClass}
@@ -349,67 +449,6 @@ export default function CommunityManager({ token }: { token: string }) {
             The site will be at /{draft.slug || 'slug'} and /{draft.slug || 'slug'}/admin.
           </span>
         </label>
-
-        <label className={labelClass}>
-          Tagline
-          <input
-            className={inputClass}
-            value={draft.tagline}
-            onChange={(e) => set('tagline', e.target.value)}
-            placeholder="Guide for residents & visitors"
-          />
-        </label>
-
-        <label className={labelClass}>
-          Mission
-          <textarea
-            className={inputClass}
-            rows={2}
-            value={draft.mission}
-            onChange={(e) => set('mission', e.target.value)}
-            placeholder="A guide to Jewish Baltimore — kosher food, shuls, and Shabbos times."
-          />
-        </label>
-
-        <label className={labelClass}>
-          Region
-          <input className={inputClass} value={draft.region} onChange={(e) => set('region', e.target.value)} placeholder="Baltimore" />
-        </label>
-
-        <label className={labelClass}>
-          Timezone
-          <input
-            className={inputClass}
-            value={draft.timezone}
-            onChange={(e) => set('timezone', e.target.value)}
-            placeholder="America/New_York"
-          />
-        </label>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className={labelClass}>
-            Map center latitude
-            <input className={inputClass} value={draft.lat} onChange={(e) => set('lat', e.target.value)} placeholder="39.3690" />
-          </label>
-          <label className={labelClass}>
-            Map center longitude
-            <input className={inputClass} value={draft.lng} onChange={(e) => set('lng', e.target.value)} placeholder="-76.7150" />
-          </label>
-        </div>
-        <p className="text-xs text-muted -mt-2">
-          Search the neighborhood on Google Maps, right-click the middle of it, and click the lat/lng at the top of the menu.
-        </p>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className={labelClass}>
-            Brand color
-            <input className={inputClass} value={draft.themeColor} onChange={(e) => set('themeColor', e.target.value)} />
-          </label>
-          <label className={labelClass}>
-            Background color
-            <input className={inputClass} value={draft.backgroundColor} onChange={(e) => set('backgroundColor', e.target.value)} />
-          </label>
-        </div>
 
         <label className={labelClass}>
           Admin email
@@ -430,6 +469,90 @@ export default function CommunityManager({ token }: { token: string }) {
             ))}
           </select>
         </label>
+
+        {/* Everything below is either already auto-filled by the city
+            picker above, or safe to leave at its default — a new community
+            starts unpublished (see the visibility migration), so none of
+            this needs to be right, or even present, before creating it.
+            Tagline/mission are editable later from Site Settings too. */}
+        <button
+          type="button"
+          onClick={() => setDetailsOpen((v) => !v)}
+          className="text-sm font-medium text-primary hover:underline cursor-pointer"
+        >
+          {detailsOpen ? '− Hide' : '+ Show'} more details (tagline, mission, region, timezone, map center, colors)
+        </button>
+
+        {detailsOpen && (
+          <div className="space-y-4 border-t border-slate-200 pt-4">
+            <label className={labelClass}>
+              Tagline
+              <input
+                className={inputClass}
+                value={draft.tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                placeholder="Guide for residents & visitors"
+              />
+            </label>
+
+            <label className={labelClass}>
+              Mission
+              <textarea
+                className={inputClass}
+                rows={2}
+                value={draft.mission}
+                onChange={(e) => setMission(e.target.value)}
+                placeholder="A guide to Jewish Baltimore — kosher food, shuls, and Shabbos times."
+              />
+            </label>
+
+            <label className={labelClass}>
+              Region
+              <input
+                className={inputClass}
+                value={draft.region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="Baltimore"
+              />
+            </label>
+
+            <label className={labelClass}>
+              Timezone
+              <input
+                className={inputClass}
+                value={draft.timezone}
+                onChange={(e) => set('timezone', e.target.value)}
+                placeholder="America/New_York"
+              />
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className={labelClass}>
+                Map center latitude
+                <input className={inputClass} value={draft.lat} onChange={(e) => set('lat', e.target.value)} placeholder="39.3690" />
+              </label>
+              <label className={labelClass}>
+                Map center longitude
+                <input className={inputClass} value={draft.lng} onChange={(e) => set('lng', e.target.value)} placeholder="-76.7150" />
+              </label>
+            </div>
+            <p className="text-xs text-muted -mt-2">
+              Set by the city picker above. To set by hand instead: search the neighborhood on Google Maps,
+              right-click the middle of it, and click the lat/lng at the top of the menu.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className={labelClass}>
+                Brand color
+                <input className={inputClass} value={draft.themeColor} onChange={(e) => set('themeColor', e.target.value)} />
+              </label>
+              <label className={labelClass}>
+                Background color
+                <input className={inputClass} value={draft.backgroundColor} onChange={(e) => set('backgroundColor', e.target.value)} />
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-2">
           <button
