@@ -35,6 +35,7 @@ function toView(row: FormResponseRow): InboxResponse {
 // new code here. `formId` is set only for a custom admin-created form's
 // submission (see GenericFormWizard.tsx); every built-in type leaves it unset.
 export async function insertFormResponse(input: {
+  community: string
   requestId: string
   requestType: RequestType | string
   formId?: string
@@ -42,6 +43,7 @@ export async function insertFormResponse(input: {
   data: Record<string, unknown>
 }): Promise<void> {
   const { error } = await getAdminClient().from('form_response').insert({
+    community_id: input.community,
     request_id: input.requestId,
     request_type: input.requestType,
     form_id: input.formId ?? null,

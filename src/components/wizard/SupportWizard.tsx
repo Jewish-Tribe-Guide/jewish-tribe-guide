@@ -5,6 +5,7 @@ import { buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
 import { useForm } from '@/lib/useForms'
 import type { FormStep } from '@/lib/forms'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 // The question list itself is data-driven (see src/data/forms.js, seeded into
 // the `form` table, editable from /admin's Forms tab) — this component just
@@ -39,6 +40,7 @@ type Props = {
 }
 
 export default function SupportWizard({ preselect, onClose }: Props) {
+  const community = useCommunitySlug()
   const form = useForm('support')
   const initial: Answers = preselect && preselect.length ? { needs: preselect } : {}
 
@@ -98,6 +100,7 @@ export default function SupportWizard({ preselect, onClose }: Props) {
     if (Object.keys(extra).length > 0) formData.extra = extra
 
     await submitRequest(
+      community,
       'Direct Support',
       contact,
       formData,

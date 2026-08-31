@@ -5,6 +5,8 @@ import type { DirectoryResource } from '@/types'
 import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 type Props = {
   listing: DirectoryResource
@@ -18,6 +20,7 @@ type Props = {
 }
 
 export default function ReportListing({ listing, upLabel, onUp, onSubmitted, preview }: Props) {
+  const community = useCommunitySlug()
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
   const [honeypot, setHoneypot] = useState('')
@@ -37,7 +40,7 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/submissions', {
+      const res = await fetch(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

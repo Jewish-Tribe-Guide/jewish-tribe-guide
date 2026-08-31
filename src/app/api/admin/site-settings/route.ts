@@ -2,7 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { getSiteSettingsUncached, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_MOBILE_TABS, type SiteSettings } from '@/lib/siteSettings'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { adminCommunityFromRequest } from '@/lib/adminCommunity'
 
 // GET /api/admin/site-settings — the current settings, for the admin editor.
 // Admin only (same data as the public route, just auth-gated for symmetry
@@ -12,7 +12,8 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const settings = await getSiteSettingsUncached((await getDefaultCommunity()).slug)
+    const community = await adminCommunityFromRequest(request)
+    const settings = await getSiteSettingsUncached(community.slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
     console.error('[admin/site-settings] GET failed:', err)
@@ -71,7 +72,8 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const settings = await updateSiteSettings((await getDefaultCommunity()).slug, body)
+    const community = await adminCommunityFromRequest(request)
+    const settings = await updateSiteSettings(community.slug, body)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })

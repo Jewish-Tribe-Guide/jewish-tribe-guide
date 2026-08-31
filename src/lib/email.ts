@@ -4,7 +4,6 @@ import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
-import { getDefaultCommunity } from '@/lib/communityStore'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -301,7 +300,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
           : 'Removal reported'
     title = payload.name ?? 'a listing'
     const category = payload.category
-      ? await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+      ? await getCategoryById(submission.community_id, payload.category)
       : undefined
     const categoryLabel = category?.label ?? payload.category ?? ''
     // Real, human-editable content when the category configured it as a

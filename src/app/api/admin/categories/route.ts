@@ -4,7 +4,7 @@ import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { isHttpUrl } from '@/lib/validation'
 import { isValidPinColor } from '@/lib/categoryColor'
 import type { CategoryCapabilities, CategoryField, CategoryKind } from '@/lib/categories'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { adminCommunityFromRequest } from '@/lib/adminCommunity'
 
 // GET /api/admin/categories — every category (resolved config, incl. fields and
 // capabilities) for the admin category manager. Admin only. The public
@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const categories = await listCategoriesUncached((await getDefaultCommunity()).slug)
+    const community = await adminCommunityFromRequest(request)
+    const categories = await listCategoriesUncached(community.slug)
     return Response.json({ ok: true, categories })
   } catch (err) {
     console.error('[admin/categories] GET failed:', err)
@@ -70,7 +71,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const category = await createCategory({
+    const community = await adminCommunityFromRequest(request)
+    const category = await createCategory(community.slug, {
       label: body.label,
       pluralLabel: body.pluralLabel,
       icon: body.icon,

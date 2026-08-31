@@ -11,6 +11,7 @@ import { easternTimestamp } from '@/lib/time'
 import { payloadTooLarge } from '@/lib/limits'
 import { isHoneypotTripped } from '@/lib/honeypot'
 import { verifyTurnstile } from '@/lib/turnstile'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 export async function POST(request: Request) {
   // Sends two emails per call — throttle hard.
@@ -58,7 +59,9 @@ export async function POST(request: Request) {
 
   // 2. Save to the database (system of record — hard failure if this fails).
   try {
+    const community = await resolveCommunity(communitySlugFromRequest(request))
     await insertFormResponse({
+      community: community.slug,
       requestId,
       requestType: payload.requestType,
       formId: payload.formId,

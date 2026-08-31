@@ -64,18 +64,25 @@ export async function listHomeSections(community: string): Promise<HomeSection[]
 // previously-removed built-in has to succeed even though a row for that
 // exact id may already exist from an earlier session (or the one-time
 // seed-home-blocks.mjs backfill), not conflict-error.
-export async function createHomeSection(input: {
-  title: string
-  cardIds?: string[]
-  kind?: HomeBlockKind
-}): Promise<HomeSection> {
+export async function createHomeSection(
+  community: string,
+  input: {
+    title: string
+    cardIds?: string[]
+    kind?: HomeBlockKind
+  },
+): Promise<HomeSection> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'section'
 
   if (kind !== 'section') {
-    const { count } = await supabase.from('home_section').select('id', { count: 'exact', head: true })
+    const { count } = await supabase
+      .from('home_section')
+      .select('id', { count: 'exact', head: true })
+      .eq('community_id', community)
     const row = {
       id: BUILT_IN_BLOCKS[kind].id,
+      community_id: community,
       kind,
       title: BUILT_IN_BLOCKS[kind].title,
       sort_order: ((count ?? 0) + 1) * 100,
@@ -92,18 +99,28 @@ export async function createHomeSection(input: {
 
   const base = slugify(input.title) || 'section'
 
+  // Scoped by community — see createCategory's identical comment.
   let id = base
   for (let n = 2; ; n++) {
-    const { data } = await supabase.from('home_section').select('id').eq('id', id).maybeSingle()
+    const { data } = await supabase
+      .from('home_section')
+      .select('id')
+      .eq('community_id', community)
+      .eq('id', id)
+      .maybeSingle()
     if (!data) break
     id = `${base}-${n}`
   }
 
-  const { count } = await supabase.from('home_section').select('id', { count: 'exact', head: true })
+  const { count } = await supabase
+    .from('home_section')
+    .select('id', { count: 'exact', head: true })
+    .eq('community_id', community)
   const sortOrder = ((count ?? 0) + 1) * 100
 
   const row = {
     id,
+    community_id: community,
     kind: 'section',
     title: input.title.trim(),
     sort_order: sortOrder,
@@ -121,6 +138,7 @@ export async function createHomeSection(input: {
 // cardIds is meaningless for one (the admin editor never offers a "+ Add a
 // card" picker for zmanim/map, since they aren't card groups).
 export async function updateHomeSection(
+  community: string,
   id: string,
   patch: { title?: string; cardIds?: string[]; sortOrder?: number },
 ): Promise<HomeSection | null> {
@@ -132,13 +150,19 @@ export async function updateHomeSection(
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder
 
   if (Object.keys(row).length === 0) {
-    const { data } = await supabase.from('home_section').select('*').eq('id', id).maybeSingle()
+    const { data } = await supabase
+      .from('home_section')
+      .select('*')
+      .eq('community_id', community)
+      .eq('id', id)
+      .maybeSingle()
     return data ? toSection(data as HomeSectionRow) : null
   }
 
   const { data, error } = await supabase
     .from('home_section')
     .update(row)
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()
@@ -147,7 +171,11 @@ export async function updateHomeSection(
   return data ? toSection(data as HomeSectionRow) : null
 }
 
-export async function deleteHomeSection(id: string): Promise<void> {
-  const { error } = await getAdminClient().from('home_section').delete().eq('id', id)
+export async function deleteHomeSection(community: string, id: string): Promise<void> {
+  const { error } = await getAdminClient()
+    .from('home_section')
+    .delete()
+    .eq('community_id', community)
+    .eq('id', id)
   if (error) throw new Error(`Failed to delete section: ${error.message}`)
 }

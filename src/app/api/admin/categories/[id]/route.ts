@@ -6,6 +6,7 @@ import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceS
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
 import { isValidPinColor } from '@/lib/categoryColor'
+import { adminCommunityFromRequest } from '@/lib/adminCommunity'
 
 type PatchBody = {
   label?: string
@@ -77,7 +78,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (body.pinColor && !isValidPinColor(body.pinColor)) {
       return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
     }
-    const category = await updateCategory(id, body)
+    const community = await adminCommunityFromRequest(request)
+    const category = await updateCategory(community.slug, id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
     }
@@ -110,7 +112,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   const { id } = await ctx.params
   try {
-    const { listings } = await deleteCategory(id)
+    const community = await adminCommunityFromRequest(request)
+    const { listings } = await deleteCategory(community.slug, id)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, listings })

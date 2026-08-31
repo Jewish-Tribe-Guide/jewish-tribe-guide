@@ -170,7 +170,9 @@ Cached content reads are wired in three places that have to agree: a `use cache`
 
 `cacheTags.test.ts` derives the expected tag list from `TAGS` itself, so adding a store without wiring its invalidation fails the unit suite. `caching.spec.ts` then checks the pages really are served from the cache (`x-nextjs-cache: HIT`), since `use cache` that has quietly stopped applying looks identical to one that works.
 
-Note that `/admin` and `/inbox` **are** prerendered and CDN-cached, correctly — both are `'use client'` shells that fetch their data in the browser with an `Authorization` header. That stops being safe the moment anyone moves one of those fetches to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+`/inbox` **is** prerendered and CDN-cached, correctly — it's a `'use client'` shell that fetches its data in the browser with an `Authorization` header. That stops being safe the moment anyone moves that fetch to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+
+`/admin` used to be the same, but stopped being prerendered when the second-community work (see [[project-multi-community]]) gave its layout a real per-viewer read: `cookies()`, to resolve which community the admin is editing (`adminCommunity.ts`). Cache Components treats that as a genuine runtime dependency — the layout now carries `export const instant = false` (see its own comment) rather than being split into a static shell plus a Suspense-streamed island, since an internal, low-traffic console doesn't need the edge-caching payoff that split exists for. `caching.spec.ts`'s admin-shell check tolerates this (it only asserts anything when `x-nextjs-cache: HIT` is present) — it now passes on `/admin` by finding nothing to check, and still means something for `/inbox`.
 
 ## The content is not server-rendered (closed)
 

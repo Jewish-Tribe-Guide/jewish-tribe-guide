@@ -62,24 +62,34 @@ export async function listPublishedForms(community: string): Promise<Omit<FormCo
 }
 
 // Every form including drafts, for the admin Forms manager.
-export async function listFormsForAdmin(): Promise<FormConfig[]> {
-  const { data, error } = await getAdminClient().from('form').select('*').order('id')
+export async function listFormsForAdmin(community: string): Promise<FormConfig[]> {
+  const { data, error } = await getAdminClient()
+    .from('form')
+    .select('*')
+    .eq('community_id', community)
+    .order('id')
   if (error) throw new Error(`Failed to load forms: ${error.message}`)
   return (data as FormRow[]).map(toConfig)
 }
 
-export async function getFormById(id: string): Promise<FormConfig | null> {
-  const { data, error } = await getAdminClient().from('form').select('*').eq('id', id).maybeSingle()
+export async function getFormById(community: string, id: string): Promise<FormConfig | null> {
+  const { data, error } = await getAdminClient()
+    .from('form')
+    .select('*')
+    .eq('community_id', community)
+    .eq('id', id)
+    .maybeSingle()
   if (error) throw new Error(`Failed to load form: ${error.message}`)
   return data ? toConfig(data as FormRow) : null
 }
 
 // Saves a full draft copy (title/chrome text/steps) for a form, leaving the
 // published content untouched until publishDraft is called.
-export async function saveDraft(id: string, draft: FormContent): Promise<FormConfig | null> {
+export async function saveDraft(community: string, id: string, draft: FormContent): Promise<FormConfig | null> {
   const { data, error } = await getAdminClient()
     .from('form')
     .update({ draft, updated_at: new Date().toISOString() })
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()
@@ -89,8 +99,8 @@ export async function saveDraft(id: string, draft: FormContent): Promise<FormCon
 
 // Promotes a form's draft to published content, then clears the draft. No-op
 // (returns the form as-is) if there's no draft to publish.
-export async function publishDraft(id: string): Promise<FormConfig | null> {
-  const form = await getFormById(id)
+export async function publishDraft(community: string, id: string): Promise<FormConfig | null> {
+  const form = await getFormById(community, id)
   if (!form) return null
   if (!form.draft) return form
 
@@ -108,6 +118,7 @@ export async function publishDraft(id: string): Promise<FormConfig | null> {
       draft: null,
       updated_at: new Date().toISOString(),
     })
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()
@@ -116,10 +127,11 @@ export async function publishDraft(id: string): Promise<FormConfig | null> {
 }
 
 // Discards a form's draft, leaving published content untouched.
-export async function discardDraft(id: string): Promise<FormConfig | null> {
+export async function discardDraft(community: string, id: string): Promise<FormConfig | null> {
   const { data, error } = await getAdminClient()
     .from('form')
     .update({ draft: null })
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()
@@ -137,10 +149,11 @@ const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
 // Turns a form's public visibility on/off. Applies immediately to the
 // published row, independent of any pending draft — unlike saveDraft/
 // publishDraft, there's nothing to publish here, just a direct flip.
-export async function setFormActive(id: string, active: boolean): Promise<FormConfig | null> {
+export async function setFormActive(community: string, id: string, active: boolean): Promise<FormConfig | null> {
   const { data, error } = await getAdminClient()
     .from('form')
     .update({ active })
+    .eq('community_id', community)
     .eq('id', id)
     .select('*')
     .maybeSingle()
@@ -155,19 +168,28 @@ export async function setFormActive(id: string, active: boolean): Promise<FormCo
 // is deliberately no "create a blank draft" step before that. Falls back to
 // the standard contact step block if the admin published with none, so it's
 // always a usable, submittable form.
-export async function createForm(content: FormContent): Promise<FormConfig> {
+export async function createForm(community: string, content: FormContent): Promise<FormConfig> {
   const supabase = getAdminClient()
   const base = slugify(content.title) || 'form'
 
+  // Scoped by community — the same id in another community's form table is a
+  // different row (composite primary key), so a global uniqueness check
+  // would wrongly refuse a slug that community isn't even using.
   let id = base
   for (let n = 2; ; n++) {
-    const { data } = await supabase.from('form').select('id').eq('id', id).maybeSingle()
+    const { data } = await supabase
+      .from('form')
+      .select('id')
+      .eq('community_id', community)
+      .eq('id', id)
+      .maybeSingle()
     if (!data) break
     id = `${base}-${n}`
   }
 
   const row = {
     id,
+    community_id: community,
     title: content.title.trim(),
     submit_label: content.submitLabel.trim() || 'Submit',
     success_title: content.successTitle.trim() || 'All set',
@@ -189,22 +211,34 @@ export async function createForm(content: FormContent): Promise<FormConfig> {
 // into the home screen (Landing.tsx) and their own wizard components
 // (SupportWizard/VolunteerWizard) — deleting them would break those, so it's
 // blocked here rather than only hidden in the UI.
-export async function deleteForm(id: string): Promise<{ responses: number }> {
+export async function deleteForm(community: string, id: string): Promise<{ responses: number }> {
   if (PROTECTED_FORM_IDS.has(id)) {
     throw new Error('The Support and Volunteer forms can’t be deleted.')
   }
 
   const supabase = getAdminClient()
 
+  // form_response.form_id is a plain text column, not scoped by community_id
+  // on its own — filtered by community as well so a same-id form in another
+  // community can't have its responses swept up by this delete.
   const { count } = await supabase
     .from('form_response')
     .select('id', { count: 'exact', head: true })
+    .eq('community_id', community)
     .eq('form_id', id)
 
-  const { error: responsesErr } = await supabase.from('form_response').delete().eq('form_id', id)
+  const { error: responsesErr } = await supabase
+    .from('form_response')
+    .delete()
+    .eq('community_id', community)
+    .eq('form_id', id)
   if (responsesErr) throw new Error(`Failed to delete the form's responses: ${responsesErr.message}`)
 
-  const { error: formErr } = await supabase.from('form').delete().eq('id', id)
+  const { error: formErr } = await supabase
+    .from('form')
+    .delete()
+    .eq('community_id', community)
+    .eq('id', id)
   if (formErr) throw new Error(`Failed to delete form: ${formErr.message}`)
 
   return { responses: count ?? 0 }

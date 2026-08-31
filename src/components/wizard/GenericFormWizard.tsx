@@ -5,6 +5,7 @@ import { buildContact } from './contactSteps'
 import { submitRequest } from '@/lib/submitRequest'
 import { useForm } from '@/lib/useForms'
 import type { FormStep } from '@/lib/forms'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 // Runs any admin-created custom form through the exact same Wizard component
 // Support/Volunteer use — the DB write path (insertFormResponse) is already
@@ -30,6 +31,7 @@ type Props = {
 }
 
 export default function GenericFormWizard({ formId, onClose }: Props) {
+  const community = useCommunitySlug()
   const form = useForm(formId)
 
   const handleSubmit = async (a: Answers) => {
@@ -44,6 +46,7 @@ export default function GenericFormWizard({ formId, onClose }: Props) {
     }
 
     await submitRequest(
+      community,
       form!.title,
       contact,
       formData,

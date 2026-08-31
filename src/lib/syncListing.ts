@@ -181,7 +181,7 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
   let flaggedClosed = false
   if (sync.businessStatus === 'CLOSED_PERMANENTLY' && !row.details.businessStatusOverride) {
     try {
-      const submission = await submitGoogleClosure(row.id)
+      const submission = await submitGoogleClosure(row.community_id, row.id)
       if (submission) {
         flaggedClosed = true
         await sendSubmissionNotification(submission).catch(() => {})

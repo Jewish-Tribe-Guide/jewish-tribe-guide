@@ -31,11 +31,6 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
-const mockGetDefaultCommunity = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({
-  getDefaultCommunity: mockGetDefaultCommunity,
-}))
-
 const mockListCategories = vi.hoisted(() => vi.fn())
 const mockCreateCategory = vi.hoisted(() => vi.fn())
 const mockGetCategoryById = vi.hoisted(() => vi.fn())
@@ -73,11 +68,10 @@ const {
   submitListingUpdate,
 } = await import('./submissionStore')
 
-const COMMUNITY = { slug: 'philly', name: 'Philly', id: 'philly' }
-
 function baseSubmission(overrides: Partial<SubmissionRow>): SubmissionRow {
   return {
     id: 'sub-1',
+    community_id: 'philly',
     operation: 'create',
     target_type: 'listing',
     target_id: null,
@@ -107,14 +101,12 @@ function listingPayload(overrides: Partial<ResourceSubmission> = {}): ResourceSu
 
 afterEach(() => {
   mockFrom.mockReset()
-  mockGetDefaultCommunity.mockReset()
   mockListCategories.mockReset()
   mockCreateCategory.mockReset()
   mockGetCategoryById.mockReset()
   mockUpsertTags.mockReset()
   mockGeocode.mockReset()
   mockFetchPlaceSync.mockReset()
-  mockGetDefaultCommunity.mockResolvedValue(COMMUNITY)
 })
 
 // ── listPendingSubmissions: category-label resolution ───────────────────────
@@ -122,7 +114,7 @@ afterEach(() => {
 describe('listPendingSubmissions', () => {
   it('throws with the Supabase error message when the submission query fails', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(listPendingSubmissions()).rejects.toThrow('Failed to load submissions: boom')
+    await expect(listPendingSubmissions('philly')).rejects.toThrow('Failed to load submissions: boom')
   })
 
   it('uses the submitted category label for a category-create submission', async () => {
@@ -136,7 +128,7 @@ describe('listPendingSubmissions', () => {
     )
     mockListCategories.mockResolvedValue([])
 
-    const [result] = await listPendingSubmissions()
+    const [result] = await listPendingSubmissions('philly')
 
     expect(result.categoryLabel).toBe('Brand New Category')
     expect(result.current).toBeNull()
@@ -154,7 +146,7 @@ describe('listPendingSubmissions', () => {
     mockFrom.mockReturnValue(chainable({ data: [sub], error: null }))
     mockListCategories.mockResolvedValue([{ id: 'synagogue', label: 'Synagogues' }])
 
-    const [result] = await listPendingSubmissions()
+    const [result] = await listPendingSubmissions('philly')
 
     expect(result.categoryLabel).toBe('Synagogues')
   })
@@ -169,7 +161,7 @@ describe('listPendingSubmissions', () => {
     mockFrom.mockReturnValue(chainable({ data: [sub], error: null }))
     mockListCategories.mockResolvedValue([])
 
-    const [result] = await listPendingSubmissions()
+    const [result] = await listPendingSubmissions('philly')
 
     expect(result.categoryLabel).toBe('deleted-category-slug')
   })
@@ -189,7 +181,7 @@ describe('listPendingSubmissions', () => {
     )
     mockListCategories.mockResolvedValue([{ id: 'grocery', label: 'Grocery Stores' }])
 
-    const [result] = await listPendingSubmissions()
+    const [result] = await listPendingSubmissions('philly')
 
     expect(result.categoryLabel).toBe('Grocery Stores')
     expect(result.current).toEqual(currentResource)
@@ -209,7 +201,7 @@ describe('listPendingSubmissions', () => {
     )
     mockListCategories.mockResolvedValue([])
 
-    const [result] = await listPendingSubmissions()
+    const [result] = await listPendingSubmissions('philly')
 
     expect(result.categoryLabel).toBeUndefined()
   })
@@ -225,7 +217,7 @@ describe('listPendingSubmissions', () => {
     })
     mockListCategories.mockResolvedValue([])
 
-    const results = await listPendingSubmissions()
+    const results = await listPendingSubmissions('philly')
 
     expect(results).toHaveLength(2)
     expect(results.every((r) => r.current === null)).toBe(true)
@@ -240,7 +232,7 @@ describe('listPendingSubmissions', () => {
     )
     mockListCategories.mockResolvedValue([])
 
-    await expect(listPendingSubmissions()).rejects.toThrow('Failed to load current rows: timeout')
+    await expect(listPendingSubmissions('philly')).rejects.toThrow('Failed to load current rows: timeout')
   })
 })
 
@@ -252,7 +244,7 @@ describe('listSubmissionsByStatus', () => {
     mockFrom.mockReturnValue(builder)
     mockListCategories.mockResolvedValue([])
 
-    await listSubmissionsByStatus('pending')
+    await listSubmissionsByStatus('philly', 'pending')
 
     expect(builder.eq).toHaveBeenCalledWith('status', 'pending')
     expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
@@ -263,7 +255,7 @@ describe('listSubmissionsByStatus', () => {
     mockFrom.mockReturnValue(builder)
     mockListCategories.mockResolvedValue([])
 
-    await listSubmissionsByStatus('rejected')
+    await listSubmissionsByStatus('philly', 'rejected')
 
     expect(builder.eq).toHaveBeenCalledWith('status', 'rejected')
     expect(builder.order).toHaveBeenCalledWith('reviewed_at', { ascending: false })
@@ -278,7 +270,7 @@ describe('listSubmissionsByStatus', () => {
     )
     mockListCategories.mockResolvedValue([{ id: 'synagogue', label: 'Synagogues' }])
 
-    const [result] = await listSubmissionsByStatus('approved')
+    const [result] = await listSubmissionsByStatus('philly', 'approved')
 
     expect(result.categoryLabel).toBe('Synagogues')
     expect(result.current).toEqual({ id: 'res-1', category: 'synagogue' })
@@ -1100,7 +1092,7 @@ describe('submitGoogleClosure', () => {
   it('returns null (no-op) when a pending delete already exists for this listing', async () => {
     mockFrom.mockReturnValue(chainable({ data: { id: 'existing-sub' }, error: null }))
 
-    const result = await submitGoogleClosure('res-1')
+    const result = await submitGoogleClosure('philly', 'res-1')
 
     expect(result).toBeNull()
   })
@@ -1120,7 +1112,7 @@ describe('submitGoogleClosure', () => {
       return submissionCalls === 1 ? existingCheckBuilder : insertBuilder
     })
 
-    const result = await submitGoogleClosure('res-1')
+    const result = await submitGoogleClosure('philly', 'res-1')
 
     expect(result).not.toBeNull()
     expect(insertBuilder.insert).toHaveBeenCalledWith(
@@ -1148,7 +1140,7 @@ describe('submitGoogleClosure', () => {
       return submissionCalls === 1 ? existingCheckBuilder : insertBuilder
     })
 
-    await submitGoogleClosure('res-1')
+    await submitGoogleClosure('philly', 'res-1')
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ payload: {} }))
   })
@@ -1161,7 +1153,7 @@ describe('submitListingCreate', () => {
     const builder = chainable({ data: baseSubmission({}), error: null })
     mockFrom.mockReturnValue(builder)
 
-    await submitListingCreate(listingPayload({ submittedBy: { name: 'Jane' } }))
+    await submitListingCreate('philly', listingPayload({ submittedBy: { name: 'Jane' } }))
 
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1180,7 +1172,7 @@ describe('submitListingUpdate', () => {
     const builder = chainable({ data: baseSubmission({ operation: 'update', target_id: 'res-1' }), error: null })
     mockFrom.mockReturnValue(builder)
 
-    await submitListingUpdate('res-1', listingPayload(), 'fixing the phone number', { email: 'a@b.com' })
+    await submitListingUpdate('philly', 'res-1', listingPayload(), 'fixing the phone number', { email: 'a@b.com' })
 
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1200,7 +1192,7 @@ describe('submitListingDelete', () => {
     const insertBuilder = chainable({ data: baseSubmission({}), error: null })
     mockFrom.mockImplementation((table: string) => (table === 'resource' ? resourceBuilder : insertBuilder))
 
-    await submitListingDelete('res-1', 'closed', { name: 'Reporter' })
+    await submitListingDelete('philly', 'res-1', 'closed', { name: 'Reporter' })
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1217,7 +1209,7 @@ describe('submitListingDelete', () => {
     const insertBuilder = chainable({ data: baseSubmission({}), error: null })
     mockFrom.mockImplementation((table: string) => (table === 'resource' ? resourceBuilder : insertBuilder))
 
-    await submitListingDelete('res-1', null, null)
+    await submitListingDelete('philly', 'res-1', null, null)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ payload: {} }))
   })
@@ -1238,7 +1230,7 @@ describe('getSubmissionFunnelStats', () => {
       }),
     )
 
-    const stats = await getSubmissionFunnelStats()
+    const stats = await getSubmissionFunnelStats('philly')
 
     expect(stats.pending).toBe(2)
     expect(stats.approved).toBe(2)
@@ -1261,7 +1253,7 @@ describe('getSubmissionFunnelStats', () => {
       }),
     )
 
-    const stats = await getSubmissionFunnelStats()
+    const stats = await getSubmissionFunnelStats('philly')
 
     expect(stats.avgHoursToApproval).toBeCloseTo(4)
     expect(stats.medianHoursToApproval).toBeCloseTo(4)
@@ -1270,7 +1262,7 @@ describe('getSubmissionFunnelStats', () => {
   it('returns null (not 0 or NaN) for rate/timing when there is no data yet', async () => {
     mockFrom.mockReturnValue(chainable({ data: [], error: null }))
 
-    const stats = await getSubmissionFunnelStats()
+    const stats = await getSubmissionFunnelStats('philly')
 
     expect(stats).toEqual({
       pending: 0,
@@ -1294,7 +1286,7 @@ describe('getSubmissionFunnelStats', () => {
       }),
     )
 
-    const stats = await getSubmissionFunnelStats()
+    const stats = await getSubmissionFunnelStats('philly')
 
     // Only the second (valid) row counts — average of just [2], not skewed negative.
     expect(stats.avgHoursToApproval).toBeCloseTo(2)
@@ -1308,7 +1300,7 @@ describe('getSubmissionFunnelStats', () => {
       }),
     )
 
-    const stats = await getSubmissionFunnelStats()
+    const stats = await getSubmissionFunnelStats('philly')
 
     expect(stats.avgHoursToApproval).toBeNull()
     expect(stats.medianHoursToApproval).toBeNull()
@@ -1316,6 +1308,6 @@ describe('getSubmissionFunnelStats', () => {
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(getSubmissionFunnelStats()).rejects.toThrow('Failed to load submission stats: boom')
+    await expect(getSubmissionFunnelStats('philly')).rejects.toThrow('Failed to load submission stats: boom')
   })
 })

@@ -1,5 +1,4 @@
 import { getAdminClient } from './supabase/admin'
-import { getDefaultCommunity } from './communityStore'
 import { listCategoriesUncached, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import {
@@ -152,8 +151,7 @@ function allFieldsFor(row: SyncRow, category: CategoryConfig): FieldValue[] {
   }))
 }
 
-export async function getSyncCoverage(): Promise<SyncCoverage> {
-  const community = (await getDefaultCommunity()).slug
+export async function getSyncCoverage(community: string): Promise<SyncCoverage> {
   const [categories, { data, error }] = await Promise.all([
     listCategoriesUncached(community),
     getAdminClient()

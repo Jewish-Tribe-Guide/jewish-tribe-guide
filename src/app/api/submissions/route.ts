@@ -16,7 +16,7 @@ import { normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     )
   }
 
+  const community = await resolveCommunity(communitySlugFromRequest(request))
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null
 
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
   // so a disabled per-category button can't be bypassed by posting directly.
   const categoryId = operation === 'create' ? payload?.category : existingResource?.category
   if (categoryId) {
-    const cat = await getCategoryById((await getDefaultCommunity()).slug, categoryId)
+    const cat = await getCategoryById(community.slug, categoryId)
     if (cat) {
       const caps = resolveCapabilities(cat.capabilities)
       const capOk =
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
   }
 
   if (payload) {
-    const category = await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+    const category = await getCategoryById(community.slug, payload.category)
     // Nobody types the "https://" scheme by hand for a website field — add it
     // before validating (so a bare "example.com" isn't rejected) and before
     // storing (so the saved value is still a real, working link — the card
@@ -157,11 +158,14 @@ export async function POST(request: Request) {
   let submission: SubmissionRow
   try {
     if (operation === 'create') {
-      submission = await submitListingCreate({ ...payload!, submittedBy: submittedBy ?? undefined })
+      submission = await submitListingCreate(community.slug, {
+        ...payload!,
+        submittedBy: submittedBy ?? undefined,
+      })
     } else if (operation === 'update') {
-      submission = await submitListingUpdate(targetId!, payload!, note ?? null, submittedBy)
+      submission = await submitListingUpdate(community.slug, targetId!, payload!, note ?? null, submittedBy)
     } else {
-      submission = await submitListingDelete(targetId!, note ?? null, submittedBy)
+      submission = await submitListingDelete(community.slug, targetId!, note ?? null, submittedBy)
     }
   } catch (err) {
     console.error('[submissions] insert failed:', err)

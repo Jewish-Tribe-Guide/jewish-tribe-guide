@@ -28,6 +28,7 @@ function session(overrides: Partial<Session> = {}): Session {
 function submission(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmission {
   return {
     id: 'sub-1',
+    community_id: 'philly',
     operation: 'create',
     target_type: 'listing',
     target_id: null,
@@ -111,7 +112,7 @@ describe('ModerationQueue — a pending submission', () => {
       submission({
         operation: 'update',
         payload: { name: 'Acme Grocery', details: {} },
-        current: { id: 'l1', category: 'grocery', name: 'Acme Grocery', anchor_id: 'community', distance: null, address: 'Old Address', phone: null, details: {}, status: 'approved', submitted_by: null, created_at: '', reviewed_at: null },
+        current: { id: 'l1', community_id: 'philly', category: 'grocery', name: 'Acme Grocery', anchor_id: 'community', distance: null, address: 'Old Address', phone: null, details: {}, status: 'approved', submitted_by: null, created_at: '', reviewed_at: null },
       }),
     ])
 
@@ -126,7 +127,7 @@ describe('ModerationQueue — a pending submission', () => {
       submission({
         operation: 'delete',
         note: 'Permanently closed',
-        current: { id: 'l1', category: 'grocery', name: 'Acme Grocery', anchor_id: 'community', distance: null, address: '1 Main St', phone: null, details: {}, status: 'approved', submitted_by: null, created_at: '', reviewed_at: null },
+        current: { id: 'l1', community_id: 'philly', category: 'grocery', name: 'Acme Grocery', anchor_id: 'community', distance: null, address: '1 Main St', phone: null, details: {}, status: 'approved', submitted_by: null, created_at: '', reviewed_at: null },
       }),
     ])
 

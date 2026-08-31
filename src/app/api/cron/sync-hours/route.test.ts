@@ -259,7 +259,7 @@ describe('GET /api/cron/sync-hours', () => {
 
     const body = await (await runGet()).json()
 
-    expect(mockSubmitClosure).toHaveBeenCalledWith('r1')
+    expect(mockSubmitClosure).toHaveBeenCalledWith('philly', 'r1')
     expect(body).toMatchObject({ flaggedClosed: 1 })
   })
 })

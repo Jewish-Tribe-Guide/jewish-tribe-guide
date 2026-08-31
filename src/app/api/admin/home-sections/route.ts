@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
 import { listHomeSectionsUncached, createHomeSection } from '@/lib/homeSectionStore'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { adminCommunityFromRequest } from '@/lib/adminCommunity'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 
 // GET /api/admin/home-sections — every section, for the admin Sections tab.
@@ -13,7 +13,8 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const sections = await listHomeSectionsUncached((await getDefaultCommunity()).slug)
+    const community = await adminCommunityFromRequest(request)
+    const sections = await listHomeSectionsUncached(community.slug)
     return Response.json({ ok: true, sections })
   } catch (err) {
     console.error('[admin/home-sections] GET failed:', err)
@@ -54,7 +55,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const section = await createHomeSection({ title: body.title ?? '', cardIds: body.cardIds, kind: body.kind })
+    const community = await adminCommunityFromRequest(request)
+    const section = await createHomeSection(community.slug, {
+      title: body.title ?? '',
+      cardIds: body.cardIds,
+      kind: body.kind,
+    })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, section })

@@ -1,5 +1,6 @@
 import type { ContactHospitalData } from '@/types'
 import type { RequestType } from './requests'
+import { withCommunity } from './useCommunityData'
 
 type SubmitResult = { ok: true; requestId: string }
 
@@ -9,6 +10,7 @@ type SubmitResult = { ok: true; requestId: string }
 // strings for Support/Volunteer/Feedback, or a custom form's title (free
 // text) — paired with `formId`, the stable identity, for GenericFormWizard.
 export async function submitRequest(
+  community: string,
   requestType: RequestType | string,
   contact: ContactHospitalData,
   formData: Record<string, unknown>,
@@ -18,7 +20,7 @@ export async function submitRequest(
 ): Promise<SubmitResult> {
   let res: Response
   try {
-    res = await fetch('/api/requests', {
+    res = await fetch(withCommunity('/api/requests', community), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requestType, formId, contact, formData, company: honeypot, turnstileToken }),

@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeListing } from '@/test/providerFixtures'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import ReportListing from './ReportListing'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 afterEach(() => {
   cleanup()
@@ -21,7 +29,7 @@ const handlers = { onUp: vi.fn(), onSubmitted: vi.fn() }
 describe('ReportListing', () => {
   it('names the listing and shows the labeled note/name fields', () => {
     const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
-    render(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
 
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.getByLabelText("What's the issue?")).toBeInTheDocument()
@@ -32,7 +40,7 @@ describe('ReportListing', () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
-    render(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
 
     await user.type(screen.getByLabelText("What's the issue?"), 'Closed permanently.')
     await user.type(screen.getByLabelText('Your name (optional)'), 'A Neighbor')
@@ -40,7 +48,7 @@ describe('ReportListing', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/submissions')
+    expect(url).toBe('/api/submissions?community=test-community')
     const body = JSON.parse(init.body)
     expect(body.operation).toBe('delete')
     expect(body.targetType).toBe('listing')
@@ -54,7 +62,7 @@ describe('ReportListing', () => {
   it('omits note and submittedBy when left blank, rather than sending empty strings', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
-    render(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -67,7 +75,7 @@ describe('ReportListing', () => {
   it('shows the server errors and stays on the form when the report is rejected', async () => {
     const user = userEvent.setup()
     stubFetch({ ok: false, errors: ['Please slow down and try again.'] })
-    render(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -78,7 +86,7 @@ describe('ReportListing', () => {
   it('shows a network-error fallback message', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
-    render(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -88,7 +96,7 @@ describe('ReportListing', () => {
   it('in preview mode, shows the confirmation without ever calling fetch', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
-    render(<ReportListing listing={makeListing()} upLabel="Grocery Stores" preview {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" preview {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -100,7 +108,7 @@ describe('ReportListing', () => {
     const user = userEvent.setup()
     const onUp = vi.fn()
     const onSubmitted = vi.fn()
-    render(
+    renderWithProviders(
       <ReportListing listing={makeListing()} upLabel="Grocery Stores" onUp={onUp} onSubmitted={onSubmitted} preview />,
     )
 

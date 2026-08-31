@@ -1,11 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import ListingForm from './ListingForm'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // AddressInput loads the real Google Maps SDK on mount (see loadGoogleMaps.ts)
 // — no equivalent under jsdom, same reasoning ResourceMap gets stubbed in
@@ -85,7 +93,7 @@ const handlers = { onUp: vi.fn(), onSubmitted: vi.fn() }
 describe('ListingForm', () => {
   it('shows the create heading and submit label in create mode', () => {
     const category = makeCategory({ label: 'Grocery Store', pluralLabel: 'Grocery Stores' })
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     expect(screen.getByRole('heading', { name: 'Add a Grocery Store' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Submit for review' })).toBeInTheDocument()
@@ -94,7 +102,7 @@ describe('ListingForm', () => {
   it('shows the edit heading, submit label, and pre-fills from the existing listing', () => {
     const category = makeCategory()
     const existing = makeListing({ id: 'listing-1', name: 'Kosher Mart', phone: '(215) 555-0100', address: '1 Main St' })
-    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Submit edit for review' })).toBeInTheDocument()
@@ -104,7 +112,7 @@ describe('ListingForm', () => {
 
   it('hides the Address field when the category has no address, and Phone when it has none', () => {
     const category = makeCategory({ hasAddress: false, hasPhone: false })
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Phone')).not.toBeInTheDocument()
@@ -116,7 +124,7 @@ describe('ListingForm', () => {
     const category = makeCategory({
       detailFields: [booleanField(), textField({ showIf: { field: 'isKosher', equals: true } })],
     })
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     expect(screen.queryByLabelText('Kosher items')).not.toBeInTheDocument()
 
@@ -133,7 +141,7 @@ describe('ListingForm', () => {
         { key: 'womensPhone', label: "Women's Phone", type: 'text', audienceKey: 'womens', shortLabel: 'Phone' },
       ],
     })
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     expect(screen.queryByRole('button', { name: "Women's" })).not.toBeInTheDocument()
 
@@ -148,7 +156,7 @@ describe('ListingForm', () => {
     const user = userEvent.setup()
     const fetchMock = stubFetchOk({ ok: true })
     const category = makeCategory({ id: 'grocery' })
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     await user.type(screen.getByLabelText(/Name/), 'Kosher Mart')
     await user.type(screen.getByLabelText('Address'), '1 Main St')
@@ -157,7 +165,7 @@ describe('ListingForm', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('/api/submissions')
+    expect(url).toBe('/api/submissions?community=test-community')
     const body = JSON.parse(init.body)
     expect(body.operation).toBe('create')
     expect(body.targetType).toBe('listing')
@@ -174,7 +182,7 @@ describe('ListingForm', () => {
     const fetchMock = stubFetchOk({ ok: true })
     const category = makeCategory()
     const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
-    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
     await user.type(screen.getByDisplayValue('Old Name'), ' & Deli')
     await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
@@ -190,7 +198,7 @@ describe('ListingForm', () => {
     const fetchMock = stubFetchOk({ ok: true })
     const category = makeCategory()
     const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
-    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
     // Only filling in contact info — no listing field touched at all.
     await user.type(screen.getByLabelText(/Your name/), 'A Neighbor')
@@ -205,7 +213,7 @@ describe('ListingForm', () => {
     const fetchMock = stubFetchOk({ ok: true })
     const category = makeCategory()
     const existing = makeListing({ id: 'listing-42', name: 'Old Name' })
-    render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
     const nameInput = screen.getByDisplayValue('Old Name')
     await user.type(nameInput, 'x')
@@ -220,7 +228,7 @@ describe('ListingForm', () => {
     const user = userEvent.setup()
     stubFetchOk({ ok: false, errors: ['Name is required.'] })
     const category = makeCategory()
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -237,7 +245,7 @@ describe('ListingForm', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     const category = makeCategory()
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -257,7 +265,7 @@ describe('ListingForm', () => {
       status: 403,
       json: async () => ({ ok: false, errors: ['This action is not available for this category.'] }),
     }))
-    render(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
 
@@ -274,7 +282,7 @@ describe('ListingForm', () => {
       status: 403,
       json: async () => ({ ok: false, code: 'turnstile', errors: ['Verification failed.'] }),
     }))
-    render(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
 
     const submit = screen.getByRole('button', { name: 'Submit for review' })
     await user.click(submit)
@@ -290,7 +298,7 @@ describe('ListingForm', () => {
     const fetchMock = stubFetchOk()
     const onPreviewSubmit = vi.fn()
     const category = makeCategory({ id: 'grocery' })
-    render(<ListingForm category={category} mode="create" {...handlers} onPreviewSubmit={onPreviewSubmit} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} onPreviewSubmit={onPreviewSubmit} />)
 
     await user.type(screen.getByLabelText(/Name/), 'Preview Mart')
     await user.click(screen.getByRole('button', { name: 'Submit for review' }))
@@ -303,7 +311,7 @@ describe('ListingForm', () => {
   it('autofills name and phone from a selected address, live-formatting the phone', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
-    render(<ListingForm category={category} mode="create" {...handlers} />)
+    renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'simulate place select' }))
 
@@ -315,7 +323,7 @@ describe('ListingForm', () => {
     it('lets more than one option be chosen, and shows a summary of what is picked', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ detailFields: [selectField({ multiSelect: true })] })
-      render(<ListingForm category={category} mode="create" {...handlers} />)
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       await user.click(screen.getByLabelText('Cuisine'))
       await user.click(screen.getByRole('checkbox', { name: 'Italian' }))
@@ -329,7 +337,7 @@ describe('ListingForm', () => {
     it('reveals a free-text box, whose value becomes the field value', async () => {
       const user = userEvent.setup()
       const category = makeCategory({ detailFields: [selectField({ allowOther: true })] })
-      render(<ListingForm category={category} mode="create" {...handlers} />)
+      renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)
 
       await user.selectOptions(screen.getByLabelText('Cuisine'), 'Other…')
       const otherInput = screen.getByPlaceholderText('Please specify')
@@ -341,7 +349,7 @@ describe('ListingForm', () => {
     it('reopens with the free-text box already showing an unrecognized saved value', () => {
       const category = makeCategory({ detailFields: [selectField({ allowOther: true })] })
       const existing = { ...makeListing(), cuisine: 'Fusion' } as unknown as DirectoryResource
-      render(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} />)
 
       expect(screen.getByDisplayValue('Fusion')).toBeInTheDocument()
     })

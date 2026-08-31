@@ -32,11 +32,6 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
-const mockGetDefaultCommunity = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({
-  getDefaultCommunity: mockGetDefaultCommunity,
-}))
-
 const {
   listCategoriesUncached,
   listCategories,
@@ -49,8 +44,6 @@ const {
 
 afterEach(() => {
   mockFrom.mockReset()
-  mockGetDefaultCommunity.mockReset()
-  mockGetDefaultCommunity.mockResolvedValue({ slug: 'philly' })
 })
 
 const rawRow = {
@@ -194,7 +187,7 @@ describe('slugify', () => {
 
 describe('createCategory', () => {
   it('rejects a listing category whose slug collides with a reserved route', async () => {
-    await expect(createCategory({ label: 'Map' })).rejects.toThrow()
+    await expect(createCategory('philly', { label: 'Map' })).rejects.toThrow()
   })
 
   it('allows a non-listing (singleton) kind to slugify to a reserved word like "zmanim"', async () => {
@@ -207,7 +200,7 @@ describe('createCategory', () => {
       return call === 1 ? chainable({ data: null, error: null }) : insertBuilder
     })
 
-    const result = await createCategory({ label: 'Zmanim', kind: 'zmanim' })
+    const result = await createCategory('philly', { label: 'Zmanim', kind: 'zmanim' })
     expect(result.id).toBe('zmanim')
   })
 
@@ -223,7 +216,7 @@ describe('createCategory', () => {
       return insertBuilder
     })
 
-    const result = await createCategory({ label: 'Synagogue' })
+    const result = await createCategory('philly', { label: 'Synagogue' })
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ id: 'synagogue-3' }))
     expect(result.id).toBe('synagogue-3')
   })
@@ -239,7 +232,7 @@ describe('createCategory', () => {
       return chainable({ data: null, error: { code: '23505', message: 'duplicate key' } })
     })
 
-    await expect(createCategory({ label: 'Map', kind: 'map' })).rejects.toThrow('A Map category already exists.')
+    await expect(createCategory('philly', { label: 'Map', kind: 'map' })).rejects.toThrow('A Map category already exists.')
   })
 
   it('surfaces the raw error for a non-singleton insert failure', async () => {
@@ -250,7 +243,7 @@ describe('createCategory', () => {
       return chainable({ data: null, error: { code: '99999', message: 'db exploded' } })
     })
 
-    await expect(createCategory({ label: 'Some Category' })).rejects.toThrow(
+    await expect(createCategory('philly', { label: 'Some Category' })).rejects.toThrow(
       'Failed to create category: db exploded',
     )
   })
@@ -263,7 +256,7 @@ describe('createCategory', () => {
       return call === 1 ? chainable({ data: null, error: null }) : insertBuilder
     })
 
-    await createCategory({ label: 'Synagogue' })
+    await createCategory('philly', { label: 'Synagogue' })
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -283,7 +276,7 @@ describe('updateCategory', () => {
   it('is a no-op read (getCategoryById) when the patch has no keys set', async () => {
     mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
 
-    const result = await updateCategory('synagogue', {})
+    const result = await updateCategory('philly', 'synagogue', {})
 
     expect(result?.id).toBe('synagogue')
     // Only the read path (select/maybeSingle), never .update().
@@ -293,7 +286,7 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('synagogue', { label: '  New Label  ' })
+    await updateCategory('philly', 'synagogue', { label: '  New Label  ' })
 
     expect(builder.update).toHaveBeenCalledWith({ label: 'New Label' })
   })
@@ -302,7 +295,7 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('synagogue', { active: false })
+    await updateCategory('philly', 'synagogue', { active: false })
 
     expect(builder.update).toHaveBeenCalledWith({ active: false })
   })
@@ -311,7 +304,7 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('synagogue', { sortOrder: 3 })
+    await updateCategory('philly', 'synagogue', { sortOrder: 3 })
 
     expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
     expect(builder.eq).toHaveBeenCalledWith('id', 'synagogue')
@@ -321,7 +314,7 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('map', { mapZoomRadiusMiles: 10 })
+    await updateCategory('philly', 'map', { mapZoomRadiusMiles: 10 })
 
     expect(builder.update).toHaveBeenCalledWith({ map_zoom_radius_miles: 10 })
   })
@@ -330,7 +323,7 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('map', { mapZoomRadiusMiles: null })
+    await updateCategory('philly', 'map', { mapZoomRadiusMiles: null })
 
     expect(builder.update).toHaveBeenCalledWith({ map_zoom_radius_miles: null })
   })
@@ -339,19 +332,19 @@ describe('updateCategory', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateCategory('synagogue', { externalLink: null })
+    await updateCategory('philly', 'synagogue', { externalLink: null })
 
     expect(builder.update).toHaveBeenCalledWith({ external_link_label: null, external_link_url: null })
   })
 
   it('returns null when no row matches the id/community scope', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await updateCategory('missing', { label: 'X' })).toBeNull()
+    expect(await updateCategory('philly', 'missing', { label: 'X' })).toBeNull()
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(updateCategory('synagogue', { label: 'X' })).rejects.toThrow(
+    await expect(updateCategory('philly', 'synagogue', { label: 'X' })).rejects.toThrow(
       'Failed to update category: boom',
     )
   })
@@ -368,7 +361,7 @@ describe('deleteCategory', () => {
       return chainable({ error: null })
     })
 
-    const result = await deleteCategory('synagogue')
+    const result = await deleteCategory('philly', 'synagogue')
 
     expect(result).toEqual({ listings: 3 })
     // resource must be touched (count + delete) before category is deleted.
@@ -379,7 +372,7 @@ describe('deleteCategory', () => {
     mockFrom.mockImplementation((table: string) =>
       table === 'resource' ? chainable({ count: null, error: null, data: null }) : chainable({ error: null }),
     )
-    expect(await deleteCategory('synagogue')).toEqual({ listings: 0 })
+    expect(await deleteCategory('philly', 'synagogue')).toEqual({ listings: 0 })
   })
 
   it('throws and stops before deleting the category if removing its listings fails', async () => {
@@ -393,7 +386,7 @@ describe('deleteCategory', () => {
       return chainable({ error: null })
     })
 
-    await expect(deleteCategory('synagogue')).rejects.toThrow(
+    await expect(deleteCategory('philly', 'synagogue')).rejects.toThrow(
       "Failed to delete the category's listings: fk violation",
     )
     expect(categoryDeleteCalled).toBe(false)
@@ -405,7 +398,7 @@ describe('deleteCategory', () => {
         ? chainable({ count: 0, error: null, data: null })
         : chainable({ error: { message: 'category fk violation' } }),
     )
-    await expect(deleteCategory('synagogue')).rejects.toThrow(
+    await expect(deleteCategory('philly', 'synagogue')).rejects.toThrow(
       'Failed to delete category: category fk violation',
     )
   })

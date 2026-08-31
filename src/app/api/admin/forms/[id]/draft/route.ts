@@ -2,6 +2,7 @@ import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
 import { getAdminUser } from '@/lib/adminAuth'
 import { discardDraft } from '@/lib/formStore'
+import { adminCommunityFromRequest } from '@/lib/adminCommunity'
 
 // DELETE /api/admin/forms/:id/draft — discard the form's pending draft (NOT
 // the form itself). Leaves published content untouched. Admin only. Moved
@@ -13,7 +14,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin
 
   const { id } = await ctx.params
   try {
-    const form = await discardDraft(id)
+    const community = await adminCommunityFromRequest(request)
+    const form = await discardDraft(community.slug, id)
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
