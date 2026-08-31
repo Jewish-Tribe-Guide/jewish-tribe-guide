@@ -119,7 +119,14 @@ async function gateCommunityPath(request: NextRequest) {
   const fromQuery = request.nextUrl.searchParams.get(ACCESS_PARAM)
   const fromCookie = request.cookies.get(previewCookieName(segment))?.value
   const authorized = fromQuery === entry.previewToken || fromCookie === entry.previewToken
-  if (!authorized) return new NextResponse(null, { status: 404 })
+  if (!authorized) {
+    // A null body reproduced as a clean 404 against `next dev` locally, but
+    // came back as ERR_INVALID_RESPONSE on an actual Vercel deployment — a
+    // real gap between the local Node dev server and Vercel's own runtime
+    // wrapper around the proxy response. An explicit body and content-type
+    // sidesteps whatever ambiguity a null body left for Vercel's layer.
+    return new NextResponse('Not found.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+  }
 
   if (fromQuery === entry.previewToken && fromCookie !== entry.previewToken) {
     const response = NextResponse.next()
