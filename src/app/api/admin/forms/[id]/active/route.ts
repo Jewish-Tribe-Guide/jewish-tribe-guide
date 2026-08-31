@@ -1,6 +1,6 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { setFormActive } from '@/lib/formStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -9,7 +9,8 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // from publish (which promotes that draft) — this applies immediately to
 // the published row, regardless of any pending draft. Admin only.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]/active'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -25,7 +26,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const form = await setFormActive(community.slug, id, body.active)
     if (!form) return Response.json({ ok: false, errors: ['Form not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the change shows up.

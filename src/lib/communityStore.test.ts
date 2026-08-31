@@ -19,6 +19,7 @@ function chainable(result: unknown) {
     eq: vi.fn(self),
     insert: vi.fn(self),
     single: vi.fn(self),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve: (v: unknown) => void) => resolve(result),
   })
   return builder
@@ -35,6 +36,7 @@ const {
   resolveCommunity,
   communitySlugFromRequest,
   createCommunity,
+  getCommunityAdminEmail,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
 
@@ -266,6 +268,23 @@ describe('createCommunity', () => {
     mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
 
     await expect(createCommunity(validInput)).rejects.toThrow('"baltimore" is already in use by another community.')
+  })
+})
+
+describe('getCommunityAdminEmail', () => {
+  it('returns the configured admin_email for the given slug', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_email: 'philly-admin@example.com' }, error: null }))
+    expect(await getCommunityAdminEmail('philly')).toBe('philly-admin@example.com')
+  })
+
+  it('returns null when the community has no admin_email set (both do today)', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_email: null }, error: null }))
+    expect(await getCommunityAdminEmail('philly')).toBeNull()
+  })
+
+  it('returns null when the community does not exist', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    expect(await getCommunityAdminEmail('nonexistent')).toBeNull()
   })
 })
 

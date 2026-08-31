@@ -105,7 +105,15 @@ export async function POST(request: Request) {
   // Fetched once and reused below both for the per-category capability gate
   // and (for an update) the "did this actually change anything" check —
   // rather than hitting the resource table twice for the same row.
-  const existingResource = targetId ? await getResourceById(targetId) : null
+  const existingResource = targetId ? await getResourceById(targetId, community.slug) : null
+  // targetId scoped to the wrong community (or just made up) reads back as
+  // null now that getResourceById is community-scoped — reject explicitly
+  // rather than letting an update/delete fall through and file a submission
+  // against a listing in a DIFFERENT community than the one this request is
+  // posting to.
+  if (targetId && !existingResource) {
+    return Response.json({ ok: false, errors: ['Listing not found.'] }, { status: 404 })
+  }
 
   // Per-category gate: on top of the global `ui.contributions` check above, the
   // target category can independently turn add/edit/report off. Resolve the

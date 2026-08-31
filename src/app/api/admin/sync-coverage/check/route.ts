@@ -1,5 +1,6 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { checkListingAgainstGoogle } from '@/lib/syncCoverage'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // POST /api/admin/sync-coverage/check — on-demand only (never run in bulk):
 // fetches one listing's current Google Places data and compares it against
@@ -8,7 +9,8 @@ import { checkListingAgainstGoogle } from '@/lib/syncCoverage'
 // nothing at all. Costs exactly one Google Places API call, spent only when
 // an admin actually clicks in on this specific listing. Admin only.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: { id?: string }
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
   if (!body.id) return Response.json({ ok: false, errors: ['id is required.'] }, { status: 400 })
 
   try {
-    const fields = await checkListingAgainstGoogle(body.id)
+    const fields = await checkListingAgainstGoogle(body.id, community.slug)
     return Response.json({ ok: true, fields })
   } catch (err) {
     console.error('[admin/sync-coverage/check] POST failed:', err)

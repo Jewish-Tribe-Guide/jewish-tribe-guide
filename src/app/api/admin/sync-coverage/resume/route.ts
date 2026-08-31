@@ -1,5 +1,6 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { resumeSyncField } from '@/lib/syncCoverage'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { OwnableSyncField } from '@/lib/googlePlaces'
 
 // POST /api/admin/sync-coverage/resume — hands one hand-edited field back to
@@ -7,7 +8,8 @@ import type { OwnableSyncField } from '@/lib/googlePlaces'
 // (see resumeSyncField's own comment for why it doesn't just trust whatever
 // the admin's last "Check against Google" click showed). Admin only.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: { id?: string; field?: string }
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
   if (!body.field) return Response.json({ ok: false, errors: ['field is required.'] }, { status: 400 })
 
   try {
-    const result = await resumeSyncField(body.id, body.field as OwnableSyncField)
+    const result = await resumeSyncField(body.id, body.field as OwnableSyncField, community.slug)
     return Response.json({ ok: true, result })
   } catch (err) {
     console.error('[admin/sync-coverage/resume] POST failed:', err)

@@ -9,10 +9,14 @@ import type { Community } from '@/lib/communityStore'
 
 // ── The 'communities' tab: lists every community this site hosts, and lets
 // an admin create a new one — either starting empty or cloning an existing
-// community's categories + home sections as a starting shape. Reads from the
-// PUBLIC GET /api/communities (same data the header switcher uses; nothing
-// here is admin-only to read, only to create) and writes through the admin-
-// only POST /api/admin/communities. ──
+// community's categories + home sections as a starting shape. Superadmin
+// only, both for reading (GET /api/admin/communities, not the public
+// /api/communities the header switcher uses) and writing (POST
+// /api/admin/communities) — browsing/creating communities isn't scoped to
+// any one community's own admin, so it's gated by the global ADMIN_EMAILS
+// list rather than adminAuth.ts's per-community check. A regular
+// per-community admin gets a 401 from the GET and sees a plain
+// access-denied message instead of the list. ──
 
 // Mirrors categoryStore.slugify/formStore.slugify — small enough not worth
 // sharing, and those two live in server-only modules (getAdminClient, which
@@ -67,6 +71,14 @@ export default function CommunityManager({ token }: { token: string }) {
   const router = useRouter()
   const [communities, setCommunities] = useState<Community[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Managing every community (browsing the list, creating a new one) is a
+  // superadmin action, not something scoped to whichever one community this
+  // admin administers — see the GET handler's own comment in
+  // /api/admin/communities/route.ts. This is what actually removes the
+  // "switch to a different community's console" capability for a regular
+  // admin: the endpoint below 401s for them, and this renders a plain
+  // access-denied message instead of the list-of-communities-with-links.
+  const [forbidden, setForbidden] = useState(false)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
@@ -74,14 +86,19 @@ export default function CommunityManager({ token }: { token: string }) {
 
   const load = useCallback(async () => {
     setError(null)
+    setForbidden(false)
     try {
-      const res = await fetch('/api/communities')
+      const res = await fetch('/api/admin/communities', { headers: { Authorization: `Bearer ${token}` } })
+      if (res.status === 401) {
+        setForbidden(true)
+        return
+      }
       const body = await parseOkJson<{ communities: Community[] }>(res, 'Failed to load communities.')
       setCommunities(body.communities)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [])
+  }, [token])
 
   useLoadOnMount(load)
 
@@ -164,6 +181,9 @@ export default function CommunityManager({ token }: { token: string }) {
   }
 
   if (error) return <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">{error}</p>
+  if (forbidden) {
+    return <p className="text-sm text-muted">Only the site owner can create or browse other communities.</p>
+  }
   if (!communities) return <p className="text-sm text-muted">Loading communities…</p>
 
   const inputClass =
@@ -268,7 +288,7 @@ export default function CommunityManager({ token }: { token: string }) {
           Admin email
           <input className={inputClass} value={draft.adminEmail} onChange={(e) => set('adminEmail', e.target.value)} />
           <span className="block text-xs text-muted mt-1">
-            Not enforced yet — every admin can still edit every community. Captured for later.
+            Only this address can sign in to this community&rsquo;s admin console.
           </span>
         </label>
 

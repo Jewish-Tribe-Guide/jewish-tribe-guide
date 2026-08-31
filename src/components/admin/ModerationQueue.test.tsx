@@ -216,7 +216,7 @@ describe('ModerationQueue — moderating', () => {
 
     await waitFor(() => expect(queryTitleText('Acme Grocery')).not.toBeInTheDocument())
     expect(fetchJson).toHaveBeenCalledWith(
-      '/api/admin/submissions/sub-1',
+      '/api/admin/submissions/sub-1?community=test-community',
       expect.objectContaining({ method: 'PATCH', headers: expect.objectContaining({ Authorization: 'Bearer tok' }) }),
       'Failed to update.',
     )

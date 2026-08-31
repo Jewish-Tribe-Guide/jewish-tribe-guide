@@ -1,7 +1,30 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { createCommunity } from '@/lib/communityStore'
+import { createCommunity, listCommunities } from '@/lib/communityStore'
 import { cloneCommunityContent } from '@/lib/communityCloning'
+
+// GET /api/admin/communities — the same data as the public GET
+// /api/communities, but superadmin-gated (getAdminUser — the global
+// ADMIN_EMAILS list, not any one community's admin_email; see adminAuth.ts's
+// own note on what that list means now). CommunityManager.tsx calls THIS
+// instead of the public route specifically so a regular per-community admin
+// gets a 401 here and the "manage every community" UI (the list of every
+// community plus "+ New community") never renders for them at all — that's
+// the actual point: creating and browsing every community is a superadmin
+// action, not something scoped to whichever one community an admin
+// administers.
+export async function GET(request: Request) {
+  const admin = await getAdminUser(request)
+  if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
+
+  try {
+    const communities = await listCommunities()
+    return Response.json({ ok: true, communities })
+  } catch (err) {
+    console.error('[admin/communities] GET failed:', err)
+    return Response.json({ ok: false, errors: ['Could not load communities.'] }, { status: 502 })
+  }
+}
 
 type CreateBody = {
   slug?: string
@@ -21,8 +44,7 @@ type CreateBody = {
 
 // POST /api/admin/communities — the "New Community" flow: creates the
 // community row, then optionally clones another community's categories and
-// home sections into it. No GET here — the public GET /api/communities
-// already lists everything the admin UI needs. Admin only.
+// home sections into it. Superadmin only (see GET above).
 export async function POST(request: Request) {
   const admin = await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })

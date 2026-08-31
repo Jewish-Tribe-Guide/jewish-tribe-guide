@@ -1,6 +1,7 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { setBusinessStatusOverride } from '@/lib/syncCoverage'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { BusinessStatus } from '@/lib/hours'
 
 const VALID: BusinessStatus[] = ['OPERATIONAL', 'CLOSED_TEMPORARILY', 'CLOSED_PERMANENTLY']
@@ -10,7 +11,8 @@ const VALID: BusinessStatus[] = ['OPERATIONAL', 'CLOSED_TEMPORARILY', 'CLOSED_PE
 // keeps rewriting the value (see effectiveBusinessStatus). `status: null`
 // clears the override and hands the listing back to Google. Admin only.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: { id?: string; status?: string | null }
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await setBusinessStatusOverride(body.id, status as BusinessStatus | null)
+    await setBusinessStatusOverride(body.id, status as BusinessStatus | null, community.slug)
     // This changes what every visitor sees on a cached page, so it has to
     // invalidate the same way an admin save does — otherwise the correction
     // sits invisible behind cacheLife for up to a day, which looks exactly

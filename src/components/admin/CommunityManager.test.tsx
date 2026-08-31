@@ -79,7 +79,7 @@ afterEach(() => {
 })
 
 describe('CommunityManager — the community list', () => {
-  it('renders every community from GET /api/communities, with "Default" only on the flagged row', async () => {
+  it('renders every community from GET /api/admin/communities, with "Default" only on the flagged row', async () => {
     await renderAndWaitForList([
       makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true }),
       makeCommunity({ slug: 'ues', name: 'Upper East Side', isDefault: false }),
@@ -88,12 +88,32 @@ describe('CommunityManager — the community list', () => {
     expect(screen.getByText('Philadelphia')).toBeInTheDocument()
     expect(screen.getByText('Upper East Side')).toBeInTheDocument()
     expect(screen.getAllByText('Default')).toHaveLength(1)
+    expect(vi.mocked(global.fetch)).toHaveBeenCalledWith(
+      '/api/admin/communities',
+      expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
+    )
   })
 
   it('links each community to its own admin console', async () => {
     await renderAndWaitForList([makeCommunity({ slug: 'ues', name: 'Upper East Side' })])
 
     expect(screen.getByRole('link', { name: /upper east side/i })).toHaveAttribute('href', adminBase('ues'))
+  })
+
+  // This is what actually removes the "browse into another community's
+  // console" capability for a regular per-community admin: GET
+  // /api/admin/communities is superadmin-gated (unlike the public
+  // /api/communities this used to call), so a 401 here means a plain
+  // access-denied message instead of the list-of-communities-with-links.
+  it('shows an access-denied message instead of the list when the endpoint 401s', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response))
+    render(<CommunityManager token="tok" />)
+
+    expect(
+      await screen.findByText('Only the site owner can create or browse other communities.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Every community this site hosts.')).not.toBeInTheDocument()
+    expect(parseOkJson).not.toHaveBeenCalled()
   })
 })
 

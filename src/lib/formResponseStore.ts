@@ -57,15 +57,23 @@ export async function insertFormResponse(input: {
 // `requestTypes`/`formId` is expected per call site:
 //   - /inbox: `{ requestTypes: [...] }` — the explicit hospital-facing
 //     allowlist (see INBOX_TAB_REQUEST_TYPES), so Feedback and custom-form
-//     rows are never even fetched, not just hidden client-side.
-//   - /admin's Feedback tab: `{ requestTypes: ['Feedback'] }`.
-//   - /admin's per-form tab: `{ formId: '<form id>' }`.
+//     rows are never even fetched, not just hidden client-side. Deliberately
+//     NOT community-scoped (`community` omitted) — /inbox is one shared
+//     hospital-facing queue across every community, same as AGENTS.md
+//     documents for INBOX_BASE.
+//   - /admin's Feedback tab: `{ requestTypes: ['Feedback'] }, community`.
+//   - /admin's per-form tab: `{ formId: '<form id>' }, community` — `form.id`
+//     is only unique WITHIN a community (composite primary key), so without
+//     `community` here two communities' same-named custom forms (or a
+//     coincidentally-matching id) would show each other's responses.
 export async function listFormResponses(
   filter: { requestTypes?: string[]; formId?: string } = {},
+  community?: string,
 ): Promise<InboxResponse[]> {
   let query = getAdminClient().from('form_response').select('*')
   if (filter.requestTypes) query = query.in('request_type', filter.requestTypes)
   if (filter.formId) query = query.eq('form_id', filter.formId)
+  if (community) query = query.eq('community_id', community)
 
   const { data, error } = await query.order('created_at', { ascending: false })
   if (error) throw new Error(`Failed to load responses: ${error.message}`)
@@ -78,17 +86,21 @@ export async function listFormResponses(
 // for admin, "any custom form") have to be checked against the row itself.
 // `anyFormId` covers admin's per-form tabs: any `form_id` set (not just a
 // specific one), since the id alone doesn't say which form the row belongs to.
-type ResponseScope = { requestTypes?: string[]; anyFormId?: boolean }
+// `community`, when set, additionally requires the row's own community_id to
+// match — admin only (inbox omits it, same cross-community-by-design reason
+// as listFormResponses).
+type ResponseScope = { requestTypes?: string[]; anyFormId?: boolean; community?: string }
 
 async function rowInScope(id: string, scope: ResponseScope): Promise<boolean> {
   const { data, error } = await getAdminClient()
     .from('form_response')
-    .select('request_type, form_id')
+    .select('request_type, form_id, community_id')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(`Failed to load the request: ${error.message}`)
   if (!data) return false
-  const row = data as Pick<FormResponseRow, 'request_type' | 'form_id'>
+  const row = data as Pick<FormResponseRow, 'request_type' | 'form_id'> & { community_id: string }
+  if (scope.community && row.community_id !== scope.community) return false
   if (scope.anyFormId && row.form_id) return true
   return scope.requestTypes?.includes(row.request_type) ?? false
 }

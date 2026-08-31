@@ -1,5 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listFormsForAdmin, createForm } from '@/lib/formStore'
 import type { FormContent } from '@/lib/forms'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
@@ -7,11 +7,11 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // GET /api/admin/forms — every form (published content + any pending draft)
 // for the admin Forms manager. Admin only.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const forms = await listFormsForAdmin(community.slug)
     return Response.json({ ok: true, forms })
   } catch (err) {
@@ -26,7 +26,8 @@ export async function GET(request: Request) {
 // createForm — so nothing is created (not even a hidden draft row) unless the
 // admin actually publishes. Admin only.
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: Partial<FormContent>
@@ -41,7 +42,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const form = await createForm(community.slug, {
       title: body.title,
       submitLabel: body.submitLabel ?? 'Submit',

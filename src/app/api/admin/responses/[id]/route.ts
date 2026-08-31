@@ -1,7 +1,8 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateFormResponse, deleteFormResponse } from '@/lib/formResponseStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import type { ContactHospitalData } from '@/types'
 
 type PatchBody = {
@@ -13,13 +14,16 @@ type PatchBody = {
 // listFormResponses doc comment): Feedback plus any custom admin-created form.
 // Support/Volunteer/Volunteer-changes rows are /inbox's domain, not admin's —
 // out of scope here even by id, same as they're never fetched by GET.
-const ADMIN_RESPONSE_SCOPE = { requestTypes: ['Feedback'], anyFormId: true }
+function adminResponseScope(community: string) {
+  return { requestTypes: ['Feedback'], anyFormId: true, community }
+}
 
 // PATCH /api/admin/responses/:id — correct a response's contact info and/or
 // submitted data. Admin only. Mirrors /api/inbox/:id exactly, gated by the
 // admin allowlist instead of the inbox one.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/responses/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -32,7 +36,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const response = await updateFormResponse(id, body, ADMIN_RESPONSE_SCOPE)
+    const response = await updateFormResponse(id, body, adminResponseScope(community.slug))
     if (!response) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
@@ -45,12 +49,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 
 // DELETE /api/admin/responses/:id — permanently remove a response. Admin only.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/responses/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const deleted = await deleteFormResponse(id, ADMIN_RESPONSE_SCOPE)
+    const deleted = await deleteFormResponse(id, adminResponseScope(community.slug))
     if (!deleted) return Response.json({ ok: false, errors: ['Request not found.'] }, { status: 404 })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

@@ -61,12 +61,14 @@ export async function listApprovedResources(
 }
 
 // Fetches a single listing by id (any status). Used to prefill the edit form.
-export async function getResourceById(id: string): Promise<DirectoryResource | null> {
-  const { data, error } = await getAdminClient()
-    .from('resource')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle()
+// `community`, when given, scopes the lookup so an id belonging to a
+// DIFFERENT community can't be read through this function — `id` alone is a
+// real UUID primary key here (unlike category/form's composite keys), so
+// nothing else stops that on its own.
+export async function getResourceById(id: string, community?: string): Promise<DirectoryResource | null> {
+  let query = getAdminClient().from('resource').select('*').eq('id', id)
+  if (community) query = query.eq('community_id', community)
+  const { data, error } = await query.maybeSingle()
 
   if (error) throw new Error(`Failed to load resource: ${error.message}`)
   return data ? normalizeRow(data as ResourceRow) : null
@@ -79,12 +81,14 @@ export async function getResourceById(id: string): Promise<DirectoryResource | n
 // Nothing purges these on its own, so without an admin view they'd just
 // accumulate forever — these back that view.
 
-// Archived listings, newest-removed first. Any status other than 'archived'
-// is out of scope here — this is specifically the cleanup queue.
-export async function listArchivedResources(): Promise<ResourceRow[]> {
+// Archived listings, newest-removed first, for one community. Any status
+// other than 'archived' is out of scope here — this is specifically the
+// cleanup queue.
+export async function listArchivedResources(community: string): Promise<ResourceRow[]> {
   const { data, error } = await getAdminClient()
     .from('resource')
     .select('*')
+    .eq('community_id', community)
     .eq('status', 'archived')
     .order('reviewed_at', { ascending: false })
 
@@ -94,12 +98,15 @@ export async function listArchivedResources(): Promise<ResourceRow[]> {
 
 // Un-archives a listing back to 'approved' — it reappears on the public site
 // exactly as it was. Scoped to currently-archived rows so this can't be used
-// to force an unrelated pending/rejected row live.
-export async function restoreResource(id: string): Promise<ResourceRow | null> {
+// to force an unrelated pending/rejected row live, and to the given
+// community so an id can't be restored through a different community's
+// admin console than the one it actually belongs to.
+export async function restoreResource(id: string, community: string): Promise<ResourceRow | null> {
   const { data, error } = await getAdminClient()
     .from('resource')
     .update({ status: 'approved', reviewed_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('community_id', community)
     .eq('status', 'archived')
     .select('*')
     .maybeSingle()
@@ -110,12 +117,14 @@ export async function restoreResource(id: string): Promise<ResourceRow | null> {
 
 // Permanently deletes an archived listing (votes/tags cascade via FK) —
 // irreversible. Scoped to currently-archived rows for the same reason as
-// restoreResource: this is a cleanup action, not a general-purpose delete.
-export async function hardDeleteArchivedResource(id: string): Promise<boolean> {
+// restoreResource, and to the given community for the same cross-community
+// reason.
+export async function hardDeleteArchivedResource(id: string, community: string): Promise<boolean> {
   const { data, error } = await getAdminClient()
     .from('resource')
     .delete()
     .eq('id', id)
+    .eq('community_id', community)
     .eq('status', 'archived')
     .select('id')
     .maybeSingle()
@@ -201,14 +210,25 @@ function hasValue(v: unknown): boolean {
 /** How many of a category's listings currently have data in the given
  *  field(s) — used to warn an admin before they remove a field that would
  *  orphan real data. Counts listings of every status (pending/approved/
- *  rejected), same scope `deleteCategory` uses. */
+ *  rejected), same scope `deleteCategory` uses.
+ *
+ *  Scoped to `community` because `resource.category` is a plain text column
+ *  with no foreign key to a specific community's category row (see
+ *  applyFieldOptionRenames' own note) — two communities can each have a
+ *  category with the same id (e.g. both slugify a "Groceries" category to
+ *  'grocery'), and without this filter, editing one community's category
+ *  would count — and, in clearCategoryFieldData/applyFieldOptionRenames
+ *  below, actually mutate — the OTHER community's listings in the
+ *  same-named category too. */
 export async function countCategoryFieldUsage(
+  community: string,
   categoryId: string,
   opts: { address?: boolean; phone?: boolean; fieldKeys?: string[] },
 ): Promise<{ address: number; phone: number; fields: Record<string, number> }> {
   const { data, error } = await getAdminClient()
     .from('resource')
     .select('address, phone, details')
+    .eq('community_id', community)
     .eq('category', categoryId)
   if (error) throw new Error(`Failed to check existing listings: ${error.message}`)
 
@@ -230,8 +250,10 @@ export async function countCategoryFieldUsage(
 
 /** Actually clears the given field(s) from every listing in a category —
  *  irreversible. Called only after the admin has confirmed against the
- *  counts from `countCategoryFieldUsage`. */
+ *  counts from `countCategoryFieldUsage`. Scoped to `community` for the same
+ *  cross-community-collision reason as countCategoryFieldUsage. */
 export async function clearCategoryFieldData(
+  community: string,
   categoryId: string,
   opts: { address?: boolean; phone?: boolean; fieldKeys?: string[] },
 ): Promise<{ updated: number }> {
@@ -239,6 +261,7 @@ export async function clearCategoryFieldData(
   const { data, error } = await supabase
     .from('resource')
     .select('id, address, phone, details')
+    .eq('community_id', community)
     .eq('category', categoryId)
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 
@@ -275,14 +298,17 @@ export async function clearCategoryFieldData(
 /** How many of a category's listings currently store the OLD value of a
  *  select/tags field option the admin is about to rename — checked before
  *  offering to cascade the rename (see applyFieldOptionRenames). Handles both
- *  a single stored string and a multiSelect array. */
+ *  a single stored string and a multiSelect array. Scoped to `community` for
+ *  the same cross-community-collision reason as countCategoryFieldUsage. */
 export async function countFieldOptionUsage(
+  community: string,
   categoryId: string,
   renames: { fieldKey: string; oldValue: string; newValue: string }[],
 ): Promise<{ fieldKey: string; oldValue: string; newValue: string; count: number }[]> {
   const { data, error } = await getAdminClient()
     .from('resource')
     .select('details')
+    .eq('community_id', community)
     .eq('category', categoryId)
   if (error) throw new Error(`Failed to check existing listings: ${error.message}`)
 
@@ -305,6 +331,7 @@ export async function countFieldOptionUsage(
  *  removing it, so a rename doesn't silently orphan existing listings the way
  *  editing an option's text in the raw options list otherwise would. */
 export async function applyFieldOptionRenames(
+  community: string,
   categoryId: string,
   renames: { fieldKey: string; oldValue: string; newValue: string }[],
 ): Promise<{ updated: number }> {
@@ -313,6 +340,7 @@ export async function applyFieldOptionRenames(
   const { data, error } = await supabase
     .from('resource')
     .select('id, details')
+    .eq('community_id', community)
     .eq('category', categoryId)
   if (error) throw new Error(`Failed to load existing listings: ${error.message}`)
 

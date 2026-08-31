@@ -83,6 +83,7 @@ export default function ResponsesManager({ token }: { token: string }) {
       <ResponsesList
         key={activeKey}
         token={token}
+        community={community}
         query={activeKey === FEEDBACK_KEY ? { feedback: true } : { formId: activeKey }}
       />
     </div>
@@ -91,9 +92,11 @@ export default function ResponsesManager({ token }: { token: string }) {
 
 function ResponsesList({
   token,
+  community,
   query,
 }: {
   token: string
+  community: string
   query: { feedback: true } | { formId: string }
 }) {
   const [items, setItems] = useState<InboxResponse[] | null>(null)
@@ -106,7 +109,7 @@ function ResponsesList({
     try {
       const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
       const body = await fetchJson<{ responses: InboxResponse[] }>(
-        `/api/admin/responses?${params}`,
+        withCommunity(`/api/admin/responses?${params}`, community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load.',
       )
@@ -117,7 +120,7 @@ function ResponsesList({
     // query is a fresh object each render; stringify-free re-run is driven by
     // ResponsesManager remounting this component via `key={activeKey}` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -148,6 +151,7 @@ function ResponsesList({
               item={item}
               token={token}
               apiBase="/api/admin/responses"
+              community={community}
               expanded={expandedId === item.id}
               onToggle={() => setExpandedId((id) => (id === item.id ? null : item.id))}
               onUpdated={handleUpdated}

@@ -15,9 +15,15 @@ type Props = {
   /** Shown after a link is sent — phrase the allowlist in plain language,
    *  e.g. "an authorized admin" or "allowed to view the inbox". */
   sentMessage: string
+  /** The community this sign-in is for — sent along so the admin request-link
+   *  endpoint can check the email against THAT community's own admin_email
+   *  instead of the global allowlist (see adminAuth.ts's
+   *  isAllowedForCommunity). Omitted by /inbox, which has no per-community
+   *  split. */
+  community?: string
 }
 
-export default function MagicLinkLogin({ requestLinkUrl, emailLabel, sentMessage }: Props) {
+export default function MagicLinkLogin({ requestLinkUrl, emailLabel, sentMessage, community }: Props) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +37,7 @@ export default function MagicLinkLogin({ requestLinkUrl, emailLabel, sentMessage
       const res = await fetch(requestLinkUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), ...(community ? { community } : {}) }),
       })
       const body = await res.json()
       if (!res.ok || !body.ok) throw new Error(body.error || 'Could not send the sign-in link.')

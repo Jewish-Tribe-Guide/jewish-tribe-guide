@@ -147,6 +147,21 @@ export async function resolveCommunity(slug: string | null | undefined): Promise
   return all.find((c) => c.isDefault) ?? all[0]
 }
 
+/** The admin email configured for one community, or null if it hasn't been
+ *  set yet. Server-only, and deliberately NOT part of the `Community` type /
+ *  `listCommunities()`'s output — that object is serialized straight to any
+ *  visitor via the public GET /api/communities (the header switcher's data
+ *  source), so an admin's email has no business riding along on it. Used
+ *  only by adminAuth.ts's per-community authorization check. Not cached
+ *  ('use cache'/cacheTag) like listCommunities() — this is read at admin
+ *  sign-in/authorization time, where a stale value could wrongly admit or
+ *  reject someone right after it was changed, and it's a single indexed-row
+ *  point query, not a page-render-path cost worth caching. */
+export async function getCommunityAdminEmail(slug: string): Promise<string | null> {
+  const { data } = await getAdminClient().from('community').select('admin_email').eq('slug', slug).maybeSingle()
+  return (data as { admin_email: string | null } | null)?.admin_email ?? null
+}
+
 /** Reads the requested community slug off an incoming request. Query param
  *  only for now — the URL/subdomain shape is still undecided, and keeping the
  *  read in one place means changing it later touches this function alone. */

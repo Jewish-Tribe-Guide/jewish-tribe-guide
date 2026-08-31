@@ -43,7 +43,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     setError(null)
     try {
       await fetchJson(
-        `/api/admin/archived-listings/${id}`,
+        withCommunity(`/api/admin/archived-listings/${id}`, community),
         { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } },
         'Restore failed.',
       )
@@ -60,7 +60,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     setError(null)
     try {
       await fetchJson(
-        `/api/admin/archived-listings/${id}`,
+        withCommunity(`/api/admin/archived-listings/${id}`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )

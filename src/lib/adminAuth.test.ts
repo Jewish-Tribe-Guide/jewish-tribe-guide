@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
-import { getAdminUser, getAllowedAdminEmails, isAllowedAdminEmail } from './adminAuth'
+import {
+  getAdminUser,
+  getAdminUserForCommunity,
+  getAllowedAdminEmails,
+  isAllowedAdminEmail,
+  isAllowedForCommunity,
+} from './adminAuth'
+import { getCommunityAdminEmail } from './communityStore'
 
 // A bug here either locks every admin out or, far worse, lets someone in who
 // shouldn't be — so both the allowlist parsing and the token-to-email path
 // get direct coverage, not just "does it run."
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }))
+vi.mock('./communityStore', () => ({ getCommunityAdminEmail: vi.fn() }))
 
 function req(authorization?: string): Request {
   return new Request('https://example.com', {
@@ -104,5 +112,65 @@ describe('getAdminUser', () => {
     await getAdminUser(req('Bearer  goodtoken'))
     const client = vi.mocked(createClient).mock.results[0]!.value
     expect(client.auth.getUser).toHaveBeenCalledWith('goodtoken')
+  })
+})
+
+// The check that actually stops one community's admin from acting on
+// another's data once their emails diverge — see adminAuth.ts's own comment
+// on what ADMIN_EMAILS means now that this exists.
+describe('isAllowedForCommunity', () => {
+  beforeEach(() => vi.stubEnv('ADMIN_EMAILS', 'super@example.com'))
+
+  it('admits only the community\'s own configured admin_email, case-insensitively', async () => {
+    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    expect(await isAllowedForCommunity('PHILLY-ADMIN@example.com', 'philly')).toBe(true)
+    expect(await isAllowedForCommunity('ues-admin@example.com', 'philly')).toBe(false)
+  })
+
+  it('rejects the global superadmin list once a community has its own admin_email set', async () => {
+    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(false)
+  })
+
+  it('falls back to the global ADMIN_EMAILS list when the community has no admin_email configured yet', async () => {
+    vi.mocked(getCommunityAdminEmail).mockResolvedValue(null)
+    expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(true)
+    expect(await isAllowedForCommunity('stranger@example.com', 'philly')).toBe(false)
+  })
+})
+
+describe('getAdminUserForCommunity', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.supabase.co')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key')
+  })
+
+  it('returns null with no Authorization header', async () => {
+    expect(await getAdminUserForCommunity(req(), 'philly')).toBeNull()
+  })
+
+  it('returns null when the token is valid but the email is not this community\'s admin', async () => {
+    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    mockSupabaseUser({ email: 'ues-admin@example.com' })
+    expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toBeNull()
+  })
+
+  // The actual scenario this whole check exists for: a real, valid session —
+  // proven identity — that just isn't authorized for the community being
+  // asked about.
+  it('returns null for a session that is a valid admin of a DIFFERENT community', async () => {
+    vi.mocked(getCommunityAdminEmail).mockImplementation(async (slug) =>
+      slug === 'ues' ? 'ues-admin@example.com' : 'philly-admin@example.com',
+    )
+    mockSupabaseUser({ email: 'ues-admin@example.com' })
+    expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toBeNull()
+  })
+
+  it('returns the email when the token is valid and matches this community\'s admin', async () => {
+    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    mockSupabaseUser({ email: 'philly-admin@example.com' })
+    expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toEqual({
+      email: 'philly-admin@example.com',
+    })
   })
 })

@@ -52,7 +52,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     setBusyId(id)
     try {
       await fetchJson(
-        `/api/admin/submissions/${id}`,
+        withCommunity(`/api/admin/submissions/${id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

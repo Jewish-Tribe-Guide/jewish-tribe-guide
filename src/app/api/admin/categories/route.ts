@@ -1,5 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listCategoriesUncached, createCategory } from '@/lib/categoryStore'
 import { isHttpUrl } from '@/lib/validation'
 import { isValidPinColor } from '@/lib/categoryColor'
@@ -11,11 +11,11 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // GET /api/categories serves the same data to the site; this route exists so the
 // manager can require auth and evolve independently.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const categories = await listCategoriesUncached(community.slug)
     return Response.json({ ok: true, categories })
   } catch (err) {
@@ -45,7 +45,8 @@ type CreateBody = {
 // POST /api/admin/categories — create a category directly (the admin equivalent
 // of approving a suggestion, but with full control over fields + capabilities).
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: CreateBody
@@ -71,7 +72,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const category = await createCategory(community.slug, {
       label: body.label,
       pluralLabel: body.pluralLabel,

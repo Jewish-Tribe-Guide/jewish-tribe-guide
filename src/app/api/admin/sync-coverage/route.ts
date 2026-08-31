@@ -1,4 +1,4 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { getSyncCoverage } from '@/lib/syncCoverage'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
@@ -7,11 +7,11 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // sync is deliberately not touching (hand-edited), and listings whose sync
 // is actively failing. Admin only.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     const coverage = await getSyncCoverage(community.slug)
     return Response.json({ ok: true, coverage })
   } catch (err) {

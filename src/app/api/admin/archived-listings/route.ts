@@ -1,4 +1,4 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
@@ -8,18 +8,13 @@ import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore
 // it — see submissionStore.ts), enriched with its category's label so the
 // admin cleanup view doesn't have to show bare category ids. Admin only.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
-    // listArchivedResources() is not yet scoped by community (see
-    // resourceStore.ts) — every community's archived listings show up mixed
-    // together here, labeled against whichever community the admin is
-    // editing. Known gap, deferred: category ids can collide across
-    // communities, so a mismatched label is possible until this is scoped.
     const [listings, categories] = await Promise.all([
-      listArchivedResources(),
+      listArchivedResources(community.slug),
       listCategoriesUncached(community.slug),
     ])
     const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))

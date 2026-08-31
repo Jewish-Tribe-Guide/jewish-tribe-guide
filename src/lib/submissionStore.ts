@@ -280,8 +280,13 @@ export async function submitGoogleClosure(community: string, targetId: string): 
 // ── Moderation (admin) ───────────────────────────────────────────────────────
 
 // Approves a submission and APPLIES its change to the live tables, then marks it
-// approved. Returns the updated submission.
-export async function approveSubmission(id: string): Promise<SubmissionRow> {
+// approved. Returns the updated submission. `community`, when given, has to
+// match the submission's own community_id — `id` alone is a real UUID
+// primary key on this table (no composite key the way category/form get),
+// so without this an admin authorized for one community could approve/
+// reject a DIFFERENT community's queue entry by id alone, e.g. via a direct
+// API call rather than through that community's own moderation queue UI.
+export async function approveSubmission(id: string, community?: string): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -292,6 +297,9 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
   if (subErr || !sub) throw new Error(`Submission not found: ${subErr?.message ?? id}`)
 
   const submission = sub as SubmissionRow
+  if (community && submission.community_id !== community) {
+    throw new Error(`Submission not found: ${id}`)
+  }
 
   let affectedResourceId: string | null = null
   if (submission.target_type === 'listing') {
@@ -323,13 +331,16 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
   return data as SubmissionRow
 }
 
-export async function rejectSubmission(id: string): Promise<SubmissionRow> {
-  const { data, error } = await getAdminClient()
+// `community`, when given, must match — same cross-community guard as
+// approveSubmission, and for the same reason (a plain UUID id, not a
+// composite key).
+export async function rejectSubmission(id: string, community?: string): Promise<SubmissionRow> {
+  let query = getAdminClient()
     .from('submission')
     .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*')
-    .single()
+  if (community) query = query.eq('community_id', community)
+  const { data, error } = await query.select('*').single()
   if (error) throw new Error(`Failed to reject submission: ${error.message}`)
   return data as SubmissionRow
 }

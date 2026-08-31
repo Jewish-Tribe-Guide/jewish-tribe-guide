@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { countFieldOptionUsage } from '@/lib/resourceStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   renames: { fieldKey: string; oldValue: string; newValue: string }[]
@@ -13,7 +14,8 @@ type Body = {
 // it can offer to cascade the rename into existing listings' data instead of
 // silently orphaning them. Read-only; admin only.
 export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]/option-usage'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/c
   }
 
   try {
-    const usage = await countFieldOptionUsage(id, body.renames)
+    const usage = await countFieldOptionUsage(community.slug, id, body.renames)
     return Response.json({ ok: true, usage })
   } catch (err) {
     console.error('[admin/categories/:id/option-usage] POST failed:', err)
