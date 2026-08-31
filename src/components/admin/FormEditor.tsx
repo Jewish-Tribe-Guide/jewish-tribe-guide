@@ -6,6 +6,8 @@ import FormStepEditor from './FormStepEditor'
 import FormPreview from './FormPreview'
 import { IconField, CardBackgroundField } from './CategoryFormFields'
 import { fetchJson } from '@/lib/fetchJson'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // ── Editor for one form — title, chrome text, and questions. Mounted from
 // CategoryManager's unified list, both for the two built-in forms (Request
@@ -61,6 +63,7 @@ export default function FormEditor({
   onCancel: () => void
 }) {
   const isNew = form === null
+  const community = useCommunitySlug()
   const [draft, setDraft] = useState<FormContent>(() => toContent(form))
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -149,7 +152,7 @@ export default function FormEditor({
     setSaving(true)
     try {
       await fetchJson(
-        `/api/admin/forms/${form.id}`,
+        withCommunity(`/api/admin/forms/${form.id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -180,7 +183,7 @@ export default function FormEditor({
     setPublishing(true)
     try {
       await fetchJson(
-        '/api/admin/forms',
+        withCommunity('/api/admin/forms', community),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -203,7 +206,7 @@ export default function FormEditor({
       const ok = await saveDraft()
       if (!ok) return
       await fetchJson(
-        `/api/admin/forms/${form.id}/publish`,
+        withCommunity(`/api/admin/forms/${form.id}/publish`, community),
         { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
         'Publish failed.',
       )
@@ -221,7 +224,7 @@ export default function FormEditor({
     setErrors([])
     try {
       await fetchJson(
-        `/api/admin/forms/${form.id}/draft`,
+        withCommunity(`/api/admin/forms/${form.id}/draft`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Could not discard the draft.',
       )

@@ -1,7 +1,6 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
-import { getDefaultCommunity } from './communityStore'
 import { assertUsableSlug } from './routes'
 import {
   DEFAULT_CATEGORY_ICON,
@@ -129,7 +128,7 @@ const KIND_LABELS: Record<CategoryKind, string> = {
   medical: 'Jewish Medical Resources category',
 }
 
-export async function createCategory(input: {
+export async function createCategory(community: string, input: {
   label: string
   pluralLabel?: string
   icon?: string
@@ -160,16 +159,25 @@ export async function createCategory(input: {
   // singleton from ever being created.
   if (kind === 'listing') assertUsableSlug(base)
 
-  // Ensure a unique id.
+  // Ensure a unique id within this community — the same slug is a separate
+  // row in another community (composite primary key), so the uniqueness
+  // check has to be scoped the same way or it'd wrongly refuse (or wrongly
+  // allow) a slug based on what a DIFFERENT community already has.
   let id = base
   for (let n = 2; ; n++) {
-    const { data } = await supabase.from('category').select('id').eq('id', id).maybeSingle()
+    const { data } = await supabase
+      .from('category')
+      .select('id')
+      .eq('community_id', community)
+      .eq('id', id)
+      .maybeSingle()
     if (!data) break
     id = `${base}-${n}`
   }
 
   const row = {
     id,
+    community_id: community,
     label: input.label.trim(),
     plural_label: (input.pluralLabel || input.label).trim(),
     icon: input.icon?.trim() || DEFAULT_CATEGORY_ICON,
@@ -205,6 +213,7 @@ export async function createCategory(input: {
 // the provided keys are changed. The slug (`id`) is immutable — it's referenced
 // by every listing's `resource.category`, so it's never rewritten here.
 export async function updateCategory(
+  community: string,
   id: string,
   patch: {
     label?: string
@@ -250,10 +259,9 @@ export async function updateCategory(
   if (patch.iconImageUrl !== undefined) row.icon_image_url = patch.iconImageUrl?.trim() || null
   if (patch.mapZoomRadiusMiles !== undefined) row.map_zoom_radius_miles = patch.mapZoomRadiusMiles
 
-  // Admin edits are still single-community — see the note in communityStore.
-  // Scoping the write by community as well as id means a future second
-  // community's identically-slugged category can't be hit by mistake.
-  const community = (await getDefaultCommunity()).slug
+  // Scoped by community as well as id — the composite primary key means a
+  // second community's identically-slugged category is a different row, and
+  // an update aimed at one must never be able to hit the other.
   if (Object.keys(row).length === 0) return getCategoryById(community, id)
 
   const { data, error } = await supabase
@@ -272,18 +280,30 @@ export async function updateCategory(
 // first (resource.category has no DB cascade), then the category row. Votes
 // cascade from the resource delete. Returns how many listings were removed so
 // the caller can confirm the scope of the deletion.
-export async function deleteCategory(id: string): Promise<{ listings: number }> {
+export async function deleteCategory(community: string, id: string): Promise<{ listings: number }> {
   const supabase = getAdminClient()
 
+  // Scoped by community: `resource.category` is a plain text column (not a
+  // foreign key into the composite category key), so an unscoped delete here
+  // would remove every community's listings that happen to share this slug.
   const { count } = await supabase
     .from('resource')
     .select('id', { count: 'exact', head: true })
+    .eq('community_id', community)
     .eq('category', id)
 
-  const { error: resErr } = await supabase.from('resource').delete().eq('category', id)
+  const { error: resErr } = await supabase
+    .from('resource')
+    .delete()
+    .eq('community_id', community)
+    .eq('category', id)
   if (resErr) throw new Error(`Failed to delete the category's listings: ${resErr.message}`)
 
-  const { error: catErr } = await supabase.from('category').delete().eq('id', id)
+  const { error: catErr } = await supabase
+    .from('category')
+    .delete()
+    .eq('community_id', community)
+    .eq('id', id)
   if (catErr) throw new Error(`Failed to delete category: ${catErr.message}`)
 
   return { listings: count ?? 0 }

@@ -1,5 +1,4 @@
 import { getAdminClient } from './supabase/admin'
-import { getDefaultCommunity } from './communityStore'
 import { listCategoriesUncached, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible, type CategoryConfig } from './categories'
 import {
@@ -152,8 +151,7 @@ function allFieldsFor(row: SyncRow, category: CategoryConfig): FieldValue[] {
   }))
 }
 
-export async function getSyncCoverage(): Promise<SyncCoverage> {
-  const community = (await getDefaultCommunity()).slug
+export async function getSyncCoverage(community: string): Promise<SyncCoverage> {
   const [categories, { data, error }] = await Promise.all([
     listCategoriesUncached(community),
     getAdminClient()
@@ -240,16 +238,18 @@ export async function getSyncCoverage(): Promise<SyncCoverage> {
  * and clearing the override drops the listing back to reality rather than to a
  * remembered guess.
  */
+// `community`, when given, has to match the listing's own community_id —
+// `resourceId` alone is a real UUID primary key (see loadRowAndCategory's
+// own note on the same issue for checkListingAgainstGoogle/resumeSyncField).
 export async function setBusinessStatusOverride(
   resourceId: string,
   status: BusinessStatus | null,
+  community?: string,
 ): Promise<void> {
   const supabase = getAdminClient()
-  const { data, error } = await supabase
-    .from('resource')
-    .select('details')
-    .eq('id', resourceId)
-    .single()
+  let query = supabase.from('resource').select('details, community_id').eq('id', resourceId)
+  if (community) query = query.eq('community_id', community)
+  const { data, error } = await query.single()
   if (error || !data) throw new Error(`Listing not found: ${error?.message ?? resourceId}`)
 
   const details = { ...((data.details ?? {}) as Record<string, unknown>) }
@@ -285,15 +285,17 @@ function googleValuesFor(sync: PlaceSync): Record<OwnableSyncField, string> {
   }
 }
 
+// `community`, when given, has to match the row's own community_id — same
+// cross-community guard as everywhere else id-only lookups exist on a table
+// without a composite (community_id, id) key.
 async function loadRowAndCategory(
   resourceId: string,
+  community?: string,
 ): Promise<{ supabase: ReturnType<typeof getAdminClient>; row: SyncRow; category: CategoryConfig }> {
   const supabase = getAdminClient()
-  const { data, error } = await supabase
-    .from('resource')
-    .select('id,name,category,phone,address,details,community_id')
-    .eq('id', resourceId)
-    .maybeSingle()
+  let query = supabase.from('resource').select('id,name,category,phone,address,details,community_id').eq('id', resourceId)
+  if (community) query = query.eq('community_id', community)
+  const { data, error } = await query.maybeSingle()
   if (error) throw new Error(`Failed to load listing: ${error.message}`)
   if (!data) throw new Error('Listing not found.')
   const row = data as SyncRow
@@ -312,8 +314,8 @@ async function loadRowAndCategory(
 // currently declining to write, so an admin can see what a "manually
 // entered" field would become if it were ever handed back to Google —
 // including when Google simply has nothing for it at all.
-export async function checkListingAgainstGoogle(resourceId: string): Promise<SyncCheckField[]> {
-  const { row, category } = await loadRowAndCategory(resourceId)
+export async function checkListingAgainstGoogle(resourceId: string, community?: string): Promise<SyncCheckField[]> {
+  const { row, category } = await loadRowAndCategory(resourceId, community)
   const placeId = row.details.placeId as string
 
   const sync = await fetchPlaceSync(placeId)
@@ -336,8 +338,12 @@ export async function checkListingAgainstGoogle(resourceId: string): Promise<Syn
 // Doesn't touch `details.googleFields` at all when the live values don't
 // actually match, same "don't risk claiming ownership we can't back up"
 // rule computeGoogleFields follows in submissionStore.ts.
-export async function resumeSyncField(resourceId: string, field: OwnableSyncField): Promise<SyncCheckField> {
-  const { supabase, row, category } = await loadRowAndCategory(resourceId)
+export async function resumeSyncField(
+  resourceId: string,
+  field: OwnableSyncField,
+  community?: string,
+): Promise<SyncCheckField> {
+  const { supabase, row, category } = await loadRowAndCategory(resourceId, community)
   const placeId = row.details.placeId as string
   if (!protectedFieldsFor(row, category).includes(field)) {
     throw new Error('This field is already following Google.')

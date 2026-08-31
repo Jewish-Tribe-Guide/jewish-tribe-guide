@@ -4,7 +4,6 @@ import { isCategorySyncEligible } from './categories'
 import { fetchPlaceSync, namesOverlap, OWNABLE_SYNC_FIELDS, type OwnableSyncField } from './googlePlaces'
 import { upsertTags } from './tagStore'
 import { geocode } from './geo'
-import { getDefaultCommunity } from './communityStore'
 import type {
   ResourceRow,
   ResourceSubmission,
@@ -38,8 +37,11 @@ function median(sorted: number[]): number {
 // submission, ever) rather than a windowed query — this is a low-traffic
 // community site, so the whole table is cheap, and a rolling window would
 // just add a parameter nobody asked for yet.
-export async function getSubmissionFunnelStats(): Promise<SubmissionFunnelStats> {
-  const { data, error } = await getAdminClient().from('submission').select('status, created_at, reviewed_at')
+export async function getSubmissionFunnelStats(community: string): Promise<SubmissionFunnelStats> {
+  const { data, error } = await getAdminClient()
+    .from('submission')
+    .select('status, created_at, reviewed_at')
+    .eq('community_id', community)
   if (error) throw new Error(`Failed to load submission stats: ${error.message}`)
 
   const rows = data as { status: SubmissionRow['status']; created_at: string; reviewed_at: string | null }[]
@@ -71,8 +73,8 @@ export async function getSubmissionFunnelStats(): Promise<SubmissionFunnelStats>
 
 // Pending submissions, newest first, each enriched with the current target row
 // (for update/delete) so the admin UI can show a before → after diff.
-export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {
-  return listSubmissionsByStatus('pending')
+export async function listPendingSubmissions(community: string): Promise<EnrichedSubmission[]> {
+  return listSubmissionsByStatus(community, 'pending')
 }
 
 // Submissions in a given status, each enriched the same way as
@@ -82,12 +84,16 @@ export async function listPendingSubmissions(): Promise<EnrichedSubmission[]> {
 // so it orders by created_at (oldest waiting first isn't the goal here,
 // newest submitted first is); approved/rejected order by reviewed_at, most
 // recently decided first — that's what "what just happened" means.
-export async function listSubmissionsByStatus(status: SubmissionStatus): Promise<EnrichedSubmission[]> {
+export async function listSubmissionsByStatus(
+  community: string,
+  status: SubmissionStatus,
+): Promise<EnrichedSubmission[]> {
   const supabase = getAdminClient()
 
   const { data, error } = await supabase
     .from('submission')
     .select('*')
+    .eq('community_id', community)
     .eq('status', status)
     .order(status === 'pending' ? 'created_at' : 'reviewed_at', { ascending: false })
 
@@ -95,7 +101,7 @@ export async function listSubmissionsByStatus(status: SubmissionStatus): Promise
   const submissions = data as SubmissionRow[]
 
   // Resolve category labels for display.
-  const categories = await listCategories((await getDefaultCommunity()).slug)
+  const categories = await listCategories(community)
   const labelById = new Map(categories.map((c) => [c.id, c.label]))
   const categoryLabel = (s: SubmissionRow, current: ResourceRow | null): string | undefined => {
     if (s.target_type === 'category') return (s.payload as CategorySubmissionPayload).label
@@ -109,6 +115,7 @@ export async function listSubmissionsByStatus(status: SubmissionStatus): Promise
     const { data: current, error: curErr } = await supabase
       .from('resource')
       .select('*')
+      .eq('community_id', community)
       .in('id', targetIds)
     if (curErr) throw new Error(`Failed to load current rows: ${curErr.message}`)
     byId = new Map((current as ResourceRow[]).map((r) => [r.id, r]))
@@ -156,8 +163,9 @@ async function listingColumnsWithGeo(payload: ResourceSubmission) {
 }
 
 // Records a proposed NEW listing (operation=create, target_type=listing).
-export async function submitListingCreate(payload: ResourceSubmission): Promise<SubmissionRow> {
+export async function submitListingCreate(community: string, payload: ResourceSubmission): Promise<SubmissionRow> {
   return insertSubmission({
+    community_id: community,
     operation: 'create',
     target_type: 'listing',
     target_id: null,
@@ -169,12 +177,14 @@ export async function submitListingCreate(payload: ResourceSubmission): Promise<
 
 // Records a proposed EDIT to an existing listing.
 export async function submitListingUpdate(
+  community: string,
   targetId: string,
   payload: ResourceSubmission,
   note: string | null,
   submittedBy: { name?: string; email?: string } | null,
 ): Promise<SubmissionRow> {
   return insertSubmission({
+    community_id: community,
     operation: 'update',
     target_type: 'listing',
     target_id: targetId,
@@ -188,6 +198,7 @@ export async function submitListingUpdate(
 // Fetches the listing's name + category first so the notification email can
 // display them — the payload is otherwise empty for delete submissions.
 export async function submitListingDelete(
+  community: string,
   targetId: string,
   note: string | null,
   submittedBy: { name?: string; email?: string } | null,
@@ -195,10 +206,12 @@ export async function submitListingDelete(
   const { data: existing } = await getAdminClient()
     .from('resource')
     .select('name, category')
+    .eq('community_id', community)
     .eq('id', targetId)
     .single()
 
   return insertSubmission({
+    community_id: community,
     operation: 'delete',
     target_type: 'listing',
     target_id: targetId,
@@ -209,6 +222,7 @@ export async function submitListingDelete(
 }
 
 async function insertSubmission(row: {
+  community_id: string
   operation: SubmissionRow['operation']
   target_type: SubmissionRow['target_type']
   target_id: string | null
@@ -229,8 +243,10 @@ async function insertSubmission(row: {
 // Creates a pending deletion submission triggered by the Google sync job when
 // it detects businessStatus=CLOSED_PERMANENTLY. Returns the new submission, or
 // null if a pending deletion already exists for this listing (idempotent across
-// repeated weekly syncs).
-export async function submitGoogleClosure(targetId: string): Promise<SubmissionRow | null> {
+// repeated weekly syncs). `community` is the target listing's own community —
+// the sync job scans every community's listings, so this must come from the
+// resource row it found, never a default.
+export async function submitGoogleClosure(community: string, targetId: string): Promise<SubmissionRow | null> {
   const supabase = getAdminClient()
 
   // Idempotency guard — skip if there is already a pending delete for this row.
@@ -246,10 +262,12 @@ export async function submitGoogleClosure(targetId: string): Promise<SubmissionR
   const { data: resource } = await supabase
     .from('resource')
     .select('name, category')
+    .eq('community_id', community)
     .eq('id', targetId)
     .single()
 
   return insertSubmission({
+    community_id: community,
     operation: 'delete',
     target_type: 'listing',
     target_id: targetId,
@@ -262,8 +280,13 @@ export async function submitGoogleClosure(targetId: string): Promise<SubmissionR
 // ── Moderation (admin) ───────────────────────────────────────────────────────
 
 // Approves a submission and APPLIES its change to the live tables, then marks it
-// approved. Returns the updated submission.
-export async function approveSubmission(id: string): Promise<SubmissionRow> {
+// approved. Returns the updated submission. `community`, when given, has to
+// match the submission's own community_id — `id` alone is a real UUID
+// primary key on this table (no composite key the way category/form get),
+// so without this an admin authorized for one community could approve/
+// reject a DIFFERENT community's queue entry by id alone, e.g. via a direct
+// API call rather than through that community's own moderation queue UI.
+export async function approveSubmission(id: string, community?: string): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -274,6 +297,9 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
   if (subErr || !sub) throw new Error(`Submission not found: ${subErr?.message ?? id}`)
 
   const submission = sub as SubmissionRow
+  if (community && submission.community_id !== community) {
+    throw new Error(`Submission not found: ${id}`)
+  }
 
   let affectedResourceId: string | null = null
   if (submission.target_type === 'listing') {
@@ -305,13 +331,16 @@ export async function approveSubmission(id: string): Promise<SubmissionRow> {
   return data as SubmissionRow
 }
 
-export async function rejectSubmission(id: string): Promise<SubmissionRow> {
-  const { data, error } = await getAdminClient()
+// `community`, when given, must match — same cross-community guard as
+// approveSubmission, and for the same reason (a plain UUID id, not a
+// composite key).
+export async function rejectSubmission(id: string, community?: string): Promise<SubmissionRow> {
+  let query = getAdminClient()
     .from('submission')
     .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*')
-    .single()
+  if (community) query = query.eq('community_id', community)
+  const { data, error } = await query.select('*').single()
   if (error) throw new Error(`Failed to reject submission: ${error.message}`)
   return data as SubmissionRow
 }
@@ -386,11 +415,12 @@ function isEmptyValue(value: unknown): boolean {
 // back to leaving provenance exactly as it was (existing's own googleFields,
 // or none for a brand-new listing) rather than guessing.
 async function resolveGoogleFields(
+  community: string,
   payload: ResourceSubmission,
   existing: ResourceRow | null,
 ): Promise<string[] | undefined> {
   try {
-    return await computeGoogleFields(payload, existing)
+    return await computeGoogleFields(community, payload, existing)
   } catch (err) {
     console.error('[submissions] resolveGoogleFields failed:', err)
     return Array.isArray(existing?.details?.googleFields) ? (existing.details.googleFields as string[]) : []
@@ -398,10 +428,10 @@ async function resolveGoogleFields(
 }
 
 async function computeGoogleFields(
+  community: string,
   payload: ResourceSubmission,
   existing: ResourceRow | null,
 ): Promise<string[] | undefined> {
-  const community = (await getDefaultCommunity()).slug
   const category = await getCategoryById(community, payload.category)
   // Eligibility depends on hasAddress, which only the fetched category
   // knows — can't check this before the lookup above. A category that
@@ -595,12 +625,13 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
   if (submission.operation === 'create') {
     const payload = submission.payload as unknown as ResourceSubmission
     payload.details = withResolvedPlaceId(payload.details, payload)
-    const googleFields = await resolveGoogleFields(payload, null)
+    const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     const { data: created, error } = await supabase
       .from('resource')
       .insert({
         ...(await listingColumnsWithGeo(payload)),
+        community_id: submission.community_id,
         status: 'approved',
         submitted_by: submission.submitted_by,
         reviewed_at: now,
@@ -608,7 +639,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
       .select('id')
       .single()
     if (error) throw new Error(`Failed to create listing: ${error.message}`)
-    await growTagVocabulary(payload)
+    await growTagVocabulary(submission.community_id, payload)
     return (created as { id: string } | null)?.id ?? null
   }
 
@@ -618,19 +649,25 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     const { data: existingData } = await supabase
       .from('resource')
       .select('*')
+      .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
       .maybeSingle()
     payload.details = withResolvedPlaceId(payload.details, payload)
-    const googleFields = await resolveGoogleFields(payload, existingData as ResourceRow | null)
+    const googleFields = await resolveGoogleFields(
+      submission.community_id,
+      payload,
+      existingData as ResourceRow | null,
+    )
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })
+      .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to update listing: ${error.message}`)
-    await growTagVocabulary(payload)
+    await growTagVocabulary(submission.community_id, payload)
     return submission.target_id
   }
 
@@ -640,6 +677,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     const { error } = await supabase
       .from('resource')
       .update({ status: 'archived', reviewed_at: now })
+      .eq('community_id', submission.community_id)
       .eq('id', submission.target_id)
     if (error) throw new Error(`Failed to archive listing: ${error.message}`)
     return submission.target_id
@@ -651,15 +689,15 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
 // When a listing with tag fields is approved, add any newly-typed tags to the
 // vocabulary so future submitters can pick them. Best-effort — a vocab hiccup
 // shouldn't block approving the listing.
-async function growTagVocabulary(payload: ResourceSubmission): Promise<void> {
+async function growTagVocabulary(community: string, payload: ResourceSubmission): Promise<void> {
   try {
-    const category = await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+    const category = await getCategoryById(community, payload.category)
     if (!category) return
     for (const field of category.detailFields) {
       if (field.type !== 'tags' || !field.tagGroup) continue
       const labels = payload.details?.[field.key]
       if (Array.isArray(labels) && labels.length > 0) {
-        await upsertTags((await getDefaultCommunity()).slug, labels as string[], field.tagGroup)
+        await upsertTags(community, labels as string[], field.tagGroup)
       }
     }
   } catch (err) {
@@ -674,7 +712,7 @@ async function applyCategory(submission: SubmissionRow): Promise<void> {
   }
   const payload = submission.payload as unknown as CategorySubmissionPayload
 
-  const category = await createCategory({
+  const category = await createCategory(submission.community_id, {
     label: payload.label,
     icon: payload.icon,
     description: payload.description,
@@ -684,6 +722,7 @@ async function applyCategory(submission: SubmissionRow): Promise<void> {
   const first = payload.firstListing
   const geo = first.geo ?? (first.address?.trim() ? await geocode(first.address) : null)
   const { error } = await getAdminClient().from('resource').insert({
+    community_id: submission.community_id,
     category: category.id,
     name: first.name.trim(),
     anchor_id: first.anchorId || 'community',

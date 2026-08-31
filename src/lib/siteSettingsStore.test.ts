@@ -25,10 +25,16 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
+const mockResolveCommunity = vi.hoisted(() => vi.fn())
+vi.mock('./communityStore', () => ({
+  resolveCommunity: mockResolveCommunity,
+}))
+
 const { getSiteSettingsUncached, updateSiteSettings } = await import('./siteSettingsStore')
 
 afterEach(() => {
   mockFrom.mockReset()
+  mockResolveCommunity.mockReset()
 })
 
 const rawRow = {
@@ -49,7 +55,40 @@ const rawRow = {
 describe('getSiteSettingsUncached', () => {
   it('falls back to SITE_SETTINGS_DEFAULTS when no row exists yet (fresh deployment)', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    mockResolveCommunity.mockResolvedValue({
+      slug: 'philly',
+      name: SITE_SETTINGS_DEFAULTS.name,
+      tagline: SITE_SETTINGS_DEFAULTS.tagline,
+      mission: SITE_SETTINGS_DEFAULTS.mission,
+    })
     expect(await getSiteSettingsUncached('philly')).toEqual(SITE_SETTINGS_DEFAULTS)
+  })
+
+  // Regression: a second community with no site_settings row yet used to
+  // fall back to SITE_SETTINGS_DEFAULTS unconditionally — a module-level
+  // constant built once from community.config.ts (the bootstrap/Philly
+  // community) — so an un-configured community rendered Philadelphia's own
+  // name/tagline/mission rather than its own. Reproduced live: visiting a
+  // freshly-seeded second community showed "Philadelphia Jewish Community"
+  // in the header before this fell back to the resolved community row instead.
+  it("falls back to the resolved community's own name/tagline/mission, not the bootstrap community's", async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    mockResolveCommunity.mockResolvedValue({
+      slug: 'ues',
+      name: 'Upper East Side Jewish Community',
+      tagline: 'Guide for residents and visitors',
+      mission: 'A guide to Jewish life on the Upper East Side.',
+    })
+
+    const settings = await getSiteSettingsUncached('ues')
+
+    expect(settings.name).toBe('Upper East Side Jewish Community')
+    expect(settings.tagline).toBe('Guide for residents and visitors')
+    expect(settings.mission).toBe('A guide to Jewish life on the Upper East Side.')
+    expect(mockResolveCommunity).toHaveBeenCalledWith('ues')
+    // Everything not community-specific still comes from the shared defaults.
+    expect(settings.mobileTabs).toEqual(SITE_SETTINGS_DEFAULTS.mobileTabs)
+    expect(settings.heroTitle).toBe(SITE_SETTINGS_DEFAULTS.heroTitle)
   })
 
   it('maps a full row, normalizing null featured_card_ids to an empty array', async () => {

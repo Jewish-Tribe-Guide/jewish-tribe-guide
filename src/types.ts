@@ -122,6 +122,7 @@ export type ResourceStatus = 'pending' | 'approved' | 'rejected' | 'archived'
 /** A row from the `resource` table, exactly as Supabase returns it (snake_case). */
 export type ResourceRow = {
   id: string
+  community_id: string
   category: string
   name: string
   /** Generic grouping key (defaults to 'community'); the directory anchors on the
@@ -223,6 +224,7 @@ export type SubmissionStatus = 'pending' | 'approved' | 'rejected'
 /** A row from the `submission` table — one proposed change awaiting review. */
 export type SubmissionRow = {
   id: string
+  community_id: string
   operation: SubmissionOperation
   target_type: SubmissionTargetType
   target_id: string | null

@@ -1,7 +1,7 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listHomeSectionsUncached, createHomeSection } from '@/lib/homeSectionStore'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 
 // GET /api/admin/home-sections — every section, for the admin Sections tab.
@@ -9,11 +9,12 @@ import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 // site; this route exists so the manager can require auth and evolve
 // independently.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const sections = await listHomeSectionsUncached((await getDefaultCommunity()).slug)
+    const sections = await listHomeSectionsUncached(community.slug)
     return Response.json({ ok: true, sections })
   } catch (err) {
     console.error('[admin/home-sections] GET failed:', err)
@@ -36,7 +37,8 @@ const BUILT_IN_KINDS = Object.keys(BUILT_IN_BLOCKS) as HomeBlockKind[]
 // POST /api/admin/home-sections — create a new (initially empty, unless
 // cardIds is given) section, or re-add a built-in block (kind set).
 export async function POST(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: CreateBody
@@ -54,7 +56,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const section = await createHomeSection({ title: body.title ?? '', cardIds: body.cardIds, kind: body.kind })
+    const section = await createHomeSection(community.slug, {
+      title: body.title ?? '',
+      cardIds: body.cardIds,
+      kind: body.kind,
+    })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, section })

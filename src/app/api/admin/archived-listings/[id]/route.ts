@@ -1,18 +1,20 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { restoreResource, hardDeleteArchivedResource } from '@/lib/resourceStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // PATCH /api/admin/archived-listings/:id — restore an archived listing back
 // to 'approved' (it reappears on the public site exactly as it was). Admin
 // only.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const resource = await restoreResource(id)
+    const resource = await restoreResource(id, community.slug)
     if (!resource) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }
@@ -28,12 +30,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 // DELETE /api/admin/archived-listings/:id — permanently deletes an archived
 // listing. Irreversible. Admin only.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/archived-listings/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const found = await hardDeleteArchivedResource(id)
+    const found = await hardDeleteArchivedResource(id, community.slug)
     if (!found) {
       return Response.json({ ok: false, errors: ['Listing not found (or not archived).'] }, { status: 404 })
     }

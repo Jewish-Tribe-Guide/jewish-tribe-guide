@@ -42,12 +42,12 @@ afterEach(async () => {
   for (const id of pendingCategoryIds.splice(0)) {
     // Also removes every listing in the category — covers the resource rows
     // these tests create, no separate resource cleanup needed.
-    await deleteCategory(id)
+    await deleteCategory('philly', id)
   }
 })
 
 async function makeTestCategory() {
-  const category = await createCategory({ label: `Integration Test ${randomUUID().slice(0, 8)}` })
+  const category = await createCategory('philly', { label: `Integration Test ${randomUUID().slice(0, 8)}` })
   pendingCategoryIds.push(category.id)
   return category
 }
@@ -71,10 +71,10 @@ describe('submissionStore (integration)', () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`
 
-    const submission = await submitListingCreate(listingPayload(category.id, name))
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
     pendingSubmissionIds.push(submission.id)
 
-    const pendingBefore = await listPendingSubmissions()
+    const pendingBefore = await listPendingSubmissions('philly')
     expect(pendingBefore.some((s) => s.id === submission.id)).toBe(true)
 
     await approveSubmission(submission.id)
@@ -88,7 +88,7 @@ describe('submissionStore (integration)', () => {
     expect(resource.status).toBe('approved')
     expect(resource.category).toBe(category.id)
 
-    const pendingAfter = await listPendingSubmissions()
+    const pendingAfter = await listPendingSubmissions('philly')
     expect(pendingAfter.some((s) => s.id === submission.id)).toBe(false)
   })
 
@@ -96,7 +96,7 @@ describe('submissionStore (integration)', () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`
 
-    const submission = await submitListingCreate(listingPayload(category.id, name))
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
     pendingSubmissionIds.push(submission.id)
 
     await rejectSubmission(submission.id)
@@ -108,7 +108,7 @@ describe('submissionStore (integration)', () => {
       .maybeSingle()
     expect(resource).toBeNull()
 
-    const pendingAfter = await listPendingSubmissions()
+    const pendingAfter = await listPendingSubmissions('philly')
     expect(pendingAfter.some((s) => s.id === submission.id)).toBe(false)
   })
 
@@ -116,7 +116,7 @@ describe('submissionStore (integration)', () => {
     const category = await makeTestCategory()
     const name = `Integration Listing ${randomUUID()}`
 
-    const createSub = await submitListingCreate(listingPayload(category.id, name))
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
     pendingSubmissionIds.push(createSub.id)
     await approveSubmission(createSub.id)
 
@@ -127,7 +127,7 @@ describe('submissionStore (integration)', () => {
       .single()
     if (!created) throw new Error('Setup failed: created resource not found.')
 
-    const deleteSub = await submitListingDelete(created.id, 'no longer in business', null)
+    const deleteSub = await submitListingDelete('philly', created.id, 'no longer in business', null)
     pendingSubmissionIds.push(deleteSub.id)
     await approveSubmission(deleteSub.id)
 
@@ -140,7 +140,7 @@ describe('submissionStore (integration)', () => {
 
     // Archived listings never show in the public directory — the moderation
     // queue itself is the only place this round trip is visible.
-    const pendingAfter = await listPendingSubmissions()
+    const pendingAfter = await listPendingSubmissions('philly')
     expect(pendingAfter.some((s) => s.id === deleteSub.id)).toBe(false)
   })
 })

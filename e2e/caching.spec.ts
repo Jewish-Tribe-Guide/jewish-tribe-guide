@@ -113,13 +113,21 @@ test.describe('nothing per-visitor is ever cached', () => {
     }
   })
 
-  // /admin and /inbox ARE prerendered and CDN-cached, and that's correct: both
-  // are `'use client'` login shells that fetch the queue in the browser with an
+  // /inbox IS prerendered and CDN-cached, and that's correct: it's a
+  // `'use client'` login shell that fetches the queue in the browser with an
   // Authorization header. What must stay true is that the cached shell is only
   // ever a shell. The day someone moves that fetch to the server to get rid of
   // the loading spinner, the page keeps working, the cache header doesn't
-  // change, and one admin's moderation queue starts being served to whoever
-  // loads /admin next — with no visible symptom at all.
+  // change, and one admin's inbox starts being served to whoever loads /inbox
+  // next — with no visible symptom at all.
+  //
+  // /admin is now the standalone superadmin console (src/app/admin/page.tsx,
+  // no community in its URL — see AGENTS.md's multi-community/caching
+  // notes), a plain 'use client' shell same shape as /inbox: whether or not
+  // it ends up prerendered/cached depends on Cache Components' own analysis
+  // of it, not asserted here either way. Left in the loop either way — if
+  // it's ever served from cache, this starts actually checking it, same as
+  // /inbox.
   test('the admin shell carries no queue data, since it is cached', async ({ request }) => {
     for (const path of ['/admin', '/inbox']) {
       const res = await request.get(path, { failOnStatusCode: false })

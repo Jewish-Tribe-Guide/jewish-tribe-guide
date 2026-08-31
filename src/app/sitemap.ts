@@ -21,7 +21,9 @@ import { siteUrl } from '@/lib/siteUrl'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl()
-  const communities = await listCommunities().catch(() => [])
+  // Invisible communities (still being built out) get no sitemap entries —
+  // same public-facing filter as GET /api/communities.
+  const communities = (await listCommunities().catch(() => [])).filter((c) => c.visible)
   const now = new Date()
 
   const entries: MetadataRoute.Sitemap = []

@@ -1,11 +1,12 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { updateCategory, deleteCategory } from '@/lib/categoryStore'
 import { clearCategoryFieldData, applyFieldOptionRenames } from '@/lib/resourceStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { CategoryCapabilities, CategoryField } from '@/lib/categories'
 import { isValidPinColor } from '@/lib/categoryColor'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   label?: string
@@ -44,7 +45,8 @@ type PatchBody = {
 // capabilities. Only the provided keys change; the slug (id) is immutable.
 // Admin only.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -77,13 +79,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     if (body.pinColor && !isValidPinColor(body.pinColor)) {
       return Response.json({ ok: false, errors: ['The pin colour must be a hex value like #2657bf.'] }, { status: 400 })
     }
-    const category = await updateCategory(id, body)
+    const category = await updateCategory(community.slug, id, body)
     if (!category) {
       return Response.json({ ok: false, errors: ['Category not found.'] }, { status: 404 })
     }
     let cleared: number | undefined
     if (body.clearFields && (body.clearFields.address || body.clearFields.phone || body.clearFields.keys?.length)) {
-      ;({ updated: cleared } = await clearCategoryFieldData(id, {
+      ;({ updated: cleared } = await clearCategoryFieldData(community.slug, id, {
         address: body.clearFields.address,
         phone: body.clearFields.phone,
         fieldKeys: body.clearFields.keys,
@@ -91,7 +93,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     }
     let renamed: number | undefined
     if (body.applyOptionRenames?.length) {
-      ;({ updated: renamed } = await applyFieldOptionRenames(id, body.applyOptionRenames))
+      ;({ updated: renamed } = await applyFieldOptionRenames(community.slug, id, body.applyOptionRenames))
     }
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
@@ -105,12 +107,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 // DELETE /api/admin/categories/:id — permanently remove a category and all of
 // its listings. Admin only.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const { listings } = await deleteCategory(id)
+    const { listings } = await deleteCategory(community.slug, id)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, listings })

@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Local admin access
 
-Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. (`/admin` still works too — it redirects to `/philly/admin`, see next.config.ts.)
+Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `ADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.
 
 # Never write to production without being told to, every time
 
@@ -170,7 +170,9 @@ Cached content reads are wired in three places that have to agree: a `use cache`
 
 `cacheTags.test.ts` derives the expected tag list from `TAGS` itself, so adding a store without wiring its invalidation fails the unit suite. `caching.spec.ts` then checks the pages really are served from the cache (`x-nextjs-cache: HIT`), since `use cache` that has quietly stopped applying looks identical to one that works.
 
-Note that `/admin` and `/inbox` **are** prerendered and CDN-cached, correctly — both are `'use client'` shells that fetch their data in the browser with an `Authorization` header. That stops being safe the moment anyone moves one of those fetches to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+`/inbox` **is** prerendered and CDN-cached, correctly — it's a `'use client'` shell that fetches its data in the browser with an `Authorization` header. That stops being safe the moment anyone moves that fetch to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+
+`/admin` used to be the same single shared console, but became per-community (`/philly/admin`, `/ues/admin`, …) once a second community needed its own admin — see [[project-multi-community]]. It went through two designs before landing here: first a shared console with an `ADMIN_COMMUNITY_COOKIE` switcher (needed `cookies()` in the layout, which Cache Components treats as a genuine per-viewer runtime read, so the layout carried `export const instant = false` to opt out of prerendering). That's gone now — `src/app/admin/[community]/layout.tsx` resolves the community from the URL segment itself, the same way the public `[community]/layout.tsx` does, with no runtime API involved and no `instant = false` needed. `caching.spec.ts`'s admin-shell check still runs; it just finds nothing cached to check for `/admin` and still means something for `/inbox`.
 
 ## The content is not server-rendered (closed)
 

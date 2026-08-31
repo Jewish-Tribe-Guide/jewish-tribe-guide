@@ -1,7 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
+import { getCommunityAdminEmail } from './communityStore'
 
 // The single source of truth for who may administer the site: a comma-separated
 // list in the ADMIN_EMAILS env var. Add an email here to grant admin access.
+//
+// Once a community has its own admin_email set (see isAllowedForCommunity),
+// this list stops being "who can edit THIS community" and becomes the
+// superadmin list instead — used only for genuinely cross-community actions
+// (creating a new community) and site-wide singletons that were never
+// per-community to begin with (the Pages tab's About/Privacy copy, the
+// /api/admin/revalidate script hook). See getAdminUserForCommunity for the
+// per-community check that everything else should use.
 export function getAllowedAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || '')
     .split(',')
@@ -13,13 +22,22 @@ export function isAllowedAdminEmail(email: string): boolean {
   return getAllowedAdminEmails().includes(email.trim().toLowerCase())
 }
 
-// Verifies that a request carries a valid Supabase access token (Bearer) for an
-// allowlisted admin email. Returns the admin email, or null if unauthorized.
-//
-// The token is minted by the magic-link login on the /admin page and sent in the
-// Authorization header. We validate it against Supabase Auth, then check the
-// user's email against ADMIN_EMAILS before allowing any moderation action.
-export async function getAdminUser(request: Request): Promise<{ email: string } | null> {
+/** Whether `email` may administer the given community: it has to match that
+ *  community's own `admin_email` — NOT just be anywhere on the global
+ *  ADMIN_EMAILS list, which is what let one admin edit every community
+ *  before this existed. Falls back to the superadmin list only when the
+ *  community has no admin_email configured yet (both communities are in
+ *  exactly this state today — see the 2026-08 migration's own comment,
+ *  "captured, not yet enforced") so a fresh community isn't locked out
+ *  before anyone's had a chance to set one. Once an admin_email is set,
+ *  that's the only email admitted — the superadmin list no longer applies. */
+export async function isAllowedForCommunity(email: string, communitySlug: string): Promise<boolean> {
+  const configured = await getCommunityAdminEmail(communitySlug)
+  if (configured) return configured.trim().toLowerCase() === email.trim().toLowerCase()
+  return isAllowedAdminEmail(email)
+}
+
+async function verifyToken(request: Request): Promise<string | null> {
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
   if (!token) return null
 
@@ -34,7 +52,31 @@ export async function getAdminUser(request: Request): Promise<{ email: string } 
   const { data, error } = await supabase.auth.getUser(token)
   const email = data.user?.email
   if (error || !email) return null
+  return email
+}
 
-  if (!isAllowedAdminEmail(email)) return null
+// Verifies that a request carries a valid Supabase access token (Bearer) for a
+// SUPERADMIN email (the global ADMIN_EMAILS list). Returns the admin email, or
+// null if unauthorized. Only for the genuinely cross-community actions listed
+// on getAllowedAdminEmails' own comment — everything scoped to one community's
+// content should use getAdminUserForCommunity instead.
+export async function getAdminUser(request: Request): Promise<{ email: string } | null> {
+  const email = await verifyToken(request)
+  if (!email || !isAllowedAdminEmail(email)) return null
+  return { email }
+}
+
+/** Same token verification as getAdminUser, but checks the caller against one
+ *  specific community's admin (isAllowedForCommunity) instead of the global
+ *  superadmin list — the check every community-scoped admin route (category/
+ *  form/site editors, the moderation queue, …) should use, so a valid admin
+ *  session for one community can't act on another's data once their emails
+ *  diverge. */
+export async function getAdminUserForCommunity(
+  request: Request,
+  communitySlug: string,
+): Promise<{ email: string } | null> {
+  const email = await verifyToken(request)
+  if (!email || !(await isAllowedForCommunity(email, communitySlug))) return null
   return { email }
 }

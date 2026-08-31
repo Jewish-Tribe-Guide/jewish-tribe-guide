@@ -7,6 +7,8 @@ import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { getBrowserClient } from '@/lib/supabase/client'
 import type { EnrichedSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import { SubmissionCard } from './SubmissionCard'
 
 // The admin's default screen (mounted at /admin itself) — review and
@@ -15,6 +17,7 @@ import { SubmissionCard } from './SubmissionCard'
 // "Suggest a category" flow.
 
 export default function ModerationQueue({ session }: { session: Session }) {
+  const community = useCommunitySlug()
   const [items, setItems] = useState<EnrichedSubmission[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -28,7 +31,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch('/api/admin/submissions', {
+      const res = await fetch(withCommunity('/api/admin/submissions', community), {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.status === 401) {
@@ -41,7 +44,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token, session.user.email])
+  }, [token, session.user.email, community])
 
   useLoadOnMount(load)
 
@@ -49,7 +52,7 @@ export default function ModerationQueue({ session }: { session: Session }) {
     setBusyId(id)
     try {
       await fetchJson(
-        `/api/admin/submissions/${id}`,
+        withCommunity(`/api/admin/submissions/${id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

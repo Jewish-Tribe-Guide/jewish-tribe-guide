@@ -7,6 +7,8 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import ResponseCard from '@/components/responses/ResponseCard'
 import { INBOX_BASE } from '@/lib/adminNav'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // Responses for Feedback and any custom admin-created form (support/volunteer
 // excluded — those are hospital-facing and live in /inbox instead, see
@@ -20,13 +22,14 @@ const PROTECTED_FORM_IDS = new Set(['support', 'volunteer'])
 const FEEDBACK_KEY = '__feedback__'
 
 export default function ResponsesManager({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [formsError, setFormsError] = useState<string | null>(null)
   const [activeKey, setActiveKey] = useState<string>(FEEDBACK_KEY)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/admin/forms', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(withCommunity('/api/admin/forms', community), { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((body) => {
         if (cancelled) return
@@ -39,7 +42,7 @@ export default function ResponsesManager({ token }: { token: string }) {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, community])
 
   const tabs: { key: string; label: string }[] = [
     { key: FEEDBACK_KEY, label: 'Feedback' },
@@ -80,6 +83,7 @@ export default function ResponsesManager({ token }: { token: string }) {
       <ResponsesList
         key={activeKey}
         token={token}
+        community={community}
         query={activeKey === FEEDBACK_KEY ? { feedback: true } : { formId: activeKey }}
       />
     </div>
@@ -88,9 +92,11 @@ export default function ResponsesManager({ token }: { token: string }) {
 
 function ResponsesList({
   token,
+  community,
   query,
 }: {
   token: string
+  community: string
   query: { feedback: true } | { formId: string }
 }) {
   const [items, setItems] = useState<InboxResponse[] | null>(null)
@@ -103,7 +109,7 @@ function ResponsesList({
     try {
       const params = 'feedback' in query ? 'feedback=1' : `formId=${encodeURIComponent(query.formId)}`
       const body = await fetchJson<{ responses: InboxResponse[] }>(
-        `/api/admin/responses?${params}`,
+        withCommunity(`/api/admin/responses?${params}`, community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load.',
       )
@@ -114,7 +120,7 @@ function ResponsesList({
     // query is a fresh object each render; stringify-free re-run is driven by
     // ResponsesManager remounting this component via `key={activeKey}` instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -145,6 +151,7 @@ function ResponsesList({
               item={item}
               token={token}
               apiBase="/api/admin/responses"
+              community={community}
               expanded={expandedId === item.id}
               onToggle={() => setExpandedId((id) => (id === item.id ? null : item.id))}
               onUpdated={handleUpdated}

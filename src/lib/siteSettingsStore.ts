@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
+import { resolveCommunity } from './communityStore'
 import {
   DEFAULT_MOBILE_TABS,
   MAX_MOBILE_TABS,
@@ -42,8 +43,8 @@ function toMobileTabs(raw: unknown): MobileTabConfig[] {
   return tabs.length ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
 }
 
-function toSettings(row: Row | null): SiteSettings {
-  if (!row) return SITE_SETTINGS_DEFAULTS
+function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFAULTS): SiteSettings {
+  if (!row) return fallback
   return {
     name: row.name,
     tagline: row.tagline,
@@ -61,7 +62,7 @@ function toSettings(row: Row | null): SiteSettings {
   }
 }
 
-// The single settings row, or the community.config defaults if none exists
+// The single settings row, or that community's own defaults if none exists
 // yet (a fresh deployment, before the first admin edit). Uncached — reads
 // Supabase directly. Used by the admin route (read-after-write consistency,
 // same reasoning as categoryStore's listCategoriesUncached) and by
@@ -69,6 +70,14 @@ function toSettings(row: Row | null): SiteSettings {
 // merging a patch onto a stale cached snapshot if two saves land close
 // together (revalidateTag('max') marks the cache stale but doesn't purge it,
 // so a read right after a save can still return the pre-save row).
+//
+// The fallback used to be a single module-level SITE_SETTINGS_DEFAULTS built
+// from community.config.ts (the bootstrap community) — fine while only one
+// community existed, but a second community with no site_settings row yet
+// would render Philadelphia's name/tagline/mission on its own domain until an
+// admin saved something. Falls back to the resolved `community` row's own
+// branding instead, so an un-configured community reads as itself, empty,
+// rather than as someone else's site.
 export async function getSiteSettingsUncached(community: string): Promise<SiteSettings> {
   const { data, error } = await getAdminClient()
     .from('site_settings')
@@ -77,7 +86,10 @@ export async function getSiteSettingsUncached(community: string): Promise<SiteSe
     .maybeSingle()
 
   if (error) throw new Error(`Failed to load site settings: ${error.message}`)
-  return toSettings(data as Row | null)
+  if (data) return toSettings(data as Row)
+
+  const c = await resolveCommunity(community)
+  return { ...SITE_SETTINGS_DEFAULTS, name: c.name, tagline: c.tagline, mission: c.mission }
 }
 
 // Same as getSiteSettingsUncached, but cached for the public site.

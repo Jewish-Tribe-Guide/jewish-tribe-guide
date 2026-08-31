@@ -14,6 +14,8 @@ import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // Whether the Turnstile challenge is actually active for this deploy — mirrors
 // TurnstileWidget's own check. When it's not configured, the widget renders
@@ -49,6 +51,7 @@ const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
 export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile }: Props) {
+  const community = useCommunitySlug()
   const config = category
   const hasAddress = category.hasAddress !== false
   const hasPhone = category.hasPhone !== false
@@ -254,7 +257,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/submissions', {
+      const res = await fetch(withCommunity('/api/submissions', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

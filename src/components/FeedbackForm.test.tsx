@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FeedbackForm from './FeedbackForm'
 import { submitRequest } from '@/lib/submitRequest'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 
 vi.mock('@/lib/submitRequest', () => ({ submitRequest: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 afterEach(() => cleanup())
 
@@ -13,7 +20,7 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
   it('lets the visitor send a second message after the first succeeds', async () => {
     vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
     const user = userEvent.setup()
-    render(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" variant="inline" />)
 
     await user.type(screen.getByLabelText('Your feedback'), 'First note')
     await user.click(screen.getByRole('button', { name: 'Send feedback' }))
@@ -34,7 +41,7 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
   it('does not offer "Send another message" in the modal variant, which closes instead', async () => {
     vi.mocked(submitRequest).mockResolvedValue({ ok: true, requestId: 'r1' })
     const user = userEvent.setup()
-    render(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+    renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
 
     await user.type(screen.getByLabelText('Your feedback'), 'A note')
     await user.click(screen.getByRole('button', { name: 'Send feedback' }))

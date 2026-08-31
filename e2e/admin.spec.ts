@@ -28,7 +28,11 @@ import { expect, test } from '@playwright/test'
 
 test.describe('admin console', () => {
   test('shows the moderation queue for a signed-in admin, not the login form', async ({ page }) => {
-    await page.goto('/admin')
+    // /philly/admin, not bare /admin — /admin is now the standalone
+    // superadmin console (src/app/admin/page.tsx), a different page with no
+    // moderation queue on it at all. See next.config.ts's own note on why
+    // /admin no longer redirects here.
+    await page.goto('/philly/admin')
 
     await expect(page.getByText(/^Signed in as /)).toBeVisible()
     // The magic-link login form's own submit button — its absence is the
@@ -40,7 +44,7 @@ test.describe('admin console', () => {
   })
 
   test('the moderation queue loads to either real submissions or the empty state, not stuck loading', async ({ page }) => {
-    await page.goto('/admin')
+    await page.goto('/philly/admin')
 
     await expect(page.getByText('Loading submissions…')).not.toBeVisible({ timeout: 10_000 })
     const empty = page.getByText('🎉 Nothing pending — the queue is clear.')
@@ -54,7 +58,7 @@ test.describe('admin console', () => {
     const listingCategory = (body.categories as { kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing')
     test.skip(!listingCategory, 'no listing-kind category configured')
 
-    await page.goto('/admin/categories')
+    await page.goto('/philly/admin/categories')
 
     // .first(): a row also shows its own raw id in small print (e.g.
     // "childcare" under "Childcare"), which Playwright's default
@@ -68,7 +72,7 @@ test.describe('admin console', () => {
     const listingCategory = (body.categories as { kind: string; pluralLabel: string }[]).find((c) => c.kind === 'listing')
     test.skip(!listingCategory, 'no listing-kind category configured')
 
-    await page.goto('/admin/categories')
+    await page.goto('/philly/admin/categories')
     // Scoped to the row's own card (CategoryRow's outer element — see
     // CategoryManager.tsx) rather than any div containing the text, which
     // matched ancestor containers wrapping the whole list and made `.last()`
@@ -80,7 +84,7 @@ test.describe('admin console', () => {
     // Read-only: navigate back out via the editor's own Cancel/Back control
     // rather than Save, leaving nothing changed.
     await page.getByRole('button', { name: /Back to categories/i }).click()
-    await expect(page).toHaveURL(/\/admin\/categories$/)
+    await expect(page).toHaveURL(/\/philly\/admin\/categories$/)
   })
 
   test('the Site tab shows the real saved site name and tagline', async ({ page, request }) => {
@@ -88,7 +92,7 @@ test.describe('admin console', () => {
     const body = await res.json()
     const settings = body.settings as { name: string; tagline: string }
 
-    await page.goto('/admin/site')
+    await page.goto('/philly/admin/site')
 
     // Not getByLabel, and not a plain hasText filter: each <label> also
     // wraps its own trailing helper text, which folds into the computed
@@ -102,14 +106,14 @@ test.describe('admin console', () => {
   })
 
   test('the Desktop & mobile tab loads without error', async ({ page }) => {
-    await page.goto('/admin/home')
+    await page.goto('/philly/admin/home')
 
     await expect(page.getByText('Featured cards')).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 
   test('the Metrics tab shows real submission stats, not stuck loading', async ({ page }) => {
-    await page.goto('/admin/metrics')
+    await page.goto('/philly/admin/metrics')
 
     // Loading text should resolve to a real number, not sit forever — and
     // "Approved"/"Rejected" tiles always render even with zero decided
@@ -121,7 +125,7 @@ test.describe('admin console', () => {
   })
 
   test('opening the Site tab’s preview shows the live home screen, and closes back to the editor untouched', async ({ page }) => {
-    await page.goto('/admin/site')
+    await page.goto('/philly/admin/site')
     await page.getByRole('button', { name: 'Preview' }).click()
 
     // The preview is a real iframe of the live site — its own frame, not

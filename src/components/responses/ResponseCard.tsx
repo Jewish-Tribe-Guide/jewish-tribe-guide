@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { ContactHospitalData } from '@/types'
 import type { InboxResponse } from '@/lib/inbox'
 import { fetchJson } from '@/lib/fetchJson'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // Shared response card — expandable, editable, deletable — used by both
 // /inbox (hospital-facing: support/volunteer/volunteer changes) and /admin's
@@ -46,6 +47,7 @@ export default function ResponseCard({
   item,
   token,
   apiBase,
+  community,
   expanded,
   onToggle,
   onUpdated,
@@ -55,6 +57,11 @@ export default function ResponseCard({
   token: string
   /** e.g. '/api/inbox' or '/api/admin/responses' — PATCH/DELETE go to `${apiBase}/${item.id}`. */
   apiBase: string
+  /** Sent as `?community=` on PATCH/DELETE — admin's own auth check is
+   *  per-community (see adminAuth.ts's getAdminUserForCommunity), so it has
+   *  to know which community it's authorizing against. Omitted by /inbox,
+   *  which has no per-community split (see formResponseStore.ts's own note). */
+  community?: string
   expanded: boolean
   onToggle: () => void
   onUpdated: (item: InboxResponse) => void
@@ -86,7 +93,7 @@ export default function ResponseCard({
     setError(null)
     try {
       const body = await fetchJson<{ response: InboxResponse }>(
-        `${apiBase}/${item.id}`,
+        community ? withCommunity(`${apiBase}/${item.id}`, community) : `${apiBase}/${item.id}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -108,7 +115,7 @@ export default function ResponseCard({
     setError(null)
     try {
       await fetchJson(
-        `${apiBase}/${item.id}`,
+        community ? withCommunity(`${apiBase}/${item.id}`, community) : `${apiBase}/${item.id}`,
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )

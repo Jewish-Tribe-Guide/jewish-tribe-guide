@@ -23,7 +23,7 @@
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
-import { CACHE_TEST_ADMIN_EMAIL } from './cacheE2eAdmin.mjs'
+import { CACHE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from './cacheE2eAdmin.mjs'
 import { FORM_E2E_FORM_ID } from './formE2eConstants.mjs'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
@@ -150,12 +150,25 @@ async function ensureMinimalContent() {
 
 const PORT = process.env.CACHE_E2E_PORT || '3211'
 
+// Superadmin-gated routes (getAdminUser, e.g. GET /api/admin/pages — see
+// adminAuth.ts's own comment on what's still superadmin-only) check this
+// list directly, never the per-community admin_email. Both auth.setup.ts
+// files mint a session for whichever email resolveDefaultCommunityAdminEmail
+// resolves — CACHE_TEST_ADMIN_EMAIL on a pristine test project, or the
+// default community's real admin_email once one's configured on a shared
+// project (see that function's own comment). This list has to include
+// BOTH: the per-community check alone would already accept the resolved
+// email once admin_email is set, but the global superadmin check wouldn't
+// unless it's listed here too.
+const testAdminEmail = await resolveDefaultCommunityAdminEmail(url, serviceRoleKey)
+const adminEmails = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, testAdminEmail])).join(',')
+
 const env = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: url,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-  ADMIN_EMAILS: CACHE_TEST_ADMIN_EMAIL,
+  ADMIN_EMAILS: adminEmails,
   // Its own build output, derived from the port rather than a separate env
   // var — each config already sets a distinct CACHE_E2E_PORT, so this can't
   // collide with whatever the real e2e suite, the other test-project suite,

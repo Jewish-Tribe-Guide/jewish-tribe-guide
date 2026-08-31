@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { countCategoryFieldUsage } from '@/lib/resourceStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   address?: boolean
@@ -14,7 +15,8 @@ type Body = {
 // existing category, so it can warn the admin how much data would be
 // orphaned before they save. Read-only; admin only.
 export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/categories/[id]/field-usage'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -27,7 +29,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<'/api/admin/c
   }
 
   try {
-    const usage = await countCategoryFieldUsage(id, body)
+    const usage = await countCategoryFieldUsage(community.slug, id, body)
     return Response.json({ ok: true, usage })
   } catch (err) {
     console.error('[admin/categories/:id/field-usage] POST failed:', err)

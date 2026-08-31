@@ -1,12 +1,21 @@
 import { getAdminClient } from '@/lib/supabase/admin'
 import { getAllowedAdminEmails } from '@/lib/adminAuth'
+import { getCommunityAdminEmail } from '@/lib/communityStore'
 
-// POST /api/admin/dev-login  body: { secret }
+// POST /api/admin/dev-login  body: { secret, community? }
 //
 // Local-development-only shortcut: mints a real admin session server-side (via
 // the same admin.generateLink Supabase Auth uses for the magic-link email) and
 // returns its tokens directly, so /admin can call supabase.auth.setSession()
-// with them — no email round-trip needed while iterating locally.
+// with them — no email round-trip needed while iterating locally. Mints a
+// session for the COMMUNITY's own configured admin_email (falling back to
+// ADMIN_EMAILS[0] if that community hasn't set one yet — true for both
+// communities as of writing), so /philly/admin?devToken=... and
+// /ues/admin?devToken=... sign you in as whichever community's admin the URL
+// actually names, once those genuinely diverge, instead of always the same
+// address regardless of which console you're testing. `community` omitted —
+// as it is from the standalone superadmin console at /admin?devToken=... —
+// mints a session for ADMIN_EMAILS[0] directly, the superadmin identity.
 //
 // Refuses outright unless BOTH of these hold, so it's structurally incapable of
 // weakening a real deployment even if DEV_ADMIN_BYPASS_SECRET leaked:
@@ -24,9 +33,11 @@ export async function POST(request: Request) {
   }
 
   let secret: string
+  let communitySlug: string
   try {
-    const body = (await request.json()) as { secret?: string }
+    const body = (await request.json()) as { secret?: string; community?: string }
     secret = body.secret || ''
+    communitySlug = (body.community || '').trim()
   } catch {
     return Response.json({ ok: false, error: 'Invalid request body.' }, { status: 400 })
   }
@@ -35,7 +46,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: 'Wrong secret.' }, { status: 401 })
   }
 
-  const email = getAllowedAdminEmails()[0]
+  const email = (communitySlug ? await getCommunityAdminEmail(communitySlug) : null) || getAllowedAdminEmails()[0]
   if (!email) {
     return Response.json({ ok: false, error: 'No ADMIN_EMAILS configured.' }, { status: 500 })
   }

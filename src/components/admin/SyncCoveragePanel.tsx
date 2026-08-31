@@ -3,6 +3,8 @@
 import { useCallback, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import type { SyncCoverage, SyncCheckField, ClosureReport, PendingFirstSyncReport } from '@/lib/syncCoverage'
 import type { BusinessStatus } from '@/lib/hours'
 
@@ -54,11 +56,13 @@ function Section({
 // comes back as `matches: false` and the row quietly stays protected.
 function ResumeSyncButton({
   token,
+  community,
   resourceId,
   field,
   onResumed,
 }: {
   token: string
+  community: string
   resourceId: string
   field: SyncCheckField['field']
   onResumed: (field: SyncCheckField['field'], matched: boolean) => void
@@ -71,7 +75,7 @@ function ResumeSyncButton({
     setError(null)
     try {
       const body = await fetchJson<{ result: SyncCheckField }>(
-        '/api/admin/sync-coverage/resume',
+        withCommunity('/api/admin/sync-coverage/resume', community),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -104,10 +108,12 @@ function ResumeSyncButton({
 
 function CheckAgainstGoogle({
   token,
+  community,
   resourceId,
   onFieldResumed,
 }: {
   token: string
+  community: string
   resourceId: string
   onFieldResumed: (field: SyncCheckField['field']) => void
 }) {
@@ -120,7 +126,7 @@ function CheckAgainstGoogle({
     setError(null)
     try {
       const body = await fetchJson<{ fields: SyncCheckField[] }>(
-        '/api/admin/sync-coverage/check',
+        withCommunity('/api/admin/sync-coverage/check', community),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -148,6 +154,7 @@ function CheckAgainstGoogle({
                 {' — '}
                 <ResumeSyncButton
                   token={token}
+                  community={community}
                   resourceId={resourceId}
                   field={f.field}
                   onResumed={(field, matched) => {
@@ -198,10 +205,12 @@ const STATUS_WORDS: Record<BusinessStatus, string> = {
 function ClosureRow({
   listing,
   token,
+  community,
   onChanged,
 }: {
   listing: ClosureReport
   token: string
+  community: string
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
@@ -211,7 +220,7 @@ function ClosureRow({
     setBusy(true)
     setError(null)
     try {
-      await fetchJson('/api/admin/sync-coverage/override', {
+      await fetchJson(withCommunity('/api/admin/sync-coverage/override', community), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ id: listing.id, status }),
@@ -277,6 +286,7 @@ function ClosureRow({
 }
 
 export default function SyncCoveragePanel({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [coverage, setCoverage] = useState<SyncCoverage | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -284,7 +294,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
     setError(null)
     try {
       const body = await fetchJson<{ coverage: SyncCoverage }>(
-        '/api/admin/sync-coverage',
+        withCommunity('/api/admin/sync-coverage', community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load sync coverage.',
       )
@@ -292,7 +302,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -346,7 +356,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
                 </li>
               ))}
             </ul>
-            <CheckAgainstGoogle token={token} resourceId={l.id} onFieldResumed={() => load()} />
+            <CheckAgainstGoogle token={token} community={community} resourceId={l.id} onFieldResumed={() => load()} />
           </div>
         ))}
       </Section>
@@ -380,6 +390,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
             key={l.id}
             listing={{ ...l, googleStatus: l.addedStatus, override: null, changedAt: null }}
             token={token}
+            community={community}
             onChanged={() => load()}
           />
         ))}
@@ -391,7 +402,7 @@ export default function SyncCoveragePanel({ token }: { token: string }) {
         count={coverage.closures.length}
       >
         {coverage.closures.map((l) => (
-          <ClosureRow key={l.id} listing={l} token={token} onChanged={() => load()} />
+          <ClosureRow key={l.id} listing={l} token={token} community={community} onChanged={() => load()} />
         ))}
       </Section>
     </div>

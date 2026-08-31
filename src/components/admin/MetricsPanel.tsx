@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
 import type { SubmissionFunnelStats } from '@/lib/submissionStore'
-import { ADMIN_BASE } from '@/lib/adminNav'
+import { adminBase } from '@/lib/adminNav'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import SyncCoveragePanel from './SyncCoveragePanel'
 
 // The 'metrics' tab in /admin: how many submissions are waiting, the
@@ -45,6 +47,7 @@ function StatTile({ label, value, sub, href }: { label: string; value: string; s
 }
 
 export default function MetricsPanel({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [stats, setStats] = useState<SubmissionFunnelStats | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +55,7 @@ export default function MetricsPanel({ token }: { token: string }) {
     setError(null)
     try {
       const body = await fetchJson<{ stats: SubmissionFunnelStats }>(
-        '/api/admin/metrics',
+        withCommunity('/api/admin/metrics', community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load metrics.',
       )
@@ -60,7 +63,7 @@ export default function MetricsPanel({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -75,9 +78,9 @@ export default function MetricsPanel({ token }: { token: string }) {
         The submission moderation queue, all time — how much is waiting, and how it&rsquo;s been handled.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatTile label="Pending" value={String(stats.pending)} href={ADMIN_BASE} />
-        <StatTile label="Approved" value={String(stats.approved)} href={`${ADMIN_BASE}/history/approved`} />
-        <StatTile label="Rejected" value={String(stats.rejected)} href={`${ADMIN_BASE}/history/rejected`} />
+        <StatTile label="Pending" value={String(stats.pending)} href={adminBase(community)} />
+        <StatTile label="Approved" value={String(stats.approved)} href={`${adminBase(community)}/history/approved`} />
+        <StatTile label="Rejected" value={String(stats.rejected)} href={`${adminBase(community)}/history/rejected`} />
         <StatTile
           label="Approval rate"
           value={formatPercent(stats.approvalRate)}

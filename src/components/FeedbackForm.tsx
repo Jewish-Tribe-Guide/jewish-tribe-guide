@@ -6,6 +6,7 @@ import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
 import PrivacyNote from '@/components/PrivacyNote'
 import type { ContactHospitalData } from '@/types'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 type Props = {
   heading: string
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export default function FeedbackForm({ heading, successMessage, variant = 'modal', onClose }: Props) {
+  const community = useCommunitySlug()
   const [message, setMessage] = useState('')
   const [email, setEmail] = useState('')
   const [honeypot, setHoneypot] = useState('')
@@ -41,7 +43,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
         hospitalId: '',
         unitFloorRoom: '',
       }
-      await submitRequest('Feedback', contact, { message: message.trim() }, honeypot, turnstileToken)
+      await submitRequest(community, 'Feedback', contact, { message: message.trim() }, honeypot, turnstileToken)
       setStatus('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')

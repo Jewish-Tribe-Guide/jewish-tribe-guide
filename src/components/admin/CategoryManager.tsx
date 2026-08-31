@@ -5,6 +5,8 @@ import { CATEGORY_CAPABILITY_KEYS, resolveCapabilities, type CategoryConfig } fr
 import type { FormConfig } from '@/lib/forms'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
 import { CardBackgroundField, IconField } from './CategoryFormFields'
@@ -62,6 +64,7 @@ export default function CategoryManager({
   onOpenEditor: (id: string) => void
   onCloseEditor: () => void
 }) {
+  const community = useCommunitySlug()
   const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
   const [forms, setForms] = useState<FormConfig[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -74,8 +77,8 @@ export default function CategoryManager({
     setError(null)
     try {
       const [catRes, formRes] = await Promise.all([
-        fetch('/api/admin/categories', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/admin/forms', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/categories', community), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(withCommunity('/api/admin/forms', community), { headers: { Authorization: `Bearer ${token}` } }),
       ])
       const catBody = await parseOkJson<{ categories: CategoryConfig[] }>(catRes, 'Failed to load categories.')
       const formBody = await parseOkJson<{ forms: FormConfig[] }>(formRes, 'Failed to load forms.')
@@ -84,7 +87,7 @@ export default function CategoryManager({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -108,7 +111,7 @@ export default function CategoryManager({
     try {
       const label = SINGLETON_KIND_LABELS[kind]
       await fetchJson(
-        '/api/admin/categories',
+        withCommunity('/api/admin/categories', community),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -132,7 +135,7 @@ export default function CategoryManager({
     setTogglingId(id)
     try {
       await fetchJson(
-        `/api/admin/categories/${id}`,
+        withCommunity(`/api/admin/categories/${id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -156,7 +159,7 @@ export default function CategoryManager({
     setTogglingId(`${FORM_PREFIX}${id}`)
     try {
       await fetchJson(
-        `/api/admin/forms/${id}/active`,
+        withCommunity(`/api/admin/forms/${id}/active`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -177,7 +180,7 @@ export default function CategoryManager({
     setDeletingId(id)
     try {
       await fetchJson(
-        `/api/admin/categories/${id}`,
+        withCommunity(`/api/admin/categories/${id}`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )
@@ -197,7 +200,7 @@ export default function CategoryManager({
     setDeletingId(`${FORM_PREFIX}${id}`)
     try {
       await fetchJson(
-        `/api/admin/forms/${id}`,
+        withCommunity(`/api/admin/forms/${id}`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )
@@ -628,6 +631,7 @@ export function SingletonEditor({
   onSaved: () => void
   onCancel: () => void
 }) {
+  const community = useCommunitySlug()
   const [name, setName] = useState(category.pluralLabel)
   const [icon, setIcon] = useState(category.icon || '')
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
@@ -650,7 +654,7 @@ export function SingletonEditor({
     setSaving(true)
     try {
       await fetchJson(
-        `/api/admin/categories/${category.id}`,
+        withCommunity(`/api/admin/categories/${category.id}`, community),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

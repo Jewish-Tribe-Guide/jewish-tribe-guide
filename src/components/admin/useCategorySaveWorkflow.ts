@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CategoryConfig } from '@/lib/categories'
 import { fetchJson } from '@/lib/fetchJson'
+import { withCommunity } from '@/lib/useCommunityData'
 import {
   detectOptionRenames,
   fieldsWithRenamedShowIf,
@@ -21,12 +22,14 @@ export function useCategorySaveWorkflow({
   initial,
   isNew,
   token,
+  community,
   onSaved,
 }: {
   draft: Draft
   initial: CategoryConfig | null
   isNew: boolean
   token: string
+  community: string
   onSaved: () => void
 }) {
   const [saving, setSaving] = useState(false)
@@ -80,7 +83,7 @@ export function useCategorySaveWorkflow({
         setSaving(true)
         try {
           const body = await fetchJson<{ usage: { fieldKey: string; oldValue: string; newValue: string; count: number }[] }>(
-            `/api/admin/categories/${initial!.id}/option-usage`,
+            withCommunity(`/api/admin/categories/${initial!.id}/option-usage`, community),
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -117,7 +120,7 @@ export function useCategorySaveWorkflow({
         setSaving(true)
         try {
           const body = await fetchJson<{ usage: { address: number; phone: number; fields: Record<string, number> } }>(
-            `/api/admin/categories/${initial!.id}/field-usage`,
+            withCommunity(`/api/admin/categories/${initial!.id}/field-usage`, community),
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -185,7 +188,7 @@ export function useCategorySaveWorkflow({
           }),
       }
       await fetchJson(
-        isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`,
+        withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),
         {
           method: isNew ? 'POST' : 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

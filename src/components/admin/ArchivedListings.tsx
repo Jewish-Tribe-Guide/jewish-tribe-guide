@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react'
 import type { ResourceRow } from '@/types'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson } from '@/lib/fetchJson'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
 
 // The 'archived' tab in /admin: listings soft-deleted by an approved removal
 // report (see submissionStore.ts) — hidden from the public site but kept in
@@ -14,6 +16,7 @@ import { fetchJson } from '@/lib/fetchJson'
 type ArchivedListing = ResourceRow & { categoryLabel: string }
 
 export default function ArchivedListings({ token }: { token: string }) {
+  const community = useCommunitySlug()
   const [listings, setListings] = useState<ArchivedListing[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -23,7 +26,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     setError(null)
     try {
       const body = await fetchJson<{ listings: ArchivedListing[] }>(
-        '/api/admin/archived-listings',
+        withCommunity('/api/admin/archived-listings', community),
         { headers: { Authorization: `Bearer ${token}` } },
         'Failed to load.',
       )
@@ -31,7 +34,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
-  }, [token])
+  }, [token, community])
 
   useLoadOnMount(load)
 
@@ -40,7 +43,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     setError(null)
     try {
       await fetchJson(
-        `/api/admin/archived-listings/${id}`,
+        withCommunity(`/api/admin/archived-listings/${id}`, community),
         { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } },
         'Restore failed.',
       )
@@ -57,7 +60,7 @@ export default function ArchivedListings({ token }: { token: string }) {
     setError(null)
     try {
       await fetchJson(
-        `/api/admin/archived-listings/${id}`,
+        withCommunity(`/api/admin/archived-listings/${id}`, community),
         { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
         'Delete failed.',
       )

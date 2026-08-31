@@ -1,18 +1,19 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { getSiteSettingsUncached, updateSiteSettings } from '@/lib/siteSettingsStore'
 import { MAX_MOBILE_TABS, type SiteSettings } from '@/lib/siteSettings'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/site-settings — the current settings, for the admin editor.
 // Admin only (same data as the public route, just auth-gated for symmetry
 // with the rest of /admin).
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const settings = await getSiteSettingsUncached((await getDefaultCommunity()).slug)
+    const settings = await getSiteSettingsUncached(community.slug)
     return Response.json({ ok: true, settings })
   } catch (err) {
     console.error('[admin/site-settings] GET failed:', err)
@@ -24,7 +25,8 @@ export async function GET(request: Request) {
 // effect immediately (no draft/publish step — this is plain copy, not
 // branching structure). Admin only.
 export async function PATCH(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   let body: Partial<SiteSettings>
@@ -71,7 +73,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const settings = await updateSiteSettings((await getDefaultCommunity()).slug, body)
+    const settings = await updateSiteSettings(community.slug, body)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, settings })

@@ -24,9 +24,9 @@ describe('submitRequest', () => {
     const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ ok: true, requestId: 'REQ-1' }))
     vi.stubGlobal('fetch', fetchSpy)
 
-    await submitRequest('Direct Support', contact, { note: 'x' }, 'trap-value', 'turnstile-token', 'form-1')
+    await submitRequest('philly', 'Direct Support', contact, { note: 'x' }, 'trap-value', 'turnstile-token', 'form-1')
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/requests', {
+    expect(fetchSpy).toHaveBeenCalledWith('/api/requests?community=philly', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -42,7 +42,7 @@ describe('submitRequest', () => {
 
   it('resolves with the request id on success', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: true, requestId: 'REQ-42' })))
-    const result = await submitRequest('Direct Support', contact, {})
+    const result = await submitRequest('philly', 'Direct Support', contact, {})
     expect(result).toEqual({ ok: true, requestId: 'REQ-42' })
   })
 
@@ -51,21 +51,21 @@ describe('submitRequest', () => {
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ ok: false, errors: ['Name is required.', 'Phone is invalid.'] }, false)),
     )
-    await expect(submitRequest('Direct Support', contact, {})).rejects.toThrow(
+    await expect(submitRequest('philly', 'Direct Support', contact, {})).rejects.toThrow(
       'Name is required. Phone is invalid.',
     )
   })
 
   it('throws a generic message when ok but body.ok is falsy with no errors array', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false })))
-    await expect(submitRequest('Direct Support', contact, {})).rejects.toThrow(
+    await expect(submitRequest('philly', 'Direct Support', contact, {})).rejects.toThrow(
       'Something went wrong. Please try again.',
     )
   })
 
   it('throws a network-specific message when fetch itself throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
-    await expect(submitRequest('Direct Support', contact, {})).rejects.toThrow(
+    await expect(submitRequest('philly', 'Direct Support', contact, {})).rejects.toThrow(
       'Network error. Please check your connection and try again.',
     )
   })
@@ -79,7 +79,7 @@ describe('submitRequest', () => {
     } as unknown as Response)
     vi.stubGlobal('fetch', fetchSpy)
 
-    await expect(submitRequest('Direct Support', contact, {})).rejects.toThrow(
+    await expect(submitRequest('philly', 'Direct Support', contact, {})).rejects.toThrow(
       'Something went wrong. Please try again.',
     )
   })

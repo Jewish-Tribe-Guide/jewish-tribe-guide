@@ -140,55 +140,66 @@ describe('getResourceById', () => {
 // ── Archived listings ────────────────────────────────────────────────────────
 
 describe('listArchivedResources', () => {
-  it('scopes to archived status, newest-removed first', async () => {
+  it('scopes to the given community and archived status, newest-removed first', async () => {
     const builder = chainable({ data: [], error: null })
     mockFrom.mockReturnValue(builder)
 
-    await listArchivedResources()
+    await listArchivedResources('philly')
 
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
     expect(builder.eq).toHaveBeenCalledWith('status', 'archived')
     expect(builder.order).toHaveBeenCalledWith('reviewed_at', { ascending: false })
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(listArchivedResources()).rejects.toThrow('Failed to load archived listings: boom')
+    await expect(listArchivedResources('philly')).rejects.toThrow('Failed to load archived listings: boom')
   })
 })
 
 describe('restoreResource', () => {
-  it('scopes the restore to currently-archived rows, setting status back to approved', async () => {
+  it('scopes the restore to the given community and currently-archived rows, setting status back to approved', async () => {
     const builder = chainable({ data: { id: 'res-1', status: 'approved' }, error: null })
     mockFrom.mockReturnValue(builder)
 
-    const result = await restoreResource('res-1')
+    const result = await restoreResource('res-1', 'philly')
 
     expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }))
     expect(builder.eq).toHaveBeenCalledWith('id', 'res-1')
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
     expect(builder.eq).toHaveBeenCalledWith('status', 'archived')
     expect(result?.status).toBe('approved')
   })
 
   it('returns null when the row is not currently archived (or missing)', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await restoreResource('res-1')).toBeNull()
+    expect(await restoreResource('res-1', 'philly')).toBeNull()
+  })
+
+  // Regression: restoreResource used to be scoped only by id/status, so a
+  // valid admin token for one community could restore an archived listing
+  // that actually belongs to a DIFFERENT community, by id alone.
+  it('does not restore a listing that belongs to a different community', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    const result = await restoreResource('ues-listing', 'philly')
+    expect(result).toBeNull()
   })
 })
 
 describe('hardDeleteArchivedResource', () => {
   it('returns true when a row was actually deleted', async () => {
     mockFrom.mockReturnValue(chainable({ data: { id: 'res-1' }, error: null }))
-    expect(await hardDeleteArchivedResource('res-1')).toBe(true)
+    expect(await hardDeleteArchivedResource('res-1', 'philly')).toBe(true)
   })
 
   it('returns false when no archived row matched (nothing deleted)', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await hardDeleteArchivedResource('res-1')).toBe(false)
+    expect(await hardDeleteArchivedResource('res-1', 'philly')).toBe(false)
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(hardDeleteArchivedResource('res-1')).rejects.toThrow(
+    await expect(hardDeleteArchivedResource('res-1', 'philly')).rejects.toThrow(
       'Failed to permanently delete listing: boom',
     )
   })
@@ -312,29 +323,33 @@ describe('validateSubmission', () => {
 
 describe('countCategoryFieldUsage', () => {
   it('counts listings with real data in address/phone/each requested field', async () => {
-    mockFrom.mockReturnValue(
-      chainable({
-        data: [
-          { address: '123 Main St', phone: '', details: { kosher: ['OU'] } },
-          { address: '', phone: '215-555-0100', details: {} },
-          { address: null, phone: null, details: { kosher: [] } }, // empty array doesn't count
-        ],
-        error: null,
-      }),
-    )
+    const builder = chainable({
+      data: [
+        { address: '123 Main St', phone: '', details: { kosher: ['OU'] } },
+        { address: '', phone: '215-555-0100', details: {} },
+        { address: null, phone: null, details: { kosher: [] } }, // empty array doesn't count
+      ],
+      error: null,
+    })
+    mockFrom.mockReturnValue(builder)
 
-    const result = await countCategoryFieldUsage('synagogue', {
+    const result = await countCategoryFieldUsage('philly', 'synagogue', {
       address: true,
       phone: true,
       fieldKeys: ['kosher'],
     })
 
     expect(result).toEqual({ address: 1, phone: 1, fields: { kosher: 1 } })
+    // Regression: this used to filter on `category` alone — since
+    // resource.category has no per-community uniqueness of its own, that
+    // counted (and, in clearCategoryFieldData, actually cleared) a
+    // same-named category's listings from EVERY community, not just this one.
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(countCategoryFieldUsage('synagogue', {})).rejects.toThrow(
+    await expect(countCategoryFieldUsage('philly', 'synagogue', {})).rejects.toThrow(
       'Failed to check existing listings: boom',
     )
   })
@@ -358,7 +373,7 @@ describe('clearCategoryFieldData', () => {
       return call === 1 ? selectBuilder : updateBuilder
     })
 
-    const result = await clearCategoryFieldData('synagogue', { address: true })
+    const result = await clearCategoryFieldData('philly', 'synagogue', { address: true })
 
     expect(result).toEqual({ updated: 1 })
     expect(updateBuilder.update).toHaveBeenCalledWith({
@@ -373,7 +388,7 @@ describe('clearCategoryFieldData', () => {
     const updateBuilder = chainable({ error: null })
     mockFrom.mockImplementation(() => (mockFrom.mock.calls.length === 1 ? selectBuilder : updateBuilder))
 
-    const result = await clearCategoryFieldData('synagogue', { address: true, phone: true })
+    const result = await clearCategoryFieldData('philly', 'synagogue', { address: true, phone: true })
 
     expect(result).toEqual({ updated: 0 })
     expect(updateBuilder.update).not.toHaveBeenCalled()
@@ -389,14 +404,14 @@ describe('clearCategoryFieldData', () => {
       return call === 1 ? selectBuilder : updateBuilder
     })
 
-    await clearCategoryFieldData('synagogue', { fieldKeys: ['hours'] })
+    await clearCategoryFieldData('philly', 'synagogue', { fieldKeys: ['hours'] })
 
     expect(updateBuilder.update).toHaveBeenCalledWith({ details: {} })
   })
 
   it('throws with the Supabase error message when the read fails', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(clearCategoryFieldData('synagogue', { address: true })).rejects.toThrow(
+    await expect(clearCategoryFieldData('philly', 'synagogue', { address: true })).rejects.toThrow(
       'Failed to load existing listings: boom',
     )
   })
@@ -411,7 +426,7 @@ describe('clearCategoryFieldData', () => {
       return call === 1 ? selectBuilder : updateBuilder
     })
 
-    await expect(clearCategoryFieldData('synagogue', { address: true })).rejects.toThrow(
+    await expect(clearCategoryFieldData('philly', 'synagogue', { address: true })).rejects.toThrow(
       'Failed to clear data for a listing: write failed',
     )
   })
@@ -430,7 +445,7 @@ describe('countFieldOptionUsage', () => {
       }),
     )
 
-    const result = await countFieldOptionUsage('synagogue', [
+    const result = await countFieldOptionUsage('philly', 'synagogue', [
       { fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' },
     ])
 
@@ -439,7 +454,7 @@ describe('countFieldOptionUsage', () => {
 
   it('returns zero counts (not an error) when there are no matching rows', async () => {
     mockFrom.mockReturnValue(chainable({ data: [], error: null }))
-    const result = await countFieldOptionUsage('synagogue', [
+    const result = await countFieldOptionUsage('philly', 'synagogue', [
       { fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' },
     ])
     expect(result[0].count).toBe(0)
@@ -448,7 +463,7 @@ describe('countFieldOptionUsage', () => {
 
 describe('applyFieldOptionRenames', () => {
   it('returns immediately with zero updates when given no renames (skips the query entirely)', async () => {
-    const result = await applyFieldOptionRenames('synagogue', [])
+    const result = await applyFieldOptionRenames('philly', 'synagogue', [])
     expect(result).toEqual({ updated: 0 })
     expect(mockFrom).not.toHaveBeenCalled()
   })
@@ -463,7 +478,7 @@ describe('applyFieldOptionRenames', () => {
       return call === 1 ? selectBuilder : updateBuilder
     })
 
-    const result = await applyFieldOptionRenames('synagogue', [
+    const result = await applyFieldOptionRenames('philly', 'synagogue', [
       { fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' },
     ])
 
@@ -481,7 +496,7 @@ describe('applyFieldOptionRenames', () => {
       return call === 1 ? selectBuilder : updateBuilder
     })
 
-    await applyFieldOptionRenames('synagogue', [
+    await applyFieldOptionRenames('philly', 'synagogue', [
       { fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' },
     ])
 
@@ -494,7 +509,7 @@ describe('applyFieldOptionRenames', () => {
     const updateBuilder = chainable({ error: null })
     mockFrom.mockImplementation(() => (mockFrom.mock.calls.length === 1 ? selectBuilder : updateBuilder))
 
-    const result = await applyFieldOptionRenames('synagogue', [
+    const result = await applyFieldOptionRenames('philly', 'synagogue', [
       { fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' },
     ])
 
@@ -513,7 +528,7 @@ describe('applyFieldOptionRenames', () => {
     })
 
     await expect(
-      applyFieldOptionRenames('synagogue', [{ fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' }]),
+      applyFieldOptionRenames('philly', 'synagogue', [{ fieldKey: 'kosher', oldValue: 'OU', newValue: 'Orthodox Union' }]),
     ).rejects.toThrow("Failed to migrate a listing's data: write failed")
   })
 })

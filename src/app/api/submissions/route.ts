@@ -16,7 +16,7 @@ import { normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import { ui } from '@/lib/uiConfig'
 import type { ResourceSubmission, SubmissionRow } from '@/types'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type Body = {
   operation?: 'create' | 'update' | 'delete'
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     )
   }
 
+  const community = await resolveCommunity(communitySlugFromRequest(request))
   const { operation, targetType = 'listing', targetId, note } = body
   const submittedBy = body.submittedBy ?? null
 
@@ -104,7 +105,15 @@ export async function POST(request: Request) {
   // Fetched once and reused below both for the per-category capability gate
   // and (for an update) the "did this actually change anything" check —
   // rather than hitting the resource table twice for the same row.
-  const existingResource = targetId ? await getResourceById(targetId) : null
+  const existingResource = targetId ? await getResourceById(targetId, community.slug) : null
+  // targetId scoped to the wrong community (or just made up) reads back as
+  // null now that getResourceById is community-scoped — reject explicitly
+  // rather than letting an update/delete fall through and file a submission
+  // against a listing in a DIFFERENT community than the one this request is
+  // posting to.
+  if (targetId && !existingResource) {
+    return Response.json({ ok: false, errors: ['Listing not found.'] }, { status: 404 })
+  }
 
   // Per-category gate: on top of the global `ui.contributions` check above, the
   // target category can independently turn add/edit/report off. Resolve the
@@ -112,7 +121,7 @@ export async function POST(request: Request) {
   // so a disabled per-category button can't be bypassed by posting directly.
   const categoryId = operation === 'create' ? payload?.category : existingResource?.category
   if (categoryId) {
-    const cat = await getCategoryById((await getDefaultCommunity()).slug, categoryId)
+    const cat = await getCategoryById(community.slug, categoryId)
     if (cat) {
       const caps = resolveCapabilities(cat.capabilities)
       const capOk =
@@ -127,7 +136,7 @@ export async function POST(request: Request) {
   }
 
   if (payload) {
-    const category = await getCategoryById((await getDefaultCommunity()).slug, payload.category)
+    const category = await getCategoryById(community.slug, payload.category)
     // Nobody types the "https://" scheme by hand for a website field — add it
     // before validating (so a bare "example.com" isn't rejected) and before
     // storing (so the saved value is still a real, working link — the card
@@ -157,11 +166,14 @@ export async function POST(request: Request) {
   let submission: SubmissionRow
   try {
     if (operation === 'create') {
-      submission = await submitListingCreate({ ...payload!, submittedBy: submittedBy ?? undefined })
+      submission = await submitListingCreate(community.slug, {
+        ...payload!,
+        submittedBy: submittedBy ?? undefined,
+      })
     } else if (operation === 'update') {
-      submission = await submitListingUpdate(targetId!, payload!, note ?? null, submittedBy)
+      submission = await submitListingUpdate(community.slug, targetId!, payload!, note ?? null, submittedBy)
     } else {
-      submission = await submitListingDelete(targetId!, note ?? null, submittedBy)
+      submission = await submitListingDelete(community.slug, targetId!, note ?? null, submittedBy)
     }
   } catch (err) {
     console.error('[submissions] insert failed:', err)

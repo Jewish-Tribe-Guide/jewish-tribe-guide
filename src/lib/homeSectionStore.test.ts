@@ -95,7 +95,7 @@ describe('createHomeSection', () => {
       return insertBuilder
     })
 
-    const result = await createHomeSection({ title: 'Nearby' })
+    const result = await createHomeSection('philly', { title: 'Nearby' })
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ id: 'nearby-2' }))
     expect(result.id).toBe('nearby-2')
   })
@@ -110,7 +110,7 @@ describe('createHomeSection', () => {
       return insertBuilder
     })
 
-    await createHomeSection({ title: 'New Section' })
+    await createHomeSection('philly', { title: 'New Section' })
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ card_ids: [], sort_order: 300 }),
@@ -127,7 +127,7 @@ describe('createHomeSection', () => {
       return insertBuilder
     })
 
-    await createHomeSection({ title: 'First Section' })
+    await createHomeSection('philly', { title: 'First Section' })
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ sort_order: 100 }))
   })
@@ -140,7 +140,7 @@ describe('createHomeSection', () => {
       if (call === 2) return chainable({ count: 0, error: null, data: null })
       return chainable({ data: null, error: { message: 'boom' } })
     })
-    await expect(createHomeSection({ title: 'X' })).rejects.toThrow('Failed to create section: boom')
+    await expect(createHomeSection('philly', { title: 'X' })).rejects.toThrow('Failed to create section: boom')
   })
 
   // A built-in block (kind !== 'section') skips the slugify/insert path
@@ -158,7 +158,7 @@ describe('createHomeSection', () => {
         return upsertBuilder
       })
 
-      const result = await createHomeSection({ title: 'ignored', cardIds: ['ignored'], kind: 'map' })
+      const result = await createHomeSection('philly', { title: 'ignored', cardIds: ['ignored'], kind: 'map' })
 
       expect(upsertBuilder.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'map', kind: 'map', title: 'Explore the map', card_ids: [] }),
@@ -175,7 +175,7 @@ describe('createHomeSection', () => {
         if (call === 1) return chainable({ count: 0, error: null, data: null })
         return chainable({ data: null, error: { message: 'boom' } })
       })
-      await expect(createHomeSection({ title: '', kind: 'zmanim' })).rejects.toThrow(
+      await expect(createHomeSection('philly', { title: '', kind: 'zmanim' })).rejects.toThrow(
         'Failed to add Zmanim & Shabbos: boom',
       )
     })
@@ -187,7 +187,7 @@ describe('updateHomeSection', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    const result = await updateHomeSection('featured', {})
+    const result = await updateHomeSection('philly', 'featured', {})
 
     expect(result?.id).toBe('featured')
     expect(builder.update).not.toHaveBeenCalled()
@@ -197,19 +197,19 @@ describe('updateHomeSection', () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
 
-    await updateHomeSection('featured', { title: '  New Title  ' })
+    await updateHomeSection('philly', 'featured', { title: '  New Title  ' })
 
     expect(builder.update).toHaveBeenCalledWith({ title: 'New Title' })
   })
 
   it('returns null when no row matches the id', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await updateHomeSection('missing', { sortOrder: 1 })).toBeNull()
+    expect(await updateHomeSection('philly', 'missing', { sortOrder: 1 })).toBeNull()
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(updateHomeSection('featured', { sortOrder: 1 })).rejects.toThrow(
+    await expect(updateHomeSection('philly', 'featured', { sortOrder: 1 })).rejects.toThrow(
       'Failed to update section: boom',
     )
   })
@@ -218,11 +218,11 @@ describe('updateHomeSection', () => {
 describe('deleteHomeSection', () => {
   it('resolves without error on success', async () => {
     mockFrom.mockReturnValue(chainable({ error: null }))
-    await expect(deleteHomeSection('featured')).resolves.toBeUndefined()
+    await expect(deleteHomeSection('philly', 'featured')).resolves.toBeUndefined()
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ error: { message: 'boom' } }))
-    await expect(deleteHomeSection('featured')).rejects.toThrow('Failed to delete section: boom')
+    await expect(deleteHomeSection('philly', 'featured')).rejects.toThrow('Failed to delete section: boom')
   })
 })

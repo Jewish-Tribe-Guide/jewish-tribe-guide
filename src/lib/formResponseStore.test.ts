@@ -57,6 +57,7 @@ describe('insertFormResponse', () => {
     mockFrom.mockReturnValue(builder)
 
     await insertFormResponse({
+      community: 'philly',
       requestId: 'REQ-1',
       requestType: 'Direct Support',
       contact,
@@ -73,6 +74,7 @@ describe('insertFormResponse', () => {
     mockFrom.mockReturnValue(builder)
 
     await insertFormResponse({
+      community: 'philly',
       requestId: 'REQ-1',
       requestType: 'Custom Form Title',
       formId: 'my-form',
@@ -86,7 +88,7 @@ describe('insertFormResponse', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ error: { message: 'boom' } }))
     await expect(
-      insertFormResponse({ requestId: 'REQ-1', requestType: 'Direct Support', contact, data: {} }),
+      insertFormResponse({ community: 'philly', requestId: 'REQ-1', requestType: 'Direct Support', contact, data: {} }),
     ).rejects.toThrow('Failed to save the request: boom')
   })
 })

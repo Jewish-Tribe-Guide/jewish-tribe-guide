@@ -1,20 +1,28 @@
 'use client'
 
-import { useAdminSession } from '@/components/admin/AdminAuthGate'
-import AdminNav from '@/components/admin/AdminNav'
-import ModerationQueue from '@/components/admin/ModerationQueue'
+import AdminAuthGate, { useAdminSession } from '@/components/admin/AdminAuthGate'
+import CommunityManager from '@/components/admin/CommunityManager'
 
-// The default admin screen — moderation queue, mounted at /admin itself
-// (every other tab gets its own sibling route: /admin/categories,
-// /admin/responses, /admin/archived, /admin/site, /admin/home). Auth is
-// already resolved by AdminAuthGate (see admin/layout.tsx) by the time this
-// renders, so this is just the queue plus the shared tab bar.
-export default function AdminPage() {
-  const session = useAdminSession()
+// The standalone superadmin console, at /admin itself — genuinely
+// cross-community, unlike everything under /{community}/admin (see
+// admin/[community]/layout.tsx). Gated by AdminAuthGate with no `community`
+// prop, which checks the SUPERADMIN list (the global ADMIN_EMAILS) instead
+// of any one community's admin_email — see AdminAuthGate's own doc and
+// /api/admin/whoami's community-omitted branch.
+//
+// Deliberately no AdminNav here — that's the per-community tab bar
+// (Moderation queue, Categories, …), which has nothing to point at from a
+// page with no community in its URL. If a second genuinely-cross-community
+// screen shows up, it gets its own sibling route under this same gate.
+export default function SuperAdminPage() {
   return (
-    <div>
-      <AdminNav />
-      <ModerationQueue session={session} />
-    </div>
+    <AdminAuthGate shellTitle="Every community" shellSubtitle="Manage every community this site hosts, or add a new one.">
+      <SuperAdminConsole />
+    </AdminAuthGate>
   )
+}
+
+function SuperAdminConsole() {
+  const session = useAdminSession()
+  return <CommunityManager token={session.access_token} />
 }

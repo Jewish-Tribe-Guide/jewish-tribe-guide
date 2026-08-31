@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 function chainable(result: unknown) {
   const builder: Record<string, unknown> = {}
@@ -16,11 +16,6 @@ function chainable(result: unknown) {
 const mockFrom = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
-}))
-
-const mockGetDefaultCommunity = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({
-  getDefaultCommunity: mockGetDefaultCommunity,
 }))
 
 const mockListCategoriesUncached = vi.hoisted(() => vi.fn())
@@ -62,13 +57,8 @@ const whatsappCategory = {
   hasAddress: false,
 }
 
-beforeEach(() => {
-  mockGetDefaultCommunity.mockResolvedValue({ slug: 'philly' })
-})
-
 afterEach(() => {
   mockFrom.mockReset()
-  mockGetDefaultCommunity.mockReset()
   mockListCategoriesUncached.mockReset()
   mockGetCategoryById.mockReset()
   mockFetchPlaceSync.mockReset()
@@ -84,7 +74,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.neverSynced).toEqual([
       {
         id: 'r1',
@@ -112,7 +102,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.neverSynced).toEqual([])
   })
 
@@ -126,7 +116,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.neverSynced).toEqual([])
   })
 
@@ -150,7 +140,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.protectedFields).toEqual([
       {
         id: 'r1',
@@ -187,7 +177,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.protectedFields).toEqual([])
   })
 
@@ -215,7 +205,7 @@ describe('getSyncCoverage', () => {
       }),
     )
 
-    const coverage = await getSyncCoverage()
+    const coverage = await getSyncCoverage('philly')
     expect(coverage.failing).toEqual([
       {
         id: 'r1',
@@ -231,7 +221,7 @@ describe('getSyncCoverage', () => {
   it('throws with the Supabase error message on failure', async () => {
     mockListCategoriesUncached.mockResolvedValue([restaurantCategory])
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(getSyncCoverage()).rejects.toThrow('Failed to load resources: boom')
+    await expect(getSyncCoverage('philly')).rejects.toThrow('Failed to load resources: boom')
   })
 })
 

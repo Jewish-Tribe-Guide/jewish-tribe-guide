@@ -1,20 +1,20 @@
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { listArchivedResources } from '@/lib/resourceStore'
 import { listCategoriesUncached } from '@/lib/categoryStore'
-import { getDefaultCommunity } from '@/lib/communityStore'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 // GET /api/admin/archived-listings — every soft-deleted listing (an approved
 // removal report leaves the row as status='archived' rather than dropping
 // it — see submissionStore.ts), enriched with its category's label so the
 // admin cleanup view doesn't have to show bare category ids. Admin only.
 export async function GET(request: Request) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const community = await getDefaultCommunity()
     const [listings, categories] = await Promise.all([
-      listArchivedResources(),
+      listArchivedResources(community.slug),
       listCategoriesUncached(community.slug),
     ])
     const labelById = new Map(categories.map((c) => [c.id, c.pluralLabel]))

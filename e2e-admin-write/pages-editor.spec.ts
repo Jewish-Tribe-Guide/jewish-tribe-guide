@@ -57,7 +57,7 @@ test('editing a page through the real Pages tab saves to the database', async ({
 
   try {
     await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
-    await page.goto('/admin/pages')
+    await page.goto('/philly/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
     // getByRole, not getByLabel('Body'): the body field is a WYSIWYG now, and
@@ -113,7 +113,7 @@ test('formatting applied in the Pages tab survives the save', async ({ page }) =
 
   try {
     await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
-    await page.goto('/admin/pages')
+    await page.goto('/philly/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
     const bodyField = page.getByRole('textbox', { name: 'Page body' })

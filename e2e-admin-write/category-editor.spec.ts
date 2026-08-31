@@ -48,7 +48,7 @@ test('creating a category through the real editor makes it live, and deleting it
   // treatment as the "Title" input in form-editor.spec.ts.
   const visible = (l: Locator) => l.and(page.locator(':visible'))
 
-  await page.goto('/admin/categories')
+  await page.goto('/philly/admin/categories')
   await visible(page.getByRole('button', { name: '+ New category' })).click()
 
   await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(name)

@@ -97,7 +97,7 @@ describe('setFormActive', () => {
     const builder = chainable({ data: { ...rawRow, id: 'event-rsvp', active: false }, error: null })
     mockFrom.mockReturnValue(builder)
 
-    const result = await setFormActive('event-rsvp', false)
+    const result = await setFormActive('philly', 'event-rsvp', false)
 
     expect(builder.update).toHaveBeenCalledWith({ active: false })
     expect(builder.eq).toHaveBeenCalledWith('id', 'event-rsvp')
@@ -106,24 +106,24 @@ describe('setFormActive', () => {
 
   it('returns null when the form does not exist', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await setFormActive('missing', true)).toBeNull()
+    expect(await setFormActive('philly', 'missing', true)).toBeNull()
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(setFormActive('event-rsvp', true)).rejects.toThrow('Failed to update form: boom')
+    await expect(setFormActive('philly', 'event-rsvp', true)).rejects.toThrow('Failed to update form: boom')
   })
 
   it('allows hiding and re-activating the built-in support/volunteer forms', async () => {
     const hideBuilder = chainable({ data: { ...rawRow, id: 'support', active: false }, error: null })
     mockFrom.mockReturnValue(hideBuilder)
-    const hideResult = await setFormActive('support', false)
+    const hideResult = await setFormActive('philly', 'support', false)
     expect(hideBuilder.update).toHaveBeenCalledWith({ active: false })
     expect(hideResult?.active).toBe(false)
 
     const showBuilder = chainable({ data: { ...rawRow, id: 'volunteer', active: true }, error: null })
     mockFrom.mockReturnValue(showBuilder)
-    const showResult = await setFormActive('volunteer', true)
+    const showResult = await setFormActive('philly', 'volunteer', true)
     expect(showBuilder.update).toHaveBeenCalledWith({ active: true })
     expect(showResult?.active).toBe(true)
   })
@@ -132,13 +132,13 @@ describe('setFormActive', () => {
 describe('listFormsForAdmin', () => {
   it('returns every form including drafts', async () => {
     mockFrom.mockReturnValue(chainable({ data: [rawRow], error: null }))
-    const [form] = await listFormsForAdmin()
+    const [form] = await listFormsForAdmin('philly')
     expect(form.id).toBe('support')
   })
 
   it('includes inactive forms, unlike listPublishedForms', async () => {
     mockFrom.mockReturnValue(chainable({ data: [{ ...rawRow, id: 'hidden-form', active: false }], error: null }))
-    const [form] = await listFormsForAdmin()
+    const [form] = await listFormsForAdmin('philly')
     expect(form.active).toBe(false)
   })
 })
@@ -146,7 +146,7 @@ describe('listFormsForAdmin', () => {
 describe('getFormById', () => {
   it('returns null when not found', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await getFormById('missing')).toBeNull()
+    expect(await getFormById('philly', 'missing')).toBeNull()
   })
 })
 
@@ -165,7 +165,7 @@ describe('saveDraft', () => {
       cardImageUrl: null,
       cardTextColor: null,
     }
-    await saveDraft('support', draft)
+    await saveDraft('philly', 'support', draft)
 
     expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ draft }))
     expect(builder.eq).toHaveBeenCalledWith('id', 'support')
@@ -175,12 +175,12 @@ describe('saveDraft', () => {
 describe('publishDraft', () => {
   it('returns null when the form does not exist', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await publishDraft('missing')).toBeNull()
+    expect(await publishDraft('philly', 'missing')).toBeNull()
   })
 
   it('is a no-op (returns the form as-is) when there is no draft', async () => {
     mockFrom.mockReturnValue(chainable({ data: rawRow, error: null }))
-    const result = await publishDraft('support')
+    const result = await publishDraft('philly', 'support')
     expect(result?.id).toBe('support')
     // Only the read (getFormById) happened — no write.
     expect(mockFrom).toHaveBeenCalledTimes(1)
@@ -205,7 +205,7 @@ describe('publishDraft', () => {
       return call === 1 ? readBuilder : writeBuilder
     })
 
-    await publishDraft('support')
+    await publishDraft('philly', 'support')
 
     expect(writeBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -238,7 +238,7 @@ describe('publishDraft', () => {
       return call === 1 ? readBuilder : writeBuilder
     })
 
-    await publishDraft('support')
+    await publishDraft('philly', 'support')
 
     expect(writeBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({ card_image_url: null, card_text_color: null }),
@@ -264,7 +264,7 @@ describe('publishDraft', () => {
       return call === 1 ? readBuilder : writeBuilder
     })
 
-    await expect(publishDraft('support')).rejects.toThrow('Failed to publish form: boom')
+    await expect(publishDraft('philly', 'support')).rejects.toThrow('Failed to publish form: boom')
   })
 })
 
@@ -272,7 +272,7 @@ describe('discardDraft', () => {
   it('clears the draft only, leaving published content untouched', async () => {
     const builder = chainable({ data: rawRow, error: null })
     mockFrom.mockReturnValue(builder)
-    await discardDraft('support')
+    await discardDraft('philly', 'support')
     expect(builder.update).toHaveBeenCalledWith({ draft: null })
   })
 })
@@ -298,7 +298,7 @@ describe('createForm', () => {
       cardImageUrl: null,
       cardTextColor: null,
     }
-    await createForm(content as never)
+    await createForm('philly', content as never)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ id: 'event-rsvp-2' }))
   })
@@ -321,7 +321,7 @@ describe('createForm', () => {
       cardImageUrl: null,
       cardTextColor: null,
     }
-    await createForm(content as never)
+    await createForm('philly', content as never)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ steps: DEFAULT_CONTACT_STEPS }),
@@ -346,7 +346,7 @@ describe('createForm', () => {
       cardImageUrl: null,
       cardTextColor: null,
     }
-    await createForm(content as never)
+    await createForm('philly', content as never)
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -372,14 +372,14 @@ describe('createForm', () => {
       cardImageUrl: null,
       cardTextColor: null,
     }
-    await expect(createForm(content as never)).rejects.toThrow('Failed to create form: boom')
+    await expect(createForm('philly', content as never)).rejects.toThrow('Failed to create form: boom')
   })
 })
 
 describe('deleteForm', () => {
   it('refuses to delete the built-in support/volunteer forms', async () => {
-    await expect(deleteForm('support')).rejects.toThrow("The Support and Volunteer forms can’t be deleted.")
-    await expect(deleteForm('volunteer')).rejects.toThrow("The Support and Volunteer forms can’t be deleted.")
+    await expect(deleteForm('philly', 'support')).rejects.toThrow("The Support and Volunteer forms can’t be deleted.")
+    await expect(deleteForm('philly', 'volunteer')).rejects.toThrow("The Support and Volunteer forms can’t be deleted.")
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
@@ -391,7 +391,7 @@ describe('deleteForm', () => {
       return chainable({ error: null })
     })
 
-    const result = await deleteForm('event-rsvp')
+    const result = await deleteForm('philly', 'event-rsvp')
 
     expect(result).toEqual({ responses: 4 })
     expect(calls.indexOf('form')).toBeGreaterThan(calls.lastIndexOf('form_response'))
@@ -405,7 +405,7 @@ describe('deleteForm', () => {
       return chainable({ error: null })
     })
 
-    await expect(deleteForm('event-rsvp')).rejects.toThrow(
+    await expect(deleteForm('philly', 'event-rsvp')).rejects.toThrow(
       "Failed to delete the form's responses: fk violation",
     )
     expect(formDeleteCalled).toBe(false)
@@ -417,6 +417,6 @@ describe('deleteForm', () => {
         ? chainable({ count: 0, error: null, data: null })
         : chainable({ error: { message: 'form fk violation' } }),
     )
-    await expect(deleteForm('event-rsvp')).rejects.toThrow('Failed to delete form: form fk violation')
+    await expect(deleteForm('philly', 'event-rsvp')).rejects.toThrow('Failed to delete form: form fk violation')
   })
 })

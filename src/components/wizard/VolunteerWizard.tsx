@@ -9,6 +9,7 @@ import { useHospitals } from '@/lib/useHospitals'
 import type { FormStep } from '@/lib/forms'
 import type { Hospital } from '@/types'
 import { community } from '@/community.config'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 const ANYWHERE = 'anywhere'
 
@@ -57,6 +58,7 @@ type Props = {
 }
 
 export default function VolunteerWizard({ preselect, onClose }: Props) {
+  const activeCommunity = useCommunitySlug()
   const form = useForm('volunteer')
   const hospitalsData = useHospitals()
   const steps = useMemo(() => (form ? toWizardSteps(form.steps, hospitalsData ?? []) : []), [form, hospitalsData])
@@ -98,7 +100,7 @@ export default function VolunteerWizard({ preselect, onClose }: Props) {
     }
     if (Object.keys(extra).length > 0) volunteer.extra = extra
 
-    await submitRequest('Volunteer', contact, volunteer, str('company'), str('turnstileToken'))
+    await submitRequest(activeCommunity, 'Volunteer', contact, volunteer, str('company'), str('turnstileToken'))
   }
 
   if (!form) return <WizardLoading onClose={onClose} />

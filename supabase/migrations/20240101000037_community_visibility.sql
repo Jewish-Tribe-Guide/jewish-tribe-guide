@@ -1,0 +1,24 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Visibility — lets a community exist in prod without being live yet.
+--
+-- Before this, the moment a community row existed it was in the public
+-- GET /api/communities list (the header switcher) and the sitemap, even
+-- though its own /slug page and /slug/admin console were already reachable
+-- by direct URL. That's backwards for standing up a new community on the
+-- real database: you want to build it out — categories, listings, admin
+-- console — before anyone can stumble onto it from the switcher or a search
+-- engine.
+--
+-- Defaults to true so every existing row (philly, ues) is unaffected. New
+-- communities are inserted with visible=false by createCommunity
+-- (src/lib/communityStore.ts) — a superadmin flips it with the "Publish"
+-- toggle in CommunityManager once it's ready.
+--
+-- Deliberately NOT read by resolveCommunity/getDefaultCommunity/listCommunities
+-- itself — those keep returning every community, invisible or not, so direct
+-- URLs (the page, the admin console, its own API routes) keep working while
+-- it's being built. Only the genuinely public-facing consumers filter on it:
+-- GET /api/communities (the switcher) and sitemap.ts.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table community add column if not exists visible boolean not null default true;

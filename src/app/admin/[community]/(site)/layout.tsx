@@ -4,7 +4,8 @@ import { usePathname } from 'next/navigation'
 import { useAdminSession } from '@/components/admin/AdminAuthGate'
 import AdminNav from '@/components/admin/AdminNav'
 import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
-import { ADMIN_BASE } from '@/lib/adminNav'
+import { adminBase } from '@/lib/adminNav'
+import { useCommunitySlug } from '@/lib/communityContext'
 
 // /admin/site and /admin/home deliberately render the SAME mounted
 // SiteSettingsEditor instance — one draft, one Save button — so switching
@@ -19,8 +20,9 @@ import { ADMIN_BASE } from '@/lib/adminNav'
 // for both, ignoring `children`.
 export default function SiteSettingsLayout() {
   const session = useAdminSession()
+  const community = useCommunitySlug()
   const pathname = usePathname()
-  const section = pathname.startsWith(`${ADMIN_BASE}/home`) ? 'home' : 'site'
+  const section = pathname.startsWith(`${adminBase(community)}/home`) ? 'home' : 'site'
 
   return (
     <div>

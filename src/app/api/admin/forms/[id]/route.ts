@@ -1,9 +1,10 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import type { NextRequest } from 'next/server'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { saveDraft, deleteForm } from '@/lib/formStore'
 import { isHttpUrl } from '@/lib/validation'
 import type { FormStep } from '@/lib/forms'
+import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
 
 type PatchBody = {
   title?: string
@@ -20,7 +21,8 @@ type PatchBody = {
 // wizard chrome text, and steps. Never touches the published content the live
 // wizard reads — see /publish to promote a draft. Admin only.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
@@ -43,7 +45,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const form = await saveDraft(id, {
+    const form = await saveDraft(community.slug, id, {
       title: body.title,
       submitLabel: body.submitLabel || 'Submit',
       successTitle: body.successTitle || 'All set',
@@ -69,12 +71,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
 // only. To discard a pending draft instead (leaving the form itself intact),
 // see DELETE /api/admin/forms/:id/draft.
 export async function DELETE(request: NextRequest, ctx: RouteContext<'/api/admin/forms/[id]'>) {
-  const admin = await getAdminUser(request)
+  const community = await resolveCommunity(communitySlugFromRequest(request))
+  const admin = await getAdminUserForCommunity(request, community.slug)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { id } = await ctx.params
   try {
-    const { responses } = await deleteForm(id)
+    const { responses } = await deleteForm(community.slug, id)
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()
     return Response.json({ ok: true, responses })
