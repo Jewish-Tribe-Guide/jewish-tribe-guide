@@ -229,6 +229,18 @@ export async function createCommunity(input: {
     .select('*')
     .single()
 
-  if (error) throw new Error(`Failed to create community: ${error.message}`)
+  if (error) {
+    // The uniqueness check above reads listCommunities(), which is cached
+    // ('days') — two creations for the same slug landing inside that
+    // staleness window both pass it and fall through to the database's own
+    // primary-key constraint. Re-map that to the same friendly message
+    // instead of surfacing Postgres's raw constraint-violation text, the
+    // same way categoryStore.createCategory does for its own singleton
+    // collision.
+    if (error.code === '23505') {
+      throw new Error(`"${slug}" is already in use by another community.`)
+    }
+    throw new Error(`Failed to create community: ${error.message}`)
+  }
   return toCommunity(data as Row)
 }

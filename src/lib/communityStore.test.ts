@@ -244,10 +244,28 @@ describe('createCommunity', () => {
 
   it('throws with the Supabase error message on insert failure', async () => {
     const listBuilder = chainable({ data: [philly], error: null })
-    const insertBuilder = chainable({ data: null, error: { message: 'unique violation' } })
+    const insertBuilder = chainable({ data: null, error: { message: 'other failure', code: '23514' } })
     mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
 
-    await expect(createCommunity(validInput)).rejects.toThrow('Failed to create community: unique violation')
+    await expect(createCommunity(validInput)).rejects.toThrow('Failed to create community: other failure')
+  })
+
+  // The uniqueness check above reads the cached listCommunities() — proven
+  // stale by the clone-dropdown bug this same staleness caused elsewhere —
+  // so two creations for the same slug can both pass it and race to the
+  // insert. The DB's own primary-key constraint (code 23505) still stops
+  // the duplicate row; this just re-maps that into the same friendly
+  // message a normal "already taken" rejection gets, instead of leaking
+  // Postgres's constraint-violation text.
+  it('re-maps a Postgres unique-violation on insert to the friendly "already in use" message', async () => {
+    const listBuilder = chainable({ data: [philly], error: null })
+    const insertBuilder = chainable({
+      data: null,
+      error: { message: 'duplicate key value violates unique constraint "community_pkey"', code: '23505' },
+    })
+    mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
+
+    await expect(createCommunity(validInput)).rejects.toThrow('"baltimore" is already in use by another community.')
   })
 })
 
