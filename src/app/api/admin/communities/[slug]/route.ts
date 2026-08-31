@@ -25,11 +25,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
 
   try {
-    const community = await setCommunityVisibility(slug, body.visible)
+    const { community, previewToken } = await setCommunityVisibility(slug, body.visible)
     // Publishing/unpublishing changes the public switcher and sitemap
     // immediately, same as any other public-content admin save.
     await revalidatePublicContent()
-    return Response.json({ ok: true, community })
+    // previewToken rides along here (superadmin-only route) so the client
+    // can show the fresh link right away — unpublishing rotates it, and
+    // without this the UI would keep displaying the now-dead old one until
+    // the next full list reload.
+    return Response.json({ ok: true, community: { ...community, previewToken } })
   } catch (err) {
     console.error('[admin/communities/:slug] PATCH failed:', err)
     const message = err instanceof Error ? err.message : 'Could not update visibility.'

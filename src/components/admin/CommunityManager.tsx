@@ -224,7 +224,7 @@ export default function CommunityManager({ token }: { token: string }) {
     setTogglingSlug(slug)
     setToggleError(null)
     try {
-      await fetchJson(
+      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
         `/api/admin/communities/${slug}`,
         {
           method: 'PATCH',
@@ -234,8 +234,13 @@ export default function CommunityManager({ token }: { token: string }) {
         'Could not update visibility.',
       )
       // Unlike delete, this isn't destructive — patch the row in place
-      // instead of a full reload.
-      setCommunities((cs) => cs?.map((c) => (c.slug === slug ? { ...c, visible: nextVisible } : c)) ?? cs)
+      // instead of a full reload. previewToken comes from the response, not
+      // just `visible` flipped locally: unpublishing rotates it server-side
+      // (see setCommunityVisibility's own comment), so the old token this
+      // component already had is now wrong.
+      setCommunities(
+        (cs) => cs?.map((c) => (c.slug === slug ? { ...c, visible: nextVisible, previewToken: community.previewToken } : c)) ?? cs,
+      )
     } catch (err) {
       setToggleError(err instanceof Error ? err.message : 'Could not update visibility.')
     } finally {

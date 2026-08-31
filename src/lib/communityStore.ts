@@ -324,10 +324,22 @@ export async function createCommunity(input: {
  *  gated by the same GET/POST /api/admin/communities check, not any one
  *  community's own admin, since publishing a community isn't scoped to
  *  itself any more than creating one is. */
-export async function setCommunityVisibility(slug: string, visible: boolean): Promise<Community> {
-  const { data, error } = await getAdminClient().from('community').update({ visible }).eq('slug', slug).select('*').single()
+export async function setCommunityVisibility(
+  slug: string,
+  visible: boolean,
+): Promise<{ community: Community; previewToken: string }> {
+  const update: { visible: boolean; preview_token?: string } = { visible }
+  // Unpublishing also rotates the preview token, so a link (or the cookie
+  // proxy.ts sets from one — see that file's own comment) handed out before
+  // stops working the instant the community is hidden again, instead of
+  // quietly continuing to work forever off whatever token it already has.
+  // Publishing doesn't need this: the token isn't meaningful while visible.
+  if (!visible) update.preview_token = crypto.randomUUID()
+
+  const { data, error } = await getAdminClient().from('community').update(update).eq('slug', slug).select('*').single()
   if (error) throw new Error(`Failed to update "${slug}"'s visibility: ${error.message}`)
-  return toCommunity(data as Row)
+  const row = data as Row & { preview_token: string }
+  return { community: toCommunity(row), previewToken: row.preview_token }
 }
 
 /** Every table that carries `community_id` — the tables `deleteCommunity`

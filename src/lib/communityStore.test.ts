@@ -415,15 +415,33 @@ describe('listCommunityAdminEmails', () => {
 })
 
 describe('setCommunityVisibility', () => {
-  it('updates visible and maps the returned row', async () => {
-    const updateBuilder = chainable({ data: { ...baltimore, visible: true }, error: null })
+  it('publishing sets visible=true and leaves the token alone', async () => {
+    const updateBuilder = chainable({
+      data: { ...baltimore, visible: true, preview_token: 'unchanged-token' },
+      error: null,
+    })
     mockFrom.mockReturnValue(updateBuilder)
 
-    const result = await setCommunityVisibility('baltimore', true)
+    const { community, previewToken } = await setCommunityVisibility('baltimore', true)
 
     expect(updateBuilder.update).toHaveBeenCalledWith({ visible: true })
     expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'baltimore')
-    expect(result.visible).toBe(true)
+    expect(community.visible).toBe(true)
+    expect(previewToken).toBe('unchanged-token')
+  })
+
+  it('unpublishing rotates the preview token', async () => {
+    const updateBuilder = chainable({
+      data: { ...baltimore, visible: false, preview_token: 'freshly-rotated-token' },
+      error: null,
+    })
+    mockFrom.mockReturnValue(updateBuilder)
+
+    const { community, previewToken } = await setCommunityVisibility('baltimore', false)
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ visible: false, preview_token: expect.any(String) })
+    expect(community.visible).toBe(false)
+    expect(previewToken).toBe('freshly-rotated-token')
   })
 
   it('throws with the Supabase error message on failure', async () => {

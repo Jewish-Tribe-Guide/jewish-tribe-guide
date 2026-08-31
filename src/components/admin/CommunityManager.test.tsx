@@ -483,7 +483,7 @@ describe('CommunityManager — publishing a community', () => {
   it('PATCHes visible:true and flips the row to "Live" on Publish', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true })
+    vi.mocked(fetchJson).mockResolvedValueOnce({ community: { ...ues, visible: true, previewToken: null } })
 
     await user.click(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
 

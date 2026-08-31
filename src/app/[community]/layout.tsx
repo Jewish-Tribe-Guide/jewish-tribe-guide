@@ -24,8 +24,17 @@ import { currentYear } from '@/lib/currentYear'
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function resolveFromPath(slug: string) {
-  const communities = await listCommunities()
-  const community = communities.find((c) => c.slug === slug)
+  const all = await listCommunities()
+  const community = all.find((c) => c.slug === slug)
+  // The switcher (SiteHeader, via CommunityProvider) only ever offers
+  // published communities — a hidden one reaching this far already got past
+  // proxy.ts's own gate (see that file), but that only protects the
+  // request THAT'S for it; every other community's page still rendered this
+  // same list unfiltered, so a hidden community showed up as a switcher
+  // option to any visitor on a published one. The one exception is the
+  // hidden community currently being viewed itself: it still needs to
+  // render as the switcher's own selected value.
+  const communities = all.filter((c) => c.visible || c.slug === slug)
   return { community, communities }
 }
 
