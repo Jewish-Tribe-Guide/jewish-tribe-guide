@@ -18,6 +18,7 @@ function chainable(result: unknown) {
     order: vi.fn(self),
     eq: vi.fn(self),
     insert: vi.fn(self),
+    delete: vi.fn(self),
     single: vi.fn(self),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve: (v: unknown) => void) => resolve(result),
@@ -36,6 +37,7 @@ const {
   resolveCommunity,
   communitySlugFromRequest,
   createCommunity,
+  deleteCommunity,
   getCommunityAdminEmail,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
@@ -268,6 +270,100 @@ describe('createCommunity', () => {
     mockFrom.mockReturnValueOnce(listBuilder).mockReturnValueOnce(insertBuilder)
 
     await expect(createCommunity(validInput)).rejects.toThrow('"baltimore" is already in use by another community.')
+  })
+})
+
+describe('deleteCommunity', () => {
+  it('refuses to delete the default community', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly, baltimore], error: null }))
+    await expect(deleteCommunity('philly')).rejects.toThrow('The default community cannot be deleted.')
+    // Never got past the list-and-check — no delete call was made at all.
+    expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses to delete the only remaining community, even if not default', async () => {
+    const soleNonDefault = { ...baltimore, is_default: false }
+    mockFrom.mockReturnValue(chainable({ data: [soleNonDefault], error: null }))
+    await expect(deleteCommunity('baltimore')).rejects.toThrow('Cannot delete the only remaining community.')
+    expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a slug that is not a real community', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [philly, baltimore], error: null }))
+    await expect(deleteCommunity('nonexistent')).rejects.toThrow('"nonexistent" is not a real community.')
+  })
+
+  it('deletes every community-scoped table, then the community row itself', async () => {
+    const calls: string[] = []
+    mockFrom.mockImplementation((table: string) => {
+      calls.push(table)
+      return table === 'community' && calls.length === 1
+        ? chainable({ data: [philly, baltimore], error: null }) // the initial listCommunities()
+        : chainable({ error: null })
+    })
+
+    await deleteCommunity('baltimore')
+
+    // listCommunities() first, then every community-scoped table, then the
+    // community row itself last — order matters here only in that the
+    // community row must go last (deleting it first would leave nothing to
+    // scope the content deletes against, were a real FK ever added later).
+    expect(calls[0]).toBe('community')
+    expect(calls.slice(1)).toEqual([
+      'resource',
+      'category',
+      'form',
+      'home_section',
+      'site_settings',
+      'submission',
+      'form_response',
+      'hospital',
+      'tag',
+      'community',
+    ])
+  })
+
+  it('scopes every table delete to the given community, and the final delete by slug', async () => {
+    const builders: ReturnType<typeof chainable>[] = []
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      const builder = call === 1 ? chainable({ data: [philly, baltimore], error: null }) : chainable({ error: null })
+      builders.push(builder)
+      return builder
+    })
+
+    await deleteCommunity('baltimore')
+
+    // builders[1..9] are the 9 community-scoped table deletes, builders[10] is the community row itself.
+    for (const builder of builders.slice(1, 10)) {
+      expect(builder.eq).toHaveBeenCalledWith('community_id', 'baltimore')
+    }
+    expect(builders[10]!.eq).toHaveBeenCalledWith('slug', 'baltimore')
+  })
+
+  it('throws with the Supabase error message when a content table fails to delete', async () => {
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      if (call === 1) return chainable({ data: [philly, baltimore], error: null })
+      if (call === 2) return chainable({ error: { message: 'boom' } }) // first scoped table: 'resource'
+      return chainable({ error: null })
+    })
+
+    await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete resource rows: boom')
+  })
+
+  it('throws with the Supabase error message when deleting the community row itself fails', async () => {
+    let call = 0
+    mockFrom.mockImplementation(() => {
+      call += 1
+      if (call === 1) return chainable({ data: [philly, baltimore], error: null })
+      if (call === 11) return chainable({ error: { message: 'boom' } }) // the final community-row delete
+      return chainable({ error: null })
+    })
+
+    await expect(deleteCommunity('baltimore')).rejects.toThrow('Failed to delete community: boom')
   })
 })
 

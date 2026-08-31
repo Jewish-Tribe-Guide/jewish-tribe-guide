@@ -158,3 +158,96 @@ test('cloning from an existing community carries its categories over', async ({ 
   expect(clonedCategory, 'the source category should have been cloned onto the new community').not.toBeNull()
   expect(clonedCategory!.label).toBe('Grocery Store')
 })
+
+test('deleting a community through the real UI removes it and everything in it', async ({ page }) => {
+  const slug = `e2e-delete-${randomUUID().slice(0, 8)}`
+  pendingSlugs.push(slug) // idempotent no-op cleanup if the delete below already got it
+  const name = `E2E Delete ${slug}`
+
+  // Created through the real UI (not a direct DB insert), same reasoning as
+  // the clone test's source community above: creating through
+  // POST /api/admin/communities is what calls revalidatePublicContent(), so
+  // the community actually shows up in the very next GET
+  // /api/admin/communities read instead of sitting behind
+  // cacheLife('days')'s stale-while-revalidate window with nothing to ever
+  // invalidate it.
+  await page.goto('/philly/admin/communities')
+  await visible(page, page.getByRole('button', { name: '+ New community' })).click()
+  await page.getByLabel('Name').fill(name)
+  await page.getByLabel('URL slug').fill(slug)
+  await page.getByLabel('Tagline').fill('Guide for residents & visitors')
+  await page.getByLabel('Mission').fill('A guide to a disposable test community, about to be deleted.')
+  await page.getByLabel('Region').fill('Testville')
+  await page.getByLabel('Map center latitude').fill('39.95')
+  await page.getByLabel('Map center longitude').fill('-75.16')
+  await visible(page, page.getByRole('button', { name: 'Create community' })).click()
+  await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: 10_000 })
+
+  // A category + listing, added directly — there's something real to prove
+  // gets swept along with the community, beyond what the creation flow
+  // itself produces (which is nothing, for "start empty").
+  const supabase = getAdminClient()
+  const { error: categoryErr } = await supabase.from('category').insert({
+    id: 'grocery',
+    community_id: slug,
+    label: 'Grocery Store',
+    plural_label: 'Grocery Stores',
+    icon: '🛒',
+    kind: 'listing',
+  })
+  expect(categoryErr).toBeNull()
+  const { error: resourceErr } = await supabase.from('resource').insert({
+    id: randomUUID(),
+    community_id: slug,
+    category: 'grocery',
+    name: 'Test Grocery',
+    status: 'approved',
+    details: {},
+  })
+  expect(resourceErr).toBeNull()
+
+  // Same staleness reasoning as the clone test's second poll — the
+  // just-created community's own revalidation happened a moment ago and
+  // marks the entry stale rather than purging it, so the very next read can
+  // still serve the pre-creation snapshot while a fresh one regenerates.
+  await expect(async () => {
+    await page.goto('/philly/admin/communities')
+    await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
+
+  const row = page.getByRole('link', { name }).locator('..')
+  await visible(page, row.getByRole('button', { name: 'Delete' })).click()
+  await page.getByLabel(`Type ${slug} to confirm`).fill(slug)
+  // Waited for explicitly rather than inferred from the UI settling — this
+  // is the one action in this whole file whose success can't be re-derived
+  // from a later poll (there's nothing left to look at once it works).
+  // confirmDelete() does a real window.location.reload() on success (see
+  // its own comment: staying mounted and soft-refetching in place hit a
+  // genuine Next.js Cache Components bug — the client bailed out of
+  // reconciling this route and hard-navigated to the public site instead,
+  // right when this same DELETE's own revalidation landed), so the
+  // reliable signal here is the DELETE response itself, not any DOM state.
+  const [deleteRes] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.request().method() === 'DELETE' && res.url().includes(`/api/admin/communities/${slug}`),
+    ),
+    visible(page, page.getByRole('button', { name: 'Delete forever' })).click(),
+  ])
+  expect(deleteRes.status(), 'DELETE /api/admin/communities/:slug should succeed').toBe(200)
+
+  // The reload lands back on this same page; same stale-while-revalidate
+  // reasoning as the poll above applies to it too (revalidatePublicContent()
+  // marks the cached list stale rather than purging it), so confirm with a
+  // poll rather than trusting the reload's own first paint.
+  await expect(async () => {
+    await page.goto('/philly/admin/communities')
+    await expect(page.getByRole('link', { name })).not.toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
+
+  const { data: communityRow } = await supabase.from('community').select('slug').eq('slug', slug).maybeSingle()
+  expect(communityRow, 'the community row should be gone').toBeNull()
+  const { data: categoryRows } = await supabase.from('category').select('id').eq('community_id', slug)
+  expect(categoryRows ?? [], 'its category should be gone too').toEqual([])
+  const { data: resourceRows } = await supabase.from('resource').select('id').eq('community_id', slug)
+  expect(resourceRows ?? [], 'its listing should be gone too').toEqual([])
+})

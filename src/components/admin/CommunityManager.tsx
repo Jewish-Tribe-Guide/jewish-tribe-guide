@@ -69,6 +69,18 @@ function emptyDraft(): Draft {
 
 export default function CommunityManager({ token }: { token: string }) {
   const router = useRouter()
+  // Same signal the DELETE route itself enforces (see
+  // /api/admin/communities/[slug]/route.ts) — checked here too so the
+  // button doesn't even appear against the real deployment, rather than
+  // existing only to fail with a 403 when clicked. NEXT_PUBLIC_VERCEL_ENV
+  // is the client-safe mirror of the server's VERCEL_ENV, same pattern
+  // instrumentation-client.ts's Sentry gate already uses. Unset locally
+  // (npm run dev, a local production build) and on preview deployments, so
+  // deletion stays available everywhere except the live site. Read inside
+  // the component (not module scope) purely so tests can toggle it with
+  // vi.stubEnv — Next.js inlines NEXT_PUBLIC_ vars at build time either way,
+  // so this makes no difference to the real deployed behavior.
+  const deletionDisabled = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
   const [communities, setCommunities] = useState<Community[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Managing every community (browsing the list, creating a new one) is a
@@ -83,6 +95,14 @@ export default function CommunityManager({ token }: { token: string }) {
   const [saving, setSaving] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [draft, setDraft] = useState<Draft>(emptyDraft())
+  // Which community's delete-confirmation panel is open, if any — and what
+  // the admin has typed into its "retype the slug" field so far. Only one
+  // open at a time (opening a second closes whichever was open), same
+  // pattern as ArchivedListings.tsx's confirmDeleteId.
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -177,6 +197,52 @@ export default function CommunityManager({ token }: { token: string }) {
       setFormErrors([err instanceof Error ? err.message : 'Could not create community.'])
     } finally {
       setSaving(false)
+    }
+  }
+
+  function startDeleting(slug: string) {
+    setDeletingSlug(slug)
+    setDeleteConfirmText('')
+    setDeleteError(null)
+  }
+
+  function cancelDeleting() {
+    setDeletingSlug(null)
+    setDeleteConfirmText('')
+    setDeleteError(null)
+  }
+
+  async function confirmDelete(slug: string) {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await fetchJson(
+        `/api/admin/communities/${slug}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ confirmSlug: slug }),
+        },
+        'Could not delete community.',
+      )
+      // A real, full reload rather than re-fetching in place. This route
+      // deletes a community, which calls revalidatePublicContent() and
+      // invalidates the same content tags the surrounding admin layout's
+      // own listCommunities() read depends on — staying mounted and
+      // soft-refetching while that lands ran into a genuine Next.js
+      // Cache Components issue: the client bailed out of reconciling this
+      // route (an "instant-unrendered-segment" validation error) and
+      // hard-navigated away to the public site, losing this handler's own
+      // continuation before it could show anything. Confirmed the DELETE
+      // itself still completed when that happened — only the UI went
+      // silent, which is worse than useless for an irreversible action.
+      // A plain reload sidesteps the client router entirely rather than
+      // fighting it, and is a small price for an action this rare.
+      window.location.reload()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete community.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -336,23 +402,75 @@ export default function CommunityManager({ token }: { token: string }) {
         </button>
       </div>
 
+      {deletionDisabled && (
+        <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
+      )}
+
       <div className="space-y-3">
         {communities.map((c) => (
-          <a
-            key={c.slug}
-            href={adminBase(c.slug)}
-            className="block bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors"
-          >
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-slate-900 text-sm">{c.name}</p>
-              {c.isDefault && (
-                <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">Default</span>
+          <div key={c.slug} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors">
+            <div className="flex items-start justify-between gap-3">
+              <a href={adminBase(c.slug)} className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-slate-900 text-sm">{c.name}</p>
+                  {c.isDefault && (
+                    <span className="text-xs font-medium bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">Default</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  /{c.slug} · {c.region}
+                </p>
+              </a>
+              {/* The default community can't be deleted at all (see
+                  deleteCommunity's own doc) — no button rather than one
+                  that always fails. */}
+              {!c.isDefault && !deletionDisabled && (
+                <button
+                  onClick={() => startDeleting(c.slug)}
+                  className="text-xs font-medium text-red-600 hover:underline cursor-pointer shrink-0"
+                >
+                  Delete
+                </button>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              /{c.slug} · {c.region}
-            </p>
-          </a>
+
+            {deletingSlug === c.slug && (
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                  <p className="text-sm text-red-800">
+                    This permanently deletes <span className="font-semibold">{c.name}</span> and everything in
+                    it — every listing, category, form, and submission. This can&rsquo;t be undone.
+                  </p>
+                  <label className="block text-xs font-medium text-red-800">
+                    Type <span className="font-mono">{c.slug}</span> to confirm
+                    <input
+                      className="mt-1 w-full rounded-md border border-red-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-400"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      autoFocus
+                    />
+                  </label>
+                  {deleteError && <p className="text-xs text-red-700">{deleteError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => confirmDelete(c.slug)}
+                      disabled={deleteConfirmText !== c.slug || deleting}
+                      className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer"
+                    >
+                      {deleting ? 'Deleting…' : 'Delete forever'}
+                    </button>
+                    <button
+                      onClick={cancelDeleting}
+                      disabled={deleting}
+                      className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>

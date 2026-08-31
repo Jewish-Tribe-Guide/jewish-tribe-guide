@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityManager from './CommunityManager'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -75,6 +75,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   vi.clearAllMocks()
 })
 
@@ -283,5 +284,125 @@ describe('CommunityManager — new community form', () => {
     expect(mockRouter.push).not.toHaveBeenCalled()
     // The form is still there, not swapped back to the list view.
     expect(screen.getByRole('button', { name: /create community/i })).toBeInTheDocument()
+  })
+})
+
+describe('CommunityManager — deleting a community', () => {
+  const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true })
+  // region overridden — makeCommunity defaults it to 'Philadelphia', which
+  // would otherwise make this row's own link text ("/ues · Philadelphia")
+  // match a `/philadelphia/i` query meant for the philly row alone.
+  const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false })
+
+  // The delete button is a sibling of the community's own admin-console
+  // link, not nested under it — parentElement is the shared row container
+  // for both, which is what `within` needs to scope to just this row.
+  function rowFor(name: RegExp): HTMLElement {
+    return screen.getByRole('link', { name }).parentElement!
+  }
+
+  it('offers no delete option for the default community', async () => {
+    await renderAndWaitForList([philly, ues])
+
+    // There IS a "Delete" button on the page (Upper East Side's) — just not
+    // attached to the default community's own row.
+    expect(within(rowFor(/philadelphia/i)).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+  })
+
+  it('offers a delete option for a non-default community', async () => {
+    await renderAndWaitForList([philly, ues])
+    expect(within(rowFor(/upper east side/i)).getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+  })
+
+  it('requires retyping the exact slug before "Delete forever" is enabled', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    expect(
+      // A function matcher, not a string/regex — the warning text is split
+      // across a plain text node and a nested <span> (the bolded name), so
+      // no single text node contains the whole sentence for RTL's default
+      // per-text-node matching to find.
+      screen.getByText(
+        (_content, el) =>
+          el?.tagName === 'P' &&
+          /permanently deletes[\s\S]*Upper East Side[\s\S]*every listing, category, form, and submission/.test(
+            el.textContent ?? '',
+          ),
+      ),
+    ).toBeInTheDocument()
+
+    const deleteForeverButton = screen.getByRole('button', { name: /delete forever/i })
+    expect(deleteForeverButton).toBeDisabled()
+
+    const confirmInput = screen.getByLabelText(/type.*to confirm/i)
+    await user.type(confirmInput, 'wrong-slug')
+    expect(deleteForeverButton).toBeDisabled()
+
+    await user.clear(confirmInput)
+    await user.type(confirmInput, 'ues')
+    expect(deleteForeverButton).toBeEnabled()
+  })
+
+  it('Cancel backs out of the confirmation without deleting', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+
+    expect(screen.queryByText(/permanently deletes/i)).not.toBeInTheDocument()
+    expect(fetchJson).not.toHaveBeenCalled()
+  })
+
+  it('sends the confirmed slug to DELETE /api/admin/communities/:slug and does a full reload on success', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+    vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true })
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
+    await user.click(screen.getByRole('button', { name: /delete forever/i }))
+
+    // The success path calls window.location.reload() (see confirmDelete's
+    // own comment on why: a real, full reload, not a soft re-fetch — jsdom
+    // doesn't support stubbing location.reload directly, so this waits for
+    // the DELETE call it's meant to prove happened first) rather than
+    // asserting the reload call itself.
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
+    const call = vi.mocked(fetchJson).mock.calls[0]!
+    expect(call[0]).toBe('/api/admin/communities/ues')
+    const init = call[1] as RequestInit
+    expect(init.method).toBe('DELETE')
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    expect(JSON.parse(init.body as string)).toEqual({ confirmSlug: 'ues' })
+  })
+
+  it('shows a server-side error inline and leaves the community in the list', async () => {
+    vi.mocked(fetchJson).mockRejectedValue(new Error('The default community cannot be deleted.'))
+    const user = userEvent.setup()
+    await renderAndWaitForList([philly, ues])
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
+    await user.click(screen.getByRole('button', { name: /delete forever/i }))
+
+    expect(await screen.findByText('The default community cannot be deleted.')).toBeInTheDocument()
+    // Still in the list — scoped past the confirmation panel's own repeat
+    // of the name, which is still open since the delete failed.
+    expect(within(rowFor(/upper east side/i)).getByText('Upper East Side')).toBeInTheDocument()
+  })
+
+  // The real production safety net — see /api/admin/communities/[slug]/route.ts's
+  // own VERCEL_ENV check. This proves the client-side half: the button
+  // doesn't even render against the real deployment, rather than existing
+  // only to fail with a 403 when clicked.
+  it('hides every delete button when NEXT_PUBLIC_VERCEL_ENV is production', async () => {
+    vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'production')
+    await renderAndWaitForList([philly, ues])
+
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/deleting a community isn.t available in production/i)).toBeInTheDocument()
   })
 })

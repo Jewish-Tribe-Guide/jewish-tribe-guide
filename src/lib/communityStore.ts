@@ -259,3 +259,55 @@ export async function createCommunity(input: {
   }
   return toCommunity(data as Row)
 }
+
+/** Every table that carries `community_id` — the tables `deleteCommunity`
+ *  sweeps before removing the `community` row itself. `community_id` is a
+ *  plain column with no foreign key back to `community` (see this module's
+ *  migration file's own note on why: resource.category isn't FK'd either,
+ *  for the same slug-collision reason), so nothing cascades on its own —
+ *  deleting a community without this would leave every one of its listings,
+ *  categories, forms, submissions, etc. orphaned in the database forever,
+ *  invisible but never cleaned up. Kept in one place so a new
+ *  community-scoped table added later doesn't get silently left behind by a
+ *  delete. Rows within each table that reference `resource.id` (votes, the
+ *  tag junction) are left to their own existing FK cascade — see
+ *  resourceStore.ts's hardDeleteArchivedResource. */
+const COMMUNITY_SCOPED_TABLES = [
+  'resource',
+  'category',
+  'form',
+  'home_section',
+  'site_settings',
+  'submission',
+  'form_response',
+  'hospital',
+  'tag',
+] as const
+
+/** Permanently deletes a community and every row that belongs to it —
+ *  every listing, category, form, submission, site setting, tag, hospital,
+ *  and form response. Irreversible, and there is no confirmation step
+ *  in here — that belongs to the caller (see
+ *  /api/admin/communities/[slug]/route.ts, which requires the admin to
+ *  retype the slug, and CommunityManager.tsx, which shows the warning).
+ *
+ *  Refuses on the default community — there must always be exactly one
+ *  (community_single_default_idx), and there's no "make a different one
+ *  default" flow yet to reassign it to — and when this is the only
+ *  community left, since listCommunities() is documented as never empty. */
+export async function deleteCommunity(slug: string): Promise<void> {
+  const all = await listCommunities()
+  const target = all.find((c) => c.slug === slug)
+  if (!target) throw new Error(`"${slug}" is not a real community.`)
+  if (target.isDefault) throw new Error('The default community cannot be deleted.')
+  if (all.length <= 1) throw new Error('Cannot delete the only remaining community.')
+
+  const supabase = getAdminClient()
+  for (const table of COMMUNITY_SCOPED_TABLES) {
+    const { error } = await supabase.from(table).delete().eq('community_id', slug)
+    if (error) throw new Error(`Failed to delete ${table} rows: ${error.message}`)
+  }
+
+  const { error } = await supabase.from('community').delete().eq('slug', slug)
+  if (error) throw new Error(`Failed to delete community: ${error.message}`)
+}
