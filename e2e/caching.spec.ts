@@ -121,12 +121,12 @@ test.describe('nothing per-visitor is ever cached', () => {
   // change, and one admin's inbox starts being served to whoever loads /inbox
   // next — with no visible symptom at all.
   //
-  // /admin used to be the same case, but its layout now reads cookies() to
-  // resolve which community the admin is editing (see admin/layout.tsx's own
-  // comment on `export const instant = false`), so it's no longer prerendered
-  // at all — nothing to cache, nothing for this check to find. Left in the
-  // loop rather than special-cased out: if /admin ever becomes cacheable
-  // again, this starts actually checking it, same as it always has for
+  // /admin is now the standalone superadmin console (src/app/admin/page.tsx,
+  // no community in its URL — see AGENTS.md's multi-community/caching
+  // notes), a plain 'use client' shell same shape as /inbox: whether or not
+  // it ends up prerendered/cached depends on Cache Components' own analysis
+  // of it, not asserted here either way. Left in the loop either way — if
+  // it's ever served from cache, this starts actually checking it, same as
   // /inbox.
   test('the admin shell carries no queue data, since it is cached', async ({ request }) => {
     for (const path of ['/admin', '/inbox']) {

@@ -2,7 +2,7 @@ import { getAdminClient } from '@/lib/supabase/admin'
 import { getAllowedAdminEmails } from '@/lib/adminAuth'
 import { getCommunityAdminEmail } from '@/lib/communityStore'
 
-// POST /api/admin/dev-login  body: { secret, community }
+// POST /api/admin/dev-login  body: { secret, community? }
 //
 // Local-development-only shortcut: mints a real admin session server-side (via
 // the same admin.generateLink Supabase Auth uses for the magic-link email) and
@@ -13,7 +13,9 @@ import { getCommunityAdminEmail } from '@/lib/communityStore'
 // communities as of writing), so /philly/admin?devToken=... and
 // /ues/admin?devToken=... sign you in as whichever community's admin the URL
 // actually names, once those genuinely diverge, instead of always the same
-// address regardless of which console you're testing.
+// address regardless of which console you're testing. `community` omitted —
+// as it is from the standalone superadmin console at /admin?devToken=... —
+// mints a session for ADMIN_EMAILS[0] directly, the superadmin identity.
 //
 // Refuses outright unless BOTH of these hold, so it's structurally incapable of
 // weakening a real deployment even if DEV_ADMIN_BYPASS_SECRET leaked:
@@ -43,11 +45,8 @@ export async function POST(request: Request) {
   if (secret !== expected) {
     return Response.json({ ok: false, error: 'Wrong secret.' }, { status: 401 })
   }
-  if (!communitySlug) {
-    return Response.json({ ok: false, error: 'community is required.' }, { status: 400 })
-  }
 
-  const email = (await getCommunityAdminEmail(communitySlug)) || getAllowedAdminEmails()[0]
+  const email = (communitySlug ? await getCommunityAdminEmail(communitySlug) : null) || getAllowedAdminEmails()[0]
   if (!email) {
     return Response.json({ ok: false, error: 'No ADMIN_EMAILS configured.' }, { status: 500 })
   }

@@ -3,8 +3,21 @@
 // The <main>/heading wrapper every admin screen renders inside — both the
 // loading/login states (see AdminAuthGate) and the authenticated route tree,
 // so every route file drops straight into the same chrome without repeating
-// it.
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+// it. `title`/`subtitle` default to the moderation-queue copy, which is
+// still literally right for most of /{community}/admin/* — every other tab
+// renders its own additional heading below this one rather than needing its
+// own AdminShell copy. Only overridden by the standalone superadmin console
+// (/admin itself, src/app/admin/page.tsx), where "Resource Moderation"
+// would be actively wrong — there's no moderation queue at that URL.
+export default function AdminShell({
+  children,
+  title = 'Resource Moderation',
+  subtitle = 'Review and approve submitted resources.',
+}: {
+  children: React.ReactNode
+  title?: string
+  subtitle?: string
+}) {
   return (
     // w-full: this <main> is a flex item of <body>'s flex-col layout (see
     // admin/layout.tsx). The tab bar's un-wrapped row of labels ("Desktop &
@@ -24,8 +37,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     // it's still the semantically-correct guard for this class of bug and
     // costs nothing alongside w-full.
     <main className="w-full min-w-0 max-w-3xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Resource Moderation</h1>
-      <p className="text-sm text-muted mb-6">Review and approve submitted resources.</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{title}</h1>
+      <p className="text-sm text-muted mb-6">{subtitle}</p>
       {children}
     </main>
   )

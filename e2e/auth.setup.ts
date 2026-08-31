@@ -68,9 +68,12 @@ setup('authenticate as admin', async ({ page, baseURL }) => {
     token_type,
     type: 'magiclink',
   })
-  await page.goto(`${baseURL}/admin#${hash.toString()}`)
-  // The real, authenticated shell — not just the URL settling on /admin,
-  // which could also be the still-loading or logged-out state.
+  // /philly/admin, not bare /admin — /admin is the standalone superadmin
+  // console now (src/app/admin/page.tsx), a different page with no
+  // "Signed in as" moderation-queue text to wait for.
+  await page.goto(`${baseURL}/philly/admin#${hash.toString()}`)
+  // The real, authenticated shell — not just the URL settling on
+  // /philly/admin, which could also be the still-loading or logged-out state.
   await page.getByText(`Signed in as ${email}`).waitFor()
 
   await page.context().storageState({ path: authFile })

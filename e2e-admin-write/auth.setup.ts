@@ -64,7 +64,10 @@ setup('authenticate as the disposable test-project admin', async ({ page, baseUR
     token_type,
     type: 'magiclink',
   })
-  await page.goto(`${baseURL}/admin#${hash.toString()}`)
+  // /philly/admin, not bare /admin — /admin is the standalone superadmin
+  // console now (src/app/admin/page.tsx), a different page with no
+  // "Signed in as" moderation-queue text to wait for.
+  await page.goto(`${baseURL}/philly/admin#${hash.toString()}`)
   await page.getByText(`Signed in as ${CACHE_TEST_ADMIN_EMAIL}`).waitFor()
 
   await page.context().storageState({ path: authFile })

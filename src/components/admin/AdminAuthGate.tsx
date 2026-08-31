@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
-import { useCommunitySlug } from '@/lib/communityContext'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
 import AdminShell from './AdminShell'
 
@@ -24,26 +23,50 @@ export function useAdminSession(): Session {
   return session
 }
 
-/** Gates every /admin/* route behind a real admin session — renders the
+/** Gates a /admin/* route behind a real admin session — renders the
  *  loading/magic-link-login screens itself (in the same AdminShell chrome
  *  every authenticated route uses) until one exists, then makes it available
  *  to `children` via useAdminSession(). Auth stays entirely client-side here,
  *  same as before this existed as its own component: /admin is deliberately
  *  CDN-cached as a static shell (see AGENTS.md's caching notes), so nothing
- *  session-scoped can move server-side into layout.tsx itself. */
-export default function AdminAuthGate({ children }: { children: React.ReactNode }) {
-  const community = useCommunitySlug()
+ *  session-scoped can move server-side into layout.tsx itself.
+ *
+ *  `community`: which community this gate is checking the session against
+ *  (adminAuth.ts's per-community isAllowedForCommunity, via
+ *  /api/admin/whoami). Passed explicitly rather than read from
+ *  useCommunitySlug() so this same gate also covers the standalone
+ *  superadmin console at /admin itself (src/app/admin/page.tsx), which has
+ *  no community in the URL at all and needs the SUPERADMIN check instead
+ *  (community omitted — see /api/admin/whoami's own doc). Every route under
+ *  /admin/[community]/... passes its own community.slug (see that
+ *  layout.tsx).
+ *
+ *  `shellTitle`/`shellSubtitle`: forwarded to every AdminShell this renders
+ *  (loading, login form, and the authenticated content) — AdminShell's own
+ *  defaults ("Resource Moderation…") are right for the per-community
+ *  console but wrong for the superadmin one. */
+export default function AdminAuthGate({
+  children,
+  community,
+  shellTitle,
+  shellSubtitle,
+}: {
+  children: React.ReactNode
+  community?: string
+  shellTitle?: string
+  shellSubtitle?: string
+}) {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [devLoginError, setDevLoginError] = useState<string | null>(null)
-  // Whether the signed-in session's email is actually allowed to administer
-  // THIS community (checked server-side via /api/admin/whoami, which uses
-  // adminAuth.ts's per-community isAllowedForCommunity — not just "is there a
+  // Whether the signed-in session's email is actually allowed in here —
+  // checked server-side via /api/admin/whoami (not just "is there a
   // session"). A valid Supabase session proves identity, not access: without
   // this, an admin who signed in for one community could open a different
   // community's /admin URL and get straight in on the strength of the same
-  // browser-held token, once communities have different admin_emails. null
-  // = not checked yet for the current session.
+  // browser-held token, once communities have different admin_emails — and,
+  // for the superadmin console, any ordinary community admin could reach it
+  // the same way. null = not checked yet for the current session.
   const [authorized, setAuthorized] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -73,7 +96,8 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
     async function checkAuthorized(currentSession: Session) {
       setAuthorized(null)
       try {
-        const res = await fetch(`/api/admin/whoami?community=${encodeURIComponent(community)}`, {
+        const query = community ? `?community=${encodeURIComponent(community)}` : ''
+        const res = await fetch(`/api/admin/whoami${query}`, {
           headers: { Authorization: `Bearer ${currentSession.access_token}` },
         })
         const body = await res.json()
@@ -105,7 +129,7 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
     fetch('/api/admin/dev-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: devToken, community }),
+      body: JSON.stringify({ secret: devToken, ...(community ? { community } : {}) }),
     })
       .then((res) => res.json())
       .then(async (body) => {
@@ -119,27 +143,31 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
       .catch((err) => setDevLoginError(err instanceof Error ? err.message : 'Dev login failed.'))
   }, [community])
 
-  // Signs out a session that turned out not to belong to this community's
-  // admin, rather than leaving it sitting in the browser to be re-checked
-  // (and re-fail) on every render — a real side effect, so it belongs here,
-  // not in the render below.
+  // Signs out a session that turned out not to belong here, rather than
+  // leaving it sitting in the browser to be re-checked (and re-fail) on
+  // every render — a real side effect, so it belongs here, not in the
+  // render below.
   useEffect(() => {
     if (session && authorized === false) getBrowserClient().auth.signOut()
   }, [session, authorized])
 
   if (!ready) {
-    return <AdminShell><p className="text-sm text-muted">Loading…</p></AdminShell>
+    return (
+      <AdminShell title={shellTitle} subtitle={shellSubtitle}>
+        <p className="text-sm text-muted">Loading…</p>
+      </AdminShell>
+    )
   }
 
-  // A session that turned out not to belong to THIS community's admin is
-  // treated the same as no session — the sign-in form shows again rather
-  // than any of `children`, just with an explanation instead of silence.
-  // Signed out (not just ignored) so a stale, wrong-community token doesn't
-  // linger and get re-checked forever, and so a fresh "Send magic link"
-  // click here is unambiguously starting over.
+  // A session that turned out not to be authorized here is treated the same
+  // as no session — the sign-in form shows again rather than any of
+  // `children`, just with an explanation instead of silence. Signed out (not
+  // just ignored) so a stale, unauthorized token doesn't linger and get
+  // re-checked forever, and so a fresh "Send magic link" click here is
+  // unambiguously starting over.
   if (!session || authorized === false) {
     return (
-      <AdminShell>
+      <AdminShell title={shellTitle} subtitle={shellSubtitle}>
         {devLoginError && (
           <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
             Dev login failed: {devLoginError}
@@ -147,13 +175,13 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
         )}
         {authorized === false && (
           <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
-            That account isn&apos;t an admin for this community.
+            {community ? "That account isn't an admin for this community." : "That account isn't a superadmin."}
           </p>
         )}
         <MagicLinkLogin
           requestLinkUrl="/api/admin/request-link"
           emailLabel="Admin email"
-          sentMessage="an authorized admin for this community"
+          sentMessage={community ? 'an authorized admin for this community' : 'an authorized superadmin'}
           community={community}
         />
       </AdminShell>
@@ -164,11 +192,15 @@ export default function AdminAuthGate({ children }: { children: React.ReactNode 
   // loading treatment as `!ready`, rather than flashing `children` (or the
   // login form) for a moment before the real answer arrives.
   if (authorized !== true) {
-    return <AdminShell><p className="text-sm text-muted">Loading…</p></AdminShell>
+    return (
+      <AdminShell title={shellTitle} subtitle={shellSubtitle}>
+        <p className="text-sm text-muted">Loading…</p>
+      </AdminShell>
+    )
   }
 
   return (
-    <AdminShell>
+    <AdminShell title={shellTitle} subtitle={shellSubtitle}>
       <AdminSessionContext.Provider value={session}>{children}</AdminSessionContext.Provider>
     </AdminShell>
   )

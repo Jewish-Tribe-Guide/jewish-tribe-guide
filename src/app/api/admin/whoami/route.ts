@@ -1,11 +1,17 @@
-import { getAdminUserForCommunity } from '@/lib/adminAuth'
+import { getAdminUser, getAdminUserForCommunity } from '@/lib/adminAuth'
 
-// GET /api/admin/whoami?community=<slug> — the only thing this route does is
-// answer "is the Bearer token's email allowed to administer this specific
-// community." Used by AdminAuthGate right after a Supabase session appears,
-// so a session minted for one community's admin can't silently work on
-// another's console just because a token exists — the check has to happen
-// again per community, not once at login.
+// GET /api/admin/whoami?community=<slug> — is the Bearer token's email
+// allowed to administer this specific community (adminAuth.ts's
+// getAdminUserForCommunity). GET /api/admin/whoami with no `community` —
+// is it a SUPERADMIN (the global ADMIN_EMAILS list, getAdminUser) instead;
+// used by the standalone superadmin console at /admin itself
+// (src/app/admin/page.tsx), which has no community in its URL at all.
+//
+// Used by AdminAuthGate right after a Supabase session appears, so a
+// session minted for one community's admin (or a superadmin's) can't
+// silently work somewhere it isn't authorized just because a token exists —
+// the check has to happen again for wherever the gate actually is, not once
+// at login.
 //
 // Deliberately returns no information beyond ok/not-ok — never the community's
 // configured admin_email itself, which stays server-only (see
@@ -13,9 +19,8 @@ import { getAdminUserForCommunity } from '@/lib/adminAuth'
 // its own email just needs a yes/no.
 export async function GET(request: Request) {
   const community = new URL(request.url).searchParams.get('community')
-  if (!community) return Response.json({ ok: false, errors: ['community is required.'] }, { status: 400 })
 
-  const admin = await getAdminUserForCommunity(request, community)
+  const admin = community ? await getAdminUserForCommunity(request, community) : await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   return Response.json({ ok: true, email: admin.email })

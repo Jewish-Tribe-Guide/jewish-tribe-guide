@@ -90,16 +90,14 @@ const nextConfig: NextConfig = {
       ],
     };
   },
-  // Sends the old bare paths (existing bookmarks, and any link that still
-  // hardcodes them) to the default community's canonical URL, permanently.
-  // Only the root of each — there's no way to guess which community an old
-  // deep link (e.g. /admin/categories) meant, so those 404 rather than
-  // silently landing on the wrong community's admin.
+  // /admin used to redirect to /philly/admin (the shared console, back when
+  // there was only one). Now it's a real, standalone page of its own — the
+  // superadmin console (src/app/admin/page.tsx) — so no redirect for it.
+  // /inbox keeps its redirect: it has no per-community split (one
+  // hospital-facing queue) and no standalone page of its own, so the old
+  // bare bookmark still needs somewhere real to land.
   async redirects() {
-    return [
-      { source: '/admin', destination: '/philly/admin', permanent: true },
-      { source: '/inbox', destination: '/philly/inbox', permanent: true },
-    ];
+    return [{ source: '/inbox', destination: '/philly/inbox', permanent: true }];
   },
 };
 

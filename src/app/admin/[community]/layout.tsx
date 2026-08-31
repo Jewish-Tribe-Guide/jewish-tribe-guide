@@ -73,7 +73,9 @@ export default async function AdminLayout(props: LayoutProps<'/admin/[community]
             one of them, subscribing to the Supabase session once at the
             layout level (which persists across sibling-route navigations)
             instead of every route re-doing its own session check. */}
-        <AdminAuthGate key={community.slug}>{props.children}</AdminAuthGate>
+        <AdminAuthGate key={community.slug} community={community.slug}>
+          {props.children}
+        </AdminAuthGate>
       </ContentProvider>
     </CommunityProvider>
   )

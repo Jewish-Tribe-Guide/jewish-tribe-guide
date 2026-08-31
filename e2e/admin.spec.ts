@@ -28,7 +28,11 @@ import { expect, test } from '@playwright/test'
 
 test.describe('admin console', () => {
   test('shows the moderation queue for a signed-in admin, not the login form', async ({ page }) => {
-    await page.goto('/admin')
+    // /philly/admin, not bare /admin — /admin is now the standalone
+    // superadmin console (src/app/admin/page.tsx), a different page with no
+    // moderation queue on it at all. See next.config.ts's own note on why
+    // /admin no longer redirects here.
+    await page.goto('/philly/admin')
 
     await expect(page.getByText(/^Signed in as /)).toBeVisible()
     // The magic-link login form's own submit button — its absence is the
@@ -40,7 +44,7 @@ test.describe('admin console', () => {
   })
 
   test('the moderation queue loads to either real submissions or the empty state, not stuck loading', async ({ page }) => {
-    await page.goto('/admin')
+    await page.goto('/philly/admin')
 
     await expect(page.getByText('Loading submissions…')).not.toBeVisible({ timeout: 10_000 })
     const empty = page.getByText('🎉 Nothing pending — the queue is clear.')
