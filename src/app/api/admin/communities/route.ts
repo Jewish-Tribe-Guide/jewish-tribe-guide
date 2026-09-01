@@ -1,5 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import { getAdminUser } from '@/lib/adminAuth'
+import { getAdminUser, getAllowedAdminEmails } from '@/lib/adminAuth'
 import {
   createCommunity,
   listCommunities,
@@ -94,6 +94,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Every superadmin (SUPERADMIN_EMAILS) gets folded into the new
+    // community's own admin_emails, on top of whatever was typed into the
+    // form — otherwise a brand-new community's admin_emails starts non-empty
+    // (see the "starting empty" case below) and isAllowedForCommunity stops
+    // falling back to the superadmin list for it (adminAuth.ts's own doc on
+    // why), which would silently lock every superadmin out of a community
+    // console they just created.
+    const submittedEmails = Array.isArray(body.adminEmails) ? body.adminEmails : []
+    const adminEmails = Array.from(new Set([...submittedEmails, ...getAllowedAdminEmails()]))
     const community = await createCommunity({
       slug: body.slug!,
       name: body.name!,
@@ -104,7 +113,7 @@ export async function POST(request: Request) {
       mapCenter: body.mapCenter!,
       themeColor: body.themeColor!,
       backgroundColor: body.backgroundColor!,
-      adminEmails: Array.isArray(body.adminEmails) ? body.adminEmails : [],
+      adminEmails,
     })
 
     if (body.cloneFrom) {

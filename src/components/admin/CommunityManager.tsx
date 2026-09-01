@@ -61,7 +61,6 @@ function previewLink(slug: string, token: string): string {
 
 const DEFAULT_THEME_COLOR = '#1d4ed8'
 const DEFAULT_BACKGROUND_COLOR = '#f8fafc'
-const DEFAULT_ADMIN_EMAILS = 'phillyjewishguide@gmail.com'
 const DEFAULT_TIMEZONE = 'America/New_York'
 
 type Draft = {
@@ -106,7 +105,10 @@ function emptyDraft(): Draft {
     lng: '',
     themeColor: DEFAULT_THEME_COLOR,
     backgroundColor: DEFAULT_BACKGROUND_COLOR,
-    adminEmails: DEFAULT_ADMIN_EMAILS,
+    // Empty rather than defaulting to any one address — every superadmin is
+    // added automatically server-side (see the create route's own comment),
+    // so this field is only for community-specific admins on top of that.
+    adminEmails: '',
     cloneFrom: '',
   }
 }
@@ -547,8 +549,9 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Comma-separated. Only these addresses can sign in to this community&rsquo;s admin console — each signs in
-            as themselves — and they&rsquo;ll get new-submission emails (turn that off later if not wanted).
+            Comma-separated. Only these addresses (plus every superadmin, added automatically) can sign in to this
+            community&rsquo;s admin console — each signs in as themselves — and they&rsquo;ll get new-submission
+            emails (turn that off later if not wanted).
           </p>
         </div>
 
