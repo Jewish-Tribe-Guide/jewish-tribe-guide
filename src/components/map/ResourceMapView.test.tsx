@@ -388,6 +388,75 @@ describe('ResourceMapView — nested touch gestures', () => {
 
     expect(rowContent.style.transform).toBe('translateX(-168px)') // REVEAL_WIDTH (84) * 2 — fully revealed
   })
+
+  // Real bug, the other direction: a plain `abs(deltaX) >= 8` threshold
+  // claimed the row's horizontal swipe the moment X crossed 8px, even while
+  // the same drag was moving mostly vertically — so swiping up/down over a
+  // row (to drag the sheet) could still crack the row open a little, unlike
+  // Spotify/WhatsApp, where a vertical-dominant drag never triggers the
+  // horizontal row action at all. See onPointerMove's own comment.
+  it('a vertical-dominant drag over a row does not reveal its pin/share actions, even once its horizontal component crosses the row\'s own 8px threshold', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'row-swipe-2', category: 'grocery', name: 'Corner Bakery' })], [grocery])
+
+    const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
+    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Corner Bakery' })
+    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+
+    fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
+    // 10px left, 50px down — past the row's own 8px X threshold, but
+    // vertical clearly dominates. Read mid-drag, before release: releasing
+    // this short a horizontal distance snaps back to closed either way (it
+    // never reaches REVEAL_WIDTH/2), which would make even a wrongly-claimed
+    // gesture look identical to a correctly-ignored one by the time the
+    // gesture ends — same reasoning as the sheet's own boundary-handoff
+    // tests reading dragHeight mid-drag instead of the post-release snap.
+    fireEvent.pointerMove(rowContent, { clientX: 290, clientY: 350 })
+
+    expect(rowContent.style.transform).toBe('translateX(0px)')
+
+    fireEvent.pointerUp(rowContent, { clientX: 290, clientY: 350 })
+  })
+
+  // The other side of the same axis-lock: once a row's own gesture commits
+  // to horizontal, it now calls stopPropagation so MobileNearbySheet's own
+  // vertical-drag listener (an ancestor) never sees those events either —
+  // otherwise a horizontal-dominant swipe with even a small Y component
+  // would still nudge the sheet's height at the same time it opens the row.
+  it('a horizontal swipe on a row does not also drag the sheet, even though the events would otherwise bubble to it', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'row-swipe-3', category: 'grocery', name: 'Test Grocery' })], [grocery])
+
+    const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
+    const sheetEl = sheetContent.parentElement as HTMLElement
+    const handle = sheetContent.previousElementSibling as HTMLElement
+
+    // Raise the sheet to 'half' — at 'peek'/'half' every touch on the
+    // content area is treated as a sheet-drag from the very first move (see
+    // onContentPointerDown), the state where a row's own horizontal swipe
+    // would leak into the sheet most easily if left unguarded.
+    fireEvent.pointerDown(handle, { clientY: 100 })
+    fireEvent.pointerUp(handle, { clientY: 100 })
+    // The actual height number can't tell these two cases apart in jsdom —
+    // ResizeObserver never fires here, so containerHeight stays 0 and every
+    // snap point computes to the same PEEK_PX floor. But dragHeight is a
+    // separate bit of state from the settled snap height, and a live drag
+    // sets it (dropping the CSS transition to 'none') even when its numeric
+    // value happens to match — a detectable side effect either way.
+    const idleTransition = sheetEl.style.transition
+    expect(idleTransition).toContain('280ms')
+
+    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Test Grocery' })
+    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+
+    fireEvent.pointerDown(rowContent, { clientX: 300, clientY: 300 })
+    fireEvent.pointerMove(rowContent, { clientX: 190, clientY: 320 }) // 110px horizontal, 20px vertical — clearly horizontal, but a real Y component too
+
+    expect(rowContent.style.transform).toBe('translateX(-110px)') // the row did respond
+    expect(sheetEl.style.transition).toBe(idleTransition) // ...but the sheet did not
+
+    fireEvent.pointerUp(rowContent, { clientX: 190, clientY: 320 })
+  })
 })
 
 describe('ResourceMapView — mobile full-screen category picker', () => {

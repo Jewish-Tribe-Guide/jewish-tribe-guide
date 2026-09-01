@@ -154,6 +154,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   const activeGestureRef = useRef(false)
   const movedRef = useRef(false)
   const startXRef = useRef(0)
+  const startYRef = useRef(0)
   const startDragXRef = useRef(0)
   const wheelSettleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -196,6 +197,7 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
     if (hoverCapable || !canPin) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     startXRef.current = e.clientX
+    startYRef.current = e.clientY
     startDragXRef.current = dragX
     activeGestureRef.current = false
     movedRef.current = false
@@ -205,9 +207,20 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
     if (hoverCapable || !canPin || startXRef.current === undefined) return
     const delta = e.clientX - startXRef.current
     if (!activeGestureRef.current) {
-      // Only claims the gesture once it's clearly horizontal, so vertical
-      // scrolling of the sheet still works normally.
-      if (Math.abs(delta) < 8) return
+      // Claims the gesture only once it's CLEARLY horizontal — not just past
+      // a flat threshold, but past it with more horizontal movement than
+      // vertical. A plain `abs(delta) >= 8` check (what this used to be)
+      // still let a mostly-vertical drag claim the row the moment its
+      // horizontal component ticked past 8px, even while the same drag was
+      // also moving the sheet up/down — which is exactly the "swiping left
+      // still triggers the up/down scroll" feel Spotify/WhatsApp don't have.
+      // Comparing against deltaY is what actually locks the two apart: a
+      // vertical-dominant drag never satisfies this, so it never captures
+      // here and never calls stopPropagation below, leaving the sheet's own
+      // vertical handling (an ancestor's bubbled listener) completely
+      // unaffected for that gesture.
+      const deltaY = e.clientY - startYRef.current
+      if (Math.abs(delta) < 8 || Math.abs(delta) <= Math.abs(deltaY)) return
       activeGestureRef.current = true
       movedRef.current = true
       // Can throw if the pointer was already released between events (fast
@@ -216,13 +229,27 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
         e.currentTarget.setPointerCapture(e.pointerId)
       } catch {}
     }
+    // Claimed as horizontal (this event or an earlier one in the same
+    // gesture) — stop it from also bubbling to MobileNearbySheet's own
+    // vertical-drag listener on an ancestor, the other half of the same
+    // axis-lock: once a gesture is horizontal, it should never also read as
+    // a vertical drag/scroll for the sheet, the same way Spotify/WhatsApp's
+    // row swipes don't fight their list's own vertical scroll.
+    e.stopPropagation()
     dragXRef.current = Math.min(0, Math.max(-REVEAL_WIDTH, startDragXRef.current + delta))
     setDragX(dragXRef.current)
   }
 
-  function endDrag() {
+  function endDrag(e: React.PointerEvent) {
     if (hoverCapable) return
     if (activeGestureRef.current) {
+      // Same reasoning as onPointerMove's own stopPropagation — without it,
+      // MobileNearbySheet's onContentPointerUp (an ancestor's bubbled
+      // listener) could still resolve a snap-point change from whatever
+      // small residual vertical delta it saw before this gesture locked
+      // itself to horizontal, turning a pure row-swipe into an unwanted
+      // sheet-height change too.
+      e.stopPropagation()
       const shouldOpen = dragX < -REVEAL_WIDTH / 2
       onOpenChange(shouldOpen)
       dragXRef.current = shouldOpen ? -REVEAL_WIDTH : 0

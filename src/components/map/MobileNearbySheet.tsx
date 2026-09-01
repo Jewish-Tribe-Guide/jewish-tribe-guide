@@ -9,7 +9,18 @@ import type { DirectoryResource } from '@/types'
 
 type Snap = 'peek' | 'half' | 'full'
 type Point = MapPoint & { filterId: string; raw?: DirectoryResource }
-type DragState = { startY: number; startHeight: number; moved: boolean; lastY: number; lastT: number; velocity: number }
+// `history`: recent (y, t) samples, oldest first, pruned to the last
+// VELOCITY_WINDOW_MS — see trackDrag's own comment on why velocity is
+// computed over a short window instead of just the last two samples.
+type DragState = {
+  startY: number
+  startHeight: number
+  moved: boolean
+  lastY: number
+  lastT: number
+  velocity: number
+  history: { y: number; t: number }[]
+}
 type ContentDragState = DragState & { active: boolean }
 
 // Collapsed height (handle + one-line summary) and how much room the 'full'
@@ -20,6 +31,8 @@ const SNAP_ORDER: Snap[] = ['peek', 'half', 'full']
 // Google Maps' sheet advances an extra snap point on a fast flick even if you
 // release well short of it — px/ms measured over the last pointer move.
 const FLING_VELOCITY = 0.5
+// How far back trackDrag looks to compute velocity — see its own comment.
+const VELOCITY_WINDOW_MS = 80
 // 'half' only claims this fraction of the full peek↔full drag range around
 // its own height — see resolveSnap.
 const HALF_BAND_FRACTION = 0.14
@@ -228,16 +241,46 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // momentum threshold needs to not be flaky about. performance.now() is the
   // real high-resolution clock either way, in a browser or under test.
   function startDrag(clientY: number, timeStamp: number): DragState {
-    return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
+    return {
+      startY: clientY,
+      startHeight: heights[snap],
+      moved: false,
+      lastY: clientY,
+      lastT: timeStamp,
+      velocity: 0,
+      history: [{ y: clientY, t: timeStamp }],
+    }
   }
 
   /** Advances a drag state to a new pointer position, returning the
-   *  startY-relative delta (positive = finger moved up). */
+   *  startY-relative delta (positive = finger moved up).
+   *
+   *  Velocity is computed over the last VELOCITY_WINDOW_MS, not just the two
+   *  most recent samples — a real flick's very last pointermove before
+   *  release is often a small "settling" motion (or just close together in
+   *  time), so a single-sample instantaneous velocity reads as much slower
+   *  than the flick actually was, right when it matters most: this is
+   *  exactly the number both the sheet's own fling threshold and the list's
+   *  momentum coast decide "was that fast?" from. A short recent window
+   *  smooths that out the same way real touch/scroll implementations do,
+   *  without smoothing away a genuine slow, deliberate drag. */
   function trackDrag(drag: DragState, clientY: number, timeStamp: number): number {
     const delta = drag.startY - clientY
     if (Math.abs(delta) > 3) drag.moved = true
-    const dt = timeStamp - drag.lastT
-    if (dt > 0) drag.velocity = (drag.lastY - clientY) / dt // px/ms, positive = growing
+
+    drag.history.push({ y: clientY, t: timeStamp })
+    // Checks history[1], not history[0], before shifting: only discard the
+    // oldest sample once a SECOND one is also old enough to take over as the
+    // window's baseline. Checking history[0] itself would let the buffer
+    // shrink to just the sample that was pushed this call whenever move
+    // events are sparser than the window (e.g. one every >80ms) — leaving
+    // oldest === the current sample, a zero window and no velocity at all,
+    // rather than genuinely too little data.
+    while (drag.history.length > 2 && timeStamp - drag.history[1]!.t >= VELOCITY_WINDOW_MS) drag.history.shift()
+    const oldest = drag.history[0]!
+    const windowDt = timeStamp - oldest.t
+    if (windowDt > 0) drag.velocity = (oldest.y - clientY) / windowDt // px/ms, positive = growing
+
     drag.lastY = clientY
     drag.lastT = timeStamp
     return delta
