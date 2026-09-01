@@ -23,6 +23,15 @@ const FLING_VELOCITY = 0.5
 // 'half' only claims this fraction of the full peek↔full drag range around
 // its own height — see resolveSnap.
 const HALF_BAND_FRACTION = 0.14
+// Exponential decay applied to scroll velocity per millisecond once the
+// finger lifts, e.g. 0.996 leaves ~37% of the speed after 250ms — a coast
+// that dies out in a few hundred ms, not a real physics simulation. Frame-
+// rate independent (raised to dt, not multiplied per frame) so it doesn't
+// speed up or slow down with the display's refresh rate.
+const MOMENTUM_FRICTION = 0.996
+// Below this, the coast is imperceptible — stop the animation loop instead
+// of running it forever at a velocity too small to move a whole pixel.
+const MOMENTUM_MIN_VELOCITY = 0.02
 
 type Props = {
   points: Point[]
@@ -105,6 +114,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   const dragRef = useRef<DragState | null>(null)
   const contentDragRef = useRef<ContentDragState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  // requestAnimationFrame id of an in-progress momentum coast (see
+  // startMomentum), or null when nothing's running — checked, not just
+  // fire-and-forget, so a new touch can cancel a still-coasting scroll
+  // instead of fighting it.
+  const momentumFrameRef = useRef<number | null>(null)
   const [selected, setSelected] = useState<Point | null>(null)
   // Read via a ref, like ResourceMap's own callback props, so this effect
   // only re-fires when the selection itself changes, not on every parent
@@ -207,6 +221,12 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
 
   useImperativeHandle(ref, () => ({ selectPoint: selectPlace, deselectPoint, collapse, lower, raise }))
 
+  // Callers pass performance.now(), not e.timeStamp — jsdom's Event.timeStamp
+  // turned out to be coarse enough (integer milliseconds, occasionally
+  // identical across two synchronous events) that velocity could compute as
+  // a divide-by-near-zero, which is exactly the kind of thing a fling/
+  // momentum threshold needs to not be flaky about. performance.now() is the
+  // real high-resolution clock either way, in a browser or under test.
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0 }
   }
@@ -237,15 +257,59 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     return SNAP_ORDER[index]
   }
 
+  function stopMomentum() {
+    if (momentumFrameRef.current !== null) {
+      cancelAnimationFrame(momentumFrameRef.current)
+      momentumFrameRef.current = null
+    }
+  }
+
+  // Coasts the list the rest of the way on a flick, the way native momentum
+  // scrolling would — needed because onContentPointerMove now drives
+  // scrollTop by hand instead of letting the browser's own touch-action:
+  // pan-y panning do it (see that function's own comment on why), and a
+  // hand-driven scroll stops dead the instant the finger lifts otherwise.
+  // Not a real physics simulation — exponential decay until it's
+  // imperceptible or the list runs out of room, same as the sheet's own
+  // drag-to-height math is a deliberately simple approximation, not
+  // something aiming to match WebKit's own scroll physics exactly.
+  function startMomentum(initialVelocity: number) {
+    stopMomentum()
+    let velocity = initialVelocity
+    let lastT = performance.now()
+    function step(now: number) {
+      const dt = now - lastT
+      lastT = now
+      velocity *= Math.pow(MOMENTUM_FRICTION, dt)
+      const el = contentRef.current
+      if (!el || Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) {
+        momentumFrameRef.current = null
+        return
+      }
+      const max = el.scrollHeight - el.clientHeight
+      const next = el.scrollTop + velocity * dt
+      if (next <= 0 || next >= max) {
+        el.scrollTop = Math.max(0, Math.min(next, max))
+        momentumFrameRef.current = null
+        return
+      }
+      el.scrollTop = next
+      momentumFrameRef.current = requestAnimationFrame(step)
+    }
+    momentumFrameRef.current = requestAnimationFrame(step)
+  }
+
+  useEffect(() => stopMomentum, [])
+
   function onPointerDown(e: React.PointerEvent) {
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    dragRef.current = startDrag(e.clientY, e.timeStamp)
+    dragRef.current = startDrag(e.clientY, performance.now())
   }
 
   function onPointerMove(e: React.PointerEvent) {
     const drag = dragRef.current
     if (!drag) return
-    const delta = trackDrag(drag, e.clientY, e.timeStamp)
+    const delta = trackDrag(drag, e.clientY, performance.now())
     setDragHeight(Math.min(heights.full, Math.max(PEEK_PX, drag.startHeight + delta)))
   }
 
@@ -285,6 +349,22 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
    *  then, dragging down once you're already scrolled to the top hands
    *  control back to the sheet so it collapses instead of doing nothing.
    *
+   *  The list's own scrolling (the 'full' + not-yet-at-top case) is driven
+   *  by hand here too, via contentRef.scrollTop, rather than left to the
+   *  browser's native touch-action: pan-y panning the way it used to be.
+   *  That was the actual cause of the handoff feeling unreliable even after
+   *  the boundary math itself was fixed: native scrolling on iOS includes
+   *  its own elastic "rubber-band" bounce at the top, which is a WebKit
+   *  animation entirely outside this component's control — it races against
+   *  (and can visually win over) a JS handler watching scrollTop from the
+   *  sidelines, however correct that handler's own logic is. Taking over the
+   *  whole gesture, the way Google Maps' own sheet does, removes the race
+   *  instead of trying to out-guess it: there's no native panning left to
+   *  bounce. startMomentum below exists because driving scrollTop by hand
+   *  loses the free momentum/fling native panning provided — coasting the
+   *  release velocity ourselves is what keeps a fast flick through the list
+   *  feeling like a normal scroll instead of stopping dead on release.
+   *
    *  (A leftward swipe over this area used to also act as "back to list"
    *  while a place was selected, as a gesture alternative to the button. It
    *  was removed: on a real phone it competes with the browser/OS's own
@@ -292,6 +372,10 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
    *  navigate away entirely instead of just deselecting — confusing and not
    *  reliably fixable from here. "Back to list" is the one way back now.) */
   function onContentPointerDown(e: React.PointerEvent) {
+    // A fresh touch always takes over from wherever a momentum coast left
+    // off, rather than fighting it — same reasoning a real scroll view
+    // stopping a fling on touch would have.
+    stopMomentum()
     // Deliberately NOT capturing here (unlike the handle's own
     // onPointerDown) — a previous attempt at that broke NearbyList's own
     // swipe-to-reveal-pin/share gesture on each row. That gesture defers its
@@ -305,25 +389,28 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     // whichever gesture actually claims itself (this one via `active`
     // becoming true, the row's via clear horizontal movement) is what lets
     // both live on the same touch surface.
-    contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full' }
+    contentDragRef.current = { ...startDrag(e.clientY, performance.now()), active: snap !== 'full' }
   }
 
   function onContentPointerMove(e: React.PointerEvent) {
     const drag = contentDragRef.current
     if (!drag) return
     // Captured before trackDrag overwrites drag.lastY with the new position —
-    // the handoff check below needs the finger's most recent direction, not
-    // its position relative to wherever this touch originally landed.
+    // both the handoff check and the manual scroll below need the finger's
+    // most recent increment, not its position relative to wherever this
+    // touch originally landed.
     const prevY = drag.lastY
-    trackDrag(drag, e.clientY, e.timeStamp)
+    trackDrag(drag, e.clientY, performance.now())
+    const localDelta = e.clientY - prevY // positive = finger moved down since the last move event
 
     if (!drag.active) {
+      const content = contentRef.current
       // Only armed when snap === 'full' (see onContentPointerDown) — hand
       // control to the sheet once the list is scrolled to the top and the
       // drag continues downward.
       //
-      // Deliberately checked against the PREVIOUS move event (prevY), not
-      // drag.startY (where this touch first landed): a real gesture is
+      // Deliberately checked against the PREVIOUS move event (localDelta),
+      // not drag.startY (where this touch first landed): a real gesture is
       // rarely a single straight line — scroll down, then back up past the
       // top, all in one continuous touch, and the boundary should hand off
       // the moment that specific motion is downward, regardless of which
@@ -331,12 +418,18 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
       // against startY instead made the sheet keep trying to scroll past
       // the top for however far the finger had to retrace before crossing
       // back over its own start point — a real bug, not just imprecise.
-      const atTop = (contentRef.current?.scrollTop ?? 0) <= 0
-      if (atTop && e.clientY - prevY > 1) {
+      const atTop = (content?.scrollTop ?? 0) <= 0
+      if (atTop && localDelta > 1) {
         drag.active = true
         drag.startY = e.clientY
         drag.startHeight = heights.full
+        return
       }
+      // Still scrolling the list, not yet at the boundary — move it
+      // ourselves instead of the browser's native pan (see this function's
+      // own top-level comment). Assigning past either end just clamps, same
+      // as native scrollTop already does, so no manual bounds-checking here.
+      if (content) content.scrollTop -= localDelta
       return
     }
 
@@ -348,7 +441,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
     const drag = contentDragRef.current
     contentDragRef.current = null
     if (!drag) return
-    if (!drag.moved || !drag.active) return
+    if (!drag.active) {
+      // Ended as a plain list-scroll, never handed off to the sheet — coast
+      // the release velocity the way native panning's own momentum would
+      // have (see onContentPointerDown's comment on why that's now this
+      // component's job instead of the browser's).
+      if (drag.moved && Math.abs(drag.velocity) > MOMENTUM_MIN_VELOCITY) startMomentum(drag.velocity)
+      return
+    }
+    if (!drag.moved) return
     setSnap(resolveSnap(drag, dragHeight ?? heights[snap]))
     setDragHeight(null)
   }
@@ -396,8 +497,11 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
         onPointerMove={onContentPointerMove}
         onPointerUp={onContentPointerUp}
         onPointerCancel={onContentPointerCancel}
-        style={{ touchAction: snap === 'full' ? 'pan-y' : 'none' }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+        // touch-none unconditionally now, in every snap state — the list's
+        // own scrolling is hand-driven (see onContentPointerMove) rather
+        // than native touch-action: pan-y panning, so there's no longer a
+        // snap state where the browser needs panning permission here.
+        className="min-h-0 flex-1 touch-none overflow-y-auto overscroll-contain px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       >
         {selected && selected.raw && selectedCategory ? (
           <MapPlaceDetail

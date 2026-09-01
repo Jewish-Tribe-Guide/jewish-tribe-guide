@@ -225,6 +225,95 @@ describe('MobileNearbySheet', () => {
     fireEvent.pointerUp(content, { clientY: 280 })
   })
 
+  // The list's own scrolling is now driven by hand (contentRef.scrollTop)
+  // instead of the browser's native touch-action: pan-y panning — see
+  // onContentPointerMove's own comment for why (native panning's elastic
+  // bounce at the top raced against, and could visually beat, the boundary
+  // handoff above, however correct its own logic was).
+  it('at "full", scrolling within the list (not at the boundary) drives scrollTop by hand', () => {
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const handle = () => screen.getByRole('button', { name: /nearby list/i })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+
+    const content = container.querySelector('.overscroll-contain')! as HTMLElement
+    content.scrollTop = 100 // already partway down the list, nowhere near the top boundary
+
+    fireEvent.pointerDown(content, { clientY: 500 })
+    fireEvent.pointerMove(content, { clientY: 400 }) // finger moves up 100px — scrolls further down the list
+
+    expect(content.scrollTop).toBe(200)
+  })
+
+  // Driving scrollTop by hand loses the free momentum native panning
+  // provided — without coasting it ourselves, a fast flick through the list
+  // would stop dead the instant the finger lifts instead of continuing to
+  // glide, a real regression relative to how this felt before.
+  it('coasts the list after a fast release instead of stopping dead the instant the finger lifts', () => {
+    const rafCallbacks: FrameRequestCallback[] = []
+    const rafSpy = vi.fn((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb)
+      return rafCallbacks.length
+    })
+    vi.stubGlobal('requestAnimationFrame', rafSpy)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const handle = () => screen.getByRole('button', { name: /nearby list/i })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+
+    const content = container.querySelector('.overscroll-contain')! as HTMLElement
+    content.scrollTop = 100
+    // jsdom has no real layout, so scrollHeight/clientHeight default to 0 —
+    // set explicitly so the list has room to coast into rather than being
+    // clamped at its own (zero-sized) bounds immediately.
+    Object.defineProperty(content, 'scrollHeight', { value: 5000, configurable: true })
+    Object.defineProperty(content, 'clientHeight', { value: 500, configurable: true })
+
+    // Controlled performance.now() rather than relying on real wall-clock
+    // gaps between synchronous fireEvent calls — jsdom's own clock is coarse
+    // enough that two calls this close together can read identical
+    // millisecond values, which would make the computed velocity (and so
+    // whether momentum starts at all) flaky. 100px in 100ms is a fast,
+    // unambiguous flick relative to MOMENTUM_MIN_VELOCITY. (fireEvent's own
+    // `timeStamp` init property is a no-op here — jsdom's Event.timeStamp
+    // has no setter — which is exactly why the component reads
+    // performance.now() directly instead; see startDrag's own comment.)
+    const nowSpy = vi.spyOn(performance, 'now')
+    nowSpy.mockReturnValueOnce(0) // startDrag, on pointerdown
+    fireEvent.pointerDown(content, { clientY: 500 })
+    nowSpy.mockReturnValueOnce(100) // trackDrag, on the move below
+    fireEvent.pointerMove(content, { clientY: 400 })
+    // A 3rd queued value: startMomentum reads performance.now() once more of
+    // its own, inside this same pointerup, to seed its step loop's clock.
+    nowSpy.mockReturnValueOnce(100)
+    fireEvent.pointerUp(content, { clientY: 400 })
+    nowSpy.mockRestore()
+
+    expect(rafSpy).toHaveBeenCalled()
+    const scrollTopAfterRelease = content.scrollTop
+
+    // Manually pump one animation frame with a plain, deterministic
+    // timestamp — a real browser would call this on its own (jsdom never
+    // fires requestAnimationFrame callbacks by itself), and 16ms after the
+    // startMomentum call above's own clock read (100) is one realistic frame.
+    const frame = rafCallbacks[rafCallbacks.length - 1]!
+    frame(116)
+
+    expect(content.scrollTop).toBeGreaterThan(scrollTopAfterRelease)
+
+    vi.unstubAllGlobals()
+  })
+
   it('closes via history.back(), not a direct state reset, when "Back to list" is tapped', async () => {
     const user = userEvent.setup()
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
