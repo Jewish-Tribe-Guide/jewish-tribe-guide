@@ -33,7 +33,7 @@ export function useAdminSession(): Session {
 const IsSuperAdminContext = createContext(false)
 
 /** Whether the signed-in admin is ALSO on the global superadmin list
- *  (ADMIN_EMAILS), on top of whatever got them into this particular
+ *  (SUPERADMIN_EMAILS), on top of whatever got them into this particular
  *  community's console — from /api/admin/whoami's own isSuperAdmin field.
  *  Only ever called from inside AdminAuthGate's authenticated children. */
 export function useIsSuperAdmin(): boolean {

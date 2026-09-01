@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // A fixed admin identity shared by every write-suite that runs against the
 // disposable test Supabase project (cache-roundtrip, admin-write) — not a
-// real person, not shared with the app's real ADMIN_EMAILS. Exists only
+// real person, not shared with the app's real SUPERADMIN_EMAILS. Exists only
 // inside that test project (see run-test-project-server.mjs, which boots
 // every one of these suites' server, and each suite's own auth.setup.ts).
 // Safe to share across suites: each runs as its own process/port and the
@@ -16,7 +16,7 @@ export const CACHE_TEST_ADMIN_EMAIL = 'cache-roundtrip-admin@test.invalid'
 // unconditionally, on the assumption that the default community had no
 // admin_email configured — true when this was written (see the migration
 // that introduced admin_email, "captured, not yet enforced"), so the
-// per-community check always fell back to the global ADMIN_EMAILS list
+// per-community check always fell back to the global SUPERADMIN_EMAILS list
 // (which the server scripts set to exactly this email). That assumption
 // broke the instant a real admin_email got set on a project these suites
 // also point at — SHARED_DEV_TEST_PROJECT means that's the same project a

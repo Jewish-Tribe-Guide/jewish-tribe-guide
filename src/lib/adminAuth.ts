@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getCommunityAdminEmails } from './communityStore'
 
 // The single source of truth for who may administer the site: a comma-separated
-// list in the ADMIN_EMAILS env var. Add an email here to grant admin access.
+// list in the SUPERADMIN_EMAILS env var. Add an email here to grant admin access.
 //
 // Once a community has its own admin_emails set (see isAllowedForCommunity),
 // this list stops being "who can edit THIS community" and becomes the
@@ -12,7 +12,7 @@ import { getCommunityAdminEmails } from './communityStore'
 // /api/admin/revalidate script hook). See getAdminUserForCommunity for the
 // per-community check that everything else should use.
 export function getAllowedAdminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || '')
+  return (process.env.SUPERADMIN_EMAILS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
@@ -24,7 +24,7 @@ export function isAllowedAdminEmail(email: string): boolean {
 
 /** Whether `email` may administer the given community: it has to be on
  *  that community's own `admin_emails` allowlist — NOT just be anywhere on
- *  the global ADMIN_EMAILS list, which is what let one admin edit every
+ *  the global SUPERADMIN_EMAILS list, which is what let one admin edit every
  *  community before this existed. A real list, not a single shared
  *  address (see the admin_emails migration's own comment on why) — several
  *  people can each sign in as themselves, with their own audit trail,
@@ -61,7 +61,7 @@ async function verifyToken(request: Request): Promise<string | null> {
 }
 
 // Verifies that a request carries a valid Supabase access token (Bearer) for a
-// SUPERADMIN email (the global ADMIN_EMAILS list). Returns the admin email, or
+// SUPERADMIN email (the global SUPERADMIN_EMAILS list). Returns the admin email, or
 // null if unauthorized. Only for the genuinely cross-community actions listed
 // on getAllowedAdminEmails' own comment — everything scoped to one community's
 // content should use getAdminUserForCommunity instead.

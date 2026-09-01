@@ -11,7 +11,7 @@ import { cloneCommunityContent } from '@/lib/communityCloning'
 
 // GET /api/admin/communities — the same data as the public GET
 // /api/communities, but superadmin-gated (getAdminUser — the global
-// ADMIN_EMAILS list, not any one community's admin_email; see adminAuth.ts's
+// SUPERADMIN_EMAILS list, not any one community's admin_email; see adminAuth.ts's
 // own note on what that list means now). CommunityManager.tsx calls THIS
 // instead of the public route specifically so a regular per-community admin
 // gets a 401 here and the "manage every community" UI (the list of every

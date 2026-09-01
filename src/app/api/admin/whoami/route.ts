@@ -3,7 +3,7 @@ import { getAdminUser, getAdminUserForCommunity, isAllowedAdminEmail } from '@/l
 // GET /api/admin/whoami?community=<slug> — is the Bearer token's email
 // allowed to administer this specific community (adminAuth.ts's
 // getAdminUserForCommunity). GET /api/admin/whoami with no `community` —
-// is it a SUPERADMIN (the global ADMIN_EMAILS list, getAdminUser) instead;
+// is it a SUPERADMIN (the global SUPERADMIN_EMAILS list, getAdminUser) instead;
 // used by the standalone superadmin console at /admin itself
 // (src/app/admin/page.tsx), which has no community in its URL at all.
 //

@@ -6,7 +6,7 @@ import CommunityManager from '@/components/admin/CommunityManager'
 // The standalone superadmin console, at /admin itself — genuinely
 // cross-community, unlike everything under /{community}/admin (see
 // admin/[community]/layout.tsx). Gated by AdminAuthGate with no `community`
-// prop, which checks the SUPERADMIN list (the global ADMIN_EMAILS) instead
+// prop, which checks the SUPERADMIN list (the global SUPERADMIN_EMAILS) instead
 // of any one community's admin_email — see AdminAuthGate's own doc and
 // /api/admin/whoami's community-omitted branch.
 //

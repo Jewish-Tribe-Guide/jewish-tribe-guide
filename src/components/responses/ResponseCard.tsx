@@ -10,7 +10,7 @@ import { withCommunity } from '@/lib/useCommunityData'
 // /inbox (hospital-facing: support/volunteer/volunteer changes) and /admin's
 // Responses tab (Feedback + custom admin-created forms). `apiBase` points
 // each consumer at its own auth boundary: /api/inbox (INBOX_EMAILS) or
-// /api/admin/responses (ADMIN_EMAILS) — same shape, different allowlist.
+// /api/admin/responses (SUPERADMIN_EMAILS) — same shape, different allowlist.
 
 export const inputClass =
   'w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'

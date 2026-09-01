@@ -18,7 +18,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 // The `npm run build && next start` webServer command below gets .env.local
 // for free — Next.js auto-loads it in that child process. This config file
-// (and e2e/auth.setup.ts, which needs SUPABASE_SERVICE_ROLE_KEY/ADMIN_EMAILS
+// (and e2e/auth.setup.ts, which needs SUPABASE_SERVICE_ROLE_KEY/SUPERADMIN_EMAILS
 // to mint a real admin session) runs in the Playwright test-runner process
 // itself, which does not — same reasoning as scripts/*.mjs's own
 // `node --env-file=.env.local`. Guarded rather than required: CI has no

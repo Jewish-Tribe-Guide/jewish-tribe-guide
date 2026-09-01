@@ -5,7 +5,7 @@ import { enforceRateLimit } from '@/lib/rateLimit'
 
 // POST /api/inbox/request-link  body: { email }
 // Sends a magic sign-in link ONLY if the email is allowlisted in INBOX_EMAILS —
-// a separate list from ADMIN_EMAILS (see inboxAuth.ts). Mirrors
+// a separate list from SUPERADMIN_EMAILS (see inboxAuth.ts). Mirrors
 // /api/admin/request-link exactly, down to the generic response (so this
 // endpoint can't be used to discover which addresses can read the inbox).
 export async function POST(request: Request) {

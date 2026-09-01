@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
 //
 // Runs in the `admin` project (see playwright.config.ts), which reuses the
 // session e2e/auth.setup.ts mints via the service-role key — the real
-// production admin address in ADMIN_EMAILS, since there is no separate
+// production admin address in SUPERADMIN_EMAILS, since there is no separate
 // test-admin account.
 //
 // DELIBERATELY READ-ONLY. Two independent reasons, either one sufficient on

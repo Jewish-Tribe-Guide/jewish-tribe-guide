@@ -20,7 +20,7 @@ type CommunityWithAdminEmail = Community & {
   previewToken: string | null
 }
 
-// Comma-separated, same convention the ADMIN_EMAILS env var already uses —
+// Comma-separated, same convention the SUPERADMIN_EMAILS env var already uses —
 // familiar shape, and simple enough not to need a real multi-value widget
 // for something edited this rarely.
 function parseEmailList(value: string): string[] {
@@ -36,7 +36,7 @@ function parseEmailList(value: string): string[] {
 // only, both for reading (GET /api/admin/communities, not the public
 // /api/communities the header switcher uses) and writing (POST
 // /api/admin/communities) — browsing/creating communities isn't scoped to
-// any one community's own admin, so it's gated by the global ADMIN_EMAILS
+// any one community's own admin, so it's gated by the global SUPERADMIN_EMAILS
 // list rather than adminAuth.ts's per-community check. A regular
 // per-community admin gets a 401 from the GET and sees a plain
 // access-denied message instead of the list. ──
@@ -720,7 +720,7 @@ export default function CommunityManager({ token }: { token: string }) {
                   {c.adminEmails.length > 0 ? (
                     <span className="font-mono">{c.adminEmails.join(', ')}</span>
                   ) : (
-                    <span className="italic">not set — falls back to the superadmin list (ADMIN_EMAILS)</span>
+                    <span className="italic">not set — falls back to the superadmin list (SUPERADMIN_EMAILS)</span>
                   )}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
