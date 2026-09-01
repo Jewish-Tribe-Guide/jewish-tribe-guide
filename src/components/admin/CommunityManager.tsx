@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import tzLookup from 'tz-lookup'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -245,7 +246,7 @@ export default function CommunityManager({ token }: { token: string }) {
     setDraft((d) => {
       if (!coords) return { ...d, lat: '', lng: '' }
       const city = cityShortName(d.cityQuery)
-      const name = d.nameTouched ? d.name : `${city} Jewish Community`
+      const name = d.nameTouched ? d.name : `${city} Jewish Guide`
       return {
         ...d,
         lat: String(coords.lat),
@@ -253,7 +254,11 @@ export default function CommunityManager({ token }: { token: string }) {
         timezone: tzLookup(coords.lat, coords.lng),
         region: d.regionTouched ? d.region : city,
         name,
-        slug: d.slugTouched ? d.slug : slugify(name),
+        // When the name itself is being auto-filled, slugify the city alone
+        // rather than the generated name — otherwise the "Jewish Guide"
+        // suffix ends up baked into the URL (e.g. baltimore-jewish-guide).
+        // A hand-typed name still drives the slug as before.
+        slug: d.slugTouched ? d.slug : slugify(d.nameTouched ? name : city),
         tagline: d.taglineTouched ? d.tagline : 'Guide for residents & visitors',
         mission: d.missionTouched
           ? d.mission
@@ -502,8 +507,8 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Fills in the name, URL, region, timezone and map center below — pick one from the dropdown rather than
-            just typing, so those actually get set.
+            Fills in the name, URL slug, region, timezone, map center, tagline and mission below — pick a suggestion
+            from the dropdown rather than just typing, so those actually get set.
           </p>
         </div>
 
@@ -513,7 +518,7 @@ export default function CommunityManager({ token }: { token: string }) {
             className={inputClass}
             value={draft.name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Baltimore Jewish Community"
+            placeholder="e.g. Baltimore Jewish Guide"
           />
         </label>
 
@@ -684,7 +689,18 @@ export default function CommunityManager({ token }: { token: string }) {
         {communities.map((c) => (
           <div key={c.slug} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors">
             <div className="flex items-start justify-between gap-3">
-              <a href={adminBase(c.slug)} className="min-w-0 flex-1">
+              {/* prefetch={false}: this list can include communities other than
+                  the one whose admin console is currently mounted, and
+                  prefetching primes Next's client router cache for that
+                  other community's segment of the same /admin/[community]
+                  layout. That collided for real with the very next thing
+                  this screen does — creating a community and router.push-ing
+                  into its console — which silently failed to update the URL
+                  (no error, no reload, just stuck) once these rows started
+                  prefetching. Same underlying Cache Components router-cache
+                  issue as confirmDelete's own reload workaround below, just
+                  triggered by priming instead of by the delete itself. */}
+              <Link href={adminBase(c.slug)} prefetch={false} className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-slate-900 text-sm">{c.name}</p>
                   {c.isDefault && (
@@ -716,7 +732,7 @@ export default function CommunityManager({ token }: { token: string }) {
                     admin console works normally regardless — sign in any time to keep building it out.
                   </p>
                 )}
-              </a>
+              </Link>
               <div className="flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => startEditingEmails(c)}

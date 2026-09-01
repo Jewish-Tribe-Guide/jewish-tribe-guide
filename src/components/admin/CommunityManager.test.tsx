@@ -366,8 +366,8 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
     const call = vi.mocked(fetchJson).mock.calls[0]!
     const body = JSON.parse((call[1] as RequestInit).body as string)
     expect(body).toMatchObject({
-      name: 'Baltimore Jewish Community',
-      slug: 'baltimore-jewish-community',
+      name: 'Baltimore Jewish Guide',
+      slug: 'baltimore',
       region: 'Baltimore',
       mapCenter: { lat: 39.2904, lng: -76.6122 },
       timezone: 'America/New_York',
