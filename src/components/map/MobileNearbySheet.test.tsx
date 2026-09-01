@@ -181,6 +181,50 @@ describe('MobileNearbySheet', () => {
     expect(sheet.style.height).not.toBe('524px')
   })
 
+  // Real bug: the handoff above used to check the finger's position against
+  // where THIS TOUCH started, not its most recent direction — fine for a
+  // single straight downward drag, wrong for the much more common real
+  // gesture of scrolling down, then back up past the top, all without
+  // lifting the finger. The finger has to physically re-cross its own
+  // starting point before a startY-relative check can ever go negative, so
+  // the sheet kept acting like it was still trying to scroll past the top
+  // even once scrollTop had already hit 0 and the finger was clearly moving
+  // down again.
+  it('at "full", scrolling down then back up past the top in one continuous gesture still hands off — not just a straight drag from the start', () => {
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const handle = () => screen.getByRole('button', { name: /nearby list/i })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+
+    const sheet = container.firstElementChild as HTMLElement
+    const content = container.querySelector('.overscroll-contain')!
+
+    fireEvent.pointerDown(content, { clientY: 300 })
+    // Scrolls the list further down (finger moves up, scrollTop grows).
+    content.scrollTop = 200
+    fireEvent.pointerMove(content, { clientY: 250 })
+    // Same touch reverses and scrolls back up to the top — scrollTop
+    // returns to 0 — then keeps moving the same direction. The finger
+    // (260, then 280) never re-crosses where the touch started (300), so a
+    // check against the touch's own start point would never fire here —
+    // and resolveSnap's own "round back to full unless you've dragged far
+    // enough" behavior on release would make even a late activation look
+    // identical to no activation by the time the gesture ends, so this
+    // reads the height mid-drag (before release) instead of the settled
+    // snap, which is the only place the delay this bug caused is visible.
+    content.scrollTop = 0
+    fireEvent.pointerMove(content, { clientY: 260 }) // at the top, moving down — should arm the handoff right here
+    fireEvent.pointerMove(content, { clientY: 280 }) // a further small move down — should already be dragging the sheet
+
+    expect(sheet.style.height).not.toBe('524px')
+
+    fireEvent.pointerUp(content, { clientY: 280 })
+  })
+
   it('closes via history.back(), not a direct state reset, when "Back to list" is tapped', async () => {
     const user = userEvent.setup()
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})

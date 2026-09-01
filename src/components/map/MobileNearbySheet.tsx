@@ -311,14 +311,28 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   function onContentPointerMove(e: React.PointerEvent) {
     const drag = contentDragRef.current
     if (!drag) return
+    // Captured before trackDrag overwrites drag.lastY with the new position —
+    // the handoff check below needs the finger's most recent direction, not
+    // its position relative to wherever this touch originally landed.
+    const prevY = drag.lastY
     trackDrag(drag, e.clientY, e.timeStamp)
 
     if (!drag.active) {
       // Only armed when snap === 'full' (see onContentPointerDown) — hand
       // control to the sheet once the list is scrolled to the top and the
       // drag continues downward.
+      //
+      // Deliberately checked against the PREVIOUS move event (prevY), not
+      // drag.startY (where this touch first landed): a real gesture is
+      // rarely a single straight line — scroll down, then back up past the
+      // top, all in one continuous touch, and the boundary should hand off
+      // the moment that specific motion is downward, regardless of which
+      // way the finger was moving earlier in the same touch. Comparing
+      // against startY instead made the sheet keep trying to scroll past
+      // the top for however far the finger had to retrace before crossing
+      // back over its own start point — a real bug, not just imprecise.
       const atTop = (contentRef.current?.scrollTop ?? 0) <= 0
-      if (atTop && drag.startY - e.clientY < -3) {
+      if (atTop && e.clientY - prevY > 1) {
         drag.active = true
         drag.startY = e.clientY
         drag.startHeight = heights.full
