@@ -292,6 +292,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
    *  navigate away entirely instead of just deselecting — confusing and not
    *  reliably fixable from here. "Back to list" is the one way back now.) */
   function onContentPointerDown(e: React.PointerEvent) {
+    // Capture, same as the handle's own onPointerDown — without it, once the
+    // list scrolls under the finger during the native (touch-action: pan-y)
+    // portion of a 'full' drag, the browser can retarget subsequent
+    // pointermove events to whichever list row is now underneath instead of
+    // this container, which is what a lost/janky scroll→drag handoff looks
+    // like from a finger's perspective. Safe to capture even while native
+    // panning is allowed — capture only redirects where events are
+    // delivered, it doesn't disable touch-action's own native scrolling.
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full' }
   }
 
