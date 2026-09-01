@@ -525,19 +525,27 @@ export default function CommunityManager({ token }: { token: string }) {
           </span>
         </label>
 
-        <label className={labelClass}>
-          Admin emails
-          <input
-            className={inputClass}
-            value={draft.adminEmails}
-            onChange={(e) => set('adminEmails', e.target.value)}
-            placeholder="jane@example.com, sam@example.com"
-          />
-          <span className="block text-xs text-muted mt-1">
+        <div>
+          {/* Caption deliberately OUTSIDE the <label> — same reasoning as
+              the City/State field's own comment above: nested inside, it
+              becomes part of the accessible name, and "new-submission"
+              contains "mission" as a literal substring. That collided with
+              the actual Mission field and broke
+              e2e-admin-write/community-editor.spec.ts for real. */}
+          <label className={labelClass}>
+            Admin emails
+            <input
+              className={inputClass}
+              value={draft.adminEmails}
+              onChange={(e) => set('adminEmails', e.target.value)}
+              placeholder="jane@example.com, sam@example.com"
+            />
+          </label>
+          <p className="text-xs text-muted mt-1">
             Comma-separated. Only these addresses can sign in to this community&rsquo;s admin console — each signs in
             as themselves — and they&rsquo;ll get new-submission emails (turn that off later if not wanted).
-          </span>
-        </label>
+          </p>
+        </div>
 
         <label className={labelClass}>
           Starting content
