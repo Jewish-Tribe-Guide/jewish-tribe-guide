@@ -292,15 +292,19 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
    *  navigate away entirely instead of just deselecting — confusing and not
    *  reliably fixable from here. "Back to list" is the one way back now.) */
   function onContentPointerDown(e: React.PointerEvent) {
-    // Capture, same as the handle's own onPointerDown — without it, once the
-    // list scrolls under the finger during the native (touch-action: pan-y)
-    // portion of a 'full' drag, the browser can retarget subsequent
-    // pointermove events to whichever list row is now underneath instead of
-    // this container, which is what a lost/janky scroll→drag handoff looks
-    // like from a finger's perspective. Safe to capture even while native
-    // panning is allowed — capture only redirects where events are
-    // delivered, it doesn't disable touch-action's own native scrolling.
-    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    // Deliberately NOT capturing here (unlike the handle's own
+    // onPointerDown) — a previous attempt at that broke NearbyList's own
+    // swipe-to-reveal-pin/share gesture on each row. That gesture defers its
+    // own setPointerCapture until it's clearly horizontal (see its
+    // onPointerMove), specifically so a vertical drag over a row still
+    // reaches this handler instead of being stolen. Capturing here
+    // unconditionally on every touchdown wins that race before the row ever
+    // gets to decide, so every row-swipe attempt got treated as a sheet-drag
+    // instead. Pointer capture is one-winner-takes-all per pointer id, and
+    // bubbling still reaches this ancestor either way, so leaving it to
+    // whichever gesture actually claims itself (this one via `active`
+    // becoming true, the row's via clear horizontal movement) is what lets
+    // both live on the same touch surface.
     contentDragRef.current = { ...startDrag(e.clientY, e.timeStamp), active: snap !== 'full' }
   }
 
