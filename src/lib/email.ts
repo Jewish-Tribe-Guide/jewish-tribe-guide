@@ -3,6 +3,7 @@ import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { getCommunityNotifyRecipients } from './communityStore'
+import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
@@ -120,20 +121,24 @@ export async function sendEmail({
 // buildFeedbackHtml's own note on /admin/responses landing on Feedback only
 // because it happens to be the default) — this links to the right SCREEN,
 // not a further-selected tab within it.
-function appLinkFor(payload: SubmissionPayload): string | null {
+function appLinkFor(payload: SubmissionPayload, communitySlug: string): string | null {
   const appUrl = adminAppUrl()
   if (!appUrl) return null
-  return payload.formId ? `${appUrl}/admin/responses` : `${appUrl}/inbox`
+  // /inbox stays hardcoded (no community segment) — it has no per-community
+  // split, see INBOX_BASE's own comment. The admin Responses tab does, via
+  // adminBase — same fix as sendSubmissionNotification's adminLink below.
+  return payload.formId ? `${appUrl}${adminBase(communitySlug)}/responses` : `${appUrl}/inbox`
 }
 
 function buildHtml(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  communitySlug: string,
 ): string {
   const { contact, requestType, formData } = payload
   const formJson = JSON.stringify(formData, null, 2)
-  const appUrl = appLinkFor(payload)
+  const appUrl = appLinkFor(payload, communitySlug)
   const appLink = appUrl
     ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in ${payload.formId ? 'admin' : 'inbox'} →</a></p>`
     : ''
@@ -193,18 +198,19 @@ function buildFeedbackHtml(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  communitySlug: string,
 ): string {
   const message = escapeHtml(String(payload.formData.message ?? ''))
   const email = payload.contact.email?.trim()
   // Feedback lives in the admin's Responses tab now, not a Sheet — same
   // link shape as sendSubmissionNotification's own adminLink below, just
-  // pointed at /admin/responses (its own real route since the admin routing
-  // refactor) rather than /admin. Feedback is that tab's default sub-tab
-  // (see ResponsesManager's FEEDBACK_KEY), so no query param is needed to
-  // land there directly.
+  // pointed at that community's own /responses (its own real route since
+  // the admin routing refactor) rather than the bare superadmin /admin.
+  // Feedback is that tab's default sub-tab (see ResponsesManager's
+  // FEEDBACK_KEY), so no query param is needed to land there directly.
   const appUrl = adminAppUrl()
   const adminLink = appUrl
-    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin/responses" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in admin →</a></p>`
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(communitySlug)}/responses" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open in admin →</a></p>`
     : ''
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
     <h2 style="color:#1d4ed8;margin-bottom:4px;">New Site Feedback</h2>
@@ -241,8 +247,8 @@ export async function sendNotification(
   const to = await notificationRecipients(communitySlug)
   if (!to) return // this community has submission notifications turned off
   const html = payload.requestType === 'Feedback'
-    ? buildFeedbackHtml(payload, requestId, timestamp)
-    : buildHtml(payload, requestId, timestamp)
+    ? buildFeedbackHtml(payload, requestId, timestamp, communitySlug)
+    : buildHtml(payload, requestId, timestamp, communitySlug)
   await sendEmail({
     to,
     subject: buildRequestSubject(payload),
@@ -349,8 +355,12 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   }
 
   const appUrl = adminAppUrl()
+  // adminBase(community), not a bare '/admin' — that's the standalone
+  // superadmin console (no moderation queue of its own), while this
+  // submission belongs to one specific community's own console. See
+  // adminBase's own doc for why every admin link should go through it.
   const adminLink = appUrl
-    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}/admin" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Review in admin →</a></p>`
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(submission.community_id)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Review in admin →</a></p>`
     : ''
 
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">

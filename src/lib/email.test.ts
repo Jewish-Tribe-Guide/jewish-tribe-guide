@@ -178,6 +178,38 @@ describe('sendEmail', () => {
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['fallback@example.com'] }))
       })
 
+      // Same bug as sendSubmissionNotification's own admin link above, in two
+      // more spots that build the "Open in admin" button: Feedback and a
+      // custom form response both used to link to the bare /admin/responses
+      // (no community segment) for every community.
+      it('sendNotification links Feedback to the submitting community\'s own Responses tab', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        vi.stubEnv('VERCEL_ENV', 'production')
+        vi.stubEnv('APP_URL', 'https://example.org')
+        await sendNotification(
+          { requestType: 'Feedback', contact: minimalContact, formData: { message: 'hi' } },
+          'REQ-1',
+          '2026-01-01',
+          'ues',
+        )
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('href="https://example.org/ues/admin/responses"')
+      })
+
+      it('sendNotification links a custom form response to the submitting community\'s own Responses tab', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        vi.stubEnv('VERCEL_ENV', 'production')
+        vi.stubEnv('APP_URL', 'https://example.org')
+        await sendNotification(
+          { requestType: 'Custom Form', formId: 'form-1', contact: minimalContact, formData: { message: 'hi' } },
+          'REQ-1',
+          '2026-01-01',
+          'ues',
+        )
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('href="https://example.org/ues/admin/responses"')
+      })
+
       it('sendSubmissionNotification reads the notify list off the submission\'s own community_id', async () => {
         mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
         const submission: SubmissionRow = {
@@ -196,6 +228,32 @@ describe('sendEmail', () => {
         await sendSubmissionNotification(submission)
         expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
+      })
+
+      // Real bug: the "Review in admin" button linked to the bare /admin
+      // superadmin console — which has no moderation queue of its own — for
+      // every community, instead of that submission's own /{community}/admin.
+      it("sendSubmissionNotification's admin link points at the submitting community's own console, not the bare superadmin one", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        vi.stubEnv('VERCEL_ENV', 'production')
+        vi.stubEnv('APP_URL', 'https://example.org')
+        const submission: SubmissionRow = {
+          id: 's1',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+        }
+        await sendSubmissionNotification(submission)
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('href="https://example.org/ues/admin"')
+        expect(html).not.toContain('href="https://example.org/admin"')
       })
     })
 
