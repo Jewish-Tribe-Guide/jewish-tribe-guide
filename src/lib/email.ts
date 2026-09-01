@@ -90,11 +90,13 @@ export async function sendEmail({
   subject,
   html,
   replyTo,
+  bcc,
 }: {
   to: string | string[]
   subject: string
   html: string
   replyTo?: string
+  bcc?: string[]
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('Missing required environment variable: RESEND_API_KEY')
@@ -106,6 +108,7 @@ export async function sendEmail({
     subject: taggedSubject(subject),
     html,
     ...(replyTo ? { replyTo } : {}),
+    ...(bcc && bcc.length > 0 ? { bcc } : {}),
   })
   if (error) throw new Error(`Resend email failed: ${JSON.stringify(error)}`)
 }
