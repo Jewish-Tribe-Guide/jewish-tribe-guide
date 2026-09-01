@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { adminBase, adminTabs } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { useIsSuperAdmin } from './AdminAuthGate'
 
 /** Real per-tab underline, driven by the URL instead of the pushState-shim
  *  local state AdminTabs used to keep — every tab is a genuine
@@ -11,8 +12,9 @@ import { useCommunitySlug } from '@/lib/communityContext'
 export default function AdminNav() {
   const pathname = usePathname()
   const community = useCommunitySlug()
+  const isSuperAdmin = useIsSuperAdmin()
   const base = adminBase(community)
-  const tabs = adminTabs(community)
+  const tabs = adminTabs(community, isSuperAdmin)
 
   return (
     // touch-pan-x: a diagonal-ish swipe on this strip otherwise gets read as

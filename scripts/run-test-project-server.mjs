@@ -168,7 +168,7 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: url,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey,
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-  ADMIN_EMAILS: adminEmails,
+  SUPERADMIN_EMAILS: adminEmails,
   // Its own build output, derived from the port rather than a separate env
   // var — each config already sets a distinct CACHE_E2E_PORT, so this can't
   // collide with whatever the real e2e suite, the other test-project suite,

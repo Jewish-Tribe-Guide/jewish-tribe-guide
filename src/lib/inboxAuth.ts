@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 // The single source of truth for who may read form-response data: a
 // comma-separated list in the INBOX_EMAILS env var. Deliberately separate from
-// ADMIN_EMAILS (adminAuth.ts) — someone who manages categories/site content is
+// SUPERADMIN_EMAILS (adminAuth.ts) — someone who manages categories/site content is
 // NOT automatically allowed to read patients' support requests, and vice versa.
 // A person can be on both lists, but each grants only its own access.
 export function getAllowedInboxEmails(): string[] {

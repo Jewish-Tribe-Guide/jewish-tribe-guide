@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('getAllowedAdminEmails', () => {
   it('splits, trims, and lowercases the comma-separated list', () => {
-    vi.stubEnv('ADMIN_EMAILS', ' Admin@Example.com, second@example.com ,third@example.com')
+    vi.stubEnv('SUPERADMIN_EMAILS', ' Admin@Example.com, second@example.com ,third@example.com')
     expect(getAllowedAdminEmails()).toEqual([
       'admin@example.com',
       'second@example.com',
@@ -50,18 +50,18 @@ describe('getAllowedAdminEmails', () => {
   })
 
   it('drops empty entries from stray commas', () => {
-    vi.stubEnv('ADMIN_EMAILS', 'a@example.com,,b@example.com,')
+    vi.stubEnv('SUPERADMIN_EMAILS', 'a@example.com,,b@example.com,')
     expect(getAllowedAdminEmails()).toEqual(['a@example.com', 'b@example.com'])
   })
 
   it('is empty when the env var is unset', () => {
-    vi.stubEnv('ADMIN_EMAILS', '')
+    vi.stubEnv('SUPERADMIN_EMAILS', '')
     expect(getAllowedAdminEmails()).toEqual([])
   })
 })
 
 describe('isAllowedAdminEmail', () => {
-  beforeEach(() => vi.stubEnv('ADMIN_EMAILS', 'admin@example.com'))
+  beforeEach(() => vi.stubEnv('SUPERADMIN_EMAILS', 'admin@example.com'))
 
   it('matches case-insensitively', () => {
     expect(isAllowedAdminEmail('ADMIN@EXAMPLE.COM')).toBe(true)
@@ -78,7 +78,7 @@ describe('isAllowedAdminEmail', () => {
 
 describe('getAdminUser', () => {
   beforeEach(() => {
-    vi.stubEnv('ADMIN_EMAILS', 'admin@example.com')
+    vi.stubEnv('SUPERADMIN_EMAILS', 'admin@example.com')
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.supabase.co')
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key')
   })
@@ -117,9 +117,9 @@ describe('getAdminUser', () => {
 
 // The check that actually stops one community's admin from acting on
 // another's data once their emails diverge — see adminAuth.ts's own comment
-// on what ADMIN_EMAILS means now that this exists.
+// on what SUPERADMIN_EMAILS means now that this exists.
 describe('isAllowedForCommunity', () => {
-  beforeEach(() => vi.stubEnv('ADMIN_EMAILS', 'super@example.com'))
+  beforeEach(() => vi.stubEnv('SUPERADMIN_EMAILS', 'super@example.com'))
 
   it('admits an email on the community\'s own configured admin_emails list, case-insensitively', async () => {
     vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
@@ -139,7 +139,7 @@ describe('isAllowedForCommunity', () => {
     expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(false)
   })
 
-  it('falls back to the global ADMIN_EMAILS list when the community has no admin_emails configured yet', async () => {
+  it('falls back to the global SUPERADMIN_EMAILS list when the community has no admin_emails configured yet', async () => {
     vi.mocked(getCommunityAdminEmails).mockResolvedValue([])
     expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(true)
     expect(await isAllowedForCommunity('stranger@example.com', 'philly')).toBe(false)

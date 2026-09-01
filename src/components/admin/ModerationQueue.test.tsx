@@ -7,12 +7,10 @@ import { makeCategory } from '@/test/providerFixtures'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import { getBrowserClient } from '@/lib/supabase/client'
 import type { EnrichedSubmission } from '@/types'
 import ModerationQueue from './ModerationQueue'
 
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
-vi.mock('@/lib/supabase/client', () => ({ getBrowserClient: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
   usePathname: () => '/test-community',
@@ -73,7 +71,6 @@ function renderQueue(items: EnrichedSubmission[], sess = session()) {
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn())
-  vi.mocked(getBrowserClient).mockReturnValue({ auth: { signOut: vi.fn() } } as unknown as ReturnType<typeof getBrowserClient>)
 })
 
 afterEach(() => {
@@ -250,19 +247,5 @@ describe('ModerationQueue — moderating', () => {
     expect(titleText('Acme Grocery')).toBeInTheDocument()
     expect(fetchJson).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument()
-  })
-})
-
-describe('ModerationQueue — signing out', () => {
-  it('the Sign out button calls the browser client’s signOut', async () => {
-    const user = userEvent.setup()
-    const signOut = vi.fn()
-    vi.mocked(getBrowserClient).mockReturnValue({ auth: { signOut } } as unknown as ReturnType<typeof getBrowserClient>)
-    renderQueue([])
-    await screen.findByText('🎉 Nothing pending — the queue is clear.')
-
-    await user.click(screen.getByRole('button', { name: 'Sign out' }))
-
-    expect(signOut).toHaveBeenCalledTimes(1)
   })
 })

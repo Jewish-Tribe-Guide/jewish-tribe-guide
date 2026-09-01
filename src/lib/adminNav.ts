@@ -36,7 +36,13 @@ export type AdminTab =
   | 'team'
   | 'communities'
 
-export function adminTabs(community: string): { tab: AdminTab; href: string; label: string }[] {
+// `isSuperAdmin`: whether to include the Communities tab at all — its own
+// route (and the GET /api/admin/communities it reads) are already
+// superadmin-gated server-side (see CommunityManager's own comment), but
+// leaving the tab visible to every ordinary community admin just handed
+// them a click that always dead-ends in "Only the site owner can create or
+// browse other communities" instead of not offering it in the first place.
+export function adminTabs(community: string, isSuperAdmin: boolean): { tab: AdminTab; href: string; label: string }[] {
   const base = adminBase(community)
   return [
     { tab: 'queue', href: base, label: 'Moderation queue' },
@@ -57,7 +63,8 @@ export function adminTabs(community: string): { tab: AdminTab; href: string; lab
     // Cross-community: creating a new community isn't an action scoped to
     // whichever one you're currently editing, but this tab still lives
     // under the current community's console — there's no community-less
-    // admin route to put it on instead.
-    { tab: 'communities', href: `${base}/communities`, label: 'Communities' },
+    // admin route to put it on instead. Superadmin-only — see this
+    // function's own doc.
+    ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
   ]
 }

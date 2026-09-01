@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 // Shared magic-link sign-in form — used by /admin and /inbox, which check
-// different email allowlists (ADMIN_EMAILS vs INBOX_EMAILS) but share the same
+// different email allowlists (SUPERADMIN_EMAILS vs INBOX_EMAILS) but share the same
 // Supabase Auth user pool and the same "send a link, no password" UX. The
 // allowlist check happens server-side in each route's own request-link
 // endpoint; this component has no idea which list it's talking to.

@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Local admin access
 
-Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `ADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.
+Default to the **local** admin console (`npm run dev`, then `http://localhost:3000/philly/admin?devToken=<DEV_ADMIN_BYPASS_SECRET>`) instead of the deployed one — the secret is in `.env.local` as `DEV_ADMIN_BYPASS_SECRET`. This hits `/api/admin/dev-login`, which signs you in instantly and works only when `NODE_ENV !== 'production'` (so it's a no-op against a real deployment — see that route's own comments). No magic-link email needed. `/admin` (no community segment, `?devToken=` works there too) is a different, standalone page — the superadmin console (`src/app/admin/page.tsx`), gated by the global `SUPERADMIN_EMAILS` list rather than any one community's `admin_email` — for cross-community actions like creating a new community. It no longer redirects to `/philly/admin`.
 
 # Never write to production without being told to, every time
 

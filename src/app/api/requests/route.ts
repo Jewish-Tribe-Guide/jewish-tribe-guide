@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     console.error('[requests] Admin notification failed:', err)
   }
   try {
-    await sendRequestConfirmation(payload, requestId)
+    await sendRequestConfirmation(payload, requestId, community.slug)
   } catch (err) {
     console.error('[requests] Confirmation email failed:', err)
   }

@@ -24,6 +24,22 @@ export function useAdminSession(): Session {
   return session
 }
 
+// Separate from AdminSessionContext (rather than folded into it) so the
+// existing useAdminSession() callers — every one of them expects a raw
+// Session, not a wrapper object — don't all need updating for one new,
+// narrow need: whether the tabs under a per-community console should offer
+// the Communities tab, which is superadmin-only underneath regardless of
+// which community's console it's rendered inside (see AdminNav).
+const IsSuperAdminContext = createContext(false)
+
+/** Whether the signed-in admin is ALSO on the global superadmin list
+ *  (SUPERADMIN_EMAILS), on top of whatever got them into this particular
+ *  community's console — from /api/admin/whoami's own isSuperAdmin field.
+ *  Only ever called from inside AdminAuthGate's authenticated children. */
+export function useIsSuperAdmin(): boolean {
+  return useContext(IsSuperAdminContext)
+}
+
 /** Gates a /admin/* route behind a real admin session — renders the
  *  loading/magic-link-login screens itself (in the same AdminShell chrome
  *  every authenticated route uses) until one exists, then makes it available
@@ -70,6 +86,7 @@ export default function AdminAuthGate({
   // for the superadmin console, any ordinary community admin could reach it
   // the same way. null = not checked yet for the current session.
   const [authorized, setAuthorized] = useState<boolean | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
 
   useEffect(() => {
     const supabase = getBrowserClient()
@@ -103,9 +120,15 @@ export default function AdminAuthGate({
           headers: { Authorization: `Bearer ${currentSession.access_token}` },
         })
         const body = await res.json()
-        if (!cancelled) setAuthorized(!!body.ok)
+        if (!cancelled) {
+          setAuthorized(!!body.ok)
+          setIsSuperAdmin(!!body.isSuperAdmin)
+        }
       } catch {
-        if (!cancelled) setAuthorized(false)
+        if (!cancelled) {
+          setAuthorized(false)
+          setIsSuperAdmin(false)
+        }
       }
     }
     checkAuthorized(session)
@@ -233,7 +256,20 @@ export default function AdminAuthGate({
 
   return (
     <AdminShell title={shellTitle} subtitle={shellSubtitle}>
-      <AdminSessionContext.Provider value={session}>{children}</AdminSessionContext.Provider>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted">
+          Signed in as <span className="font-medium text-slate-700">{session.user.email}</span>
+        </p>
+        <button
+          onClick={() => getBrowserClient().auth.signOut()}
+          className="text-sm text-muted hover:text-slate-700 underline cursor-pointer"
+        >
+          Sign out
+        </button>
+      </div>
+      <AdminSessionContext.Provider value={session}>
+        <IsSuperAdminContext.Provider value={isSuperAdmin}>{children}</IsSuperAdminContext.Provider>
+      </AdminSessionContext.Provider>
     </AdminShell>
   )
 }

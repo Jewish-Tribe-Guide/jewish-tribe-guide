@@ -90,11 +90,13 @@ export async function sendEmail({
   subject,
   html,
   replyTo,
+  bcc,
 }: {
   to: string | string[]
   subject: string
   html: string
   replyTo?: string
+  bcc?: string[]
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('Missing required environment variable: RESEND_API_KEY')
@@ -106,6 +108,7 @@ export async function sendEmail({
     subject: taggedSubject(subject),
     html,
     ...(replyTo ? { replyTo } : {}),
+    ...(bcc && bcc.length > 0 ? { bcc } : {}),
   })
   if (error) throw new Error(`Resend email failed: ${JSON.stringify(error)}`)
 }
@@ -277,7 +280,7 @@ export async function sendAdminMagicLink(email: string, link: string): Promise<v
 
 // Emails an inbox-viewer sign-in link. Used by /api/inbox/request-link AFTER
 // the email has been verified against INBOX_EMAILS (a separate allowlist from
-// ADMIN_EMAILS — see inboxAuth.ts), so only allowed viewers ever receive one.
+// SUPERADMIN_EMAILS — see inboxAuth.ts), so only allowed viewers ever receive one.
 export async function sendInboxMagicLink(email: string, link: string): Promise<void> {
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;">
     <h2 style="color:#1d4ed8;">Sign in to the Inbox</h2>

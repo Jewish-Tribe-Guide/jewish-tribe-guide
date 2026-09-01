@@ -70,7 +70,7 @@ describe('getInboxViewer', () => {
     expect(await getInboxViewer(req('Bearer badtoken'))).toBeNull()
   })
 
-  // The whole point of having a separate list from ADMIN_EMAILS — an admin
+  // The whole point of having a separate list from SUPERADMIN_EMAILS — an admin
   // who is NOT also on INBOX_EMAILS must not get inbox access.
   it('returns null for a valid token whose email is admin-only, not inbox-allowlisted', async () => {
     mockSupabaseUser({ email: 'admin-only@example.com' })

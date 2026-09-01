@@ -21,7 +21,7 @@ import { createClient } from '@supabase/supabase-js'
 // the exact hash fragment a successful redirect would have produced.
 // detectSessionInUrl (src/lib/supabase/client.ts) does the rest.
 //
-// This authenticates as the REAL production admin address in ADMIN_EMAILS —
+// This authenticates as the REAL production admin address in SUPERADMIN_EMAILS —
 // there is no separate test-admin account. That's why every test in
 // admin.spec.ts is read-only: this suite's own rule ("nothing in e2e/ may
 // write to the database") already forces that, but it matters doubly here
@@ -31,13 +31,13 @@ import { createClient } from '@supabase/supabase-js'
 const authFile = 'e2e/.auth/admin.json'
 
 setup('authenticate as admin', async ({ page, baseURL }) => {
-  const email = process.env.ADMIN_EMAILS?.split(',')[0]?.trim()
+  const email = process.env.SUPERADMIN_EMAILS?.split(',')[0]?.trim()
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!email || !supabaseUrl || !anonKey || !serviceRoleKey) {
     throw new Error(
-      'Missing ADMIN_EMAILS / NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / ' +
+      'Missing SUPERADMIN_EMAILS / NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / ' +
         'SUPABASE_SERVICE_ROLE_KEY — these must be visible to the Playwright process itself ' +
         '(see playwright.config.ts\'s process.loadEnvFile call), not just the Next.js server it starts.',
     )

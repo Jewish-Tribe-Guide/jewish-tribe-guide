@@ -1,4 +1,5 @@
 import { sendEmail, escapeHtml } from './email'
+import { getCommunityAdminEmails, getCommunityNotifyRecipients } from './communityStore'
 import type { SubmissionPayload } from './requests'
 import type { SubmissionRow, CategorySubmissionPayload, ResourceSubmission } from '@/types'
 
@@ -10,10 +11,29 @@ function isSandbox(): boolean {
   return (process.env.RESEND_FROM || 'onboarding@resend.dev') === 'onboarding@resend.dev'
 }
 
-// Where replies from submitters should land. Defaults to the admin
-// notification address so a human sees any reply.
-function replyTo(): string | undefined {
-  return process.env.RESEND_REPLY_TO || process.env.NOTIFICATION_TO || undefined
+/** Where a submitter's reply should land, and who else should quietly get a
+ *  copy of the confirmation itself — both scoped to the community the
+ *  submission was actually for, not one fixed address for the whole site.
+ *  Baltimore's confirmation emails should read back to
+ *  baltimorejewishguide@gmail.com, not Philly's address, once Baltimore has
+ *  its own admin_emails configured.
+ *
+ *  replyTo: the first entry of that community's own admin_emails — the
+ *  closest thing this app has to "the community's own contact address"
+ *  without a dedicated field for it. Falls back to the site-wide
+ *  RESEND_REPLY_TO/NOTIFICATION_TO env vars for a community with none
+ *  configured yet, same fallback notificationRecipients() in email.ts uses
+ *  for the admin notification's own recipient list.
+ *
+ *  bcc: getCommunityNotifyRecipients's own list — "every admin who'd get
+ *  the separate new-submission notification" is exactly "every admin with
+ *  notifications on" the way the admin console's own toggle describes it,
+ *  so a submitter's reply doesn't need a human to separately forward it. */
+async function communityContact(communitySlug: string): Promise<{ replyTo?: string; bcc?: string[] }> {
+  const adminEmails = await getCommunityAdminEmails(communitySlug)
+  const replyTo = adminEmails[0] || process.env.RESEND_REPLY_TO || process.env.NOTIFICATION_TO || undefined
+  const bcc = (await getCommunityNotifyRecipients(communitySlug)) ?? []
+  return { replyTo, bcc }
 }
 
 const BODY_STYLE = 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;'
@@ -95,6 +115,7 @@ function buildRequestConfirmation(
 export async function sendRequestConfirmation(
   payload: SubmissionPayload,
   requestId: string,
+  communitySlug: string,
 ): Promise<void> {
   const to = payload.contact.email?.trim()
   if (!to) return
@@ -105,7 +126,8 @@ export async function sendRequestConfirmation(
   }
 
   const { subject, html } = buildRequestConfirmation(payload, requestId)
-  await sendEmail({ to, subject, html, replyTo: replyTo() })
+  const { replyTo, bcc } = await communityContact(communitySlug)
+  await sendEmail({ to, subject, html, replyTo, bcc })
 }
 
 // ── Resource directory submission confirmations ───────────────────────────────
@@ -305,7 +327,8 @@ export async function sendDecisionEmail(
   if (!result) return
 
   const { subject, html } = result
-  await sendEmail({ to, subject, html, replyTo: replyTo() })
+  const { replyTo, bcc } = await communityContact(submission.community_id)
+  await sendEmail({ to, subject, html, replyTo, bcc })
 }
 
 // ── Resource directory submission confirmations ───────────────────────────────
@@ -327,5 +350,6 @@ export async function sendSubmissionConfirmation(submission: SubmissionRow): Pro
   if (!result) return
 
   const { subject, html } = result
-  await sendEmail({ to, subject, html, replyTo: replyTo() })
+  const { replyTo, bcc } = await communityContact(submission.community_id)
+  await sendEmail({ to, subject, html, replyTo, bcc })
 }

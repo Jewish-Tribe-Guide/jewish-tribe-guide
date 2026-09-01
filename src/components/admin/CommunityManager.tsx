@@ -20,7 +20,7 @@ type CommunityWithAdminEmail = Community & {
   previewToken: string | null
 }
 
-// Comma-separated, same convention the ADMIN_EMAILS env var already uses —
+// Comma-separated, same convention the SUPERADMIN_EMAILS env var already uses —
 // familiar shape, and simple enough not to need a real multi-value widget
 // for something edited this rarely.
 function parseEmailList(value: string): string[] {
@@ -36,7 +36,7 @@ function parseEmailList(value: string): string[] {
 // only, both for reading (GET /api/admin/communities, not the public
 // /api/communities the header switcher uses) and writing (POST
 // /api/admin/communities) — browsing/creating communities isn't scoped to
-// any one community's own admin, so it's gated by the global ADMIN_EMAILS
+// any one community's own admin, so it's gated by the global SUPERADMIN_EMAILS
 // list rather than adminAuth.ts's per-community check. A regular
 // per-community admin gets a 401 from the GET and sees a plain
 // access-denied message instead of the list. ──
@@ -61,7 +61,6 @@ function previewLink(slug: string, token: string): string {
 
 const DEFAULT_THEME_COLOR = '#1d4ed8'
 const DEFAULT_BACKGROUND_COLOR = '#f8fafc'
-const DEFAULT_ADMIN_EMAILS = 'phillyjewishguide@gmail.com'
 const DEFAULT_TIMEZONE = 'America/New_York'
 
 type Draft = {
@@ -106,7 +105,10 @@ function emptyDraft(): Draft {
     lng: '',
     themeColor: DEFAULT_THEME_COLOR,
     backgroundColor: DEFAULT_BACKGROUND_COLOR,
-    adminEmails: DEFAULT_ADMIN_EMAILS,
+    // Empty rather than defaulting to any one address — every superadmin is
+    // added automatically server-side (see the create route's own comment),
+    // so this field is only for community-specific admins on top of that.
+    adminEmails: '',
     cloneFrom: '',
   }
 }
@@ -547,8 +549,9 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Comma-separated. Only these addresses can sign in to this community&rsquo;s admin console — each signs in
-            as themselves — and they&rsquo;ll get new-submission emails (turn that off later if not wanted).
+            Comma-separated. Only these addresses (plus every superadmin, added automatically) can sign in to this
+            community&rsquo;s admin console — each signs in as themselves — and they&rsquo;ll get new-submission
+            emails (turn that off later if not wanted).
           </p>
         </div>
 
@@ -720,7 +723,7 @@ export default function CommunityManager({ token }: { token: string }) {
                   {c.adminEmails.length > 0 ? (
                     <span className="font-mono">{c.adminEmails.join(', ')}</span>
                   ) : (
-                    <span className="italic">not set — falls back to the superadmin list (ADMIN_EMAILS)</span>
+                    <span className="italic">not set — falls back to the superadmin list (SUPERADMIN_EMAILS)</span>
                   )}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">

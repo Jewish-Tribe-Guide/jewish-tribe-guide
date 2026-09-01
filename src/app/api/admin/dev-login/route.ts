@@ -9,12 +9,12 @@ import { getCommunityAdminEmails } from '@/lib/communityStore'
 // returns its tokens directly, so /admin can call supabase.auth.setSession()
 // with them — no email round-trip needed while iterating locally. Mints a
 // session for the first of the COMMUNITY's own configured admin_emails
-// (falling back to ADMIN_EMAILS[0] if that community hasn't set any yet),
+// (falling back to SUPERADMIN_EMAILS[0] if that community hasn't set any yet),
 // so /philly/admin?devToken=... and /ues/admin?devToken=... sign you in as
 // whichever community's admin the URL actually names, instead of always the
 // same address regardless of which console you're testing. `community`
 // omitted — as it is from the standalone superadmin console at
-// /admin?devToken=... — mints a session for ADMIN_EMAILS[0] directly, the
+// /admin?devToken=... — mints a session for SUPERADMIN_EMAILS[0] directly, the
 // superadmin identity.
 //
 // Refuses outright unless BOTH of these hold, so it's structurally incapable of
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const communityAdmins = communitySlug ? await getCommunityAdminEmails(communitySlug) : []
   const email = communityAdmins[0] || getAllowedAdminEmails()[0]
   if (!email) {
-    return Response.json({ ok: false, error: 'No ADMIN_EMAILS configured.' }, { status: 500 })
+    return Response.json({ ok: false, error: 'No SUPERADMIN_EMAILS configured.' }, { status: 500 })
   }
 
   try {

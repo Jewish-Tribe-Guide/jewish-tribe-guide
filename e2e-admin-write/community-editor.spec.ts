@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import { CACHE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives CommunityManager's real create flow — creating a community through
@@ -74,9 +75,26 @@ test('creating a community through the real UI, starting empty, makes it live wi
   await expect(page).toHaveURL(new RegExp(`/${slug}/admin$`), { timeout: 10_000 })
 
   const supabase = getAdminClient()
-  const { data: created } = await supabase.from('community').select('slug, name').eq('slug', slug).maybeSingle()
+  const { data: created } = await supabase.from('community').select('slug, name, admin_emails').eq('slug', slug).maybeSingle()
   expect(created, 'the community should exist in the database after Create').not.toBeNull()
   expect(created!.name).toBe(name)
+
+  // Every superadmin (SUPERADMIN_EMAILS, computed for this run by
+  // run-test-project-server.mjs the same way auth.setup.ts's own session
+  // is) should be folded in automatically — the "Admin emails" field above
+  // was never filled in, so a community whose admin_emails came out empty
+  // would otherwise lock every superadmin out of the console it just
+  // created (see the create route's own comment). Not read from
+  // process.env.SUPERADMIN_EMAILS here — that's set inside the webServer's
+  // own child process (run-test-project-server.mjs), not visible to this
+  // Playwright test process — so it's recomputed the same way instead.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey)
+  const expectedSuperadmins = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, testAdminEmail]))
+  for (const email of expectedSuperadmins) {
+    expect(created!.admin_emails).toContain(email)
+  }
 
   // Live immediately — no redeploy, no manual cache warmup.
   const publicRes = await request.get(`/${slug}`)

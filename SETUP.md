@@ -27,11 +27,11 @@ what's set, what's missing, and how to fix it.
    each file in `supabase/migrations/` **in filename order** (they're numbered).
    Paste a file, click **Run**, repeat. (If you use the Supabase CLI instead,
    `supabase db push` does all of them at once.)
-5. Set who can moderate: put your email in `ADMIN_EMAILS` (comma-separated for
+5. Set who can moderate: put your email in `SUPERADMIN_EMAILS` (comma-separated for
    several). These are the accounts allowed into `/admin`.
 6. Set who can read form submissions (support requests, volunteer signups,
    feedback): put email(s) in `INBOX_EMAILS`. This is a **separate** allowlist
-   from `ADMIN_EMAILS` — those accounts are allowed into `/inbox`, not
+   from `SUPERADMIN_EMAILS` — those accounts are allowed into `/inbox`, not
    `/admin`, unless the same email is on both lists.
 
 Now run **`npm run setup`** to seed your categories and starter content, then
