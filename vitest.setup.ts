@@ -63,6 +63,19 @@ if (typeof window !== 'undefined') {
   // for the full rationale and how to drive a specific "now it's visible" path.
   installMockIntersectionObserver()
 
+  // jsdom has no setPointerCapture/releasePointerCapture/hasPointerCapture at
+  // all (not a stub gap, just absent — same as matchMedia above) — anything
+  // driving a custom drag gesture via Pointer Events (MobileNearbySheet's
+  // bottom sheet) throws without this the moment a test fires a real
+  // pointerdown on the draggable element. No-ops are enough: nothing here
+  // asserts on capture state itself, only on the drag logic that runs
+  // alongside the call.
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {}
+    Element.prototype.releasePointerCapture = () => {}
+    Element.prototype.hasPointerCapture = () => false
+  }
+
   // jsdom has no ResizeObserver either — a no-op stand-in (never fires a
   // callback) is enough for components that only use it to measure an
   // element after mount (ResourceMapView's map-box/overlay height tracking);

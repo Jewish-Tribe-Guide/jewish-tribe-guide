@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import tzLookup from 'tz-lookup'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -9,10 +10,25 @@ import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
 import type { Community } from '@/lib/communityStore'
 
-// GET /api/admin/communities adds adminEmail/previewToken on top of the
-// plain Community shape (see that route's own comment) — never on Community
-// itself, since that type also feeds the public GET /api/communities.
-type CommunityWithAdminEmail = Community & { adminEmail: string | null; previewToken: string | null }
+// GET /api/admin/communities adds adminEmails/notifyOnSubmission/
+// previewToken on top of the plain Community shape (see that route's own
+// comment) — never on Community itself, since that type also feeds the
+// public GET /api/communities.
+type CommunityWithAdminEmail = Community & {
+  adminEmails: string[]
+  notifyOnSubmission: boolean
+  previewToken: string | null
+}
+
+// Comma-separated, same convention the ADMIN_EMAILS env var already uses —
+// familiar shape, and simple enough not to need a real multi-value widget
+// for something edited this rarely.
+function parseEmailList(value: string): string[] {
+  return value
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+}
 
 // ── The 'communities' tab: lists every community this site hosts, and lets
 // an admin create a new one — either starting empty or cloning an existing
@@ -45,7 +61,7 @@ function previewLink(slug: string, token: string): string {
 
 const DEFAULT_THEME_COLOR = '#1d4ed8'
 const DEFAULT_BACKGROUND_COLOR = '#f8fafc'
-const DEFAULT_ADMIN_EMAIL = 'phillyjewishguide@gmail.com'
+const DEFAULT_ADMIN_EMAILS = 'phillyjewishguide@gmail.com'
 const DEFAULT_TIMEZONE = 'America/New_York'
 
 type Draft = {
@@ -68,7 +84,7 @@ type Draft = {
   lng: string
   themeColor: string
   backgroundColor: string
-  adminEmail: string
+  adminEmails: string
   cloneFrom: string
 }
 
@@ -90,7 +106,7 @@ function emptyDraft(): Draft {
     lng: '',
     themeColor: DEFAULT_THEME_COLOR,
     backgroundColor: DEFAULT_BACKGROUND_COLOR,
-    adminEmail: DEFAULT_ADMIN_EMAIL,
+    adminEmails: DEFAULT_ADMIN_EMAILS,
     cloneFrom: '',
   }
 }
@@ -154,6 +170,14 @@ export default function CommunityManager({ token }: { token: string }) {
   // so briefly instead of leaving no feedback for an action with no other
   // visible effect.
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
+  // Which community's admin/notify email lists are open for editing, if
+  // any — mirrors deletingSlug's one-panel-at-a-time pattern. The draft is
+  // the two fields' raw comma-separated text, not the parsed arrays, so
+  // typing a trailing comma doesn't fight the input.
+  const [editingEmailsSlug, setEditingEmailsSlug] = useState<string | null>(null)
+  const [emailsDraft, setEmailsDraft] = useState({ adminEmails: '', notifyOnSubmission: true })
+  const [savingEmails, setSavingEmails] = useState(false)
+  const [emailsError, setEmailsError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -222,7 +246,7 @@ export default function CommunityManager({ token }: { token: string }) {
     setDraft((d) => {
       if (!coords) return { ...d, lat: '', lng: '' }
       const city = cityShortName(d.cityQuery)
-      const name = d.nameTouched ? d.name : `${city} Jewish Community`
+      const name = d.nameTouched ? d.name : `${city} Jewish Guide`
       return {
         ...d,
         lat: String(coords.lat),
@@ -230,7 +254,11 @@ export default function CommunityManager({ token }: { token: string }) {
         timezone: tzLookup(coords.lat, coords.lng),
         region: d.regionTouched ? d.region : city,
         name,
-        slug: d.slugTouched ? d.slug : slugify(name),
+        // When the name itself is being auto-filled, slugify the city alone
+        // rather than the generated name — otherwise the "Jewish Guide"
+        // suffix ends up baked into the URL (e.g. baltimore-jewish-guide).
+        // A hand-typed name still drives the slug as before.
+        slug: d.slugTouched ? d.slug : slugify(d.nameTouched ? name : city),
         tagline: d.taglineTouched ? d.tagline : 'Guide for residents & visitors',
         mission: d.missionTouched
           ? d.mission
@@ -288,7 +316,7 @@ export default function CommunityManager({ token }: { token: string }) {
             mapCenter: { lat, lng },
             themeColor: draft.themeColor.trim(),
             backgroundColor: draft.backgroundColor.trim(),
-            adminEmail: draft.adminEmail.trim() || undefined,
+            adminEmails: parseEmailList(draft.adminEmails),
             cloneFrom: draft.cloneFrom || null,
           }),
         },
@@ -343,6 +371,49 @@ export default function CommunityManager({ token }: { token: string }) {
       // input field next to the button is still there to select and copy by
       // hand, so this fails quietly rather than surfacing an error banner
       // for something this low-stakes.
+    }
+  }
+
+  function startEditingEmails(c: CommunityWithAdminEmail) {
+    setEditingEmailsSlug(c.slug)
+    setEmailsDraft({ adminEmails: c.adminEmails.join(', '), notifyOnSubmission: c.notifyOnSubmission })
+    setEmailsError(null)
+  }
+
+  function cancelEditingEmails() {
+    setEditingEmailsSlug(null)
+    setEmailsError(null)
+  }
+
+  async function saveEmails(slug: string) {
+    setSavingEmails(true)
+    setEmailsError(null)
+    try {
+      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
+        `/api/admin/communities/${slug}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            adminEmails: parseEmailList(emailsDraft.adminEmails),
+            notifyOnSubmission: emailsDraft.notifyOnSubmission,
+          }),
+        },
+        'Could not update the admin list.',
+      )
+      setCommunities(
+        (cs) =>
+          cs?.map((c) =>
+            c.slug === slug
+              ? { ...c, adminEmails: community.adminEmails, notifyOnSubmission: community.notifyOnSubmission }
+              : c,
+          ) ?? cs,
+      )
+      setEditingEmailsSlug(null)
+    } catch (err) {
+      setEmailsError(err instanceof Error ? err.message : 'Could not update the admin list.')
+    } finally {
+      setSavingEmails(false)
     }
   }
 
@@ -436,8 +507,8 @@ export default function CommunityManager({ token }: { token: string }) {
             />
           </label>
           <p className="text-xs text-muted mt-1">
-            Fills in the name, URL, region, timezone and map center below — pick one from the dropdown rather than
-            just typing, so those actually get set.
+            Fills in the name, URL slug, region, timezone, map center, tagline and mission below — pick a suggestion
+            from the dropdown rather than just typing, so those actually get set.
           </p>
         </div>
 
@@ -447,7 +518,7 @@ export default function CommunityManager({ token }: { token: string }) {
             className={inputClass}
             value={draft.name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Baltimore Jewish Community"
+            placeholder="e.g. Baltimore Jewish Guide"
           />
         </label>
 
@@ -459,13 +530,27 @@ export default function CommunityManager({ token }: { token: string }) {
           </span>
         </label>
 
-        <label className={labelClass}>
-          Admin email
-          <input className={inputClass} value={draft.adminEmail} onChange={(e) => set('adminEmail', e.target.value)} />
-          <span className="block text-xs text-muted mt-1">
-            Only this address can sign in to this community&rsquo;s admin console.
-          </span>
-        </label>
+        <div>
+          {/* Caption deliberately OUTSIDE the <label> — same reasoning as
+              the City/State field's own comment above: nested inside, it
+              becomes part of the accessible name, and "new-submission"
+              contains "mission" as a literal substring. That collided with
+              the actual Mission field and broke
+              e2e-admin-write/community-editor.spec.ts for real. */}
+          <label className={labelClass}>
+            Admin emails
+            <input
+              className={inputClass}
+              value={draft.adminEmails}
+              onChange={(e) => set('adminEmails', e.target.value)}
+              placeholder="jane@example.com, sam@example.com"
+            />
+          </label>
+          <p className="text-xs text-muted mt-1">
+            Comma-separated. Only these addresses can sign in to this community&rsquo;s admin console — each signs in
+            as themselves — and they&rsquo;ll get new-submission emails (turn that off later if not wanted).
+          </p>
+        </div>
 
         <label className={labelClass}>
           Starting content
@@ -604,7 +689,18 @@ export default function CommunityManager({ token }: { token: string }) {
         {communities.map((c) => (
           <div key={c.slug} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors">
             <div className="flex items-start justify-between gap-3">
-              <a href={adminBase(c.slug)} className="min-w-0 flex-1">
+              {/* prefetch={false}: this list can include communities other than
+                  the one whose admin console is currently mounted, and
+                  prefetching primes Next's client router cache for that
+                  other community's segment of the same /admin/[community]
+                  layout. That collided for real with the very next thing
+                  this screen does — creating a community and router.push-ing
+                  into its console — which silently failed to update the URL
+                  (no error, no reload, just stuck) once these rows started
+                  prefetching. Same underlying Cache Components router-cache
+                  issue as confirmDelete's own reload workaround below, just
+                  triggered by priming instead of by the delete itself. */}
+              <Link href={adminBase(c.slug)} prefetch={false} className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-slate-900 text-sm">{c.name}</p>
                   {c.isDefault && (
@@ -620,12 +716,15 @@ export default function CommunityManager({ token }: { token: string }) {
                   /{c.slug} · {c.region}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Admin login:{' '}
-                  {c.adminEmail ? (
-                    <span className="font-mono">{c.adminEmail}</span>
+                  Admin logins:{' '}
+                  {c.adminEmails.length > 0 ? (
+                    <span className="font-mono">{c.adminEmails.join(', ')}</span>
                   ) : (
                     <span className="italic">not set — falls back to the superadmin list (ADMIN_EMAILS)</span>
                   )}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Email admins on new submissions: {c.notifyOnSubmission ? 'Yes' : 'No'}
                 </p>
                 {!c.visible && (
                   <p className="text-xs text-amber-700 mt-1">
@@ -633,8 +732,14 @@ export default function CommunityManager({ token }: { token: string }) {
                     admin console works normally regardless — sign in any time to keep building it out.
                   </p>
                 )}
-              </a>
+              </Link>
               <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => startEditingEmails(c)}
+                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                >
+                  Edit admins
+                </button>
                 <button
                   onClick={() => toggleVisibility(c.slug, !c.visible)}
                   disabled={togglingSlug === c.slug}
@@ -670,6 +775,47 @@ export default function CommunityManager({ token }: { token: string }) {
                 >
                   {copiedSlug === c.slug ? 'Copied!' : 'Copy link'}
                 </button>
+              </div>
+            )}
+
+            {editingEmailsSlug === c.slug && (
+              <div className="mt-3 border-t border-slate-200 pt-3 space-y-3">
+                {emailsError && <p className="text-xs text-red-700">{emailsError}</p>}
+                <label className="block text-xs font-medium text-slate-700">
+                  Admin logins
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={emailsDraft.adminEmails}
+                    onChange={(e) => setEmailsDraft((d) => ({ ...d, adminEmails: e.target.value }))}
+                    placeholder="jane@example.com, sam@example.com"
+                    autoFocus
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={emailsDraft.notifyOnSubmission}
+                    onChange={(e) => setEmailsDraft((d) => ({ ...d, notifyOnSubmission: e.target.checked }))}
+                    className="cursor-pointer"
+                  />
+                  Email the admins above when someone submits something new
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveEmails(c.slug)}
+                    disabled={savingEmails}
+                    className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
+                  >
+                    {savingEmails ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={cancelEditingEmails}
+                    disabled={savingEmails}
+                    className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
 

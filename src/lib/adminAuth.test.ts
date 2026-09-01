@@ -7,14 +7,14 @@ import {
   isAllowedAdminEmail,
   isAllowedForCommunity,
 } from './adminAuth'
-import { getCommunityAdminEmail } from './communityStore'
+import { getCommunityAdminEmails } from './communityStore'
 
 // A bug here either locks every admin out or, far worse, lets someone in who
 // shouldn't be — so both the allowlist parsing and the token-to-email path
 // get direct coverage, not just "does it run."
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }))
-vi.mock('./communityStore', () => ({ getCommunityAdminEmail: vi.fn() }))
+vi.mock('./communityStore', () => ({ getCommunityAdminEmails: vi.fn() }))
 
 function req(authorization?: string): Request {
   return new Request('https://example.com', {
@@ -121,19 +121,26 @@ describe('getAdminUser', () => {
 describe('isAllowedForCommunity', () => {
   beforeEach(() => vi.stubEnv('ADMIN_EMAILS', 'super@example.com'))
 
-  it('admits only the community\'s own configured admin_email, case-insensitively', async () => {
-    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+  it('admits an email on the community\'s own configured admin_emails list, case-insensitively', async () => {
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
     expect(await isAllowedForCommunity('PHILLY-ADMIN@example.com', 'philly')).toBe(true)
     expect(await isAllowedForCommunity('ues-admin@example.com', 'philly')).toBe(false)
   })
 
-  it('rejects the global superadmin list once a community has its own admin_email set', async () => {
-    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+  it('admits any email on a multi-person admin_emails list', async () => {
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['jane@example.com', 'sam@example.com'])
+    expect(await isAllowedForCommunity('sam@example.com', 'philly')).toBe(true)
+    expect(await isAllowedForCommunity('jane@example.com', 'philly')).toBe(true)
+    expect(await isAllowedForCommunity('stranger@example.com', 'philly')).toBe(false)
+  })
+
+  it('rejects the global superadmin list once a community has its own admin_emails set', async () => {
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
     expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(false)
   })
 
-  it('falls back to the global ADMIN_EMAILS list when the community has no admin_email configured yet', async () => {
-    vi.mocked(getCommunityAdminEmail).mockResolvedValue(null)
+  it('falls back to the global ADMIN_EMAILS list when the community has no admin_emails configured yet', async () => {
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue([])
     expect(await isAllowedForCommunity('super@example.com', 'philly')).toBe(true)
     expect(await isAllowedForCommunity('stranger@example.com', 'philly')).toBe(false)
   })
@@ -150,7 +157,7 @@ describe('getAdminUserForCommunity', () => {
   })
 
   it('returns null when the token is valid but the email is not this community\'s admin', async () => {
-    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
     mockSupabaseUser({ email: 'ues-admin@example.com' })
     expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toBeNull()
   })
@@ -159,15 +166,15 @@ describe('getAdminUserForCommunity', () => {
   // proven identity — that just isn't authorized for the community being
   // asked about.
   it('returns null for a session that is a valid admin of a DIFFERENT community', async () => {
-    vi.mocked(getCommunityAdminEmail).mockImplementation(async (slug) =>
-      slug === 'ues' ? 'ues-admin@example.com' : 'philly-admin@example.com',
+    vi.mocked(getCommunityAdminEmails).mockImplementation(async (slug) =>
+      slug === 'ues' ? ['ues-admin@example.com'] : ['philly-admin@example.com'],
     )
     mockSupabaseUser({ email: 'ues-admin@example.com' })
     expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toBeNull()
   })
 
   it('returns the email when the token is valid and matches this community\'s admin', async () => {
-    vi.mocked(getCommunityAdminEmail).mockResolvedValue('philly-admin@example.com')
+    vi.mocked(getCommunityAdminEmails).mockResolvedValue(['philly-admin@example.com'])
     mockSupabaseUser({ email: 'philly-admin@example.com' })
     expect(await getAdminUserForCommunity(req('Bearer goodtoken'), 'philly')).toEqual({
       email: 'philly-admin@example.com',

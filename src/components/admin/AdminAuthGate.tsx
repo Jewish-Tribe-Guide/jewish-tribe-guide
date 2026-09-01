@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getBrowserClient } from '@/lib/supabase/client'
 import MagicLinkLogin from '@/components/auth/MagicLinkLogin'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import AdminShell from './AdminShell'
 
 // The admin's session, established once here and read by every route below —
@@ -59,6 +60,7 @@ export default function AdminAuthGate({
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [devLoginError, setDevLoginError] = useState<string | null>(null)
+  const [oauthError, setOauthError] = useState<string | null>(null)
   // Whether the signed-in session's email is actually allowed in here —
   // checked server-side via /api/admin/whoami (not just "is there a
   // session"). A valid Supabase session proves identity, not access: without
@@ -112,6 +114,23 @@ export default function AdminAuthGate({
       cancelled = true
     }
   }, [session, community])
+
+  // Supabase redirects back from a failed/declined Google sign-in with
+  // ?error=...&error_description=... on the query string (not the hash the
+  // way a successful session is), rather than rejecting a promise anywhere
+  // in this component — GoogleSignInButton's own error state only ever
+  // covers a failure to even start the redirect. Stripped from the URL bar
+  // the same way the devToken effect below strips its own param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const description = params.get('error_description')
+    if (!description) return
+    history.replaceState(history.state, '', window.location.pathname)
+    // Reading state Supabase's redirect set on the URL (external to React),
+    // once on mount — the exact case the lint rule's own guidance carves out.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOauthError(description.replace(/\+/g, ' '))
+  }, [])
 
   // Local-dev-only shortcut: /admin?devToken=<DEV_ADMIN_BYPASS_SECRET> signs in
   // instantly via /api/admin/dev-login instead of the magic-link email — see
@@ -173,11 +192,24 @@ export default function AdminAuthGate({
             Dev login failed: {devLoginError}
           </p>
         )}
+        {oauthError && (
+          <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
+            Google sign-in failed: {oauthError}
+          </p>
+        )}
         {authorized === false && (
           <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
             {community ? "That account isn't an admin for this community." : "That account isn't a superadmin."}
           </p>
         )}
+        <div className="max-w-sm space-y-4">
+          <GoogleSignInButton />
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-xs text-muted">or</span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+        </div>
         <MagicLinkLogin
           requestLinkUrl="/api/admin/request-link"
           emailLabel="Admin email"

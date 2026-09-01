@@ -14,8 +14,8 @@ import { getAdminUser, getAdminUserForCommunity } from '@/lib/adminAuth'
 // at login.
 //
 // Deliberately returns no information beyond ok/not-ok — never the community's
-// configured admin_email itself, which stays server-only (see
-// communityStore.ts's getCommunityAdminEmail). A client that already knows
+// configured admin_emails itself, which stays server-only (see
+// communityStore.ts's getCommunityAdminEmails). A client that already knows
 // its own email just needs a yes/no.
 export async function GET(request: Request) {
   const community = new URL(request.url).searchParams.get('community')

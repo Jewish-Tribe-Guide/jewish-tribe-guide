@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
-import { getCommunityAdminEmail } from './communityStore'
+import { getCommunityAdminEmails } from './communityStore'
 
 // The single source of truth for who may administer the site: a comma-separated
 // list in the ADMIN_EMAILS env var. Add an email here to grant admin access.
 //
-// Once a community has its own admin_email set (see isAllowedForCommunity),
+// Once a community has its own admin_emails set (see isAllowedForCommunity),
 // this list stops being "who can edit THIS community" and becomes the
 // superadmin list instead — used only for genuinely cross-community actions
 // (creating a new community) and site-wide singletons that were never
@@ -22,18 +22,23 @@ export function isAllowedAdminEmail(email: string): boolean {
   return getAllowedAdminEmails().includes(email.trim().toLowerCase())
 }
 
-/** Whether `email` may administer the given community: it has to match that
- *  community's own `admin_email` — NOT just be anywhere on the global
- *  ADMIN_EMAILS list, which is what let one admin edit every community
- *  before this existed. Falls back to the superadmin list only when the
- *  community has no admin_email configured yet (both communities are in
- *  exactly this state today — see the 2026-08 migration's own comment,
- *  "captured, not yet enforced") so a fresh community isn't locked out
- *  before anyone's had a chance to set one. Once an admin_email is set,
- *  that's the only email admitted — the superadmin list no longer applies. */
+/** Whether `email` may administer the given community: it has to be on
+ *  that community's own `admin_emails` allowlist — NOT just be anywhere on
+ *  the global ADMIN_EMAILS list, which is what let one admin edit every
+ *  community before this existed. A real list, not a single shared
+ *  address (see the admin_emails migration's own comment on why) — several
+ *  people can each sign in as themselves, with their own audit trail,
+ *  instead of funneling through one shared login. Falls back to the
+ *  superadmin list only when the community has no admin_emails configured
+ *  yet, so a fresh community isn't locked out before anyone's had a chance
+ *  to set one. Once admin_emails is non-empty, only what's on it is
+ *  admitted — the superadmin list no longer applies. */
 export async function isAllowedForCommunity(email: string, communitySlug: string): Promise<boolean> {
-  const configured = await getCommunityAdminEmail(communitySlug)
-  if (configured) return configured.trim().toLowerCase() === email.trim().toLowerCase()
+  const configured = await getCommunityAdminEmails(communitySlug)
+  if (configured.length > 0) {
+    const target = email.trim().toLowerCase()
+    return configured.some((e) => e.trim().toLowerCase() === target)
+  }
   return isAllowedAdminEmail(email)
 }
 

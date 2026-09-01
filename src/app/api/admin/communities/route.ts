@@ -1,6 +1,12 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { createCommunity, listCommunities, listCommunityAdminEmails, listCommunityPreviewTokens } from '@/lib/communityStore'
+import {
+  createCommunity,
+  listCommunities,
+  listCommunityAdminEmails,
+  listCommunityNotifyOnSubmission,
+  listCommunityPreviewTokens,
+} from '@/lib/communityStore'
 import { cloneCommunityContent } from '@/lib/communityCloning'
 
 // GET /api/admin/communities — the same data as the public GET
@@ -18,18 +24,20 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const [communities, adminEmails, previewTokens] = await Promise.all([
+    const [communities, adminEmails, notifyOnSubmission, previewTokens] = await Promise.all([
       listCommunities(),
       listCommunityAdminEmails(),
+      listCommunityNotifyOnSubmission(),
       listCommunityPreviewTokens(),
     ])
-    // adminEmail/previewToken ride along here (superadmin-only route) but
-    // never on Community/listCommunities() itself — that object is also
-    // served by the public GET /api/communities, which has no business
-    // exposing either.
+    // adminEmails/notifyOnSubmission/previewToken ride along here
+    // (superadmin-only route) but never on Community/listCommunities()
+    // itself — that object is also served by the public GET
+    // /api/communities, which has no business exposing any of them.
     const withExtras = communities.map((c) => ({
       ...c,
-      adminEmail: adminEmails[c.slug] ?? null,
+      adminEmails: adminEmails[c.slug] ?? [],
+      notifyOnSubmission: notifyOnSubmission[c.slug] ?? true,
       previewToken: previewTokens[c.slug] ?? null,
     }))
     return Response.json({ ok: true, communities: withExtras })
@@ -49,7 +57,7 @@ type CreateBody = {
   mapCenter?: { lat: number; lng: number }
   themeColor?: string
   backgroundColor?: string
-  adminEmail?: string
+  adminEmails?: string[]
   /** An existing community's slug to clone categories/home sections from, or
    *  omitted/null to start empty. */
   cloneFrom?: string | null
@@ -96,7 +104,7 @@ export async function POST(request: Request) {
       mapCenter: body.mapCenter!,
       themeColor: body.themeColor!,
       backgroundColor: body.backgroundColor!,
-      adminEmail: body.adminEmail,
+      adminEmails: Array.isArray(body.adminEmails) ? body.adminEmails : [],
     })
 
     if (body.cloneFrom) {

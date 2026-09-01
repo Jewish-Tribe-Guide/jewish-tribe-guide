@@ -149,6 +149,38 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByRole('button', { name: 'Drag to resize nearby list' })).toBeInTheDocument()
   })
 
+  // Google Maps' bottom sheet: once the sheet is fully expanded, the list
+  // scrolls normally — but drag past the top of the list (nowhere left to
+  // scroll) and the SAME continuous gesture hands off into dragging the
+  // sheet back down, instead of the drag just doing nothing once scrollTop
+  // bottoms out at 0. See onContentPointerDown/onContentPointerMove's own
+  // comments for the mechanism.
+  it('at "full", dragging down past the top of the list hands off into collapsing the sheet', () => {
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const handle = () => screen.getByRole('button', { name: /nearby list/i })
+    // peek -> half -> full: two taps (no vertical movement = a tap, which
+    // cycles the sheet forward one snap point per press).
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+
+    const sheet = container.firstElementChild as HTMLElement
+    expect(sheet.style.height).toBe('524px') // heights.full = containerHeight(600) - TOP_INSET_PX(76)
+
+    const content = container.querySelector('.overscroll-contain')!
+    // jsdom's scrollTop is always 0 — the same state as a real list already
+    // scrolled to its top, which is exactly the case this handoff exists for.
+    fireEvent.pointerDown(content, { clientY: 200 })
+    fireEvent.pointerMove(content, { clientY: 210 }) // arms the handoff (>3px down while at the top)
+    fireEvent.pointerMove(content, { clientY: 500 }) // now active — drags the sheet itself
+    fireEvent.pointerUp(content, { clientY: 500 })
+
+    expect(sheet.style.height).not.toBe('524px')
+  })
+
   it('closes via history.back(), not a direct state reset, when "Back to list" is tapped', async () => {
     const user = userEvent.setup()
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
