@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
+import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -10,10 +11,9 @@ const minimalContact: ContactHospitalData = {
   hospitalId: '',
   unitFloorRoom: '',
 }
-import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendSubmissionNotification } from './email'
 
-const mockGetCommunityNotifyEmails = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({ getCommunityNotifyEmails: mockGetCommunityNotifyEmails }))
+const mockGetCommunityNotifyRecipients = vi.hoisted(() => vi.fn())
+vi.mock('./communityStore', () => ({ getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients }))
 
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
@@ -152,22 +152,22 @@ describe('sendEmail', () => {
     // community's submissions used to email the same fixed NOTIFICATION_TO
     // address regardless of which community they were for.
     describe('per-community notification routing', () => {
-      afterEach(() => mockGetCommunityNotifyEmails.mockReset())
+      afterEach(() => mockGetCommunityNotifyRecipients.mockReset())
 
       it('sendNotification emails the submitting community\'s configured notify list', async () => {
-        mockGetCommunityNotifyEmails.mockResolvedValue(['ues-admin@example.com'])
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
         await sendNotification(
           { requestType: 'Feedback', contact: minimalContact, formData: { message: 'hi' } },
           'REQ-1',
           '2026-01-01',
           'ues',
         )
-        expect(mockGetCommunityNotifyEmails).toHaveBeenCalledWith('ues')
+        expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
       })
 
       it('sendNotification falls back to NOTIFICATION_TO when the community has no notify list configured', async () => {
-        mockGetCommunityNotifyEmails.mockResolvedValue([])
+        mockGetCommunityNotifyRecipients.mockResolvedValue([])
         vi.stubEnv('NOTIFICATION_TO', 'fallback@example.com')
         await sendNotification(
           { requestType: 'Feedback', contact: minimalContact, formData: { message: 'hi' } },
@@ -179,7 +179,7 @@ describe('sendEmail', () => {
       })
 
       it('sendSubmissionNotification reads the notify list off the submission\'s own community_id', async () => {
-        mockGetCommunityNotifyEmails.mockResolvedValue(['ues-admin@example.com'])
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
         const submission: SubmissionRow = {
           id: 's1',
           community_id: 'ues',
@@ -194,7 +194,7 @@ describe('sendEmail', () => {
           reviewed_at: null,
         }
         await sendSubmissionNotification(submission)
-        expect(mockGetCommunityNotifyEmails).toHaveBeenCalledWith('ues')
+        expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
       })
     })

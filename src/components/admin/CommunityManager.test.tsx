@@ -54,7 +54,7 @@ vi.mock('@/components/intake/AddressInput', () => ({
   ),
 }))
 
-type TestCommunity = Community & { adminEmails: string[]; notifyEmails: string[]; previewToken: string | null }
+type TestCommunity = Community & { adminEmails: string[]; notifyOnSubmission: boolean; previewToken: string | null }
 
 function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
   return {
@@ -75,7 +75,7 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
     isDefault: true,
     visible: true,
     adminEmails: [],
-    notifyEmails: [],
+    notifyOnSubmission: true,
     previewToken: null,
     ...overrides,
   }
@@ -650,13 +650,13 @@ describe('CommunityManager — publishing a community', () => {
   })
 })
 
-describe('CommunityManager — editing admin/notify emails', () => {
+describe('CommunityManager — editing admin emails / notify toggle', () => {
   const ues = makeCommunity({
     slug: 'ues',
     name: 'Upper East Side',
     region: 'Manhattan',
     adminEmails: ['jane@example.com', 'sam@example.com'],
-    notifyEmails: [],
+    notifyOnSubmission: true,
   })
 
   // The edit panel is a sibling of the row's own link+buttons, one level
@@ -671,17 +671,14 @@ describe('CommunityManager — editing admin/notify emails', () => {
     expect(screen.getByText('jane@example.com, sam@example.com')).toBeInTheDocument()
   })
 
-  it('shows "same as admin logins" when no notify list is configured', async () => {
-    await renderAndWaitForList([ues])
-    expect(screen.getByText(/same as admin logins/i)).toBeInTheDocument()
+  it('shows Yes/No for the notify-on-submission toggle', async () => {
+    const quiet = makeCommunity({ slug: 'quiet', name: 'Quiet Community', notifyOnSubmission: false })
+    await renderAndWaitForList([ues, quiet])
+    expect(screen.getByText(/email admins on new submissions: yes/i)).toBeInTheDocument()
+    expect(screen.getByText(/email admins on new submissions: no/i)).toBeInTheDocument()
   })
 
-  it('shows the configured notify list when one is set', async () => {
-    await renderAndWaitForList([{ ...ues, notifyEmails: ['alerts@example.com'] }])
-    expect(screen.getByText('alerts@example.com')).toBeInTheDocument()
-  })
-
-  it('opens the edit panel pre-filled with the current lists', async () => {
+  it('opens the edit panel pre-filled with the current admin list and notify checkbox', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
 
@@ -690,22 +687,23 @@ describe('CommunityManager — editing admin/notify emails', () => {
     expect(within(cardFor(/upper east side/i)).getByLabelText(/admin logins/i)).toHaveValue(
       'jane@example.com, sam@example.com',
     )
-    expect(within(cardFor(/upper east side/i)).getByLabelText(/notify on new submissions/i)).toHaveValue('')
+    expect(
+      within(cardFor(/upper east side/i)).getByRole('checkbox', { name: /email the admins above/i }),
+    ).toBeChecked()
   })
 
-  it('saves the edited lists as parsed comma-separated arrays', async () => {
+  it('saves the edited admin list and notify toggle', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
     vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: ['jane@example.com'], notifyEmails: ['alerts@example.com'] },
+      community: { ...ues, adminEmails: ['jane@example.com'], notifyOnSubmission: false },
     })
 
     await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
     const adminInput = within(cardFor(/upper east side/i)).getByLabelText(/admin logins/i)
     await user.clear(adminInput)
     await user.type(adminInput, 'jane@example.com')
-    const notifyInput = within(cardFor(/upper east side/i)).getByLabelText(/notify on new submissions/i)
-    await user.type(notifyInput, 'alerts@example.com')
+    await user.click(within(cardFor(/upper east side/i)).getByRole('checkbox', { name: /email the admins above/i }))
     await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
@@ -713,9 +711,9 @@ describe('CommunityManager — editing admin/notify emails', () => {
     expect(call[0]).toBe('/api/admin/communities/ues')
     expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({
       adminEmails: ['jane@example.com'],
-      notifyEmails: ['alerts@example.com'],
+      notifyOnSubmission: false,
     })
-    expect(await screen.findByText('jane@example.com')).toBeInTheDocument()
+    expect(await screen.findByText(/email admins on new submissions: no/i)).toBeInTheDocument()
   })
 
   it('Cancel closes the panel without saving', async () => {
@@ -730,14 +728,14 @@ describe('CommunityManager — editing admin/notify emails', () => {
   })
 
   it('shows a server-side error inline and leaves the panel open', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update the admin/notify lists.'))
+    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update the admin list.'))
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
 
     await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
     await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^save$/i }))
 
-    expect(await screen.findByText('Could not update the admin/notify lists.')).toBeInTheDocument()
+    expect(await screen.findByText('Could not update the admin list.')).toBeInTheDocument()
     expect(screen.getByLabelText(/admin logins/i)).toBeInTheDocument()
   })
 })

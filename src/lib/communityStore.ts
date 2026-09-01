@@ -177,32 +177,20 @@ export async function getCommunityAdminEmails(slug: string): Promise<string[]> {
 }
 
 /** Who gets emailed about a new submission for this community — its own
- *  notify_emails when set, else the same people who can administer it
- *  (admin_emails), else empty (the caller falls back to the global
- *  NOTIFICATION_TO env var — see sendSubmissionNotification/sendNotification
- *  in email.ts). Two separate lists on purpose: an admin doesn't have to
- *  want inbox alerts to keep login access, and a notify-only address
- *  doesn't have to be a real admin. */
-export async function getCommunityNotifyEmails(slug: string): Promise<string[]> {
+ *  admin_emails, unless notify_on_submission is explicitly off (returns
+ *  null then — see sendSubmissionNotification/sendNotification in
+ *  email.ts, which skip sending entirely rather than falling back to
+ *  anything). An empty admin_emails with notifications still on returns
+ *  `[]`, which those callers read as "fall back to NOTIFICATION_TO". */
+export async function getCommunityNotifyRecipients(slug: string): Promise<string[] | null> {
   const { data } = await getAdminClient()
     .from('community')
-    .select('admin_emails, notify_emails')
+    .select('admin_emails, notify_on_submission')
     .eq('slug', slug)
     .maybeSingle()
-  const row = data as { admin_emails: string[] | null; notify_emails: string[] | null } | null
-  if (row?.notify_emails?.length) return row.notify_emails
+  const row = data as { admin_emails: string[] | null; notify_on_submission: boolean | null } | null
+  if (row?.notify_on_submission === false) return null
   return row?.admin_emails ?? []
-}
-
-/** The RAW configured notify_emails — unresolved, unlike
- *  getCommunityNotifyEmails above. For the admin UI (PATCH's own response,
- *  which the "edit lists" form reads back) rather than for actually sending
- *  mail: an admin editing the notify field needs to see it empty when it's
- *  actually empty, not silently pre-filled with the admin list, or there'd
- *  be no way to tell "matches admin_emails on purpose" from "never set". */
-export async function getCommunityNotifyEmailsRaw(slug: string): Promise<string[]> {
-  const { data } = await getAdminClient().from('community').select('notify_emails').eq('slug', slug).maybeSingle()
-  return (data as { notify_emails: string[] | null } | null)?.notify_emails ?? []
 }
 
 /** Every community's configured admin_emails, keyed by slug — same
@@ -220,37 +208,70 @@ export async function listCommunityAdminEmails(): Promise<Record<string, string[
   return out
 }
 
-/** Every community's configured notify_emails, keyed by slug — same
+/** Every community's notify_on_submission flag, keyed by slug — same
  *  reasoning as listCommunityAdminEmails, for CommunityManager's own
- *  "notify" field. Deliberately NOT resolved against admin_emails here
- *  (unlike getCommunityNotifyEmails) — the admin UI needs to show the
- *  raw configured value, empty or not, to edit it correctly; resolving the
- *  fallback here would make an unset notify list look identical to one
- *  explicitly set to match admin_emails. */
-export async function listCommunityNotifyEmails(): Promise<Record<string, string[]>> {
-  const { data } = await getAdminClient().from('community').select('slug, notify_emails')
-  const out: Record<string, string[]> = {}
-  for (const row of (data ?? []) as { slug: string; notify_emails: string[] | null }[]) {
-    out[row.slug] = row.notify_emails ?? []
+ *  toggle. */
+export async function listCommunityNotifyOnSubmission(): Promise<Record<string, boolean>> {
+  const { data } = await getAdminClient().from('community').select('slug, notify_on_submission')
+  const out: Record<string, boolean> = {}
+  for (const row of (data ?? []) as { slug: string; notify_on_submission: boolean | null }[]) {
+    out[row.slug] = row.notify_on_submission ?? true
   }
   return out
 }
 
-/** Updates a community's admin login allowlist and/or notify list —
- *  superadmin action, same gate as create/delete/visibility (see
- *  PATCH /api/admin/communities/:slug). Either can be omitted to leave it
- *  unchanged. */
+/** One community's notify_on_submission flag — what PATCH
+ *  /api/admin/communities/:slug re-reads after a save so its response
+ *  always carries the current value, without pulling every community's
+ *  flag just to read one. */
+export async function getCommunityNotifyOnSubmission(slug: string): Promise<boolean> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_on_submission')
+    .eq('slug', slug)
+    .maybeSingle()
+  return (data as { notify_on_submission: boolean | null } | null)?.notify_on_submission ?? true
+}
+
+/** Updates a community's admin login allowlist and/or its
+ *  notify-on-submission toggle — superadmin action, same gate as
+ *  create/delete/visibility (see PATCH /api/admin/communities/:slug).
+ *  Either can be omitted to leave it unchanged. */
 export async function setCommunityEmailLists(
   slug: string,
-  updates: { adminEmails?: string[]; notifyEmails?: string[] },
+  updates: { adminEmails?: string[]; notifyOnSubmission?: boolean },
 ): Promise<Community> {
-  const update: { admin_emails?: string[]; notify_emails?: string[] } = {}
+  const update: { admin_emails?: string[]; notify_on_submission?: boolean } = {}
   if (updates.adminEmails) update.admin_emails = updates.adminEmails
-  if (updates.notifyEmails) update.notify_emails = updates.notifyEmails
+  if (updates.notifyOnSubmission !== undefined) update.notify_on_submission = updates.notifyOnSubmission
 
   const { data, error } = await getAdminClient().from('community').update(update).eq('slug', slug).select('*').single()
   if (error) throw new Error(`Failed to update "${slug}"'s email lists: ${error.message}`)
   return toCommunity(data as Row)
+}
+
+/** Adds one email to a community's admin allowlist — the one write a
+ *  community's OWN admin console can make to it (see
+ *  POST /api/admin/team), as opposed to the full replace
+ *  setCommunityEmailLists offers the superadmin console. Deliberately
+ *  add-only: there is no matching "remove" here, so a regular admin can
+ *  grow their own team's access but never shrink anyone else's — only
+ *  the superadmin console's edit panel can remove an address. Case-
+ *  insensitively deduped against what's already there; a no-op (not an
+ *  error) if the email is already on the list. */
+export async function addCommunityAdminEmail(slug: string, email: string): Promise<string[]> {
+  const trimmed = email.trim()
+  if (!trimmed) throw new Error('Email is required.')
+
+  const current = await getCommunityAdminEmails(slug)
+  const alreadyPresent = current.some((e) => e.trim().toLowerCase() === trimmed.toLowerCase())
+  const next = alreadyPresent ? current : [...current, trimmed]
+
+  if (!alreadyPresent) {
+    const { error } = await getAdminClient().from('community').update({ admin_emails: next }).eq('slug', slug)
+    if (error) throw new Error(`Failed to add "${trimmed}": ${error.message}`)
+  }
+  return next
 }
 
 /** Every community's visibility + preview token, keyed by slug — the shape

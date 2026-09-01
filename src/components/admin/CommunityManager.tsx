@@ -9,13 +9,13 @@ import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
 import type { Community } from '@/lib/communityStore'
 
-// GET /api/admin/communities adds adminEmails/notifyEmails/previewToken on
-// top of the plain Community shape (see that route's own comment) — never
-// on Community itself, since that type also feeds the public GET
-// /api/communities.
+// GET /api/admin/communities adds adminEmails/notifyOnSubmission/
+// previewToken on top of the plain Community shape (see that route's own
+// comment) — never on Community itself, since that type also feeds the
+// public GET /api/communities.
 type CommunityWithAdminEmail = Community & {
   adminEmails: string[]
-  notifyEmails: string[]
+  notifyOnSubmission: boolean
   previewToken: string | null
 }
 
@@ -174,7 +174,7 @@ export default function CommunityManager({ token }: { token: string }) {
   // the two fields' raw comma-separated text, not the parsed arrays, so
   // typing a trailing comma doesn't fight the input.
   const [editingEmailsSlug, setEditingEmailsSlug] = useState<string | null>(null)
-  const [emailsDraft, setEmailsDraft] = useState({ adminEmails: '', notifyEmails: '' })
+  const [emailsDraft, setEmailsDraft] = useState({ adminEmails: '', notifyOnSubmission: true })
   const [savingEmails, setSavingEmails] = useState(false)
   const [emailsError, setEmailsError] = useState<string | null>(null)
 
@@ -371,7 +371,7 @@ export default function CommunityManager({ token }: { token: string }) {
 
   function startEditingEmails(c: CommunityWithAdminEmail) {
     setEditingEmailsSlug(c.slug)
-    setEmailsDraft({ adminEmails: c.adminEmails.join(', '), notifyEmails: c.notifyEmails.join(', ') })
+    setEmailsDraft({ adminEmails: c.adminEmails.join(', '), notifyOnSubmission: c.notifyOnSubmission })
     setEmailsError(null)
   }
 
@@ -391,20 +391,22 @@ export default function CommunityManager({ token }: { token: string }) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             adminEmails: parseEmailList(emailsDraft.adminEmails),
-            notifyEmails: parseEmailList(emailsDraft.notifyEmails),
+            notifyOnSubmission: emailsDraft.notifyOnSubmission,
           }),
         },
-        'Could not update the admin/notify lists.',
+        'Could not update the admin list.',
       )
       setCommunities(
         (cs) =>
           cs?.map((c) =>
-            c.slug === slug ? { ...c, adminEmails: community.adminEmails, notifyEmails: community.notifyEmails } : c,
+            c.slug === slug
+              ? { ...c, adminEmails: community.adminEmails, notifyOnSubmission: community.notifyOnSubmission }
+              : c,
           ) ?? cs,
       )
       setEditingEmailsSlug(null)
     } catch (err) {
-      setEmailsError(err instanceof Error ? err.message : 'Could not update the admin/notify lists.')
+      setEmailsError(err instanceof Error ? err.message : 'Could not update the admin list.')
     } finally {
       setSavingEmails(false)
     }
@@ -533,7 +535,7 @@ export default function CommunityManager({ token }: { token: string }) {
           />
           <span className="block text-xs text-muted mt-1">
             Comma-separated. Only these addresses can sign in to this community&rsquo;s admin console — each signs in
-            as themselves. They&rsquo;ll also get new-submission emails unless a different notify list is set later.
+            as themselves — and they&rsquo;ll get new-submission emails (turn that off later if not wanted).
           </span>
         </label>
 
@@ -698,12 +700,7 @@ export default function CommunityManager({ token }: { token: string }) {
                   )}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Notify on new submissions:{' '}
-                  {c.notifyEmails.length > 0 ? (
-                    <span className="font-mono">{c.notifyEmails.join(', ')}</span>
-                  ) : (
-                    <span className="italic">same as admin logins above</span>
-                  )}
+                  Email admins on new submissions: {c.notifyOnSubmission ? 'Yes' : 'No'}
                 </p>
                 {!c.visible && (
                   <p className="text-xs text-amber-700 mt-1">
@@ -770,14 +767,14 @@ export default function CommunityManager({ token }: { token: string }) {
                     autoFocus
                   />
                 </label>
-                <label className="block text-xs font-medium text-slate-700">
-                  Notify on new submissions
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                   <input
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={emailsDraft.notifyEmails}
-                    onChange={(e) => setEmailsDraft((d) => ({ ...d, notifyEmails: e.target.value }))}
-                    placeholder="Leave blank to match admin logins above"
+                    type="checkbox"
+                    checked={emailsDraft.notifyOnSubmission}
+                    onChange={(e) => setEmailsDraft((d) => ({ ...d, notifyOnSubmission: e.target.checked }))}
+                    className="cursor-pointer"
                   />
+                  Email the admins above when someone submits something new
                 </label>
                 <div className="flex gap-2">
                   <button

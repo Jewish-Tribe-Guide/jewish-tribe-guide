@@ -33,6 +33,7 @@ export type AdminTab =
   | 'home'
   | 'metrics'
   | 'pages'
+  | 'team'
   | 'communities'
 
 export function adminTabs(community: string): { tab: AdminTab; href: string; label: string }[] {
@@ -49,6 +50,10 @@ export function adminTabs(community: string): { tab: AdminTab; href: string; lab
     // phone screen, not just the home one.
     { tab: 'home', href: `${base}/home`, label: 'Desktop & mobile' },
     { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+    // Every one of THIS community's own admins can reach this — see
+    // /api/admin/team's own comment — unlike Communities below, which is
+    // superadmin-only underneath.
+    { tab: 'team', href: `${base}/team`, label: 'Team' },
     // Cross-community: creating a new community isn't an action scoped to
     // whichever one you're currently editing, but this tab still lives
     // under the current community's console — there's no community-less

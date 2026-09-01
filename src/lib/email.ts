@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
-import { getCommunityNotifyEmails } from './communityStore'
+import { getCommunityNotifyRecipients } from './communityStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
@@ -217,16 +217,18 @@ function buildFeedbackHtml(
   </div>`
 }
 
-// Who a new submission for this community should email — the community's
-// own notify_emails/admin_emails (see getCommunityNotifyEmails's own
-// comment on the fallback order between those two), falling back to the
-// site-wide NOTIFICATION_TO env var when the community hasn't configured
-// either yet. That fallback is also what every community effectively used
-// before admin_emails/notify_emails existed, and stays the right answer for
-// one that still hasn't set either.
-async function notificationRecipients(communitySlug: string): Promise<string[]> {
-  const configured = await getCommunityNotifyEmails(communitySlug)
-  if (configured.length > 0) return configured
+// Who a new submission for this community should email, or null when the
+// community has turned notify_on_submission off (see
+// getCommunityNotifyRecipients's own comment) — callers skip sending
+// entirely in that case, rather than falling back to anyone. Falls back to
+// the site-wide NOTIFICATION_TO env var only when notifications are ON but
+// admin_emails is empty — the same thing every community effectively did
+// before admin_emails existed, and still the right answer for one that
+// hasn't set it yet.
+async function notificationRecipients(communitySlug: string): Promise<string[] | null> {
+  const recipients = await getCommunityNotifyRecipients(communitySlug)
+  if (recipients === null) return null
+  if (recipients.length > 0) return recipients
   return [process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com']
 }
 
@@ -237,6 +239,7 @@ export async function sendNotification(
   communitySlug: string,
 ): Promise<void> {
   const to = await notificationRecipients(communitySlug)
+  if (!to) return // this community has submission notifications turned off
   const html = payload.requestType === 'Feedback'
     ? buildFeedbackHtml(payload, requestId, timestamp)
     : buildHtml(payload, requestId, timestamp)
@@ -286,6 +289,7 @@ export async function sendInboxMagicLink(email: string, link: string): Promise<v
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
   const to = await notificationRecipients(submission.community_id)
+  if (!to) return // this community has submission notifications turned off
 
   let subject: string
   let verb: string

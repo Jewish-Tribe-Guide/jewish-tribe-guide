@@ -8,11 +8,14 @@
 -- listed address signs in as itself, with its own audit trail, and losing
 -- access to one no longer means losing access to all of them.
 --
--- notify_emails is a second, independent list — who gets emailed about a
--- new submission. Defaults empty, which src/lib/email.ts reads as "same as
--- admin_emails": most communities want their admins to see new submissions,
--- but the two shouldn't be forced to be identical (an admin who doesn't
--- want inbox alerts, or a notify-only address that isn't a real admin).
+-- notify_on_submission is a plain on/off switch, not a second list: whether
+-- a new submission emails the community's own admin_emails (or the global
+-- NOTIFICATION_TO fallback if that's empty too). Started as a separate
+-- notify_emails list — genuinely more flexible, but flexibility nobody
+-- asked for; a yes/no toggle is what was actually wanted, so that's what
+-- this ships as instead of building the more complicated thing "just in
+-- case". Defaults true — every community wants submission alerts until it
+-- says otherwise.
 --
 -- admin_email itself is left in place, unused by new code, rather than
 -- dropped — it still holds real data for existing communities and this
@@ -21,7 +24,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 alter table community add column if not exists admin_emails text[] not null default '{}';
-alter table community add column if not exists notify_emails text[] not null default '{}';
+alter table community add column if not exists notify_on_submission boolean not null default true;
 
 update community
 set admin_emails = array[admin_email]
