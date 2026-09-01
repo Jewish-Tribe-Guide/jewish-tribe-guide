@@ -39,11 +39,16 @@ const {
   communitySlugFromRequest,
   createCommunity,
   deleteCommunity,
-  getCommunityAdminEmail,
+  getCommunityAdminEmails,
+  getCommunityNotifyEmails,
+  getCommunityNotifyEmailsRaw,
   listCommunityAdminEmails,
+  listCommunityNotifyEmails,
+  setCommunityEmailLists,
   setCommunityVisibility,
   listCommunityVisibility,
   listCommunityPreviewTokens,
+  getCommunityPreviewToken,
   CONFIG_COMMUNITY_SLUG,
 } = await import('./communityStore')
 
@@ -374,43 +379,125 @@ describe('deleteCommunity', () => {
   })
 })
 
-describe('getCommunityAdminEmail', () => {
-  it('returns the configured admin_email for the given slug', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { admin_email: 'philly-admin@example.com' }, error: null }))
-    expect(await getCommunityAdminEmail('philly')).toBe('philly-admin@example.com')
+describe('getCommunityAdminEmails', () => {
+  it('returns the configured admin_emails list for the given slug', async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: { admin_emails: ['jane@example.com', 'sam@example.com'] }, error: null }),
+    )
+    expect(await getCommunityAdminEmails('philly')).toEqual(['jane@example.com', 'sam@example.com'])
   })
 
-  it('returns null when the community has no admin_email set (both do today)', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { admin_email: null }, error: null }))
-    expect(await getCommunityAdminEmail('philly')).toBeNull()
+  it('returns an empty array when the community has no admin_emails set', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_emails: [] }, error: null }))
+    expect(await getCommunityAdminEmails('philly')).toEqual([])
   })
 
-  it('returns null when the community does not exist', async () => {
+  it('returns an empty array when the community does not exist', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await getCommunityAdminEmail('nonexistent')).toBeNull()
+    expect(await getCommunityAdminEmails('nonexistent')).toEqual([])
+  })
+})
+
+describe('getCommunityNotifyEmails', () => {
+  it('returns notify_emails when set', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: { admin_emails: ['jane@example.com'], notify_emails: ['alerts@example.com'] },
+        error: null,
+      }),
+    )
+    expect(await getCommunityNotifyEmails('philly')).toEqual(['alerts@example.com'])
+  })
+
+  it('falls back to admin_emails when notify_emails is empty', async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: { admin_emails: ['jane@example.com'], notify_emails: [] }, error: null }),
+    )
+    expect(await getCommunityNotifyEmails('philly')).toEqual(['jane@example.com'])
+  })
+
+  it('returns an empty array when neither is set', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_emails: [], notify_emails: [] }, error: null }))
+    expect(await getCommunityNotifyEmails('philly')).toEqual([])
+  })
+})
+
+describe('getCommunityNotifyEmailsRaw', () => {
+  it('returns the raw configured notify_emails, without falling back to admin_emails', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { notify_emails: [] }, error: null }))
+    expect(await getCommunityNotifyEmailsRaw('philly')).toEqual([])
   })
 })
 
 describe('listCommunityAdminEmails', () => {
-  it('keys admin_email by slug for every community', async () => {
+  it('keys admin_emails by slug for every community', async () => {
     mockFrom.mockReturnValue(
       chainable({
         data: [
-          { slug: 'philly', admin_email: 'phillyjewishguide@gmail.com' },
-          { slug: 'ues', admin_email: null },
+          { slug: 'philly', admin_emails: ['phillyjewishguide@gmail.com'] },
+          { slug: 'ues', admin_emails: [] },
         ],
         error: null,
       }),
     )
     expect(await listCommunityAdminEmails()).toEqual({
-      philly: 'phillyjewishguide@gmail.com',
-      ues: null,
+      philly: ['phillyjewishguide@gmail.com'],
+      ues: [],
     })
   })
 
   it('returns an empty object when the table read fails', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     expect(await listCommunityAdminEmails()).toEqual({})
+  })
+})
+
+describe('listCommunityNotifyEmails', () => {
+  it('keys the raw notify_emails by slug, unresolved', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          { slug: 'philly', notify_emails: ['alerts@example.com'] },
+          { slug: 'ues', notify_emails: [] },
+        ],
+        error: null,
+      }),
+    )
+    expect(await listCommunityNotifyEmails()).toEqual({
+      philly: ['alerts@example.com'],
+      ues: [],
+    })
+  })
+})
+
+describe('setCommunityEmailLists', () => {
+  it('updates admin_emails and notify_emails together', async () => {
+    const updateBuilder = chainable({ data: { ...philly }, error: null })
+    mockFrom.mockReturnValue(updateBuilder)
+
+    await setCommunityEmailLists('philly', { adminEmails: ['jane@example.com'], notifyEmails: ['alerts@example.com'] })
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({
+      admin_emails: ['jane@example.com'],
+      notify_emails: ['alerts@example.com'],
+    })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'philly')
+  })
+
+  it('updates only the field provided, leaving the other untouched', async () => {
+    const updateBuilder = chainable({ data: { ...philly }, error: null })
+    mockFrom.mockReturnValue(updateBuilder)
+
+    await setCommunityEmailLists('philly', { adminEmails: ['jane@example.com'] })
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ admin_emails: ['jane@example.com'] })
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(setCommunityEmailLists('philly', { adminEmails: [] })).rejects.toThrow(
+      'Failed to update "philly"\'s email lists: boom',
+    )
   })
 })
 
@@ -490,6 +577,18 @@ describe('listCommunityPreviewTokens', () => {
       philly: 'philly-token',
       blatimore: 'blatimore-token',
     })
+  })
+})
+
+describe('getCommunityPreviewToken', () => {
+  it('returns the token for the given slug', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { preview_token: 'philly-token' }, error: null }))
+    expect(await getCommunityPreviewToken('philly')).toBe('philly-token')
+  })
+
+  it('returns null when the community does not exist', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: null }))
+    expect(await getCommunityPreviewToken('nonexistent')).toBeNull()
   })
 })
 

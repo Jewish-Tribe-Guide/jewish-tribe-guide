@@ -1,42 +1,90 @@
 import type { NextRequest } from 'next/server'
 import { revalidatePublicContent } from '@/lib/revalidateContent'
 import { getAdminUser } from '@/lib/adminAuth'
-import { deleteCommunity, setCommunityVisibility } from '@/lib/communityStore'
+import {
+  deleteCommunity,
+  getCommunityAdminEmails,
+  getCommunityNotifyEmailsRaw,
+  getCommunityPreviewToken,
+  setCommunityEmailLists,
+  setCommunityVisibility,
+} from '@/lib/communityStore'
 
-// PATCH /api/admin/communities/:slug  body: { visible: boolean }
-// Publishes or unpublishes a community — see the visibility migration's own
-// comment. Superadmin only, same as everything else in this file. Unlike
-// DELETE below, this IS available in production — publishing a
-// built-out-but-hidden community is the entire point of visibility existing.
+function asEmailList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((e): e is string => typeof e === 'string' && e.trim().length > 0).map((e) => e.trim())
+}
+
+// PATCH /api/admin/communities/:slug  body: { visible?, adminEmails?, notifyEmails? }
+// Any subset — publishes/unpublishes (see the visibility migration's own
+// comment) and/or updates the admin login allowlist and/or notify list (see
+// the admin_emails migration's own comment). Superadmin only, same as
+// everything else in this file. Unlike DELETE below, this IS available in
+// production — publishing a built-out-but-hidden community, or fixing who
+// can sign in to it, are both routine admin actions.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
   const admin = await getAdminUser(request)
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   const { slug } = await ctx.params
 
-  let body: { visible?: unknown }
+  let body: { visible?: unknown; adminEmails?: unknown; notifyEmails?: unknown }
   try {
-    body = (await request.json()) as { visible?: unknown }
+    body = (await request.json()) as typeof body
   } catch {
     return Response.json({ ok: false, errors: ['Invalid request body.'] }, { status: 400 })
   }
-  if (typeof body.visible !== 'boolean') {
+
+  const hasVisible = body.visible !== undefined
+  if (hasVisible && typeof body.visible !== 'boolean') {
     return Response.json({ ok: false, errors: ['"visible" must be a boolean.'] }, { status: 400 })
+  }
+  const adminEmails = asEmailList(body.adminEmails)
+  const notifyEmails = asEmailList(body.notifyEmails)
+  if (!hasVisible && adminEmails === undefined && notifyEmails === undefined) {
+    return Response.json({ ok: false, errors: ['Nothing to update.'] }, { status: 400 })
   }
 
   try {
-    const { community, previewToken } = await setCommunityVisibility(slug, body.visible)
+    let community = null
+    let previewToken: string | null = null
+    if (hasVisible) {
+      const result = await setCommunityVisibility(slug, body.visible as boolean)
+      community = result.community
+      previewToken = result.previewToken
+    }
+    if (adminEmails !== undefined || notifyEmails !== undefined) {
+      community = await setCommunityEmailLists(slug, { adminEmails, notifyEmails })
+    }
+
     // Publishing/unpublishing changes the public switcher and sitemap
-    // immediately, same as any other public-content admin save.
+    // immediately, same as any other public-content admin save. The email
+    // lists aren't public content, but revalidating unconditionally is
+    // cheap and keeps this one code path instead of two.
     await revalidatePublicContent()
-    // previewToken rides along here (superadmin-only route) so the client
-    // can show the fresh link right away — unpublishing rotates it, and
-    // without this the UI would keep displaying the now-dead old one until
-    // the next full list reload.
-    return Response.json({ ok: true, community: { ...community, previewToken } })
+
+    // adminEmails/notifyEmails/previewToken ride along here (superadmin-only
+    // route) so the client can sync its state right away regardless of
+    // which fields this call actually touched — unpublishing rotates the
+    // token, for instance, so re-reading it beats trusting whatever the
+    // client already had.
+    const [freshAdminEmails, freshNotifyEmails, freshPreviewToken] = await Promise.all([
+      getCommunityAdminEmails(slug),
+      getCommunityNotifyEmailsRaw(slug),
+      previewToken === null ? getCommunityPreviewToken(slug) : Promise.resolve(previewToken),
+    ])
+    return Response.json({
+      ok: true,
+      community: {
+        ...community,
+        adminEmails: freshAdminEmails,
+        notifyEmails: freshNotifyEmails,
+        previewToken: freshPreviewToken,
+      },
+    })
   } catch (err) {
     console.error('[admin/communities/:slug] PATCH failed:', err)
-    const message = err instanceof Error ? err.message : 'Could not update visibility.'
+    const message = err instanceof Error ? err.message : 'Could not update the community.'
     return Response.json({ ok: false, errors: [message] }, { status: 502 })
   }
 }

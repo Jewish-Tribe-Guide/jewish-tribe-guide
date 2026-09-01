@@ -165,25 +165,92 @@ export async function resolveCommunity(slug: string | null | undefined): Promise
  *  ('use cache'/cacheTag) like listCommunities() — this is read at admin
  *  sign-in/authorization time, where a stale value could wrongly admit or
  *  reject someone right after it was changed, and it's a single indexed-row
- *  point query, not a page-render-path cost worth caching. */
-export async function getCommunityAdminEmail(slug: string): Promise<string | null> {
-  const { data } = await getAdminClient().from('community').select('admin_email').eq('slug', slug).maybeSingle()
-  return (data as { admin_email: string | null } | null)?.admin_email ?? null
+ *  point query, not a page-render-path cost worth caching.
+ *
+ *  A list, not a single address — see the admin_emails migration's own
+ *  comment on why a community moved from one shared login to a real
+ *  per-person allowlist. Empty means "not configured yet", same meaning
+ *  the old null singular value had. */
+export async function getCommunityAdminEmails(slug: string): Promise<string[]> {
+  const { data } = await getAdminClient().from('community').select('admin_emails').eq('slug', slug).maybeSingle()
+  return (data as { admin_emails: string[] | null } | null)?.admin_emails ?? []
 }
 
-/** Every community's configured admin_email, keyed by slug — same
- *  server-only, uncached reasoning as getCommunityAdminEmail above, just for
- *  all communities at once. Used by the superadmin communities list
- *  (GET /api/admin/communities) so /admin can show which login email governs
+/** Who gets emailed about a new submission for this community — its own
+ *  notify_emails when set, else the same people who can administer it
+ *  (admin_emails), else empty (the caller falls back to the global
+ *  NOTIFICATION_TO env var — see sendSubmissionNotification/sendNotification
+ *  in email.ts). Two separate lists on purpose: an admin doesn't have to
+ *  want inbox alerts to keep login access, and a notify-only address
+ *  doesn't have to be a real admin. */
+export async function getCommunityNotifyEmails(slug: string): Promise<string[]> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('admin_emails, notify_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const row = data as { admin_emails: string[] | null; notify_emails: string[] | null } | null
+  if (row?.notify_emails?.length) return row.notify_emails
+  return row?.admin_emails ?? []
+}
+
+/** The RAW configured notify_emails — unresolved, unlike
+ *  getCommunityNotifyEmails above. For the admin UI (PATCH's own response,
+ *  which the "edit lists" form reads back) rather than for actually sending
+ *  mail: an admin editing the notify field needs to see it empty when it's
+ *  actually empty, not silently pre-filled with the admin list, or there'd
+ *  be no way to tell "matches admin_emails on purpose" from "never set". */
+export async function getCommunityNotifyEmailsRaw(slug: string): Promise<string[]> {
+  const { data } = await getAdminClient().from('community').select('notify_emails').eq('slug', slug).maybeSingle()
+  return (data as { notify_emails: string[] | null } | null)?.notify_emails ?? []
+}
+
+/** Every community's configured admin_emails, keyed by slug — same
+ *  server-only, uncached reasoning as getCommunityAdminEmails above, just
+ *  for all communities at once. Used by the superadmin communities list
+ *  (GET /api/admin/communities) so /admin can show which logins govern
  *  each community, without ever putting emails on the public
  *  /api/communities payload that listCommunities()/Community feeds. */
-export async function listCommunityAdminEmails(): Promise<Record<string, string | null>> {
-  const { data } = await getAdminClient().from('community').select('slug, admin_email')
-  const out: Record<string, string | null> = {}
-  for (const row of (data ?? []) as { slug: string; admin_email: string | null }[]) {
-    out[row.slug] = row.admin_email
+export async function listCommunityAdminEmails(): Promise<Record<string, string[]>> {
+  const { data } = await getAdminClient().from('community').select('slug, admin_emails')
+  const out: Record<string, string[]> = {}
+  for (const row of (data ?? []) as { slug: string; admin_emails: string[] | null }[]) {
+    out[row.slug] = row.admin_emails ?? []
   }
   return out
+}
+
+/** Every community's configured notify_emails, keyed by slug — same
+ *  reasoning as listCommunityAdminEmails, for CommunityManager's own
+ *  "notify" field. Deliberately NOT resolved against admin_emails here
+ *  (unlike getCommunityNotifyEmails) — the admin UI needs to show the
+ *  raw configured value, empty or not, to edit it correctly; resolving the
+ *  fallback here would make an unset notify list look identical to one
+ *  explicitly set to match admin_emails. */
+export async function listCommunityNotifyEmails(): Promise<Record<string, string[]>> {
+  const { data } = await getAdminClient().from('community').select('slug, notify_emails')
+  const out: Record<string, string[]> = {}
+  for (const row of (data ?? []) as { slug: string; notify_emails: string[] | null }[]) {
+    out[row.slug] = row.notify_emails ?? []
+  }
+  return out
+}
+
+/** Updates a community's admin login allowlist and/or notify list —
+ *  superadmin action, same gate as create/delete/visibility (see
+ *  PATCH /api/admin/communities/:slug). Either can be omitted to leave it
+ *  unchanged. */
+export async function setCommunityEmailLists(
+  slug: string,
+  updates: { adminEmails?: string[]; notifyEmails?: string[] },
+): Promise<Community> {
+  const update: { admin_emails?: string[]; notify_emails?: string[] } = {}
+  if (updates.adminEmails) update.admin_emails = updates.adminEmails
+  if (updates.notifyEmails) update.notify_emails = updates.notifyEmails
+
+  const { data, error } = await getAdminClient().from('community').update(update).eq('slug', slug).select('*').single()
+  if (error) throw new Error(`Failed to update "${slug}"'s email lists: ${error.message}`)
+  return toCommunity(data as Row)
 }
 
 /** Every community's visibility + preview token, keyed by slug — the shape
@@ -214,6 +281,15 @@ export async function listCommunityPreviewTokens(): Promise<Record<string, strin
     out[row.slug] = row.preview_token
   }
   return out
+}
+
+/** One community's preview token — what PATCH /api/admin/communities/:slug
+ *  re-reads after a save that didn't itself touch visibility, so the
+ *  client's response always carries the current token regardless of which
+ *  fields the request actually changed. */
+export async function getCommunityPreviewToken(slug: string): Promise<string | null> {
+  const { data } = await getAdminClient().from('community').select('preview_token').eq('slug', slug).maybeSingle()
+  return (data as { preview_token: string | null } | null)?.preview_token ?? null
 }
 
 /** Reads the requested community slug off an incoming request. Query param
@@ -257,7 +333,7 @@ export async function createCommunity(input: {
   mapCenter: { lat: number; lng: number }
   themeColor: string
   backgroundColor: string
-  adminEmail?: string
+  adminEmails?: string[]
 }): Promise<Community> {
   const slug = input.slug.trim().toLowerCase()
   assertUsableSlug(slug)
@@ -291,7 +367,7 @@ export async function createCommunity(input: {
       map_center: input.mapCenter,
       theme_color: input.themeColor,
       background_color: input.backgroundColor,
-      admin_email: input.adminEmail?.trim() || null,
+      admin_emails: (input.adminEmails ?? []).map((e) => e.trim()).filter(Boolean),
       sort_order: sortOrder,
       is_default: false,
       // Starts hidden from the switcher/sitemap — see the visibility

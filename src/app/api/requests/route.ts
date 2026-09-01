@@ -56,10 +56,10 @@ export async function POST(request: Request) {
 
   const requestId = generateRequestId()
   const timestamp = easternTimestamp()
+  const community = await resolveCommunity(communitySlugFromRequest(request))
 
   // 2. Save to the database (system of record — hard failure if this fails).
   try {
-    const community = await resolveCommunity(communitySlugFromRequest(request))
     await insertFormResponse({
       community: community.slug,
       requestId,
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
   // 3. Send emails (best-effort — never fail the request)
   try {
-    await sendNotification(payload, requestId, timestamp)
+    await sendNotification(payload, requestId, timestamp, community.slug)
   } catch (err) {
     console.error('[requests] Admin notification failed:', err)
   }

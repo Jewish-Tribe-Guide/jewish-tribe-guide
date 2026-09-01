@@ -1,6 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
-import { adminAppUrl, escapeHtml, sendEmail } from './email'
+import type { ContactHospitalData, SubmissionRow } from '@/types'
+
+const minimalContact: ContactHospitalData = {
+  fullName: '',
+  phone: '',
+  email: '',
+  preferredContact: '',
+  hospitalId: '',
+  unitFloorRoom: '',
+}
+import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendSubmissionNotification } from './email'
+
+const mockGetCommunityNotifyEmails = vi.hoisted(() => vi.fn())
+vi.mock('./communityStore', () => ({ getCommunityNotifyEmails: mockGetCommunityNotifyEmails }))
 
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
@@ -121,11 +134,69 @@ describe('sendEmail', () => {
       expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'reply@example.com' }))
     })
 
+    it('accepts an array of recipients, for a community with several notify addresses', async () => {
+      await sendEmail({ to: ['a@example.com', 'b@example.com'], subject: 'Hi', html: '<p>hi</p>' })
+      expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['a@example.com', 'b@example.com'] }))
+    })
+
     it('throws when Resend reports an error', async () => {
       sendSpy.mockResolvedValue({ data: null, error: { message: 'invalid domain' } })
       await expect(sendEmail({ to: 'a@example.com', subject: 'Hi', html: '<p>hi</p>' })).rejects.toThrow(
         /Resend email failed/,
       )
+    })
+
+    // Both submission-notification paths (a form response, a resource
+    // suggestion) route to whichever community the submission belongs to —
+    // not a single site-wide inbox. Added after a real bug: every
+    // community's submissions used to email the same fixed NOTIFICATION_TO
+    // address regardless of which community they were for.
+    describe('per-community notification routing', () => {
+      afterEach(() => mockGetCommunityNotifyEmails.mockReset())
+
+      it('sendNotification emails the submitting community\'s configured notify list', async () => {
+        mockGetCommunityNotifyEmails.mockResolvedValue(['ues-admin@example.com'])
+        await sendNotification(
+          { requestType: 'Feedback', contact: minimalContact, formData: { message: 'hi' } },
+          'REQ-1',
+          '2026-01-01',
+          'ues',
+        )
+        expect(mockGetCommunityNotifyEmails).toHaveBeenCalledWith('ues')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
+      })
+
+      it('sendNotification falls back to NOTIFICATION_TO when the community has no notify list configured', async () => {
+        mockGetCommunityNotifyEmails.mockResolvedValue([])
+        vi.stubEnv('NOTIFICATION_TO', 'fallback@example.com')
+        await sendNotification(
+          { requestType: 'Feedback', contact: minimalContact, formData: { message: 'hi' } },
+          'REQ-1',
+          '2026-01-01',
+          'ues',
+        )
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['fallback@example.com'] }))
+      })
+
+      it('sendSubmissionNotification reads the notify list off the submission\'s own community_id', async () => {
+        mockGetCommunityNotifyEmails.mockResolvedValue(['ues-admin@example.com'])
+        const submission: SubmissionRow = {
+          id: 's1',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+        }
+        await sendSubmissionNotification(submission)
+        expect(mockGetCommunityNotifyEmails).toHaveBeenCalledWith('ues')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
+      })
     })
 
     // A local dev run now points at the same disposable Supabase project the

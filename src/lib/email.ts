@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
+import { getCommunityNotifyEmails } from './communityStore'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
 
@@ -89,7 +90,7 @@ export async function sendEmail({
   html,
   replyTo,
 }: {
-  to: string
+  to: string | string[]
   subject: string
   html: string
   replyTo?: string
@@ -216,12 +217,26 @@ function buildFeedbackHtml(
   </div>`
 }
 
+// Who a new submission for this community should email — the community's
+// own notify_emails/admin_emails (see getCommunityNotifyEmails's own
+// comment on the fallback order between those two), falling back to the
+// site-wide NOTIFICATION_TO env var when the community hasn't configured
+// either yet. That fallback is also what every community effectively used
+// before admin_emails/notify_emails existed, and stays the right answer for
+// one that still hasn't set either.
+async function notificationRecipients(communitySlug: string): Promise<string[]> {
+  const configured = await getCommunityNotifyEmails(communitySlug)
+  if (configured.length > 0) return configured
+  return [process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com']
+}
+
 export async function sendNotification(
   payload: SubmissionPayload,
   requestId: string,
   timestamp: string,
+  communitySlug: string,
 ): Promise<void> {
-  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+  const to = await notificationRecipients(communitySlug)
   const html = payload.requestType === 'Feedback'
     ? buildFeedbackHtml(payload, requestId, timestamp)
     : buildHtml(payload, requestId, timestamp)
@@ -270,7 +285,7 @@ export async function sendInboxMagicLink(email: string, link: string): Promise<v
 // Notifies the moderator that a new resource was submitted and is awaiting
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
-  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+  const to = await notificationRecipients(submission.community_id)
 
   let subject: string
   let verb: string
