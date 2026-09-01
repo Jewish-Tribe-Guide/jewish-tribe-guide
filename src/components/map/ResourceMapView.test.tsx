@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeCommunity, makeContent, makeListing } from '@/test/providerFixtures'
@@ -352,6 +352,41 @@ describe('ResourceMapView — pinning', () => {
     await user.click(screen.getByRole('button', { name: 'Long-press Acme Grocery' }))
 
     expect(await screen.findByRole('button', { name: /^Pinned/ })).toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — nested touch gestures', () => {
+  // Real bug: MobileNearbySheet's content area used to capture the pointer
+  // on every touchdown (an attempted fix for a different, unrelated
+  // smoothness issue) — which won the race against NearbyList's own row-level
+  // swipe-to-reveal gesture (its setPointerCapture is deliberately deferred
+  // until it detects clear horizontal movement, specifically so a vertical
+  // sheet-drag isn't stolen from it — see NearbyRow's onPointerMove). Once
+  // the sheet's wrapper grabbed the pointer first, every row swipe attempt
+  // got swallowed by the sheet instead of ever reaching the row.
+  it('a horizontal swipe on a nearby-list row inside the mobile sheet still reveals its pin/share actions', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    // A listing id/name not used by any other test in this file — usePinned()
+    // persists to the shared localStorage mock across tests (see
+    // vitest.setup.ts), so reusing 'g1'/Acme Grocery here would pick up
+    // whatever pinned state the "pinning" describe block above left behind.
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ id: 'row-swipe-1', category: 'grocery', name: 'Nosh Deli' })], [grocery])
+
+    // MobileNearbySheet stays mounted (CSS-hidden, not unmounted) even on
+    // desktop (see the frame-token test above) — its content area is the
+    // only ancestor with this class, so it's enough to scope into the
+    // sheet's own copy of the row rather than the sidebar's.
+    const sheetContent = document.querySelector('.overscroll-contain') as HTMLElement
+    const pinButton = within(sheetContent).getByRole('button', { name: 'Pin Nosh Deli' })
+    // The row's draggable content div is the reveal buttons' next sibling —
+    // both are direct children of NearbyRow's own wrapper (see its return).
+    const rowContent = pinButton.parentElement!.nextElementSibling as HTMLElement
+
+    fireEvent.pointerDown(rowContent, { clientX: 300 })
+    fireEvent.pointerMove(rowContent, { clientX: 190 }) // 110px left — past both the 8px activation threshold and REVEAL_WIDTH/2
+    fireEvent.pointerUp(rowContent, { clientX: 190 })
+
+    expect(rowContent.style.transform).toBe('translateX(-168px)') // REVEAL_WIDTH (84) * 2 — fully revealed
   })
 })
 
