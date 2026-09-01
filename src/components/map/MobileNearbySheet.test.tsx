@@ -314,6 +314,63 @@ describe('MobileNearbySheet', () => {
     vi.unstubAllGlobals()
   })
 
+  // Real bug: velocity used to come from just the two most recent samples.
+  // A real flick's very last pointermove before release is often a tiny
+  // "settling" motion (or just close together in time) that doesn't reflect
+  // how fast the finger was actually moving — so a genuinely fast flick
+  // could compute as a near-zero final-sample velocity and never trigger the
+  // momentum coast, which is exactly what "can't scroll fast" feels like:
+  // the drag itself tracks the finger fine, it's the release that goes dead.
+  it('a fast flick still coasts even when the very last recorded movement was tiny', () => {
+    const rafCallbacks: FrameRequestCallback[] = []
+    const rafSpy = vi.fn((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb)
+      return rafCallbacks.length
+    })
+    vi.stubGlobal('requestAnimationFrame', rafSpy)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const { container } = render(
+      <MobileNearbySheet points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
+    )
+    const handle = () => screen.getByRole('button', { name: /nearby list/i })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+    fireEvent.pointerDown(handle(), { clientY: 100 })
+    fireEvent.pointerUp(handle(), { clientY: 100 })
+
+    const content = container.querySelector('.overscroll-contain')! as HTMLElement
+    content.scrollTop = 200
+    Object.defineProperty(content, 'scrollHeight', { value: 5000, configurable: true })
+    Object.defineProperty(content, 'clientHeight', { value: 500, configurable: true })
+
+    const nowSpy = vi.spyOn(performance, 'now')
+    // Overall: 150.1px in 80ms ≈ 1.9 px/ms — a fast flick by any measure.
+    // But that LAST move alone is 0.1px in 10ms = 0.01 px/ms, below
+    // MOMENTUM_MIN_VELOCITY (0.02) on its own — a single-sample velocity
+    // would read this release as too slow to coast at all.
+    nowSpy.mockReturnValueOnce(0)
+    fireEvent.pointerDown(content, { clientY: 600 })
+    nowSpy.mockReturnValueOnce(40)
+    fireEvent.pointerMove(content, { clientY: 500 })
+    nowSpy.mockReturnValueOnce(70)
+    fireEvent.pointerMove(content, { clientY: 450 })
+    nowSpy.mockReturnValueOnce(80)
+    fireEvent.pointerMove(content, { clientY: 449.9 })
+    nowSpy.mockReturnValueOnce(80) // startMomentum's own internal clock read
+    fireEvent.pointerUp(content, { clientY: 449.9 })
+    nowSpy.mockRestore()
+
+    expect(rafSpy).toHaveBeenCalled()
+    const scrollTopAfterRelease = content.scrollTop
+    const frame = rafCallbacks[rafCallbacks.length - 1]!
+    frame(96) // 16ms after startMomentum's own clock read (80)
+
+    expect(content.scrollTop).toBeGreaterThan(scrollTopAfterRelease)
+
+    vi.unstubAllGlobals()
+  })
+
   it('closes via history.back(), not a direct state reset, when "Back to list" is tapped', async () => {
     const user = userEvent.setup()
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
