@@ -126,6 +126,9 @@ export default function AdminAuthGate({
     const description = params.get('error_description')
     if (!description) return
     history.replaceState(history.state, '', window.location.pathname)
+    // Reading state Supabase's redirect set on the URL (external to React),
+    // once on mount — the exact case the lint rule's own guidance carves out.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOauthError(description.replace(/\+/g, ' '))
   }, [])
 
