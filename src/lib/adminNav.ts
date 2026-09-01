@@ -32,7 +32,6 @@ export type AdminTab =
   | 'site'
   | 'home'
   | 'metrics'
-  | 'pages'
   | 'team'
   | 'communities'
 
@@ -50,7 +49,6 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },
-    { tab: 'pages', href: `${base}/pages`, label: 'Pages' },
     // Not "Home page" any more — what's left here is whatever exists on
     // exactly one of the two devices, and the mobile tab bar shows on every
     // phone screen, not just the home one.
@@ -66,5 +64,26 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     // admin route to put it on instead. Superadmin-only — see this
     // function's own doc.
     ...(isSuperAdmin ? [{ tab: 'communities' as const, href: `${base}/communities`, label: 'Communities' }] : []),
+  ]
+}
+
+// The standalone superadmin console's own tab bar (/admin, no community
+// segment — src/app/admin/page.tsx and src/app/admin/pages/page.tsx). Kept
+// separate from adminTabs above rather than folded in: those tabs are
+// per-community (base derives from a community slug), these two screens are
+// genuinely cross-community and live outside every community's own console
+// entirely — About/Privacy used to have a "Pages" tab inside
+// /{community}/admin too, gated by the same global SUPERADMIN_EMAILS check
+// underneath, but that only ever worked for a superadmin and dead-ended in
+// "Not authorized" for every other admin of that community, the same
+// UX mistake the Communities tab's own isSuperAdmin guard above exists to
+// avoid. Moving it here instead of just hiding it means there's exactly one
+// admin-emails page, not one that quietly differs per community.
+export type SuperAdminTab = 'communities' | 'pages'
+
+export function superAdminTabs(): { tab: SuperAdminTab; href: string; label: string }[] {
+  return [
+    { tab: 'communities', href: '/admin', label: 'Communities' },
+    { tab: 'pages', href: '/admin/pages', label: 'Pages' },
   ]
 }
