@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
-import { getBrowserClient } from '@/lib/supabase/client'
 import type { EnrichedSubmission } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -68,21 +67,8 @@ export default function ModerationQueue({ session }: { session: Session }) {
     }
   }
 
-  async function signOut() {
-    await getBrowserClient().auth.signOut()
-  }
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted">
-          Signed in as <span className="font-medium text-slate-700">{session.user.email}</span>
-        </p>
-        <button onClick={signOut} className="text-sm text-muted hover:text-slate-700 underline cursor-pointer">
-          Sign out
-        </button>
-      </div>
-
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
       )}

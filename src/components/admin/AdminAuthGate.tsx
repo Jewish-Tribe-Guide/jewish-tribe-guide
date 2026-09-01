@@ -256,6 +256,17 @@ export default function AdminAuthGate({
 
   return (
     <AdminShell title={shellTitle} subtitle={shellSubtitle}>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted">
+          Signed in as <span className="font-medium text-slate-700">{session.user.email}</span>
+        </p>
+        <button
+          onClick={() => getBrowserClient().auth.signOut()}
+          className="text-sm text-muted hover:text-slate-700 underline cursor-pointer"
+        >
+          Sign out
+        </button>
+      </div>
       <AdminSessionContext.Provider value={session}>
         <IsSuperAdminContext.Provider value={isSuperAdmin}>{children}</IsSuperAdminContext.Provider>
       </AdminSessionContext.Provider>
