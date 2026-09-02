@@ -341,10 +341,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
       <UpButton label={config.pluralLabel} onClick={onUp} />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-1">{heading}</h2>
-      <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 mb-5">
-        <span className="text-amber-500 text-lg leading-none mt-0.5" aria-hidden="true">
-          👀
-        </span>
+      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 mb-5">
         <p className="text-sm text-amber-800">
           <span className="font-semibold">Reviewed before it goes live.</span>{' '}
           {mode === 'edit'
