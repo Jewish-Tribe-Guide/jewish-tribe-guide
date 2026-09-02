@@ -43,6 +43,9 @@ const {
   getCommunityNotifyRecipients,
   getAdminNotifyPreference,
   setAdminNotifyPreference,
+  getReviewActionRecipients,
+  getAdminReviewNotifyPreference,
+  setAdminReviewNotifyPreference,
   getCommunityNotifyOnSubmission,
   listCommunityAdminEmails,
   listCommunityNotifyOnSubmission,
@@ -512,6 +515,70 @@ describe('setAdminNotifyPreference', () => {
     mockFrom.mockReturnValueOnce(readBuilder).mockReturnValueOnce(updateBuilder)
 
     await expect(setAdminNotifyPreference('philly', 'jane@example.com', false)).rejects.toThrow(
+      'Failed to update notification preference: boom',
+    )
+  })
+})
+
+describe('getReviewActionRecipients', () => {
+  it('returns every opted-in admin except the acting one, case-insensitively', async () => {
+    mockFrom.mockReturnValue(
+      chainable({ data: { notify_review_emails: ['jane@example.com', 'SAM@example.com'] }, error: null }),
+    )
+    expect(await getReviewActionRecipients('philly', 'jane@example.com')).toEqual(['SAM@example.com'])
+  })
+
+  it('returns an empty array when nobody has opted in', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { notify_review_emails: [] }, error: null }))
+    expect(await getReviewActionRecipients('philly', 'jane@example.com')).toEqual([])
+  })
+
+  it('returns an empty array when the community row has no notify_review_emails set', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { notify_review_emails: null }, error: null }))
+    expect(await getReviewActionRecipients('philly', 'jane@example.com')).toEqual([])
+  })
+})
+
+describe('getAdminReviewNotifyPreference', () => {
+  it('is false (opt-in default) when the admin has never turned it on', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { notify_review_emails: [] }, error: null }))
+    expect(await getAdminReviewNotifyPreference('philly', 'jane@example.com')).toBe(false)
+  })
+
+  it('is true when the admin is on notify_review_emails, case-insensitively', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { notify_review_emails: ['JANE@example.com'] }, error: null }))
+    expect(await getAdminReviewNotifyPreference('philly', 'jane@example.com')).toBe(true)
+  })
+})
+
+describe('setAdminReviewNotifyPreference', () => {
+  it('adds the email to notify_review_emails when opting in', async () => {
+    const readBuilder = chainable({ data: { notify_review_emails: [] }, error: null })
+    const updateBuilder = chainable({ data: null, error: null })
+    mockFrom.mockReturnValueOnce(readBuilder).mockReturnValueOnce(updateBuilder)
+
+    await setAdminReviewNotifyPreference('philly', 'jane@example.com', true)
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ notify_review_emails: ['jane@example.com'] })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'philly')
+  })
+
+  it('removes the email from notify_review_emails when opting out, case-insensitively', async () => {
+    const readBuilder = chainable({ data: { notify_review_emails: ['JANE@example.com', 'sam@example.com'] }, error: null })
+    const updateBuilder = chainable({ data: null, error: null })
+    mockFrom.mockReturnValueOnce(readBuilder).mockReturnValueOnce(updateBuilder)
+
+    await setAdminReviewNotifyPreference('philly', 'jane@example.com', false)
+
+    expect(updateBuilder.update).toHaveBeenCalledWith({ notify_review_emails: ['sam@example.com'] })
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    const readBuilder = chainable({ data: { notify_review_emails: [] }, error: null })
+    const updateBuilder = chainable({ data: null, error: { message: 'boom' } })
+    mockFrom.mockReturnValueOnce(readBuilder).mockReturnValueOnce(updateBuilder)
+
+    await expect(setAdminReviewNotifyPreference('philly', 'jane@example.com', true)).rejects.toThrow(
       'Failed to update notification preference: boom',
     )
   })

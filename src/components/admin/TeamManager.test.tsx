@@ -18,13 +18,13 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
-function mockList(adminEmails: string[], myNotify = true) {
+function mockList(adminEmails: string[], myNotify = true, myReviewNotify = false) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true } as Response))
-  vi.mocked(parseOkJson).mockResolvedValue({ adminEmails, myNotify })
+  vi.mocked(parseOkJson).mockResolvedValue({ adminEmails, myNotify, myReviewNotify })
 }
 
-async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com'], myNotify = true) {
-  mockList(adminEmails, myNotify)
+async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com'], myNotify = true, myReviewNotify = false) {
+  mockList(adminEmails, myNotify, myReviewNotify)
   const view = renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
   await screen.findByText('Team')
   return view
@@ -143,6 +143,53 @@ describe('TeamManager', () => {
       expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
       // Reverted, not left on the optimistic (unchecked) value.
       expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
+    })
+  })
+
+  // Opt-in (defaults off), unlike the new-submissions checkbox above — see
+  // the notify_review_emails migration's own comment on why. Otherwise the
+  // same self-only, optimistic-with-revert shape.
+  describe('review-notification checkbox', () => {
+    it('defaults to unchecked and reflects myReviewNotify from the load', async () => {
+      await renderAndWaitForList(['jane@example.com'], true, false)
+      expect(
+        screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }),
+      ).not.toBeChecked()
+
+      cleanup()
+      await renderAndWaitForList(['jane@example.com'], true, true)
+      expect(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i })).toBeChecked()
+    })
+
+    it('checking it PATCHes { reviewNotify: true } scoped to the active community, without touching notify', async () => {
+      const user = userEvent.setup()
+      await renderAndWaitForList(['jane@example.com'], true, false)
+      vi.mocked(fetchJson).mockResolvedValueOnce({ myReviewNotify: true })
+
+      await user.click(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }))
+
+      await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
+      const call = vi.mocked(fetchJson).mock.calls[0]!
+      expect(call[0]).toBe('/api/admin/team?community=ues')
+      const init = call[1] as RequestInit
+      expect(init.method).toBe('PATCH')
+      expect(JSON.parse(init.body as string)).toEqual({ reviewNotify: true })
+      expect(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i })).toBeChecked()
+      // The other checkbox's own value is untouched.
+      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
+    })
+
+    it('reverts the checkbox and shows an error when the PATCH fails', async () => {
+      const user = userEvent.setup()
+      await renderAndWaitForList(['jane@example.com'], true, false)
+      vi.mocked(fetchJson).mockRejectedValueOnce(new Error('Could not update your notification preference.'))
+
+      await user.click(screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }))
+
+      expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
+      expect(
+        screen.getByRole('checkbox', { name: /email me when another admin approves or rejects/i }),
+      ).not.toBeChecked()
     })
   })
 })

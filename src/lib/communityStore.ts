@@ -244,6 +244,58 @@ export async function setAdminNotifyPreference(slug: string, email: string, noti
   if (error) throw new Error(`Failed to update notification preference: ${error.message}`)
 }
 
+/** Who to email when ONE admin approves or rejects a submission — every
+ *  address on notify_review_emails EXCEPT the acting admin's own (nobody
+ *  needs to be told about their own decision). Opt-IN, unlike
+ *  notify_muted_emails' opt-out shape — see the notify_review_emails
+ *  migration's own comment on why the two defaults differ. */
+export async function getReviewActionRecipients(slug: string, actorEmail: string): Promise<string[]> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const list = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const actor = actorEmail.trim().toLowerCase()
+  return list.filter((e) => e.trim().toLowerCase() !== actor)
+}
+
+/** Whether ONE admin currently wants to be emailed about other admins'
+ *  approve/reject decisions — the Team tab's own second checkbox reads
+ *  this, scoped to the signed-in admin's own verified email (never
+ *  another admin's — see setAdminReviewNotifyPreference). True only when
+ *  that address is on notify_review_emails; opt-in, so false for anyone
+ *  who has never turned it on. */
+export async function getAdminReviewNotifyPreference(slug: string, email: string): Promise<boolean> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const list = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const target = email.trim().toLowerCase()
+  return list.some((e) => e.trim().toLowerCase() === target)
+}
+
+/** Sets ONE admin's own review-action-notification preference — same
+ *  self-only shape as setAdminNotifyPreference: the write behind PATCH
+ *  /api/admin/team always passes the CALLER's own verified email, never a
+ *  client-supplied one. */
+export async function setAdminReviewNotifyPreference(slug: string, email: string, notify: boolean): Promise<void> {
+  const target = email.trim().toLowerCase()
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const current = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const withoutTarget = current.filter((e) => e.trim().toLowerCase() !== target)
+  const next = notify ? [...withoutTarget, email.trim()] : withoutTarget
+
+  const { error } = await getAdminClient().from('community').update({ notify_review_emails: next }).eq('slug', slug)
+  if (error) throw new Error(`Failed to update notification preference: ${error.message}`)
+}
+
 /** Every community's configured admin_emails, keyed by slug — same
  *  server-only, uncached reasoning as getCommunityAdminEmails above, just
  *  for all communities at once. Used by the superadmin communities list

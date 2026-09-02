@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -13,7 +13,11 @@ const minimalContact: ContactHospitalData = {
 }
 
 const mockGetCommunityNotifyRecipients = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({ getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients }))
+const mockGetReviewActionRecipients = vi.hoisted(() => vi.fn())
+vi.mock('./communityStore', () => ({
+  getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients,
+  getReviewActionRecipients: mockGetReviewActionRecipients,
+}))
 
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
@@ -312,6 +316,54 @@ describe('sendEmail', () => {
           { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
         ])
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['fallback@example.com'] }))
+      })
+    })
+
+    // Opt-in — nobody gets emailed about another admin's decision unless
+    // they've turned it on (see the notify_review_emails migration's own
+    // comment on why the default differs from new-submission notifications).
+    describe('sendReviewActionNotification', () => {
+      afterEach(() => mockGetReviewActionRecipients.mockReset())
+
+      const listingSubmission: SubmissionRow = {
+        id: 's1',
+        community_id: 'ues',
+        operation: 'create',
+        target_type: 'listing',
+        target_id: null,
+        payload: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' },
+        note: null,
+        status: 'approved',
+        submitted_by: null,
+        created_at: '2026-01-01T00:00:00Z',
+        reviewed_at: '2026-01-01T00:05:00Z',
+        reviewed_by: 'jane@example.com',
+      }
+
+      it('emails every opted-in admin except the acting one', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
+        expect(mockGetReviewActionRecipients).toHaveBeenCalledWith('ues', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ to: ['sam@example.com'], subject: 'jane@example.com approved A Shul' }),
+        )
+      })
+
+      it('sends nothing when nobody has opted in', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue([])
+        await sendReviewActionNotification(listingSubmission, 'rejected', 'jane@example.com')
+        expect(sendSpy).not.toHaveBeenCalled()
+      })
+
+      it('names a category submission by its own label, not "a listing"', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        const categorySubmission: SubmissionRow = {
+          ...listingSubmission,
+          target_type: 'category',
+          payload: { label: 'Kosher Butchers' },
+        }
+        await sendReviewActionNotification(categorySubmission, 'approved', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: 'jane@example.com approved Kosher Butchers' }))
       })
     })
 

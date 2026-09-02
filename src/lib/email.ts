@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
-import { getCommunityNotifyRecipients } from './communityStore'
+import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -378,6 +378,56 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   </div>`
 
   await sendEmail({ to, subject, html })
+}
+
+/** "New category — Kosher Butchers" / "New listing — Goldi's" — the same
+ *  title text sendSubmissionNotification's own subject already derives, in
+ *  one place so the review-action notification below doesn't have to
+ *  re-derive it differently and drift. */
+function submissionDisplayName(submission: SubmissionRow): string {
+  if (submission.target_type === 'category') {
+    return (submission.payload as CategorySubmissionPayload).label
+  }
+  return (submission.payload as Partial<ResourceSubmission>).name ?? 'a listing'
+}
+
+// Tells every OTHER opted-in admin of this community that ONE admin just
+// approved or rejected a submission — not the submitter (see
+// confirmationEmail.ts's sendDecisionEmail for that), and never the acting
+// admin themselves (getReviewActionRecipients excludes them). Best-effort:
+// callers catch and log without failing the moderation action, same
+// convention as every other notification here.
+//
+// Opt-in (empty by default — see the notify_review_emails migration's own
+// comment), unlike new-submission notifications: nobody asked to be
+// told about other admins' decisions until this existed, so nothing turns
+// itself on for anyone. `actorEmail` is the acting admin's own verified
+// token email from the call site (getAdminUserForCommunity) — never
+// client-supplied — the same way reviewed_by itself is recorded.
+export async function sendReviewActionNotification(
+  submission: SubmissionRow,
+  decision: 'approved' | 'rejected',
+  actorEmail: string,
+): Promise<void> {
+  const to = await getReviewActionRecipients(submission.community_id, actorEmail)
+  if (to.length === 0) return
+
+  const title = escapeHtml(submissionDisplayName(submission))
+  const verb = decision === 'approved' ? 'approved' : 'rejected'
+  const appUrl = adminAppUrl()
+  const adminLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(submission.community_id)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open the admin console →</a></p>`
+    : ''
+
+  await sendEmail({
+    to,
+    subject: `${actorEmail} ${verb} ${submissionDisplayName(submission)}`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(actorEmail)} ${verb} a submission</h2>
+      <p style="color:#334155;font-size:14px;">${title} was just ${verb}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
+      ${adminLink}
+    </div>`,
+  })
 }
 
 /** One row of the business-status digest below. */
