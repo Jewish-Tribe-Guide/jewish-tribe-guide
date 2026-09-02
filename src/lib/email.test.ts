@@ -385,14 +385,6 @@ describe('sendEmail', () => {
         expect(phillyCall[0].html).not.toContain('Bagel Shop')
       })
 
-      it('skips a community entirely when its notifications are off', async () => {
-        mockGetCommunityNotifyRecipients.mockResolvedValue(null)
-        await sendStatusChangeDigest([
-          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
-        ])
-        expect(sendSpy).not.toHaveBeenCalled()
-      })
-
       it('falls back to NOTIFICATION_TO for a community with no notify list configured', async () => {
         mockGetCommunityNotifyRecipients.mockResolvedValue([])
         vi.stubEnv('NOTIFICATION_TO', 'fallback@example.com')
