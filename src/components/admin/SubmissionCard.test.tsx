@@ -174,3 +174,36 @@ describe('moderation queue — every minyan property a moderator should see', ()
     expect(text).not.toMatch(/\d+ minyanim:/)
   })
 })
+
+// The read-only history view (approved/rejected — no onModerate prop) is
+// what the Metrics tiles link to, specifically so "who approved/rejected
+// this" has an answer now that a community can have several admins.
+describe('read-only history card — who reviewed it', () => {
+  function renderHistoryCard(overrides: Partial<EnrichedSubmission> = {}) {
+    const submission = {
+      id: 's1',
+      operation: 'create',
+      target_type: 'listing',
+      target_id: null,
+      payload: { category: 'grocery', name: 'Place', address: '', phone: '', details: {} },
+      note: null,
+      status: 'approved',
+      submitted_by: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: null,
+      ...overrides,
+    } as unknown as EnrichedSubmission
+    return render(<SubmissionCard submission={submission} categoriesById={new Map()} />)
+  }
+
+  it('shows who reviewed it when reviewed_by is set', () => {
+    renderHistoryCard({ reviewed_by: 'jane@example.com' })
+    expect(screen.getByText(/by jane@example\.com/)).toBeInTheDocument()
+  })
+
+  it('shows nothing extra for a submission decided before reviewed_by existed', () => {
+    renderHistoryCard({ reviewed_by: null })
+    expect(screen.queryByText(/^by /)).not.toBeInTheDocument()
+  })
+})

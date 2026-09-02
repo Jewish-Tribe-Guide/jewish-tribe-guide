@@ -41,8 +41,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   try {
     submission =
       decision === 'approved'
-        ? await approveSubmission(id, community.slug)
-        : await rejectSubmission(id, community.slug)
+        ? await approveSubmission(id, community.slug, admin.email)
+        : await rejectSubmission(id, community.slug, admin.email)
   } catch (err) {
     console.error('[admin/submissions/:id] PATCH failed:', err)
     return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })

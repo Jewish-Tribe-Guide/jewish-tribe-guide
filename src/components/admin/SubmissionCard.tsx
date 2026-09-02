@@ -239,6 +239,10 @@ export function SubmissionCard({
             <p className="text-xs text-muted mt-2">
               <span className={`font-medium rounded-full px-2 py-0.5 ${statusMeta.cls}`}>{statusMeta.label}</span>
               {s.reviewed_at && <span className="ml-2">{dateFormatter.format(new Date(s.reviewed_at))}</span>}
+              {/* Only for submissions decided after reviewed_by existed —
+                  older rows have nothing to show here, not a fabricated
+                  "unknown admin". */}
+              {s.reviewed_by && <span className="ml-2">by {s.reviewed_by}</span>}
             </p>
           )}
         </div>

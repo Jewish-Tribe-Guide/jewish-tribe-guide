@@ -42,6 +42,7 @@ function submission(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmis
     submitted_by: { name: 'Jane Doe' },
     created_at: new Date().toISOString(),
     reviewed_at: null,
+    reviewed_by: null,
     categoryLabel: 'Grocery Stores',
     ...overrides,
   }
