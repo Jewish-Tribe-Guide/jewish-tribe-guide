@@ -872,7 +872,7 @@ export default function CommunityManager({ token }: { token: string }) {
                                   : 'inline-block rounded-full px-2 py-0.5 bg-slate-100 text-slate-500'
                               }
                             >
-                              {submissionsOn ? 'On' : 'Muted'}
+                              {submissionsOn ? 'On' : 'Off'}
                             </span>
                           </td>
                           <td className="py-1.5 text-center">

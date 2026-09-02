@@ -684,7 +684,7 @@ describe('CommunityManager — admin roster', () => {
     const card = cardFor(/upper east side/i)
 
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
-    expect(within(janeRow).getByText('Muted')).toBeInTheDocument()
+    expect(within(janeRow).getByText('Off')).toBeInTheDocument()
     expect(within(janeRow).getByText('On')).toBeInTheDocument()
 
     const samRow = within(card).getByText('sam@example.com').closest('tr')!
