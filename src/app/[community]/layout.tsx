@@ -7,7 +7,7 @@ import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
 import { loadCommunityContent } from '@/lib/loadCommunityContent'
 import SiteChrome from '@/components/SiteChrome'
-import RefreshContentOnFocus from '@/components/RefreshContentOnFocus'
+import RefreshContentOnReturn from '@/components/RefreshContentOnReturn'
 import { currentYear } from '@/lib/currentYear'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ export default async function CommunityLayout(props: LayoutProps<'/[community]'>
   // to be. The layout is the right place: every screen below it needs this,
   // and it isn't re-fetched when navigating between them.
   //
-  // That last part is why RefreshContentOnFocus exists below. Not re-fetching
+  // That last part is why RefreshContentOnReturn exists below. Not re-fetching
   // per navigation is the point, but nothing else re-fetched it either, so an
   // already-open tab held whatever it loaded with until a full reload — an
   // admin's rename or newly published form never reached it. See that
@@ -93,8 +93,8 @@ export default async function CommunityLayout(props: LayoutProps<'/[community]'>
     <CommunityProvider community={community} communities={communities}>
       <ContentProvider content={content}>
         {/* Renders nothing; re-asks the server for the content above when the
-            tab is next looked at. */}
-        <RefreshContentOnFocus />
+            tab is next looked at, or the network comes back. */}
+        <RefreshContentOnReturn />
         {/* The brand color is per-community now, so it's set here rather than on
             <html> in the root layout — switching community restyles the site
             without a reload. globals.css still holds the build-time fallback. */}

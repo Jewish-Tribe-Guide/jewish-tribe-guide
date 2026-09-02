@@ -4,8 +4,9 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Asks the server for the community layout's content again when the tab is
-// next looked at.
+// Asks the server for the community layout's content again on the moments it
+// could have gone stale unnoticed: the tab coming back into view, and the
+// network coming back.
 //
 // [community]/layout.tsx loads categories, site settings, home sections, forms
 // and hospitals once and hands them to ContentProvider. That is deliberate and
@@ -21,11 +22,24 @@ import { useRouter } from 'next/navigation'
 // PWA: a phone gets backgrounded rather than closed, and a desktop tab stays
 // open for days. Those are exactly the sessions that never reload.
 //
-// The trigger is the one useNow.ts already uses to resync the clock, for the
-// same reason it gives there — "however long the tab was away, this is the
-// moment the screen is wrong and about to be looked at". Both events, also
-// for the reason useNow gives: a desktop window can be fully visible and
-// simply not focused for hours, which never fires visibilitychange.
+// The three triggers are the same set SWR and React Query revalidate on by
+// default, minus polling — deliberately, because a background request on a
+// loop costs battery and mobile data for content an admin changes a few times
+// a week. What is left:
+//
+//   • visibilitychange — the tab was backgrounded and is being looked at again
+//   • focus            — a desktop window can be fully visible and simply not
+//                        focused for hours, which never fires visibilitychange
+//                        (useNow.ts makes the same point for the same reason)
+//   • online           — this app is used on hospital wifi and mobile data,
+//                        where losing signal and regaining it is an ordinary
+//                        part of a session. Without this, reconnecting leaves
+//                        the content stale until something else happens to
+//                        fire one of the two above.
+//
+// The reasoning for the first is useNow.ts's, verbatim, about the clock:
+// however long the tab was away, this is the moment the screen is wrong and
+// about to be looked at.
 //
 // router.refresh() rather than a reload: it re-renders the route on the server
 // (layout included, which is the whole point) while keeping client state, so a
@@ -36,15 +50,16 @@ import { useRouter } from 'next/navigation'
 
 /** Minimum gap between refreshes.
  *
- *  Alt-tabbing between two windows fires this on every switch, and each
- *  refresh is a real request, so bursts collapse into one. Ten seconds is
- *  short enough that any genuine "came back to the app" gap clears it and
- *  long enough that flipping back and forth doesn't send a request per flip.
- *  The content behind it changes when an admin saves — rarely — so there is
- *  nothing to gain from being twitchier than this. */
-const MIN_REFRESH_INTERVAL_MS = 10_000
+ *  All three triggers can arrive in bursts — alt-tabbing between two windows
+ *  fires focus on every switch, and a flaky mobile connection fires `online`
+ *  repeatedly as it flaps — and each refresh is a real request, so bursts
+ *  collapse into one. Ten seconds is short enough that any genuine "came back
+ *  to the app" gap clears it, and long enough that flipping back and forth
+ *  doesn't send a request per flip. The content behind it changes when an
+ *  admin saves — rarely — so there is nothing to gain from being twitchier. */
+export const MIN_REFRESH_INTERVAL_MS = 10_000
 
-export default function RefreshContentOnFocus() {
+export default function RefreshContentOnReturn() {
   const router = useRouter()
   // Seeded in the effect below rather than here. `useRef(Date.now())` reads
   // the clock during render, and Cache Components rejects that outright in a
@@ -77,9 +92,11 @@ export default function RefreshContentOnFocus() {
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('focus', refreshIfDue)
+    window.addEventListener('online', refreshIfDue)
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('focus', refreshIfDue)
+      window.removeEventListener('online', refreshIfDue)
     }
   }, [router])
 
