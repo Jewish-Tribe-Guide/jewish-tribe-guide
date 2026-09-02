@@ -67,8 +67,14 @@ const CATEGORY_ICON_MARKUP: Record<string, string> = {
   // used to be a plain plus/cross (M12 9.5v4M10 11.5h4) — read as a
   // Christian cross, wrong for a Jewish cemetery. Replaced with a Star of
   // David: the same two-overlapping-triangles technique the synagogue icon
-  // above already uses, just scaled down to fit the headstone's face.
-  cemetery: '<path d="M7 21V11a5 5 0 0 1 10 0v10"/><path d="M7 21h10"/><path d="M12 12.7 L14.4 16.9 L9.6 16.9 Z"/><path d="M12 18.3 L9.6 14.1 L14.4 14.1 Z"/>',
+  // above already uses, scaled to fit the headstone's face. The star's own
+  // two paths carry an explicit, thinner stroke-width (overriding
+  // CategoryGlyph's shared 1.8 default, which SVG lets a child element do) —
+  // at the small size a carving has to be, 1.8 made six crossing line
+  // segments read as a bold, blobby mark rather than a crisp star; a
+  // lighter stroke on a slightly larger star reads as a silhouette instead.
+  cemetery:
+    '<path d="M7 21V11a5 5 0 0 1 10 0v10"/><path d="M7 21h10"/><path d="M12 12.2 L14.6 16.7 L9.4 16.7 Z" stroke-width="1.1"/><path d="M12 18.2 L9.4 13.7 L14.6 13.7 Z" stroke-width="1.1"/>',
   zmanim: '<path d="M12 2.5c1.6 2 2.2 3.6 2.2 5a2.2 2.2 0 1 1-4.4 0c0-1.4.6-3 2.2-5Z"/><path d="M9 21.5h6M12 9v12.5"/>',
 }
 
