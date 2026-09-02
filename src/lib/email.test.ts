@@ -19,6 +19,9 @@ vi.mock('./communityStore', () => ({
   getReviewActionRecipients: mockGetReviewActionRecipients,
 }))
 
+const mockGetCategoryById = vi.hoisted(() => vi.fn())
+vi.mock('./categoryStore', () => ({ getCategoryById: mockGetCategoryById }))
+
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
 
@@ -235,6 +238,29 @@ describe('sendEmail', () => {
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
       })
 
+      // So a later "X approved/rejected this" email (sendReviewActionNotification)
+      // can be recognized as the same submission — see submissionRef's own
+      // comment on why this exists.
+      it("sendSubmissionNotification's own subject carries the same short reference", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        const submission: SubmissionRow = {
+          id: 'abc123de-f000-0000-0000-000000000000',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+        }
+        await sendSubmissionNotification(submission)
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('[#abc123]') }))
+      })
+
       // Real bug: the "Review in admin" button linked to the bare /admin
       // superadmin console — which has no moderation queue of its own — for
       // every community, instead of that submission's own /{community}/admin.
@@ -260,6 +286,58 @@ describe('sendEmail', () => {
         const html = sendSpy.mock.calls[0]![0].html as string
         expect(html).toContain('href="https://example.org/ues/admin"')
         expect(html).not.toContain('href="https://example.org/admin"')
+      })
+
+      // Real bug: a listing's detail rows were built straight from
+      // Object.entries(payload.details) — always the raw JSON key as the
+      // label ("type" instead of "Type", or "t" for a field whose key got
+      // mangled — see CategoryFieldEditor's own fix) and the raw stored
+      // *value* for a select/tags field, never the admin-configured option
+      // label. SubmissionCard.tsx's moderation-queue card already resolved
+      // both through the category's own field config; this notification
+      // now does too.
+      afterEach(() => mockGetCategoryById.mockReset())
+
+      it("resolves a listing's detail rows through the category's own field labels and option text, not the raw JSON", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        mockGetCategoryById.mockResolvedValue({
+          id: 'cemetery',
+          label: 'Cemetery',
+          pluralLabel: 'Cemeteries',
+          icon: 'cemetery',
+          description: '',
+          kind: 'listing',
+          detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'jewish', label: 'Jewish Cemetery' }] }],
+        })
+        const submission: SubmissionRow = {
+          id: 's1',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'listing',
+          target_id: null,
+          payload: {
+            category: 'cemetery',
+            name: 'A Cemetery',
+            anchorId: '',
+            distance: null,
+            address: '',
+            phone: '',
+            details: { type: 'jewish' },
+          },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+        }
+        await sendSubmissionNotification(submission)
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('Type')
+        expect(html).toContain('Jewish Cemetery')
+        // Neither the raw key nor the raw stored value on their own.
+        expect(html).not.toMatch(/>type</)
+        expect(html).not.toMatch(/>jewish</)
       })
     })
 
@@ -345,8 +423,17 @@ describe('sendEmail', () => {
         await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
         expect(mockGetReviewActionRecipients).toHaveBeenCalledWith('ues', 'jane@example.com')
         expect(sendSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ to: ['sam@example.com'], subject: 'jane@example.com approved A Shul' }),
+          expect.objectContaining({ to: ['sam@example.com'], subject: 'jane@example.com approved A Shul [#s1]' }),
         )
+      })
+
+      // So an admin who already got the ORIGINAL new-submission email can
+      // tell this is about the same submission, not a fresh one — see
+      // submissionRef's own comment.
+      it('includes the same short submission reference a prior new-submission email would have used', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification({ ...listingSubmission, id: 'abc123de-f000-0000-0000-000000000000' }, 'approved', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('[#abc123]') }))
       })
 
       it('sends nothing when nobody has opted in', async () => {
@@ -363,7 +450,9 @@ describe('sendEmail', () => {
           payload: { label: 'Kosher Butchers' },
         }
         await sendReviewActionNotification(categorySubmission, 'approved', 'jane@example.com')
-        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: 'jane@example.com approved Kosher Butchers' }))
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ subject: 'jane@example.com approved Kosher Butchers [#s1]' }),
+        )
       })
     })
 

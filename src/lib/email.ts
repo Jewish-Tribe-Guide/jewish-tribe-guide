@@ -6,6 +6,7 @@ import { getCommunityNotifyRecipients, getReviewActionRecipients } from './commu
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
+import type { CategoryField } from './categories'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -36,6 +37,19 @@ export function adminAppUrl(): string | undefined {
   return process.env.APP_URL?.replace(/\/$/, '')
 }
 
+// A short, stable reference an admin can eyeball across two DIFFERENT
+// emails about the same submission — the new-submission notification, and
+// later a review-action notification saying someone else approved/rejected
+// it. Without this, "X approved/rejected Y" reads as a fresh fact with
+// nothing tying it back to the original request the admin already saw,
+// which got confusing the moment more than one admin was acting on the
+// same queue. Same convention listingSlug.ts already uses for a listing's
+// own shareable URL (id.replace(/-/g,'').slice(0,6)) — short enough to read
+// in a subject line, still practically unique within one moderation queue.
+function submissionRef(id: string): string {
+  return `#${id.replace(/-/g, '').slice(0, 6)}`
+}
+
 function row(label: string, value: string): string {
   return `<tr>
     <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
@@ -52,7 +66,18 @@ function formatMinyan(m: Record<string, unknown>): string {
   return `${tefillah}${days}: ${m.time}${note}`
 }
 
-function formatDetailValue(v: unknown): string {
+// A select/tags field stores raw option *values*, which don't always match
+// what the admin typed as the option's label (e.g. renamed since) — same
+// distinction SubmissionCard.tsx's own resolveOptionLabel makes, so this
+// notification reads the same text the moderation queue shows instead of
+// whatever's in the raw JSON.
+function resolveOptionLabel(field: CategoryField | undefined, value: unknown): string {
+  const raw = String(value)
+  const label = field?.options?.find((o) => o.value === raw)?.label
+  return label ?? raw
+}
+
+function formatDetailValue(v: unknown, field?: CategoryField): string {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   if (Array.isArray(v)) {
     if (v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
@@ -61,9 +86,10 @@ function formatDetailValue(v: unknown): string {
         'tefillah' in item ? formatMinyan(item) : JSON.stringify(item)
       ).join(' | ')
     }
-    return (v as unknown[]).map(String).join(', ')
+    return (v as unknown[]).map((item) => resolveOptionLabel(field, item)).join(', ')
   }
   if (v && typeof v === 'object') return formatHoursSummary(v)
+  if (field?.type === 'select') return resolveOptionLabel(field, v)
   return v != null ? String(v) : ''
 }
 
@@ -311,7 +337,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     const payload = submission.payload as CategorySubmissionPayload
     verb = 'New category'
     title = payload.label
-    subject = `New Category Suggestion — ${title}`
+    subject = `New Category Suggestion — ${title} [${submissionRef(submission.id)}]`
     const f = payload.firstListing
     proposedRows = `${row('Category name', payload.label)}
       ${payload.description ? row('Description', payload.description) : ''}
@@ -337,15 +363,24 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     // review email.
     const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
+    const ref = ` [${submissionRef(submission.id)}]`
     subject =
       submission.operation === 'create'
-        ? `New Listing Suggestion — ${title}${catSuffix}`
+        ? `New Listing Suggestion — ${title}${catSuffix}${ref}`
         : submission.operation === 'update'
-          ? `Edit Listing Suggestion — ${title}${catSuffix}`
-          : `Removal Listing Suggestion — ${title}${catSuffix}`
+          ? `Edit Listing Suggestion — ${title}${catSuffix}${ref}`
+          : `Removal Listing Suggestion — ${title}${catSuffix}${ref}`
     const detailRows = Object.entries(payload.details ?? {})
       .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
-      .map(([k, v]) => row(k, formatDetailValue(v)))
+      .map(([k, v]) => {
+        // Resolved through the category's own field config — SAME reasoning
+        // as SubmissionCard.tsx's flatListing: a raw JSON key/value is
+        // sometimes all there is (a renamed/removed field, or a category not
+        // yet loaded), but it's never preferred over the field's real,
+        // admin-configured label and option text.
+        const field = category?.detailFields.find((f) => f.key === k)
+        return row(field?.label ?? k, formatDetailValue(v, field))
+      })
       .join('')
     proposedRows =
       submission.operation === 'delete'
@@ -421,7 +456,7 @@ export async function sendReviewActionNotification(
 
   await sendEmail({
     to,
-    subject: `${actorEmail} ${verb} ${submissionDisplayName(submission)}`,
+    subject: `${actorEmail} ${verb} ${submissionDisplayName(submission)} [${submissionRef(submission.id)}]`,
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
       <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(actorEmail)} ${verb} a submission</h2>
       <p style="color:#334155;font-size:14px;">${title} was just ${verb}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
