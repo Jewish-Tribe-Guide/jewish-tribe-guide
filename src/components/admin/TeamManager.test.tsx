@@ -18,13 +18,13 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))
 
-function mockList(adminEmails: string[]) {
+function mockList(adminEmails: string[], myNotify = true) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true } as Response))
-  vi.mocked(parseOkJson).mockResolvedValue({ adminEmails })
+  vi.mocked(parseOkJson).mockResolvedValue({ adminEmails, myNotify })
 }
 
-async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com']) {
-  mockList(adminEmails)
+async function renderAndWaitForList(adminEmails: string[] = ['jane@example.com'], myNotify = true) {
+  mockList(adminEmails, myNotify)
   const view = renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
   await screen.findByText('Team')
   return view
@@ -104,5 +104,45 @@ describe('TeamManager', () => {
     renderWithProviders(<TeamManager token="tok" />, { community: { slug: 'ues' } })
 
     expect(await screen.findByText('Failed to load the team list.')).toBeInTheDocument()
+  })
+
+  describe('notification checkbox', () => {
+    it('reflects the signed-in admin\'s own myNotify value from the load', async () => {
+      await renderAndWaitForList(['jane@example.com'], true)
+      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
+
+      cleanup()
+      await renderAndWaitForList(['jane@example.com'], false)
+      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).not.toBeChecked()
+    })
+
+    it('unchecking it PATCHes { notify: false } scoped to the active community', async () => {
+      const user = userEvent.setup()
+      await renderAndWaitForList(['jane@example.com'], true)
+      vi.mocked(fetchJson).mockResolvedValueOnce({ myNotify: false })
+
+      await user.click(screen.getByRole('checkbox', { name: /email me about new submissions/i }))
+
+      await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
+      const call = vi.mocked(fetchJson).mock.calls[0]!
+      expect(call[0]).toBe('/api/admin/team?community=ues')
+      const init = call[1] as RequestInit
+      expect(init.method).toBe('PATCH')
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+      expect(JSON.parse(init.body as string)).toEqual({ notify: false })
+      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).not.toBeChecked()
+    })
+
+    it('reverts the checkbox and shows an error when the PATCH fails', async () => {
+      const user = userEvent.setup()
+      await renderAndWaitForList(['jane@example.com'], true)
+      vi.mocked(fetchJson).mockRejectedValueOnce(new Error('Could not update your notification preference.'))
+
+      await user.click(screen.getByRole('checkbox', { name: /email me about new submissions/i }))
+
+      expect(await screen.findByText('Could not update your notification preference.')).toBeInTheDocument()
+      // Reverted, not left on the optimistic (unchecked) value.
+      expect(screen.getByRole('checkbox', { name: /email me about new submissions/i })).toBeChecked()
+    })
   })
 })
