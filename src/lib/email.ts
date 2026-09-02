@@ -37,17 +37,18 @@ export function adminAppUrl(): string | undefined {
   return process.env.APP_URL?.replace(/\/$/, '')
 }
 
-// A short, stable reference an admin can eyeball across two DIFFERENT
-// emails about the same submission — the new-submission notification, and
-// later a review-action notification saying someone else approved/rejected
-// it. Without this, "X approved/rejected Y" reads as a fresh fact with
-// nothing tying it back to the original request the admin already saw,
-// which got confusing the moment more than one admin was acting on the
-// same queue. Same convention listingSlug.ts already uses for a listing's
-// own shareable URL (id.replace(/-/g,'').slice(0,6)) — short enough to read
-// in a subject line, still practically unique within one moderation queue.
-function submissionRef(id: string): string {
-  return `#${id.replace(/-/g, '').slice(0, 6)}`
+// A plain number an admin can eyeball across two DIFFERENT emails about the
+// same submission — the new-submission notification, and later a
+// review-action notification saying someone else approved/rejected it.
+// Without this, "X approved/rejected Y" reads as a fresh fact with nothing
+// tying it back to the original request the admin already saw, which got
+// confusing the moment more than one admin was acting on the same queue.
+// Both subjects lead with it (rather than tucking it in a bracket at the
+// end) since an inbox row usually truncates a long subject from the right,
+// not the left — leading with the number is what keeps it visible no
+// matter how the rest of the line gets cut off.
+function submissionRef(caseNumber: number): string {
+  return `#${caseNumber}`
 }
 
 function row(label: string, value: string): string {
@@ -337,7 +338,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     const payload = submission.payload as CategorySubmissionPayload
     verb = 'New category'
     title = payload.label
-    subject = `New Category Suggestion — ${title} [${submissionRef(submission.id)}]`
+    subject = `${submissionRef(submission.case_number)} New Category Suggestion — ${title}`
     const f = payload.firstListing
     proposedRows = `${row('Category name', payload.label)}
       ${payload.description ? row('Description', payload.description) : ''}
@@ -363,13 +364,13 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     // review email.
     const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
-    const ref = ` [${submissionRef(submission.id)}]`
+    const ref = submissionRef(submission.case_number)
     subject =
       submission.operation === 'create'
-        ? `New Listing Suggestion — ${title}${catSuffix}${ref}`
+        ? `${ref} New Listing Suggestion — ${title}${catSuffix}`
         : submission.operation === 'update'
-          ? `Edit Listing Suggestion — ${title}${catSuffix}${ref}`
-          : `Removal Listing Suggestion — ${title}${catSuffix}${ref}`
+          ? `${ref} Edit Listing Suggestion — ${title}${catSuffix}`
+          : `${ref} Removal Listing Suggestion — ${title}${catSuffix}`
     const detailRows = Object.entries(payload.details ?? {})
       .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
       .map(([k, v]) => {
@@ -449,17 +450,22 @@ export async function sendReviewActionNotification(
 
   const title = escapeHtml(submissionDisplayName(submission))
   const verb = decision === 'approved' ? 'approved' : 'rejected'
+  const Verb = decision === 'approved' ? 'Approved' : 'Rejected'
   const appUrl = adminAppUrl()
   const adminLink = appUrl
     ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(submission.community_id)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open the admin console →</a></p>`
     : ''
 
+  // Subject leads with the number, then the decision — that's the two
+  // things someone scanning an inbox actually needs ("is this an approval,
+  // and which request") — not who did it. WHO is in the body instead: it
+  // matters once you've opened the email, not before.
   await sendEmail({
     to,
-    subject: `${actorEmail} ${verb} ${submissionDisplayName(submission)} [${submissionRef(submission.id)}]`,
+    subject: `${submissionRef(submission.case_number)} ${Verb} — ${submissionDisplayName(submission)}`,
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
-      <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(actorEmail)} ${verb} a submission</h2>
-      <p style="color:#334155;font-size:14px;">${title} was just ${verb}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
+      <h2 style="color:#1d4ed8;margin-bottom:4px;">${Verb}</h2>
+      <p style="color:#334155;font-size:14px;">${title} was just ${verb} by ${escapeHtml(actorEmail)}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
       ${adminLink}
     </div>`,
   })

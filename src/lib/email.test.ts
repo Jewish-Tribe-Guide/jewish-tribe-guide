@@ -232,6 +232,7 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
@@ -240,8 +241,10 @@ describe('sendEmail', () => {
 
       // So a later "X approved/rejected this" email (sendReviewActionNotification)
       // can be recognized as the same submission — see submissionRef's own
-      // comment on why this exists.
-      it("sendSubmissionNotification's own subject carries the same short reference", async () => {
+      // comment on why this exists. Leads the subject, not tucked in a
+      // bracket at the end, since a long subject usually truncates from
+      // the right in an inbox row.
+      it("sendSubmissionNotification's own subject leads with the submission's plain case number", async () => {
         mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
         const submission: SubmissionRow = {
           id: 'abc123de-f000-0000-0000-000000000000',
@@ -256,9 +259,10 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 77,
         }
         await sendSubmissionNotification(submission)
-        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('[#abc123]') }))
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringMatching(/^#77 /) }))
       })
 
       // Real bug: the "Review in admin" button linked to the bare /admin
@@ -281,6 +285,7 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         const html = sendSpy.mock.calls[0]![0].html as string
@@ -330,6 +335,7 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         const html = sendSpy.mock.calls[0]![0].html as string
@@ -416,6 +422,7 @@ describe('sendEmail', () => {
         created_at: '2026-01-01T00:00:00Z',
         reviewed_at: '2026-01-01T00:05:00Z',
         reviewed_by: 'jane@example.com',
+        case_number: 42,
       }
 
       it('emails every opted-in admin except the acting one', async () => {
@@ -423,17 +430,25 @@ describe('sendEmail', () => {
         await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
         expect(mockGetReviewActionRecipients).toHaveBeenCalledWith('ues', 'jane@example.com')
         expect(sendSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ to: ['sam@example.com'], subject: 'jane@example.com approved A Shul [#s1]' }),
+          expect.objectContaining({ to: ['sam@example.com'], subject: '#42 Approved — A Shul' }),
         )
       })
 
-      // So an admin who already got the ORIGINAL new-submission email can
-      // tell this is about the same submission, not a fresh one — see
-      // submissionRef's own comment.
-      it('includes the same short submission reference a prior new-submission email would have used', async () => {
+      // Subject leads with the plain case number, then the decision — the
+      // two things someone scanning an inbox actually needs to know. WHO
+      // did it is in the body instead, not the subject.
+      it('leads the subject with the submission\'s own case number and the decision, capitalized', async () => {
         mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
-        await sendReviewActionNotification({ ...listingSubmission, id: 'abc123de-f000-0000-0000-000000000000' }, 'approved', 'jane@example.com')
-        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringContaining('[#abc123]') }))
+        await sendReviewActionNotification(listingSubmission, 'rejected', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: '#42 Rejected — A Shul' }))
+      })
+
+      it("puts who acted in the body, not the subject", async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
+        const call = sendSpy.mock.calls[0]![0]
+        expect(call.subject).not.toContain('jane@example.com')
+        expect(call.html).toContain('approved by jane@example.com')
       })
 
       it('sends nothing when nobody has opted in', async () => {
@@ -451,7 +466,7 @@ describe('sendEmail', () => {
         }
         await sendReviewActionNotification(categorySubmission, 'approved', 'jane@example.com')
         expect(sendSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ subject: 'jane@example.com approved Kosher Butchers [#s1]' }),
+          expect.objectContaining({ subject: '#42 Approved — Kosher Butchers' }),
         )
       })
     })

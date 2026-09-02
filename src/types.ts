@@ -238,6 +238,11 @@ export type SubmissionRow = {
    *  — null for anything reviewed before this existed, and for anything
    *  still pending. */
   reviewed_by: string | null
+  /** A plain, auto-incrementing number — what admin-facing emails lead
+   *  with (see email.ts's own doc) so two different emails about the same
+   *  submission are trivially recognizable as such. Not a business key:
+   *  never used to look a submission up, only to LABEL it for a human. */
+  case_number: number
 }
 
 /** A submission plus the current target row (for update/delete diffs in /admin)
