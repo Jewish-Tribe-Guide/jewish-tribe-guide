@@ -126,6 +126,7 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
         category: row.category,
         from: previous,
         to: sync.businessStatus,
+        communitySlug: row.community_id,
       }
     }
     details.businessStatus = sync.businessStatus

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -224,6 +224,7 @@ describe('sendEmail', () => {
           submitted_by: null,
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
+          reviewed_by: null,
         }
         await sendSubmissionNotification(submission)
         expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
@@ -249,11 +250,68 @@ describe('sendEmail', () => {
           submitted_by: null,
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
+          reviewed_by: null,
         }
         await sendSubmissionNotification(submission)
         const html = sendSpy.mock.calls[0]![0].html as string
         expect(html).toContain('href="https://example.org/ues/admin"')
         expect(html).not.toContain('href="https://example.org/admin"')
+      })
+    })
+
+    // Real bug: every community's Google status changes used to email one
+    // hardcoded address (NOTIFICATION_TO, or phillyjewishguide@gmail.com)
+    // regardless of which community the listing belonged to, or which
+    // admins had actually signed up for notifications — see
+    // sendStatusChangeDigest's own comment.
+    describe('sendStatusChangeDigest — per-community routing', () => {
+      afterEach(() => mockGetCommunityNotifyRecipients.mockReset())
+
+      it('routes each community\'s changes through its own configured notify list', async () => {
+        mockGetCommunityNotifyRecipients.mockImplementation((slug: string) =>
+          Promise.resolve(slug === 'philly' ? ['philly-admin@example.com'] : ['ues-admin@example.com']),
+        )
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+          { name: 'Bagel Shop', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'ues' },
+        ])
+
+        expect(sendSpy).toHaveBeenCalledTimes(2)
+        const calls = sendSpy.mock.calls.map((c) => c[0])
+        expect(calls).toContainEqual(
+          expect.objectContaining({ to: ['philly-admin@example.com'], subject: 'Kosher Bite is now temporarily closed' }),
+        )
+        expect(calls).toContainEqual(
+          expect.objectContaining({ to: ['ues-admin@example.com'], subject: 'Bagel Shop is now permanently closed' }),
+        )
+      })
+
+      it('never mixes one community\'s listings into another\'s digest email', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['philly-admin@example.com'])
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+          { name: 'Bagel Shop', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'ues' },
+        ])
+
+        const phillyCall = sendSpy.mock.calls.find((c) => (c[0].html as string).includes('Kosher Bite'))!
+        expect(phillyCall[0].html).not.toContain('Bagel Shop')
+      })
+
+      it('skips a community entirely when its notifications are off', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(null)
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+        ])
+        expect(sendSpy).not.toHaveBeenCalled()
+      })
+
+      it('falls back to NOTIFICATION_TO for a community with no notify list configured', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue([])
+        vi.stubEnv('NOTIFICATION_TO', 'fallback@example.com')
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+        ])
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['fallback@example.com'] }))
       })
     })
 

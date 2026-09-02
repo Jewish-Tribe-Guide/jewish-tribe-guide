@@ -386,6 +386,7 @@ export type StatusChange = {
   category: string
   from: string
   to: string
+  communitySlug: string
 }
 
 const STATUS_WORDS: Record<string, string> = {
@@ -411,10 +412,37 @@ function statusWord(v: string): string {
  * still files a `delete` submission for review, separately from this.
  *
  * Sent only when something actually changed, so a quiet week is silent.
+ *
+ * Grouped by community and routed through notificationRecipients() — the
+ * same per-community/per-admin lookup sendNotification uses — rather than
+ * one flat email to a single hardcoded address. A single nightly cron run
+ * covers every community at once, so a batch of changes can span several of
+ * them; each gets its own digest (only its own listings, only its own
+ * admins, respecting that community's notify_on_submission switch and each
+ * admin's own opt-out) instead of every community's admins seeing every
+ * other community's changes.
  */
 export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<void> {
   if (changes.length === 0) return
-  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+
+  const byCommunity = new Map<string, StatusChange[]>()
+  for (const change of changes) {
+    const existing = byCommunity.get(change.communitySlug)
+    if (existing) existing.push(change)
+    else byCommunity.set(change.communitySlug, [change])
+  }
+
+  await Promise.all(
+    Array.from(byCommunity.entries()).map(([communitySlug, communityChanges]) =>
+      sendCommunityStatusChangeDigest(communitySlug, communityChanges),
+    ),
+  )
+}
+
+async function sendCommunityStatusChangeDigest(communitySlug: string, changes: StatusChange[]): Promise<void> {
+  const to = await notificationRecipients(communitySlug)
+  if (!to) return // this community has submission notifications turned off
+
   const rows = changes
     .map(
       (c) => `<tr>
