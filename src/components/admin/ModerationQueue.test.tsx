@@ -43,6 +43,7 @@ function submission(overrides: Partial<EnrichedSubmission> = {}): EnrichedSubmis
     created_at: new Date().toISOString(),
     reviewed_at: null,
     reviewed_by: null,
+    case_number: 1,
     categoryLabel: 'Grocery Stores',
     ...overrides,
   }

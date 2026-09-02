@@ -44,6 +44,7 @@ function makeSubmission(overrides: Partial<SubmissionRow> = {}): SubmissionRow {
     created_at: '2026-01-01T00:00:00Z',
     reviewed_at: null,
     reviewed_by: null,
+    case_number: 1,
     ...overrides,
   }
 }

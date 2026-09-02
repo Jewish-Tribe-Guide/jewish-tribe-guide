@@ -93,6 +93,72 @@ describe('AdminAuthGate — hash-based sign-in errors', () => {
   })
 })
 
+describe('AdminAuthGate — tab-visibility token-refresh noise', () => {
+  // Real bug: Supabase's own client (GoTrueClient) registers a
+  // visibilitychange listener that re-checks the token every time the tab
+  // becomes visible again — even a routine "still valid, nothing to do"
+  // check calls onAuthStateChange with a freshly-constructed session object
+  // (same access_token, new object reference). Passing that straight to
+  // setSession looked like a full reload every time an admin tabbed away
+  // and back: a new session reference re-ran the authorization-check
+  // effect, which reset `authorized` to null and re-fetched
+  // /api/admin/whoami for no actual reason, flashing "Loading…" in place of
+  // the console the admin was just looking at.
+  const session = { access_token: 'tok-1', user: { email: 'admin@example.com' } }
+
+  function mockSignedIn() {
+    mockGetSession.mockResolvedValue({ data: { session } })
+    let capturedCallback: ((event: string, s: typeof session | null) => void) | undefined
+    mockOnAuthStateChange.mockImplementation((cb: typeof capturedCallback) => {
+      capturedCallback = cb
+      return { data: { subscription: { unsubscribe: vi.fn() } } }
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ json: () => Promise.resolve({ ok: true, isSuperAdmin: false }) }),
+    )
+    return {
+      fireAuthStateChange: (event: string, s: typeof session | null) => capturedCallback?.(event, s),
+    }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('does not re-check authorization when onAuthStateChange fires with an UNCHANGED access_token', async () => {
+    const { fireAuthStateChange } = mockSignedIn()
+    render(
+      <AdminAuthGate community="philly">
+        <div>children</div>
+      </AdminAuthGate>,
+    )
+    await screen.findByText('children')
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1) // the initial whoami check
+
+    // The visibility-triggered "still valid" notification: same token, new
+    // object reference — exactly what a real tab-focus re-check sends.
+    fireAuthStateChange('TOKEN_REFRESHED', { ...session })
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(await screen.findByText('children')).toBeInTheDocument()
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1) // NOT called again
+  })
+
+  it('still re-checks authorization when the access_token actually changes', async () => {
+    const { fireAuthStateChange } = mockSignedIn()
+    render(
+      <AdminAuthGate community="philly">
+        <div>children</div>
+      </AdminAuthGate>,
+    )
+    await screen.findByText('children')
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+
+    fireAuthStateChange('TOKEN_REFRESHED', { ...session, access_token: 'tok-2' })
+
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2))
+  })
+})
+
 describe('AdminAuthGate — stray trailing "#" cleanup', () => {
   it('strips a leftover bare "#" once the initial session check settles, even with no error in it', async () => {
     mockNoSession()

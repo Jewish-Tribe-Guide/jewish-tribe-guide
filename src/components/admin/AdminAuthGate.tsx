@@ -94,7 +94,25 @@ export default function AdminAuthGate({
       setSession(data.session)
       setReady(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    // Supabase's own client registers a `visibilitychange` listener
+    // (GoTrueClient) that re-checks the token every time the tab becomes
+    // visible again — including a routine "still valid, nothing to do"
+    // check, which STILL fires this callback with a freshly-constructed
+    // session object (same access_token, new reference). Passing that
+    // straight to setSession looked like a full reload every time an admin
+    // tabbed away and back: a new session reference re-runs the
+    // authorization-check effect below (its own deps include `session`),
+    // which resets `authorized` to null and renders the "Loading…" shell
+    // while it re-fetches /api/admin/whoami for no actual reason.
+    //
+    // Comparing access_token and keeping the OLD reference when it's
+    // unchanged lets React's setState bail-out (same reference in, same
+    // reference out) skip the re-render entirely for that case — a real
+    // sign-in/out or an actual token rotation still flows through normally,
+    // since the token itself differs then.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession((prev) => (prev?.access_token === s?.access_token ? prev : s))
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 

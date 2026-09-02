@@ -19,6 +19,9 @@ vi.mock('./communityStore', () => ({
   getReviewActionRecipients: mockGetReviewActionRecipients,
 }))
 
+const mockGetCategoryById = vi.hoisted(() => vi.fn())
+vi.mock('./categoryStore', () => ({ getCategoryById: mockGetCategoryById }))
+
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
 
@@ -229,10 +232,37 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
+      })
+
+      // So a later "X approved/rejected this" email (sendReviewActionNotification)
+      // can be recognized as the same submission — see submissionRef's own
+      // comment on why this exists. Leads the subject, not tucked in a
+      // bracket at the end, since a long subject usually truncates from
+      // the right in an inbox row.
+      it("sendSubmissionNotification's own subject leads with the submission's plain case number", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        const submission: SubmissionRow = {
+          id: 'abc123de-f000-0000-0000-000000000000',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 77,
+        }
+        await sendSubmissionNotification(submission)
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringMatching(/^#77 /) }))
       })
 
       // Real bug: the "Review in admin" button linked to the bare /admin
@@ -255,11 +285,65 @@ describe('sendEmail', () => {
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
           reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         const html = sendSpy.mock.calls[0]![0].html as string
         expect(html).toContain('href="https://example.org/ues/admin"')
         expect(html).not.toContain('href="https://example.org/admin"')
+      })
+
+      // Real bug: a listing's detail rows were built straight from
+      // Object.entries(payload.details) — always the raw JSON key as the
+      // label ("type" instead of "Type", or "t" for a field whose key got
+      // mangled — see CategoryFieldEditor's own fix) and the raw stored
+      // *value* for a select/tags field, never the admin-configured option
+      // label. SubmissionCard.tsx's moderation-queue card already resolved
+      // both through the category's own field config; this notification
+      // now does too.
+      afterEach(() => mockGetCategoryById.mockReset())
+
+      it("resolves a listing's detail rows through the category's own field labels and option text, not the raw JSON", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        mockGetCategoryById.mockResolvedValue({
+          id: 'cemetery',
+          label: 'Cemetery',
+          pluralLabel: 'Cemeteries',
+          icon: 'cemetery',
+          description: '',
+          kind: 'listing',
+          detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'jewish', label: 'Jewish Cemetery' }] }],
+        })
+        const submission: SubmissionRow = {
+          id: 's1',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'listing',
+          target_id: null,
+          payload: {
+            category: 'cemetery',
+            name: 'A Cemetery',
+            anchorId: '',
+            distance: null,
+            address: '',
+            phone: '',
+            details: { type: 'jewish' },
+          },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 1,
+        }
+        await sendSubmissionNotification(submission)
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('Type')
+        expect(html).toContain('Jewish Cemetery')
+        // Neither the raw key nor the raw stored value on their own.
+        expect(html).not.toMatch(/>type</)
+        expect(html).not.toMatch(/>jewish</)
       })
     })
 
@@ -338,6 +422,7 @@ describe('sendEmail', () => {
         created_at: '2026-01-01T00:00:00Z',
         reviewed_at: '2026-01-01T00:05:00Z',
         reviewed_by: 'jane@example.com',
+        case_number: 42,
       }
 
       it('emails every opted-in admin except the acting one', async () => {
@@ -345,8 +430,25 @@ describe('sendEmail', () => {
         await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
         expect(mockGetReviewActionRecipients).toHaveBeenCalledWith('ues', 'jane@example.com')
         expect(sendSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ to: ['sam@example.com'], subject: 'jane@example.com approved A Shul' }),
+          expect.objectContaining({ to: ['sam@example.com'], subject: '#42 Approved — A Shul' }),
         )
+      })
+
+      // Subject leads with the plain case number, then the decision — the
+      // two things someone scanning an inbox actually needs to know. WHO
+      // did it is in the body instead, not the subject.
+      it('leads the subject with the submission\'s own case number and the decision, capitalized', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'rejected', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: '#42 Rejected — A Shul' }))
+      })
+
+      it("puts who acted in the body, not the subject", async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
+        const call = sendSpy.mock.calls[0]![0]
+        expect(call.subject).not.toContain('jane@example.com')
+        expect(call.html).toContain('approved by jane@example.com')
       })
 
       it('sends nothing when nobody has opted in', async () => {
@@ -363,7 +465,9 @@ describe('sendEmail', () => {
           payload: { label: 'Kosher Butchers' },
         }
         await sendReviewActionNotification(categorySubmission, 'approved', 'jane@example.com')
-        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: 'jane@example.com approved Kosher Butchers' }))
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ subject: '#42 Approved — Kosher Butchers' }),
+        )
       })
     })
 

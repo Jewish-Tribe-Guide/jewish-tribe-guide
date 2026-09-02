@@ -63,7 +63,25 @@ const CATEGORY_ICON_MARKUP: Record<string, string> = {
     '<path d="M21 11.5A8.5 8.5 0 0 1 9.4 19.4L3 21l1.7-6.2A8.5 8.5 0 1 1 21 11.5Z"/>',
   'young-professional':
     '<circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M2.5 20c0-3.1 2.5-5.5 5.5-5.5s5.5 2.4 5.5 5.5"/><path d="M14.5 20c0-2.4 1.9-4.3 4.3-4.3S21.5 17.6 21.5 20"/>',
-  cemetery: '<path d="M7 21V11a5 5 0 0 1 10 0v10"/><path d="M7 21h10"/><path d="M12 9.5v4M10 11.5h4"/>',
+  // Headstone outline — bigger than the first pass, to match how much of
+  // the 24x24 canvas every other icon here actually uses. restaurant/
+  // grocery above span roughly 16-18 units each way; the original
+  // headstone (x:7-17, y:6-21) only spanned 10x15, which read visibly
+  // smaller AND made its stroke look thicker (a fixed stroke-width reads
+  // heavier the smaller its shape is drawn). Now x:5-19, y:7-22 — close to
+  // that same scale.
+  //
+  // The carving on its face used to be a plain plus/cross
+  // (M12 9.5v4M10 11.5h4) — read as a Christian cross, wrong for a Jewish
+  // cemetery. Replaced with a Star of David: the same two-overlapping-
+  // triangles technique the synagogue icon above already uses, sized up
+  // along with the bigger headstone. Its own two paths still carry an
+  // explicit, thinner stroke-width (overriding CategoryGlyph's shared 1.8
+  // default, which SVG lets a child element do) — even at the larger size,
+  // six crossing line segments at the outline's own weight read as a bold,
+  // blobby mark rather than a crisp, wiry star like the rest of this set.
+  cemetery:
+    '<path d="M5 22V14a7 7 0 0 1 14 0v8"/><path d="M5 22h14"/><path d="M12 11.5 L15.5 17.5 L8.5 17.5 Z" stroke-width="1.1"/><path d="M12 19.5 L8.5 13.5 L15.5 13.5 Z" stroke-width="1.1"/>',
   zmanim: '<path d="M12 2.5c1.6 2 2.2 3.6 2.2 5a2.2 2.2 0 1 1-4.4 0c0-1.4.6-3 2.2-5Z"/><path d="M9 21.5h6M12 9v12.5"/>',
 }
 

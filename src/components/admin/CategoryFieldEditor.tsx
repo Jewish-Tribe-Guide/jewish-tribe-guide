@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   FIELD_TYPES,
   FIELD_TYPE_SHAPE,
@@ -58,10 +58,34 @@ export function FieldEditor({
   hasCaveat: boolean
   onToggleCaveat: (on: boolean) => void
 }) {
-  // "Name" auto-fills the internal key only while it's still blank, then freezes,
-  // so renaming a detail later never orphans its stored data.
+  // "Name" auto-fills the internal key from the label while the admin is
+  // still typing a BRAND NEW field's name, then freezes on blur — so
+  // renaming a detail later never orphans its stored data.
+  //
+  // Used to freeze on `!f.key` instead — checked fresh every keystroke, so
+  // it froze after the very FIRST character typed (that one character's own
+  // slugified key is already non-empty). Typing "Type" into a new field
+  // saved key: 't' with label: 'Type', a real bug this fixed: the field's
+  // value ended up stored under details.t, invisible everywhere that
+  // resolves a value by the field's real key (the moderation queue's diff,
+  // the notification email) and only recoverable through the raw-leftover-
+  // key fallback those views also have, which shows "t" as if it were the
+  // field's whole label.
+  //
+  // keyFrozenRef starts frozen (true) for a field that already had a real
+  // key when this editor row first mounted — i.e. an existing, previously-
+  // saved field — so renaming one still never touches its key, matching the
+  // original behavior exactly. A brand-new field (key: '' at mount) starts
+  // unfrozen and stays that way for the whole time its Name input has
+  // focus, so the key keeps tracking the FULL current label through every
+  // keystroke; it only freezes once the admin blurs the field, at the
+  // natural "done naming this" moment.
+  const keyFrozenRef = useRef(!!f.key)
   function onNameChange(name: string) {
-    onChange(!f.key ? { label: name, key: slugifyFieldKey(name) } : { label: name })
+    onChange(keyFrozenRef.current ? { label: name } : { label: name, key: slugifyFieldKey(name) })
+  }
+  function onNameBlur() {
+    keyFrozenRef.current = true
   }
 
   // Choices textarea: kept as its own local, uncontrolled-feeling string
@@ -114,7 +138,13 @@ export function FieldEditor({
     <div className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-2">
       <label className="block">
         <span className={fieldLabel}>Name</span>
-        <input value={f.label} onChange={(e) => onNameChange(e.target.value)} className={inputClass} placeholder="e.g. Grades served" />
+        <input
+          value={f.label}
+          onChange={(e) => onNameChange(e.target.value)}
+          onBlur={onNameBlur}
+          className={inputClass}
+          placeholder="e.g. Grades served"
+        />
       </label>
 
       <label className="block sm:w-1/2">
