@@ -1,0 +1,22 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Per-admin notification opt-out, layered on top of the existing all-or-
+-- nothing notify_on_submission switch (20240101000040).
+--
+-- notify_on_submission stays the community-wide master switch (superadmin
+-- console, "Email admins on new submissions: Yes/No") — this is a second,
+-- narrower control: any individual admin can mute just their own inbox
+-- without touching that switch or anyone else's preference. Deliberately a
+-- separate opt-OUT list rather than reshaping admin_emails itself (e.g. into
+-- an array of {email, notify} objects) — admin_emails is the identity/auth
+-- allowlist read by isAllowedForCommunity on every sign-in check, and
+-- changing its shape would mean touching every reader of it (adminAuth.ts,
+-- the whoami route, the Team/Communities admin UIs) for a feature that only
+-- ever needs to answer "is this one address currently muted". An opt-out
+-- list also means the empty '{}' default is exactly today's behavior
+-- (nobody muted) with no backfill required.
+--
+-- getCommunityNotifyRecipients (communityStore.ts) filters admin_emails
+-- against this list before returning who to email.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table community add column if not exists notify_muted_emails text[] not null default '{}';

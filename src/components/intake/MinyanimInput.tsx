@@ -19,9 +19,11 @@ import {
 const ZMAN_ANCHOR_ORDER: ZmanAnchor[] = ['sunset', 'candle_lighting', 'havdalah']
 
 // The relative (sunset/candle-lighting/havdalah) mode only makes sense for
-// tefillos whose time actually moves with the zman day to day — Shacharis,
-// Kabbalas Shabbos, etc. are always clock times in practice.
-const RELATIVE_ELIGIBLE: Tefillah[] = ['mincha', 'maariv', 'mincha_maariv']
+// tefillos whose time actually moves with the zman day to day — Shacharis
+// etc. are always clock times in practice. Kabbalas Shabbos is the one
+// Friday-only exception: shuls commonly set it relative to candle-lighting
+// or sunset rather than a fixed clock time, same as Mincha/Maariv.
+const RELATIVE_ELIGIBLE: Tefillah[] = ['kabbalas_shabbos', 'mincha', 'maariv', 'mincha_maariv']
 
 type Direction = 'before' | 'after'
 

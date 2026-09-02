@@ -76,7 +76,7 @@ export default function AdminAuthGate({
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
   const [devLoginError, setDevLoginError] = useState<string | null>(null)
-  const [oauthError, setOauthError] = useState<string | null>(null)
+  const [signInError, setSignInError] = useState<string | null>(null)
   // Whether the signed-in session's email is actually allowed in here —
   // checked server-side via /api/admin/whoami (not just "is there a
   // session"). A valid Supabase session proves identity, not access: without
@@ -139,11 +139,11 @@ export default function AdminAuthGate({
   }, [session, community])
 
   // Supabase redirects back from a failed/declined Google sign-in with
-  // ?error=...&error_description=... on the query string (not the hash the
-  // way a successful session is), rather than rejecting a promise anywhere
-  // in this component — GoogleSignInButton's own error state only ever
-  // covers a failure to even start the redirect. Stripped from the URL bar
-  // the same way the devToken effect below strips its own param.
+  // ?error=...&error_description=... on the query string, rather than
+  // rejecting a promise anywhere in this component — GoogleSignInButton's
+  // own error state only ever covers a failure to even start the redirect.
+  // Stripped from the URL bar the same way the devToken effect below strips
+  // its own param.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const description = params.get('error_description')
@@ -152,8 +152,55 @@ export default function AdminAuthGate({
     // Reading state Supabase's redirect set on the URL (external to React),
     // once on mount — the exact case the lint rule's own guidance carves out.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOauthError(description.replace(/\+/g, ' '))
+    setSignInError(description.replace(/\+/g, ' '))
   }, [])
+
+  // A DIFFERENT failure shape from the one above: an expired or already-used
+  // magic link (or any other /verify failure) comes back with
+  // #error=...&error_description=... on the HASH instead of the query
+  // string — the same place a successful sign-in's #access_token=... lands.
+  // Confirmed directly against a real generateLink()'d expired link:
+  // Supabase's own /verify redirect is
+  // "<redirectTo>#error=access_denied&error_code=otp_expired&error_description=...".
+  // Left unhandled, this used to just sit there — no message shown, login
+  // form rendered with no explanation — and it went on to break the NEXT
+  // sign-in attempt too: GoogleSignInButton's redirectTo is
+  // window.location.href, so a leftover #error=... hash got carried into
+  // the next OAuth round trip, and Supabase's own redirect construction
+  // appends its new #access_token=... directly onto whatever redirect_to
+  // it's given — producing a literal "...##access_token=..." and silently
+  // failing the retry too.
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const description = hash.get('error_description')
+    if (!description) return
+    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSignInError(description.replace(/\+/g, ' '))
+  }, [])
+
+  // Even a SUCCESSFUL hash gets left half-cleaned: Supabase's client clears
+  // #access_token=...'s CONTENTS once it's read the session out of them, but
+  // leaves a bare trailing "#" in the address bar rather than removing it
+  // outright (confirmed directly — the URL sat at ".../admin#" right after a
+  // real, successful sign-in). That stray "#" alone is enough to corrupt a
+  // LATER sign-in attempt the exact same way an unhandled #error=... does
+  // (see the effect above) — so once Supabase has had its turn (`ready`,
+  // set inside the getSession() effect below, only ever becomes true AFTER
+  // that), strip whatever's left in the hash unconditionally, whether or
+  // not there was ever anything meaningful in it.
+  //
+  // window.location.hash, NOT .href.includes('#') — a bare trailing "#"
+  // with nothing after it normalizes to an EMPTY .hash (per the URL spec),
+  // even though it's still literally sitting in .href/the address bar. That
+  // cost a whole extra round of manual reproduction to notice: this exact
+  // effect, checking `.hash`, silently never fired against the exact bug
+  // it exists to fix.
+  useEffect(() => {
+    if (!ready) return
+    if (!window.location.href.includes('#')) return
+    history.replaceState(history.state, '', window.location.pathname + window.location.search)
+  }, [ready])
 
   // Local-dev-only shortcut: /admin?devToken=<DEV_ADMIN_BYPASS_SECRET> signs in
   // instantly via /api/admin/dev-login instead of the magic-link email — see
@@ -215,9 +262,9 @@ export default function AdminAuthGate({
             Dev login failed: {devLoginError}
           </p>
         )}
-        {oauthError && (
+        {signInError && (
           <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
-            Google sign-in failed: {oauthError}
+            Sign-in failed: {signInError}
           </p>
         )}
         {authorized === false && (

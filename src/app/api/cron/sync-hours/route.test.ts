@@ -182,7 +182,7 @@ describe('GET /api/cron/sync-hours', () => {
       }),
     )
     expect(mockDigest).toHaveBeenCalledWith([
-      { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY' },
+      { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
     ])
   })
 

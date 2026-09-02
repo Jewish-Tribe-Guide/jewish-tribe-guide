@@ -181,16 +181,119 @@ export async function getCommunityAdminEmails(slug: string): Promise<string[]> {
  *  null then — see sendSubmissionNotification/sendNotification in
  *  email.ts, which skip sending entirely rather than falling back to
  *  anything). An empty admin_emails with notifications still on returns
- *  `[]`, which those callers read as "fall back to NOTIFICATION_TO". */
+ *  `[]`, which those callers read as "fall back to NOTIFICATION_TO".
+ *
+ *  Filtered against notify_muted_emails — any individual admin can mute
+ *  just their own inbox (see setAdminNotifyPreference) without touching the
+ *  community-wide switch or anyone else's address. Every admin muted still
+ *  counts as "notifications on" for the `[]`-means-fall-back-to-
+ *  NOTIFICATION_TO distinction above — this only ever narrows an already-on
+ *  list, same as an empty admin_emails always has. */
 export async function getCommunityNotifyRecipients(slug: string): Promise<string[] | null> {
   const { data } = await getAdminClient()
     .from('community')
-    .select('admin_emails, notify_on_submission')
+    .select('admin_emails, notify_on_submission, notify_muted_emails')
     .eq('slug', slug)
     .maybeSingle()
-  const row = data as { admin_emails: string[] | null; notify_on_submission: boolean | null } | null
+  const row = data as {
+    admin_emails: string[] | null
+    notify_on_submission: boolean | null
+    notify_muted_emails: string[] | null
+  } | null
   if (row?.notify_on_submission === false) return null
-  return row?.admin_emails ?? []
+  const muted = new Set((row?.notify_muted_emails ?? []).map((e) => e.trim().toLowerCase()))
+  return (row?.admin_emails ?? []).filter((e) => !muted.has(e.trim().toLowerCase()))
+}
+
+/** Whether ONE admin currently wants submission-notification emails for
+ *  this community — the Team tab's own "Email me about new submissions"
+ *  checkbox reads this, scoped to the signed-in admin's own verified email
+ *  (never another admin's — see setAdminNotifyPreference). True unless
+ *  that address is on notify_muted_emails; not affected by the
+ *  community-wide notify_on_submission switch, which is a separate,
+ *  coarser control (see getCommunityNotifyRecipients). */
+export async function getAdminNotifyPreference(slug: string, email: string): Promise<boolean> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_muted_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const muted = (data as { notify_muted_emails: string[] | null } | null)?.notify_muted_emails ?? []
+  const target = email.trim().toLowerCase()
+  return !muted.some((e) => e.trim().toLowerCase() === target)
+}
+
+/** Sets ONE admin's own submission-notification preference — the write
+ *  behind PATCH /api/admin/team, which always passes the CALLER's own
+ *  verified email (never a client-supplied one), so this can only ever mute
+ *  or unmute the signed-in admin's own address, never anyone else's.
+ *  Case-insensitively deduped against notify_muted_emails the same way
+ *  addCommunityAdminEmail dedupes admin_emails. */
+export async function setAdminNotifyPreference(slug: string, email: string, notify: boolean): Promise<void> {
+  const target = email.trim().toLowerCase()
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_muted_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const current = (data as { notify_muted_emails: string[] | null } | null)?.notify_muted_emails ?? []
+  const withoutTarget = current.filter((e) => e.trim().toLowerCase() !== target)
+  const next = notify ? withoutTarget : [...withoutTarget, email.trim()]
+
+  const { error } = await getAdminClient().from('community').update({ notify_muted_emails: next }).eq('slug', slug)
+  if (error) throw new Error(`Failed to update notification preference: ${error.message}`)
+}
+
+/** Who to email when ONE admin approves or rejects a submission — every
+ *  address on notify_review_emails EXCEPT the acting admin's own (nobody
+ *  needs to be told about their own decision). Opt-IN, unlike
+ *  notify_muted_emails' opt-out shape — see the notify_review_emails
+ *  migration's own comment on why the two defaults differ. */
+export async function getReviewActionRecipients(slug: string, actorEmail: string): Promise<string[]> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const list = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const actor = actorEmail.trim().toLowerCase()
+  return list.filter((e) => e.trim().toLowerCase() !== actor)
+}
+
+/** Whether ONE admin currently wants to be emailed about other admins'
+ *  approve/reject decisions — the Team tab's own second checkbox reads
+ *  this, scoped to the signed-in admin's own verified email (never
+ *  another admin's — see setAdminReviewNotifyPreference). True only when
+ *  that address is on notify_review_emails; opt-in, so false for anyone
+ *  who has never turned it on. */
+export async function getAdminReviewNotifyPreference(slug: string, email: string): Promise<boolean> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const list = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const target = email.trim().toLowerCase()
+  return list.some((e) => e.trim().toLowerCase() === target)
+}
+
+/** Sets ONE admin's own review-action-notification preference — same
+ *  self-only shape as setAdminNotifyPreference: the write behind PATCH
+ *  /api/admin/team always passes the CALLER's own verified email, never a
+ *  client-supplied one. */
+export async function setAdminReviewNotifyPreference(slug: string, email: string, notify: boolean): Promise<void> {
+  const target = email.trim().toLowerCase()
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const current = (data as { notify_review_emails: string[] | null } | null)?.notify_review_emails ?? []
+  const withoutTarget = current.filter((e) => e.trim().toLowerCase() !== target)
+  const next = notify ? [...withoutTarget, email.trim()] : withoutTarget
+
+  const { error } = await getAdminClient().from('community').update({ notify_review_emails: next }).eq('slug', slug)
+  if (error) throw new Error(`Failed to update notification preference: ${error.message}`)
 }
 
 /** Every community's configured admin_emails, keyed by slug — same

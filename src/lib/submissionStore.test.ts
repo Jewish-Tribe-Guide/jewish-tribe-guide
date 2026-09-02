@@ -81,6 +81,7 @@ function baseSubmission(overrides: Partial<SubmissionRow>): SubmissionRow {
     submitted_by: null,
     created_at: '2026-01-01T00:00:00.000Z',
     reviewed_at: null,
+    reviewed_by: null,
     ...overrides,
   }
 }
@@ -320,6 +321,51 @@ describe('approveSubmission', () => {
       expect.objectContaining({ status: 'approved' }),
     )
     expect(result.status).toBe('approved')
+  })
+
+  it('records the acting admin as reviewed_by when given', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const resourceInsertBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let submissionSelectCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionSelectCalls += 1
+        return submissionSelectCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      if (table === 'resource') return resourceInsertBuilder
+      throw new Error(`unexpected table ${table}`)
+    })
+    mockGetCategoryById.mockResolvedValue(null)
+
+    await approveSubmission('sub-1', undefined, 'jane@example.com')
+
+    expect(approveBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewed_by: 'jane@example.com' }),
+    )
+  })
+
+  it('omits reviewed_by entirely rather than writing it null when no admin is given', async () => {
+    const sub = baseSubmission({ operation: 'create', payload: listingPayload() as unknown as Record<string, unknown> })
+    const submissionBuilder = chainable({ data: sub, error: null })
+    const resourceInsertBuilder = chainable({ error: null })
+    const approveBuilder = chainable({ data: { ...sub, status: 'approved' }, error: null })
+    let submissionSelectCalls = 0
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'submission') {
+        submissionSelectCalls += 1
+        return submissionSelectCalls === 1 ? submissionBuilder : approveBuilder
+      }
+      if (table === 'resource') return resourceInsertBuilder
+      throw new Error(`unexpected table ${table}`)
+    })
+    mockGetCategoryById.mockResolvedValue(null)
+
+    await approveSubmission('sub-1')
+
+    const call = (approveBuilder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>
+    expect('reviewed_by' in call).toBe(false)
   })
 
   it('applies an update listing submission by updating the existing row, keyed by target_id', async () => {
@@ -1083,6 +1129,29 @@ describe('rejectSubmission', () => {
   it('surfaces the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
     await expect(rejectSubmission('sub-1')).rejects.toThrow('Failed to reject submission: boom')
+  })
+
+  it('records the acting admin as reviewed_by when given', async () => {
+    const sub = baseSubmission({ status: 'rejected' })
+    const builder = chainable({ data: sub, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await rejectSubmission('sub-1', undefined, 'jane@example.com')
+
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'rejected', reviewed_by: 'jane@example.com' }),
+    )
+  })
+
+  it('omits reviewed_by entirely rather than writing it null when no admin is given', async () => {
+    const sub = baseSubmission({ status: 'rejected' })
+    const builder = chainable({ data: sub, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await rejectSubmission('sub-1')
+
+    const call = (builder.update as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>
+    expect('reviewed_by' in call).toBe(false)
   })
 })
 

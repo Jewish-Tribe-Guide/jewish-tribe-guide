@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
-import { getCommunityNotifyRecipients } from './communityStore'
+import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
@@ -380,12 +380,63 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   await sendEmail({ to, subject, html })
 }
 
+/** "New category — Kosher Butchers" / "New listing — Goldi's" — the same
+ *  title text sendSubmissionNotification's own subject already derives, in
+ *  one place so the review-action notification below doesn't have to
+ *  re-derive it differently and drift. */
+function submissionDisplayName(submission: SubmissionRow): string {
+  if (submission.target_type === 'category') {
+    return (submission.payload as CategorySubmissionPayload).label
+  }
+  return (submission.payload as Partial<ResourceSubmission>).name ?? 'a listing'
+}
+
+// Tells every OTHER opted-in admin of this community that ONE admin just
+// approved or rejected a submission — not the submitter (see
+// confirmationEmail.ts's sendDecisionEmail for that), and never the acting
+// admin themselves (getReviewActionRecipients excludes them). Best-effort:
+// callers catch and log without failing the moderation action, same
+// convention as every other notification here.
+//
+// Opt-in (empty by default — see the notify_review_emails migration's own
+// comment), unlike new-submission notifications: nobody asked to be
+// told about other admins' decisions until this existed, so nothing turns
+// itself on for anyone. `actorEmail` is the acting admin's own verified
+// token email from the call site (getAdminUserForCommunity) — never
+// client-supplied — the same way reviewed_by itself is recorded.
+export async function sendReviewActionNotification(
+  submission: SubmissionRow,
+  decision: 'approved' | 'rejected',
+  actorEmail: string,
+): Promise<void> {
+  const to = await getReviewActionRecipients(submission.community_id, actorEmail)
+  if (to.length === 0) return
+
+  const title = escapeHtml(submissionDisplayName(submission))
+  const verb = decision === 'approved' ? 'approved' : 'rejected'
+  const appUrl = adminAppUrl()
+  const adminLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(submission.community_id)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open the admin console →</a></p>`
+    : ''
+
+  await sendEmail({
+    to,
+    subject: `${actorEmail} ${verb} ${submissionDisplayName(submission)}`,
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;margin-bottom:4px;">${escapeHtml(actorEmail)} ${verb} a submission</h2>
+      <p style="color:#334155;font-size:14px;">${title} was just ${verb}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
+      ${adminLink}
+    </div>`,
+  })
+}
+
 /** One row of the business-status digest below. */
 export type StatusChange = {
   name: string
   category: string
   from: string
   to: string
+  communitySlug: string
 }
 
 const STATUS_WORDS: Record<string, string> = {
@@ -411,10 +462,37 @@ function statusWord(v: string): string {
  * still files a `delete` submission for review, separately from this.
  *
  * Sent only when something actually changed, so a quiet week is silent.
+ *
+ * Grouped by community and routed through notificationRecipients() — the
+ * same per-community/per-admin lookup sendNotification uses — rather than
+ * one flat email to a single hardcoded address. A single nightly cron run
+ * covers every community at once, so a batch of changes can span several of
+ * them; each gets its own digest (only its own listings, only its own
+ * admins, respecting that community's notify_on_submission switch and each
+ * admin's own opt-out) instead of every community's admins seeing every
+ * other community's changes.
  */
 export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<void> {
   if (changes.length === 0) return
-  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+
+  const byCommunity = new Map<string, StatusChange[]>()
+  for (const change of changes) {
+    const existing = byCommunity.get(change.communitySlug)
+    if (existing) existing.push(change)
+    else byCommunity.set(change.communitySlug, [change])
+  }
+
+  await Promise.all(
+    Array.from(byCommunity.entries()).map(([communitySlug, communityChanges]) =>
+      sendCommunityStatusChangeDigest(communitySlug, communityChanges),
+    ),
+  )
+}
+
+async function sendCommunityStatusChangeDigest(communitySlug: string, changes: StatusChange[]): Promise<void> {
+  const to = await notificationRecipients(communitySlug)
+  if (!to) return // this community has submission notifications turned off
+
   const rows = changes
     .map(
       (c) => `<tr>

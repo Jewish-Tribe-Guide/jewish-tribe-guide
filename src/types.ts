@@ -234,6 +234,10 @@ export type SubmissionRow = {
   submitted_by: { name?: string; email?: string } | null
   created_at: string
   reviewed_at: string | null
+  /** The acting admin's own email, set by approveSubmission/rejectSubmission
+   *  — null for anything reviewed before this existed, and for anything
+   *  still pending. */
+  reviewed_by: string | null
 }
 
 /** A submission plus the current target row (for update/delete diffs in /admin)

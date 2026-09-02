@@ -93,12 +93,19 @@ describe('MinyanimInput', () => {
     expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ notes: undefined })])
   })
 
-  it('shows the Clock/Relative toggle only for a relative-eligible tefillah (mincha/maariv/mincha_maariv)', () => {
+  it('shows the Clock/Relative toggle only for a relative-eligible tefillah (kabbalas_shabbos/mincha/maariv/mincha_maariv)', () => {
     render(<MinyanimInput value={[row({ tefillah: 'shacharis' })]} onChange={vi.fn()} />)
     expect(screen.queryByText('Sunset/Havdalah…')).not.toBeInTheDocument()
 
     cleanup()
     render(<MinyanimInput value={[row({ tefillah: 'mincha' })]} onChange={vi.fn()} />)
+    expect(screen.getByText('Sunset/Havdalah…')).toBeInTheDocument()
+
+    // Kabbalas Shabbos is commonly set relative to candle-lighting/sunset,
+    // same as Mincha/Maariv — unlike Shacharis, which is always a clock
+    // time in practice.
+    cleanup()
+    render(<MinyanimInput value={[row({ tefillah: 'kabbalas_shabbos' })]} onChange={vi.fn()} />)
     expect(screen.getByText('Sunset/Havdalah…')).toBeInTheDocument()
   })
 

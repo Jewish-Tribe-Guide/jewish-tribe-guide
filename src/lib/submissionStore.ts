@@ -286,7 +286,12 @@ export async function submitGoogleClosure(community: string, targetId: string): 
 // so without this an admin authorized for one community could approve/
 // reject a DIFFERENT community's queue entry by id alone, e.g. via a direct
 // API call rather than through that community's own moderation queue UI.
-export async function approveSubmission(id: string, community?: string): Promise<SubmissionRow> {
+//
+// `reviewedBy`: the acting admin's own verified email (from
+// getAdminUserForCommunity at the call site), recorded alongside
+// reviewed_at so the moderation history can answer "who approved this" —
+// see the reviewed_by migration's own comment.
+export async function approveSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -316,6 +321,7 @@ export async function approveSubmission(id: string, community?: string): Promise
     .update({
       status: 'approved',
       reviewed_at: new Date().toISOString(),
+      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
       // A `create` arrives with no target_id — there was nothing to point at
       // yet. Recording it now makes the submission point at the listing it
       // produced, which is what lets the caller sync that listing against
@@ -333,11 +339,15 @@ export async function approveSubmission(id: string, community?: string): Promise
 
 // `community`, when given, must match — same cross-community guard as
 // approveSubmission, and for the same reason (a plain UUID id, not a
-// composite key).
-export async function rejectSubmission(id: string, community?: string): Promise<SubmissionRow> {
+// composite key). `reviewedBy` — see approveSubmission's own comment.
+export async function rejectSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
   let query = getAdminClient()
     .from('submission')
-    .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+    .update({
+      status: 'rejected',
+      reviewed_at: new Date().toISOString(),
+      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+    })
     .eq('id', id)
   if (community) query = query.eq('community_id', community)
   const { data, error } = await query.select('*').single()

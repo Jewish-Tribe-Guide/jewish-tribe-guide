@@ -43,6 +43,7 @@ function makeSubmission(overrides: Partial<SubmissionRow> = {}): SubmissionRow {
     submitted_by: { name: 'Jane Doe', email: 'visitor@example.com' },
     created_at: '2026-01-01T00:00:00Z',
     reviewed_at: null,
+    reviewed_by: null,
     ...overrides,
   }
 }
