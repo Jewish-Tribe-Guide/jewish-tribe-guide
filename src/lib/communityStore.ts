@@ -323,6 +323,32 @@ export async function listCommunityNotifyOnSubmission(): Promise<Record<string, 
   return out
 }
 
+/** Every community's notify_muted_emails + notify_review_emails, keyed by
+ *  slug — what the superadmin console's admin roster reads to show, next to
+ *  each of a community's own admin_emails, the same two preferences that
+ *  admin's own Team tab lets them set for themselves (see
+ *  getAdminNotifyPreference/getAdminReviewNotifyPreference above). Read-only
+ *  there: this just exposes the two arrays for the client to check
+ *  membership against, same derivation those two getters already do one
+ *  admin at a time. */
+export async function listCommunityNotifyPreferenceLists(): Promise<
+  Record<string, { notifyMutedEmails: string[]; notifyReviewEmails: string[] }>
+> {
+  const { data } = await getAdminClient().from('community').select('slug, notify_muted_emails, notify_review_emails')
+  const out: Record<string, { notifyMutedEmails: string[]; notifyReviewEmails: string[] }> = {}
+  for (const row of (data ?? []) as {
+    slug: string
+    notify_muted_emails: string[] | null
+    notify_review_emails: string[] | null
+  }[]) {
+    out[row.slug] = {
+      notifyMutedEmails: row.notify_muted_emails ?? [],
+      notifyReviewEmails: row.notify_review_emails ?? [],
+    }
+  }
+  return out
+}
+
 /** One community's notify_on_submission flag — what PATCH
  *  /api/admin/communities/:slug re-reads after a save so its response
  *  always carries the current value, without pulling every community's
@@ -375,6 +401,57 @@ export async function addCommunityAdminEmail(slug: string, email: string): Promi
     if (error) throw new Error(`Failed to add "${trimmed}": ${error.message}`)
   }
   return next
+}
+
+/** One community's notify_muted_emails + notify_review_emails — the
+ *  single-slug counterpart to listCommunityNotifyPreferenceLists, for
+ *  re-reading fresh state after PATCH /api/admin/communities/:slug adds or
+ *  removes an admin without pulling every community's arrays just for
+ *  one. */
+export async function getCommunityNotifyPreferenceLists(
+  slug: string,
+): Promise<{ notifyMutedEmails: string[]; notifyReviewEmails: string[] }> {
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('notify_muted_emails, notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const row = data as { notify_muted_emails: string[] | null; notify_review_emails: string[] | null } | null
+  return { notifyMutedEmails: row?.notify_muted_emails ?? [], notifyReviewEmails: row?.notify_review_emails ?? [] }
+}
+
+/** Removes one email from a community's admin allowlist — the superadmin
+ *  console's roster "Remove" button, and the only place an admin is ever
+ *  removed (see addCommunityAdminEmail's own comment on why the community's
+ *  own Team tab is add-only). Also strips that address from
+ *  notify_muted_emails and notify_review_emails in the same update, so a
+ *  removed admin's old preference doesn't linger as a stale row that
+ *  outlives their access — nothing else in this module ever cleaned those up
+ *  before. Case-insensitive, and a no-op (not an error) if the email isn't
+ *  actually on admin_emails. */
+export async function removeCommunityAdminEmail(slug: string, email: string): Promise<string[]> {
+  const target = email.trim().toLowerCase()
+  const { data } = await getAdminClient()
+    .from('community')
+    .select('admin_emails, notify_muted_emails, notify_review_emails')
+    .eq('slug', slug)
+    .maybeSingle()
+  const row = data as {
+    admin_emails: string[] | null
+    notify_muted_emails: string[] | null
+    notify_review_emails: string[] | null
+  } | null
+
+  const admin_emails = (row?.admin_emails ?? []).filter((e) => e.trim().toLowerCase() !== target)
+  const notify_muted_emails = (row?.notify_muted_emails ?? []).filter((e) => e.trim().toLowerCase() !== target)
+  const notify_review_emails = (row?.notify_review_emails ?? []).filter((e) => e.trim().toLowerCase() !== target)
+
+  const { error } = await getAdminClient()
+    .from('community')
+    .update({ admin_emails, notify_muted_emails, notify_review_emails })
+    .eq('slug', slug)
+  if (error) throw new Error(`Failed to remove "${email.trim()}": ${error.message}`)
+  return admin_emails
 }
 
 /** Every community's visibility + preview token, keyed by slug — the shape
