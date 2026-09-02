@@ -1,6 +1,5 @@
 import { toggleVote, getVotedResourceIds } from '@/lib/voteStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
-import { revalidatePublicContent } from '@/lib/revalidateContent'
 
 // GET /api/votes?token=…
 // Every resource this browser token has voted on — lets a page correct its
@@ -46,12 +45,21 @@ export async function POST(request: Request) {
 
   try {
     const result = await toggleVote(resourceId, token)
-    // Counts are read through the same cached listApprovedResources() every
-    // category page uses — without this, a fresh vote wouldn't show up for
-    // other visitors until the cache's own lifetime elapsed (see AGENTS.md's
-    // caching section). Same blunt-invalidate-everything call every other
-    // write path in this app already makes; a vote is no different.
-    await revalidatePublicContent()
+    // Deliberately does NOT call revalidatePublicContent() — a vote IS
+    // different from every other write path here, in the one way that
+    // matters: frequency. Every admin write revalidates every content tag
+    // for every community (see that function's own comment on why that's an
+    // acceptable blunt instrument), which is fine because admin writes are
+    // rare. Votes aren't — a handful of visitors idly upvoting could
+    // trigger that same site-wide, every-community invalidation dozens of
+    // times a minute, defeating the point of caching listing pages at all.
+    // A vote count a little behind reality is harmless (nobody chooses a
+    // hospital by upvote count); a listing showing the wrong open/closed
+    // status is not — that distinction is why this path is the one
+    // exception. cacheLife('hours') on listApprovedResources() still
+    // catches counts up on its own, no invalidation call needed. The
+    // voter's OWN count looking momentarily behind is handled separately,
+    // client-side — see UpvoteButton.tsx's remembered-count comment.
     return Response.json({ ok: true, ...result })
   } catch (err) {
     console.error('[votes] toggle failed:', err)
