@@ -5,7 +5,6 @@ import {
   addCommunityAdminEmail,
   deleteCommunity,
   getCommunityAdminEmails,
-  getCommunityNotifyOnSubmission,
   getCommunityNotifyPreferenceLists,
   getCommunityPreviewToken,
   removeCommunityAdminEmail,
@@ -19,15 +18,14 @@ function asEmailList(value: unknown): string[] | undefined {
 }
 
 // PATCH /api/admin/communities/:slug
-//   body: { visible?, adminEmails?, notifyOnSubmission?, addAdminEmail?, removeAdminEmail? }
+//   body: { visible?, adminEmails?, addAdminEmail?, removeAdminEmail? }
 // Any subset — publishes/unpublishes (see the visibility migration's own
-// comment), updates the admin login allowlist wholesale (adminEmails) or one
-// address at a time (addAdminEmail/removeAdminEmail — what the superadmin
-// console's per-community admin roster actually uses; adminEmails' full
-// replace stays for anything else that wants it), and/or the
-// notify-on-submission toggle (see the admin_emails migration's own
-// comment). Superadmin only, same as everything else in this file. Unlike
-// DELETE below, this IS available in production — publishing a
+// comment), and/or updates the admin login allowlist wholesale (adminEmails)
+// or one address at a time (addAdminEmail/removeAdminEmail — what the
+// superadmin console's per-community admin roster actually uses;
+// adminEmails' full replace stays for anything else that wants it).
+// Superadmin only, same as everything else in this file. Unlike DELETE
+// below, this IS available in production — publishing a
 // built-out-but-hidden community, or fixing who can sign in to it, are both
 // routine admin actions.
 export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/communities/[slug]'>) {
@@ -39,7 +37,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   let body: {
     visible?: unknown
     adminEmails?: unknown
-    notifyOnSubmission?: unknown
     addAdminEmail?: unknown
     removeAdminEmail?: unknown
   }
@@ -53,10 +50,6 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (hasVisible && typeof body.visible !== 'boolean') {
     return Response.json({ ok: false, errors: ['"visible" must be a boolean.'] }, { status: 400 })
   }
-  const hasNotify = body.notifyOnSubmission !== undefined
-  if (hasNotify && typeof body.notifyOnSubmission !== 'boolean') {
-    return Response.json({ ok: false, errors: ['"notifyOnSubmission" must be a boolean.'] }, { status: 400 })
-  }
   const adminEmails = asEmailList(body.adminEmails)
   const hasAddAdmin = body.addAdminEmail !== undefined
   if (hasAddAdmin && (typeof body.addAdminEmail !== 'string' || !body.addAdminEmail.trim())) {
@@ -66,7 +59,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   if (hasRemoveAdmin && (typeof body.removeAdminEmail !== 'string' || !body.removeAdminEmail.trim())) {
     return Response.json({ ok: false, errors: ['"removeAdminEmail" must be a non-empty string.'] }, { status: 400 })
   }
-  if (!hasVisible && adminEmails === undefined && !hasNotify && !hasAddAdmin && !hasRemoveAdmin) {
+  if (!hasVisible && adminEmails === undefined && !hasAddAdmin && !hasRemoveAdmin) {
     return Response.json({ ok: false, errors: ['Nothing to update.'] }, { status: 400 })
   }
 
@@ -78,11 +71,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       community = result.community
       previewToken = result.previewToken
     }
-    if (adminEmails !== undefined || hasNotify) {
-      community = await setCommunityEmailLists(slug, {
-        adminEmails,
-        notifyOnSubmission: hasNotify ? (body.notifyOnSubmission as boolean) : undefined,
-      })
+    if (adminEmails !== undefined) {
+      community = await setCommunityEmailLists(slug, { adminEmails })
     }
     if (hasAddAdmin) await addCommunityAdminEmail(slug, body.addAdminEmail as string)
     if (hasRemoveAdmin) await removeCommunityAdminEmail(slug, body.removeAdminEmail as string)
@@ -93,24 +83,21 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     // cheap and keeps this one code path instead of two.
     await revalidatePublicContent()
 
-    // adminEmails/notifyOnSubmission/notifyMutedEmails/notifyReviewEmails/
-    // previewToken ride along here (superadmin-only route) so the client can
-    // sync its state right away regardless of which fields this call
-    // actually touched — unpublishing rotates the token, for instance, so
-    // re-reading it beats trusting whatever the client already had.
-    const [freshAdminEmails, freshNotifyOnSubmission, freshNotifyPreferenceLists, freshPreviewToken] =
-      await Promise.all([
-        getCommunityAdminEmails(slug),
-        getCommunityNotifyOnSubmission(slug),
-        getCommunityNotifyPreferenceLists(slug),
-        previewToken === null ? getCommunityPreviewToken(slug) : Promise.resolve(previewToken),
-      ])
+    // adminEmails/notifyMutedEmails/notifyReviewEmails/previewToken ride
+    // along here (superadmin-only route) so the client can sync its state
+    // right away regardless of which fields this call actually touched —
+    // unpublishing rotates the token, for instance, so re-reading it beats
+    // trusting whatever the client already had.
+    const [freshAdminEmails, freshNotifyPreferenceLists, freshPreviewToken] = await Promise.all([
+      getCommunityAdminEmails(slug),
+      getCommunityNotifyPreferenceLists(slug),
+      previewToken === null ? getCommunityPreviewToken(slug) : Promise.resolve(previewToken),
+    ])
     return Response.json({
       ok: true,
       community: {
         ...community,
         adminEmails: freshAdminEmails,
-        notifyOnSubmission: freshNotifyOnSubmission,
         notifyMutedEmails: freshNotifyPreferenceLists.notifyMutedEmails,
         notifyReviewEmails: freshNotifyPreferenceLists.notifyReviewEmails,
         previewToken: freshPreviewToken,

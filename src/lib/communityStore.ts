@@ -177,30 +177,18 @@ export async function getCommunityAdminEmails(slug: string): Promise<string[]> {
 }
 
 /** Who gets emailed about a new submission for this community — its own
- *  admin_emails, unless notify_on_submission is explicitly off (returns
- *  null then — see sendSubmissionNotification/sendNotification in
- *  email.ts, which skip sending entirely rather than falling back to
- *  anything). An empty admin_emails with notifications still on returns
- *  `[]`, which those callers read as "fall back to NOTIFICATION_TO".
- *
- *  Filtered against notify_muted_emails — any individual admin can mute
- *  just their own inbox (see setAdminNotifyPreference) without touching the
- *  community-wide switch or anyone else's address. Every admin muted still
- *  counts as "notifications on" for the `[]`-means-fall-back-to-
- *  NOTIFICATION_TO distinction above — this only ever narrows an already-on
- *  list, same as an empty admin_emails always has. */
-export async function getCommunityNotifyRecipients(slug: string): Promise<string[] | null> {
+ *  admin_emails, filtered against notify_muted_emails (any individual admin
+ *  can mute just their own inbox — see setAdminNotifyPreference — without
+ *  touching anyone else's address). An empty admin_emails returns `[]`,
+ *  which sendSubmissionNotification/sendNotification in email.ts read as
+ *  "fall back to NOTIFICATION_TO". */
+export async function getCommunityNotifyRecipients(slug: string): Promise<string[]> {
   const { data } = await getAdminClient()
     .from('community')
-    .select('admin_emails, notify_on_submission, notify_muted_emails')
+    .select('admin_emails, notify_muted_emails')
     .eq('slug', slug)
     .maybeSingle()
-  const row = data as {
-    admin_emails: string[] | null
-    notify_on_submission: boolean | null
-    notify_muted_emails: string[] | null
-  } | null
-  if (row?.notify_on_submission === false) return null
+  const row = data as { admin_emails: string[] | null; notify_muted_emails: string[] | null } | null
   const muted = new Set((row?.notify_muted_emails ?? []).map((e) => e.trim().toLowerCase()))
   return (row?.admin_emails ?? []).filter((e) => !muted.has(e.trim().toLowerCase()))
 }
@@ -209,9 +197,7 @@ export async function getCommunityNotifyRecipients(slug: string): Promise<string
  *  this community — the Team tab's own "Email me about new submissions"
  *  checkbox reads this, scoped to the signed-in admin's own verified email
  *  (never another admin's — see setAdminNotifyPreference). True unless
- *  that address is on notify_muted_emails; not affected by the
- *  community-wide notify_on_submission switch, which is a separate,
- *  coarser control (see getCommunityNotifyRecipients). */
+ *  that address is on notify_muted_emails. */
 export async function getAdminNotifyPreference(slug: string, email: string): Promise<boolean> {
   const { data } = await getAdminClient()
     .from('community')
@@ -311,18 +297,6 @@ export async function listCommunityAdminEmails(): Promise<Record<string, string[
   return out
 }
 
-/** Every community's notify_on_submission flag, keyed by slug — same
- *  reasoning as listCommunityAdminEmails, for CommunityManager's own
- *  toggle. */
-export async function listCommunityNotifyOnSubmission(): Promise<Record<string, boolean>> {
-  const { data } = await getAdminClient().from('community').select('slug, notify_on_submission')
-  const out: Record<string, boolean> = {}
-  for (const row of (data ?? []) as { slug: string; notify_on_submission: boolean | null }[]) {
-    out[row.slug] = row.notify_on_submission ?? true
-  }
-  return out
-}
-
 /** Every community's notify_muted_emails + notify_review_emails, keyed by
  *  slug — what the superadmin console's admin roster reads to show, next to
  *  each of a community's own admin_emails, the same two preferences that
@@ -349,30 +323,15 @@ export async function listCommunityNotifyPreferenceLists(): Promise<
   return out
 }
 
-/** One community's notify_on_submission flag — what PATCH
- *  /api/admin/communities/:slug re-reads after a save so its response
- *  always carries the current value, without pulling every community's
- *  flag just to read one. */
-export async function getCommunityNotifyOnSubmission(slug: string): Promise<boolean> {
-  const { data } = await getAdminClient()
-    .from('community')
-    .select('notify_on_submission')
-    .eq('slug', slug)
-    .maybeSingle()
-  return (data as { notify_on_submission: boolean | null } | null)?.notify_on_submission ?? true
-}
-
-/** Updates a community's admin login allowlist and/or its
- *  notify-on-submission toggle — superadmin action, same gate as
- *  create/delete/visibility (see PATCH /api/admin/communities/:slug).
- *  Either can be omitted to leave it unchanged. */
+/** Updates a community's admin login allowlist — superadmin action, same
+ *  gate as create/delete/visibility (see PATCH /api/admin/communities/:slug).
+ */
 export async function setCommunityEmailLists(
   slug: string,
-  updates: { adminEmails?: string[]; notifyOnSubmission?: boolean },
+  updates: { adminEmails?: string[] },
 ): Promise<Community> {
-  const update: { admin_emails?: string[]; notify_on_submission?: boolean } = {}
+  const update: { admin_emails?: string[] } = {}
   if (updates.adminEmails) update.admin_emails = updates.adminEmails
-  if (updates.notifyOnSubmission !== undefined) update.notify_on_submission = updates.notifyOnSubmission
 
   const { data, error } = await getAdminClient().from('community').update(update).eq('slug', slug).select('*').single()
   if (error) throw new Error(`Failed to update "${slug}"'s email lists: ${error.message}`)

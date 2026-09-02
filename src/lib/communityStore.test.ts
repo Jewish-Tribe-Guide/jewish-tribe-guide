@@ -46,9 +46,7 @@ const {
   getReviewActionRecipients,
   getAdminReviewNotifyPreference,
   setAdminReviewNotifyPreference,
-  getCommunityNotifyOnSubmission,
   listCommunityAdminEmails,
-  listCommunityNotifyOnSubmission,
   setCommunityEmailLists,
   addCommunityAdminEmail,
   setCommunityVisibility,
@@ -405,30 +403,14 @@ describe('getCommunityAdminEmails', () => {
 })
 
 describe('getCommunityNotifyRecipients', () => {
-  it('returns admin_emails when notify_on_submission is on', async () => {
-    mockFrom.mockReturnValue(
-      chainable({ data: { admin_emails: ['jane@example.com'], notify_on_submission: true }, error: null }),
-    )
+  it('returns admin_emails', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_emails: ['jane@example.com'] }, error: null }))
     expect(await getCommunityNotifyRecipients('philly')).toEqual(['jane@example.com'])
   })
 
-  it('returns an empty array (caller falls back to NOTIFICATION_TO) when notifications are on but admin_emails is empty', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { admin_emails: [], notify_on_submission: true }, error: null }))
+  it('returns an empty array (caller falls back to NOTIFICATION_TO) when admin_emails is empty', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { admin_emails: [] }, error: null }))
     expect(await getCommunityNotifyRecipients('philly')).toEqual([])
-  })
-
-  it('returns null (caller sends nothing) when notify_on_submission is explicitly off', async () => {
-    mockFrom.mockReturnValue(
-      chainable({ data: { admin_emails: ['jane@example.com'], notify_on_submission: false }, error: null }),
-    )
-    expect(await getCommunityNotifyRecipients('philly')).toBeNull()
-  })
-
-  it('defaults to on when notify_on_submission is unset (null)', async () => {
-    mockFrom.mockReturnValue(
-      chainable({ data: { admin_emails: ['jane@example.com'], notify_on_submission: null }, error: null }),
-    )
-    expect(await getCommunityNotifyRecipients('philly')).toEqual(['jane@example.com'])
   })
 
   it('excludes any admin on notify_muted_emails, case-insensitively', async () => {
@@ -436,7 +418,6 @@ describe('getCommunityNotifyRecipients', () => {
       chainable({
         data: {
           admin_emails: ['jane@example.com', 'sam@example.com'],
-          notify_on_submission: true,
           notify_muted_emails: ['JANE@EXAMPLE.COM'],
         },
         error: null,
@@ -445,12 +426,11 @@ describe('getCommunityNotifyRecipients', () => {
     expect(await getCommunityNotifyRecipients('philly')).toEqual(['sam@example.com'])
   })
 
-  it('a muted list that covers everyone still returns [] (fall back to NOTIFICATION_TO), not null', async () => {
+  it('a muted list that covers everyone still returns [] (fall back to NOTIFICATION_TO)', async () => {
     mockFrom.mockReturnValue(
       chainable({
         data: {
           admin_emails: ['jane@example.com'],
-          notify_on_submission: true,
           notify_muted_emails: ['jane@example.com'],
         },
         error: null,
@@ -584,18 +564,6 @@ describe('setAdminReviewNotifyPreference', () => {
   })
 })
 
-describe('getCommunityNotifyOnSubmission', () => {
-  it('returns the configured value', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { notify_on_submission: false }, error: null }))
-    expect(await getCommunityNotifyOnSubmission('philly')).toBe(false)
-  })
-
-  it('defaults to true when unset', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { notify_on_submission: null }, error: null }))
-    expect(await getCommunityNotifyOnSubmission('philly')).toBe(true)
-  })
-})
-
 describe('listCommunityAdminEmails', () => {
   it('keys admin_emails by slug for every community', async () => {
     mockFrom.mockReturnValue(
@@ -619,45 +587,15 @@ describe('listCommunityAdminEmails', () => {
   })
 })
 
-describe('listCommunityNotifyOnSubmission', () => {
-  it('keys notify_on_submission by slug, defaulting unset rows to true', async () => {
-    mockFrom.mockReturnValue(
-      chainable({
-        data: [
-          { slug: 'philly', notify_on_submission: false },
-          { slug: 'ues', notify_on_submission: null },
-        ],
-        error: null,
-      }),
-    )
-    expect(await listCommunityNotifyOnSubmission()).toEqual({
-      philly: false,
-      ues: true,
-    })
-  })
-})
-
 describe('setCommunityEmailLists', () => {
-  it('updates admin_emails and notify_on_submission together', async () => {
-    const updateBuilder = chainable({ data: { ...philly }, error: null })
-    mockFrom.mockReturnValue(updateBuilder)
-
-    await setCommunityEmailLists('philly', { adminEmails: ['jane@example.com'], notifyOnSubmission: false })
-
-    expect(updateBuilder.update).toHaveBeenCalledWith({
-      admin_emails: ['jane@example.com'],
-      notify_on_submission: false,
-    })
-    expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'philly')
-  })
-
-  it('updates only the field provided, leaving the other untouched', async () => {
+  it('updates admin_emails', async () => {
     const updateBuilder = chainable({ data: { ...philly }, error: null })
     mockFrom.mockReturnValue(updateBuilder)
 
     await setCommunityEmailLists('philly', { adminEmails: ['jane@example.com'] })
 
     expect(updateBuilder.update).toHaveBeenCalledWith({ admin_emails: ['jane@example.com'] })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('slug', 'philly')
   })
 
   it('throws with the Supabase error message on failure', async () => {

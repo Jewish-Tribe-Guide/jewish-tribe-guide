@@ -10,13 +10,11 @@ import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
 import type { Community } from '@/lib/communityStore'
 
-// GET /api/admin/communities adds adminEmails/notifyOnSubmission/
-// previewToken on top of the plain Community shape (see that route's own
-// comment) — never on Community itself, since that type also feeds the
-// public GET /api/communities.
+// GET /api/admin/communities adds adminEmails/previewToken on top of the
+// plain Community shape (see that route's own comment) — never on Community
+// itself, since that type also feeds the public GET /api/communities.
 type CommunityWithAdminEmail = Community & {
   adminEmails: string[]
-  notifyOnSubmission: boolean
   // The same two preferences each admin sets for themselves on their own
   // community's Team tab (see TeamManager.tsx) — membership in these two
   // arrays, not a per-admin row (there isn't one; see communityStore.ts's
@@ -186,9 +184,6 @@ export default function CommunityManager({ token }: { token: string }) {
   // so briefly instead of leaving no feedback for an action with no other
   // visible effect.
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
-  // Which community's notify-on-submission master switch is mid-flight.
-  const [togglingNotifySlug, setTogglingNotifySlug] = useState<string | null>(null)
-  const [notifyToggleError, setNotifyToggleError] = useState<string | null>(null)
   // The "Add admin" input's typed value, one per community (keyed by slug)
   // so switching which card you're typing into doesn't clobber another.
   const [newAdminEmail, setNewAdminEmail] = useState<Record<string, string>>({})
@@ -395,29 +390,6 @@ export default function CommunityManager({ token }: { token: string }) {
       // input field next to the button is still there to select and copy by
       // hand, so this fails quietly rather than surfacing an error banner
       // for something this low-stakes.
-    }
-  }
-
-  async function toggleNotifyOnSubmission(slug: string, next: boolean) {
-    setTogglingNotifySlug(slug)
-    setNotifyToggleError(null)
-    try {
-      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
-        `/api/admin/communities/${slug}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ notifyOnSubmission: next }),
-        },
-        'Could not update the notification setting.',
-      )
-      setCommunities(
-        (cs) => cs?.map((c) => (c.slug === slug ? { ...c, notifyOnSubmission: community.notifyOnSubmission } : c)) ?? cs,
-      )
-    } catch (err) {
-      setNotifyToggleError(err instanceof Error ? err.message : 'Could not update the notification setting.')
-    } finally {
-      setTogglingNotifySlug(null)
     }
   }
 
@@ -751,7 +723,6 @@ export default function CommunityManager({ token }: { token: string }) {
         <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
       )}
       {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
-      {notifyToggleError && <p className="text-xs text-red-700 mb-3">{notifyToggleError}</p>}
 
       <div className="space-y-3">
         {communities.map((c) => (
@@ -830,19 +801,7 @@ export default function CommunityManager({ token }: { token: string }) {
             )}
 
             <div className="mt-3 border-t border-slate-200 pt-3">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <p className="text-xs font-semibold text-slate-700">Admins</p>
-                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={c.notifyOnSubmission}
-                    disabled={togglingNotifySlug === c.slug}
-                    onChange={(e) => toggleNotifyOnSubmission(c.slug, e.target.checked)}
-                    className="cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  Email on new submissions
-                </label>
-              </div>
+              <p className="text-xs font-semibold text-slate-700 mb-2">Admins</p>
 
               {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
 

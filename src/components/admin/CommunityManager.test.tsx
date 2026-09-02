@@ -56,7 +56,6 @@ vi.mock('@/components/intake/AddressInput', () => ({
 
 type TestCommunity = Community & {
   adminEmails: string[]
-  notifyOnSubmission: boolean
   notifyMutedEmails: string[]
   notifyReviewEmails: string[]
   previewToken: string | null
@@ -81,7 +80,6 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
     isDefault: true,
     visible: true,
     adminEmails: [],
-    notifyOnSubmission: true,
     notifyMutedEmails: [],
     notifyReviewEmails: [],
     previewToken: null,
@@ -664,7 +662,6 @@ describe('CommunityManager — admin roster', () => {
     name: 'Upper East Side',
     region: 'Manhattan',
     adminEmails: ['jane@example.com', 'sam@example.com'],
-    notifyOnSubmission: true,
     // jane is muted on submissions (opted out) and opted in to review-action
     // emails; sam is on the defaults for both — exercises every combination
     // of the two read-only pills at once.
@@ -696,22 +693,6 @@ describe('CommunityManager — admin roster', () => {
     const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
     await renderAndWaitForList([empty])
     expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
-  })
-
-  it('reflects the community-wide notify-on-submission checkbox and toggles it', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-    vi.mocked(fetchJson).mockResolvedValueOnce({ community: { ...ues, notifyOnSubmission: false } })
-
-    const checkbox = within(cardFor(/upper east side/i)).getByRole('checkbox', { name: /email on new submissions/i })
-    expect(checkbox).toBeChecked()
-
-    await user.click(checkbox)
-
-    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
-    const call = vi.mocked(fetchJson).mock.calls[0]!
-    expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ notifyOnSubmission: false })
   })
 
   it('adds a new admin', async () => {

@@ -253,17 +253,12 @@ function buildFeedbackHtml(
   </div>`
 }
 
-// Who a new submission for this community should email, or null when the
-// community has turned notify_on_submission off (see
-// getCommunityNotifyRecipients's own comment) — callers skip sending
-// entirely in that case, rather than falling back to anyone. Falls back to
-// the site-wide NOTIFICATION_TO env var only when notifications are ON but
-// admin_emails is empty — the same thing every community effectively did
-// before admin_emails existed, and still the right answer for one that
-// hasn't set it yet.
-async function notificationRecipients(communitySlug: string): Promise<string[] | null> {
+// Who a new submission for this community should email — falls back to the
+// site-wide NOTIFICATION_TO env var when admin_emails is empty, the same
+// thing every community effectively did before admin_emails existed, and
+// still the right answer for one that hasn't set it yet.
+async function notificationRecipients(communitySlug: string): Promise<string[]> {
   const recipients = await getCommunityNotifyRecipients(communitySlug)
-  if (recipients === null) return null
   if (recipients.length > 0) return recipients
   return [process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com']
 }
@@ -275,7 +270,6 @@ export async function sendNotification(
   communitySlug: string,
 ): Promise<void> {
   const to = await notificationRecipients(communitySlug)
-  if (!to) return // this community has submission notifications turned off
   const html = payload.requestType === 'Feedback'
     ? buildFeedbackHtml(payload, requestId, timestamp, communitySlug)
     : buildHtml(payload, requestId, timestamp, communitySlug)
@@ -325,7 +319,6 @@ export async function sendInboxMagicLink(email: string, link: string): Promise<v
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
   const to = await notificationRecipients(submission.community_id)
-  if (!to) return // this community has submission notifications turned off
 
   let subject: string
   let verb: string
@@ -509,9 +502,8 @@ function statusWord(v: string): string {
  * one flat email to a single hardcoded address. A single nightly cron run
  * covers every community at once, so a batch of changes can span several of
  * them; each gets its own digest (only its own listings, only its own
- * admins, respecting that community's notify_on_submission switch and each
- * admin's own opt-out) instead of every community's admins seeing every
- * other community's changes.
+ * admins, respecting each admin's own opt-out) instead of every community's
+ * admins seeing every other community's changes.
  */
 export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<void> {
   if (changes.length === 0) return
@@ -532,7 +524,6 @@ export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<v
 
 async function sendCommunityStatusChangeDigest(communitySlug: string, changes: StatusChange[]): Promise<void> {
   const to = await notificationRecipients(communitySlug)
-  if (!to) return // this community has submission notifications turned off
 
   const rows = changes
     .map(
