@@ -17,12 +17,26 @@ import type { Community } from '@/lib/communityStore'
 type CommunityWithAdminEmail = Community & {
   adminEmails: string[]
   notifyOnSubmission: boolean
+  // The same two preferences each admin sets for themselves on their own
+  // community's Team tab (see TeamManager.tsx) — membership in these two
+  // arrays, not a per-admin row (there isn't one; see communityStore.ts's
+  // own notes on getAdminNotifyPreference/getAdminReviewNotifyPreference).
+  // Shown here read-only, so the roster below derives each admin's two
+  // states from these rather than storing anything of its own.
+  notifyMutedEmails: string[]
+  notifyReviewEmails: string[]
   previewToken: string | null
 }
 
-// Comma-separated, same convention the SUPERADMIN_EMAILS env var already uses —
-// familiar shape, and simple enough not to need a real multi-value widget
-// for something edited this rarely.
+function isMuted(list: string[], email: string): boolean {
+  const target = email.trim().toLowerCase()
+  return list.some((e) => e.trim().toLowerCase() === target)
+}
+
+// Comma-separated, same convention the SUPERADMIN_EMAILS env var already
+// uses — only still needed for the "new community" form's admin-emails
+// field below; the per-community roster further down edits one address at a
+// time instead.
 function parseEmailList(value: string): string[] {
   return value
     .split(',')
@@ -172,14 +186,22 @@ export default function CommunityManager({ token }: { token: string }) {
   // so briefly instead of leaving no feedback for an action with no other
   // visible effect.
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
-  // Which community's admin/notify email lists are open for editing, if
-  // any — mirrors deletingSlug's one-panel-at-a-time pattern. The draft is
-  // the two fields' raw comma-separated text, not the parsed arrays, so
-  // typing a trailing comma doesn't fight the input.
-  const [editingEmailsSlug, setEditingEmailsSlug] = useState<string | null>(null)
-  const [emailsDraft, setEmailsDraft] = useState({ adminEmails: '', notifyOnSubmission: true })
-  const [savingEmails, setSavingEmails] = useState(false)
-  const [emailsError, setEmailsError] = useState<string | null>(null)
+  // Which community's notify-on-submission master switch is mid-flight.
+  const [togglingNotifySlug, setTogglingNotifySlug] = useState<string | null>(null)
+  const [notifyToggleError, setNotifyToggleError] = useState<string | null>(null)
+  // The "Add admin" input's typed value, one per community (keyed by slug)
+  // so switching which card you're typing into doesn't clobber another.
+  const [newAdminEmail, setNewAdminEmail] = useState<Record<string, string>>({})
+  // Which community is mid-flight on an add or remove, and which email a
+  // remove is acting on — enough to disable just the affected row/button
+  // rather than the whole roster.
+  const [rosterBusySlug, setRosterBusySlug] = useState<string | null>(null)
+  const [rosterError, setRosterError] = useState<Record<string, string>>({})
+  // Which single roster row (slug + email) is showing its inline "remove
+  // this admin?" confirmation, if any — same one-at-a-time,
+  // click-again-to-confirm shape as ArchivedListings.tsx's confirmDeleteId,
+  // just keyed by a pair since the roster spans every community at once.
+  const [confirmRemove, setConfirmRemove] = useState<{ slug: string; email: string } | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -376,46 +398,88 @@ export default function CommunityManager({ token }: { token: string }) {
     }
   }
 
-  function startEditingEmails(c: CommunityWithAdminEmail) {
-    setEditingEmailsSlug(c.slug)
-    setEmailsDraft({ adminEmails: c.adminEmails.join(', '), notifyOnSubmission: c.notifyOnSubmission })
-    setEmailsError(null)
-  }
-
-  function cancelEditingEmails() {
-    setEditingEmailsSlug(null)
-    setEmailsError(null)
-  }
-
-  async function saveEmails(slug: string) {
-    setSavingEmails(true)
-    setEmailsError(null)
+  async function toggleNotifyOnSubmission(slug: string, next: boolean) {
+    setTogglingNotifySlug(slug)
+    setNotifyToggleError(null)
     try {
       const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
         `/api/admin/communities/${slug}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            adminEmails: parseEmailList(emailsDraft.adminEmails),
-            notifyOnSubmission: emailsDraft.notifyOnSubmission,
-          }),
+          body: JSON.stringify({ notifyOnSubmission: next }),
         },
-        'Could not update the admin list.',
+        'Could not update the notification setting.',
       )
       setCommunities(
-        (cs) =>
-          cs?.map((c) =>
-            c.slug === slug
-              ? { ...c, adminEmails: community.adminEmails, notifyOnSubmission: community.notifyOnSubmission }
-              : c,
-          ) ?? cs,
+        (cs) => cs?.map((c) => (c.slug === slug ? { ...c, notifyOnSubmission: community.notifyOnSubmission } : c)) ?? cs,
       )
-      setEditingEmailsSlug(null)
     } catch (err) {
-      setEmailsError(err instanceof Error ? err.message : 'Could not update the admin list.')
+      setNotifyToggleError(err instanceof Error ? err.message : 'Could not update the notification setting.')
     } finally {
-      setSavingEmails(false)
+      setTogglingNotifySlug(null)
+    }
+  }
+
+  function applyRosterUpdate(slug: string, community: CommunityWithAdminEmail) {
+    setCommunities(
+      (cs) =>
+        cs?.map((c) =>
+          c.slug === slug
+            ? {
+                ...c,
+                adminEmails: community.adminEmails,
+                notifyMutedEmails: community.notifyMutedEmails,
+                notifyReviewEmails: community.notifyReviewEmails,
+              }
+            : c,
+        ) ?? cs,
+    )
+  }
+
+  async function addAdmin(slug: string) {
+    const email = (newAdminEmail[slug] ?? '').trim()
+    if (!email) return
+    setRosterBusySlug(slug)
+    setRosterError((e) => ({ ...e, [slug]: '' }))
+    try {
+      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
+        `/api/admin/communities/${slug}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ addAdminEmail: email }),
+        },
+        'Could not add that admin.',
+      )
+      applyRosterUpdate(slug, community)
+      setNewAdminEmail((v) => ({ ...v, [slug]: '' }))
+    } catch (err) {
+      setRosterError((e) => ({ ...e, [slug]: err instanceof Error ? err.message : 'Could not add that admin.' }))
+    } finally {
+      setRosterBusySlug(null)
+    }
+  }
+
+  async function removeAdmin(slug: string, email: string) {
+    setConfirmRemove(null)
+    setRosterBusySlug(slug)
+    setRosterError((e) => ({ ...e, [slug]: '' }))
+    try {
+      const { community } = await fetchJson<{ community: CommunityWithAdminEmail }>(
+        `/api/admin/communities/${slug}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ removeAdminEmail: email }),
+        },
+        'Could not remove that admin.',
+      )
+      applyRosterUpdate(slug, community)
+    } catch (err) {
+      setRosterError((e) => ({ ...e, [slug]: err instanceof Error ? err.message : 'Could not remove that admin.' }))
+    } finally {
+      setRosterBusySlug(null)
     }
   }
 
@@ -687,6 +751,7 @@ export default function CommunityManager({ token }: { token: string }) {
         <p className="text-xs text-muted mb-3">Deleting a community isn&rsquo;t available in production.</p>
       )}
       {toggleError && <p className="text-xs text-red-700 mb-3">{toggleError}</p>}
+      {notifyToggleError && <p className="text-xs text-red-700 mb-3">{notifyToggleError}</p>}
 
       <div className="space-y-3">
         {communities.map((c) => (
@@ -718,17 +783,6 @@ export default function CommunityManager({ token }: { token: string }) {
                 <p className="text-xs text-slate-500 mt-1">
                   /{c.slug} · {c.region}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Admin logins:{' '}
-                  {c.adminEmails.length > 0 ? (
-                    <span className="font-mono">{c.adminEmails.join(', ')}</span>
-                  ) : (
-                    <span className="italic">not set — falls back to the superadmin list (SUPERADMIN_EMAILS)</span>
-                  )}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Email admins on new submissions: {c.notifyOnSubmission ? 'Yes' : 'No'}
-                </p>
                 {!c.visible && (
                   <p className="text-xs text-amber-700 mt-1">
                     Not on the switcher or sitemap, and the public site 404s for anyone without the link below. The
@@ -737,12 +791,6 @@ export default function CommunityManager({ token }: { token: string }) {
                 )}
               </Link>
               <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => startEditingEmails(c)}
-                  className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                >
-                  Edit admins
-                </button>
                 <button
                   onClick={() => toggleVisibility(c.slug, !c.visible)}
                   disabled={togglingSlug === c.slug}
@@ -781,46 +829,118 @@ export default function CommunityManager({ token }: { token: string }) {
               </div>
             )}
 
-            {editingEmailsSlug === c.slug && (
-              <div className="mt-3 border-t border-slate-200 pt-3 space-y-3">
-                {emailsError && <p className="text-xs text-red-700">{emailsError}</p>}
-                <label className="block text-xs font-medium text-slate-700">
-                  Admin logins
-                  <input
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
-                    value={emailsDraft.adminEmails}
-                    onChange={(e) => setEmailsDraft((d) => ({ ...d, adminEmails: e.target.value }))}
-                    placeholder="jane@example.com, sam@example.com"
-                    autoFocus
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-xs font-semibold text-slate-700">Admins</p>
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={emailsDraft.notifyOnSubmission}
-                    onChange={(e) => setEmailsDraft((d) => ({ ...d, notifyOnSubmission: e.target.checked }))}
-                    className="cursor-pointer"
+                    checked={c.notifyOnSubmission}
+                    disabled={togglingNotifySlug === c.slug}
+                    onChange={(e) => toggleNotifyOnSubmission(c.slug, e.target.checked)}
+                    className="cursor-pointer disabled:cursor-not-allowed"
                   />
-                  Email the admins above when someone submits something new
+                  Email on new submissions
                 </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => saveEmails(c.slug)}
-                    disabled={savingEmails}
-                    className="text-sm font-medium bg-primary text-white rounded-md px-3 py-1.5 hover:opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
-                  >
-                    {savingEmails ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    onClick={cancelEditingEmails}
-                    disabled={savingEmails}
-                    className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
               </div>
-            )}
+
+              {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
+
+              {c.adminEmails.length > 0 ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-slate-400">
+                      <th className="font-medium pb-1">Email</th>
+                      <th className="font-medium pb-1 text-center w-24">Submissions</th>
+                      <th className="font-medium pb-1 text-center w-24">Approve/reject</th>
+                      <th className="w-14" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {c.adminEmails.map((email) => {
+                      const submissionsOn = !isMuted(c.notifyMutedEmails, email)
+                      const reviewOn = isMuted(c.notifyReviewEmails, email)
+                      const confirming = confirmRemove?.slug === c.slug && confirmRemove.email === email
+                      return (
+                        <tr key={email} className="border-t border-slate-100">
+                          <td className="py-1.5 font-mono text-slate-700">{email}</td>
+                          <td className="py-1.5 text-center">
+                            <span
+                              className={
+                                submissionsOn
+                                  ? 'inline-block rounded-full px-2 py-0.5 bg-green-50 text-green-700'
+                                  : 'inline-block rounded-full px-2 py-0.5 bg-slate-100 text-slate-500'
+                              }
+                            >
+                              {submissionsOn ? 'On' : 'Muted'}
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-center">
+                            <span
+                              className={
+                                reviewOn
+                                  ? 'inline-block rounded-full px-2 py-0.5 bg-green-50 text-green-700'
+                                  : 'inline-block rounded-full px-2 py-0.5 bg-slate-100 text-slate-500'
+                              }
+                            >
+                              {reviewOn ? 'On' : 'Off'}
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-right">
+                            {confirming ? (
+                              <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                <button
+                                  onClick={() => removeAdmin(c.slug, email)}
+                                  disabled={rosterBusySlug === c.slug}
+                                  className="font-medium text-red-600 hover:underline cursor-pointer disabled:opacity-60"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => setConfirmRemove(null)}
+                                  className="font-medium text-slate-500 hover:underline cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmRemove({ slug: c.slug, email })}
+                                className="font-medium text-red-600 hover:underline cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  No admins set — falls back to the superadmin list (SUPERADMIN_EMAILS).
+                </p>
+              )}
+
+              <div className="flex gap-2 mt-2">
+                <input
+                  className="flex-1 min-w-0 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={newAdminEmail[c.slug] ?? ''}
+                  onChange={(e) => setNewAdminEmail((v) => ({ ...v, [c.slug]: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && addAdmin(c.slug)}
+                  placeholder="new-admin@example.com"
+                  type="email"
+                />
+                <button
+                  onClick={() => addAdmin(c.slug)}
+                  disabled={rosterBusySlug === c.slug || !(newAdminEmail[c.slug] ?? '').trim()}
+                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer shrink-0"
+                >
+                  Add admin
+                </button>
+              </div>
+            </div>
 
             {deletingSlug === c.slug && (
               <div className="mt-3 border-t border-slate-200 pt-3">

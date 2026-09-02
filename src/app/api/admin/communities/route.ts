@@ -5,6 +5,7 @@ import {
   listCommunities,
   listCommunityAdminEmails,
   listCommunityNotifyOnSubmission,
+  listCommunityNotifyPreferenceLists,
   listCommunityPreviewTokens,
 } from '@/lib/communityStore'
 import { cloneCommunityContent } from '@/lib/communityCloning'
@@ -24,20 +25,24 @@ export async function GET(request: Request) {
   if (!admin) return Response.json({ ok: false, errors: ['Not authorized.'] }, { status: 401 })
 
   try {
-    const [communities, adminEmails, notifyOnSubmission, previewTokens] = await Promise.all([
+    const [communities, adminEmails, notifyOnSubmission, notifyPreferenceLists, previewTokens] = await Promise.all([
       listCommunities(),
       listCommunityAdminEmails(),
       listCommunityNotifyOnSubmission(),
+      listCommunityNotifyPreferenceLists(),
       listCommunityPreviewTokens(),
     ])
-    // adminEmails/notifyOnSubmission/previewToken ride along here
-    // (superadmin-only route) but never on Community/listCommunities()
-    // itself — that object is also served by the public GET
-    // /api/communities, which has no business exposing any of them.
+    // adminEmails/notifyOnSubmission/notifyMutedEmails/notifyReviewEmails/
+    // previewToken ride along here (superadmin-only route) but never on
+    // Community/listCommunities() itself — that object is also served by the
+    // public GET /api/communities, which has no business exposing any of
+    // them.
     const withExtras = communities.map((c) => ({
       ...c,
       adminEmails: adminEmails[c.slug] ?? [],
       notifyOnSubmission: notifyOnSubmission[c.slug] ?? true,
+      notifyMutedEmails: notifyPreferenceLists[c.slug]?.notifyMutedEmails ?? [],
+      notifyReviewEmails: notifyPreferenceLists[c.slug]?.notifyReviewEmails ?? [],
       previewToken: previewTokens[c.slug] ?? null,
     }))
     return Response.json({ ok: true, communities: withExtras })
