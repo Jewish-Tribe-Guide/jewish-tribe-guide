@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { CategoryField, FieldType } from '@/lib/categories'
-import type { Minyan } from '@/lib/davening'
+import { formatAnchorRule, type Minyan } from '@/lib/davening'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
@@ -125,6 +125,12 @@ const MINYAN_FIELD_VISIBILITY: Record<keyof Minyan, 'shown' | 'deliberately-hidd
   // intake form, so it already reads "15 min before Sunset". Asserted below.
   anchor: 'deliberately-hidden',
   offsetMinutes: 'deliberately-hidden',
+  // Same deal: formatAnchorRule folds the bounds into `time` as "(between
+  // 5:00 PM and 7:00 PM)", so a moderator reads the window in the line they
+  // were already reading. Asserted below — a bound edited from 7:00 to 7:15
+  // must not approve blind.
+  notBefore: 'deliberately-hidden',
+  notAfter: 'deliberately-hidden',
 }
 
 const MINYAN_CHANGES: Record<string, [Partial<Minyan>, Partial<Minyan>]> = {
@@ -158,6 +164,17 @@ describe('moderation queue — every minyan property a moderator should see', ()
       [{ ...base, time: '30 min before Sunset', anchor: 'sunset' as const, offsetMinutes: -30 }],
     )
     expect(diffText()).toContain('→')
+  })
+
+  it('reflects a bounds change through the generated time text', () => {
+    const rule = { anchor: 'candle_lighting' as const, offsetMinutes: 0, notBefore: '17:00' }
+    renderDiff(
+      field,
+      [{ ...base, ...rule, notAfter: '19:00', time: formatAnchorRule('candle_lighting', 0, { notBefore: '17:00', notAfter: '19:00' }) }],
+      [{ ...base, ...rule, notAfter: '19:15', time: formatAnchorRule('candle_lighting', 0, { notBefore: '17:00', notAfter: '19:15' }) }],
+    )
+    expect(diffText()).toContain('→')
+    expect(diffText()).toContain('7:15 PM')
   })
 
   it('renders one line per minyan rather than a count', () => {

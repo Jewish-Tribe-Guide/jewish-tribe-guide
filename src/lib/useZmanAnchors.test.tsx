@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { useZmanAnchors, geoKey } from './useZmanAnchors'
+import { useZmanAnchors, geoKey, resolveAnchorTime } from './useZmanAnchors'
 
 // The module-level cache used to be keyed on location alone, on the reasoning
 // that zmanim "don't change within a session". A session here is a phone in
@@ -100,5 +100,54 @@ describe('useZmanAnchors', () => {
 
     expect(fetchCount).toBe(beforeMidnight + 1)
     expect(screen.getByTestId('sunset').textContent).toBe(sunsetIso)
+  })
+})
+
+// ── Bounded rules ─────────────────────────────────────────────────────────────
+//
+// The shtiebel case: Kabbalas Shabbos at candle lighting, never before 5:00pm
+// and never after 7:00pm. Both real Philadelphia candle-lightings below — the
+// December one falls under the floor, the June one over the ceiling, and the
+// rule is the same single rule on both dates.
+
+describe('resolveAnchorTime with bounds', () => {
+  const at = (candleLightingIso: string) => ({ candleLightingIso })
+  const rule = { anchor: 'candle_lighting' as const, offsetMinutes: 0 }
+
+  it('shows the real candle lighting when it falls inside the window', () => {
+    // Late October — 5:47pm, comfortably between the two bounds.
+    expect(
+      resolveAnchorTime(
+        { ...rule, notBefore: '17:00', notAfter: '19:00' },
+        at('2026-10-23T17:47:00-04:00'),
+      ),
+    ).toBe('5:47 PM')
+  })
+
+  it('holds at the floor when candle lighting is earlier', () => {
+    // Mid-December — candle lighting is 4:12pm, but the shul never starts
+    // before 5:00pm.
+    expect(
+      resolveAnchorTime(
+        { ...rule, notBefore: '17:00', notAfter: '19:00' },
+        at('2026-12-18T16:12:00-05:00'),
+      ),
+    ).toBe('5:00 PM')
+  })
+
+  it('holds at the ceiling when candle lighting is later', () => {
+    // Late June — candle lighting is 8:13pm, but the shul never starts after
+    // 7:00pm. This is the case seasons could not express: it is the same rule
+    // as December, not a different one.
+    expect(
+      resolveAnchorTime(
+        { ...rule, notBefore: '17:00', notAfter: '19:00' },
+        at('2026-06-26T20:13:00-04:00'),
+      ),
+    ).toBe('7:00 PM')
+  })
+
+  it('is unaffected when a row carries no bounds', () => {
+    expect(resolveAnchorTime(rule, at('2026-06-26T20:13:00-04:00'))).toBe('8:13 PM')
   })
 })
