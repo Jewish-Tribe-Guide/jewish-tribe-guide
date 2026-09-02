@@ -166,3 +166,140 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     })
   }
 })
+
+// The client-side half of the same story, and a different failure mode from
+// the two tests above.
+//
+// Those prove the SERVER stops serving stale content after an admin saves.
+// This proves a BROWSER THAT IS ALREADY OPEN eventually sees it. Those are
+// not the same thing here, and the gap between them was a real bug:
+// [community]/layout.tsx loads categories, site settings, home sections,
+// forms and hospitals once and hands them to ContentProvider, and an App
+// Router layout does not re-render on client-side navigation between the
+// screens under it (that layout's own comment calls this out as a feature —
+// it replaced five post-hydration fetches). So all five were pinned to
+// whatever they were when the tab first loaded, for as long as the tab
+// stayed open, no matter how thoroughly the server had been revalidated.
+// Only a full document load picked up an admin's edit.
+//
+// That matters most in the case this app is actually used in: an installed
+// PWA on a phone that gets backgrounded rather than closed, or a desktop tab
+// left open for days. RefreshContentOnFocus fixes it by asking the server
+// again when the tab is next looked at — the same trigger, and the same
+// reasoning, useNow.ts already uses to resync the clock.
+//
+// Measured, not guessed: the server converges 2–4s after the admin save (the
+// probe that established this watched x-nextjs-cache go STALE → HIT), so
+// anything still stale well after that is the client holding onto it.
+test('an already-open tab picks up an admin edit when it regains focus', async ({ page, request }) => {
+  // Deliberately generous. The bulk is one unavoidable wait: the refresh is
+  // throttled (see RefreshContentOnFocus) so that rapid alt-tabbing doesn't
+  // fire a request per switch, and this has to sit out that window to
+  // exercise the real thing rather than a version of it weakened for the test.
+  test.setTimeout(90_000)
+
+  const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
+    accessToken: string
+  }
+  const authHeaders = { Authorization: `Bearer ${accessToken}` }
+
+  const initialPage = await request.get('/')
+  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
+  const catsRes = await request.get(`/api/categories?community=${community}`)
+  expect(catsRes.ok(), 'GET /api/categories should succeed').toBe(true)
+  const { categories } = await catsRes.json()
+
+  // /all rather than home: home embeds a live Google Map, and a test origin
+  // isn't an authorized referer for the Maps key, which takes the whole page
+  // down to its error boundary. /all has no map and lists every category.
+  await page.goto(`/${community}/all`)
+  // The location prompt overlays everything and swallows clicks (AGENTS.md
+  // says the same about the mobile suite).
+  const notNow = page.getByRole('button', { name: 'Not now' })
+  await notNow.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
+  await notNow.click().catch(() => {})
+  await page.locator('header').first().waitFor({ state: 'visible' })
+
+  // Borrowed, not created, and picked from what's actually on the page rather
+  // than off the API list: "Cache Round-trip Seed" is a real listing category
+  // but belongs to no home section, so it never renders here — picking it
+  // leaves every click below hitting nothing. Restored in `finally`.
+  const visibleLabels = await page.locator('main button').allTextContents()
+  const target = (categories as { id: string; pluralLabel: string; kind: string }[]).find(
+    (c) => c.kind === 'listing' && visibleLabels.includes(c.pluralLabel),
+  )
+  expect(target, 'at least one listing category should be visible on /all to borrow').toBeTruthy()
+  const slug = target!.id
+  const originalLabel = target!.pluralLabel
+  const newLabel = `${originalLabel} (focus refresh ${Date.now() % 100000})`
+
+  try {
+    const patchRes = await request.patch(`/api/admin/categories/${slug}?community=${community}`, {
+      headers: authHeaders,
+      data: { label: newLabel, pluralLabel: newLabel },
+    })
+    expect(patchRes.ok(), 'renaming the borrowed category should succeed').toBe(true)
+
+    // Wait out the server side explicitly, so a failure below can only mean
+    // the client held onto stale content — never that the server hadn't
+    // caught up yet. This is the distinction an earlier version of this
+    // investigation got wrong.
+    await expect
+      .poll(async () => (await (await request.get(`/${community}/${slug}`)).text()).includes(newLabel), {
+        timeout: 30_000,
+        message: 'waiting for the server itself to serve the renamed category',
+      })
+      .toBe(true)
+
+    // The tab has not reloaded, so its layout content is still the pre-rename
+    // set. Confirm that first — without it, a passing test below could just
+    // mean the rename was visible all along.
+    await page.getByText(originalLabel, { exact: true }).first().click()
+    await page.waitForURL(new RegExp(`/${slug}$`))
+    await page.locator('header').first().waitFor({ state: 'visible' })
+    await expect(
+      page.getByRole('heading', { level: 1 }).and(page.locator(':visible')),
+      'before refocusing, an open tab should still be showing the pre-rename name',
+    ).toHaveText(originalLabel)
+
+    // Sit out the refresh throttle (see this test's own timeout note).
+    await page.waitForTimeout(11_000)
+
+    // Dispatched rather than driven by really backgrounding the tab, and the
+    // reason is measured: Playwright's bringToFront() fires NOTHING in
+    // headless Chromium. Instrumenting the page to record every
+    // visibilitychange/focus/blur it saw across a full
+    // newPage -> bringToFront -> bringToFront cycle recorded an empty array,
+    // and the content correctly did not refresh, because nothing had
+    // happened. So that version of this test would have passed for the wrong
+    // reason forever — it proved only that an event which never arrived
+    // changed nothing.
+    //
+    // What this does and does not cover is worth being exact about. It covers
+    // our own wiring: that when these events arrive, the layout's content is
+    // re-fetched and what is on screen updates. It does not cover Chromium
+    // firing them on a real tab switch — that is web-platform behaviour, not
+    // something this app can get wrong, and not something a change here could
+    // regress.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    // router.refresh() is asynchronous, so this polls rather than asserting on
+    // the next tick.
+    await expect(
+      page.getByRole('heading', { level: 1 }).and(page.locator(':visible')),
+      'after refocusing, the open tab should have picked up the rename',
+    ).toHaveText(newLabel, { timeout: 15_000 })
+  } finally {
+    await request
+      .patch(`/api/admin/categories/${slug}?community=${community}`, {
+        headers: authHeaders,
+        data: { label: originalLabel, pluralLabel: originalLabel },
+      })
+      .catch(() => {})
+  }
+})
