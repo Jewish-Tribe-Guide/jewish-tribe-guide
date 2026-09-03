@@ -157,6 +157,14 @@ export function GenericListingCard({
     .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
     .filter((x): x is { f: CategoryField; text: string } => !!x.text)
+  // Whether the CATEGORY has this field at all, independent of whether THIS
+  // item filled it in. In the desktop grid, cards in the same row stretch to
+  // match the tallest one (see the card's own h-full comment) — but only the
+  // outer box, not where each line of content falls inside it, so one card
+  // having this line and its row-mate not having it still left their badge
+  // rows starting at different heights, the divider above the badges landing
+  // a whole line apart between neighbors. See the spacer below.
+  const hasHeaderTextField = fields.some((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
 
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
@@ -335,10 +343,18 @@ export function GenericListingCard({
                 before the badge row (a genuinely different mode: read text
                 vs. scannable chips). Hidden on mobile: on a narrow card this
                 can run to 2-3 lines. The desktop:hidden twin further down
-                renders it instead, outside this row. */}
-            {headerTextFields.map(({ f, text }) => (
-              <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
-            ))}
+                renders it instead, outside this row.
+                invisible, not omitted, when the category has this field but
+                THIS listing left it blank — see hasHeaderTextField's own
+                comment: reserves the same line so a shorter card's badge
+                row still starts at the same height as its grid row-mates. */}
+            {headerTextFields.length > 0 ? (
+              headerTextFields.map(({ f, text }) => (
+                <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
+              ))
+            ) : hasHeaderTextField ? (
+              <p aria-hidden="true" className="invisible hidden desktop:block truncate text-sm text-slate-600 mt-2">placeholder</p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
