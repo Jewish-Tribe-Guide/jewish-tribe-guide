@@ -112,6 +112,46 @@ The general rule, since this cost three separate investigations: **when a test
 "flakes" only in CI and the failure lands exactly on a round number, suspect a
 budget, not the system under test.**
 
+### …and `/about` has a second problem underneath it (OPEN)
+
+Raising the budget did not make the `/about` test pass. It now uses the full
+60s and still fails in CI — `Timeout 60000ms exceeded while waiting on the
+predicate` — while passing locally every time, including under a deliberately
+parallel run against the same shared test project (`/about` resolves in 1.6s).
+
+So the ceiling was real and is fixed, and something else is wrong as well.
+Do not re-close this section on the budget explanation alone.
+
+What is known:
+
+- It passed on a bare CI runner, and has failed on every run since the job
+  moved into the Playwright container (see the note in ci.yml on why it moved).
+  Two failures against one earlier pass — a correlation worth suspecting, not
+  a proof, since this test did fail occasionally on bare runners too.
+- It is not reproducible locally, with or without a competing suite running
+  against the same Supabase project.
+- Docker was not available on the dev machine to run the container image
+  directly. That is the experiment that would settle the container question.
+
+The test now instruments itself rather than guessing, because both previous
+diagnoses were wrong and both grew from a failure message that said only "the
+predicate never came true":
+
+- it asserts the stored row holds the new body first, through the uncached
+  admin route — which separates a write/sanitizer failure from a cache one
+  before any cache theory gets entertained;
+- it records `x-nextjs-cache` on every poll and attaches the sequence to the
+  failure. `HIT/old` throughout means the invalidation never reached that
+  server; `STALE/old` means it arrived and the regeneration behind it is
+  failing. Those need opposite fixes, which is why the old message could not
+  be acted on.
+
+Verified by mutation: with `revalidateTag` removed from the pages PATCH route,
+the failure reports the row holding the new body and twelve consecutive
+`HIT/old` polls.
+
+**Next CI failure here will name which half it is. Read it before theorising.**
+
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
 ## The moderation queue must show what an edit actually proposes
