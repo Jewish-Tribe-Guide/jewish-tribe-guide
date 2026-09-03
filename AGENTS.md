@@ -122,16 +122,35 @@ parallel run against the same shared test project (`/about` resolves in 1.6s).
 So the ceiling was real and is fixed, and something else is wrong as well.
 Do not re-close this section on the budget explanation alone.
 
-What is known:
+What is known, now that the instrumentation has reported:
 
-- It passed on a bare CI runner, and has failed on every run since the job
-  moved into the Playwright container (see the note in ci.yml on why it moved).
-  Two failures against one earlier pass — a correlation worth suspecting, not
-  a proof, since this test did fail occasionally on bare runners too.
-- It is not reproducible locally, with or without a competing suite running
-  against the same Supabase project.
-- Docker was not available on the dev machine to run the container image
-  directly. That is the experiment that would settle the container question.
+- **Every poll is HIT/old** — 62 in CI, 61 locally. The server considers its
+  cache entry fresh, so the invalidation never reached it. That rules out
+  stale-while-revalidate, which this file blamed for months, and it rules out
+  the write: the stored row is asserted to hold the new body first.
+- **It is not CI-only.** That was claimed here, on the strength of several
+  clean local runs and a correlation with the Playwright-container move, and
+  disproved locally within the hour with an identical signature. It is
+  intermittent everywhere; the container correlation was noise.
+- Leading hypothesis, **untested**: a write-after-invalidate race. The test
+  GETs /about before the PATCH, to prove the new body isn't already there. If
+  that read is still regenerating its entry when `revalidateTag` fires, the
+  late write lands after it and marks the entry fresh — holding the pre-edit
+  body. That is HIT/old forever, until `cacheLife('days')` expires, and it
+  would be likelier under load, which matches CI failing more often than a
+  laptop.
+- If that is the mechanism it is a **product bug, not a test bug**: an admin
+  saving a page moments after anyone loaded it loses the edit for a day.
+  Whether production is affected is still open — Vercel serves /about as
+  `x-vercel-cache: PRERENDER`, a different mechanism from `next start`'s
+  in-process cache, so the artifact and the real bug look identical from here.
+  Settling it needs a page edit against production with someone watching.
+
+The test is `test.fixme()`d (inside the test body — at file scope the marker
+applies to every test in the file, which took the other three down twice
+while quarantining it). `test.fail()` is the wrong tool here: the failure is
+intermittent, so the runs that pass report as unexpected passes and the suite
+is red either way.
 
 The test now instruments itself rather than guessing, because both previous
 diagnoses were wrong and both grew from a failure message that said only "the
@@ -150,7 +169,8 @@ Verified by mutation: with `revalidateTag` removed from the pages PATCH route,
 the failure reports the row holding the new body and twelve consecutive
 `HIT/old` polls.
 
-**Next CI failure here will name which half it is. Read it before theorising.**
+**The instrumentation did its job — the answer is above. The next step is
+testing the race hypothesis, not theorising about a fourth cause.**
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
