@@ -100,43 +100,33 @@ test('an admin save reaches the cached public page', async ({ request }) => {
 // invalidated by the admin route calling revalidateTag directly instead of
 // going through revalidatePublicContent — a different enough code path from
 // site-settings above that a bug in one wouldn't show up in the other.
-// QUARANTINED, not fixed — and this is a suspected PRODUCT bug, not a test
-// problem. Do not delete this comment along with the marker.
+// This test is RUNNING again, and it is the experiment for a fix.
 //
-// What the instrumentation established:
-//   • The stored row DOES hold the new body (asserted below, before the
-//     poll), so the write and the sanitizer are innocent.
-//   • Every poll is HIT/old — 62 of them in CI, 61 locally. The server
-//     considers its entry fresh, so the invalidation never reached it. That
-//     rules out stale-while-revalidate, which this file and AGENTS.md both
-//     blamed for months.
-//   • It is NOT CI-only. It was claimed to be, on the strength of several
-//     clean local runs, and reproduced locally within the hour with an
-//     identical signature. It is intermittent everywhere.
+// What the instrumentation below established, so nobody re-derives it:
+//   • The stored row holds the new body (asserted before the poll), so the
+//     write and the sanitizer are innocent.
+//   • Every failing poll is HIT/old — 62 in CI, 61 locally. A healthy run
+//     reads STALE/old → HIT/new. The failure never reaches STALE at all, so
+//     the page's cached entry was never marked. That rules out
+//     stale-while-revalidate, which this file blamed for months.
+//   • Not reproducible on demand. Warm server 15/15 and 12/12 clean, cold
+//     build with the dist dir deleted 5/5 clean, the suite itself 5/5 clean
+//     across warm and cold. It was also wrongly called CI-only after several
+//     clean local runs, then reproduced locally within the hour.
 //
-// Leading hypothesis, untested: a write-after-invalidate race. The test GETs
-// /about before the PATCH (to prove the new body isn't already there). If
-// that read is still regenerating its cache entry when revalidateTag fires,
-// the late write lands afterwards and marks the entry fresh — holding the
-// PRE-EDIT body, which is exactly HIT/old forever, until cacheLife('days')
-// expires. It would be likelier under load, which matches CI failing more
-// than a laptop. If that is what this is, it is real: an admin saving a page
-// moments after anyone loaded it could have the edit swallowed for a day.
+// The mechanism is still unknown. What is known precisely is the symptom —
+// this path's entry was not marked — so the PATCH route now calls
+// revalidatePath(`/${slug}`) alongside revalidateTag. If that closes it, this
+// test goes green in CI and the hypothesis was right. If it fails again with
+// the same HIT/old signature, revalidatePath does not reach that entry either
+// and the next suspect is the build-time prerender, not the tag.
 //
-// fixme() rather than fail(): the failure is intermittent, so test.fail()
-// reports the runs that DO pass as unexpected passes and the suite is red
-// either way. Skipping keeps it named in every report instead.
-//
-// Whether production is affected is open. Vercel serves /about as
-// x-vercel-cache: PRERENDER, a different mechanism from `next start`'s
-// in-process cache, so the CI-only artifact and the real bug look identical
-// from here. Settling it needs a page edit against production with someone
-// watching the live page.
+// Left running deliberately: quarantining it hid the only instrument that can
+// tell us whether the fix worked.
 test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
   // Inside the test body on purpose: at file scope this marks every test in
   // the file, which is how the previous two attempts at quarantining it took
   // the other three tests down with it.
-  test.fixme(true, 'invalidation never reaches the server (all HIT/old) — see the note above')
   // Conditional, and only on CI, because this passes locally every time —
   // an unconditional test.fail() would turn every local run red for the
   // opposite reason. Scoped this way the marker states precisely what is

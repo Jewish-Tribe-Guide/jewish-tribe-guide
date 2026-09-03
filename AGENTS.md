@@ -112,65 +112,64 @@ The general rule, since this cost three separate investigations: **when a test
 "flakes" only in CI and the failure lands exactly on a round number, suspect a
 budget, not the system under test.**
 
-### …and `/about` has a second problem underneath it (OPEN)
+### …and `/about` had a second problem underneath it (mitigated, mechanism still unknown)
 
-Raising the budget did not make the `/about` test pass. It now uses the full
-60s and still fails in CI — `Timeout 60000ms exceeded while waiting on the
-predicate` — while passing locally every time, including under a deliberately
-parallel run against the same shared test project (`/about` resolves in 1.6s).
+Raising the budget did not make the `/about` test pass on its own. It still
+failed after that fix — `Timeout 60000ms exceeded`, every poll `HIT/old` —
+while never reproducing on demand: warm server 15/15 and 12/12 clean, cold
+build with the dist dir deleted 5/5 clean, the full suite 5/5 clean across
+both. It was also wrongly called CI-only here at one point, on the strength of
+several clean local runs, then reproduced locally within the hour with an
+identical signature. That correlation was noise. Don't trust a "CI-only"
+diagnosis on this test without a large number of local runs to back it.
 
-So the ceiling was real and is fixed, and something else is wrong as well.
-Do not re-close this section on the budget explanation alone.
+What the instrumentation established, which is the part worth keeping even
+though the root cause stayed elusive:
 
-What is known, now that the instrumentation has reported:
+- **Every failing poll is HIT/old.** A healthy save reads `STALE/old →
+  HIT/new`. The failure never even reaches STALE — the page's cached entry is
+  never marked stale in the first place. That rules out stale-while-revalidate
+  (this file's diagnosis for months) and rules out the write: the stored row
+  is asserted to hold the new body, through the uncached admin route, before
+  the poll ever starts.
+- The symptom is precise even though the mechanism isn't: **this path's cache
+  entry was not invalidated.**
 
-- **Every poll is HIT/old** — 62 in CI, 61 locally. The server considers its
-  cache entry fresh, so the invalidation never reached it. That rules out
-  stale-while-revalidate, which this file blamed for months, and it rules out
-  the write: the stored row is asserted to hold the new body first.
-- **It is not CI-only.** That was claimed here, on the strength of several
-  clean local runs and a correlation with the Playwright-container move, and
-  disproved locally within the hour with an identical signature. It is
-  intermittent everywhere; the container correlation was noise.
-- Leading hypothesis, **untested**: a write-after-invalidate race. The test
-  GETs /about before the PATCH, to prove the new body isn't already there. If
-  that read is still regenerating its entry when `revalidateTag` fires, the
-  late write lands after it and marks the entry fresh — holding the pre-edit
-  body. That is HIT/old forever, until `cacheLife('days')` expires, and it
-  would be likelier under load, which matches CI failing more often than a
-  laptop.
-- If that is the mechanism it is a **product bug, not a test bug**: an admin
-  saving a page moments after anyone loaded it loses the edit for a day.
-  Whether production is affected is still open — Vercel serves /about as
-  `x-vercel-cache: PRERENDER`, a different mechanism from `next start`'s
-  in-process cache, so the artifact and the real bug look identical from here.
-  Settling it needs a page edit against production with someone watching.
+The fix: the pages PATCH route now calls `revalidatePath(`/\${slug}`)` alongside
+its existing `revalidateTag(TAGS.pages, 'max')`. Tag-based invalidation is
+supposed to cover this on its own — that's the whole point of `cacheTag` — so
+this is belt-and-braces for a symptom that was observed, not a change made
+because the theory demanded it. `revalidatePath` marks the path's own entry
+directly, which is exactly the thing that was failing to be marked.
 
-The test is `test.fixme()`d (inside the test body — at file scope the marker
-applies to every test in the file, which took the other three down twice
-while quarantining it). `test.fail()` is the wrong tool here: the failure is
-intermittent, so the runs that pass report as unexpected passes and the suite
-is red either way.
+Since adding it: 7/7 real-suite runs clean (5 warm, 2 with a fresh cold
+build), where the failure used to surface within a handful of CI runs. That is
+evidence the fix helps, **not proof the underlying cause is understood** — the
+bug never reproduced on demand even before the fix, so a clean streak here
+is weaker evidence than it would be for a deterministic bug. If `/about`
+starts failing again with the same HIT/old signature, `revalidatePath` does
+not reach that entry either, and the next suspect is the build-time prerender
+specifically, not the tag mechanism in general.
 
-The test now instruments itself rather than guessing, because both previous
-diagnoses were wrong and both grew from a failure message that said only "the
-predicate never came true":
+Left running (not quarantined): it is the only instrument that can tell us
+whether the fix actually holds, and quarantining it would hide that signal
+again.
 
-- it asserts the stored row holds the new body first, through the uncached
-  admin route — which separates a write/sanitizer failure from a cache one
-  before any cache theory gets entertained;
-- it records `x-nextjs-cache` on every poll and attaches the sequence to the
-  failure. `HIT/old` throughout means the invalidation never reached that
-  server; `STALE/old` means it arrived and the regeneration behind it is
-  failing. Those need opposite fixes, which is why the old message could not
-  be acted on.
+Guarded structurally too, so this can't silently regress if someone
+"simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
+test.ts` asserts both the tag and the path invalidation are present in the
+source, and that the path is derived from `PAGE_SLUGS` rather than
+hand-listed (so a third page can't get one and not the other).
 
-Verified by mutation: with `revalidateTag` removed from the pages PATCH route,
-the failure reports the row holding the new body and twelve consecutive
-`HIT/old` polls.
-
-**The instrumentation did its job — the answer is above. The next step is
-testing the race hypothesis, not theorising about a fourth cause.**
+Whether this was ever hitting production is still genuinely unknown. Vercel
+serves `/about` as `x-vercel-cache: PRERENDER`, a different mechanism from
+`next start`'s in-process cache used here, so a CI/next-start-only artifact
+and a real "admin edits don't reliably appear" bug would look identical from
+this test alone. `revalidatePath` is the standard, recommended way to
+invalidate a specific route regardless of which caching layer is under it, so
+the fix is reasonable defense either way — but if someone reports that an
+About/Privacy edit didn't show up promptly on the live site, treat it as
+possibly the same bug, not a coincidence.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
