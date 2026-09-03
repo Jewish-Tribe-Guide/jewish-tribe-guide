@@ -47,8 +47,23 @@ export function adminAppUrl(): string | undefined {
 // end) since an inbox row usually truncates a long subject from the right,
 // not the left — leading with the number is what keeps it visible no
 // matter how the rest of the line gets cut off.
-function submissionRef(caseNumber: number): string {
-  return `#${caseNumber}`
+// Returns "" rather than "#undefined" when the number is missing. It HAS been
+// missing, in every notification this app has sent: the case_number migration
+// was never applied to any Supabase project, so `select('*')` came back
+// without the column and moderators got "#undefined Approved — <name>".
+//
+// The type said otherwise (`case_number: number`, non-optional) — it is now
+// optional, which is the honest shape for a column a deployed database may not
+// have yet. Migrations land after the code that reads them, so this degrades
+// instead of asserting.
+function submissionRef(caseNumber: number | null | undefined): string {
+  return caseNumber == null ? '' : `#${caseNumber}`
+}
+
+/** Joins a subject's parts, dropping any that are empty — so a missing
+ *  reference costs the subject nothing, not a leading space. */
+function subjectLine(...parts: string[]): string {
+  return parts.filter(Boolean).join(' ')
 }
 
 function row(label: string, value: string): string {
@@ -331,7 +346,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     const payload = submission.payload as CategorySubmissionPayload
     verb = 'New category'
     title = payload.label
-    subject = `${submissionRef(submission.case_number)} New Category Suggestion — ${title}`
+    subject = subjectLine(submissionRef(submission.case_number), `New Category Suggestion — ${title}`)
     const f = payload.firstListing
     proposedRows = `${row('Category name', payload.label)}
       ${payload.description ? row('Description', payload.description) : ''}
@@ -358,12 +373,13 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
     const ref = submissionRef(submission.case_number)
-    subject =
+    const kind =
       submission.operation === 'create'
-        ? `${ref} New Listing Suggestion — ${title}${catSuffix}`
+        ? 'New Listing Suggestion'
         : submission.operation === 'update'
-          ? `${ref} Edit Listing Suggestion — ${title}${catSuffix}`
-          : `${ref} Removal Listing Suggestion — ${title}${catSuffix}`
+          ? 'Edit Listing Suggestion'
+          : 'Removal Listing Suggestion'
+    subject = subjectLine(ref, `${kind} — ${title}${catSuffix}`)
     const detailRows = Object.entries(payload.details ?? {})
       .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
       .map(([k, v]) => {
@@ -455,7 +471,7 @@ export async function sendReviewActionNotification(
   // matters once you've opened the email, not before.
   await sendEmail({
     to,
-    subject: `${submissionRef(submission.case_number)} ${Verb} — ${submissionDisplayName(submission)}`,
+    subject: subjectLine(submissionRef(submission.case_number), `${Verb} — ${submissionDisplayName(submission)}`),
     html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
       <h2 style="color:#1d4ed8;margin-bottom:4px;">${Verb}</h2>
       <p style="color:#334155;font-size:14px;">${title} was just ${verb} by ${escapeHtml(actorEmail)}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>

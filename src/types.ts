@@ -242,7 +242,12 @@ export type SubmissionRow = {
    *  with (see email.ts's own doc) so two different emails about the same
    *  submission are trivially recognizable as such. Not a business key:
    *  never used to look a submission up, only to LABEL it for a human. */
-  case_number: number
+  /** Optional because a deployed database may not have the column yet — the
+   *  migration that adds it lands after the code that reads it. Declared
+   *  non-optional once, which is how "#undefined" reached real moderators:
+   *  the Supabase row is cast to this type, so the type was simply asserting
+   *  a column that wasn't there, and nothing in TypeScript could object. */
+  case_number?: number | null
 }
 
 /** A submission plus the current target row (for update/delete diffs in /admin)

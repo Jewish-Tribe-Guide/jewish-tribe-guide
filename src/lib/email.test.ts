@@ -265,6 +265,47 @@ describe('sendEmail', () => {
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringMatching(/^#77 /) }))
       })
 
+      // Real bug, in every notification email this app has ever sent: the
+      // case_number migration was never applied to any project, so `*` came
+      // back without the column, `submission.case_number` was undefined, and
+      // the subject read "#undefined Approved — South Philadelphia Shtiebel".
+      //
+      // types.ts declared it `case_number: number`, non-optional, so nothing
+      // in TypeScript objected — the Supabase row is cast to SubmissionRow,
+      // and the type simply asserted a column that wasn't there. Every test
+      // built its submission in memory with the field set, so the whole suite
+      // agreed with the type rather than with the database.
+      //
+      // The subject must degrade to no reference at all rather than printing
+      // the word "undefined" at a moderator.
+      it.each([
+        ['a missing case number', undefined],
+        ['a null case number', null],
+      ])('omits the reference entirely given %s', async (_label, caseNumber) => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        const submission = {
+          id: 'abc123de-f000-0000-0000-000000000000',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: caseNumber,
+        } as unknown as SubmissionRow
+
+        await sendSubmissionNotification(submission)
+
+        const { subject } = sendSpy.mock.calls.at(-1)![0] as { subject: string }
+        expect(subject).not.toMatch(/undefined|null|#\s/)
+        expect(subject).toMatch(/^New Category Suggestion — New Category$/)
+      })
+
       // Real bug: the "Review in admin" button linked to the bare /admin
       // superadmin console — which has no moderation queue of its own — for
       // every community, instead of that submission's own /{community}/admin.
