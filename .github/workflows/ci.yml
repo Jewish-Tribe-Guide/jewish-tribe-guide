@@ -15,8 +15,8 @@ name: CI
 # silently eat a runner-hour (or make cancelling it someone's job to
 # notice) if something does hang.
 #
-# `form-roundtrip`, `admin-write` and `e2e` all drive a real browser, and
-# used to run `npx playwright install --with-deps chromium` on the bare
+# `cache-roundtrip`, `form-roundtrip`, `admin-write` and `e2e` all drive a
+# real browser, and used to run `npx playwright install --with-deps chromium` on the bare
 # runner. That repeatedly hung for 20+ minutes, then 1+ hour, then hit the
 # 15-minute timeout outright, always stuck in `apt-get update` endlessly
 # retrying an unreachable azure.archive.ubuntu.com mirror before falling
@@ -79,8 +79,9 @@ jobs:
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     needs: unit
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -88,8 +89,17 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # No browser install — this suite only makes raw HTTP calls via
-      # Playwright's `request` fixture, never launches a browser.
+      # This job ran on a bare runner while every test here took only the
+      # `request` fixture. That stopped being true when "an already-open tab
+      # picks up an admin edit when it regains focus" was added — it takes
+      # `page`, so it needs a real browser binary, and CI failed on
+      # "Executable doesn't exist … run npx playwright install" while the
+      # three request-only tests beside it passed.
+      #
+      # Fixed by putting it in the same image the other browser-driving jobs
+      # use, rather than adding a `playwright install` step: installing on a
+      # bare runner is the exact thing that used to hang for an hour in
+      # apt-get (see the note at the top of this file).
       - run: npm run test:cache-roundtrip
         env:
           TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}

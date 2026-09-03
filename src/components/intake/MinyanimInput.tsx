@@ -13,6 +13,7 @@ import {
   SEASON_LABELS,
   formatAnchorRule,
   isMinyanim,
+  type MinyanBounds,
   type Season,
 } from '@/lib/davening'
 
@@ -36,6 +37,8 @@ type Draft = {
   anchor?: ZmanAnchor
   direction?: Direction
   magnitudeText?: string
+  notBefore?: string
+  notAfter?: string
 }
 
 const DAY_SHORT: Record<MinyanDayKey, string> = {
@@ -56,6 +59,12 @@ const DAY_SHORT: Record<MinyanDayKey, string> = {
 // removeRow all match by id, a collision meant editing the new row silently
 // also edited whichever saved row shared its id (e.g. adding a second Mincha
 // for Sons of Israel overwrote its existing Shacharis entry to Mincha too).
+/** A row's bounds as a standalone MinyanBounds, for handing to
+ *  formatAnchorRule without dragging the whole Minyan along. */
+function boundsOf(row: Minyan | undefined): MinyanBounds {
+  return { notBefore: row?.notBefore, notAfter: row?.notAfter }
+}
+
 function genId(): string {
   return crypto.randomUUID()
 }
@@ -93,6 +102,12 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   const [rows, setRows] = useState<Minyan[]>(() => initMinyanim(value))
   // Keyed by row id — not part of Minyan, never saved. See Draft above.
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  // Which rows have the earliest/latest limits revealed. Collapsed by
+  // default and deliberately so: almost every minyan wants the plain zman,
+  // and a form that shows all five controls at once reads as five decisions
+  // to make rather than one. A row that already HAS a bound opens expanded
+  // (see `boundsOpen` below), so nothing saved is ever hidden from an editor.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   function update(next: Minyan[]) {
     setRows(next)
@@ -132,7 +147,27 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   function setRelative(id: string, anchor: ZmanAnchor, direction: Direction, magnitudeText: string) {
     mergeDraft(id, { anchor, direction, magnitudeText })
     const offsetMinutes = (direction === 'before' ? -1 : 1) * (Number(magnitudeText) || 0)
-    updateRow(id, { anchor, offsetMinutes, time: formatAnchorRule(anchor, offsetMinutes) })
+    // Bounds carried through rather than re-derived: formatAnchorRule builds
+    // the whole `time` string, so omitting them here would silently strip the
+    // "(between 5:00 PM and 7:00 PM)" off the moment anyone nudged the offset.
+    const bounds = boundsOf(rows.find((r) => r.id === id))
+    updateRow(id, { anchor, offsetMinutes, time: formatAnchorRule(anchor, offsetMinutes, bounds) })
+  }
+
+  /** Applies one end of the window and regenerates `time` from it. An empty
+   *  input clears that bound rather than storing "", so "no limit" stays a
+   *  missing field everywhere downstream instead of a falsy string. */
+  function setBound(id: string, patch: MinyanBounds) {
+    const row = rows.find((r) => r.id === id)
+    if (!row?.anchor) return
+    const bounds: MinyanBounds = { ...boundsOf(row), ...patch }
+    if (!bounds.notBefore) bounds.notBefore = undefined
+    if (!bounds.notAfter) bounds.notAfter = undefined
+    mergeDraft(id, bounds)
+    updateRow(id, {
+      ...bounds,
+      time: formatAnchorRule(row.anchor, row.offsetMinutes ?? 0, bounds),
+    })
   }
 
   function setClockTime(id: string, time: string) {
@@ -147,7 +182,18 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
   function switchToRelative(row: Minyan) {
     mergeDraft(row.id, { clockTime: row.time })
     const draft = drafts[row.id]
-    setRelative(row.id, draft?.anchor ?? 'sunset', draft?.direction ?? 'before', draft?.magnitudeText ?? '0')
+    const anchor = draft?.anchor ?? 'sunset'
+    const direction = draft?.direction ?? 'before'
+    const magnitudeText = draft?.magnitudeText ?? '0'
+    const offsetMinutes = (direction === 'before' ? -1 : 1) * (Number(magnitudeText) || 0)
+    const bounds: MinyanBounds = { notBefore: draft?.notBefore, notAfter: draft?.notAfter }
+    mergeDraft(row.id, { anchor, direction, magnitudeText })
+    updateRow(row.id, {
+      anchor,
+      offsetMinutes,
+      ...bounds,
+      time: formatAnchorRule(anchor, offsetMinutes, bounds),
+    })
   }
 
   // `extraPatch` lets a caller fold in another field change (e.g. a new
@@ -160,9 +206,21 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
       anchor: row.anchor,
       direction: (row.offsetMinutes ?? 0) < 0 ? 'before' : (row.offsetMinutes ?? 0) > 0 ? 'after' : drafts[row.id]?.direction,
       magnitudeText: row.anchor ? String(Math.abs(row.offsetMinutes ?? 0)) : drafts[row.id]?.magnitudeText,
+      notBefore: row.notBefore,
+      notAfter: row.notAfter,
     })
     const clockTime = drafts[row.id]?.clockTime ?? ''
-    updateRow(row.id, { anchor: undefined, offsetMinutes: undefined, time: clockTime, ...extraPatch })
+    // Bounds cleared, not carried: they clamp a zman that moves, and a fixed
+    // clock time has nothing to clamp. Stashed in the draft just above, so
+    // toggling back restores them like everything else here.
+    updateRow(row.id, {
+      anchor: undefined,
+      offsetMinutes: undefined,
+      notBefore: undefined,
+      notAfter: undefined,
+      time: clockTime,
+      ...extraPatch,
+    })
   }
 
   const inputClass =
@@ -188,6 +246,9 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
           const direction: Direction = draft?.direction ?? ((row.offsetMinutes ?? 0) <= 0 ? 'before' : 'after')
           const magnitudeText = draft?.magnitudeText ?? String(Math.abs(row.offsetMinutes ?? 0))
           const anchor = draft?.anchor ?? row.anchor ?? 'sunset'
+          // Open when a bound is already stored, so an editor can never be
+          // shown a row whose saved limits are hidden behind a collapsed link.
+          const boundsOpen = expanded[row.id] || !!row.notBefore || !!row.notAfter
 
           return (
           <div
@@ -325,6 +386,54 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
                 className={`${inputClass} flex-1 min-w-[8rem]`}
               />
             </div>
+
+            {/* Line 2b: the optional window a zman-based time is clamped into.
+                Only offered on relative rows — a fixed clock time is already
+                fixed — and collapsed behind a link so the ordinary case stays
+                a one-decision row. This is what expresses "candle lighting,
+                but never before 5:00pm and never after 7:00pm": one rule that
+                holds all year, which no combination of Winter/Summer could
+                say (see MinyanBounds in davening.ts). */}
+            {isRelative && (
+              boundsOpen ? (
+                <div className="flex items-center gap-2 flex-wrap pl-1">
+                  <span className="text-xs text-muted shrink-0">But never before</span>
+                  <input
+                    type="time"
+                    value={row.notBefore ?? ''}
+                    onChange={(e) => setBound(row.id, { notBefore: e.target.value })}
+                    aria-label="Earliest time"
+                    className={`${inputClass} w-32`}
+                  />
+                  <span className="text-xs text-muted shrink-0">or after</span>
+                  <input
+                    type="time"
+                    value={row.notAfter ?? ''}
+                    onChange={(e) => setBound(row.id, { notAfter: e.target.value })}
+                    aria-label="Latest time"
+                    className={`${inputClass} w-32`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBound(row.id, { notBefore: undefined, notAfter: undefined })
+                      setExpanded((x) => ({ ...x, [row.id]: false }))
+                    }}
+                    className="text-xs text-muted hover:text-slate-700 underline cursor-pointer"
+                  >
+                    Remove limits
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((x) => ({ ...x, [row.id]: true }))}
+                  className="text-xs text-primary hover:underline cursor-pointer pl-1"
+                >
+                  + Add earliest/latest limits
+                </button>
+              )
+            )}
 
             {/* Line 3: day chips */}
             <div className="flex items-center gap-1 flex-wrap">

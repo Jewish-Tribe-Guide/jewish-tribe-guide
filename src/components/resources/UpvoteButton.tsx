@@ -7,14 +7,14 @@ const VOTED_KEY = 'jpc_voted'
 const COUNT_KEY = 'jpc_vote_counts'
 
 // Listing pages are cached for up to an hour (see resourceStore.ts's own
-// comment on listApprovedResources — a deliberate trade, not an oversight),
-// and revalidateTag('max') after a vote is stale-while-revalidate: the very
-// next page load can still serve the pre-vote count while a fresh one
-// regenerates in the background. Nobody but the voter ever notices this —
-// it's only visible to the one person whose own action briefly appears to
-// have been undone. Remembering the count THIS browser last confirmed
-// (straight from the vote response, not the cached page) and preferring it
-// over a fresher-looking-but-actually-older server count fixes that, without
+// comment on listApprovedResources), and a vote deliberately does NOT force
+// an immediate rebuild (see POST /api/votes's own comment on why) — so the
+// very next page load can still serve the pre-vote count for as long as an
+// hour. Nobody but the voter ever notices this — it's only visible to the
+// one person whose own action briefly appears to have been undone.
+// Remembering the count THIS browser last confirmed (straight from the vote
+// response, not the cached page) and preferring it over a
+// fresher-looking-but-actually-older server count fixes that, without
 // touching the caching decision itself. Bounded to a short window so a vote
 // cast from a different device eventually wins once the cache genuinely
 // catches up, rather than this browser disagreeing with reality forever.

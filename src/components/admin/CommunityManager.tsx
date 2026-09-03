@@ -726,7 +726,16 @@ export default function CommunityManager({ token }: { token: string }) {
 
       <div className="space-y-3">
         {communities.map((c) => (
-          <div key={c.slug} className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors">
+          // data-community-slug so a test can scope to ONE community's card.
+          // Without it the only handle is nth/first, and a spec that reaches
+          // for `.first()` here edits whichever community happens to sort
+          // first — which is the real, shared one, not the disposable one the
+          // test created. That exact mistake left two stray admins on philly.
+          <div
+            key={c.slug}
+            data-community-slug={c.slug}
+            className="bg-white border border-slate-200 rounded-lg shadow-sm p-4 hover:border-primary transition-colors"
+          >
             <div className="flex items-start justify-between gap-3">
               {/* prefetch={false}: this list can include communities other than
                   the one whose admin console is currently mounted, and
@@ -806,8 +815,27 @@ export default function CommunityManager({ token }: { token: string }) {
               {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
 
               {c.adminEmails.length > 0 ? (
-                <table className="w-full text-xs">
-                  <thead>
+                // Four columns do not fit a phone. A table cannot render
+                // narrower than its min-content width — `w-full` is only a
+                // preference — and a column of font-mono email addresses is a
+                // wall of unbreakable characters, so this table rendered
+                // 390px wide inside a 309px card and pushed the whole
+                // document to 422px on a 375px screen, leaving Remove off the
+                // right edge entirely.
+                //
+                // Below `sm` the same elements lay out as stacked rows
+                // instead: email on its own line, then the two pills and
+                // Remove beneath it. The DOM is untouched — still a real
+                // table, still real <tr>s — so this stays presentational, and
+                // both the unit tests' `closest('tr')` and the e2e row
+                // locators keep meaning what they meant.
+                //
+                // overflow-x-auto is the backstop: at any width where the
+                // table still can't fit, it scrolls inside its own card
+                // rather than dragging the page sideways with it.
+                <div className="overflow-x-auto">
+                <table className="w-full text-xs max-sm:block">
+                  <thead className="max-sm:hidden">
                     <tr className="text-left text-slate-400">
                       <th className="font-medium pb-1">Email</th>
                       <th className="font-medium pb-1 text-center w-24">Submissions</th>
@@ -815,15 +843,27 @@ export default function CommunityManager({ token }: { token: string }) {
                       <th className="w-14" />
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="max-sm:block">
                     {c.adminEmails.map((email) => {
                       const submissionsOn = !isMuted(c.notifyMutedEmails, email)
                       const reviewOn = isMuted(c.notifyReviewEmails, email)
                       const confirming = confirmRemove?.slug === c.slug && confirmRemove.email === email
                       return (
-                        <tr key={email} className="border-t border-slate-100">
-                          <td className="py-1.5 font-mono text-slate-700">{email}</td>
-                          <td className="py-1.5 text-center">
+                        <tr
+                          key={email}
+                          className="border-t border-slate-100 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:py-1"
+                        >
+                          {/* break-all, not just wrapping: an email address
+                              has no spaces to break at, and it is the one column
+                              that was setting the table's floor. */}
+                          <td className="py-1.5 font-mono text-slate-700 break-all max-sm:block max-sm:basis-full max-sm:pb-0">
+                            {email}
+                          </td>
+                          <td className="py-1.5 text-center max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:pt-1">
+                            {/* The header row is hidden at this width, so each
+                                pill carries its own label — two bare "On"s
+                                side by side say nothing about which is which. */}
+                            <span className="hidden max-sm:inline text-slate-400">Submissions</span>
                             <span
                               className={
                                 submissionsOn
@@ -834,7 +874,8 @@ export default function CommunityManager({ token }: { token: string }) {
                               {submissionsOn ? 'On' : 'Off'}
                             </span>
                           </td>
-                          <td className="py-1.5 text-center">
+                          <td className="py-1.5 text-center max-sm:flex max-sm:items-center max-sm:gap-1 max-sm:pt-1">
+                            <span className="hidden max-sm:inline text-slate-400">Approve/reject</span>
                             <span
                               className={
                                 reviewOn
@@ -845,7 +886,7 @@ export default function CommunityManager({ token }: { token: string }) {
                               {reviewOn ? 'On' : 'Off'}
                             </span>
                           </td>
-                          <td className="py-1.5 text-right">
+                          <td className="py-1.5 text-right max-sm:ml-auto max-sm:pt-1">
                             {confirming ? (
                               <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                                 <button
@@ -876,6 +917,7 @@ export default function CommunityManager({ token }: { token: string }) {
                     })}
                   </tbody>
                 </table>
+                </div>
               ) : (
                 <p className="text-xs text-slate-500 italic">
                   No admins set — falls back to the superadmin list (SUPERADMIN_EMAILS).

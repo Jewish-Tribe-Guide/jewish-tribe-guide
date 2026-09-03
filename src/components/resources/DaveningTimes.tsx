@@ -123,7 +123,11 @@ function StructuredDaveningTimes({ minyanim, geo }: { minyanim: Minyan[]; geo?: 
                       {calc && (
                         <span
                           className="text-primary/80"
-                          title={`Calculated from today's ${anchorNoun(row.anchor!)} — confirm with the shul.`}
+                          title={
+                            row.notBefore || row.notAfter
+                              ? `Calculated from today's ${anchorNoun(row.anchor!)}, held within the shul's posted limits — confirm with the shul.`
+                              : `Calculated from today's ${anchorNoun(row.anchor!)} — confirm with the shul.`
+                          }
                         >
                           ≈ {calc} today
                         </span>
