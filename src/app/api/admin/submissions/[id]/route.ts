@@ -1,5 +1,5 @@
 import { revalidatePublicContent } from '@/lib/revalidateContent'
-import type { NextRequest } from 'next/server'
+import { after, type NextRequest } from 'next/server'
 import { getAdminUserForCommunity } from '@/lib/adminAuth'
 import { approveSubmission, rejectSubmission } from '@/lib/submissionStore'
 import { sendDecisionEmail } from '@/lib/confirmationEmail'
@@ -48,13 +48,20 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
     return Response.json({ ok: false, errors: ['Could not update submission.'] }, { status: 502 })
   }
 
-  // Best-effort — never fails the moderation action
-  sendDecisionEmail(submission, decision, reason).catch((err) =>
-    console.error('[admin/submissions/:id] Decision email failed:', err),
-  )
-  sendReviewActionNotification(submission, decision, admin.email).catch((err) =>
-    console.error('[admin/submissions/:id] Review-action notification failed:', err),
-  )
+  // Best-effort — never fails the moderation action — but scheduled with
+  // after() rather than left as a floating promise. Same reasoning as
+  // /api/submissions: the handler returns below, and an abandoned send is at
+  // the mercy of whether the invocation survives long enough to finish it.
+  after(async () => {
+    await Promise.all([
+      sendDecisionEmail(submission, decision, reason).catch((err) =>
+        console.error('[admin/submissions/:id] Decision email failed:', err),
+      ),
+      sendReviewActionNotification(submission, decision, admin.email).catch((err) =>
+        console.error('[admin/submissions/:id] Review-action notification failed:', err),
+      ),
+    ])
+  })
 
   // Sync the listing against Google when there's something new to learn.
   //

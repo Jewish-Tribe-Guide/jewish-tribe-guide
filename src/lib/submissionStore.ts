@@ -1,3 +1,4 @@
+import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible } from './categories'
@@ -554,18 +555,9 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
  * listingColumnsWithGeo carry those explicitly, and an edit is allowed to
  * change them. `googleFields` too — resolveGoogleFields recomputes it.
  */
-const SUBMITTER_CANNOT_TOUCH = [
-  'googleSyncedAt',
-  'lastSyncError',
-  'lastSyncFailedAt',
-  'businessStatus',
-  'businessStatusBefore',
-  'businessStatusChangedAt',
-  'businessStatusOverride',
-  'googleDescription',
-  'verifiedPlaceId',
-  'legacyId',
-] as const
+// Shared with the moderation card's diff, which hides the same keys — see
+// lib/syncFields.ts for why the two lists were merged.
+const SUBMITTER_CANNOT_TOUCH = SYNC_INTERNAL_FIELDS
 
 function withPreservedInternals(
   details: Record<string, unknown>,

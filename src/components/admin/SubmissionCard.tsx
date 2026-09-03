@@ -5,7 +5,7 @@ import type { EnrichedSubmission, ResourceRow, ResourceSubmission, CategorySubmi
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // Flattening/formatting/diffing lives in lib/listingDiff so the notification
 // emails render the identical before/after — see that file's own note.
-import { diffListing, flatListing } from '@/lib/submissionDiff'
+import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
@@ -219,14 +219,36 @@ function Diff({
                 multi-line, and collapsing them to one run-on line is what made
                 a davening-times change unreadable even once it was diffable. */}
             <dd className={`min-w-0 break-words whitespace-pre-line ${changed ? 'text-slate-800' : 'text-slate-400'}`}>
-              {changed ? (
+              {!changed ? (
+                afterValue
+              ) : isMultiline(beforeValue, afterValue) ? (
+                // Line by line for the multi-line fields (minyanim, hours).
+                // As one string, a shul with ten minyanim correcting one time
+                // got all ten struck through and all ten repeated — twenty
+                // lines to read to find the one that moved, which is the
+                // approve-it-blind problem again, one level down.
+                <span className="block">
+                  {diffLines(beforeValue, afterValue).map((line, i) => (
+                    <span
+                      key={`${line.kind}-${i}-${line.text}`}
+                      className={
+                        line.kind === 'removed'
+                          ? 'block line-through text-red-500'
+                          : line.kind === 'added'
+                            ? 'block text-green-700 font-medium'
+                            : 'block text-slate-400'
+                      }
+                    >
+                      {line.text}
+                    </span>
+                  ))}
+                </span>
+              ) : (
                 <span>
                   <span className="line-through text-red-500">{beforeValue}</span>{' '}
                   <span aria-hidden="true">→</span>{' '}
                   <span className="text-green-700 font-medium">{afterValue}</span>
                 </span>
-              ) : (
-                afterValue
               )}
             </dd>
           </div>

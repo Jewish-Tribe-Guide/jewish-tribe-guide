@@ -3,7 +3,7 @@ import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
 import { getResourceRowById } from './resourceStore'
-import { diffListing } from './submissionDiff'
+import { diffLines, diffListing, isMultiline } from './submissionDiff'
 import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
@@ -68,15 +68,33 @@ function subjectLine(...parts: string[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
-/** A row whose value is a before → after pair, for a proposed edit. */
+/** A row whose value is a before → after pair, for a proposed edit.
+ *
+ *  Multi-line fields (minyanim, hours) are diffed line by line instead, for
+ *  the same reason the moderation card does it: a shul with ten minyanim
+ *  correcting one time otherwise sends twenty lines to read to find the one
+ *  that moved. Same diffLines the card uses, so the email and the queue agree
+ *  about what changed. */
 function diffRow(label: string, before: string, after: string): string {
+  const value = isMultiline(before, after)
+    ? diffLines(before, after)
+        .map((line) => {
+          const style =
+            line.kind === 'removed'
+              ? 'color:#b91c1c;text-decoration:line-through;'
+              : line.kind === 'added'
+                ? 'color:#15803d;font-weight:600;'
+                : 'color:#64748b;'
+          return `<div style="${style}">${escapeHtml(line.text)}</div>`
+        })
+        .join('')
+    : `<span style="color:#b91c1c;text-decoration:line-through;">${escapeHtml(before)}</span>` +
+      `<span style="color:#64748b;"> → </span>` +
+      `<span style="color:#15803d;font-weight:600;">${escapeHtml(after)}</span>`
+
   return `<tr>
     <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
-    <td style="padding:6px 12px;color:#0f172a;white-space:pre-line;">
-      <span style="color:#b91c1c;text-decoration:line-through;">${escapeHtml(before)}</span>
-      <span style="color:#64748b;"> → </span>
-      <span style="color:#15803d;font-weight:600;">${escapeHtml(after)}</span>
-    </td>
+    <td style="padding:6px 12px;color:#0f172a;white-space:pre-line;">${value}</td>
   </tr>`
 }
 

@@ -22,6 +22,7 @@ import type { ResourceRow, ResourceSubmission } from '@/types'
 import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
 import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
 import type { CategoryField } from '@/lib/categories'
+import { SYNC_INTERNAL_FIELDS, DIFF_ONLY_HIDDEN_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
 
 // A select/tags field stores raw option *values*, which don't always match
 // what the admin typed as the option's label (e.g. renamed since). Resolve
@@ -67,37 +68,23 @@ export function fmt(value: unknown, field?: CategoryField): string {
   return text === '[object Object]' ? JSON.stringify(value) : text
 }
 
-// Internal bookkeeping the admin never authors directly (Google-sync
-// provenance, geocoding) — never real category content, so always excluded
-// regardless of what fields a category happens to have.
-// googleFields tracks which fields Google Places sync is allowed to
-// overwrite (see googlePlaces.ts) — the sync cron and the submission form
-// each recompute it independently and can land on the same set of fields in
-// a different order, which would otherwise show up here as a "changed"
-// field a submitter never touched.
+// Derived from lib/syncFields.ts rather than hand-listed here. This set used
+// to be its own copy and fell behind: it knew `businessStatus` but not
+// `businessStatusBefore` or `businessStatusChangedAt`, so a moderator
+// reviewing a davening-times edit was shown
+// "businessStatusBefore UNKNOWN → —" as though the submitter had proposed it.
 //
-// googleDescription is deliberately NOT in here: some categories configure it
-// as a real, human-editable "Description" field (see ListingForm.tsx's
-// intake autofill and googlePlaces.ts's recurring sync) with its own help
-// text — that's real content worth a moderator seeing, same as any other
-// configured field. Only skip it below, in the raw-leftover-details loop,
-// for categories that never configured it as a field at all — there it's
-// nothing but the sync's own fallback card-subtitle text.
-// googleAutofill is the raw per-field autofill snapshot a pending
-// submission still carries (see ListingForm.tsx) — resolved into
-// googleFields and stripped only once approved (submissionStore.ts's
-// withResolvedGoogleFields), so it's still present here for the moderator's
-// view and just as uninteresting as googleFields itself.
-const SKIP = new Set([
-  'legacyId',
-  'geo',
-  'placeId',
-  'googleSyncedAt',
-  'businessStatus',
-  'googleFields',
-  'googleAutofill',
+// googleDescription is deliberately excluded from the always-skip set: some
+// categories configure it as a real, human-editable "Description" field, and
+// there it is content worth seeing. It is skipped only in the raw-leftover
+// loop below, for categories that never configured it — there it is nothing
+// but the sync's own fallback card subtitle.
+const SKIP = new Set<string>([
+  ...SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED),
+  ...DIFF_ONLY_HIDDEN_FIELDS,
 ])
-const SKIP_WHEN_UNCONFIGURED = new Set(['googleDescription'])
+
+const SKIP_WHEN_UNCONFIGURED = new Set<string>([SHOWN_WHEN_CONFIGURED])
 
 export type FlatField = { key: string; label: string; value: string }
 
@@ -168,4 +155,70 @@ export function diffListing(
       changed: beforeValue !== afterValue,
     }
   })
+}
+
+/** One line of a multi-line field's before/after. */
+export type LineDiff = { text: string; kind: 'same' | 'removed' | 'added' }
+
+/**
+ * Line-level diff for the multi-line fields — minyanim and hours summaries.
+ *
+ * Comparing those as single strings is technically a diff and practically
+ * useless: a shul with ten minyanim who corrects one time gets all ten struck
+ * through in red and all ten repeated in green, and the moderator has to read
+ * twenty lines to find the one word that moved. That is the same "approving
+ * blind" problem the whole-field diff was built to solve, one level down.
+ *
+ * Matching is by exact line, not by position: minyanim are sorted by tefillah
+ * then time, so an edit that moves a minyan earlier shifts every line after it
+ * and a positional pairing would report the whole tail as changed.
+ *
+ * A removed line is emitted immediately before the added line that took its
+ * place, so the common case — one line edited — reads as one red line above
+ * one green line, in position. Leftovers (a genuine deletion, with nothing
+ * added to pair it with) are appended at the end rather than dropped.
+ */
+export function diffLines(before: string, after: string): LineDiff[] {
+  const beforeLines = before.split('\n')
+  const afterLines = after.split('\n')
+
+  const remaining = new Map<string, number>()
+  for (const line of beforeLines) remaining.set(line, (remaining.get(line) ?? 0) + 1)
+
+  // Which before-lines survive into `after` — the rest are candidates to pair
+  // with an added line, in their original order.
+  const surviving = new Map(remaining)
+  const added: boolean[] = afterLines.map((line) => {
+    const left = surviving.get(line) ?? 0
+    if (left > 0) {
+      surviving.set(line, left - 1)
+      return false
+    }
+    return true
+  })
+  const unpaired = beforeLines.filter((line) => {
+    const left = remaining.get(line) ?? 0
+    if (left > 0 && !afterLines.includes(line)) return true
+    return false
+  })
+
+  const out: LineDiff[] = []
+  let nextRemoved = 0
+  afterLines.forEach((line, i) => {
+    if (added[i] && nextRemoved < unpaired.length) {
+      out.push({ text: unpaired[nextRemoved++], kind: 'removed' })
+    }
+    out.push({ text: line, kind: added[i] ? 'added' : 'same' })
+  })
+  for (; nextRemoved < unpaired.length; nextRemoved++) {
+    out.push({ text: unpaired[nextRemoved], kind: 'removed' })
+  }
+  return out
+}
+
+/** Whether a field's change is worth showing line by line rather than as one
+ *  before → after pair: both sides are multi-line, so most of it is context
+ *  the reader already agrees with. */
+export function isMultiline(before: string, after: string): boolean {
+  return before.includes('\n') || after.includes('\n')
 }
