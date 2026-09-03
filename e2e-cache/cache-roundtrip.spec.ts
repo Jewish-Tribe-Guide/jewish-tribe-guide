@@ -147,18 +147,55 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     // bug is unbounded, not slow: the entry would live for cacheLife('days'),
     // so it fails at 60s as surely as at 20s. The extra headroom only covers a
     // regeneration that had to be retried.
+    // Read the row back through the UNCACHED admin route first. This splits
+    // the failure in two, and the split is the whole point: if the row does
+    // not hold the new body, the write or the sanitizer is at fault and the
+    // cache is innocent; only if it does is this a caching question at all.
+    //
+    // Worth its own assertion because the sanitizer rewrites what it stores
+    // (see the PATCH route), so "what I sent" and "what was saved" are not the
+    // same claim.
+    const savedRes = await request.get('/api/admin/pages', { headers: authHeaders })
+    const saved = (await savedRes.json()).pages.find((p: { slug: string }) => p.slug === 'about')
+    expect(
+      saved?.body,
+      'the PATCH reported success, so the stored row must hold the new body — if it does not, ' +
+        'this is a write/sanitizer failure and nothing to do with the cache',
+    ).toContain(newBody)
+
+    // Every poll's cache header and outcome, kept for the failure message.
+    // This test has been misdiagnosed twice, both times because the failure
+    // said only "the predicate never came true" — which cannot distinguish an
+    // invalidation that never arrived (HIT, forever, with the old body) from a
+    // regeneration that keeps failing behind a stale entry (STALE, forever).
+    // Those need opposite fixes, so the failure has to name which one it is.
+    const seen: string[] = []
     await expect
       .poll(
         async () => {
           const res = await request.get('/about')
-          return (await res.text()).includes(newBody)
+          const body = await res.text()
+          const hit = body.includes(newBody)
+          seen.push(`${res.headers()['x-nextjs-cache'] ?? 'no-header'}${hit ? '/new' : '/old'}`)
+          return hit
         },
         {
           timeout: 60_000,
-          message: 'waiting for the revalidated /about page to serve the new body',
+          message:
+            'waiting for the revalidated /about page to serve the new body. ' +
+            'The row already holds it (asserted above), so this is the cache. ' +
+            'x-nextjs-cache per poll follows — all HIT/old means the invalidation ' +
+            'never reached this server; STALE/old means it did and the regeneration ' +
+            'behind it is failing',
         },
       )
       .toBe(true)
+      .catch((err: Error) => {
+        // Re-thrown with the observed sequence attached, since Playwright's own
+        // poll failure does not carry it.
+        const tail = seen.slice(-12).join(' ')
+        throw new Error(`${err.message}\n\nlast ${Math.min(seen.length, 12)} of ${seen.length} polls: ${tail}`)
+      })
   } finally {
     await request.patch('/api/admin/pages/about', {
       headers: authHeaders,
