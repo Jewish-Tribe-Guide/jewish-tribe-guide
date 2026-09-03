@@ -109,7 +109,8 @@ describe('SiteHeader — several communities', () => {
       { community: philly, communities: [philly, baltimore] },
     )
 
-    await user.click(screen.getByRole('button', { name: 'Home' }))
+    // A real <Link>, not a <button> — see SiteHeader's own comment on why.
+    await user.click(screen.getByRole('link', { name: 'Home' }))
 
     expect(onGoHome).toHaveBeenCalledTimes(1)
     expect(mockRouter.push).not.toHaveBeenCalled()
