@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -618,5 +618,150 @@ describe('sendSubmissionNotification — an edit shows what changed', () => {
     mockGetResourceRowById.mockRejectedValue(new Error('gone'))
     await sendSubmissionNotification(submission)
     expect(bodyOf()).toContain('Luhv Vegan Bistro')
+  })
+})
+
+// ── Bodies, not just routing ─────────────────────────────────────────────────
+//
+// Everything above this point tested who an email goes to, what its subject
+// says, and that sending works. Almost nothing tested what is actually IN the
+// body — which is how "#undefined" reached real moderators and stayed there,
+// and how an edit notification could list a whole listing without ever saying
+// which field changed. Routing being right is not the same as the email being
+// usable.
+
+function harness() {
+  const state = { spy: vi.fn() }
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 'key_123')
+    vi.stubEnv('NODE_ENV', 'production')
+    state.spy = vi.fn().mockResolvedValue({ data: { id: 'x' }, error: null })
+    vi.mocked(Resend).mockImplementation(
+      function () { return { emails: { send: state.spy } } } as unknown as typeof Resend,
+    )
+  })
+  afterEach(() => vi.unstubAllEnvs())
+  return {
+    last: () => state.spy.mock.calls.at(-1)![0] as { to: string | string[]; subject: string; html: string },
+  }
+}
+
+describe('magic-link emails', () => {
+  const h = harness()
+  // A sign-in link IS the credential. If it never reaches the body intact,
+  // nobody can get into the admin console at all — and these two functions are
+  // near-identical, which is exactly the shape a copy/paste error hides in.
+  const link = 'https://example.com/auth/callback?token_hash=abc123&type=magiclink'
+
+  it('puts the admin link in the body, intact, addressed to the requester', async () => {
+    await sendAdminMagicLink('admin@example.com', link)
+    const { to, html } = h.last()
+    expect(to).toBe('admin@example.com')
+    // &amp; is the correct encoding of & inside an href — the browser decodes
+    // it — so assert on the token rather than the raw ampersand.
+    expect(html).toContain('token_hash=abc123')
+    expect(html).toContain('type=magiclink')
+    expect(html).toMatch(/<a href="https:\/\/example\.com\/auth\/callback\?token_hash=abc123&amp;type=magiclink"/)
+  })
+
+  it('does not cross the two sign-in emails', async () => {
+    await sendAdminMagicLink('admin@example.com', link)
+    const admin = h.last()
+    await sendInboxMagicLink('viewer@example.com', link)
+    const inbox = h.last()
+
+    expect(admin.subject).toContain('Resource Moderation')
+    expect(admin.html).toContain('Sign in to Resource Moderation')
+    expect(inbox.subject).toContain('Inbox')
+    expect(inbox.html).toContain('Sign in to the Inbox')
+    // The distinguishing half, asserted in both directions: an inbox link that
+    // says "Resource Moderation" tells the recipient they are signing in to
+    // something they may not have access to.
+    expect(inbox.html).not.toContain('Resource Moderation')
+    expect(admin.html).not.toContain('Sign in to the Inbox')
+  })
+
+  it('names the address the link is bound to, so a forwarded one is obviously wrong', async () => {
+    await sendInboxMagicLink('viewer@example.com', link)
+    expect(h.last().html).toContain('viewer@example.com')
+  })
+})
+
+describe('sendStatusChangeDigest — the body', () => {
+  const h = harness()
+  beforeEach(() => {
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+  })
+
+  it('renders each change as name, category, and from → to', async () => {
+    await sendStatusChangeDigest([
+      { name: "Goldi's", category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'philly' },
+    ])
+    const { html } = h.last()
+    // Apostrophes are left as-is: escapeHtml covers & < > " only, which is
+    // sufficient because every attribute in these templates is double-quoted.
+    expect(html).toContain("Goldi's")
+    expect(html).toContain('Food')
+    // Words, not Google's enum — "OPERATIONAL → CLOSED_PERMANENTLY" is not
+    // something an admin should have to translate at a glance.
+    expect(html).toContain('open')
+    expect(html).toContain('permanently closed')
+    expect(html).not.toContain('OPERATIONAL')
+  })
+
+  it('names the single listing in the subject, and counts them when there are several', async () => {
+    await sendStatusChangeDigest([
+      { name: 'Solo Cafe', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+    ])
+    expect(h.last().subject).toBe('Solo Cafe is now temporarily closed')
+
+    await sendStatusChangeDigest([
+      { name: 'A', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+      { name: 'B', category: 'Food', from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL', communitySlug: 'philly' },
+    ])
+    expect(h.last().subject).toBe('2 listings changed status on Google')
+  })
+
+  it('lists every change, not just the first', async () => {
+    await sendStatusChangeDigest([
+      { name: 'First Place', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+      { name: 'Second Place', category: 'Grocery', from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL', communitySlug: 'philly' },
+    ])
+    const { html } = h.last()
+    expect(html).toContain('First Place')
+    expect(html).toContain('Second Place')
+  })
+})
+
+// escapeHtml is unit-tested in isolation at the top of this file, which proves
+// the function works and nothing about whether it is actually APPLIED. These
+// values are attacker-controlled: anyone on the internet can submit a listing.
+describe('user-supplied text never reaches an inbox as live HTML', () => {
+  const h = harness()
+  const XSS = '<script>alert(1)</script>'
+
+  beforeEach(() => {
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    mockGetCategoryById.mockResolvedValue({ id: 'restaurant', label: 'Food', detailFields: [] })
+    mockGetResourceRowById.mockResolvedValue(null)
+  })
+
+  it('escapes a submitted listing name and note in the admin notification', async () => {
+    await sendSubmissionNotification({
+      id: 's1', community_id: 'philly', operation: 'create', target_type: 'listing', target_id: null,
+      payload: { category: 'restaurant', name: XSS, anchorId: 'community', distance: null, address: '1 Main St', phone: '', details: {} },
+      note: XSS, status: 'pending', submitted_by: { name: XSS },
+      created_at: '2026-01-01T00:00:00Z', reviewed_at: null, reviewed_by: null, case_number: 1,
+    } as unknown as SubmissionRow)
+    const { html } = h.last()
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('escapes a listing name in the status digest', async () => {
+    await sendStatusChangeDigest([
+      { name: XSS, category: XSS, from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+    ])
+    expect(h.last().html).not.toContain('<script>')
   })
 })
