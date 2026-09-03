@@ -66,12 +66,21 @@ export async function listApprovedResources(
 // real UUID primary key here (unlike category/form's composite keys), so
 // nothing else stops that on its own.
 export async function getResourceById(id: string, community?: string): Promise<DirectoryResource | null> {
+  const row = await getResourceRowById(id, community)
+  return row ? normalizeRow(row) : null
+}
+
+/** The same lookup, un-normalized. normalizeRow spreads `details` onto the
+ *  row and drops the object itself, which is exactly what a diff needs to
+ *  read — so anything comparing a listing field-by-field (the moderation
+ *  queue's before/after, and the notification emails) wants the raw row. */
+export async function getResourceRowById(id: string, community?: string): Promise<ResourceRow | null> {
   let query = getAdminClient().from('resource').select('*').eq('id', id)
   if (community) query = query.eq('community_id', community)
   const { data, error } = await query.maybeSingle()
 
   if (error) throw new Error(`Failed to load resource: ${error.message}`)
-  return data ? normalizeRow(data as ResourceRow) : null
+  return (data as ResourceRow) ?? null
 }
 
 // ── Archived listings (admin) ────────────────────────────────────────────────

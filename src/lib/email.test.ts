@@ -22,6 +22,9 @@ vi.mock('./communityStore', () => ({
 const mockGetCategoryById = vi.hoisted(() => vi.fn())
 vi.mock('./categoryStore', () => ({ getCategoryById: mockGetCategoryById }))
 
+const mockGetResourceRowById = vi.hoisted(() => vi.fn())
+vi.mock('./resourceStore', () => ({ getResourceRowById: mockGetResourceRowById }))
+
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
 
@@ -521,5 +524,99 @@ describe('sendEmail', () => {
         )
       })
     })
+  })
+})
+
+// An "edit" notification used to list the PROPOSED listing and nothing else —
+// every field, with no indication which one the submitter actually touched.
+// A phone-number correction arrived as a full copy of the listing, and the
+// only way to learn what was being suggested was to open the console. That is
+// the same defect the moderation queue had and fixed; the email never got it.
+describe('sendSubmissionNotification — an edit shows what changed', () => {
+  const category = {
+    id: 'restaurant',
+    label: 'Food',
+    detailFields: [{ key: 'website', type: 'url', label: 'Website' }],
+  }
+
+  const current = {
+    id: 'listing-1',
+    community_id: 'philly',
+    category: 'restaurant',
+    name: 'Luhv Vegan Bistro',
+    anchor_id: 'community',
+    distance: null,
+    address: '1131 S 19th St, Philadelphia',
+    phone: '(215) 555-0100',
+    details: { website: 'https://old.example.com' },
+    status: 'approved',
+  }
+
+  const submission = {
+    id: 'sub-1',
+    community_id: 'philly',
+    operation: 'update',
+    target_type: 'listing',
+    target_id: 'listing-1',
+    payload: {
+      category: 'restaurant',
+      name: 'Luhv Vegan Bistro',
+      anchorId: 'community',
+      distance: null,
+      address: '1131 S 19th St, Philadelphia',
+      phone: '(215) 555-0199',
+      details: { website: 'https://old.example.com' },
+    },
+    note: null,
+    status: 'pending',
+    submitted_by: null,
+    created_at: '2026-01-01T00:00:00Z',
+    reviewed_at: null,
+    reviewed_by: null,
+    case_number: 1064,
+  } as unknown as SubmissionRow
+
+  let sendSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 'key_123')
+    vi.stubEnv('NODE_ENV', 'production')
+    sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
+    vi.mocked(Resend).mockImplementation(
+      function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend,
+    )
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    mockGetCategoryById.mockResolvedValue(category)
+    mockGetResourceRowById.mockResolvedValue(current)
+  })
+
+  afterEach(() => vi.unstubAllEnvs())
+
+  function bodyOf(): string {
+    return (sendSpy.mock.calls.at(-1)![0] as { html: string }).html
+  }
+
+  it('shows the changed field as before → after', async () => {
+    await sendSubmissionNotification(submission)
+    const html = bodyOf()
+    expect(html).toContain('(215) 555-0100')
+    expect(html).toContain('(215) 555-0199')
+    expect(html).toContain('→')
+  })
+
+  it('leaves the untouched fields out of the diff', async () => {
+    await sendSubmissionNotification(submission)
+    // The website is identical in both, so it is not part of what this edit
+    // proposes — listing it is the noise that made the old email unreadable.
+    expect(bodyOf()).not.toContain('https://old.example.com')
+  })
+
+  // Best-effort email: a listing that has since been deleted, or a read that
+  // fails, must still produce a usable notification rather than throwing
+  // inside a .catch()-ed background call and sending nothing at all.
+  it('still sends when the current listing cannot be read', async () => {
+    mockGetResourceRowById.mockRejectedValue(new Error('gone'))
+    await sendSubmissionNotification(submission)
+    expect(bodyOf()).toContain('Luhv Vegan Bistro')
   })
 })

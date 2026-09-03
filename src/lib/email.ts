@@ -2,6 +2,8 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
+import { getResourceRowById } from './resourceStore'
+import { diffListing } from './submissionDiff'
 import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
@@ -64,6 +66,18 @@ function submissionRef(caseNumber: number | null | undefined): string {
  *  reference costs the subject nothing, not a leading space. */
 function subjectLine(...parts: string[]): string {
   return parts.filter(Boolean).join(' ')
+}
+
+/** A row whose value is a before → after pair, for a proposed edit. */
+function diffRow(label: string, before: string, after: string): string {
+  return `<tr>
+    <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
+    <td style="padding:6px 12px;color:#0f172a;white-space:pre-line;">
+      <span style="color:#b91c1c;text-decoration:line-through;">${escapeHtml(before)}</span>
+      <span style="color:#64748b;"> → </span>
+      <span style="color:#15803d;font-weight:600;">${escapeHtml(after)}</span>
+    </td>
+  </tr>`
 }
 
 function row(label: string, value: string): string {
@@ -392,14 +406,43 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
         return row(field?.label ?? k, formatDetailValue(v, field))
       })
       .join('')
-    proposedRows =
-      submission.operation === 'delete'
-        ? ''
-        : `${row('Category', categoryLabel)}
+    // An edit is shown as a diff against the listing it proposes to change,
+    // not as a copy of the whole listing. Listing everything is what made
+    // these unreadable: a one-field correction arrived as the entire record
+    // with nothing marking the change, so the email could not answer the only
+    // question it exists to raise, and the admin had to open the console.
+    //
+    // Same diffListing the moderation queue renders, so the two can't drift.
+    // Best-effort: the read is wrapped, and a listing that has since been
+    // deleted (or any failure) falls back to the proposed-values view rather
+    // than losing the notification entirely.
+    const current =
+      submission.operation === 'update' && submission.target_id
+        ? await getResourceRowById(submission.target_id, submission.community_id).catch(() => null)
+        : null
+
+    const proposedList = `${row('Category', categoryLabel)}
            ${row('Name', payload.name ?? '')}
            ${row('Address', payload.address ?? '')}
            ${row('Phone', payload.phone ?? '')}
            ${detailRows}`
+
+    if (submission.operation === 'delete') {
+      proposedRows = ''
+    } else if (current) {
+      const diffs = diffListing(current, payload as ResourceSubmission, category?.detailFields)
+      const changed = diffs.filter((d) => d.changed)
+      const unchanged = diffs.length - changed.length
+      proposedRows = changed.length
+        ? `${row('Listing', payload.name ?? '')}
+           ${changed.map((d) => diffRow(d.label, d.before, d.after)).join('')}
+           ${unchanged ? row('Unchanged', `${unchanged} other field${unchanged === 1 ? '' : 's'}`) : ''}`
+        : // Nothing actually differs. Worth saying plainly rather than
+          // rendering an empty table that reads like a failure to load.
+          `${row('Listing', payload.name ?? '')}${row('Proposed change', 'No field differs from the current listing')}`
+    } else {
+      proposedRows = proposedList
+    }
   }
 
   const appUrl = adminAppUrl()
