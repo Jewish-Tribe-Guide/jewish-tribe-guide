@@ -300,6 +300,37 @@ describe('GenericListingCard — count badge', () => {
     expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
+
+  // The replaced badge used to reappear the moment the card expanded — it
+  // was excluded from the collapsed row's badges (so the count could take
+  // its spot) but not from PlaceDetailBody's hiddenBadgeKeys, which only
+  // knew about what the collapsed row was actually showing. Same "12 kosher
+  // items already says yes, kosher" reasoning applies whether the card is
+  // open or closed.
+  it('does not bring the replaced badge back once the card is expanded', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
 })
 
 describe('GenericListingCard — expanded', () => {

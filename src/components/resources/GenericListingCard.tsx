@@ -495,7 +495,15 @@ export function GenericListingCard({
             onFilterBool={onFilterBool}
             onFilterSelect={onFilterSelect}
             hideOpenStatus
-            hiddenBadgeKeys={visibleHeaderBadges.map((f) => f.key)}
+            // headerBadges (the full set), not visibleHeaderBadges — a badge
+            // countReplacesKey suppressed from the collapsed row shouldn't
+            // reappear down here either. It was excluded from
+            // visibleHeaderBadges specifically so the count could take its
+            // spot, not because the badge stopped applying; showing it again
+            // once expanded reintroduces the exact "says the same thing
+            // twice" duplication the count was built to avoid, just one tap
+            // later instead of never.
+            hiddenBadgeKeys={headerBadges.map((f) => f.key)}
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
