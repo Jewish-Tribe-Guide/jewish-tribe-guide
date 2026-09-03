@@ -239,7 +239,7 @@ describe('GenericListingCard — count badge', () => {
     expect(screen.getByText('2 kosher items')).toBeInTheDocument()
   })
 
-  it('shows nothing extra when the tags field has no items, but keeps the gating badge', () => {
+  it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
     const category = makeCategory({
       detailFields: [
         { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
@@ -249,7 +249,7 @@ describe('GenericListingCard — count badge', () => {
           type: 'tags',
           showCountInHeader: true,
           countLabel: 'kosher item',
-          showIf: { field: 'isKosher', equals: true },
+          countReplacesKey: 'isKosher',
         },
       ],
     })
@@ -262,10 +262,10 @@ describe('GenericListingCard — count badge', () => {
     expect(screen.getByText('Kosher')).toBeInTheDocument()
   })
 
-  // A count already says "yes, kosher" — the plain badge the tags field's
-  // showIf gates on (e.g. a boolean "Kosher" toggle) would just repeat that
-  // in a less useful form once there's an actual count to show instead.
-  it('replaces the showIf-gating badge with the count once there are items', () => {
+  // A count already says "yes, kosher" — the badge countReplacesKey points
+  // at (e.g. a boolean "Kosher" toggle) would just repeat that in a less
+  // useful form once there's an actual count to show instead.
+  it('replaces the chosen badge with the count once there are items', () => {
     const category = makeCategory({
       detailFields: [
         { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
@@ -275,7 +275,7 @@ describe('GenericListingCard — count badge', () => {
           type: 'tags',
           showCountInHeader: true,
           countLabel: 'kosher item',
-          showIf: { field: 'isKosher', equals: true },
+          countReplacesKey: 'isKosher',
         },
       ],
     })

@@ -170,13 +170,13 @@ export function GenericListingCard({
   // explicit opt-in shape as showInHeader (text/url fields), just for tags.
   const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
   const countHeaderCount = countHeaderField ? selectValues(item[countHeaderField.key]).length : 0
-  // A count already implies the gating boolean/select this field's showIf
-  // depends on (e.g. "12 kosher items" already says "yes, kosher") — showing
-  // that field's own plain badge alongside would just repeat the same fact in
-  // a less useful form. Suppressed from the generic badge loop below only
-  // when there's an actual count to replace it with; a listing that qualifies
-  // but has no items typed in yet still gets that plain badge as before.
-  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.showIf?.field : undefined
+  // An admin-chosen field (countReplacesKey — see its own doc) whose badge
+  // would otherwise repeat the same fact the count already says, e.g. a
+  // "Kosher Items" store-type badge next to a "12 kosher items" count.
+  // Suppressed from the generic badge loop below only when there's an actual
+  // count to replace it with; a listing that qualifies but has no items
+  // typed in yet still gets that other badge as before.
+  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.countReplacesKey : undefined
   const visibleHeaderBadges = suppressedBadgeKey
     ? headerBadges.filter((f) => f.key !== suppressedBadgeKey)
     : headerBadges
@@ -417,16 +417,19 @@ export function GenericListingCard({
               const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
               return (
                 // Not clickable — unlike the other badges here, which each
-                // map to one filter control, this one's gating field
-                // (showIf) can be either boolean or select depending on the
-                // category, and there's no single filter action that's
-                // correct for both. Purely informational: it's the "there's
-                // more here" signal that pulls a shopper into expanding the
-                // card. A single string child, not adjacent expressions —
+                // map to one filter control, the field this one might be
+                // replacing (countReplacesKey) can be boolean or select
+                // depending on the category, and there's no single filter
+                // action that's correct for both. Purely informational: it's
+                // the "there's more here" signal that pulls a shopper into
+                // expanding the card. Slate, not a color already carrying
+                // meaning elsewhere on this card (green means "open"/a
+                // positive filter state) — this badge is a fact, not a
+                // status. A single string child, not adjacent expressions —
                 // JSX would otherwise split it into multiple text nodes,
                 // which still reads fine visually but breaks exact-text
                 // matching (tests, find-in-page).
-                <Chip tone="green" title={`See which ${plural} this place has`}>
+                <Chip tone="slate" title={`See which ${plural} this place has`}>
                   {`${countHeaderCount} ${plural}`}
                 </Chip>
               )
