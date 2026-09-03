@@ -1,4 +1,4 @@
-import { revalidateTag } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { getAdminUser } from '@/lib/adminAuth'
 import { TAGS } from '@/lib/cacheTags'
 import { PAGE_SLUGS, updatePage, type PageSlug } from '@/lib/pagesStore'
@@ -45,6 +45,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     // the edit shows up. 'max' keeps serving the stale value while the fresh
     // one regenerates, same as revalidatePublicContent.
     revalidateTag(TAGS.pages, 'max')
+    // And the path itself. Belt and braces, added because the tag alone
+    // demonstrably is not always enough: e2e-cache's /about test fails
+    // intermittently with x-nextjs-cache HIT on every poll — the page's own
+    // entry never even reaching STALE — while the stored row provably holds
+    // the new body. Whatever the mechanism (not reproducible on demand: warm
+    // server 15/15 and 12/12 clean, cold build 5/5 clean, yet CI fails
+    // repeatedly), the symptom is precisely "this path's cached entry was not
+    // marked", and this marks it directly.
+    //
+    // Slug-derived because the public route IS the slug — /about, /privacy —
+    // and PAGE_SLUGS is the closed set both sides share, so a third page
+    // cannot get one and not the other.
+    revalidatePath(`/${slug}`)
     return Response.json({ ok: true, page })
   } catch (err) {
     console.error('[admin/pages] PATCH failed:', err)

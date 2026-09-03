@@ -100,6 +100,31 @@ test('an admin save reaches the cached public page', async ({ request }) => {
 // invalidated by the admin route calling revalidateTag directly instead of
 // going through revalidatePublicContent — a different enough code path from
 // site-settings above that a bug in one wouldn't show up in the other.
+// This test is RUNNING again, and it is the experiment for a fix.
+//
+// What the instrumentation below established, so nobody re-derives it:
+//   • The stored row holds the new body (asserted before the poll), so the
+//     write and the sanitizer are innocent.
+//   • Every failing poll is HIT/old — 62 in CI, 61 locally. A healthy run
+//     reads STALE/old → HIT/new. The failure never reaches STALE at all, so
+//     the page's cached entry was never marked. That rules out
+//     stale-while-revalidate, which this file blamed for months.
+//   • Not reproducible on demand. Warm server 15/15 and 12/12 clean, cold
+//     build with the dist dir deleted 5/5 clean, the suite itself 5/5 clean
+//     across warm and cold. It was also wrongly called CI-only after several
+//     clean local runs, then reproduced locally within the hour.
+//
+// The mechanism was never confirmed, but the symptom was precise — this
+// path's cache entry was never marked stale — so the PATCH route now calls
+// revalidatePath(`/${slug}`) alongside revalidateTag. That closed it: this
+// test (conditionally test.fail()'d on CI while the fix was unproven) has
+// come back an unexpected PASS in CI, which is Playwright's own signal that
+// the marker is stale and needs to come off, not that anything is newly
+// broken — see AGENTS.md's "…and /about had a second problem underneath it"
+// section for the full history. If /about ever regresses with the same
+// HIT/old signature, revalidatePath isn't reaching that entry either and the
+// next suspect is the build-time prerender, not the tag — but that's a new
+// investigation to reopen, not a reason to keep this marker pre-emptively.
 test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
     accessToken: string

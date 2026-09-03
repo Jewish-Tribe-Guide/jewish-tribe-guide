@@ -197,6 +197,142 @@ describe('GenericListingCard — collapsed', () => {
   })
 })
 
+describe('GenericListingCard — count badge', () => {
+  // The count itself is bold (see GenericListingCard's own comment on why —
+  // a slate chip is deliberately quiet, but the number needs to stand out as
+  // an invitation to expand, not just another static-fact badge), which
+  // splits the badge's text across more than one DOM text node. getByText's
+  // default exact-string match only ever matches a single node, so it can't
+  // find "3 kosher items" as such even though that's what the badge reads —
+  // a function matcher against the whole chip's textContent is what Testing
+  // Library itself recommends for exactly this "text split across markup"
+  // case, rather than reaching for a brittle partial/regex match instead.
+  function chipText(text: string) {
+    return (_: string, element: Element | null) => element?.tagName === 'SPAN' && element.textContent === text
+  }
+
+  it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+  })
+
+  it('uses the singular with exactly one item', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('1 kosher item'))).toBeInTheDocument()
+    expect(screen.queryByText(chipText('1 kosher items'))).not.toBeInTheDocument()
+  })
+
+  it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags', showCountInHeader: true }],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+  })
+
+  it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: [] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.queryByText(/kosher item/)).not.toBeInTheDocument()
+    expect(screen.getByText('Kosher')).toBeInTheDocument()
+  })
+
+  // A count already says "yes, kosher" — the badge countReplacesKey points
+  // at (e.g. a boolean "Kosher" toggle) would just repeat that in a less
+  // useful form once there's an actual count to show instead.
+  it('replaces the chosen badge with the count once there are items', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
+
+  // The replaced badge used to reappear the moment the card expanded — it
+  // was excluded from the collapsed row's badges (so the count could take
+  // its spot) but not from PlaceDetailBody's hiddenBadgeKeys, which only
+  // knew about what the collapsed row was actually showing. Same "12 kosher
+  // items already says yes, kosher" reasoning applies whether the card is
+  // open or closed.
+  it('does not bring the replaced badge back once the card is expanded', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
+})
+
 describe('GenericListingCard — expanded', () => {
   it('shows the full address and an Edit button once expanded, when the category allows editing', async () => {
     const user = userEvent.setup()

@@ -37,6 +37,7 @@ describe('FieldEditor — auto-deriving a new field\'s key from its name', () =>
           canRequire
           audienceOptions={[]}
           showIfOptions={[]}
+          badgeFieldOptions={[]}
           onChange={(patch) => setField((f) => { latestField = { ...f, ...patch }; return latestField })}
           onRemove={() => {}}
           onMove={() => {}}
@@ -67,6 +68,7 @@ describe('FieldEditor — auto-deriving a new field\'s key from its name', () =>
           canRequire
           audienceOptions={[]}
           showIfOptions={[]}
+          badgeFieldOptions={[]}
           onChange={(patch) => setField((f) => { latestField = { ...f, ...patch }; return latestField })}
           onRemove={() => {}}
           onMove={() => {}}
@@ -104,6 +106,7 @@ describe('FieldEditor — auto-deriving a new field\'s key from its name', () =>
           canRequire
           audienceOptions={[]}
           showIfOptions={[]}
+          badgeFieldOptions={[]}
           onChange={(patch) => setField((f) => { latestField = { ...f, ...patch }; return latestField })}
           onRemove={() => {}}
           onMove={() => {}}

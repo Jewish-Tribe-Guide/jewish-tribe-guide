@@ -102,7 +102,7 @@ describe('Landing', () => {
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    await user.type(screen.getByLabelText('Filter resources'), 'grocery')
+    await user.type(screen.getByLabelText('Search resources'), 'grocery')
 
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
@@ -112,7 +112,7 @@ describe('Landing', () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
 
-    await user.type(screen.getByLabelText('Filter resources'), 'xyznotreal')
+    await user.type(screen.getByLabelText('Search resources'), 'xyznotreal')
 
     expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
   })
