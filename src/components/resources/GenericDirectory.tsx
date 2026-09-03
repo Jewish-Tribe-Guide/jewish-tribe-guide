@@ -286,7 +286,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the "Filters" toggle button itself so it doesn't show (opening onto an
   // empty panel) for a category with upvotes/minyanim but no filterable field.
   const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim
+  // Whether the Map button has anywhere to render — moved into this row from
+  // the header (see its own comment further down), so a category with none
+  // of the other three things in this row (no filters, no upvotes, no
+  // minyanim) still needs the row to exist just to hold Map.
+  const hasMapButton = !!(onViewMap && hasMapCategory && category.hasAddress !== false && caps.map)
+  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || hasMapButton
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -329,18 +334,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         onUp={onUp}
         actions={
           <>
-            {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (
-              <button
-                onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
-                /* Desktop only — on mobile the Map button moves into the filter/sort
-                   row (next to Filters) to keep the header uncluttered. `desktop:`
-                   not `sm:` so a landscape phone doesn't lose it from here only to
-                   not have it in the mobile row either — see globals.css. */
-                className="hidden desktop:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-              >
-                🗺️ Map
-              </button>
-            )}
             {canAdd && (
               <button
                 onClick={onAdd}
@@ -414,7 +407,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   )}
                 </button>
               )}
-              {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (
+              {onViewMap && hasMapButton && (
                 <button
                   onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
@@ -548,6 +541,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   />
                 )
               })}
+              {/* Desktop only — this used to live in the header instead (top-right,
+                  beside Add), which put it above the sticky toolbar rather than in
+                  it: scroll a few rows down and it was gone until you scrolled back
+                  up, the same problem the sticky toolbar exists to solve for search/
+                  filters/sort. Mobile already had this right — its Map button has
+                  always lived in this same row (see the row above, mobile-only). */}
+              {onViewMap && hasMapButton && (
+                <button
+                  onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
+                  className="hidden desktop:inline-flex shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  🗺️ Map
+                </button>
+              )}
               {category.externalLink && (
                 <a
                   href={category.externalLink.url}
