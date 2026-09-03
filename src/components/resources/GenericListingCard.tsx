@@ -257,8 +257,16 @@ export function GenericListingCard({
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
     // collapsed card. Corners stay clean because the header and expanded panel
-    // round their own edges below.
-    <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
+    // round their own edges below. h-full: in the desktop grid (see
+    // GenericDirectory) the wrapper div around each card is the actual grid
+    // item, and a CSS grid row already stretches that wrapper to match its
+    // tallest neighbor — but a plain block child doesn't inherit that height
+    // on its own, so without this the wrapper was the right height and the
+    // visible bordered card inside it wasn't, leaving cards in the same row
+    // looking mismatched even though their invisible containers matched. A
+    // no-op everywhere the card isn't a stretched grid item (mobile's single
+    // column, the admin category preview).
+    <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
@@ -277,19 +285,13 @@ export function GenericListingCard({
         })}
         className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
-              thing here and on the map. self-start (overriding the row's own
-              items-center) keeps it pinned near the name's own line instead
-              of drifting toward the middle of the block once a header text
-              field makes it 3 lines instead of 2 — an avatar anchored to the
-              title reads right at any height; a trailing chevron/distance
-              centered against the whole block (below) still reads right too,
-              since it's a short glance-able number, not a title. mt-0.5
-              nudges it those last couple pixels: the name's own line-height
-              leaves a little leading above the visible text, so even with
-              matching box tops the glyph itself starts lower than the icon. */}
+              thing here and on the map. mt-0.5 nudges it those last couple
+              pixels: the name's own line-height leaves a little leading
+              above the visible text, so even with matching box tops the
+              glyph itself starts lower than the icon. */}
           <CategoryIcon
             icon={category.icon}
             categoryId={category.id}
@@ -300,10 +302,16 @@ export function GenericListingCard({
 
           {/* Name + subtitle + an optional one-line "what this place is" note
               — badges get their own full-width row below (see badge row
-              further down) so they don't have to compete with the distance/
-              votes column for horizontal space and wrap early. */}
+              further down) so they don't have to compete with the name for
+              horizontal space and wrap early. line-clamp-2, not `truncate`:
+              a directory card is narrower than the full page width once it's
+              one of several columns in the desktop grid (see GenericDirectory),
+              and a business name routinely needs a second line at that width —
+              clamping bounds it instead of letting it run to three or four and
+              throwing every card in the row wildly out of proportion with its
+              neighbors. */}
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900">
+            <p className="font-semibold text-slate-900 line-clamp-2">
               {onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
                 // is block-level and stretches to fill the row, which would
@@ -326,68 +334,14 @@ export function GenericListingCard({
                 border/section treatment, which is reserved for the hairline
                 before the badge row (a genuinely different mode: read text
                 vs. scannable chips). Hidden on mobile: on a narrow card this
-                can run to 2-3 lines, and having it inside the row the trailing
-                chevron/votes/distance column centers against (below) would
-                drag that column down with it. The desktop:hidden twin further down
-                renders it instead, outside that row, so on mobile the trailing
-                column centers against just the name + address. */}
+                can run to 2-3 lines. The desktop:hidden twin further down
+                renders it instead, outside this row. */}
             {headerTextFields.map(({ f, text }) => (
               <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
             ))}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            {(upvotes || travel.length > 0 || showDistanceSlot) && (
-              // Stacked on mobile to save horizontal space; side by side from
-              // desktop up, each in its own fixed-width column so every row's
-              // upvote count lands in the same spot, and the distance column is
-              // left-aligned so the 📍/🚗/🚶 glyphs all line up under each
-              // other instead of drifting with how long the mileage text is.
-              <div className="flex flex-col items-end gap-0.5 desktop:flex-row desktop:items-center desktop:gap-4">
-                {upvotes && (
-                  <div className="desktop:flex desktop:w-10 desktop:justify-end">
-                    <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-                  </div>
-                )}
-                {travel.length > 0 ? (
-                  <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:items-start sm:w-14">
-                    {travel.map((t) => <span key={t}>{t}</span>)}
-                  </div>
-                ) : showDistanceSlot ? (
-                  // Deliberately quiet — muted, not the amber of the header's
-                  // prompt. This is the column not yet filled in, repeated
-                  // down the list; it should read as a gap the visitor can
-                  // close, never as the site asking again.
-                  //
-                  // No underline. It first carried a dotted rule meaning "a
-                  // blank to fill in", and that failed the only test that
-                  // mattered: the person who designed this app looked at it
-                  // and asked what the stray line was. An affordance nobody
-                  // recognises is just an artifact, and an artifact is
-                  // something people learn to ignore. The repetition down the
-                  // rows is what does the work here, not the decoration.
-                  <button
-                    type="button"
-                    aria-label="Set your location to see distances"
-                    onClick={(e) => {
-                      // The row's own handler expands the card. This tap was
-                      // for the picker, not for this listing's details.
-                      e.stopPropagation()
-                      document.dispatchEvent(new CustomEvent('jpc:open-location'))
-                    }}
-                    // -my-2 py-2: the label itself is 17px tall, under the
-                    // 24px WCAG-recommended tap target. Padding grows the real
-                    // hit area to ~33px; the negative margin cancels it out of
-                    // the layout so the row's height doesn't shift. Same
-                    // technique, and same reason, as the chevron below.
-                    className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
-                  >
-                    <span aria-hidden="true">📍</span>
-                    <span aria-hidden="true">—</span>
-                  </button>
-                ) : null}
-              </div>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             {headerUrlFields.map(({ f, href }) => (
               <a
                 key={f.key}
@@ -424,27 +378,93 @@ export function GenericListingCard({
           </div>
         </div>
 
+        {/* Upvote count + distance/travel — its own row, left-aligned under
+            the icon (pl-[52px] = the 40px icon + 12px gap it sits next to
+            above, same offset the badge row used to use), rather than a
+            column squeezed in beside the name. That column used to sit
+            inline with the name (see git history), which was fine while the
+            card spanned the page's full width; once desktop cards became one
+            of 2-3 grid columns (see GenericDirectory) the same column left
+            the name only a third of a viewport-width's worth of room, and a
+            longer business name wrapped to three or four lines fighting it
+            for space. Its own row gives it the whole card width instead, so
+            it never competes with the name at any card width, viewport-based
+            breakpoint or not. Left-aligned under the address/description,
+            not right-aligned against the card edge — a distance/upvote line
+            reads as more of a fact about the place, alongside its address,
+            than a stat pinned to the card's corner. */}
+        {(upvotes || travel.length > 0 || showDistanceSlot) && (
+          <div className="mt-1.5 flex justify-start pl-[52px]">
+            {/* Stacked on mobile to save horizontal space; side by side from
+                desktop up, each in its own fixed-width column so every row's
+                upvote count lands in the same spot, and the distance column is
+                left-aligned so the 📍/🚗/🚶 glyphs all line up under each
+                other instead of drifting with how long the mileage text is. */}
+            <div className="flex flex-col items-start gap-0.5 desktop:flex-row desktop:items-center desktop:gap-4">
+              {upvotes && (
+                <div className="desktop:flex desktop:w-10">
+                  <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+                </div>
+              )}
+              {travel.length > 0 ? (
+                <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:w-14">
+                  {travel.map((t) => <span key={t}>{t}</span>)}
+                </div>
+              ) : showDistanceSlot ? (
+                // Deliberately quiet — muted, not the amber of the header's
+                // prompt. This is the column not yet filled in, repeated
+                // down the list; it should read as a gap the visitor can
+                // close, never as the site asking again.
+                //
+                // No underline. It first carried a dotted rule meaning "a
+                // blank to fill in", and that failed the only test that
+                // mattered: the person who designed this app looked at it
+                // and asked what the stray line was. An affordance nobody
+                // recognises is just an artifact, and an artifact is
+                // something people learn to ignore. The repetition down the
+                // rows is what does the work here, not the decoration.
+                <button
+                  type="button"
+                  aria-label="Set your location to see distances"
+                  onClick={(e) => {
+                    // The row's own handler expands the card. This tap was
+                    // for the picker, not for this listing's details.
+                    e.stopPropagation()
+                    document.dispatchEvent(new CustomEvent('jpc:open-location'))
+                  }}
+                  // -my-2 py-2: the label itself is 17px tall, under the
+                  // 24px WCAG-recommended tap target. Padding grows the real
+                  // hit area to ~33px; the negative margin cancels it out of
+                  // the layout so the row's height doesn't shift. Same
+                  // technique, and same reason, as the chevron above.
+                  className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
+                >
+                  <span aria-hidden="true">📍</span>
+                  <span aria-hidden="true">—</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
+
         {/* Mobile-only twin of the headerTextFields loop above — see the
             comment there. Indented to align under the name/address (same
-            52px = icon + gap as the badge row below), outside the row the
-            chevron/votes/distance column centers against. */}
+            52px = icon + gap as above). */}
         {headerTextFields.map(({ f, text }) => (
           <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
         ))}
 
         {/* Badge row — the only chips that survive collapsed: Open and any
-            badge tied to an actual filter control. Below the name/distance
-            row (rather than wrapping inside the name column) so it gets the
-            whole card's width to lay out in, instead of fighting the
-            distance/votes column for space and wrapping early. The hairline
-            still spans the full card, but on sm+ the chips themselves are
-            indented to start under the name/address (sm:pl-[52px] = the 40px
-            icon + 12px gap it sits next to above), not flush with the icon's
-            own left edge — padding, not the icon's own width, so the divider
-            above stays untouched. On mobile the chips sit flush left instead,
-            since the narrower width makes the indent crowd them into wrapping. */}
+            badge tied to an actual filter control. Below the name row
+            (rather than wrapping inside the name column) so it gets the
+            whole card's width to lay out in. Flush left, same as the name —
+            it used to be indented to align under the name text rather than
+            the icon, but that reads as a stray, unexplained gap once the
+            card is narrower than the full page width (see the comment on
+            the upvote/distance row above for why "narrower than the full
+            page width" is now the normal case on desktop, not just mobile). */}
         {badgeRow && (
-          <div className="mt-2 pt-2 pl-0 sm:pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
             {badgeRow}
           </div>
         )}
