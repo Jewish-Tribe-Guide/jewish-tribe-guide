@@ -269,10 +269,18 @@ export function GenericListingCard({
                     {travel.map((t) => <span key={t}>{t}</span>)}
                   </div>
                 ) : showDistanceSlot ? (
-                  // Deliberately quiet — muted and dotted, not the amber of
-                  // the header's prompt. This is the column not yet filled
-                  // in, repeated down the list; it should read as a gap the
-                  // visitor can close, never as the site asking again.
+                  // Deliberately quiet — muted, not the amber of the header's
+                  // prompt. This is the column not yet filled in, repeated
+                  // down the list; it should read as a gap the visitor can
+                  // close, never as the site asking again.
+                  //
+                  // No underline. It first carried a dotted rule meaning "a
+                  // blank to fill in", and that failed the only test that
+                  // mattered: the person who designed this app looked at it
+                  // and asked what the stray line was. An affordance nobody
+                  // recognises is just an artifact, and an artifact is
+                  // something people learn to ignore. The repetition down the
+                  // rows is what does the work here, not the decoration.
                   <button
                     type="button"
                     aria-label="Set your location to see distances"
@@ -287,17 +295,10 @@ export function GenericListingCard({
                     // hit area to ~33px; the negative margin cancels it out of
                     // the layout so the row's height doesn't shift. Same
                     // technique, and same reason, as the chevron below.
-                    className="group -my-2 flex items-center py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
+                    className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
                   >
-                    {/* The dotted rule sits on the inner span so it hugs the
-                        text instead of stretching to the padded hit area. */}
-                    <span
-                      aria-hidden="true"
-                      className="flex items-center gap-1 whitespace-nowrap border-b border-dotted border-slate-300 group-hover:border-slate-400"
-                    >
-                      <span>📍</span>
-                      <span>—</span>
-                    </span>
+                    <span aria-hidden="true">📍</span>
+                    <span aria-hidden="true">—</span>
                   </button>
                 ) : null}
               </div>
