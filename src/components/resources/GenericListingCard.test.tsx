@@ -240,6 +240,25 @@ describe('GenericListingCard — count badge', () => {
     expect(screen.queryByText(chipText('1 kosher items'))).not.toBeInTheDocument()
   })
 
+  // Tags fields store a second array alongside the plain key — the `_sometimes`
+  // companion (TagsInput's green/amber toggle) — and PlaceDetailBody already
+  // shows those as real items, in their own section, rather than hiding them.
+  // The count used to only read the plain key, so a listing with sometimes-
+  // kosher items undercounted them right out of the badge.
+  it('counts the "_sometimes" companion array too', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread'], items_sometimes: ['Cheese'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+  })
+
   it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
     const category = makeCategory({
       detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags', showCountInHeader: true }],

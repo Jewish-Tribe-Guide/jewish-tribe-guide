@@ -169,7 +169,15 @@ export function GenericListingCard({
   // and drifts the moment someone edits it. showCountInHeader is the same
   // explicit opt-in shape as showInHeader (text/url fields), just for tags.
   const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
-  const countHeaderCount = countHeaderField ? selectValues(item[countHeaderField.key]).length : 0
+  // Tags fields store two arrays — the plain key ("always") and a
+  // `_sometimes` companion (see TagsInput's green/amber toggle) — and both
+  // are real, user-authored items (PlaceDetailBody shows "sometimes" tags in
+  // their own section rather than hiding them). Missing the companion here
+  // undercounted any listing with sometimes-kosher items.
+  const countHeaderCount = countHeaderField
+    ? selectValues(item[countHeaderField.key]).length +
+      selectValues(item[countHeaderField.key + '_sometimes']).length
+    : 0
   // An admin-chosen field (countReplacesKey — see its own doc) whose badge
   // would otherwise repeat the same fact the count already says, e.g. a
   // "Kosher Items" store-type badge next to a "12 kosher items" count.
