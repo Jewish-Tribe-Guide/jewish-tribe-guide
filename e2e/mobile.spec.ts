@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithListings, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithDistances, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -232,7 +232,11 @@ test.describe('mobile', () => {
   // and that tapping it opens the picker instead of expanding the card.
   test('the empty distance slot is tappable and opens the location picker', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    const { category } = await categoryWithListings(request, community)
+    // categoryWithDistances, not categoryWithListings: the latter's first hit
+    // in the real community is `cemetery`, which collects no address, so
+    // nothing distance-related renders there at all and this failed in CI
+    // while passing against the test project's own data.
+    const { category } = await categoryWithDistances(request, community)
 
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
