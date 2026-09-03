@@ -15,11 +15,13 @@ import CategoryIcon from '@/components/CategoryIcon'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
+import ListingDetailModal from './ListingDetailModal'
 import ShareButton from './ShareButton'
 import Chip from './Chip'
 import { PencilIcon, FlagIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
 
@@ -102,6 +104,16 @@ export function GenericListingCard({
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   const categories = useCategories()
   const community = useCommunitySlug()
+  // Which UI opens on click: a single-column mobile list has room to push an
+  // inline panel down; a multi-column desktop grid doesn't (expanding one
+  // card among several in a row has no sensible place to put the panel), so
+  // desktop opens the same content in ListingDetailModal instead. Same
+  // `expanded` state either way — just where it renders. `useIsMobile`
+  // starts `false` until mount (see its own SSR-safe note), so a listing
+  // reopened via `defaultExpanded` can flash as "modal open" on a phone for
+  // one tick before settling into the inline panel — accepted the same way
+  // the other isMobile-gated layout branches in this app already are.
+  const isMobile = useIsMobile()
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -164,6 +176,83 @@ export function GenericListingCard({
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
 
   const color = getCategoryColor(categories, category.id)
+  // Shared with ListingDetailModal's own header avatar on desktop — computed
+  // once here rather than duplicated, since it's the same "which photo (if
+  // any) represents this listing" decision either way.
+  const iconImageUrl =
+    (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
+      ? (item[PHOTO_FIELD_KEY] as string)
+      : category.iconImageUrl) ?? undefined
+
+  // The chips that survive collapsed (Open/closure + filterable badges) — see
+  // the badge row's own comment further down. Pulled into a variable, not
+  // just inline JSX, because ListingDetailModal needs the identical row
+  // restated in its own header on desktop (the card behind it is obscured by
+  // the modal's backdrop), and computing it twice would be two places a
+  // badge rule could drift out of sync.
+  const badgeRow = (isOpen || closure || headerBadges.length > 0) ? (
+    <>
+      {/* Closure outranks everything: it used to appear only once the card
+          was expanded, so a temporarily-closed shop was indistinguishable
+          from an open one in a directory list — worse, its saved hours still
+          earned it a green "Open" chip. Not a filter chip like the others;
+          there is nothing useful to filter to here. */}
+      {closure && (
+        <Chip tone={closure === 'permanent' ? 'red' : 'amber'}>{CLOSURE_LABELS[closure]}</Chip>
+      )}
+      {isOpen && (closing?.closesSoon ? (
+        <span className="relative group/tip">
+          <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
+            Closes Soon
+          </Chip>
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+            Closes at {closing.closeLabel}
+          </span>
+        </span>
+      ) : (
+        <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
+          Open
+        </Chip>
+      ))}
+      {headerBadges.flatMap((f) => {
+        const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
+        // Resolve each stored value to the option's CURRENT label — a
+        // renamed option's label should show up on cards immediately,
+        // without needing every listing that had it selected re-saved.
+        // Falls back to the raw value for anything renamed via
+        // resourceStore's applyFieldOptionRenames (which stores the new
+        // value directly) or a value with no matching option at all.
+        const labelFor = (v: string) => f.options?.find((opt) => opt.value === v)?.label ?? v
+        const note = caveatNote(f)
+        const amber = note !== null
+        return values.map((value) => {
+          const text = labelFor(value)
+          const btn = (
+            <Chip
+              tone={amber ? 'amber' : 'slate'}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (f.type === 'boolean') onFilterBool(f.key)
+                else onFilterSelect(f.key, value)
+              }}
+              title={amber ? undefined : `Filter by ${text}`}
+            >
+              {text}
+            </Chip>
+          )
+          if (!amber) return <span key={`${f.key}:${value}`}>{btn}</span>
+          return (
+            <span key={`${f.key}:${value}`} className="relative group/tip">
+              {btn}
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
+                {note || 'Not everything here is kosher — please verify.'}
+              </span>
+            </span>
+          )
+        })
+      })}
+    </>
+  ) : null
 
   return (
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
@@ -186,7 +275,7 @@ export function GenericListingCard({
           if (!p) track('listing_opened', { listing: item.name, category: category.id })
           return !p
         })}
-        className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
+        className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         <div className="flex items-center gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
@@ -204,11 +293,7 @@ export function GenericListingCard({
           <CategoryIcon
             icon={category.icon}
             categoryId={category.id}
-            iconImageUrl={
-              (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
-                ? (item[PHOTO_FIELD_KEY] as string)
-                : category.iconImageUrl) ?? undefined
-            }
+            iconImageUrl={iconImageUrl}
             color={color}
             className="h-10 w-10 text-xl self-start mt-0.5"
           />
@@ -330,7 +415,7 @@ export function GenericListingCard({
               className="-m-2.5 cursor-pointer p-2.5"
             >
               <svg
-                className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
                 fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -358,73 +443,16 @@ export function GenericListingCard({
             own left edge — padding, not the icon's own width, so the divider
             above stays untouched. On mobile the chips sit flush left instead,
             since the narrower width makes the indent crowd them into wrapping. */}
-        {(isOpen || closure || headerBadges.length > 0) && (
+        {badgeRow && (
           <div className="mt-2 pt-2 pl-0 sm:pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
-            {/* Closure outranks everything: it used to appear only once the
-                card was expanded, so a temporarily-closed shop was
-                indistinguishable from an open one in a directory list — worse,
-                its saved hours still earned it a green "Open" chip. Not a
-                filter chip like the others; there is nothing useful to filter
-                to here. */}
-            {closure && (
-              <Chip tone={closure === 'permanent' ? 'red' : 'amber'}>{CLOSURE_LABELS[closure]}</Chip>
-            )}
-            {isOpen && (closing?.closesSoon ? (
-              <span className="relative group/tip">
-                <Chip tone="greenSolid" onClick={(e) => { e.stopPropagation(); onFilterOpen() }}>
-                  Closes Soon
-                </Chip>
-                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                  Closes at {closing.closeLabel}
-                </span>
-              </span>
-            ) : (
-              <Chip tone="green" onClick={(e) => { e.stopPropagation(); onFilterOpen() }} title="Filter to places open now">
-                Open
-              </Chip>
-            ))}
-            {headerBadges.flatMap((f) => {
-              const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
-              // Resolve each stored value to the option's CURRENT label — a
-              // renamed option's label should show up on cards immediately,
-              // without needing every listing that had it selected re-saved.
-              // Falls back to the raw value for anything renamed via
-              // resourceStore's applyFieldOptionRenames (which stores the new
-              // value directly) or a value with no matching option at all.
-              const labelFor = (v: string) => f.options?.find((opt) => opt.value === v)?.label ?? v
-              const note = caveatNote(f)
-              const amber = note !== null
-              return values.map((value) => {
-                const text = labelFor(value)
-                const btn = (
-                  <Chip
-                    tone={amber ? 'amber' : 'slate'}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (f.type === 'boolean') onFilterBool(f.key)
-                      else onFilterSelect(f.key, value)
-                    }}
-                    title={amber ? undefined : `Filter by ${text}`}
-                  >
-                    {text}
-                  </Chip>
-                )
-                if (!amber) return <span key={`${f.key}:${value}`}>{btn}</span>
-                return (
-                  <span key={`${f.key}:${value}`} className="relative group/tip">
-                    {btn}
-                    <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 w-max max-w-[220px] whitespace-normal rounded bg-slate-800 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden sm:block z-10">
-                      {note || 'Not everything here is kosher — please verify.'}
-                    </span>
-                  </span>
-                )
-              })
-            })}
+            {badgeRow}
           </div>
         )}
       </div>
 
-      {expanded && (
+      {/* Mobile: inline accordion, pushing the rest of the list down — see
+          the isMobile note above the state declaration. */}
+      {isMobile && expanded && (
         <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
           <PlaceDetailBody
             item={item}
@@ -450,6 +478,30 @@ export function GenericListingCard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}
+      {!isMobile && (
+        <ListingDetailModal
+          isOpen={expanded}
+          onClose={() => setExpanded(false)}
+          item={item}
+          category={category}
+          color={color}
+          iconImageUrl={iconImageUrl}
+          name={item.name}
+          subtitle={subtitle}
+          badgeRow={badgeRow}
+          headerBadgeKeys={headerBadges.map((f) => f.key)}
+          onTagClick={onTagClick}
+          onFilterOpen={onFilterOpen}
+          onFilterBool={onFilterBool}
+          onFilterSelect={onFilterSelect}
+          onEdit={onEdit}
+          onReport={onReport}
+          canEdit={canEdit}
+          canReport={canReport}
+        />
       )}
     </div>
   )

@@ -347,8 +347,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         }
       />
 
-      {/* Controls */}
-      <div className="mb-4 space-y-2">
+      {/* Controls — sticky from lg up so search/filters/sort stay reachable
+          on a long list instead of scrolling away above the fold. `top-16`
+          matches SiteHeader's own fixed `h-16` (see that component), which
+          on desktop is always visible (never the scroll-hide behavior mobile
+          gets), so this can sit at a fixed offset rather than measuring it.
+          Not gated on the `desktop:` custom variant (640px) — that's wide
+          enough to fit the sticky bar but too narrow for it to be worth the
+          fixed screen real estate it costs; `lg:` (1024px) is where a phone
+          landscape or small tablet stops paying more than it gets back. */}
+      <div className="mb-4 space-y-2 lg:sticky lg:top-16 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
         {showSearch && (
           <div className="relative">
             <input
@@ -609,7 +617,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
         </div>
       ) : (
-        <div className="space-y-2">
+        // lg+: a grid instead of a single column — see GenericListingCard's
+        // isMobile split, which is what makes this safe: desktop cards open
+        // their detail in a dialog rather than expanding in place, so a card
+        // growing taller never has to fight its grid neighbors for space.
+        <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
           {filtered.map((item) => (
             <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
