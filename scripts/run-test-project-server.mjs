@@ -84,6 +84,79 @@ async function ensureMinimalListing(supabase) {
   if (resourceError) throw new Error(`Could not seed minimal listing: ${resourceError.message}`)
 }
 
+// Dedicated, always-present fixture for e2e-cache/cache-roundtrip.spec.ts's
+// "already-open tab picks up an admin edit" test, which needs a listing
+// category it can safely rename mid-test. It used to borrow whatever
+// category happened to be visible on /all — but integration, cache-roundtrip,
+// form-roundtrip and admin-write all write to and delete from this SAME
+// disposable project, often in parallel, so another job renaming/hiding/
+// deleting that borrowed category out from under it made the test fail with
+// "at least one listing category should be visible on /all to borrow".
+//
+// Unlike ensureMinimalListing above (which only fires when the project is
+// otherwise completely empty), this runs every boot regardless of what else
+// is in the project — the whole point is that this category is never
+// missing. Every write here is upsert/existence-checked so repeat runs don't
+// pile up duplicate listings or home-section rows.
+const CACHE_ROUNDTRIP_CATEGORY_ID = 'cache-roundtrip-seed'
+
+async function ensureCacheRoundtripFixtureCategory(supabase) {
+  const { error: categoryError } = await supabase.from('category').upsert({
+    id: CACHE_ROUNDTRIP_CATEGORY_ID,
+    label: 'Cache Round-trip Seed',
+    plural_label: 'Cache Round-trip Seed',
+    icon: '📋',
+    description: 'Dedicated fixture for the cache-roundtrip e2e suite — safe to ignore, never delete.',
+    fields: [],
+    kind: 'listing',
+    sort_order: 999,
+    upvotes_enabled: false,
+    has_address: true,
+    has_phone: true,
+    capabilities: {},
+  })
+  if (categoryError) throw new Error(`Could not seed cache-roundtrip fixture category: ${categoryError.message}`)
+
+  const { data: existingResource } = await supabase
+    .from('resource')
+    .select('id')
+    .eq('category', CACHE_ROUNDTRIP_CATEGORY_ID)
+    .limit(1)
+    .maybeSingle()
+  if (!existingResource) {
+    const { error: resourceError } = await supabase.from('resource').insert({
+      category: CACHE_ROUNDTRIP_CATEGORY_ID,
+      name: 'Cache Round-trip Seed Listing',
+      address: '1 Test St, Philadelphia, PA',
+      phone: null,
+      details: {},
+      status: 'approved',
+      reviewed_at: new Date().toISOString(),
+    })
+    if (resourceError) throw new Error(`Could not seed cache-roundtrip fixture listing: ${resourceError.message}`)
+  }
+
+  // A listing category only renders on /all if it's grouped into a home
+  // section (AllCategories.tsx groups by home_section, with a "More" bucket
+  // for anything left over — but a category in NO section at all is never a
+  // card to begin with, see resourceCards/groupCardsIntoSections in
+  // src/components/home/sections.tsx). Its own dedicated section, for the
+  // same "nothing else ever touches this" reason as the category above.
+  const { error: sectionError } = await supabase.from('home_section').upsert({
+    id: 'cache-roundtrip-seed-section',
+    // Deliberately NOT "Cache Round-trip Seed" — the category card below has
+    // that exact text too, and the roundtrip test locates the card with
+    // getByText(label, {exact: true}).first(). A same-text section heading
+    // above it wins that race (it's a heading, not a link, so the click just
+    // hits nothing) — confirmed live: the test hung for the full 90s timeout
+    // on page.waitForURL because the click never navigated anywhere.
+    title: 'E2E Fixtures',
+    sort_order: 999,
+    card_ids: [CACHE_ROUNDTRIP_CATEGORY_ID],
+  })
+  if (sectionError) throw new Error(`Could not seed home section for the cache-roundtrip fixture: ${sectionError.message}`)
+}
+
 // The form-submission suite needs a real, published, multi-step form to
 // drive through the UI — forms are server-loaded content (loadCommunityContent
 // -> listPublishedForms, cached), so it has to exist before the build starts,
@@ -145,6 +218,7 @@ async function ensureTestForm(supabase) {
 async function ensureMinimalContent() {
   const supabase = createClient(url, serviceRoleKey)
   await ensureMinimalListing(supabase)
+  await ensureCacheRoundtripFixtureCategory(supabase)
   await ensureTestForm(supabase)
 }
 

@@ -225,6 +225,10 @@ export function CardBackgroundField({
               cardImageUrl: cardImageUrl.trim() || null,
               cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
               go: () => {},
+              // A same-page anchor, not a real route — this preview isn't
+              // meant to navigate anywhere (go is a no-op for the same
+              // reason), it's just showing what the tile will look like.
+              href: '#',
             }}
             tint={TINTS[0]}
           />

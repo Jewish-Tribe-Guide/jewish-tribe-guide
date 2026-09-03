@@ -209,7 +209,10 @@ test.describe('URLs', () => {
 
     await page.goto(`/${community}/all`)
     await dismissLocationPrompt(page)
-    await page.getByRole('button', { name: eruv.pluralLabel }).first().click()
+    // A real <a>, not a <button> — see sections.tsx's CardDef.href, added so
+    // cmd/ctrl/middle-click "open in new tab" works on these tiles, which a
+    // click handler alone never supports regardless of what it navigates to.
+    await page.getByRole('link', { name: eruv.pluralLabel }).first().click()
 
     await expect(page).toHaveURL(`/${community}/eruv`)
   })
