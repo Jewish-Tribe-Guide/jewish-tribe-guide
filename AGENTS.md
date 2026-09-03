@@ -78,25 +78,39 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `playwright.*.config.ts` for the three Playwright suites, and in
 `src/test/integrationEnv.ts` for `test:integration`.
 
-One caveat when you do run them: `cache-roundtrip`'s `/about` test fails
-roughly one run in thirty, and it is not a caching bug. The invalidation was
-instrumented by reading `x-nextjs-cache` on every poll — the transition is
-STALE → HIT on every observed run, in 15/15 repeated saves against a warm
-server (median 453ms), 3/3 against a freshly booted one (~950ms), and 5/5 full
-cold runs of the suite (1.2–1.6s). An earlier version of this note blamed cold
-starts; that was wrong, and cold is under a second.
+### A wait can never outlast the test budget above it (closed)
 
-The residue is stale-while-revalidate: `revalidateTag(…, 'max')` serves the
-stale entry while regenerating behind it, so one failed regeneration — a
-transient Supabase timeout while four CI jobs share a single test project —
-leaves the old body served rather than retrying immediately. Hence the shape:
-every success under two seconds, the rare failure never landing at all. The
-poll allows 60s to absorb a retry, which costs nothing against a real bug,
-since a genuine invalidation failure lasts `cacheLife('days')` and fails at any
-timeout.
+This section used to say `cache-roundtrip`'s `/about` test failed "roughly one
+run in thirty" for reasons intrinsic to stale-while-revalidate, and told you to
+re-run before believing a failure. **That was wrong, and following it meant
+re-running a real, deterministic bug until it went away.**
 
-So: re-run before believing a failure there — but if it fails twice, believe
-it, because the measurements above say it should essentially never fail.
+The measurements it cited still stand — invalidation converges in 1.2–1.6s
+cold, STALE → HIT on every observed run — which is precisely why the diagnosis
+should have been suspect: a thing that always finishes in under two seconds
+does not intermittently need more than sixty. The poll asks for 60s. The
+config set no `timeout` at all, so Playwright's 30s default applied, and the
+poll could never reach the budget the comment beside it spends a paragraph
+justifying. CI failed with `Test timeout of 30000ms exceeded`, exactly on the
+ceiling. The "one in thirty" was a 30s cap under a 60s allowance.
+
+Generalising the check found the same shape twice more:
+`e2e/helpers.ts` fetched content on the 30s request default inside a 30s test,
+and `e2e-admin-write/community-editor.spec.ts` has three
+`toPass({ timeout: 30_000 })` revalidation polls under the same default. The
+last two pass today only because their conditions resolve quickly; the retry
+headroom written into them was fictional.
+
+Every Playwright config now sets a test `timeout` above the largest wait
+beneath it (e2e 60s, cache 90s, admin-write 60s), with `expect` left at 5s so
+a genuine regression still fails in five seconds rather than a minute.
+`src/test/e2eTimeouts.test.ts` derives this for every `playwright*.config.ts`
+by scanning its `testDir`, so a poll that asks for more than its config allows
+fails the unit suite instead of surfacing as a flake months later.
+
+The general rule, since this cost three separate investigations: **when a test
+"flakes" only in CI and the failure lands exactly on a round number, suspect a
+budget, not the system under test.**
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
