@@ -6,6 +6,7 @@ import {
   submitListingUpdate,
   submitListingDelete,
 } from '@/lib/submissionStore'
+import { after } from 'next/server'
 import { sendSubmissionNotification } from '@/lib/email'
 import { sendSubmissionConfirmation } from '@/lib/confirmationEmail'
 import { enforceRateLimit, clientIp } from '@/lib/rateLimit'
@@ -183,16 +184,31 @@ export async function POST(request: Request) {
     )
   }
 
-  notify(submission)
+  // after(), not a floating promise. These used to be started and abandoned:
+  // the handler returned its response on the next line and the invocation was
+  // free to be frozen or torn down with the sends still in flight, so whether
+  // an admin got told about a submission came down to whether the function
+  // happened to stay alive. A real submission (#1065, Mekor Habracha) landed
+  // in the database with nothing ever reaching Resend and no error anywhere,
+  // which is what that race looks like when it loses.
+  //
+  // after() is the framework's own answer (next/server): the callback runs
+  // once the response is finished, and the platform keeps the invocation alive
+  // for the route's max duration rather than reclaiming it.
+  after(() => notify(submission))
   return Response.json({ ok: true, id: submission.id })
 }
 
-// Best-effort emails — never fail the request.
-function notify(submission: SubmissionRow) {
-  sendSubmissionNotification(submission).catch((err) =>
-    console.error('[submissions] Admin notification failed:', err),
-  )
-  sendSubmissionConfirmation(submission).catch((err) =>
-    console.error('[submissions] Confirmation email failed:', err),
-  )
+// Best-effort emails — never fail the request. Awaited (not fired and
+// forgotten) so after() actually waits on them: a promise left floating
+// INSIDE the callback would be abandoned exactly the same way.
+async function notify(submission: SubmissionRow): Promise<void> {
+  await Promise.all([
+    sendSubmissionNotification(submission).catch((err) =>
+      console.error('[submissions] Admin notification failed:', err),
+    ),
+    sendSubmissionConfirmation(submission).catch((err) =>
+      console.error('[submissions] Confirmation email failed:', err),
+    ),
+  ])
 }

@@ -6,6 +6,7 @@ import { formatAnchorRule, type Minyan } from '@/lib/davening'
 import type { EnrichedSubmission, ResourceRow } from '@/types'
 import { SubmissionCard } from './SubmissionCard'
 import { makeCategory } from '@/test/providerFixtures'
+import { SYNC_INTERNAL_FIELDS, SHOWN_WHEN_CONFIGURED } from '@/lib/syncFields'
 
 afterEach(() => cleanup())
 
@@ -222,5 +223,76 @@ describe('read-only history card — who reviewed it', () => {
   it('shows nothing extra for a submission decided before reviewed_by existed', () => {
     renderHistoryCard({ reviewed_by: null })
     expect(screen.queryByText(/^by /)).not.toBeInTheDocument()
+  })
+})
+
+// Real bug, seen by a moderator: a davening-times edit rendered
+// "businessStatusBefore UNKNOWN → —" and "businessStatusChangedAt
+// 2026-08-31T… → —" under the minyanim, as though the submitter had proposed
+// something about Google's sync bookkeeping. The card kept its own hand-listed
+// skip set, which knew `businessStatus` but not the two fields beside it.
+//
+// Derived from SYNC_INTERNAL_FIELDS now, and asserted from it too — a new
+// bookkeeping key added there must never need a second edit here to stay
+// hidden, because the second edit is the one that gets forgotten.
+describe('the diff hides sync bookkeeping, all of it', () => {
+  for (const key of SYNC_INTERNAL_FIELDS.filter((k) => k !== SHOWN_WHEN_CONFIGURED)) {
+    it(`never shows ${key}`, () => {
+      renderDiff({ key, type: 'text' }, 'INTERNAL_BEFORE', 'INTERNAL_AFTER')
+      expect(screen.queryByText('INTERNAL_BEFORE')).not.toBeInTheDocument()
+      expect(screen.queryByText('INTERNAL_AFTER')).not.toBeInTheDocument()
+    })
+  }
+
+  // The one exception, and the reason the skip set can't just be the whole
+  // list: some categories configure this as a real, editable "Description".
+  it('still shows googleDescription, which some categories offer as real content', () => {
+    renderDiff({ key: SHOWN_WHEN_CONFIGURED, type: 'text' }, 'Old blurb', 'New blurb')
+    expect(screen.getByText('New blurb')).toBeInTheDocument()
+  })
+})
+
+// Reported from the real queue: Mekor Habracha has ten minyanim, one Kabbalas
+// Shabbos time gained a "(not after 7:00 PM)" clamp, and the card struck
+// through all ten in red and repeated all ten in green. Twenty lines to read
+// to find one changed word.
+describe('a multi-line field marks only the lines that changed', () => {
+  const many: Minyan[] = [
+    { id: 'a', tefillah: 'shacharis', days: ['mon', 'thu'], time: '6:45am' },
+    { id: 'b', tefillah: 'shacharis', days: ['sun'], time: '8:30am' },
+    { id: 'c', tefillah: 'kabbalas_shabbos', days: ['fri'], time: 'At Candle Lighting', anchor: 'candle_lighting', offsetMinutes: 0 },
+    { id: 'd', tefillah: 'mincha', days: ['sat'], time: '12:20pm' },
+  ]
+  // The exact edit from the report: a clamp added to one row.
+  const clamped: Minyan[] = many.map((m) =>
+    m.id === 'c'
+      ? { ...m, notAfter: '19:00', time: formatAnchorRule('candle_lighting', 0, { notAfter: '19:00' }) }
+      : m,
+  )
+
+  function lineClasses(text: RegExp): string {
+    return screen.getByText(text).className
+  }
+
+  it('strikes through only the line that was replaced', () => {
+    renderDiff({ key: 'davening', type: 'minyanim' }, many, clamped)
+    expect(lineClasses(/^Kabbalas Shabbos.*At Candle Lighting$/)).toContain('line-through')
+    expect(lineClasses(/^Kabbalas Shabbos.*not after 7:00 PM/)).toContain('text-green-700')
+  })
+
+  it('leaves the untouched minyanim as plain context, neither red nor green', () => {
+    renderDiff({ key: 'davening', type: 'minyanim' }, many, clamped)
+    for (const untouched of [/^Shacharis.*6:45am$/, /^Shacharis.*8:30am$/, /^Mincha.*12:20pm$/]) {
+      const cls = lineClasses(untouched)
+      expect(cls).not.toContain('line-through')
+      expect(cls).not.toContain('text-green-700')
+    }
+  })
+
+  it('shows each untouched minyan once, not twice', () => {
+    renderDiff({ key: 'davening', type: 'minyanim' }, many, clamped)
+    // The old rendering repeated every line — once struck through, once in
+    // green — which is what made a ten-minyan edit unreadable.
+    expect(screen.getAllByText(/^Mincha.*12:20pm$/)).toHaveLength(1)
   })
 })
