@@ -198,6 +198,19 @@ describe('GenericListingCard — collapsed', () => {
 })
 
 describe('GenericListingCard — count badge', () => {
+  // The count itself is bold (see GenericListingCard's own comment on why —
+  // a slate chip is deliberately quiet, but the number needs to stand out as
+  // an invitation to expand, not just another static-fact badge), which
+  // splits the badge's text across more than one DOM text node. getByText's
+  // default exact-string match only ever matches a single node, so it can't
+  // find "3 kosher items" as such even though that's what the badge reads —
+  // a function matcher against the whole chip's textContent is what Testing
+  // Library itself recommends for exactly this "text split across markup"
+  // case, rather than reaching for a brittle partial/regex match instead.
+  function chipText(text: string) {
+    return (_: string, element: Element | null) => element?.tagName === 'SPAN' && element.textContent === text
+  }
+
   it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
     const category = makeCategory({
       detailFields: [
@@ -209,7 +222,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
+    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
   })
 
   it('uses the singular with exactly one item', () => {
@@ -223,8 +236,8 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('1 kosher item')).toBeInTheDocument()
-    expect(screen.queryByText('1 kosher items')).not.toBeInTheDocument()
+    expect(screen.getByText(chipText('1 kosher item'))).toBeInTheDocument()
+    expect(screen.queryByText(chipText('1 kosher items'))).not.toBeInTheDocument()
   })
 
   it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
@@ -236,7 +249,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
   })
 
   it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
@@ -284,7 +297,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
 })

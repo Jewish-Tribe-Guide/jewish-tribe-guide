@@ -426,11 +426,21 @@ export function GenericListingCard({
                 // meaning elsewhere on this card (green means "open"/a
                 // positive filter state) — this badge is a fact, not a
                 // status. A single string child, not adjacent expressions —
-                // JSX would otherwise split it into multiple text nodes,
-                // which still reads fine visually but breaks exact-text
-                // matching (tests, find-in-page).
+                // JSX splits this into more than one text node on purpose —
+                // see the bold number below — which is fine for matching
+                // (tests, find-in-page) as long as it's matched by the whole
+                // element's textContent rather than an exact single-node
+                // string; see this test file's own note on the pattern.
                 <Chip tone="slate" title={`See which ${plural} this place has`}>
-                  {`${countHeaderCount} ${plural}`}
+                  {/* A slate chip is deliberately quiet — it shouldn't shout
+                      the way "Open" does — but that risked reading as just
+                      another static fact next to Restaurant/Parve instead of
+                      an invitation to expand. Bolding only the number (not
+                      recoloring the whole chip) borrows the same "128
+                      reviews" convention other directory apps use for
+                      exactly this signal, without undoing the color choice
+                      that was made deliberately. */}
+                  <span className="font-semibold">{countHeaderCount}</span> {plural}
                 </Chip>
               )
             })()}
