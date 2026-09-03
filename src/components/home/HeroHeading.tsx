@@ -45,14 +45,26 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
               value={query}
               onChange={(e) => interactive && onQueryChange(e.target.value)}
               readOnly={!interactive}
-              placeholder={isMobile ? 'Filter — food, rides, housing…' : 'Filter — kosher food, rides, housing, synagogues…'}
-              aria-label="Filter resources"
+              // "Search", not "Filter": on desktop the grid isn't on screen
+              // when this is empty, so there is nothing visible to be
+              // filtering — typing reveals results. "Filter" describes the
+              // implementation; "Search" describes what the visitor is doing.
+              //
+              // The examples name categories this community actually has.
+              // They used to read "rides, housing", which the guide no longer
+              // offers — a placeholder promising things that aren't there is
+              // worse than a generic one. "shuls" is deliberate: it isn't a
+              // category label, it's one of the hidden keywords that resolves
+              // to Synagogues, so the example doubles as a hint that everyday
+              // words work.
+              placeholder={isMobile ? 'Search — food, mikvah, shuls…' : 'Search — kosher food, mikvah, shuls, schools…'}
+              aria-label="Search resources"
               className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
             {query && interactive && (
               <button
                 onClick={() => onQueryChange('')}
-                aria-label="Clear filter"
+                aria-label="Clear search"
                 className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
               >
                 ✕
