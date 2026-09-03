@@ -114,27 +114,18 @@ test('an admin save reaches the cached public page', async ({ request }) => {
 //     across warm and cold. It was also wrongly called CI-only after several
 //     clean local runs, then reproduced locally within the hour.
 //
-// The mechanism is still unknown. What is known precisely is the symptom —
-// this path's entry was not marked — so the PATCH route now calls
-// revalidatePath(`/${slug}`) alongside revalidateTag. If that closes it, this
-// test goes green in CI and the hypothesis was right. If it fails again with
-// the same HIT/old signature, revalidatePath does not reach that entry either
-// and the next suspect is the build-time prerender, not the tag.
-//
-// Left running deliberately: quarantining it hid the only instrument that can
-// tell us whether the fix worked.
+// The mechanism was never confirmed, but the symptom was precise — this
+// path's cache entry was never marked stale — so the PATCH route now calls
+// revalidatePath(`/${slug}`) alongside revalidateTag. That closed it: this
+// test (conditionally test.fail()'d on CI while the fix was unproven) has
+// come back an unexpected PASS in CI, which is Playwright's own signal that
+// the marker is stale and needs to come off, not that anything is newly
+// broken — see AGENTS.md's "…and /about had a second problem underneath it"
+// section for the full history. If /about ever regresses with the same
+// HIT/old signature, revalidatePath isn't reaching that entry either and the
+// next suspect is the build-time prerender, not the tag — but that's a new
+// investigation to reopen, not a reason to keep this marker pre-emptively.
 test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
-  // Inside the test body on purpose: at file scope this marks every test in
-  // the file, which is how the previous two attempts at quarantining it took
-  // the other three tests down with it.
-  // Conditional, and only on CI, because this passes locally every time —
-  // an unconditional test.fail() would turn every local run red for the
-  // opposite reason. Scoped this way the marker states precisely what is
-  // known: green here, red there.
-  //
-  // Bare `test.fail()` at file scope, for the record, applies to every test
-  // in the file — it took the other three down with it.
-  test.fail(!!process.env.CI, 'CI-only: invalidation never reaches the server (all HIT/old) — under investigation')
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
     accessToken: string
   }
