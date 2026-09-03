@@ -51,6 +51,7 @@ export function GenericListingCard({
   onEdit,
   onReport,
   showCategoryLabel = true,
+  showDistanceSlot = false,
   onNameClick,
 }: {
   item: DirectoryResource
@@ -63,6 +64,21 @@ export function GenericListingCard({
    *  single-category directory page, which already says the category once in
    *  its header. Defaults on. */
   showCategoryLabel?: boolean
+  /** Hold the distance column open with a tappable placeholder when this
+   *  listing has no distance to show.
+   *
+   *  The column used to render only when there WAS a distance, so with no
+   *  location set it wasn't empty — it was absent, and every card looked
+   *  complete. Nothing in the list hinted that distances existed, which is
+   *  why the feature went unnoticed: the only clue was a single pill at the
+   *  top of the directory, easily read as the first-load location popup the
+   *  visitor had already dismissed.
+   *
+   *  Set by the directory, which knows a location is unset AND that this
+   *  category is distance-based (`addressPrompt` — see ResourceLoader).
+   *  Off by default: cross-category lists like the landing search render this
+   *  same card with no directory around them. */
+  showDistanceSlot?: boolean
   onVote: (count: number) => void
   onTagClick: (tag: string) => void
   /** When provided, clicking the listing's name navigates to that item's own
@@ -236,7 +252,7 @@ export function GenericListingCard({
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {(upvotes || travel.length > 0) && (
+            {(upvotes || travel.length > 0 || showDistanceSlot) && (
               // Stacked on mobile to save horizontal space; side by side from
               // desktop up, each in its own fixed-width column so every row's
               // upvote count lands in the same spot, and the distance column is
@@ -248,11 +264,42 @@ export function GenericListingCard({
                     <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
                   </div>
                 )}
-                {travel.length > 0 && (
+                {travel.length > 0 ? (
                   <div className="flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:items-start sm:w-14">
                     {travel.map((t) => <span key={t}>{t}</span>)}
                   </div>
-                )}
+                ) : showDistanceSlot ? (
+                  // Deliberately quiet — muted and dotted, not the amber of
+                  // the header's prompt. This is the column not yet filled
+                  // in, repeated down the list; it should read as a gap the
+                  // visitor can close, never as the site asking again.
+                  <button
+                    type="button"
+                    aria-label="Set your location to see distances"
+                    onClick={(e) => {
+                      // The row's own handler expands the card. This tap was
+                      // for the picker, not for this listing's details.
+                      e.stopPropagation()
+                      document.dispatchEvent(new CustomEvent('jpc:open-location'))
+                    }}
+                    // -my-2 py-2: the label itself is 17px tall, under the
+                    // 24px WCAG-recommended tap target. Padding grows the real
+                    // hit area to ~33px; the negative margin cancels it out of
+                    // the layout so the row's height doesn't shift. Same
+                    // technique, and same reason, as the chevron below.
+                    className="group -my-2 flex items-center py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
+                  >
+                    {/* The dotted rule sits on the inner span so it hugs the
+                        text instead of stretching to the padded hit area. */}
+                    <span
+                      aria-hidden="true"
+                      className="flex items-center gap-1 whitespace-nowrap border-b border-dotted border-slate-300 group-hover:border-slate-400"
+                    >
+                      <span>📍</span>
+                      <span>—</span>
+                    </span>
+                  </button>
+                ) : null}
               </div>
             )}
             {headerUrlFields.map(({ f, href }) => (

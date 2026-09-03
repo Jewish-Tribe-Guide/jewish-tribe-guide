@@ -616,6 +616,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               item={item}
               category={category}
               showCategoryLabel={false}
+              // Same signal the header's prompt already uses: no location set,
+              // and this category is distance-based. In the row it is the one
+              // that gets seen — the header's pill sits above the fold once.
+              showDistanceSlot={addressPrompt}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}
