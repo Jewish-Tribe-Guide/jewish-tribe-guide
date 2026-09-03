@@ -357,7 +357,14 @@ export function GenericListingCard({
             {/* The row's actual accessible toggle — see the row div's own
                 comment above. No onClick: relies on the native click a
                 button dispatches on mouse activation or Enter/Space
-                bubbling up to the row's handler, which does the real work. */}
+                bubbling up to the row's handler, which does the real work.
+                Still present and still carries aria-expanded/aria-label on
+                desktop even though its chevron doesn't render there —
+                removing the button itself, not just its icon, would leave
+                keyboard/screen-reader visitors with no way to open the
+                dialog at all (the row can't be a button — see that same
+                comment on why), and GenericListingCard.test.tsx queries this
+                exact button by role. */}
             <button
               type="button"
               aria-expanded={expanded}
@@ -368,8 +375,15 @@ export function GenericListingCard({
               // effect shifting anything in the row around it.
               className="-m-2.5 cursor-pointer p-2.5"
             >
+              {/* Mobile only — a chevron that rotates open/closed reads
+                  right for the inline accordion (see the isMobile branch
+                  further down). Desktop opens a dialog instead, which a
+                  rotating "this expands right here" arrow no longer
+                  describes, and the whole card is already clickable with its
+                  own hover state, so there's nothing left for it to point
+                  at. */}
               <svg
-                className={`w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
+                className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
                 fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -396,18 +410,18 @@ export function GenericListingCard({
         {(upvotes || travel.length > 0 || showDistanceSlot) && (
           <div className="mt-1.5 flex justify-start pl-[52px]">
             {/* Stacked on mobile to save horizontal space; side by side from
-                desktop up, each in its own fixed-width column so every row's
-                upvote count lands in the same spot, and the distance column is
-                left-aligned so the 📍/🚗/🚶 glyphs all line up under each
-                other instead of drifting with how long the mileage text is. */}
-            <div className="flex flex-col items-start gap-0.5 desktop:flex-row desktop:items-center desktop:gap-4">
+                desktop up, close together with a thin "|" between — the
+                upvote count and the distance are two short facts read as one
+                line, not two columns needing their own aligned width. */}
+            <div className="flex flex-col items-start gap-1 desktop:flex-row desktop:items-center desktop:gap-2">
               {upvotes && (
-                <div className="desktop:flex desktop:w-10">
-                  <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-                </div>
+                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+              )}
+              {upvotes && (travel.length > 0 || showDistanceSlot) && (
+                <span aria-hidden="true" className="hidden desktop:inline text-slate-300">|</span>
               )}
               {travel.length > 0 ? (
-                <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap sm:w-14">
+                <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
                   {travel.map((t) => <span key={t}>{t}</span>)}
                 </div>
               ) : showDistanceSlot ? (
@@ -437,7 +451,7 @@ export function GenericListingCard({
                   // hit area to ~33px; the negative margin cancels it out of
                   // the layout so the row's height doesn't shift. Same
                   // technique, and same reason, as the chevron above.
-                  className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer sm:w-14"
+                  className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer"
                 >
                   <span aria-hidden="true">📍</span>
                   <span aria-hidden="true">—</span>
