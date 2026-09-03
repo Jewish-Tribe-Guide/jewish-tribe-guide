@@ -197,6 +197,98 @@ describe('GenericListingCard — collapsed', () => {
   })
 })
 
+describe('GenericListingCard — count badge', () => {
+  it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('3 kosher items')).toBeInTheDocument()
+  })
+
+  it('uses the singular with exactly one item', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('1 kosher item')).toBeInTheDocument()
+    expect(screen.queryByText('1 kosher items')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags', showCountInHeader: true }],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+  })
+
+  it('shows nothing extra when the tags field has no items, but keeps the gating badge', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          showIf: { field: 'isKosher', equals: true },
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: [] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.queryByText(/kosher item/)).not.toBeInTheDocument()
+    expect(screen.getByText('Kosher')).toBeInTheDocument()
+  })
+
+  // A count already says "yes, kosher" — the plain badge the tags field's
+  // showIf gates on (e.g. a boolean "Kosher" toggle) would just repeat that
+  // in a less useful form once there's an actual count to show instead.
+  it('replaces the showIf-gating badge with the count once there are items', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          showIf: { field: 'isKosher', equals: true },
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('2 kosher items')).toBeInTheDocument()
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
+})
+
 describe('GenericListingCard — expanded', () => {
   it('shows the full address and an Edit button once expanded, when the category allows editing', async () => {
     const user = userEvent.setup()

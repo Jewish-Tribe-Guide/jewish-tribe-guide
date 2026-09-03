@@ -159,6 +159,28 @@ export function GenericListingCard({
     return String(item[f.caveat.noteField] ?? '').trim()
   }
 
+  // "N {items}" on the collapsed card for a tags field an admin has opted in
+  // via showCountInHeader — a grocery category's "which kosher items does
+  // this place carry" is the motivating case, but this isn't hardcoded to
+  // kosher: tags fields are excluded from badgeFields entirely (they're meant
+  // for the expanded panel), and a field's key/label/tagGroup are all
+  // per-community admin text with nothing stable to match against — tagGroup
+  // in particular is auto-derived from the label (see categoryEditorLogic.ts)
+  // and drifts the moment someone edits it. showCountInHeader is the same
+  // explicit opt-in shape as showInHeader (text/url fields), just for tags.
+  const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
+  const countHeaderCount = countHeaderField ? selectValues(item[countHeaderField.key]).length : 0
+  // A count already implies the gating boolean/select this field's showIf
+  // depends on (e.g. "12 kosher items" already says "yes, kosher") — showing
+  // that field's own plain badge alongside would just repeat the same fact in
+  // a less useful form. Suppressed from the generic badge loop below only
+  // when there's an actual count to replace it with; a listing that qualifies
+  // but has no items typed in yet still gets that plain badge as before.
+  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.showIf?.field : undefined
+  const visibleHeaderBadges = suppressedBadgeKey
+    ? headerBadges.filter((f) => f.key !== suppressedBadgeKey)
+    : headerBadges
+
   const showAddress = category.hasAddress !== false && !!item.address
   const subtitleParts = [showCategoryLabel ? category.label : null, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
@@ -358,7 +380,7 @@ export function GenericListingCard({
             own left edge — padding, not the icon's own width, so the divider
             above stays untouched. On mobile the chips sit flush left instead,
             since the narrower width makes the indent crowd them into wrapping. */}
-        {(isOpen || closure || headerBadges.length > 0) && (
+        {(isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0) && (
           <div className="mt-2 pt-2 pl-0 sm:pl-[52px] border-t border-slate-100 flex flex-wrap items-center gap-1.5">
             {/* Closure outranks everything: it used to appear only once the
                 card was expanded, so a temporarily-closed shop was
@@ -383,7 +405,33 @@ export function GenericListingCard({
                 Open
               </Chip>
             ))}
-            {headerBadges.flatMap((f) => {
+            {countHeaderCount > 0 && countHeaderField && (() => {
+              // countLabel is meant to be a clean singular noun ("kosher
+              // item"), but the fallback — a field's own `label`, just
+              // lowercased — is often already phrased as a plural ("Kosher
+              // Items available"). Blindly appending "s" to that doubled up
+              // ("kosher itemss"); only add it when the noun doesn't already
+              // end in one, which covers the fallback case without needing
+              // real pluralization logic this app has no other use for.
+              const noun = countHeaderField.countLabel ?? countHeaderField.label.toLowerCase()
+              const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
+              return (
+                // Not clickable — unlike the other badges here, which each
+                // map to one filter control, this one's gating field
+                // (showIf) can be either boolean or select depending on the
+                // category, and there's no single filter action that's
+                // correct for both. Purely informational: it's the "there's
+                // more here" signal that pulls a shopper into expanding the
+                // card. A single string child, not adjacent expressions —
+                // JSX would otherwise split it into multiple text nodes,
+                // which still reads fine visually but breaks exact-text
+                // matching (tests, find-in-page).
+                <Chip tone="green" title={`See which ${plural} this place has`}>
+                  {`${countHeaderCount} ${plural}`}
+                </Chip>
+              )
+            })()}
+            {visibleHeaderBadges.flatMap((f) => {
               const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
               // Resolve each stored value to the option's CURRENT label — a
               // renamed option's label should show up on cards immediately,
@@ -434,7 +482,7 @@ export function GenericListingCard({
             onFilterBool={onFilterBool}
             onFilterSelect={onFilterSelect}
             hideOpenStatus
-            hiddenBadgeKeys={headerBadges.map((f) => f.key)}
+            hiddenBadgeKeys={visibleHeaderBadges.map((f) => f.key)}
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">

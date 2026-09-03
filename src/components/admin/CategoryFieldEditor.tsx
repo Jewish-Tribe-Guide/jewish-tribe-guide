@@ -128,6 +128,8 @@ export function FieldEditor({
     if (type !== 'tags') {
       patch.expandedOnly = undefined
       patch.fixedVocabulary = undefined
+      patch.showCountInHeader = undefined
+      patch.countLabel = undefined
     }
     onChange(patch)
   }
@@ -299,6 +301,34 @@ export function FieldEditor({
               Without a limit, a long entry truncates with &ldquo;&hellip;&rdquo; there, and still shows in full once
               the card is expanded.
             </p>
+          )}
+        </div>
+      )}
+
+      {f.type === 'tags' && (
+        <div>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!f.showCountInHeader}
+              onChange={(e) => onChange({ showCountInHeader: e.target.checked })}
+              className="rounded border-slate-300"
+            />
+            Show a count on the collapsed card (e.g. &ldquo;12 kosher items&rdquo;)
+          </label>
+          {f.showCountInHeader && (
+            <label className="block ml-5 mt-1 sm:w-1/2">
+              <span className={fieldLabel}>Singular word for the count (optional)</span>
+              <input
+                value={f.countLabel ?? ''}
+                onChange={(e) => onChange({ countLabel: e.target.value || undefined })}
+                className={inputClass}
+                placeholder={f.label ? `Defaults to “${f.label.toLowerCase()}”` : 'e.g. kosher item'}
+              />
+              <span className="block text-[11px] text-muted mt-0.5">
+                Just the singular — &ldquo;s&rdquo; is added automatically for anything but exactly one.
+              </span>
+            </label>
           )}
         </div>
       )}

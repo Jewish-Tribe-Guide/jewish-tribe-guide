@@ -147,6 +147,22 @@ export type CategoryField = {
    *  today's behavior: an unbounded value truncates with an ellipsis in the
    *  header, and the full text still shows once expanded. */
   headerMaxLength?: number
+  /** For `type: 'tags'`: show a "N {countLabel}" badge on the collapsed card
+   *  (e.g. "12 kosher items") instead of leaving this field's tags invisible
+   *  until expanded — a tags field otherwise never appears in the collapsed
+   *  header at all. Off by default: most tags fields (a niche secondary list)
+   *  are exactly the kind of detail that should stay one tap away, not crowd
+   *  every card; this is for the rarer case where the tag count itself is the
+   *  category's main selling point (grocery's kosher items) and a shopper
+   *  needs to sense there's something worth expanding for. When there's a
+   *  count to show, it replaces this field's own showIf-gated badge (if any)
+   *  in the header — "12 kosher items" already implies "yes, kosher", and
+   *  showing both said the same thing twice. */
+  showCountInHeader?: boolean
+  /** For `type: 'tags'` with `showCountInHeader`: the singular noun for the
+   *  count badge (e.g. "kosher item" → "1 kosher item" / "12 kosher items").
+   *  Falls back to this field's own `label`, lowercased, when unset. */
+  countLabel?: string
   /** Renders in the submission form alongside Address/Name/Phone, above the
    *  divider that starts the category-specific fields — for a field Google
    *  can autofill the same way it does those three (Hours, Website, a
