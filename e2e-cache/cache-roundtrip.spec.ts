@@ -284,15 +284,20 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   await notNow.click().catch(() => {})
   await page.locator('header').first().waitFor({ state: 'visible' })
 
-  // Borrowed, not created, and picked from what's actually on the page rather
-  // than off the API list: "Cache Round-trip Seed" is a real listing category
-  // but belongs to no home section, so it never renders here — picking it
-  // leaves every click below hitting nothing. Restored in `finally`.
-  const visibleLabels = await page.locator('main button').allTextContents()
+  // A dedicated fixture (scripts/run-test-project-server.mjs), not borrowed
+  // from whatever else happens to be visible on /all right now. This used to
+  // scan the page for any real listing category and rename that instead —
+  // but integration, cache-roundtrip, form-roundtrip and admin-write all
+  // write to and delete from this same disposable project, often in
+  // parallel, so another job renaming/hiding/deleting the borrowed category
+  // out from under this one made it fail intermittently with "at least one
+  // listing category should be visible on /all to borrow". Nothing else
+  // touches this category, so nothing else can race it. Restored in
+  // `finally` regardless (a rename is still a rename).
   const target = (categories as { id: string; pluralLabel: string; kind: string }[]).find(
-    (c) => c.kind === 'listing' && visibleLabels.includes(c.pluralLabel),
+    (c) => c.id === 'cache-roundtrip-seed',
   )
-  expect(target, 'at least one listing category should be visible on /all to borrow').toBeTruthy()
+  expect(target, 'the cache-roundtrip fixture category should exist — see run-test-project-server.mjs').toBeTruthy()
   const slug = target!.id
   const originalLabel = target!.pluralLabel
   const newLabel = `${originalLabel} (focus refresh ${Date.now() % 100000})`
