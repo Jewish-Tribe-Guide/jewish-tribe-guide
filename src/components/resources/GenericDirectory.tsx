@@ -634,7 +634,17 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // isMobile split, which is what makes this safe: desktop cards open
         // their detail in a dialog rather than expanding in place, so a card
         // growing taller never has to fight its grid neighbors for space.
-        <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 xl:grid-cols-3">
+        //
+        // auto-fit, not a fixed grid-cols-2/xl:grid-cols-3: a sparse category
+        // (Networking's 7 plain name+link cards, WhatsApp Groups' 2) doesn't
+        // know how many items it has ahead of time, and a fixed column count
+        // left short categories with cards pinned to the top-left of a
+        // max-w-6xl row and a wide dead gap where the unused columns would
+        // have been — auto-fit's empty tracks collapse instead of reserving
+        // that space, so what actually renders always matches what's there:
+        // wide-ish cards when there are only one or two, the same ~3-up
+        // layout as before once there are enough to fill it.
+        <div className="space-y-2 lg:space-y-0 lg:grid lg:gap-3 lg:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
           {filtered.map((item) => (
             <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
