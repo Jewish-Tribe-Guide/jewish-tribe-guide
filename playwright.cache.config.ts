@@ -69,6 +69,13 @@ const BASE_URL = `http://localhost:${PORT}`
 export default defineConfig({
   testDir: './e2e-cache',
   expect: { timeout: 5_000 },
+  // Above the 60s the /about invalidation poll asks for. Without this the
+  // config took Playwright's 30s default, so that poll could never actually
+  // reach its own budget — the test died at 30s while the comment beside the
+  // poll explained, in detail, why 60s was the right number. That is what the
+  // "roughly one in thirty" flake was: not stale-while-revalidate needing one
+  // more second, but a ceiling half the height of the allowance below it.
+  timeout: 90_000,
   // One admin session, one shared site_settings row — the round-trip test
   // isn't safe to run concurrently with a copy of itself.
   fullyParallel: false,

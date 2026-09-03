@@ -53,6 +53,10 @@ export type Category = {
   label: string
   pluralLabel: string
   kind: string
+  /** False when the category collects no address at all (WhatsApp groups,
+   *  Cemetery). Those aren't distance-based, so nothing measures or prompts
+   *  for a location on them — see ResourceLoader's `addressPrompt`. */
+  hasAddress?: boolean
 }
 
 /** Every category for a community, straight from the app's own API. */
@@ -76,6 +80,29 @@ export async function categoryWithListings(
     }
   }
   throw new Error('No listing category has any listings — cannot test a populated directory')
+}
+
+/** A listing-kind category that is actually distance-based — `hasAddress` is
+ *  not false — and has listings. For anything asserting on distances or the
+ *  location prompt, neither of which exists on a category that collects no
+ *  address.
+ *
+ *  categoryWithListings is NOT a substitute: it returns the first category
+ *  with any listings at all, and in the real community that is `cemetery`,
+ *  which has hasAddress false. A distance test built on it finds nothing and
+ *  fails, having exercised the wrong category — the same trap
+ *  categoryWithMapPoints below was added for. It has now caught two tests. */
+export async function categoryWithDistances(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; count: number }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    const resources = (body.resources ?? []) as unknown[]
+    if (body.ok && resources.length > 0) return { category, count: resources.length }
+  }
+  throw new Error('No distance-based listing category has any listings')
 }
 
 /** A listing-kind category with an Hours-type field and at least one real

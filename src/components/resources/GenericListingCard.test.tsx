@@ -225,3 +225,89 @@ describe('GenericListingCard — expanded', () => {
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
 })
+
+// ── The empty distance slot ───────────────────────────────────────────────────
+//
+// The distance column used to render only when there was a distance to show,
+// so with no location set it wasn't empty — it was absent. Every card looked
+// complete, and nothing on the page hinted that distances existed at all. The
+// only clue was one pill at the top of the directory, which reads like the
+// first-load location popup the visitor already dismissed.
+//
+// Holding the slot open puts the hint in the row, where the eye already is,
+// repeated down the whole list — without interrupting anything.
+
+describe('GenericListingCard — distance slot', () => {
+  const slotLabel = /set your location to see distances/i
+
+  it('holds the slot open when there is no location set', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
+  })
+
+  it('shows the real distance instead once there is one', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing({ milesFromAddress: 0.42 })}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.getByText(/0\.4 mi/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+  })
+
+  // Search results and the home screen's cross-category lists render the same
+  // card without a directory around it, and have nowhere to send the tap.
+  it('stays out of the way when the caller does not ask for it', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+  })
+
+  it('opens the location picker without expanding the card', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-location', opened)
+
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: slotLabel }))
+
+    expect(opened).toHaveBeenCalledTimes(1)
+    // The row's own click handler expands the card. A tap meant for the slot
+    // must not also do that — the visitor asked for the location picker, not
+    // for this listing's details.
+    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+
+    document.removeEventListener('jpc:open-location', opened)
+  })
+})

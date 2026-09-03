@@ -1,83 +1,119 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Two numbers have to stay in order for the e2e suite's content fetches to be
-// able to outlast a contended moment on a CI runner:
+// A wait inside a test can never outlast the test's own budget.
 //
-//   e2e/helpers.ts API_TIMEOUT  <  playwright.config.ts timeout
+// Playwright defaults both to 30s, so a config that sets no `timeout` gives
+// every internal wait a ceiling exactly as high as itself — and a poll or
+// request asking for more than 30s silently gets less. The failure looks like
+// flakiness, and reads as one, because the number in the test says otherwise.
 //
-// At Playwright's defaults they are the same number (30s each), so the test
-// budget expires at the exact instant the request gives up — the request's own
-// timeout can never take effect, and a slow read surfaces as an opaque
-// whole-test timeout rather than a named URL. That is how CI failed on
-// mobile.spec.ts's hours-editor test inside categoryWithHoursField, on a URL
-// warmup.setup.ts had already warmed, while 158 tests around it passed.
+// This has now happened twice:
 //
-// Either number is a one-token edit, and getting them the wrong way round
-// breaks nothing locally and resurfaces a load-dependent CI failure weeks
-// later. Asserted from the sources so it cannot drift silently.
+//  - e2e/helpers.ts fetches content with the request default (30s) inside a
+//    30s test, so a contended read on a CI runner killed the test at the exact
+//    moment the request would have given up.
+//  - e2e-cache's /about test polls for 60s for the revalidated page, in a
+//    config with no `timeout` at all. It could never poll past 30s. The
+//    comment beside it carefully justifies 60s; the ceiling was 30s the whole
+//    time, and this was written off as "one run in thirty".
+//
+// So: every Playwright config's test budget must exceed the largest wait any
+// test under it asks for. Conservative on purpose — it compares against the
+// largest wait in the whole directory rather than per test, which can ask for
+// a slightly higher config timeout than strictly needed but can never let a
+// too-low one through.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HELPERS = readFileSync('e2e/helpers.ts', 'utf-8')
-const CONFIG = readFileSync('playwright.config.ts', 'utf-8')
+const PLAYWRIGHT_DEFAULT_TIMEOUT = 30_000
 
-function ms(literal: string | undefined, what: string): number {
-  if (!literal) throw new Error(`Could not find ${what} — this test needs updating alongside the rename`)
+/** `expect: { timeout: N }` is a per-assertion budget, deliberately short, and
+ *  not a wait a test sits through — excluded from the comparison. */
+const EXPECT_TIMEOUT_RE = /expect:\s*\{\s*timeout:\s*([\d_]+)/
+
+function num(literal: string): number {
   return Number(literal.replace(/_/g, ''))
 }
 
-/** `const API_TIMEOUT = 45_000` in e2e/helpers.ts. */
-const API_TIMEOUT = ms(HELPERS.match(/API_TIMEOUT\s*=\s*([\d_]+)/)?.[1], 'API_TIMEOUT in e2e/helpers.ts')
+/** Every Playwright config in the repo root, with its testDir. */
+function configs(): Array<{ file: string; dir: string; timeout: number; expectTimeout: number }> {
+  return readdirSync('.')
+    .filter((f) => /^playwright.*\.config\.ts$/.test(f))
+    .map((file) => {
+      const src = readFileSync(file, 'utf-8')
+      const dir = src.match(/testDir:\s*'\.\/([^']+)'/)?.[1]
+      if (!dir) throw new Error(`${file} has no testDir — this test needs updating`)
+      const explicit = src.match(/^ {2}timeout:\s*([\d_]+)/m)?.[1]
+      return {
+        file,
+        dir,
+        timeout: explicit ? num(explicit) : PLAYWRIGHT_DEFAULT_TIMEOUT,
+        expectTimeout: num(src.match(EXPECT_TIMEOUT_RE)?.[1] ?? '5000'),
+      }
+    })
+}
 
-/** Playwright's own default when a config sets no explicit `timeout`. */
-const PLAYWRIGHT_DEFAULT_TIMEOUT = 30_000
+/** The largest `timeout: N` any source under `dir` asks to wait for, ignoring
+ *  `test.setTimeout(...)` (which raises the budget rather than consuming it). */
+function largestWait(dir: string): { ms: number; where: string } {
+  let worst = { ms: 0, where: '(none)' }
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.ts'))) {
+    const src = readFileSync(`${dir}/${file}`, 'utf-8')
+    for (const m of src.matchAll(/timeout:\s*([\d_]+)/g)) {
+      const ms = num(m[1])
+      if (ms > worst.ms) worst = { ms, where: `${dir}/${file}` }
+    }
+    // A bare constant feeding a request/poll option counts too — e2e/helpers.ts
+    // holds its budget in API_TIMEOUT rather than inline.
+    for (const m of src.matchAll(/_TIMEOUT\s*=\s*([\d_]+)/g)) {
+      const ms = num(m[1])
+      if (ms > worst.ms) worst = { ms, where: `${dir}/${file}` }
+    }
+  }
+  return worst
+}
 
-/** The top-level `timeout:` in playwright.config.ts — anchored to its own line
- *  at the config's indentation, so it can't match the `timeout` nested inside
- *  `expect: { … }` (which is a different budget, asserted separately below).
- *
- *  Falls back to Playwright's default rather than throwing: deleting the line
- *  is the most likely way to break this, and "no explicit timeout" genuinely
- *  MEANS 30s. Modelling it that way makes that edit fail as a plain assertion
- *  naming both numbers, instead of as a collection error. */
-const TEST_TIMEOUT = CONFIG.match(/^ {2}timeout:\s*([\d_]+)/m)
-  ? ms(CONFIG.match(/^ {2}timeout:\s*([\d_]+)/m)![1], 'the top-level timeout')
-  : PLAYWRIGHT_DEFAULT_TIMEOUT
+describe('a test budget outlasts the waits inside it', () => {
+  const all = configs()
 
-/** The `expect: { timeout: … }` budget. */
-const EXPECT_TIMEOUT = ms(
-  CONFIG.match(/expect:\s*\{\s*timeout:\s*([\d_]+)/)?.[1],
-  'the expect timeout in playwright.config.ts',
-)
-
-describe('e2e content fetches can outlast a contended CI runner', () => {
-  it('gives the test budget more room than the API budget', () => {
-    expect(
-      TEST_TIMEOUT,
-      `playwright.config.ts timeout (${TEST_TIMEOUT}ms) must exceed e2e/helpers.ts ` +
-        `API_TIMEOUT (${API_TIMEOUT}ms), or a slow content read kills the test before its own ` +
-        'timeout can report which URL hung.',
-    ).toBeGreaterThan(API_TIMEOUT)
+  it('finds the Playwright configs at all', () => {
+    // Without this, a rename that made configs() return [] would turn every
+    // assertion below into a vacuous pass.
+    expect(all.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('routes every helper content fetch through the budgeted apiGet', () => {
-    // One permitted `request.get` — the one inside apiGet itself, which is the
-    // only place the timeout is applied. A helper added with a bare
-    // `request.get` silently opts back into the 30s default.
-    const bare = [...HELPERS.matchAll(/request\.get\(/g)]
+  for (const { file, dir, timeout, expectTimeout } of all) {
+    const worst = largestWait(dir)
+
+    it(`${file} (${dir})`, () => {
+      expect(
+        timeout,
+        `${file}'s test timeout is ${timeout}ms, but ${worst.where} waits up to ` +
+          `${worst.ms}ms. The wait can never reach its own budget — raise the config's ` +
+          '`timeout` above it, or lower the wait.',
+      ).toBeGreaterThan(worst.ms)
+    })
+
+    it(`${file} keeps assertions fast`, () => {
+      // The wide budget is for waits, not assertions — if expect grew to match,
+      // a genuine regression would take a minute to report instead of five
+      // seconds.
+      expect(expectTimeout).toBeLessThanOrEqual(5_000)
+    })
+  }
+})
+
+describe('e2e content fetches go through one budgeted helper', () => {
+  const HELPERS = readFileSync('e2e/helpers.ts', 'utf-8')
+
+  it('calls request.get exactly once, inside apiGet', () => {
+    // A helper added with a bare request.get silently opts back into the 30s
+    // default and stops being covered by the ordering above.
     expect(
-      bare.length,
-      'e2e/helpers.ts should call request.get exactly once (inside apiGet); ' +
-        'other helpers must go through apiGet so they get the explicit timeout.',
+      [...HELPERS.matchAll(/request\.get\(/g)].length,
+      'e2e/helpers.ts should call request.get once (inside apiGet); other helpers go through it.',
     ).toBe(1)
     expect(HELPERS).toMatch(/request\.get\(url,\s*\{\s*timeout:\s*API_TIMEOUT\s*\}\)/)
-  })
-
-  it('keeps assertions fast, so a real regression still fails quickly', () => {
-    // The wider test budget is for the network, not for assertions — if this
-    // ever grew to match, a genuine regression would take a minute to report.
-    expect(EXPECT_TIMEOUT).toBeLessThanOrEqual(5_000)
-    expect(EXPECT_TIMEOUT).toBeLessThan(TEST_TIMEOUT)
   })
 })
