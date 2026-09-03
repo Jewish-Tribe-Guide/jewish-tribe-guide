@@ -8,7 +8,7 @@
 
 import type { DayKey } from './hours'
 import type { Season } from './season'
-import { DAY_KEYS } from './hours'
+import { DAY_KEYS, fmt12 } from './hours'
 
 export type { DayKey }
 export type { Season }
@@ -96,11 +96,67 @@ export const ZMAN_ANCHOR_LABELS: Record<ZmanAnchor, string> = {
  *  stored in `Minyan.time` for anchor-based rows, so every existing display/
  *  sort call site keeps working unchanged; `anchor`/`offsetMinutes` are only
  *  consulted when a caller wants to additionally show a calculated clock time. */
-export function formatAnchorRule(anchor: ZmanAnchor, offsetMinutes: number): string {
+export function formatAnchorRule(
+  anchor: ZmanAnchor,
+  offsetMinutes: number,
+  bounds: MinyanBounds = {},
+): string {
   const label = ZMAN_ANCHOR_LABELS[anchor]
-  if (offsetMinutes === 0) return `At ${label}`
-  const mins = Math.abs(offsetMinutes)
-  return `${mins} min ${offsetMinutes < 0 ? 'before' : 'after'} ${label}`
+  const base =
+    offsetMinutes === 0
+      ? `At ${label}`
+      : `${Math.abs(offsetMinutes)} min ${offsetMinutes < 0 ? 'before' : 'after'} ${label}`
+  return `${base}${formatBounds(bounds)}`
+}
+
+/** The earliest/latest clock times a zman-based minyan is held between, as
+ *  "HH:MM" (24-hour) — the exact shape an `<input type="time">` produces, so
+ *  the intake form stores what it reads with no conversion, and fmt12 /
+ *  parseTimeToMinutes both already understand it.
+ *
+ *  This is what lets a shul say "candle lighting, but never before 5:00pm and
+ *  never after 7:00pm" — one rule that holds all year. `season` can't express
+ *  that: the rule doesn't change with the season, it's the same rule whose
+ *  clamp simply happens to bite at the two ends of the year. Keeping them
+ *  separate is deliberate — `season` answers "does this minyan run now",
+ *  bounds answer "what time does it start". */
+export type MinyanBounds = {
+  notBefore?: string
+  notAfter?: string
+}
+
+/** The parenthetical a bounded rule carries, or "" when unbounded. Folded
+ *  into the generated `time` text rather than kept only in the structured
+ *  fields, because `time` is what every display, sort and — critically — the
+ *  moderation diff reads. A bound edited from 7:00pm to 7:15pm has to READ as
+ *  a change in the queue, or an admin approves it blind. */
+function formatBounds({ notBefore, notAfter }: MinyanBounds): string {
+  if (notBefore && notAfter) return ` (between ${fmt12(notBefore)} and ${fmt12(notAfter)})`
+  if (notBefore) return ` (not before ${fmt12(notBefore)})`
+  if (notAfter) return ` (not after ${fmt12(notAfter)})`
+  return ''
+}
+
+/**
+ * Clamps an already-formatted clock time ("6:12 PM") into a minyan's bounds,
+ * returning the bound itself when the time falls outside. Both bounds are
+ * inclusive; either may be omitted.
+ *
+ * Takes formatted text rather than an instant so it stays pure and
+ * timezone-free — the caller has already resolved the zman in the community's
+ * timezone, and re-deriving a wall clock here would mean threading a tz into
+ * a function whose whole job is comparing two times of day.
+ *
+ * A time it can't parse is returned untouched. Never substitute a bound for
+ * something that might not be a time at all: showing a confidently wrong
+ * "5:00 PM" is worse than showing the rule text.
+ */
+export function clampTimeText(time: string, { notBefore, notAfter }: MinyanBounds): string {
+  const mins = parseTimeToMinutes(time)
+  if (!isFinite(mins)) return time
+  if (notBefore && mins < parseTimeToMinutes(notBefore)) return fmt12(notBefore)
+  if (notAfter && mins > parseTimeToMinutes(notAfter)) return fmt12(notAfter)
+  return time
 }
 
 export type Minyan = {
@@ -118,6 +174,11 @@ export type Minyan = {
   anchor?: ZmanAnchor
   /** Signed minutes from `anchor`: negative = before, positive = after. */
   offsetMinutes?: number
+  /** Earliest/latest clock time this minyan is ever held at, clamping the
+   *  resolved zman — see MinyanBounds. Only meaningful alongside `anchor`; a
+   *  fixed clock time is already fixed. */
+  notBefore?: string
+  notAfter?: string
   /** Set when a shul only runs this minyan in one half of the year — the
    *  structured form of the "Winter only" / "Summer only" that used to be
    *  typed into `notes` by hand. Which half it currently is gets derived from
@@ -224,6 +285,8 @@ export type ByTefillahGroup = {
     walkMinutes?: number | null
     anchor?: ZmanAnchor
     offsetMinutes?: number
+    notBefore?: string
+    notAfter?: string
     season?: Season
   }>
 }
@@ -242,6 +305,8 @@ export type ByDayGroup = {
     walkMinutes?: number | null
     anchor?: ZmanAnchor
     offsetMinutes?: number
+    notBefore?: string
+    notAfter?: string
     season?: Season
   }>
 }
@@ -265,6 +330,8 @@ export function groupByTefillah(shuls: ShulInfo[]): ByTefillahGroup[] {
         walkMinutes: shul.walkMinutes,
         anchor: m.anchor,
         offsetMinutes: m.offsetMinutes,
+        notBefore: m.notBefore,
+        notAfter: m.notAfter,
         season: m.season,
       })
     }
@@ -307,6 +374,10 @@ export function mergeSameDayTimes(rows: ByTefillahGroup['rows']): ByTefillahGrou
         time: `${prev.time}, ${row.time}`,
         anchor: undefined,
         offsetMinutes: undefined,
+        // Bounds clamp a single resolved time; a joined multi-time string
+        // isn't one, so they'd have a caller clamp something meaningless.
+        notBefore: undefined,
+        notAfter: undefined,
       }
     } else {
       merged.push(row)
@@ -333,6 +404,8 @@ export function groupByDay(shuls: ShulInfo[]): ByDayGroup[] {
           walkMinutes: shul.walkMinutes,
           anchor: m.anchor,
           offsetMinutes: m.offsetMinutes,
+          notBefore: m.notBefore,
+          notAfter: m.notAfter,
           season: m.season,
         })
       }

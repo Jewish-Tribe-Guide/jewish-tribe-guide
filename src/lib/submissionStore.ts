@@ -1,3 +1,4 @@
+import { SYNC_INTERNAL_FIELDS } from './syncFields'
 import { getAdminClient } from './supabase/admin'
 import { listCategories, createCategory, getCategoryById } from './categoryStore'
 import { isCategorySyncEligible } from './categories'
@@ -286,7 +287,12 @@ export async function submitGoogleClosure(community: string, targetId: string): 
 // so without this an admin authorized for one community could approve/
 // reject a DIFFERENT community's queue entry by id alone, e.g. via a direct
 // API call rather than through that community's own moderation queue UI.
-export async function approveSubmission(id: string, community?: string): Promise<SubmissionRow> {
+//
+// `reviewedBy`: the acting admin's own verified email (from
+// getAdminUserForCommunity at the call site), recorded alongside
+// reviewed_at so the moderation history can answer "who approved this" —
+// see the reviewed_by migration's own comment.
+export async function approveSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
   const supabase = getAdminClient()
 
   const { data: sub, error: subErr } = await supabase
@@ -316,6 +322,7 @@ export async function approveSubmission(id: string, community?: string): Promise
     .update({
       status: 'approved',
       reviewed_at: new Date().toISOString(),
+      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
       // A `create` arrives with no target_id — there was nothing to point at
       // yet. Recording it now makes the submission point at the listing it
       // produced, which is what lets the caller sync that listing against
@@ -333,11 +340,15 @@ export async function approveSubmission(id: string, community?: string): Promise
 
 // `community`, when given, must match — same cross-community guard as
 // approveSubmission, and for the same reason (a plain UUID id, not a
-// composite key).
-export async function rejectSubmission(id: string, community?: string): Promise<SubmissionRow> {
+// composite key). `reviewedBy` — see approveSubmission's own comment.
+export async function rejectSubmission(id: string, community?: string, reviewedBy?: string): Promise<SubmissionRow> {
   let query = getAdminClient()
     .from('submission')
-    .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+    .update({
+      status: 'rejected',
+      reviewed_at: new Date().toISOString(),
+      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+    })
     .eq('id', id)
   if (community) query = query.eq('community_id', community)
   const { data, error } = await query.select('*').single()
@@ -544,18 +555,9 @@ function withResolvedPlaceId(details: Record<string, unknown>, payload: Resource
  * listingColumnsWithGeo carry those explicitly, and an edit is allowed to
  * change them. `googleFields` too — resolveGoogleFields recomputes it.
  */
-const SUBMITTER_CANNOT_TOUCH = [
-  'googleSyncedAt',
-  'lastSyncError',
-  'lastSyncFailedAt',
-  'businessStatus',
-  'businessStatusBefore',
-  'businessStatusChangedAt',
-  'businessStatusOverride',
-  'googleDescription',
-  'verifiedPlaceId',
-  'legacyId',
-] as const
+// Shared with the moderation card's diff, which hides the same keys — see
+// lib/syncFields.ts for why the two lists were merged.
+const SUBMITTER_CANNOT_TOUCH = SYNC_INTERNAL_FIELDS
 
 function withPreservedInternals(
   details: Record<string, unknown>,

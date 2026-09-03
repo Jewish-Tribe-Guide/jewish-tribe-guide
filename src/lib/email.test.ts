@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Resend } from 'resend'
 import type { ContactHospitalData, SubmissionRow } from '@/types'
-import { adminAppUrl, escapeHtml, sendEmail, sendNotification, sendSubmissionNotification } from './email'
+import { adminAppUrl, escapeHtml, sendAdminMagicLink, sendEmail, sendInboxMagicLink, sendNotification, sendReviewActionNotification, sendStatusChangeDigest, sendSubmissionNotification } from './email'
 
 const minimalContact: ContactHospitalData = {
   fullName: '',
@@ -13,7 +13,17 @@ const minimalContact: ContactHospitalData = {
 }
 
 const mockGetCommunityNotifyRecipients = vi.hoisted(() => vi.fn())
-vi.mock('./communityStore', () => ({ getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients }))
+const mockGetReviewActionRecipients = vi.hoisted(() => vi.fn())
+vi.mock('./communityStore', () => ({
+  getCommunityNotifyRecipients: mockGetCommunityNotifyRecipients,
+  getReviewActionRecipients: mockGetReviewActionRecipients,
+}))
+
+const mockGetCategoryById = vi.hoisted(() => vi.fn())
+vi.mock('./categoryStore', () => ({ getCategoryById: mockGetCategoryById }))
+
+const mockGetResourceRowById = vi.hoisted(() => vi.fn())
+vi.mock('./resourceStore', () => ({ getResourceRowById: mockGetResourceRowById }))
 
 // escapeHtml is the only thing standing between a submitter's free-typed name/
 // notes and raw HTML in an admin's inbox — an XSS vector, not just cosmetics.
@@ -224,10 +234,79 @@ describe('sendEmail', () => {
           submitted_by: null,
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
+          reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         expect(mockGetCommunityNotifyRecipients).toHaveBeenCalledWith('ues')
         expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['ues-admin@example.com'] }))
+      })
+
+      // So a later "X approved/rejected this" email (sendReviewActionNotification)
+      // can be recognized as the same submission — see submissionRef's own
+      // comment on why this exists. Leads the subject, not tucked in a
+      // bracket at the end, since a long subject usually truncates from
+      // the right in an inbox row.
+      it("sendSubmissionNotification's own subject leads with the submission's plain case number", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        const submission: SubmissionRow = {
+          id: 'abc123de-f000-0000-0000-000000000000',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 77,
+        }
+        await sendSubmissionNotification(submission)
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: expect.stringMatching(/^#77 /) }))
+      })
+
+      // Real bug, in every notification email this app has ever sent: the
+      // case_number migration was never applied to any project, so `*` came
+      // back without the column, `submission.case_number` was undefined, and
+      // the subject read "#undefined Approved — South Philadelphia Shtiebel".
+      //
+      // types.ts declared it `case_number: number`, non-optional, so nothing
+      // in TypeScript objected — the Supabase row is cast to SubmissionRow,
+      // and the type simply asserted a column that wasn't there. Every test
+      // built its submission in memory with the field set, so the whole suite
+      // agreed with the type rather than with the database.
+      //
+      // The subject must degrade to no reference at all rather than printing
+      // the word "undefined" at a moderator.
+      it.each([
+        ['a missing case number', undefined],
+        ['a null case number', null],
+      ])('omits the reference entirely given %s', async (_label, caseNumber) => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        const submission = {
+          id: 'abc123de-f000-0000-0000-000000000000',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'category',
+          target_id: null,
+          payload: { label: 'New Category', firstListing: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' } },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: caseNumber,
+        } as unknown as SubmissionRow
+
+        await sendSubmissionNotification(submission)
+
+        const { subject } = sendSpy.mock.calls.at(-1)![0] as { subject: string }
+        expect(subject).not.toMatch(/undefined|null|#\s/)
+        expect(subject).toMatch(/^New Category Suggestion — New Category$/)
       })
 
       // Real bug: the "Review in admin" button linked to the bare /admin
@@ -249,11 +328,182 @@ describe('sendEmail', () => {
           submitted_by: null,
           created_at: '2026-01-01T00:00:00Z',
           reviewed_at: null,
+          reviewed_by: null,
+          case_number: 1,
         }
         await sendSubmissionNotification(submission)
         const html = sendSpy.mock.calls[0]![0].html as string
         expect(html).toContain('href="https://example.org/ues/admin"')
         expect(html).not.toContain('href="https://example.org/admin"')
+      })
+
+      // Real bug: a listing's detail rows were built straight from
+      // Object.entries(payload.details) — always the raw JSON key as the
+      // label ("type" instead of "Type", or "t" for a field whose key got
+      // mangled — see CategoryFieldEditor's own fix) and the raw stored
+      // *value* for a select/tags field, never the admin-configured option
+      // label. SubmissionCard.tsx's moderation-queue card already resolved
+      // both through the category's own field config; this notification
+      // now does too.
+      afterEach(() => mockGetCategoryById.mockReset())
+
+      it("resolves a listing's detail rows through the category's own field labels and option text, not the raw JSON", async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['ues-admin@example.com'])
+        mockGetCategoryById.mockResolvedValue({
+          id: 'cemetery',
+          label: 'Cemetery',
+          pluralLabel: 'Cemeteries',
+          icon: 'cemetery',
+          description: '',
+          kind: 'listing',
+          detailFields: [{ key: 'type', label: 'Type', type: 'select', options: [{ value: 'jewish', label: 'Jewish Cemetery' }] }],
+        })
+        const submission: SubmissionRow = {
+          id: 's1',
+          community_id: 'ues',
+          operation: 'create',
+          target_type: 'listing',
+          target_id: null,
+          payload: {
+            category: 'cemetery',
+            name: 'A Cemetery',
+            anchorId: '',
+            distance: null,
+            address: '',
+            phone: '',
+            details: { type: 'jewish' },
+          },
+          note: null,
+          status: 'pending',
+          submitted_by: null,
+          created_at: '2026-01-01T00:00:00Z',
+          reviewed_at: null,
+          reviewed_by: null,
+          case_number: 1,
+        }
+        await sendSubmissionNotification(submission)
+        const html = sendSpy.mock.calls[0]![0].html as string
+        expect(html).toContain('Type')
+        expect(html).toContain('Jewish Cemetery')
+        // Neither the raw key nor the raw stored value on their own.
+        expect(html).not.toMatch(/>type</)
+        expect(html).not.toMatch(/>jewish</)
+      })
+    })
+
+    // Real bug: every community's Google status changes used to email one
+    // hardcoded address (NOTIFICATION_TO, or phillyjewishguide@gmail.com)
+    // regardless of which community the listing belonged to, or which
+    // admins had actually signed up for notifications — see
+    // sendStatusChangeDigest's own comment.
+    describe('sendStatusChangeDigest — per-community routing', () => {
+      afterEach(() => mockGetCommunityNotifyRecipients.mockReset())
+
+      it('routes each community\'s changes through its own configured notify list', async () => {
+        mockGetCommunityNotifyRecipients.mockImplementation((slug: string) =>
+          Promise.resolve(slug === 'philly' ? ['philly-admin@example.com'] : ['ues-admin@example.com']),
+        )
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+          { name: 'Bagel Shop', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'ues' },
+        ])
+
+        expect(sendSpy).toHaveBeenCalledTimes(2)
+        const calls = sendSpy.mock.calls.map((c) => c[0])
+        expect(calls).toContainEqual(
+          expect.objectContaining({ to: ['philly-admin@example.com'], subject: 'Kosher Bite is now temporarily closed' }),
+        )
+        expect(calls).toContainEqual(
+          expect.objectContaining({ to: ['ues-admin@example.com'], subject: 'Bagel Shop is now permanently closed' }),
+        )
+      })
+
+      it('never mixes one community\'s listings into another\'s digest email', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue(['philly-admin@example.com'])
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+          { name: 'Bagel Shop', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'ues' },
+        ])
+
+        const phillyCall = sendSpy.mock.calls.find((c) => (c[0].html as string).includes('Kosher Bite'))!
+        expect(phillyCall[0].html).not.toContain('Bagel Shop')
+      })
+
+      it('falls back to NOTIFICATION_TO for a community with no notify list configured', async () => {
+        mockGetCommunityNotifyRecipients.mockResolvedValue([])
+        vi.stubEnv('NOTIFICATION_TO', 'fallback@example.com')
+        await sendStatusChangeDigest([
+          { name: 'Kosher Bite', category: 'restaurant', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+        ])
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ to: ['fallback@example.com'] }))
+      })
+    })
+
+    // Opt-in — nobody gets emailed about another admin's decision unless
+    // they've turned it on (see the notify_review_emails migration's own
+    // comment on why the default differs from new-submission notifications).
+    describe('sendReviewActionNotification', () => {
+      afterEach(() => mockGetReviewActionRecipients.mockReset())
+
+      const listingSubmission: SubmissionRow = {
+        id: 's1',
+        community_id: 'ues',
+        operation: 'create',
+        target_type: 'listing',
+        target_id: null,
+        payload: { name: 'A Shul', anchorId: '', distance: null, address: '', phone: '' },
+        note: null,
+        status: 'approved',
+        submitted_by: null,
+        created_at: '2026-01-01T00:00:00Z',
+        reviewed_at: '2026-01-01T00:05:00Z',
+        reviewed_by: 'jane@example.com',
+        case_number: 42,
+      }
+
+      it('emails every opted-in admin except the acting one', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
+        expect(mockGetReviewActionRecipients).toHaveBeenCalledWith('ues', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ to: ['sam@example.com'], subject: '#42 Approved — A Shul' }),
+        )
+      })
+
+      // Subject leads with the plain case number, then the decision — the
+      // two things someone scanning an inbox actually needs to know. WHO
+      // did it is in the body instead, not the subject.
+      it('leads the subject with the submission\'s own case number and the decision, capitalized', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'rejected', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ subject: '#42 Rejected — A Shul' }))
+      })
+
+      it("puts who acted in the body, not the subject", async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        await sendReviewActionNotification(listingSubmission, 'approved', 'jane@example.com')
+        const call = sendSpy.mock.calls[0]![0]
+        expect(call.subject).not.toContain('jane@example.com')
+        expect(call.html).toContain('approved by jane@example.com')
+      })
+
+      it('sends nothing when nobody has opted in', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue([])
+        await sendReviewActionNotification(listingSubmission, 'rejected', 'jane@example.com')
+        expect(sendSpy).not.toHaveBeenCalled()
+      })
+
+      it('names a category submission by its own label, not "a listing"', async () => {
+        mockGetReviewActionRecipients.mockResolvedValue(['sam@example.com'])
+        const categorySubmission: SubmissionRow = {
+          ...listingSubmission,
+          target_type: 'category',
+          payload: { label: 'Kosher Butchers' },
+        }
+        await sendReviewActionNotification(categorySubmission, 'approved', 'jane@example.com')
+        expect(sendSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ subject: '#42 Approved — Kosher Butchers' }),
+        )
       })
     })
 
@@ -274,5 +524,244 @@ describe('sendEmail', () => {
         )
       })
     })
+  })
+})
+
+// An "edit" notification used to list the PROPOSED listing and nothing else —
+// every field, with no indication which one the submitter actually touched.
+// A phone-number correction arrived as a full copy of the listing, and the
+// only way to learn what was being suggested was to open the console. That is
+// the same defect the moderation queue had and fixed; the email never got it.
+describe('sendSubmissionNotification — an edit shows what changed', () => {
+  const category = {
+    id: 'restaurant',
+    label: 'Food',
+    detailFields: [{ key: 'website', type: 'url', label: 'Website' }],
+  }
+
+  const current = {
+    id: 'listing-1',
+    community_id: 'philly',
+    category: 'restaurant',
+    name: 'Luhv Vegan Bistro',
+    anchor_id: 'community',
+    distance: null,
+    address: '1131 S 19th St, Philadelphia',
+    phone: '(215) 555-0100',
+    details: { website: 'https://old.example.com' },
+    status: 'approved',
+  }
+
+  const submission = {
+    id: 'sub-1',
+    community_id: 'philly',
+    operation: 'update',
+    target_type: 'listing',
+    target_id: 'listing-1',
+    payload: {
+      category: 'restaurant',
+      name: 'Luhv Vegan Bistro',
+      anchorId: 'community',
+      distance: null,
+      address: '1131 S 19th St, Philadelphia',
+      phone: '(215) 555-0199',
+      details: { website: 'https://old.example.com' },
+    },
+    note: null,
+    status: 'pending',
+    submitted_by: null,
+    created_at: '2026-01-01T00:00:00Z',
+    reviewed_at: null,
+    reviewed_by: null,
+    case_number: 1064,
+  } as unknown as SubmissionRow
+
+  let sendSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 'key_123')
+    vi.stubEnv('NODE_ENV', 'production')
+    sendSpy = vi.fn().mockResolvedValue({ data: { id: 'abc' }, error: null })
+    vi.mocked(Resend).mockImplementation(
+      function () { return { emails: { send: sendSpy } } } as unknown as typeof Resend,
+    )
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    mockGetCategoryById.mockResolvedValue(category)
+    mockGetResourceRowById.mockResolvedValue(current)
+  })
+
+  afterEach(() => vi.unstubAllEnvs())
+
+  function bodyOf(): string {
+    return (sendSpy.mock.calls.at(-1)![0] as { html: string }).html
+  }
+
+  it('shows the changed field as before → after', async () => {
+    await sendSubmissionNotification(submission)
+    const html = bodyOf()
+    expect(html).toContain('(215) 555-0100')
+    expect(html).toContain('(215) 555-0199')
+    expect(html).toContain('→')
+  })
+
+  it('leaves the untouched fields out of the diff', async () => {
+    await sendSubmissionNotification(submission)
+    // The website is identical in both, so it is not part of what this edit
+    // proposes — listing it is the noise that made the old email unreadable.
+    expect(bodyOf()).not.toContain('https://old.example.com')
+  })
+
+  // Best-effort email: a listing that has since been deleted, or a read that
+  // fails, must still produce a usable notification rather than throwing
+  // inside a .catch()-ed background call and sending nothing at all.
+  it('still sends when the current listing cannot be read', async () => {
+    mockGetResourceRowById.mockRejectedValue(new Error('gone'))
+    await sendSubmissionNotification(submission)
+    expect(bodyOf()).toContain('Luhv Vegan Bistro')
+  })
+})
+
+// ── Bodies, not just routing ─────────────────────────────────────────────────
+//
+// Everything above this point tested who an email goes to, what its subject
+// says, and that sending works. Almost nothing tested what is actually IN the
+// body — which is how "#undefined" reached real moderators and stayed there,
+// and how an edit notification could list a whole listing without ever saying
+// which field changed. Routing being right is not the same as the email being
+// usable.
+
+function harness() {
+  const state = { spy: vi.fn() }
+  beforeEach(() => {
+    vi.stubEnv('RESEND_API_KEY', 'key_123')
+    vi.stubEnv('NODE_ENV', 'production')
+    state.spy = vi.fn().mockResolvedValue({ data: { id: 'x' }, error: null })
+    vi.mocked(Resend).mockImplementation(
+      function () { return { emails: { send: state.spy } } } as unknown as typeof Resend,
+    )
+  })
+  afterEach(() => vi.unstubAllEnvs())
+  return {
+    last: () => state.spy.mock.calls.at(-1)![0] as { to: string | string[]; subject: string; html: string },
+  }
+}
+
+describe('magic-link emails', () => {
+  const h = harness()
+  // A sign-in link IS the credential. If it never reaches the body intact,
+  // nobody can get into the admin console at all — and these two functions are
+  // near-identical, which is exactly the shape a copy/paste error hides in.
+  const link = 'https://example.com/auth/callback?token_hash=abc123&type=magiclink'
+
+  it('puts the admin link in the body, intact, addressed to the requester', async () => {
+    await sendAdminMagicLink('admin@example.com', link)
+    const { to, html } = h.last()
+    expect(to).toBe('admin@example.com')
+    // &amp; is the correct encoding of & inside an href — the browser decodes
+    // it — so assert on the token rather than the raw ampersand.
+    expect(html).toContain('token_hash=abc123')
+    expect(html).toContain('type=magiclink')
+    expect(html).toMatch(/<a href="https:\/\/example\.com\/auth\/callback\?token_hash=abc123&amp;type=magiclink"/)
+  })
+
+  it('does not cross the two sign-in emails', async () => {
+    await sendAdminMagicLink('admin@example.com', link)
+    const admin = h.last()
+    await sendInboxMagicLink('viewer@example.com', link)
+    const inbox = h.last()
+
+    expect(admin.subject).toContain('Resource Moderation')
+    expect(admin.html).toContain('Sign in to Resource Moderation')
+    expect(inbox.subject).toContain('Inbox')
+    expect(inbox.html).toContain('Sign in to the Inbox')
+    // The distinguishing half, asserted in both directions: an inbox link that
+    // says "Resource Moderation" tells the recipient they are signing in to
+    // something they may not have access to.
+    expect(inbox.html).not.toContain('Resource Moderation')
+    expect(admin.html).not.toContain('Sign in to the Inbox')
+  })
+
+  it('names the address the link is bound to, so a forwarded one is obviously wrong', async () => {
+    await sendInboxMagicLink('viewer@example.com', link)
+    expect(h.last().html).toContain('viewer@example.com')
+  })
+})
+
+describe('sendStatusChangeDigest — the body', () => {
+  const h = harness()
+  beforeEach(() => {
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+  })
+
+  it('renders each change as name, category, and from → to', async () => {
+    await sendStatusChangeDigest([
+      { name: "Goldi's", category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_PERMANENTLY', communitySlug: 'philly' },
+    ])
+    const { html } = h.last()
+    // Apostrophes are left as-is: escapeHtml covers & < > " only, which is
+    // sufficient because every attribute in these templates is double-quoted.
+    expect(html).toContain("Goldi's")
+    expect(html).toContain('Food')
+    // Words, not Google's enum — "OPERATIONAL → CLOSED_PERMANENTLY" is not
+    // something an admin should have to translate at a glance.
+    expect(html).toContain('open')
+    expect(html).toContain('permanently closed')
+    expect(html).not.toContain('OPERATIONAL')
+  })
+
+  it('names the single listing in the subject, and counts them when there are several', async () => {
+    await sendStatusChangeDigest([
+      { name: 'Solo Cafe', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+    ])
+    expect(h.last().subject).toBe('Solo Cafe is now temporarily closed')
+
+    await sendStatusChangeDigest([
+      { name: 'A', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+      { name: 'B', category: 'Food', from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL', communitySlug: 'philly' },
+    ])
+    expect(h.last().subject).toBe('2 listings changed status on Google')
+  })
+
+  it('lists every change, not just the first', async () => {
+    await sendStatusChangeDigest([
+      { name: 'First Place', category: 'Food', from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+      { name: 'Second Place', category: 'Grocery', from: 'CLOSED_TEMPORARILY', to: 'OPERATIONAL', communitySlug: 'philly' },
+    ])
+    const { html } = h.last()
+    expect(html).toContain('First Place')
+    expect(html).toContain('Second Place')
+  })
+})
+
+// escapeHtml is unit-tested in isolation at the top of this file, which proves
+// the function works and nothing about whether it is actually APPLIED. These
+// values are attacker-controlled: anyone on the internet can submit a listing.
+describe('user-supplied text never reaches an inbox as live HTML', () => {
+  const h = harness()
+  const XSS = '<script>alert(1)</script>'
+
+  beforeEach(() => {
+    mockGetCommunityNotifyRecipients.mockResolvedValue(['admin@example.com'])
+    mockGetCategoryById.mockResolvedValue({ id: 'restaurant', label: 'Food', detailFields: [] })
+    mockGetResourceRowById.mockResolvedValue(null)
+  })
+
+  it('escapes a submitted listing name and note in the admin notification', async () => {
+    await sendSubmissionNotification({
+      id: 's1', community_id: 'philly', operation: 'create', target_type: 'listing', target_id: null,
+      payload: { category: 'restaurant', name: XSS, anchorId: 'community', distance: null, address: '1 Main St', phone: '', details: {} },
+      note: XSS, status: 'pending', submitted_by: { name: XSS },
+      created_at: '2026-01-01T00:00:00Z', reviewed_at: null, reviewed_by: null, case_number: 1,
+    } as unknown as SubmissionRow)
+    const { html } = h.last()
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('escapes a listing name in the status digest', async () => {
+    await sendStatusChangeDigest([
+      { name: XSS, category: XSS, from: 'OPERATIONAL', to: 'CLOSED_TEMPORARILY', communitySlug: 'philly' },
+    ])
+    expect(h.last().html).not.toContain('<script>')
   })
 })

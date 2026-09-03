@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drives PagesEditor's real save flow — the admin console's Pages tab (About/
-// Privacy), added alongside this test. Unlike category-editor.spec.ts and
+// Drives PagesEditor's real save flow — the superadmin console's Pages tab
+// (About/Privacy, /admin/pages — a site-wide singleton, not per-community,
+// so it lives beside Communities rather than under any one community's own
+// /{community}/admin). Unlike category-editor.spec.ts and
 // form-editor.spec.ts, there's nothing to create or delete: `page` rows are
 // singletons seeded by migration, so this edits a real row through the real
 // UI and puts the original body back afterward, same restore pattern as
@@ -57,7 +59,7 @@ test('editing a page through the real Pages tab saves to the database', async ({
 
   try {
     await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
-    await page.goto('/philly/admin/pages')
+    await page.goto('/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
     // getByRole, not getByLabel('Body'): the body field is a WYSIWYG now, and
@@ -113,7 +115,7 @@ test('formatting applied in the Pages tab survives the save', async ({ page }) =
 
   try {
     await supabase.from('page').update({ body: SEED_BODY }).eq('slug', 'privacy')
-    await page.goto('/philly/admin/pages')
+    await page.goto('/admin/pages')
     await page.getByRole('button', { name: title, exact: true }).click()
 
     const bodyField = page.getByRole('textbox', { name: 'Page body' })

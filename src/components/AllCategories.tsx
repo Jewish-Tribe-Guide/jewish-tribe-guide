@@ -5,6 +5,7 @@ import { CardGrid, groupCardsIntoSections, resourceCards, useEntryCards } from '
 import UpButton from '@/components/UpButton'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
+import { useCommunitySlug } from '@/lib/communityContext'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 
@@ -34,11 +35,12 @@ export default function AllCategories({
   /** Section title to scroll to on arrival (set when a tab was clicked). */
   scrollToSection?: string | null
 }) {
+  const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
   const entryCards = useEntryCards(onOpenFlow)
 
-  const resources = resourceCards(onNavigate, categories)
+  const resources = resourceCards(onNavigate, categories, communitySlug)
   const allCards = resources ? [...entryCards, ...resources] : null
   const sections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
 

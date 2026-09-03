@@ -399,7 +399,12 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
       .map((s) => [s.name, geoOrCommunityDefault(s.geo)] as const),
   )
   const anchorMap = useZmanAnchors(Array.from(shulGeo.values()))
-  const calcFor = (row: { shul: string; anchor?: Minyan['anchor']; offsetMinutes?: number }) => {
+  // Picked off Minyan rather than spelled out, so a field the time rule grows
+  // later (the bounds were one) reaches resolveAnchorTime by declaration
+  // instead of by structural accident.
+  const calcFor = (
+    row: { shul: string } & Pick<Minyan, 'anchor' | 'offsetMinutes' | 'notBefore' | 'notAfter'>,
+  ) => {
     const geo = shulGeo.get(row.shul)
     if (!geo) return null
     return resolveAnchorTime(row, anchorMap[geoKey(geo)])

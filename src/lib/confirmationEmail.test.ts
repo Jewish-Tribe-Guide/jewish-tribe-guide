@@ -43,6 +43,8 @@ function makeSubmission(overrides: Partial<SubmissionRow> = {}): SubmissionRow {
     submitted_by: { name: 'Jane Doe', email: 'visitor@example.com' },
     created_at: '2026-01-01T00:00:00Z',
     reviewed_at: null,
+    reviewed_by: null,
+    case_number: 1,
     ...overrides,
   }
 }
@@ -109,5 +111,69 @@ describe('per-community reply-to and bcc on public-facing confirmation emails', 
 
     await sendSubmissionConfirmation(makeSubmission({ community_id: 'baltimore' }))
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ replyTo: 'baltimorejewishguide@gmail.com' }))
+  })
+})
+
+// These three are the only emails that go straight to a member of the public,
+// and until now the suite only checked where their replies route. What they
+// actually SAY was untested — the same gap that let "#undefined" ship in the
+// admin-facing notifications and sit there unnoticed.
+describe('what the public-facing emails actually say', () => {
+  function bodyOf(): { subject: string; html: string } {
+    return mockSendEmail.mock.calls.at(-1)![0] as { subject: string; html: string }
+  }
+
+  it('the submission confirmation names the listing the person submitted', async () => {
+    await sendSubmissionConfirmation(makeSubmission())
+    const { subject, html } = bodyOf()
+    expect(`${subject} ${html}`).toContain('Kosher Deli')
+    // Sets the expectation that a human looks at it — the one thing a
+    // submitter wants to know is whether this is done or pending.
+    expect(html).toMatch(/review/i)
+  })
+
+  it('an approval says it is approved and live, and names the listing', async () => {
+    await sendDecisionEmail(makeSubmission(), 'approved')
+    const { subject, html } = bodyOf()
+    expect(subject).toMatch(/approved/i)
+    expect(subject).toContain('Kosher Deli')
+    // The body says what happened in plain words rather than repeating the
+    // status ("has been added to the directory"), which is the better copy —
+    // so assert the meaning, not the word.
+    expect(html).toMatch(/added to the directory/i)
+    expect(html).not.toMatch(/weren&apos;t able|not able|unable/i)
+  })
+
+  it('a rejection is not dressed up as an approval, and carries the reason given', async () => {
+    await sendDecisionEmail(makeSubmission(), 'rejected', 'Duplicate of an existing listing')
+    const { subject, html } = bodyOf()
+    expect(subject).not.toMatch(/approved/i)
+    // The reason is the entire value of a rejection email to the person who
+    // submitted; without it they only learn "no".
+    expect(html).toContain('Duplicate of an existing listing')
+  })
+
+  it('a category suggestion is named by its own label, not as a listing', async () => {
+    await sendDecisionEmail(
+      makeSubmission({ target_type: 'category', payload: { label: 'Kosher Butchers' } as never }),
+      'approved',
+    )
+    const { subject, html } = bodyOf()
+    expect(`${subject} ${html}`).toContain('Kosher Butchers')
+  })
+
+  it('sends nothing at all when the submitter left no email address', async () => {
+    await sendSubmissionConfirmation(makeSubmission({ submitted_by: null }))
+    await sendDecisionEmail(makeSubmission({ submitted_by: null }), 'approved')
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing while RESEND_FROM is still the sandbox sender', async () => {
+    // The guard that stops a half-configured deployment mailing the public
+    // from an address that cannot receive their reply.
+    vi.stubEnv('RESEND_FROM', '')
+    await sendSubmissionConfirmation(makeSubmission())
+    await sendDecisionEmail(makeSubmission(), 'approved')
+    expect(mockSendEmail).not.toHaveBeenCalled()
   })
 })

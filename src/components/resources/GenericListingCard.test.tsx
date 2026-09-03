@@ -197,6 +197,142 @@ describe('GenericListingCard — collapsed', () => {
   })
 })
 
+describe('GenericListingCard — count badge', () => {
+  // The count itself is bold (see GenericListingCard's own comment on why —
+  // a slate chip is deliberately quiet, but the number needs to stand out as
+  // an invitation to expand, not just another static-fact badge), which
+  // splits the badge's text across more than one DOM text node. getByText's
+  // default exact-string match only ever matches a single node, so it can't
+  // find "3 kosher items" as such even though that's what the badge reads —
+  // a function matcher against the whole chip's textContent is what Testing
+  // Library itself recommends for exactly this "text split across markup"
+  // case, rather than reaching for a brittle partial/regex match instead.
+  function chipText(text: string) {
+    return (_: string, element: Element | null) => element?.tagName === 'SPAN' && element.textContent === text
+  }
+
+  it('shows "N {countLabel}s" on the collapsed card for a showCountInHeader tags field', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+  })
+
+  it('uses the singular with exactly one item', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('1 kosher item'))).toBeInTheDocument()
+    expect(screen.queryByText(chipText('1 kosher items'))).not.toBeInTheDocument()
+  })
+
+  it('falls back to the field\'s own label, lowercased, when countLabel is unset', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags', showCountInHeader: true }],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+  })
+
+  it('shows nothing extra when the tags field has no items, but keeps the replaced badge', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: [] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.queryByText(/kosher item/)).not.toBeInTheDocument()
+    expect(screen.getByText('Kosher')).toBeInTheDocument()
+  })
+
+  // A count already says "yes, kosher" — the badge countReplacesKey points
+  // at (e.g. a boolean "Kosher" toggle) would just repeat that in a less
+  // useful form once there's an actual count to show instead.
+  it('replaces the chosen badge with the count once there are items', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
+
+  // The replaced badge used to reappear the moment the card expanded — it
+  // was excluded from the collapsed row's badges (so the count could take
+  // its spot) but not from PlaceDetailBody's hiddenBadgeKeys, which only
+  // knew about what the collapsed row was actually showing. Same "12 kosher
+  // items already says yes, kosher" reasoning applies whether the card is
+  // open or closed.
+  it('does not bring the replaced badge back once the card is expanded', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
+})
+
 describe('GenericListingCard — expanded', () => {
   it('shows the full address and an Edit button once expanded, when the category allows editing', async () => {
     const user = userEvent.setup()
@@ -223,5 +359,91 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: /edit/i }))
 
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── The empty distance slot ───────────────────────────────────────────────────
+//
+// The distance column used to render only when there was a distance to show,
+// so with no location set it wasn't empty — it was absent. Every card looked
+// complete, and nothing on the page hinted that distances existed at all. The
+// only clue was one pill at the top of the directory, which reads like the
+// first-load location popup the visitor already dismissed.
+//
+// Holding the slot open puts the hint in the row, where the eye already is,
+// repeated down the whole list — without interrupting anything.
+
+describe('GenericListingCard — distance slot', () => {
+  const slotLabel = /set your location to see distances/i
+
+  it('holds the slot open when there is no location set', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
+  })
+
+  it('shows the real distance instead once there is one', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing({ milesFromAddress: 0.42 })}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.getByText(/0\.4 mi/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+  })
+
+  // Search results and the home screen's cross-category lists render the same
+  // card without a directory around it, and have nowhere to send the tap.
+  it('stays out of the way when the caller does not ask for it', () => {
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        {...requiredHandlers}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
+  })
+
+  it('opens the location picker without expanding the card', async () => {
+    const user = userEvent.setup()
+    const opened = vi.fn()
+    document.addEventListener('jpc:open-location', opened)
+
+    renderWithProviders(
+      <GenericListingCard
+        item={makeListing()}
+        category={makeCategory()}
+        upvotes={false}
+        count={0}
+        showDistanceSlot
+        {...requiredHandlers}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: slotLabel }))
+
+    expect(opened).toHaveBeenCalledTimes(1)
+    // The row's own click handler expands the card. A tap meant for the slot
+    // must not also do that — the visitor asked for the location picker, not
+    // for this listing's details.
+    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+
+    document.removeEventListener('jpc:open-location', opened)
   })
 })

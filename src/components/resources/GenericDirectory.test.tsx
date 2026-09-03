@@ -25,15 +25,18 @@ vi.mock('./GenericListingCard', () => ({
     onReport,
     onTagClick,
     onFilterBool,
+    showDistanceSlot,
   }: {
     item: DirectoryResource
     onEdit: () => void
     onReport: () => void
     onTagClick: (t: string) => void
     onFilterBool: (key: string) => void
+    showDistanceSlot?: boolean
   }) => (
     <div>
       <span>{item.name}</span>
+      {showDistanceSlot && <span>distance-slot {item.name}</span>}
       <button onClick={onEdit}>Edit {item.name}</button>
       <button onClick={onReport}>Report {item.name}</button>
       <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
@@ -220,17 +223,52 @@ describe('GenericDirectory', () => {
     expect(screen.getByText('davening modal open')).toBeInTheDocument()
   })
 
-  it('shows a Map button and calls onViewMap with the current search when a Map pseudo-category exists', async () => {
+  it('shows a Map link with the current search baked into its href when a Map pseudo-category exists', async () => {
     const user = userEvent.setup()
-    const onViewMap = vi.fn()
     const category = makeCategory({ hasAddress: true })
-    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onViewMap={onViewMap} />, {
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onViewMap={vi.fn()} />, {
       content: { categories: [category, makeCategory({ id: 'map', kind: 'map' })] },
     })
 
     await user.type(screen.getByPlaceholderText('Search…'), 'mart')
-    await user.click(screen.getAllByRole('button', { name: /Map/ })[0])
 
-    expect(onViewMap).toHaveBeenCalledWith('mart', expect.objectContaining({ bool: [], select: {} }))
+    // A real <Link>, not a <button onClick> — see GenericDirectory's own
+    // comment on mapHref: only a real href gets cmd/ctrl/middle-click "open
+    // in new tab" from the browser. Asserting on the href itself, not a
+    // callback, since clicking it no longer calls onViewMap at all —
+    // navigation happens natively through the link.
+    const href = screen.getAllByRole('link', { name: /Map/ })[0].getAttribute('href')
+    expect(href).toContain(`cat=${category.id}`)
+    expect(href).toContain('q=mart')
+  })
+})
+
+// The card renders the empty distance slot; the directory decides whether it
+// should. Those are two separate failures — the card supporting it and nobody
+// passing the prop looks exactly like the bug it was built to fix, and the
+// card's own test cannot see that.
+describe('GenericDirectory — distance slot wiring', () => {
+  it('asks every card for the slot when no location is set', () => {
+    const category = makeCategory()
+    const items = [makeListing({ id: 'a', name: 'Alpha' }), makeListing({ id: 'b', name: 'Beta' })]
+    renderWithProviders(
+      <GenericDirectory category={category} items={items} addressPrompt {...handlers} />,
+    )
+    expect(screen.getByText('distance-slot Alpha')).toBeInTheDocument()
+    expect(screen.getByText('distance-slot Beta')).toBeInTheDocument()
+  })
+
+  it('does not once a location is set', () => {
+    const category = makeCategory()
+    renderWithProviders(
+      <GenericDirectory
+        category={category}
+        items={[makeListing({ name: 'Alpha' })]}
+        anchorLabel="19103"
+        addressPrompt={false}
+        {...handlers}
+      />,
+    )
+    expect(screen.queryByText('distance-slot Alpha')).not.toBeInTheDocument()
   })
 })

@@ -141,6 +141,33 @@ const DEFAULT_CENTER = community.mapCenter
 // actually include — see Props.zoomRadiusMiles. `radiusMiles == null` means
 // no cap (every point counts), which keeps this a no-op wherever the admin
 // hasn't configured one.
+/**
+ * The identity of a set of points for FRAMING purposes: which places are on
+ * the map, regardless of how they look or what order they arrive in.
+ *
+ * The marker-rebuild effect below runs on every new `points` array and ends by
+ * reframing the camera. That conflates two different reasons the array can
+ * change. "A different set of places is shown" (a filter, a search) should
+ * reframe. "The same places, drawn differently" should not — and pinning is
+ * exactly that: allPoints stamps `pinned` on every point and lists pinnedIds
+ * in its deps, so toggling one pin rebuilds the whole array.
+ *
+ * The result was that press-and-holding a marker to pin it zoomed the map out
+ * to the whole community. Only visible with no location set, because the
+ * reframe is skipped outright when there is one — so the bug hid from anyone
+ * who had entered an address.
+ *
+ * Sorted, because order carries no framing meaning: the same places in a
+ * different sequence produce the same bounds, and re-fitting for a reorder is
+ * the same unwanted camera move.
+ */
+export function framingKey(points: Array<{ id: string }>): string {
+  return points
+    .map((p) => p.id)
+    .sort()
+    .join('|')
+}
+
 export function pointsWithinZoomRadius(points: LatLng[], anchor: LatLng, radiusMiles: number | null | undefined): LatLng[] {
   if (radiusMiles == null) return points
   return points.filter((p) => haversineMiles(anchor, p) <= radiusMiles)
@@ -537,6 +564,10 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   }, [ready])
 
   // ── Sync category/hospital markers whenever the visible points change ─────
+  // The point set the camera was last framed to — see framingKey. Starts
+  // empty so the very first real set of points does frame.
+  const lastFramedKeyRef = useRef('')
+
   useEffect(() => {
     const map = mapRef.current
     if (!ready || !map) return
@@ -640,6 +671,15 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       markersRef.current.push(marker)
       markersByIdRef.current.set(p.id, { marker, point: p })
     }
+
+    // Reframe only when the SET of points changed, not merely the array. A
+    // pin toggle rebuilds `points` with identical places (see framingKey), and
+    // the markers above have already been redrawn with the new pin state by
+    // the time we get here — the camera has no business moving for it.
+    const key = framingKey(points)
+    const framingChanged = key !== lastFramedKeyRef.current
+    lastFramedKeyRef.current = key
+    if (!framingChanged) return
 
     // Don't auto-reframe to the points if the visitor has a location set —
     // keeping "where am I" in view matters more than framing every pin —

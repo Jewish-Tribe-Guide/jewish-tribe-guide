@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
 import { StarOfDavid } from '@/components/icons'
@@ -9,6 +10,8 @@ import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { nextHeaderVisible, useHeaderCollapsed } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { routes } from '@/lib/routes'
+import { isModifiedClick } from '@/lib/isModifiedClick'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
@@ -191,17 +194,35 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
             </span>
           )
 
+          // A real <Link>, not a <button onClick> — is what makes cmd/ctrl/
+          // middle-click "open in new tab" work, which a click handler alone
+          // never supports regardless of what it navigates to. Still calls
+          // onGoHome() on a plain click rather than leaving it to Link's own
+          // href-driven navigation: goHome (useSiteNavigation) also resets
+          // Landing's local search/scroll state when the visitor is already
+          // home — a real behavior beyond the URL change that Link's default
+          // click handling doesn't know to do. preventDefault only for a
+          // plain click, so a modified one still falls through to the
+          // browser's native new-tab/new-window handling on the underlying
+          // <a> untouched.
+          const goHomeClick = (e: MouseEvent) => {
+            if (isModifiedClick(e)) return
+            e.preventDefault()
+            onGoHome()
+          }
+
           // One community: the header is exactly what it always was — the whole
-          // mark-plus-title block is a single "go home" button.
+          // mark-plus-title block is a single "go home" link.
           if (!switchable || switchable.length < 2) {
             return (
-              <button
-                onClick={onGoHome}
+              <Link
+                href={routes.home(community.slug)}
+                onClick={goHomeClick}
                 className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer group text-left"
               >
                 {mark}
                 {title}
-              </button>
+              </Link>
             )
           }
 
@@ -211,9 +232,9 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
           // nest inside a button.
           return (
             <div className="flex min-w-0 flex-1 items-center gap-2.5 group">
-              <button onClick={onGoHome} aria-label="Home" className="contents cursor-pointer">
+              <Link href={routes.home(community.slug)} onClick={goHomeClick} aria-label="Home" className="contents cursor-pointer">
                 {mark}
-              </button>
+              </Link>
               <CommunitySwitcher
                 communities={switchable}
                 activeSlug={community?.slug ?? null}

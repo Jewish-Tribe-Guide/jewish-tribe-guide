@@ -10,6 +10,35 @@ import type { Page, APIRequestContext } from '@playwright/test'
 // regression, and a suite that cries wolf gets ignored.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Every content read below goes through this rather than `request.get`
+// directly.
+//
+// These calls are FIXTURES — "which category has an Hours field", "which one
+// has listings" — not the behaviour under test. Playwright charges them to
+// the same budget as the assertions, and both an API request and a test
+// default to 30s, so a single contended read cannot be absorbed by either:
+// the request gives up at exactly the moment the test would have.
+//
+// That is the CI failure this exists for. `mobile.spec.ts`'s hours-editor
+// test timed out inside categoryWithHoursField on GET /api/categories — a URL
+// warmup.setup.ts had already fetched, so not a cold cache — while 158 tests
+// around it passed and the whole local run passed 159/159. What is left is
+// CPU contention: `next start` on a two-core runner, serving three parallel
+// workers, can queue even a warm read past 30s.
+//
+// So the request gets its own explicit budget, and playwright.config.ts's
+// test timeout sits above it. A dead endpoint still fails, and fails with the
+// URL named, rather than as an opaque whole-test timeout. Same reasoning
+// warmup.setup.ts already applies to the cold read — this covers the
+// contended one, which warming cannot.
+const API_TIMEOUT = 45_000
+
+async function apiGet(request: APIRequestContext, url: string): Promise<Record<string, unknown>> {
+  const res = await request.get(url, { timeout: API_TIMEOUT })
+  if (!res.ok()) throw new Error(`GET ${url} returned ${res.status()}`)
+  return (await res.json()) as Record<string, unknown>
+}
+
 /** The community slug the site redirects "/" to. */
 export async function defaultCommunity(page: Page): Promise<string> {
   const response = await page.goto('/')
@@ -24,12 +53,15 @@ export type Category = {
   label: string
   pluralLabel: string
   kind: string
+  /** False when the category collects no address at all (WhatsApp groups,
+   *  Cemetery). Those aren't distance-based, so nothing measures or prompts
+   *  for a location on them — see ResourceLoader's `addressPrompt`. */
+  hasAddress?: boolean
 }
 
 /** Every category for a community, straight from the app's own API. */
 export async function categories(request: APIRequestContext, community: string): Promise<Category[]> {
-  const res = await request.get(`/api/categories?community=${community}`)
-  const body = await res.json()
+  const body = await apiGet(request, `/api/categories?community=${community}`)
   if (!body.ok) throw new Error('Could not read categories')
   return body.categories as Category[]
 }
@@ -42,13 +74,35 @@ export async function categoryWithListings(
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
   for (const category of all.filter((c) => c.kind === 'listing')) {
-    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const body = await res.json()
-    if (body.ok && body.resources.length > 0) {
-      return { category, count: body.resources.length }
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    if (body.ok && (body.resources as unknown[]).length > 0) {
+      return { category, count: (body.resources as unknown[]).length }
     }
   }
   throw new Error('No listing category has any listings — cannot test a populated directory')
+}
+
+/** A listing-kind category that is actually distance-based — `hasAddress` is
+ *  not false — and has listings. For anything asserting on distances or the
+ *  location prompt, neither of which exists on a category that collects no
+ *  address.
+ *
+ *  categoryWithListings is NOT a substitute: it returns the first category
+ *  with any listings at all, and in the real community that is `cemetery`,
+ *  which has hasAddress false. A distance test built on it finds nothing and
+ *  fails, having exercised the wrong category — the same trap
+ *  categoryWithMapPoints below was added for. It has now caught two tests. */
+export async function categoryWithDistances(
+  request: APIRequestContext,
+  community: string,
+): Promise<{ category: Category; count: number }> {
+  const all = await categories(request, community)
+  for (const category of all.filter((c) => c.kind === 'listing' && c.hasAddress !== false)) {
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    const resources = (body.resources ?? []) as unknown[]
+    if (body.ok && resources.length > 0) return { category, count: resources.length }
+  }
+  throw new Error('No distance-based listing category has any listings')
 }
 
 /** A listing-kind category with an Hours-type field and at least one real
@@ -58,17 +112,19 @@ export async function categoryWithHoursField(
   request: APIRequestContext,
   community: string,
 ): Promise<{ category: Category; item: { id: string; name: string } }> {
-  const res = await request.get(`/api/categories?community=${community}`)
-  const body = await res.json()
-  if (!body.ok) throw new Error('Could not read categories')
-  const withHours = (body.categories as (Category & { detailFields: { type: string }[] })[]).filter(
+  // Via categories() rather than its own inline fetch — this used to duplicate
+  // that call, and the duplicate is the line CI timed out on.
+  const all = (await categories(request, community)) as (Category & {
+    detailFields?: { type: string }[]
+  })[]
+  const withHours = all.filter(
     (c) => c.kind === 'listing' && c.detailFields?.some((f) => f.type === 'hours'),
   )
   for (const category of withHours) {
-    const listingsRes = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const listingsBody = await listingsRes.json()
-    if (listingsBody.ok && listingsBody.resources.length > 0) {
-      return { category, item: listingsBody.resources[0] }
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
+    const resources = body.resources as { id: string; name: string }[]
+    if (body.ok && resources.length > 0) {
+      return { category, item: resources[0] }
     }
   }
   throw new Error('No listing category with an Hours field has any listings')
@@ -90,8 +146,7 @@ export async function categoryWithMapPoints(
 ): Promise<{ category: Category; count: number }> {
   const all = await categories(request, community)
   for (const category of all.filter((c) => c.kind === 'listing')) {
-    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const body = await res.json()
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     if (!body.ok) continue
     const withGeo = (body.resources as { geo?: unknown }[]).filter((r) => r.geo)
     if (withGeo.length > 0) return { category, count: withGeo.length }
@@ -113,8 +168,7 @@ export async function largestCategory(
   const all = await categories(request, community)
   let best: { category: Category; count: number } | null = null
   for (const category of all.filter((c) => c.kind === 'listing')) {
-    const res = await request.get(`/api/resources?category=${category.id}&community=${community}`)
-    const body = await res.json()
+    const body = await apiGet(request, `/api/resources?category=${category.id}&community=${community}`)
     const count = body.ok ? (body.resources as unknown[]).length : 0
     if (!best || count > best.count) best = { category, count }
   }

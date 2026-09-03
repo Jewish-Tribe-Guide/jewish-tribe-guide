@@ -93,12 +93,19 @@ describe('MinyanimInput', () => {
     expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({ notes: undefined })])
   })
 
-  it('shows the Clock/Relative toggle only for a relative-eligible tefillah (mincha/maariv/mincha_maariv)', () => {
+  it('shows the Clock/Relative toggle only for a relative-eligible tefillah (kabbalas_shabbos/mincha/maariv/mincha_maariv)', () => {
     render(<MinyanimInput value={[row({ tefillah: 'shacharis' })]} onChange={vi.fn()} />)
     expect(screen.queryByText('Sunset/Havdalah…')).not.toBeInTheDocument()
 
     cleanup()
     render(<MinyanimInput value={[row({ tefillah: 'mincha' })]} onChange={vi.fn()} />)
+    expect(screen.getByText('Sunset/Havdalah…')).toBeInTheDocument()
+
+    // Kabbalas Shabbos is commonly set relative to candle-lighting/sunset,
+    // same as Mincha/Maariv — unlike Shacharis, which is always a clock
+    // time in practice.
+    cleanup()
+    render(<MinyanimInput value={[row({ tefillah: 'kabbalas_shabbos' })]} onChange={vi.fn()} />)
     expect(screen.getByText('Sunset/Havdalah…')).toBeInTheDocument()
   })
 
@@ -198,6 +205,142 @@ describe('MinyanimInput', () => {
     await user.selectOptions(screen.getAllByLabelText('Season')[1], '')
     // Absent, not the empty string — "all year" is the absence of a season.
     expect(onChange.mock.calls.at(-1)![0][0].season).toBeUndefined()
+  })
+
+  // ── Earliest/latest limits ──────────────────────────────────────────────
+  //
+  // The shtiebel case: Kabbalas Shabbos at candle lighting, never before
+  // 5:00pm and never after 7:00pm.
+
+  it('offers the limits only on a relative row, and only once expanded', async () => {
+    const user = userEvent.setup()
+    render(<MinyanimInput value={[row({ tefillah: 'mincha' })]} onChange={vi.fn()} />)
+
+    // Clock mode: nothing on offer — a fixed time has nothing to clamp.
+    expect(screen.queryByText('+ Add earliest/latest limits')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Sunset/Havdalah…'))
+    expect(screen.queryByLabelText('Earliest time')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('+ Add earliest/latest limits'))
+    expect(screen.getByLabelText('Earliest time')).toBeInTheDocument()
+    expect(screen.getByLabelText('Latest time')).toBeInTheDocument()
+  })
+
+  it('folds a window into the generated time text', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<MinyanimInput value={[row({ tefillah: 'kabbalas_shabbos' })]} onChange={onChange} />)
+
+    await user.click(screen.getByText('Sunset/Havdalah…'))
+    await user.selectOptions(screen.getByDisplayValue('Sunset'), 'candle_lighting')
+    await user.click(screen.getByText('+ Add earliest/latest limits'))
+
+    await user.type(screen.getByLabelText('Earliest time'), '17:00')
+    await user.type(screen.getByLabelText('Latest time'), '19:00')
+
+    const last = onChange.mock.calls.at(-1)![0] as Minyan[]
+    expect(last[0]).toMatchObject({
+      anchor: 'candle_lighting',
+      notBefore: '17:00',
+      notAfter: '19:00',
+      time: 'At Candle Lighting (between 5:00 PM and 7:00 PM)',
+    })
+  })
+
+  // Regression: formatAnchorRule rebuilds `time` wholesale, so an offset edit
+  // that forgot to pass the bounds silently dropped the window from the text
+  // while leaving the fields set — the row would then read as unbounded
+  // everywhere the app shows `time`, including the moderation diff.
+  it('keeps the window in the text when the offset is edited afterwards', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <MinyanimInput
+        value={[
+          row({
+            tefillah: 'kabbalas_shabbos',
+            anchor: 'candle_lighting',
+            offsetMinutes: 0,
+            notBefore: '17:00',
+            notAfter: '19:00',
+            time: 'At Candle Lighting (between 5:00 PM and 7:00 PM)',
+          }),
+        ]}
+        onChange={onChange}
+      />,
+    )
+
+    const offsetInput = screen.getByLabelText('Offset in minutes')
+    await user.clear(offsetInput)
+    await user.type(offsetInput, '10')
+
+    const last = onChange.mock.calls.at(-1)![0] as Minyan[]
+    expect(last[0]).toMatchObject({
+      offsetMinutes: -10,
+      notBefore: '17:00',
+      notAfter: '19:00',
+      time: '10 min before Candle Lighting (between 5:00 PM and 7:00 PM)',
+    })
+  })
+
+  it('opens already-expanded for a row that has a stored limit', () => {
+    render(
+      <MinyanimInput
+        value={[row({ tefillah: 'mincha', anchor: 'sunset', offsetMinutes: 0, notAfter: '19:00' })]}
+        onChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByLabelText('Latest time')).toBeInTheDocument()
+  })
+
+  it('clears both bounds and the text when the limits are removed', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <MinyanimInput
+        value={[
+          row({
+            tefillah: 'mincha',
+            anchor: 'sunset',
+            offsetMinutes: 0,
+            notBefore: '17:00',
+            notAfter: '19:00',
+            time: 'At Sunset (between 5:00 PM and 7:00 PM)',
+          }),
+        ]}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByText('Remove limits'))
+
+    const last = onChange.mock.calls.at(-1)![0] as Minyan[]
+    expect(last[0]).toMatchObject({ notBefore: undefined, notAfter: undefined, time: 'At Sunset' })
+  })
+
+  it('drops the bounds when the row goes back to a fixed clock time', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <MinyanimInput
+        value={[
+          row({
+            tefillah: 'mincha',
+            time: '5:15pm',
+          }),
+        ]}
+        onChange={onChange}
+      />,
+    )
+
+    await user.click(screen.getByText('Sunset/Havdalah…'))
+    await user.click(screen.getByText('+ Add earliest/latest limits'))
+    await user.type(screen.getByLabelText('Latest time'), '19:00')
+    await user.click(screen.getByText('Clock time'))
+
+    const last = onChange.mock.calls.at(-1)![0] as Minyan[]
+    expect(last[0]).toMatchObject({ time: '5:15pm', notBefore: undefined, notAfter: undefined })
   })
 
   it('renders a label when provided', () => {

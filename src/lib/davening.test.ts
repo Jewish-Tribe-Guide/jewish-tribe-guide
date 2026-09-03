@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clampTimeText,
   formatAnchorRule,
   formatDays,
   groupByDay,
@@ -204,6 +205,60 @@ describe('mergeSameDayTimes', () => {
     expect(merged[0].offsetMinutes).toBeUndefined()
   })
 
+  // Same reasoning as the anchor: bounds clamp ONE computed time, so carrying
+  // them onto a joined "6:00pm, 6:30pm" string would have a caller clamp a
+  // string that is no longer a single time.
+  it('drops the bounds when merging', () => {
+    const rows = groupByTefillah([
+      {
+        name: 'Beth Israel',
+        minyanim: [
+          minyan({
+            tefillah: 'kabbalas_shabbos',
+            days: ['fri'],
+            time: 'At Candle Lighting (between 5:00 PM and 7:00 PM)',
+            anchor: 'candle_lighting',
+            offsetMinutes: 0,
+            notBefore: '17:00',
+            notAfter: '19:00',
+          }),
+          minyan({
+            tefillah: 'kabbalas_shabbos',
+            days: ['fri'],
+            time: 'At Sunset',
+            anchor: 'sunset',
+            offsetMinutes: 0,
+          }),
+        ],
+      },
+    ])[0].rows
+    const merged = mergeSameDayTimes(rows)
+    expect(merged).toHaveLength(1)
+    expect(merged[0].notBefore).toBeUndefined()
+    expect(merged[0].notAfter).toBeUndefined()
+  })
+
+  it('preserves the bounds on an unmerged row', () => {
+    const rows = groupByTefillah([
+      {
+        name: 'Beth Israel',
+        minyanim: [
+          minyan({
+            tefillah: 'kabbalas_shabbos',
+            days: ['fri'],
+            time: 'At Candle Lighting (between 5:00 PM and 7:00 PM)',
+            anchor: 'candle_lighting',
+            offsetMinutes: 0,
+            notBefore: '17:00',
+            notAfter: '19:00',
+          }),
+        ],
+      },
+    ])[0].rows
+    expect(mergeSameDayTimes(rows)[0].notBefore).toBe('17:00')
+    expect(mergeSameDayTimes(rows)[0].notAfter).toBe('19:00')
+  })
+
   it('preserves the anchor on an unmerged row', () => {
     const rows = groupByTefillah([
       {
@@ -253,5 +308,78 @@ describe('groupByDay', () => {
 
   it('returns nothing when no minyan lists any day', () => {
     expect(groupByDay([{ name: 'Beth Israel', minyanim: [minyan({ tefillah: 'mincha', days: [], time: '1:00pm' })] }])).toEqual([])
+  })
+})
+
+// ── Bounded (clamped) zman rules ───────────────────────────────────────────────
+//
+// The case these exist for: a shtiebel that davens Kabbalas Shabbos at candle
+// lighting, but never before 5:00pm and never after 7:00pm. Seasons can't
+// express it — the rule is one rule all year, and the clamp only bites at the
+// two ends of the year — so it lives on the time rule itself.
+
+describe('formatAnchorRule with bounds', () => {
+  it('appends nothing when neither bound is set', () => {
+    expect(formatAnchorRule('candle_lighting', 0, {})).toBe('At Candle Lighting')
+  })
+
+  it('names a lower bound on its own', () => {
+    expect(formatAnchorRule('candle_lighting', 0, { notBefore: '17:00' })).toBe(
+      'At Candle Lighting (not before 5:00 PM)',
+    )
+  })
+
+  it('names an upper bound on its own', () => {
+    expect(formatAnchorRule('candle_lighting', 0, { notAfter: '19:00' })).toBe(
+      'At Candle Lighting (not after 7:00 PM)',
+    )
+  })
+
+  it('reads as a window when both are set', () => {
+    expect(
+      formatAnchorRule('candle_lighting', 0, { notBefore: '17:00', notAfter: '19:00' }),
+    ).toBe('At Candle Lighting (between 5:00 PM and 7:00 PM)')
+  })
+
+  it('keeps the offset phrasing in front of the window', () => {
+    expect(formatAnchorRule('sunset', -20, { notAfter: '19:00' })).toBe(
+      '20 min before Sunset (not after 7:00 PM)',
+    )
+  })
+})
+
+describe('clampTimeText', () => {
+  const bounds = { notBefore: '17:00', notAfter: '19:00' }
+
+  it('leaves a time inside the window alone', () => {
+    expect(clampTimeText('6:12 PM', bounds)).toBe('6:12 PM')
+  })
+
+  it('raises a time below the lower bound', () => {
+    expect(clampTimeText('4:18 PM', bounds)).toBe('5:00 PM')
+  })
+
+  it('lowers a time above the upper bound', () => {
+    expect(clampTimeText('8:04 PM', bounds)).toBe('7:00 PM')
+  })
+
+  it('treats each bound as inclusive', () => {
+    expect(clampTimeText('5:00 PM', bounds)).toBe('5:00 PM')
+    expect(clampTimeText('7:00 PM', bounds)).toBe('7:00 PM')
+  })
+
+  it('applies a lone bound without needing the other', () => {
+    expect(clampTimeText('4:18 PM', { notBefore: '17:00' })).toBe('5:00 PM')
+    expect(clampTimeText('4:18 PM', { notAfter: '19:00' })).toBe('4:18 PM')
+  })
+
+  it('is a no-op with no bounds set', () => {
+    expect(clampTimeText('4:18 PM', {})).toBe('4:18 PM')
+  })
+
+  // Never invent a time: an unparseable input is passed straight through
+  // rather than being replaced by a bound that may be nothing like it.
+  it('passes through a time it cannot parse', () => {
+    expect(clampTimeText('At Havdalah', bounds)).toBe('At Havdalah')
   })
 })

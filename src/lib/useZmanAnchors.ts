@@ -5,7 +5,7 @@ import { useToday } from '@/lib/useNow'
 import { community } from '@/community.config'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
-import type { ZmanAnchor } from '@/lib/davening'
+import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
   sunsetIso?: string
@@ -118,9 +118,15 @@ export function geoOrCommunityDefault(geo: Geo | null | undefined): Geo {
 /** Resolves a minyan's calculated clock time from its anchor + offset against
  *  a location's resolved AnchorTimes, or `null` when there's nothing to
  *  calculate (clock-time row) or the zmanim for that location haven't
- *  resolved (yet, or at all — e.g. the location's Hebcal fetch failed). */
+ *  resolved (yet, or at all — e.g. the location's Hebcal fetch failed).
+ *
+ *  The row's bounds are applied last, so a shul that davens at candle
+ *  lighting but never after 7:00pm shows 7:00 PM in midsummer rather than the
+ *  8:04 PM it would otherwise compute. Clamping HERE rather than at each call
+ *  site is what keeps every surface honest — the listing card, the modal and
+ *  anything added later all get the real time without having to remember. */
 export function resolveAnchorTime(
-  row: { anchor?: ZmanAnchor; offsetMinutes?: number },
+  row: { anchor?: ZmanAnchor; offsetMinutes?: number } & MinyanBounds,
   anchors: AnchorTimes | undefined,
 ): string | null {
   if (!row.anchor || !anchors) return null
@@ -129,7 +135,8 @@ export function resolveAnchorTime(
     : row.anchor === 'candle_lighting' ? anchors.candleLightingIso
     : anchors.havdalahIso
   if (!iso) return null
-  return applyOffsetMinutes(iso, row.offsetMinutes ?? 0, community.timezone)
+  const computed = applyOffsetMinutes(iso, row.offsetMinutes ?? 0, community.timezone)
+  return clampTimeText(computed, row)
 }
 
 /** Human-readable name for an anchor, for tooltip/disclaimer copy. */

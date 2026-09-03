@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import type { HomeSection } from '@/lib/homeSections'
 import type { DirectoryResource, NavigateFn } from '@/types'
@@ -12,11 +13,22 @@ import { travelCompare } from '@/lib/listingTravel'
 import { GenericListingCard } from '@/components/resources/GenericListingCard'
 import { useForm, useForms } from '@/lib/useForms'
 import { community } from '@/community.config'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 
 export type CardDef = {
   title: string
   go: () => void
+  /** The same destination `go` navigates to, as a real path — lets `Card`
+   *  render a genuine `<Link>` instead of a `<button onClick>`, which is
+   *  what makes cmd/ctrl/middle-click "open in new tab" work at all; a
+   *  click handler alone never gets that regardless of anything else in the
+   *  app. `go` still does the actual navigating on a plain click (a real
+   *  `<Link>` already knows to leave a modified click to the browser and
+   *  only intercept a plain one), so this doesn't change what tapping the
+   *  card does today — it only fixes what a modified click does. */
+  href: string
   /** Hidden search terms — the words people type that should surface this card
    *  (e.g. "shul" for Synagogues, "supermarket" for Grocery Stores). */
   keywords?: string[]
@@ -46,7 +58,13 @@ export function Card({ card, tint, priority = false }: { card: CardDef; tint: st
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
   return (
-    <button onClick={card.go} className="group w-full cursor-pointer">
+    // A real <Link>, not a <button onClick={card.go}> — go still exists on
+    // CardDef for the one place a tile opens programmatically instead of by
+    // a visible click (Landing's search "Places" results, `card.go()`), but
+    // the tile itself now navigates the normal way: Link already knows to
+    // leave a modified click (cmd/ctrl/middle) to the browser and only
+    // intercept a plain one, which a click handler can never do on its own.
+    <Link href={card.href} className="group block w-full cursor-pointer">
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
@@ -100,7 +118,7 @@ export function Card({ card, tint, priority = false }: { card: CardDef; tint: st
           {card.title}
         </span>
       </div>
-    </button>
+    </Link>
   )
 }
 
@@ -338,6 +356,10 @@ function labelWords(c: CategoryConfig): string[] {
 export function resourceCards(
   nav: NavigateFn,
   categories: CategoryConfig[] | null,
+  // The real path each card's `go` above already navigates to under the
+  // hood — see CardDef.href's own comment for why this is threaded in
+  // alongside `nav` rather than derived from it.
+  communitySlug: string,
 ): CardDef[] | null {
   if (categories === null) return null
 
@@ -361,6 +383,7 @@ export function resourceCards(
             'temple', 'einstein',
           ],
           go: () => nav('patient', 'find', { findView: 'hospitals' }),
+          href: routes.slug(communitySlug, 'hospitals'),
         }]
       : []),
     ...categories.filter((c) => c.kind === 'listing').map((c) => ({
@@ -371,6 +394,7 @@ export function resourceCards(
       cardTextColor: c.cardTextColor,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
       go: () => nav('patient', 'find', { findView: c.id }),
+      href: routes.slug(communitySlug, c.id),
     })),
     ...(zmanim
       ? [{
@@ -385,6 +409,7 @@ export function resourceCards(
             'mincha', 'maariv', 'shacharis', 'parsha', 'molad',
           ],
           go: () => nav('patient', 'find', { findView: 'zmanim' }),
+          href: routes.slug(communitySlug, 'zmanim'),
         }]
       : []),
     ...(eruv
@@ -399,6 +424,7 @@ export function resourceCards(
             'techum', 'stroller on shabbos',
           ],
           go: () => nav('patient', 'find', { findView: 'eruv' }),
+          href: routes.slug(communitySlug, 'eruv'),
         }]
       : []),
   ]
@@ -412,6 +438,7 @@ export function resourceCards(
 export function useEntryCards(
   onOpenFlow: (kind: string, preselect?: string[]) => void,
 ): CardDef[] {
+  const communitySlug = useCommunitySlug()
   const supportForm = useForm('support')
   const volunteerForm = useForm('volunteer')
   // Every other form is an admin-created custom one — support/volunteer keep
@@ -436,6 +463,7 @@ export function useEntryCards(
             'bikur cholim', 'company', 'someone to talk to', 'case manager', 'social worker',
           ],
           go: () => onOpenFlow('support'),
+          href: routes.slug(communitySlug, 'support'),
         }]
       : []),
     ...(community.features.volunteer && volunteerForm
@@ -451,6 +479,7 @@ export function useEntryCards(
             'visit patients', 'donate time', 'sign up', 'get involved', 'tzedakah', 'lend a hand',
           ],
           go: () => onOpenFlow('volunteer'),
+          href: routes.slug(communitySlug, 'volunteer'),
         }]
       : []),
     ...customForms.map((f) => ({
@@ -460,6 +489,7 @@ export function useEntryCards(
       cardImageUrl: f.cardImageUrl,
       cardTextColor: f.cardTextColor,
       go: () => onOpenFlow(f.id),
+      href: routes.slug(communitySlug, f.id),
     })),
   ]
 }

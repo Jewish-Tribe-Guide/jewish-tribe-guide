@@ -54,7 +54,12 @@ vi.mock('@/components/intake/AddressInput', () => ({
   ),
 }))
 
-type TestCommunity = Community & { adminEmails: string[]; notifyOnSubmission: boolean; previewToken: string | null }
+type TestCommunity = Community & {
+  adminEmails: string[]
+  notifyMutedEmails: string[]
+  notifyReviewEmails: string[]
+  previewToken: string | null
+}
 
 function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
   return {
@@ -75,7 +80,8 @@ function makeCommunity(overrides: Partial<TestCommunity> = {}): TestCommunity {
     isDefault: true,
     visible: true,
     adminEmails: [],
-    notifyOnSubmission: true,
+    notifyMutedEmails: [],
+    notifyReviewEmails: [],
     previewToken: null,
     ...overrides,
   }
@@ -650,92 +656,109 @@ describe('CommunityManager — publishing a community', () => {
   })
 })
 
-describe('CommunityManager — editing admin emails / notify toggle', () => {
+describe('CommunityManager — admin roster', () => {
   const ues = makeCommunity({
     slug: 'ues',
     name: 'Upper East Side',
     region: 'Manhattan',
     adminEmails: ['jane@example.com', 'sam@example.com'],
-    notifyOnSubmission: true,
+    // jane is muted on submissions (opted out) and opted in to review-action
+    // emails; sam is on the defaults for both — exercises every combination
+    // of the two read-only pills at once.
+    notifyMutedEmails: ['jane@example.com'],
+    notifyReviewEmails: ['jane@example.com'],
   })
 
-  // The edit panel is a sibling of the row's own link+buttons, one level
-  // further up the card — rowFor (used by the publishing tests above)
-  // stops at the link's immediate parent, which doesn't reach it.
+  // The roster is a sibling of the row's own link+buttons, one level
+  // further up the card — rowFor (used by the publishing tests above) stops
+  // at the link's immediate parent, which doesn't reach it.
   function cardFor(name: RegExp): HTMLElement {
     return screen.getByRole('link', { name }).parentElement!.parentElement!
   }
 
-  it('shows every configured admin login, comma-joined', async () => {
+  it('shows every admin with their own submission and review-action preference', async () => {
     await renderAndWaitForList([ues])
-    expect(screen.getByText('jane@example.com, sam@example.com')).toBeInTheDocument()
+    const card = cardFor(/upper east side/i)
+
+    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
+    expect(within(janeRow).getByText('Off')).toBeInTheDocument()
+    expect(within(janeRow).getByText('On')).toBeInTheDocument()
+
+    const samRow = within(card).getByText('sam@example.com').closest('tr')!
+    expect(within(samRow).getByText('On')).toBeInTheDocument()
+    expect(within(samRow).getByText('Off')).toBeInTheDocument()
   })
 
-  it('shows Yes/No for the notify-on-submission toggle', async () => {
-    const quiet = makeCommunity({ slug: 'quiet', name: 'Quiet Community', notifyOnSubmission: false })
-    await renderAndWaitForList([ues, quiet])
-    expect(screen.getByText(/email admins on new submissions: yes/i)).toBeInTheDocument()
-    expect(screen.getByText(/email admins on new submissions: no/i)).toBeInTheDocument()
+  it('shows the empty state when no admins are configured', async () => {
+    const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
+    await renderAndWaitForList([empty])
+    expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
   })
 
-  it('opens the edit panel pre-filled with the current admin list and notify checkbox', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
-
-    expect(within(cardFor(/upper east side/i)).getByLabelText(/admin logins/i)).toHaveValue(
-      'jane@example.com, sam@example.com',
-    )
-    expect(
-      within(cardFor(/upper east side/i)).getByRole('checkbox', { name: /email the admins above/i }),
-    ).toBeChecked()
-  })
-
-  it('saves the edited admin list and notify toggle', async () => {
+  it('adds a new admin', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
     vi.mocked(fetchJson).mockResolvedValueOnce({
-      community: { ...ues, adminEmails: ['jane@example.com'], notifyOnSubmission: false },
+      community: { ...ues, adminEmails: [...ues.adminEmails, 'new@example.com'] },
     })
 
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
-    const adminInput = within(cardFor(/upper east side/i)).getByLabelText(/admin logins/i)
-    await user.clear(adminInput)
-    await user.type(adminInput, 'jane@example.com')
-    await user.click(within(cardFor(/upper east side/i)).getByRole('checkbox', { name: /email the admins above/i }))
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^save$/i }))
+    const card = cardFor(/upper east side/i)
+    await user.type(within(card).getByPlaceholderText(/new-admin@example.com/i), 'new@example.com')
+    await user.click(within(card).getByRole('button', { name: /^add admin$/i }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
     const call = vi.mocked(fetchJson).mock.calls[0]!
     expect(call[0]).toBe('/api/admin/communities/ues')
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({
-      adminEmails: ['jane@example.com'],
-      notifyOnSubmission: false,
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ addAdminEmail: 'new@example.com' })
+    expect(await within(card).findByText('new@example.com')).toBeInTheDocument()
+  })
+
+  it('removes an admin after a confirm step', async () => {
+    const user = userEvent.setup()
+    await renderAndWaitForList([ues])
+    vi.mocked(fetchJson).mockResolvedValueOnce({
+      community: { ...ues, adminEmails: ['sam@example.com'], notifyMutedEmails: [], notifyReviewEmails: [] },
     })
-    expect(await screen.findByText(/email admins on new submissions: no/i)).toBeInTheDocument()
-  })
 
-  it('Cancel closes the panel without saving', async () => {
-    const user = userEvent.setup()
-    await renderAndWaitForList([ues])
-
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^cancel$/i }))
-
-    expect(screen.queryByLabelText(/admin logins/i)).not.toBeInTheDocument()
+    const card = cardFor(/upper east side/i)
+    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
+    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
+    // Not sent yet — confirmation is required first.
     expect(fetchJson).not.toHaveBeenCalled()
+
+    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
+
+    await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
+    const call = vi.mocked(fetchJson).mock.calls[0]!
+    expect(call[0]).toBe('/api/admin/communities/ues')
+    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({ removeAdminEmail: 'jane@example.com' })
+    expect(within(card).queryByText('jane@example.com')).not.toBeInTheDocument()
   })
 
-  it('shows a server-side error inline and leaves the panel open', async () => {
-    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update the admin list.'))
+  it('Cancel on the remove confirmation leaves the admin in place', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([ues])
 
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /edit admins/i }))
-    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^save$/i }))
+    const card = cardFor(/upper east side/i)
+    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
+    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
+    await user.click(within(janeRow).getByRole('button', { name: /^cancel$/i }))
 
-    expect(await screen.findByText('Could not update the admin list.')).toBeInTheDocument()
-    expect(screen.getByLabelText(/admin logins/i)).toBeInTheDocument()
+    expect(fetchJson).not.toHaveBeenCalled()
+    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
+  })
+
+  it('shows a server-side error inline when removing an admin fails', async () => {
+    vi.mocked(fetchJson).mockRejectedValue(new Error('Could not remove that admin.'))
+    const user = userEvent.setup()
+    await renderAndWaitForList([ues])
+
+    const card = cardFor(/upper east side/i)
+    const janeRow = within(card).getByText('jane@example.com').closest('tr')!
+    await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
+    await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))
+
+    expect(await within(card).findByText('Could not remove that admin.')).toBeInTheDocument()
+    expect(within(card).getByText('jane@example.com')).toBeInTheDocument()
   })
 })

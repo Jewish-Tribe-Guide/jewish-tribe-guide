@@ -78,25 +78,107 @@ otherwise, rather than risk writing to the real database — the guard is in eac
 `playwright.*.config.ts` for the three Playwright suites, and in
 `src/test/integrationEnv.ts` for `test:integration`.
 
-One caveat when you do run them: `cache-roundtrip`'s `/about` test fails
-roughly one run in thirty, and it is not a caching bug. The invalidation was
-instrumented by reading `x-nextjs-cache` on every poll — the transition is
-STALE → HIT on every observed run, in 15/15 repeated saves against a warm
-server (median 453ms), 3/3 against a freshly booted one (~950ms), and 5/5 full
-cold runs of the suite (1.2–1.6s). An earlier version of this note blamed cold
-starts; that was wrong, and cold is under a second.
+### A wait can never outlast the test budget above it (closed)
 
-The residue is stale-while-revalidate: `revalidateTag(…, 'max')` serves the
-stale entry while regenerating behind it, so one failed regeneration — a
-transient Supabase timeout while four CI jobs share a single test project —
-leaves the old body served rather than retrying immediately. Hence the shape:
-every success under two seconds, the rare failure never landing at all. The
-poll allows 60s to absorb a retry, which costs nothing against a real bug,
-since a genuine invalidation failure lasts `cacheLife('days')` and fails at any
-timeout.
+This section used to say `cache-roundtrip`'s `/about` test failed "roughly one
+run in thirty" for reasons intrinsic to stale-while-revalidate, and told you to
+re-run before believing a failure. **That was wrong, and following it meant
+re-running a real, deterministic bug until it went away.**
 
-So: re-run before believing a failure there — but if it fails twice, believe
-it, because the measurements above say it should essentially never fail.
+The measurements it cited still stand — invalidation converges in 1.2–1.6s
+cold, STALE → HIT on every observed run — which is precisely why the diagnosis
+should have been suspect: a thing that always finishes in under two seconds
+does not intermittently need more than sixty. The poll asks for 60s. The
+config set no `timeout` at all, so Playwright's 30s default applied, and the
+poll could never reach the budget the comment beside it spends a paragraph
+justifying. CI failed with `Test timeout of 30000ms exceeded`, exactly on the
+ceiling. The "one in thirty" was a 30s cap under a 60s allowance.
+
+Generalising the check found the same shape twice more:
+`e2e/helpers.ts` fetched content on the 30s request default inside a 30s test,
+and `e2e-admin-write/community-editor.spec.ts` has three
+`toPass({ timeout: 30_000 })` revalidation polls under the same default. The
+last two pass today only because their conditions resolve quickly; the retry
+headroom written into them was fictional.
+
+Every Playwright config now sets a test `timeout` above the largest wait
+beneath it (e2e 60s, cache 90s, admin-write 60s), with `expect` left at 5s so
+a genuine regression still fails in five seconds rather than a minute.
+`src/test/e2eTimeouts.test.ts` derives this for every `playwright*.config.ts`
+by scanning its `testDir`, so a poll that asks for more than its config allows
+fails the unit suite instead of surfacing as a flake months later.
+
+The general rule, since this cost three separate investigations: **when a test
+"flakes" only in CI and the failure lands exactly on a round number, suspect a
+budget, not the system under test.**
+
+### …and `/about` had a second problem underneath it (closed — `test.fail()` marker removed)
+
+Raising the budget did not make the `/about` test pass on its own. It still
+failed after that fix — `Timeout 60000ms exceeded`, every poll `HIT/old` —
+while never reproducing on demand: warm server 15/15 and 12/12 clean, cold
+build with the dist dir deleted 5/5 clean, the full suite 5/5 clean across
+both. It was also wrongly called CI-only here at one point, on the strength of
+several clean local runs, then reproduced locally within the hour with an
+identical signature. That correlation was noise. Don't trust a "CI-only"
+diagnosis on this test without a large number of local runs to back it.
+
+What the instrumentation established, which is the part worth keeping even
+though the root cause stayed elusive:
+
+- **Every failing poll is HIT/old.** A healthy save reads `STALE/old →
+  HIT/new`. The failure never even reaches STALE — the page's cached entry is
+  never marked stale in the first place. That rules out stale-while-revalidate
+  (this file's diagnosis for months) and rules out the write: the stored row
+  is asserted to hold the new body, through the uncached admin route, before
+  the poll ever starts.
+- The symptom is precise even though the mechanism isn't: **this path's cache
+  entry was not invalidated.**
+
+The fix: the pages PATCH route now calls `revalidatePath(`/\${slug}`)` alongside
+its existing `revalidateTag(TAGS.pages, 'max')`. Tag-based invalidation is
+supposed to cover this on its own — that's the whole point of `cacheTag` — so
+this is belt-and-braces for a symptom that was observed, not a change made
+because the theory demanded it. `revalidatePath` marks the path's own entry
+directly, which is exactly the thing that was failing to be marked.
+
+Since adding it: 7/7 real-suite runs clean (5 warm, 2 with a fresh cold
+build), where the failure used to surface within a handful of CI runs. That is
+evidence the fix helps, **not proof the underlying cause is understood** — the
+bug never reproduced on demand even before the fix, so a clean streak here
+is weaker evidence than it would be for a deterministic bug. If `/about`
+starts failing again with the same HIT/old signature, `revalidatePath` does
+not reach that entry either, and the next suspect is the build-time prerender
+specifically, not the tag mechanism in general.
+
+Left running (not quarantined) rather than quarantined outright: while the
+fix was unproven, a conditional `test.fail(!!process.env.CI, …)` kept it as
+the only instrument that could tell us whether the fix actually held, without
+turning every local run red the way an unconditional marker would have.
+
+It has since come back an unexpected PASS in CI on top of the 7/7 runs
+above — Playwright's own signal, same as the two tests in the "Coverage that
+used to be missing" pattern below, that the marker is stale and needs to come
+off, not that anything is newly broken. The marker is gone; this is a plain
+`test()` now. If `/about` regresses again with the same HIT/old signature,
+that's a new investigation to reopen (see the build-time-prerender suspect
+above), not a reason to have kept the marker pre-emptively.
+
+Guarded structurally too, so this can't silently regress if someone
+"simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.
+test.ts` asserts both the tag and the path invalidation are present in the
+source, and that the path is derived from `PAGE_SLUGS` rather than
+hand-listed (so a third page can't get one and not the other).
+
+Whether this was ever hitting production is still genuinely unknown. Vercel
+serves `/about` as `x-vercel-cache: PRERENDER`, a different mechanism from
+`next start`'s in-process cache used here, so a CI/next-start-only artifact
+and a real "admin edits don't reliably appear" bug would look identical from
+this test alone. `revalidatePath` is the standard, recommended way to
+invalidate a specific route regardless of which caching layer is under it, so
+the fix is reasonable defense either way — but if someone reports that an
+About/Privacy edit didn't show up promptly on the live site, treat it as
+possibly the same bug, not a coincidence.
 
 **A test that uses an existing row must put that row into a known state first, and restore it after.** Two of the write suites create their own fixture (a category, a form) and delete it again, so nothing an admin does can reach them. The suites that edit a singleton — the `page` rows, `site_settings` — have no such luxury and must borrow the real record, which makes them the ones that break. `e2e-admin-write/pages-editor.spec.ts` broke three times this way: on a page being retitled, on its body gaining headings (which changed which HTML element the editor's caret landed in), and on a locator that matched a newly-added toolbar. Read what you need from the row, overwrite it with something known, then restore it in `finally`. Never assume what a real page contains.
 
@@ -171,6 +253,12 @@ Cached content reads are wired in three places that have to agree: a `use cache`
 `cacheTags.test.ts` derives the expected tag list from `TAGS` itself, so adding a store without wiring its invalidation fails the unit suite. `caching.spec.ts` then checks the pages really are served from the cache (`x-nextjs-cache: HIT`), since `use cache` that has quietly stopped applying looks identical to one that works.
 
 `/inbox` **is** prerendered and CDN-cached, correctly — it's a `'use client'` shell that fetches its data in the browser with an `Authorization` header. That stops being safe the moment anyone moves that fetch to the server, and the symptom would be invisible: the page still works, the headers don't change, and one admin's moderation queue gets served to whoever loads the page next. `caching.spec.ts` guards it.
+
+**Server-side invalidation being correct does not mean an open tab ever sees it.** These are two separate problems and the second one was missed for a long time. `[community]/layout.tsx` loads categories, site settings, home sections, forms and hospitals once (`loadCommunityContent`) and hands them to `ContentProvider`; an App Router layout does not re-render on client-side navigation between the screens under it. So all five were pinned to whatever the tab loaded with, for as long as it stayed open — an admin's rename, a newly published form, a hidden category, none of it arrived. Not on the next navigation, not an hour later, only on a full document load.
+
+Measured rather than assumed, because the two halves look identical from the outside and it is easy to blame the wrong one: after an admin save the server converges in **2–4 seconds** (`x-nextjs-cache` goes `STALE` → `HIT`), while the same tab kept showing the old value indefinitely across ~100 client-side navigations. An earlier attempt at this chased React `<Activity>` route preservation instead and was wrong — a revisit does issue a real RSC request either way; the stale data was coming from the layout above it, not from the page.
+
+`RefreshContentOnReturn` (mounted in that layout) fixes it by calling `router.refresh()` on the moments the content could have gone stale unnoticed — `visibilitychange`, `focus` and `online`. That is the set SWR and React Query revalidate on by default, minus polling, which is deliberately omitted: a background request on a loop costs battery and mobile data for content an admin changes a few times a week. `online` matters more here than it looks — this is used on hospital wifi, where losing signal and regaining it is an ordinary part of a session. The first two follow the same reasoning, and the same trigger pair, `useNow.ts` already uses to resync the clock. It matters most in the case this app is actually used in: an installed PWA that gets backgrounded rather than closed, and desktop tabs left open for days. Two things to know if you touch it: reading `Date.now()` during render fails the production build under Cache Components (`next dev` won't tell you), and **Playwright's `bringToFront()` fires neither event in headless Chromium** — instrumenting the page recorded an empty array across a full background/foreground cycle, so a test built on it would pass for the wrong reason forever. The test dispatches the events directly and says so.
 
 `/admin` used to be the same single shared console, but became per-community (`/philly/admin`, `/ues/admin`, …) once a second community needed its own admin — see [[project-multi-community]]. It went through two designs before landing here: first a shared console with an `ADMIN_COMMUNITY_COOKIE` switcher (needed `cookies()` in the layout, which Cache Components treats as a genuine per-viewer runtime read, so the layout carried `export const instant = false` to opt out of prerendering). That's gone now — `src/app/admin/[community]/layout.tsx` resolves the community from the URL segment itself, the same way the public `[community]/layout.tsx` does, with no runtime API involved and no `instant = false` needed. `caching.spec.ts`'s admin-shell check still runs; it just finds nothing cached to check for `/admin` and still means something for `/inbox`.
 

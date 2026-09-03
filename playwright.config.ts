@@ -33,6 +33,14 @@ export default defineConfig({
   testDir: './e2e',
   // A failing assertion should fail, not hang for the default 30s.
   expect: { timeout: 5_000 },
+  // Above the 45s budget e2e/helpers.ts gives its content fetches, so that
+  // budget can actually take effect — at the 30s default the two are the same
+  // number and the test dies at the exact moment the request would have,
+  // which is how a contended read surfaced as an opaque test timeout instead
+  // of a named URL. Assertions are unaffected: `expect` still fails in 5s, so
+  // a real regression surfaces just as fast as before. This only widens the
+  // window for the network, and only in the setup helpers that use it.
+  timeout: 60_000,
   fullyParallel: true,
   // Nothing here should be flaky; a retry that passes is hiding something.
   retries: 0,

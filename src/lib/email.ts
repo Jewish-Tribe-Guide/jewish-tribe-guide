@@ -2,10 +2,13 @@ import { Resend } from 'resend'
 import type { SubmissionPayload } from './requests'
 import { PREFERRED_CONTACT_LABELS } from './requests'
 import { getCategoryById } from './categoryStore'
-import { getCommunityNotifyRecipients } from './communityStore'
+import { getResourceRowById } from './resourceStore'
+import { diffLines, diffListing, isMultiline } from './submissionDiff'
+import { getCommunityNotifyRecipients, getReviewActionRecipients } from './communityStore'
 import { adminBase } from './adminNav'
 import { formatHoursSummary } from './hours'
 import type { ResourceSubmission, SubmissionRow, CategorySubmissionPayload } from '@/types'
+import type { CategoryField } from './categories'
 
 // ── Shared utilities ──────────────────────────────────────────────────────────
 
@@ -36,6 +39,65 @@ export function adminAppUrl(): string | undefined {
   return process.env.APP_URL?.replace(/\/$/, '')
 }
 
+// A plain number an admin can eyeball across two DIFFERENT emails about the
+// same submission — the new-submission notification, and later a
+// review-action notification saying someone else approved/rejected it.
+// Without this, "X approved/rejected Y" reads as a fresh fact with nothing
+// tying it back to the original request the admin already saw, which got
+// confusing the moment more than one admin was acting on the same queue.
+// Both subjects lead with it (rather than tucking it in a bracket at the
+// end) since an inbox row usually truncates a long subject from the right,
+// not the left — leading with the number is what keeps it visible no
+// matter how the rest of the line gets cut off.
+// Returns "" rather than "#undefined" when the number is missing. It HAS been
+// missing, in every notification this app has sent: the case_number migration
+// was never applied to any Supabase project, so `select('*')` came back
+// without the column and moderators got "#undefined Approved — <name>".
+//
+// The type said otherwise (`case_number: number`, non-optional) — it is now
+// optional, which is the honest shape for a column a deployed database may not
+// have yet. Migrations land after the code that reads them, so this degrades
+// instead of asserting.
+function submissionRef(caseNumber: number | null | undefined): string {
+  return caseNumber == null ? '' : `#${caseNumber}`
+}
+
+/** Joins a subject's parts, dropping any that are empty — so a missing
+ *  reference costs the subject nothing, not a leading space. */
+function subjectLine(...parts: string[]): string {
+  return parts.filter(Boolean).join(' ')
+}
+
+/** A row whose value is a before → after pair, for a proposed edit.
+ *
+ *  Multi-line fields (minyanim, hours) are diffed line by line instead, for
+ *  the same reason the moderation card does it: a shul with ten minyanim
+ *  correcting one time otherwise sends twenty lines to read to find the one
+ *  that moved. Same diffLines the card uses, so the email and the queue agree
+ *  about what changed. */
+function diffRow(label: string, before: string, after: string): string {
+  const value = isMultiline(before, after)
+    ? diffLines(before, after)
+        .map((line) => {
+          const style =
+            line.kind === 'removed'
+              ? 'color:#b91c1c;text-decoration:line-through;'
+              : line.kind === 'added'
+                ? 'color:#15803d;font-weight:600;'
+                : 'color:#64748b;'
+          return `<div style="${style}">${escapeHtml(line.text)}</div>`
+        })
+        .join('')
+    : `<span style="color:#b91c1c;text-decoration:line-through;">${escapeHtml(before)}</span>` +
+      `<span style="color:#64748b;"> → </span>` +
+      `<span style="color:#15803d;font-weight:600;">${escapeHtml(after)}</span>`
+
+  return `<tr>
+    <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
+    <td style="padding:6px 12px;color:#0f172a;white-space:pre-line;">${value}</td>
+  </tr>`
+}
+
 function row(label: string, value: string): string {
   return `<tr>
     <td style="padding:6px 12px;font-weight:600;color:#334155;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td>
@@ -52,7 +114,18 @@ function formatMinyan(m: Record<string, unknown>): string {
   return `${tefillah}${days}: ${m.time}${note}`
 }
 
-function formatDetailValue(v: unknown): string {
+// A select/tags field stores raw option *values*, which don't always match
+// what the admin typed as the option's label (e.g. renamed since) — same
+// distinction SubmissionCard.tsx's own resolveOptionLabel makes, so this
+// notification reads the same text the moderation queue shows instead of
+// whatever's in the raw JSON.
+function resolveOptionLabel(field: CategoryField | undefined, value: unknown): string {
+  const raw = String(value)
+  const label = field?.options?.find((o) => o.value === raw)?.label
+  return label ?? raw
+}
+
+function formatDetailValue(v: unknown, field?: CategoryField): string {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   if (Array.isArray(v)) {
     if (v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
@@ -61,9 +134,10 @@ function formatDetailValue(v: unknown): string {
         'tefillah' in item ? formatMinyan(item) : JSON.stringify(item)
       ).join(' | ')
     }
-    return (v as unknown[]).map(String).join(', ')
+    return (v as unknown[]).map((item) => resolveOptionLabel(field, item)).join(', ')
   }
   if (v && typeof v === 'object') return formatHoursSummary(v)
+  if (field?.type === 'select') return resolveOptionLabel(field, v)
   return v != null ? String(v) : ''
 }
 
@@ -226,17 +300,12 @@ function buildFeedbackHtml(
   </div>`
 }
 
-// Who a new submission for this community should email, or null when the
-// community has turned notify_on_submission off (see
-// getCommunityNotifyRecipients's own comment) — callers skip sending
-// entirely in that case, rather than falling back to anyone. Falls back to
-// the site-wide NOTIFICATION_TO env var only when notifications are ON but
-// admin_emails is empty — the same thing every community effectively did
-// before admin_emails existed, and still the right answer for one that
-// hasn't set it yet.
-async function notificationRecipients(communitySlug: string): Promise<string[] | null> {
+// Who a new submission for this community should email — falls back to the
+// site-wide NOTIFICATION_TO env var when admin_emails is empty, the same
+// thing every community effectively did before admin_emails existed, and
+// still the right answer for one that hasn't set it yet.
+async function notificationRecipients(communitySlug: string): Promise<string[]> {
   const recipients = await getCommunityNotifyRecipients(communitySlug)
-  if (recipients === null) return null
   if (recipients.length > 0) return recipients
   return [process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com']
 }
@@ -248,7 +317,6 @@ export async function sendNotification(
   communitySlug: string,
 ): Promise<void> {
   const to = await notificationRecipients(communitySlug)
-  if (!to) return // this community has submission notifications turned off
   const html = payload.requestType === 'Feedback'
     ? buildFeedbackHtml(payload, requestId, timestamp, communitySlug)
     : buildHtml(payload, requestId, timestamp, communitySlug)
@@ -298,7 +366,6 @@ export async function sendInboxMagicLink(email: string, link: string): Promise<v
 // review. Best-effort: callers catch and log without failing the submission.
 export async function sendSubmissionNotification(submission: SubmissionRow): Promise<void> {
   const to = await notificationRecipients(submission.community_id)
-  if (!to) return // this community has submission notifications turned off
 
   let subject: string
   let verb: string
@@ -311,7 +378,7 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     const payload = submission.payload as CategorySubmissionPayload
     verb = 'New category'
     title = payload.label
-    subject = `New Category Suggestion — ${title}`
+    subject = subjectLine(submissionRef(submission.case_number), `New Category Suggestion — ${title}`)
     const f = payload.firstListing
     proposedRows = `${row('Category name', payload.label)}
       ${payload.description ? row('Description', payload.description) : ''}
@@ -337,24 +404,63 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
     // review email.
     const descriptionConfigured = category?.detailFields.some((f) => f.key === 'googleDescription') ?? false
     const catSuffix = categoryLabel ? ` (${categoryLabel})` : ''
-    subject =
+    const ref = submissionRef(submission.case_number)
+    const kind =
       submission.operation === 'create'
-        ? `New Listing Suggestion — ${title}${catSuffix}`
+        ? 'New Listing Suggestion'
         : submission.operation === 'update'
-          ? `Edit Listing Suggestion — ${title}${catSuffix}`
-          : `Removal Listing Suggestion — ${title}${catSuffix}`
+          ? 'Edit Listing Suggestion'
+          : 'Removal Listing Suggestion'
+    subject = subjectLine(ref, `${kind} — ${title}${catSuffix}`)
     const detailRows = Object.entries(payload.details ?? {})
       .filter(([k]) => !DETAIL_SKIP.has(k) && (k !== 'googleDescription' || descriptionConfigured))
-      .map(([k, v]) => row(k, formatDetailValue(v)))
+      .map(([k, v]) => {
+        // Resolved through the category's own field config — SAME reasoning
+        // as SubmissionCard.tsx's flatListing: a raw JSON key/value is
+        // sometimes all there is (a renamed/removed field, or a category not
+        // yet loaded), but it's never preferred over the field's real,
+        // admin-configured label and option text.
+        const field = category?.detailFields.find((f) => f.key === k)
+        return row(field?.label ?? k, formatDetailValue(v, field))
+      })
       .join('')
-    proposedRows =
-      submission.operation === 'delete'
-        ? ''
-        : `${row('Category', categoryLabel)}
+    // An edit is shown as a diff against the listing it proposes to change,
+    // not as a copy of the whole listing. Listing everything is what made
+    // these unreadable: a one-field correction arrived as the entire record
+    // with nothing marking the change, so the email could not answer the only
+    // question it exists to raise, and the admin had to open the console.
+    //
+    // Same diffListing the moderation queue renders, so the two can't drift.
+    // Best-effort: the read is wrapped, and a listing that has since been
+    // deleted (or any failure) falls back to the proposed-values view rather
+    // than losing the notification entirely.
+    const current =
+      submission.operation === 'update' && submission.target_id
+        ? await getResourceRowById(submission.target_id, submission.community_id).catch(() => null)
+        : null
+
+    const proposedList = `${row('Category', categoryLabel)}
            ${row('Name', payload.name ?? '')}
            ${row('Address', payload.address ?? '')}
            ${row('Phone', payload.phone ?? '')}
            ${detailRows}`
+
+    if (submission.operation === 'delete') {
+      proposedRows = ''
+    } else if (current) {
+      const diffs = diffListing(current, payload as ResourceSubmission, category?.detailFields)
+      const changed = diffs.filter((d) => d.changed)
+      const unchanged = diffs.length - changed.length
+      proposedRows = changed.length
+        ? `${row('Listing', payload.name ?? '')}
+           ${changed.map((d) => diffRow(d.label, d.before, d.after)).join('')}
+           ${unchanged ? row('Unchanged', `${unchanged} other field${unchanged === 1 ? '' : 's'}`) : ''}`
+        : // Nothing actually differs. Worth saying plainly rather than
+          // rendering an empty table that reads like a failure to load.
+          `${row('Listing', payload.name ?? '')}${row('Proposed change', 'No field differs from the current listing')}`
+    } else {
+      proposedRows = proposedList
+    }
   }
 
   const appUrl = adminAppUrl()
@@ -380,12 +486,68 @@ export async function sendSubmissionNotification(submission: SubmissionRow): Pro
   await sendEmail({ to, subject, html })
 }
 
+/** "New category — Kosher Butchers" / "New listing — Goldi's" — the same
+ *  title text sendSubmissionNotification's own subject already derives, in
+ *  one place so the review-action notification below doesn't have to
+ *  re-derive it differently and drift. */
+function submissionDisplayName(submission: SubmissionRow): string {
+  if (submission.target_type === 'category') {
+    return (submission.payload as CategorySubmissionPayload).label
+  }
+  return (submission.payload as Partial<ResourceSubmission>).name ?? 'a listing'
+}
+
+// Tells every OTHER opted-in admin of this community that ONE admin just
+// approved or rejected a submission — not the submitter (see
+// confirmationEmail.ts's sendDecisionEmail for that), and never the acting
+// admin themselves (getReviewActionRecipients excludes them). Best-effort:
+// callers catch and log without failing the moderation action, same
+// convention as every other notification here.
+//
+// Opt-in (empty by default — see the notify_review_emails migration's own
+// comment), unlike new-submission notifications: nobody asked to be
+// told about other admins' decisions until this existed, so nothing turns
+// itself on for anyone. `actorEmail` is the acting admin's own verified
+// token email from the call site (getAdminUserForCommunity) — never
+// client-supplied — the same way reviewed_by itself is recorded.
+export async function sendReviewActionNotification(
+  submission: SubmissionRow,
+  decision: 'approved' | 'rejected',
+  actorEmail: string,
+): Promise<void> {
+  const to = await getReviewActionRecipients(submission.community_id, actorEmail)
+  if (to.length === 0) return
+
+  const title = escapeHtml(submissionDisplayName(submission))
+  const verb = decision === 'approved' ? 'approved' : 'rejected'
+  const Verb = decision === 'approved' ? 'Approved' : 'Rejected'
+  const appUrl = adminAppUrl()
+  const adminLink = appUrl
+    ? `<p style="margin-top:16px;"><a href="${escapeHtml(appUrl)}${adminBase(submission.community_id)}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;font-size:14px;">Open the admin console →</a></p>`
+    : ''
+
+  // Subject leads with the number, then the decision — that's the two
+  // things someone scanning an inbox actually needs ("is this an approval,
+  // and which request") — not who did it. WHO is in the body instead: it
+  // matters once you've opened the email, not before.
+  await sendEmail({
+    to,
+    subject: subjectLine(submissionRef(submission.case_number), `${Verb} — ${submissionDisplayName(submission)}`),
+    html: `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;margin-bottom:4px;">${Verb}</h2>
+      <p style="color:#334155;font-size:14px;">${title} was just ${verb} by ${escapeHtml(actorEmail)}. You're getting this because you turned on "Notify me when another admin approves or rejects a submission" in the Team tab.</p>
+      ${adminLink}
+    </div>`,
+  })
+}
+
 /** One row of the business-status digest below. */
 export type StatusChange = {
   name: string
   category: string
   from: string
   to: string
+  communitySlug: string
 }
 
 const STATUS_WORDS: Record<string, string> = {
@@ -411,10 +573,35 @@ function statusWord(v: string): string {
  * still files a `delete` submission for review, separately from this.
  *
  * Sent only when something actually changed, so a quiet week is silent.
+ *
+ * Grouped by community and routed through notificationRecipients() — the
+ * same per-community/per-admin lookup sendNotification uses — rather than
+ * one flat email to a single hardcoded address. A single nightly cron run
+ * covers every community at once, so a batch of changes can span several of
+ * them; each gets its own digest (only its own listings, only its own
+ * admins, respecting each admin's own opt-out) instead of every community's
+ * admins seeing every other community's changes.
  */
 export async function sendStatusChangeDigest(changes: StatusChange[]): Promise<void> {
   if (changes.length === 0) return
-  const to = process.env.NOTIFICATION_TO || 'phillyjewishguide@gmail.com'
+
+  const byCommunity = new Map<string, StatusChange[]>()
+  for (const change of changes) {
+    const existing = byCommunity.get(change.communitySlug)
+    if (existing) existing.push(change)
+    else byCommunity.set(change.communitySlug, [change])
+  }
+
+  await Promise.all(
+    Array.from(byCommunity.entries()).map(([communitySlug, communityChanges]) =>
+      sendCommunityStatusChangeDigest(communitySlug, communityChanges),
+    ),
+  )
+}
+
+async function sendCommunityStatusChangeDigest(communitySlug: string, changes: StatusChange[]): Promise<void> {
+  const to = await notificationRecipients(communitySlug)
+
   const rows = changes
     .map(
       (c) => `<tr>

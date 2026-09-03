@@ -8,7 +8,19 @@ import { makeCategory } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
 import { resetMockIntersectionObserver, triggerAllIntersections } from '@/test/intersectionObserverMock'
+import { mockRouter } from '@/test/nextNavigationMock'
 import Landing from './Landing'
+
+// Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
+// which is what makes cmd/ctrl-click "open in new tab" work — that pulled
+// useCommunitySlug() into Landing's own render for the first time, and that
+// hook calls next/navigation's useRouter() unconditionally. See
+// nextNavigationMock's own doc comment.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // HomeMap and ZmanimStrip are mocked out — both pull in real network/SDK
 // dependencies of their own (Google Maps, the uncached /api/zmanim fetch)
@@ -90,7 +102,7 @@ describe('Landing', () => {
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    await user.type(screen.getByLabelText('Filter resources'), 'grocery')
+    await user.type(screen.getByLabelText('Search resources'), 'grocery')
 
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
@@ -100,7 +112,7 @@ describe('Landing', () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
 
-    await user.type(screen.getByLabelText('Filter resources'), 'xyznotreal')
+    await user.type(screen.getByLabelText('Search resources'), 'xyznotreal')
 
     expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
   })

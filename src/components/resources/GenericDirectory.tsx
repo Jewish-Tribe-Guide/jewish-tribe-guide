@@ -20,6 +20,9 @@ import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
 import { useCategories } from '@/lib/useCategories'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes, mapQueryString } from '@/lib/routes'
+import Link from 'next/link'
 
 type Props = {
   category: CategoryConfig
@@ -51,6 +54,7 @@ type Props = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+  const communitySlug = useCommunitySlug()
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -312,6 +316,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
   })
 
+  // The exact URL onViewMap navigates to under the hood — computed here too
+  // so the Map button below can be a real <Link>, not just a click handler.
+  // Only a real anchor gets cmd/ctrl/middle-click "open in new tab" from the
+  // browser; a click handler alone never does, regardless of what it
+  // navigates to. onViewMap itself is left in place for now (still called by
+  // the mobile map screen's own back button elsewhere), just not read here
+  // anymore.
+  const filters = mapFilters()
+  const mapHref = `${routes.map(communitySlug)}${mapQueryString({
+    categories: [category.id],
+    query: search.trim() || undefined,
+    openNow: filters.openNow,
+    bool: filters.bool,
+    select: filters.select,
+  })}`
+
   return (
     <div>
       <UpButton label={upLabel} onClick={onUp} />
@@ -324,16 +344,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         actions={
           <>
             {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (
-              <button
-                onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
-                /* Desktop only — on mobile the Map button moves into the filter/sort
-                   row (next to Filters) to keep the header uncluttered. `desktop:`
-                   not `sm:` so a landscape phone doesn't lose it from here only to
-                   not have it in the mobile row either — see globals.css. */
+              <Link
+                href={mapHref}
+                /* A real <Link>, not a <button onClick>, is what makes cmd/
+                   ctrl/middle-click "open in new tab" work — see mapHref's
+                   own comment. Desktop only — on mobile the Map button moves
+                   into the filter/sort row (next to Filters) to keep the
+                   header uncluttered. `desktop:` not `sm:` so a landscape
+                   phone doesn't lose it from here only to not have it in the
+                   mobile row either — see globals.css. */
                 className="hidden desktop:inline-flex items-center gap-1 text-sm font-medium text-slate-600 border border-slate-300 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
               >
                 🗺️ Map
-              </button>
+              </Link>
             )}
             {canAdd && (
               <button
@@ -401,12 +424,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 </button>
               )}
               {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (
-                <button
-                  onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
+                <Link
+                  href={mapHref}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   🗺️ Map
-                </button>
+                </Link>
               )}
               {category.externalLink && (
                 <a
@@ -616,6 +639,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               item={item}
               category={category}
               showCategoryLabel={false}
+              // Same signal the header's prompt already uses: no location set,
+              // and this category is distance-based. In the row it is the one
+              // that gets seen — the header's pill sits above the fold once.
+              showDistanceSlot={addressPrompt}
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}

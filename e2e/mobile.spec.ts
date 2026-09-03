@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
+import { categoryWithDistances, categoryWithHoursField, defaultCommunity, dismissLocationPrompt, largestCategory } from './helpers'
 
 // The mobile tab bar and the inline card grid only exist below the `sm`
 // breakpoint, so the desktop project can't cover them at all. Mobile is also
@@ -219,5 +219,51 @@ test.describe('mobile', () => {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),
     ).toBe(false)
+  })
+
+  // The distance column used to render only when there WAS a distance, so with
+  // no location set it wasn't empty — it was absent, and every card looked
+  // complete. Nothing in the list said distances existed; the only hint was one
+  // pill at the top of the page, which reads like the first-load location popup
+  // the visitor already dismissed. Hence: nobody found the feature.
+  //
+  // Here rather than in a unit test because both halves of this need real
+  // layout, which jsdom does not have: that the slot is a usable tap target,
+  // and that tapping it opens the picker instead of expanding the card.
+  test('the empty distance slot is tappable and opens the location picker', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    // categoryWithDistances, not categoryWithListings: the latter's first hit
+    // in the real community is `cemetery`, which collects no address, so
+    // nothing distance-related renders there at all and this failed in CI
+    // while passing against the test project's own data.
+    const { category } = await categoryWithDistances(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    const slots = page.getByRole('button', { name: 'Set your location to see distances' })
+    const slot = slots.first()
+    await expect(slot).toBeVisible()
+
+    // One per row — the repetition down the list is the entire point. A slot
+    // that appeared on only some rows would read as a rendering fault.
+    const rows = await page.getByRole('button', { name: /^(Show|Hide) details for / }).count()
+    expect(await slots.count(), 'every listing row should hold the slot open').toBe(rows)
+
+    // WCAG 2.5.8 wants 24x24 minimum. The label itself is ~17px tall, so the
+    // button carries padding (cancelled by a negative margin) to clear it —
+    // the same trick the row's own chevron uses. Worth asserting: the padding
+    // is invisible, and deleting it looks like a tidy-up.
+    const box = (await slot.boundingBox())!
+    expect(Math.round(box.width), 'slot tap target width').toBeGreaterThanOrEqual(24)
+    expect(Math.round(box.height), 'slot tap target height').toBeGreaterThanOrEqual(24)
+
+    await slot.click()
+
+    // The picker opens...
+    await expect(page.getByPlaceholder('Enter your address')).toBeVisible()
+    // ...and the tap did not also expand the listing it sat on. The row's own
+    // click handler expands the card, so the slot has to stop propagation.
+    await expect(page.getByRole('button', { name: /^Hide details for / })).toHaveCount(0)
   })
 })

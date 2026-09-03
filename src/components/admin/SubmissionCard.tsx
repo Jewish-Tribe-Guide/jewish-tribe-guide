@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import type { EnrichedSubmission, ResourceRow, ResourceSubmission, CategorySubmissionPayload } from '@/types'
-import { isStructuredHours, formatHoursSummary } from '@/lib/hours'
-import { isMinyanim, formatMinyanimSummary } from '@/lib/davening'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
+// Flattening/formatting/diffing lives in lib/listingDiff so the notification
+// emails render the identical before/after — see that file's own note.
+import { diffLines, diffListing, flatListing, isMultiline } from '@/lib/submissionDiff'
 
 // One submission's card — the moderation queue (pending, with Approve/Reject
 // buttons) and the read-only history view (approved/rejected, past tense)
@@ -24,113 +25,6 @@ const STATUS_META: Record<'approved' | 'rejected', { label: string; cls: string 
   rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 border border-red-200' },
 }
 
-// A select/tags field stores raw option *values*, which don't always match
-// what the admin typed as the option's label (e.g. renamed since). Resolve
-// through the field's own `options` so the queue reads the same text the
-// submission form and card show, not whatever happens to be in the JSON.
-function resolveOptionLabel(field: CategoryField | undefined, value: unknown): string {
-  const raw = String(value)
-  const label = field?.options?.find((o) => o.value === raw)?.label
-  return label ?? raw
-}
-
-function fmt(value: unknown, field?: CategoryField): string {
-  if (value === undefined || value === null || value === '') return '—'
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
-
-  // Keyed on the configured type where there is one, with shape-detection only
-  // as the fallback for the raw-leftover loop below (a renamed or removed field
-  // arrives with no CategoryField to consult). isStructuredHours is a loose
-  // check — any non-array object satisfies it — so without the type check a
-  // future object-valued field type would be quietly rendered as if it were
-  // opening hours.
-  const structured = !field
-  if (field?.type === 'hours' || (structured && isStructuredHours(value))) {
-    return formatHoursSummary(value)
-  }
-  // One line per minyan, not a count. See formatMinyanimSummary: the summary
-  // this replaced collapsed every minyan to a count plus the distinct tefillos,
-  // so an edit that changed a time, a day, a note or the season rendered an
-  // identical string and the diff below reported the field as unchanged.
-  if (field?.type === 'minyanim' || (structured && isMinyanim(value) && value.length > 0)) {
-    return isMinyanim(value) ? formatMinyanimSummary(value) : String(value)
-  }
-
-  if (Array.isArray(value)) return value.map((v) => resolveOptionLabel(field, v)).join(', ') || '—'
-  if (field?.type === 'select') return resolveOptionLabel(field, value)
-
-  const text = String(value)
-  // Last resort. A moderator seeing "[object Object]" learns nothing about
-  // what is being proposed, which is the one thing this whole card exists to
-  // show — so fall back to the raw JSON, which is at least readable and
-  // diffable. Reaching this means a new field type needs a branch above;
-  // SubmissionCard.test.tsx fails on it rather than letting it ship.
-  return text === '[object Object]' ? JSON.stringify(value) : text
-}
-
-// Internal bookkeeping the admin never authors directly (Google-sync
-// provenance, geocoding) — never real category content, so always excluded
-// regardless of what fields a category happens to have.
-// googleFields tracks which fields Google Places sync is allowed to
-// overwrite (see googlePlaces.ts) — the sync cron and the submission form
-// each recompute it independently and can land on the same set of fields in
-// a different order, which would otherwise show up here as a "changed"
-// field a submitter never touched.
-//
-// googleDescription is deliberately NOT in here: some categories configure it
-// as a real, human-editable "Description" field (see ListingForm.tsx's
-// intake autofill and googlePlaces.ts's recurring sync) with its own help
-// text — that's real content worth a moderator seeing, same as any other
-// configured field. Only skip it below, in the raw-leftover-details loop,
-// for categories that never configured it as a field at all — there it's
-// nothing but the sync's own fallback card-subtitle text.
-// googleAutofill is the raw per-field autofill snapshot a pending
-// submission still carries (see ListingForm.tsx) — resolved into
-// googleFields and stripped only once approved (submissionStore.ts's
-// withResolvedGoogleFields), so it's still present here for the moderator's
-// view and just as uninteresting as googleFields itself.
-const SKIP = new Set([
-  'legacyId',
-  'geo',
-  'placeId',
-  'googleSyncedAt',
-  'businessStatus',
-  'googleFields',
-  'googleAutofill',
-])
-const SKIP_WHEN_UNCONFIGURED = new Set(['googleDescription'])
-
-type FlatField = { key: string; label: string; value: string }
-
-// Flattens a listing (current ResourceRow or proposed payload) into ordered
-// label/value rows for display and diffing. Walks the category's own
-// `detailFields` first (so rows appear in the same order as the submission
-// form/card, under their real admin-configured label) then appends anything
-// left in `details` that isn't a currently-configured field — a renamed or
-// removed field, or a category the moderation queue hasn't loaded yet —
-// under its raw key, so a value is never silently dropped just because the
-// lookup missed it. New fields need no code change here: they're just
-// another entry in `fields` the next time a category gains one.
-function flatListing(src: ResourceRow | ResourceSubmission | undefined, fields: CategoryField[] | undefined): FlatField[] {
-  if (!src) return []
-  const details = (src.details ?? {}) as Record<string, unknown>
-  const out: FlatField[] = [
-    { key: 'name', label: 'Name', value: fmt(src.name) },
-    { key: 'address', label: 'Address', value: fmt(src.address) },
-    { key: 'phone', label: 'Phone', value: fmt(src.phone) },
-  ]
-  const seen = new Set<string>()
-  for (const f of fields ?? []) {
-    if (SKIP.has(f.key) || !(f.key in details)) continue
-    seen.add(f.key)
-    out.push({ key: f.key, label: f.label, value: fmt(details[f.key], f) })
-  }
-  for (const [k, v] of Object.entries(details)) {
-    if (SKIP.has(k) || SKIP_WHEN_UNCONFIGURED.has(k) || seen.has(k)) continue
-    out.push({ key: k, label: k, value: fmt(v) })
-  }
-  return out
-}
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -239,6 +133,10 @@ export function SubmissionCard({
             <p className="text-xs text-muted mt-2">
               <span className={`font-medium rounded-full px-2 py-0.5 ${statusMeta.cls}`}>{statusMeta.label}</span>
               {s.reviewed_at && <span className="ml-2">{dateFormatter.format(new Date(s.reviewed_at))}</span>}
+              {/* Only for submissions decided after reviewed_by existed —
+                  older rows have nothing to show here, not a fabricated
+                  "unknown admin". */}
+              {s.reviewed_by && <span className="ml-2">by {s.reviewed_by}</span>}
             </p>
           )}
         </div>
@@ -311,22 +209,9 @@ function Diff({
   proposed: ResourceSubmission
   fields?: CategoryField[]
 }) {
-  const before = flatListing(current ?? undefined, fields)
-  const after = flatListing(proposed, fields)
-  const beforeByKey = new Map(before.map((r) => [r.key, r]))
-  const afterByKey = new Map(after.map((r) => [r.key, r]))
-  // `after`'s order first (the category's own field order, and what a
-  // moderator approving mostly cares about), then any key only `before` had
-  // — a field the edit cleared out entirely rather than just changed.
-  const orderedKeys = [...after.map((r) => r.key), ...before.map((r) => r.key).filter((k) => !afterByKey.has(k))]
-
   return (
     <dl className="text-xs space-y-0.5">
-      {orderedKeys.map((k) => {
-        const label = afterByKey.get(k)?.label ?? beforeByKey.get(k)?.label ?? k
-        const beforeValue = beforeByKey.get(k)?.value ?? '—'
-        const afterValue = afterByKey.get(k)?.value ?? '—'
-        const changed = beforeValue !== afterValue
+      {diffListing(current, proposed, fields).map(({ key: k, label, before: beforeValue, after: afterValue, changed }) => {
         return (
           <div key={k} className="flex gap-2">
             <dt className="text-muted w-28 shrink-0">{label}</dt>
@@ -334,14 +219,36 @@ function Diff({
                 multi-line, and collapsing them to one run-on line is what made
                 a davening-times change unreadable even once it was diffable. */}
             <dd className={`min-w-0 break-words whitespace-pre-line ${changed ? 'text-slate-800' : 'text-slate-400'}`}>
-              {changed ? (
+              {!changed ? (
+                afterValue
+              ) : isMultiline(beforeValue, afterValue) ? (
+                // Line by line for the multi-line fields (minyanim, hours).
+                // As one string, a shul with ten minyanim correcting one time
+                // got all ten struck through and all ten repeated — twenty
+                // lines to read to find the one that moved, which is the
+                // approve-it-blind problem again, one level down.
+                <span className="block">
+                  {diffLines(beforeValue, afterValue).map((line, i) => (
+                    <span
+                      key={`${line.kind}-${i}-${line.text}`}
+                      className={
+                        line.kind === 'removed'
+                          ? 'block line-through text-red-500'
+                          : line.kind === 'added'
+                            ? 'block text-green-700 font-medium'
+                            : 'block text-slate-400'
+                      }
+                    >
+                      {line.text}
+                    </span>
+                  ))}
+                </span>
+              ) : (
                 <span>
                   <span className="line-through text-red-500">{beforeValue}</span>{' '}
                   <span aria-hidden="true">→</span>{' '}
                   <span className="text-green-700 font-medium">{afterValue}</span>
                 </span>
-              ) : (
-                afterValue
               )}
             </dd>
           </div>

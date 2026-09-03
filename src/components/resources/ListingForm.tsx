@@ -340,12 +340,21 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     <div>
       <UpButton label={config.pluralLabel} onClick={onUp} />
 
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">{heading}</h2>
-      <p className="text-sm text-muted mb-5">
-        {mode === 'edit'
-          ? 'Change what’s wrong below. Edits are reviewed before they go live.'
-          : 'New listings are reviewed before they appear on the site.'}
-      </p>
+      <h2 className="text-xl font-semibold text-slate-800 mb-3">{heading}</h2>
+      {/* Blue, not amber — this used to read as a warning (amber is this
+          app's caveat/verify-this color elsewhere, e.g. Chip's amber tone),
+          when it's just process information: every submission goes through
+          review, nothing here is asking the visitor to double-check
+          anything. Matches FormControls' own blue-50/blue-200 for the same
+          "here's what happens next" tone in the intake wizards. */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-2.5 mb-5">
+        <p className="text-sm text-blue-800">
+          <span className="font-semibold">Reviewed before it goes live.</span>{' '}
+          {mode === 'edit'
+            ? 'This won’t change the listing — a moderator reviews it first.'
+            : 'A moderator checks new listings before they appear on the site.'}
+        </p>
+      </div>
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">

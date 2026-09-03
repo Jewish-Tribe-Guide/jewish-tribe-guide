@@ -72,6 +72,13 @@ const AUTH_FILE = 'e2e-admin-write/.auth/admin.json'
 export default defineConfig({
   testDir: './e2e-admin-write',
   expect: { timeout: 5_000 },
+  // Above the 30s the community-editor's revalidation polls ask for. At
+  // Playwright's default the two were the same number, so those polls could
+  // never use their last retry — the test expired at the instant the poll
+  // would have. They pass today only because the condition resolves quickly;
+  // the documented headroom was fictional. Same bug as e2e-cache's /about
+  // poll, found by src/test/e2eTimeouts.test.ts.
+  timeout: 60_000,
   // Every spec creates/cleans up its own submission/category/resource rows
   // by id, but they all share the one moderation queue — safer sequential.
   fullyParallel: false,
