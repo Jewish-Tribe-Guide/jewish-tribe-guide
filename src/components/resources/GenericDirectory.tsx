@@ -314,13 +314,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* desktop:hidden — DirectoryHeader renders the same destination as
+          its own "{upLabel} / {title}" breadcrumb at desktop widths, so
+          this stays for mobile only rather than the two both saying
+          "All resources". */}
+      <UpButton label={upLabel} onClick={onUp} className="desktop:hidden mb-4" />
 
       <DirectoryHeader
         title={category.pluralLabel}
         count={filtered.length}
         anchorLabel={anchorLabel}
         addressPrompt={addressPrompt}
+        upLabel={upLabel}
+        onUp={onUp}
         actions={
           <>
             {onViewMap && hasMapCategory && category.hasAddress !== false && caps.map && (

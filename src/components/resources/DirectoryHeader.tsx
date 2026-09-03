@@ -14,6 +14,18 @@ type Props = {
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
+  /** Ancestor label for a desktop-only breadcrumb ("{upLabel} / {title}") above
+   *  the heading — mirrors the UpButton every caller already renders beside this
+   *  component ("Home" on mobile, "All resources" on desktop for most callers;
+   *  see GenericDirectory's own upLabel doc). Both this and onUp are required
+   *  together or omitted together; a caller that doesn't pass them just gets no
+   *  breadcrumb line, same as before this existed. Desktop-only, not shown on
+   *  mobile: the caller's own UpButton (hidden on desktop instead, so the two
+   *  don't both say "All resources" at once) already serves mobile, where a
+   *  second line would cost vertical space this component's mobile-density
+   *  comment below already treats as scarce. */
+  upLabel?: string
+  onUp?: () => void
 }
 
 // Shared heading block for every directory: the title plus the location/count
@@ -25,46 +37,61 @@ type Props = {
 // screens (`hidden desktop:*`) to keep the header from crowding next to the
 // location label or the "Set location" prompt. The count always shows on
 // desktop.
-export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions }: Props) {
+export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, upLabel, onUp }: Props) {
   const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
   return (
-    <div className="flex items-end justify-between gap-2 mb-2">
-      <div>
-        {/* h1, not h2: this is the page's own main heading (every category
-            directory, the synagogue/hospitals directories, all share this
-            component) — every other top-level screen in the app (home,
-            All Categories, Inbox, admin, the error/offline pages) already
-            uses h1 for the same role. A real gap, not a style choice: axe's
-            page-has-heading-one caught every one of these pages having no
-            h1 at all. */}
-        <h1 className="text-xl font-semibold text-slate-800">{title}</h1>
-        {anchorLabel ? (
-          <p className="text-sm text-muted mt-0.5">
-            {anchorLabel}
-            {countText && (
-              <>
-                <span aria-hidden="true" className="hidden desktop:inline mx-1.5">·</span>
-                <span className="hidden desktop:inline">{countText}</span>
-              </>
-            )}
-          </p>
-        ) : addressPrompt ? (
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            <AddressPrompt />
-            {countText && (
-              <span className="hidden desktop:inline text-sm text-muted">
-                <span aria-hidden="true" className="mr-1">·</span>{countText}
-              </span>
-            )}
-          </div>
-        ) : countText ? (
-          <p className="hidden desktop:block text-sm text-muted mt-0.5">
-            <span aria-hidden="true" className="mr-1.5">·</span>{countText}
-          </p>
-        ) : null}
+    <div>
+      {upLabel && onUp && (
+        <div className="hidden desktop:flex items-center gap-1 text-sm mb-2">
+          <button
+            type="button"
+            onClick={onUp}
+            className="text-muted hover:text-slate-700 transition-colors cursor-pointer"
+          >
+            {upLabel}
+          </button>
+          <span aria-hidden="true" className="text-muted mx-0.5">/</span>
+          <span className="text-slate-700">{title}</span>
+        </div>
+      )}
+      <div className="flex items-end justify-between gap-2 mb-2">
+        <div>
+          {/* h1, not h2: this is the page's own main heading (every category
+              directory, the synagogue/hospitals directories, all share this
+              component) — every other top-level screen in the app (home,
+              All Categories, Inbox, admin, the error/offline pages) already
+              uses h1 for the same role. A real gap, not a style choice: axe's
+              page-has-heading-one caught every one of these pages having no
+              h1 at all. */}
+          <h1 className="text-xl font-semibold text-slate-800">{title}</h1>
+          {anchorLabel ? (
+            <p className="text-sm text-muted mt-0.5">
+              {anchorLabel}
+              {countText && (
+                <>
+                  <span aria-hidden="true" className="hidden desktop:inline mx-1.5">·</span>
+                  <span className="hidden desktop:inline">{countText}</span>
+                </>
+              )}
+            </p>
+          ) : addressPrompt ? (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <AddressPrompt />
+              {countText && (
+                <span className="hidden desktop:inline text-sm text-muted">
+                  <span aria-hidden="true" className="mr-1">·</span>{countText}
+                </span>
+              )}
+            </div>
+          ) : countText ? (
+            <p className="hidden desktop:block text-sm text-muted mt-0.5">
+              <span aria-hidden="true" className="mr-1.5">·</span>{countText}
+            </p>
+          ) : null}
+        </div>
+        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   )
 }

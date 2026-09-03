@@ -67,12 +67,16 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* desktop:hidden — see GenericDirectory's identical comment: DirectoryHeader
+          covers this same destination as a breadcrumb at desktop widths. */}
+      <UpButton label={upLabel} onClick={onUp} className="desktop:hidden mb-4" />
 
       <DirectoryHeader
         title="Which hospital?"
         anchorLabel={coords && label ? label : undefined}
         addressPrompt
+        upLabel={upLabel}
+        onUp={onUp}
       />
       {/* Description + Map sit on their own row here (not in the header's actions
           slot) because the explanatory copy is unique to this screen. */}

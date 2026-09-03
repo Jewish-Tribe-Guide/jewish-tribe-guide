@@ -56,7 +56,12 @@ export default function SlugScreen({
   }
 
   return (
-    <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
+    // max-w-6xl, not max-w-4xl: matches the header, home screen, and All
+    // Categories index (see SiteHeader/Landing/AllCategories) — this was the
+    // one screen still narrower than the rest of the site for no reason tied
+    // to its own content, and the desktop card grid (see GenericDirectory)
+    // was being squeezed into that narrower box along with everything else.
+    <main className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
       {/* The fallback IS FindResources — a full, real render of this category
           with no query-string state, which is exactly what a plain
           /community/slug visit (no ?item=/?q=/etc.) looks like. That's what
