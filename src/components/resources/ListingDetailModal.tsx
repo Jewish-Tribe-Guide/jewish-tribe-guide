@@ -89,12 +89,25 @@ export default function ListingDetailModal({
       role="presentation"
     >
       <div
-        className="flex flex-col w-full max-w-lg max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
+        // max-w-2xl (672px), not max-w-lg (512px) — the old width read as
+        // cramped once the page around it (see SlugScreen's max-w-6xl) had
+        // real room to spare, all the more so once the dialog is the one
+        // thing on a 1440px+ screen sitting in a sea of blurred backdrop.
+        // Still well short of the page's own width — it's a focused dialog,
+        // not a second page.
+        className="flex flex-col w-full max-w-2xl max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label={name}
       >
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-200 shrink-0">
+        {/* Badges live inside this same block, under the subtitle — not as
+            their own section below a divider. They're facts about this
+            place (Open, Restaurant, kosher cert), the same category of
+            information as the name and address right above them; putting a
+            hard rule between "who this is" and "what it is" read as if the
+            badges belonged with the action icons below instead. The divider
+            now marks the real boundary: identity above it, actions below. */}
+        <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0">
           <div className="flex items-start gap-3 min-w-0">
             <CategoryIcon
               icon={category.icon}
@@ -106,6 +119,11 @@ export default function ListingDetailModal({
             <div className="min-w-0">
               <h2 className="font-semibold text-slate-900 text-lg">{name}</h2>
               {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
+              {badgeRow && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {badgeRow}
+                </div>
+              )}
             </div>
           </div>
           <button
@@ -119,13 +137,7 @@ export default function ListingDetailModal({
           </button>
         </div>
 
-        {badgeRow && (
-          <div className="px-5 pt-3 flex flex-wrap items-center gap-1.5 shrink-0">
-            {badgeRow}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <PlaceDetailBody
             item={item}
             category={category}
@@ -137,7 +149,7 @@ export default function ListingDetailModal({
             hiddenBadgeKeys={headerBadgeKeys}
           />
 
-          <div className="pt-2 border-t border-slate-200 space-y-2">
+          <div className="pt-3 border-t border-slate-200 space-y-2.5">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
             <div className="flex gap-3">
               <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
