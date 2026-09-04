@@ -303,18 +303,35 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             // map. `scroll-mt` clears the sticky site header, so scrolling
             // this band into view (arriving from a collapsed fullscreen map)
             // doesn't tuck its heading underneath it.
+            //
+            // The heading sits inside the same rounded-2xl/ring-1 card as the
+            // map now, matching Browse everything's own card — HomeMap passes
+            // `borderless` to ResourceMapView so the map doesn't draw its own
+            // border inside this one (see that prop's own doc for why: this
+            // component is shared with the full map screen, which still owns
+            // its border the old way). overflow-hidden here is what clips the
+            // now-borderless map's square corners to match this card's
+            // rounded ones — ResourceMapView already clips its own contents
+            // the same way internally, so this adds no new clipping behavior,
+            // just extends the same shape one level out. Not a risk to the
+            // fullscreen expand-in-place transition either: fullscreen goes
+            // `fixed inset-0`, which escapes this ancestor's overflow/rounding
+            // entirely regardless of what wraps it.
             return hasMap && !q && (
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
-                <h2 className="mb-4 text-lg font-semibold text-slate-900">{title}</h2>
-                {mapInView ? (
-                  <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
-                ) : (
-                  // Same footprint as ResourceMapView's own embedded-mode
-                  // container (desktop:h-[70vh] desktop:min-h-[420px], rounded/ringed
-                  // the same way) so swapping in the real map once mapInView
-                  // flips true doesn't shift anything below it.
-                  <div className="h-[70vh] min-h-[420px] rounded-2xl bg-slate-100 ring-1 ring-slate-900/5" />
-                )}
+                <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
+                  <h2 className="px-5 pt-5 pb-4 text-lg font-semibold text-slate-900">{title}</h2>
+                  {mapInView ? (
+                    <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
+                  ) : (
+                    // Same footprint as ResourceMapView's own embedded-mode
+                    // container (desktop:h-[70vh] desktop:min-h-[420px]) so
+                    // swapping in the real map once mapInView flips true
+                    // doesn't shift anything below it. No rounding/ring of
+                    // its own now — the wrapping card above already owns that.
+                    <div className="h-[70vh] min-h-[420px] bg-slate-100" />
+                  )}
+                </div>
               </div>
             )
           }

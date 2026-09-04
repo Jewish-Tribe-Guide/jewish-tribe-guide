@@ -149,11 +149,20 @@ type Props = {
    *  address anyway (the admin category-preview map), which just means no
    *  control renders. */
   controls?: LocationControls
+  /** Embedded home-screen map only — drops this component's own boxed
+   *  border (rounded-2xl/ring) in the non-fullscreen state, because the
+   *  caller (Landing.tsx) draws a single outer card around a heading plus
+   *  this map instead, matching Browse everything's own card — see that
+   *  render site's own comment. No effect once fullscreen: that state
+   *  always manages its own chrome (`rounded-none`/`ring-0`, breaking out
+   *  to `fixed inset-0`), same as before this prop existed. Never set by
+   *  `standalone` callers, which have no outer card to defer to. */
+  borderless?: boolean
 }
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls, borderless }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
@@ -1420,7 +1429,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
           ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
-          : 'desktop:relative desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
+          : `desktop:relative desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
+              borderless ? '' : ' desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
+            }`
       }`}
     >
       {loading ? (
