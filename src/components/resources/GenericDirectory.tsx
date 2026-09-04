@@ -20,6 +20,9 @@ import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
 import { useCategories } from '@/lib/useCategories'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes, mapQueryString } from '@/lib/routes'
+import Link from 'next/link'
 
 type Props = {
   category: CategoryConfig
@@ -51,6 +54,7 @@ type Props = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+  const communitySlug = useCommunitySlug()
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -317,6 +321,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
   })
 
+  // The exact URL onViewMap navigates to under the hood — computed here too
+  // so the Map button below can be a real <Link>, not just a click handler.
+  // Only a real anchor gets cmd/ctrl/middle-click "open in new tab" from the
+  // browser; a click handler alone never does, regardless of what it
+  // navigates to. onViewMap itself is left in place for now (still called by
+  // the mobile map screen's own back button elsewhere), just not read here
+  // anymore.
+  const filters = mapFilters()
+  const mapHref = `${routes.map(communitySlug)}${mapQueryString({
+    categories: [category.id],
+    query: search.trim() || undefined,
+    openNow: filters.openNow,
+    bool: filters.bool,
+    select: filters.select,
+  })}`
+
   return (
     <div>
       {/* desktop:hidden — DirectoryHeader renders the same destination as
@@ -407,13 +427,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   )}
                 </button>
               )}
+              {/* A real <Link>, not a <button onClick>, is what makes cmd/
+                  ctrl/middle-click "open in new tab" work — see mapHref's
+                  own comment. */}
               {onViewMap && hasMapButton && (
-                <button
-                  onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
+                <Link
+                  href={mapHref}
                   className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   🗺️ Map
-                </button>
+                </Link>
               )}
               {category.externalLink && (
                 <a
@@ -546,14 +569,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   it: scroll a few rows down and it was gone until you scrolled back
                   up, the same problem the sticky toolbar exists to solve for search/
                   filters/sort. Mobile already had this right — its Map button has
-                  always lived in this same row (see the row above, mobile-only). */}
+                  always lived in this same row (see the row above, mobile-only).
+                  A real <Link>, not a <button onClick> — see the mobile Map
+                  button's own comment on why, and mapHref's for the exact URL. */}
               {onViewMap && hasMapButton && (
-                <button
-                  onClick={() => onViewMap(search.trim() || undefined, mapFilters())}
+                <Link
+                  href={mapHref}
                   className="hidden desktop:inline-flex shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   🗺️ Map
-                </button>
+                </Link>
               )}
               {category.externalLink && (
                 <a

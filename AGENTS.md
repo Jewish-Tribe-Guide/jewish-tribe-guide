@@ -112,7 +112,7 @@ The general rule, since this cost three separate investigations: **when a test
 "flakes" only in CI and the failure lands exactly on a round number, suspect a
 budget, not the system under test.**
 
-### …and `/about` had a second problem underneath it (mitigated, mechanism still unknown)
+### …and `/about` had a second problem underneath it (closed — `test.fail()` marker removed)
 
 Raising the budget did not make the `/about` test pass on its own. It still
 failed after that fix — `Timeout 60000ms exceeded`, every poll `HIT/old` —
@@ -151,9 +151,18 @@ starts failing again with the same HIT/old signature, `revalidatePath` does
 not reach that entry either, and the next suspect is the build-time prerender
 specifically, not the tag mechanism in general.
 
-Left running (not quarantined): it is the only instrument that can tell us
-whether the fix actually holds, and quarantining it would hide that signal
-again.
+Left running (not quarantined) rather than quarantined outright: while the
+fix was unproven, a conditional `test.fail(!!process.env.CI, …)` kept it as
+the only instrument that could tell us whether the fix actually held, without
+turning every local run red the way an unconditional marker would have.
+
+It has since come back an unexpected PASS in CI on top of the 7/7 runs
+above — Playwright's own signal, same as the two tests in the "Coverage that
+used to be missing" pattern below, that the marker is stale and needs to come
+off, not that anything is newly broken. The marker is gone; this is a plain
+`test()` now. If `/about` regresses again with the same HIT/old signature,
+that's a new investigation to reopen (see the build-time-prerender suspect
+above), not a reason to have kept the marker pre-emptively.
 
 Guarded structurally too, so this can't silently regress if someone
 "simplifies" the route later: `src/app/api/admin/pages/pagesRevalidation.

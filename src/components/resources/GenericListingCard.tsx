@@ -179,6 +179,28 @@ export function GenericListingCard({
     return String(item[f.caveat.noteField] ?? '').trim()
   }
 
+  // "N {items}" on the collapsed card for a tags field an admin has opted in
+  // via showCountInHeader — a grocery category's "which kosher items does
+  // this place carry" is the motivating case, but this isn't hardcoded to
+  // kosher: tags fields are excluded from badgeFields entirely (they're meant
+  // for the expanded panel), and a field's key/label/tagGroup are all
+  // per-community admin text with nothing stable to match against — tagGroup
+  // in particular is auto-derived from the label (see categoryEditorLogic.ts)
+  // and drifts the moment someone edits it. showCountInHeader is the same
+  // explicit opt-in shape as showInHeader (text/url fields), just for tags.
+  const countHeaderField = fields.find((f) => f.type === 'tags' && f.showCountInHeader)
+  const countHeaderCount = countHeaderField ? selectValues(item[countHeaderField.key]).length : 0
+  // An admin-chosen field (countReplacesKey — see its own doc) whose badge
+  // would otherwise repeat the same fact the count already says, e.g. a
+  // "Kosher Items" store-type badge next to a "12 kosher items" count.
+  // Suppressed from the generic badge loop below only when there's an actual
+  // count to replace it with; a listing that qualifies but has no items
+  // typed in yet still gets that other badge as before.
+  const suppressedBadgeKey = countHeaderCount > 0 ? countHeaderField?.countReplacesKey : undefined
+  const visibleHeaderBadges = suppressedBadgeKey
+    ? headerBadges.filter((f) => f.key !== suppressedBadgeKey)
+    : headerBadges
+
   const showAddress = category.hasAddress !== false && !!item.address
   const subtitleParts = [showCategoryLabel ? category.label : null, showAddress ? shortAddress(item.address!) : null].filter(Boolean)
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : (item.googleDescription as string | undefined) || null
@@ -198,7 +220,7 @@ export function GenericListingCard({
   // restated in its own header on desktop (the card behind it is obscured by
   // the modal's backdrop), and computing it twice would be two places a
   // badge rule could drift out of sync.
-  const badgeRow = (isOpen || closure || headerBadges.length > 0) ? (
+  const badgeRow = (isOpen || closure || visibleHeaderBadges.length > 0 || countHeaderCount > 0) ? (
     <>
       {/* Closure outranks everything: it used to appear only once the card
           was expanded, so a temporarily-closed shop was indistinguishable
@@ -222,7 +244,39 @@ export function GenericListingCard({
           Open
         </Chip>
       ))}
-      {headerBadges.flatMap((f) => {
+      {countHeaderCount > 0 && countHeaderField && (() => {
+        // countLabel is meant to be a clean singular noun ("kosher item"),
+        // but the fallback — a field's own `label`, just lowercased — is
+        // often already phrased as a plural ("Kosher Items available").
+        // Blindly appending "s" to that doubled up ("kosher itemss"); only
+        // add it when the noun doesn't already end in one, which covers the
+        // fallback case without needing real pluralization logic this app
+        // has no other use for.
+        const noun = countHeaderField.countLabel ?? countHeaderField.label.toLowerCase()
+        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
+        return (
+          // Not clickable — unlike the other badges here, which each map to
+          // one filter control, the field this one might be replacing
+          // (countReplacesKey) can be boolean or select depending on the
+          // category, and there's no single filter action that's correct
+          // for both. Purely informational: it's the "there's more here"
+          // signal that pulls a shopper into expanding the card. Slate, not
+          // a color already carrying meaning elsewhere on this card (green
+          // means "open"/a positive filter state) — this badge is a fact,
+          // not a status.
+          <Chip tone="slate" title={`See which ${plural} this place has`}>
+            {/* A slate chip is deliberately quiet — it shouldn't shout the
+                way "Open" does — but that risked reading as just another
+                static fact next to Restaurant/Parve instead of an invitation
+                to expand. Bolding only the number (not recoloring the whole
+                chip) borrows the same "128 reviews" convention other
+                directory apps use for exactly this signal, without undoing
+                the color choice that was made deliberately. */}
+            <span className="font-semibold">{countHeaderCount}</span> {plural}
+          </Chip>
+        )
+      })()}
+      {visibleHeaderBadges.flatMap((f) => {
         const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
         // Resolve each stored value to the option's CURRENT label — a
         // renamed option's label should show up on cards immediately,
@@ -512,6 +566,14 @@ export function GenericListingCard({
             onFilterBool={onFilterBool}
             onFilterSelect={onFilterSelect}
             hideOpenStatus
+            // headerBadges (the full set), not visibleHeaderBadges — a badge
+            // countReplacesKey suppressed from the collapsed row shouldn't
+            // reappear down here either. It was excluded from
+            // visibleHeaderBadges specifically so the count could take its
+            // spot, not because the badge stopped applying; showing it again
+            // once expanded reintroduces the exact "says the same thing
+            // twice" duplication the count was built to avoid, just one tap
+            // later instead of never.
             hiddenBadgeKeys={headerBadges.map((f) => f.key)}
           />
 

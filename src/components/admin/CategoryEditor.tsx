@@ -477,6 +477,12 @@ export function CategoryEditor({
                   showIfOptions={draft.fields
                     .filter((other) => other.type === 'select' && other.key !== f.key)
                     .map((other) => ({ key: other.key, label: other.label, options: other.options ?? [] }))}
+                  // Yes/No and Choice fields are the ones that can render as
+                  // a badge (see badgeFields in GenericListingCard.tsx) — a
+                  // field can't replace its own badge.
+                  badgeFieldOptions={draft.fields
+                    .filter((other) => (other.type === 'boolean' || other.type === 'select') && other.key !== f.key)
+                    .map((other) => ({ key: other.key, label: other.label }))}
                   onChange={(patch) => updateField(i, patch)}
                   onRemove={() => removeField(i)}
                   onMove={(dir) => moveField(i, dir)}

@@ -4,13 +4,22 @@ import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
+import { mockRouter } from '@/test/nextNavigationMock'
 import type { HomeSection } from '@/lib/homeSections'
 import AllCategories from './AllCategories'
 
-// No next/navigation mock needed here — unlike GenericListingCard/SiteHeader,
-// nothing in this tree calls useCommunitySlug()/useActiveCommunity(), only
-// useCategories()/useHomeSections()/useForms() (ContentProvider). Proves the
-// harness works fine without the router mock when a component doesn't need it.
+// Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
+// which is what makes cmd/ctrl-click "open in new tab" work — that pulled
+// useCommunitySlug() into this component's own render, which calls
+// next/navigation's useRouter() unconditionally. This file used to need no
+// router mock at all (see nextNavigationMock's own doc comment for why);
+// that's no longer true now that a Link needs a real community slug to
+// build its href.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 afterEach(() => cleanup())
 

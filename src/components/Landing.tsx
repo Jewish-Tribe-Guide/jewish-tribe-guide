@@ -19,6 +19,7 @@ import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
 import { pickFeaturedCards } from '@/lib/featuredCards'
 import { community } from '@/community.config'
+import { useCommunitySlug } from '@/lib/communityContext'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -67,6 +68,7 @@ export type LandingProps = {
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
 export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: LandingProps) {
+  const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
   const listings = useAllListings()
@@ -94,7 +96,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   // never the site's own name.
   const zmanimLocationLabel = anchor.label || community.region
 
-  const resources = resourceCards(onNavigate, categories)
+  const resources = resourceCards(onNavigate, categories, communitySlug)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
   // into the admin-configured labeled groups for the grid.
   const allCards = resources ? [...entryCards, ...resources] : null

@@ -31,6 +31,7 @@ export function FieldEditor({
   canRequire,
   audienceOptions,
   showIfOptions,
+  badgeFieldOptions,
   onChange,
   onRemove,
   onMove,
@@ -49,6 +50,10 @@ export function FieldEditor({
    *  on — see CategoryField.showIf. Empty when the category has no Choice
    *  fields yet (besides this one). */
   showIfOptions: { key: string; label: string; options: { value: string; label: string }[] }[]
+  /** The category's own Yes/No or Choice fields whose badge this one's count
+   *  could replace — see CategoryField.countReplacesKey. Empty when the
+   *  category has no other badge-eligible field yet. */
+  badgeFieldOptions: { key: string; label: string }[]
   onChange: (patch: Partial<CategoryField>) => void
   onRemove: () => void
   onMove: (dir: -1 | 1) => void
@@ -128,6 +133,9 @@ export function FieldEditor({
     if (type !== 'tags') {
       patch.expandedOnly = undefined
       patch.fixedVocabulary = undefined
+      patch.showCountInHeader = undefined
+      patch.countLabel = undefined
+      patch.countReplacesKey = undefined
     }
     onChange(patch)
   }
@@ -299,6 +307,52 @@ export function FieldEditor({
               Without a limit, a long entry truncates with &ldquo;&hellip;&rdquo; there, and still shows in full once
               the card is expanded.
             </p>
+          )}
+        </div>
+      )}
+
+      {f.type === 'tags' && (
+        <div>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!f.showCountInHeader}
+              onChange={(e) => onChange({ showCountInHeader: e.target.checked })}
+              className="rounded border-slate-300"
+            />
+            Show a count on the collapsed card (e.g. &ldquo;12 kosher items&rdquo;)
+          </label>
+          {f.showCountInHeader && (
+            <label className="block ml-5 mt-1 sm:w-1/2">
+              <span className={fieldLabel}>Singular word for the count (optional)</span>
+              <input
+                value={f.countLabel ?? ''}
+                onChange={(e) => onChange({ countLabel: e.target.value || undefined })}
+                className={inputClass}
+                placeholder={f.label ? `Defaults to “${f.label.toLowerCase()}”` : 'e.g. kosher item'}
+              />
+              <span className="block text-[11px] text-muted mt-0.5">
+                Just the singular — &ldquo;s&rdquo; is added automatically for anything but exactly one.
+              </span>
+            </label>
+          )}
+          {f.showCountInHeader && badgeFieldOptions.length > 0 && (
+            <label className="block ml-5 mt-1.5 sm:w-1/2">
+              <span className={fieldLabel}>Replaces this badge once there&rsquo;s a count (optional)</span>
+              <select
+                value={f.countReplacesKey ?? ''}
+                onChange={(e) => onChange({ countReplacesKey: e.target.value || undefined })}
+                className={inputClass}
+              >
+                <option value="">Don&rsquo;t replace anything</option>
+                {badgeFieldOptions.map((b) => (
+                  <option key={b.key} value={b.key}>{b.label}</option>
+                ))}
+              </select>
+              <span className="block text-[11px] text-muted mt-0.5">
+                E.g. a &ldquo;Kosher&rdquo; badge next to a &ldquo;12 kosher items&rdquo; count says the same thing twice — pick it here and it hides once there&rsquo;s a count to show instead. Listings with no items yet still get the badge you picked.
+              </span>
+            </label>
           )}
         </div>
       )}

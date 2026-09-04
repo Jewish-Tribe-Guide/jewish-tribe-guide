@@ -114,27 +114,18 @@ test('an admin save reaches the cached public page', async ({ request }) => {
 //     across warm and cold. It was also wrongly called CI-only after several
 //     clean local runs, then reproduced locally within the hour.
 //
-// The mechanism is still unknown. What is known precisely is the symptom —
-// this path's entry was not marked — so the PATCH route now calls
-// revalidatePath(`/${slug}`) alongside revalidateTag. If that closes it, this
-// test goes green in CI and the hypothesis was right. If it fails again with
-// the same HIT/old signature, revalidatePath does not reach that entry either
-// and the next suspect is the build-time prerender, not the tag.
-//
-// Left running deliberately: quarantining it hid the only instrument that can
-// tell us whether the fix worked.
+// The mechanism was never confirmed, but the symptom was precise — this
+// path's cache entry was never marked stale — so the PATCH route now calls
+// revalidatePath(`/${slug}`) alongside revalidateTag. That closed it: this
+// test (conditionally test.fail()'d on CI while the fix was unproven) has
+// come back an unexpected PASS in CI, which is Playwright's own signal that
+// the marker is stale and needs to come off, not that anything is newly
+// broken — see AGENTS.md's "…and /about had a second problem underneath it"
+// section for the full history. If /about ever regresses with the same
+// HIT/old signature, revalidatePath isn't reaching that entry either and the
+// next suspect is the build-time prerender, not the tag — but that's a new
+// investigation to reopen, not a reason to keep this marker pre-emptively.
 test('an admin save to a static page reaches the cached /about route', async ({ request }) => {
-  // Inside the test body on purpose: at file scope this marks every test in
-  // the file, which is how the previous two attempts at quarantining it took
-  // the other three tests down with it.
-  // Conditional, and only on CI, because this passes locally every time —
-  // an unconditional test.fail() would turn every local run red for the
-  // opposite reason. Scoped this way the marker states precisely what is
-  // known: green here, red there.
-  //
-  // Bare `test.fail()` at file scope, for the record, applies to every test
-  // in the file — it took the other three down with it.
-  test.fail(!!process.env.CI, 'CI-only: invalidation never reaches the server (all HIT/old) — under investigation')
   const { accessToken } = JSON.parse(readFileSync('e2e-cache/.auth/token.json', 'utf-8')) as {
     accessToken: string
   }
@@ -293,15 +284,20 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   await notNow.click().catch(() => {})
   await page.locator('header').first().waitFor({ state: 'visible' })
 
-  // Borrowed, not created, and picked from what's actually on the page rather
-  // than off the API list: "Cache Round-trip Seed" is a real listing category
-  // but belongs to no home section, so it never renders here — picking it
-  // leaves every click below hitting nothing. Restored in `finally`.
-  const visibleLabels = await page.locator('main button').allTextContents()
+  // A dedicated fixture (scripts/run-test-project-server.mjs), not borrowed
+  // from whatever else happens to be visible on /all right now. This used to
+  // scan the page for any real listing category and rename that instead —
+  // but integration, cache-roundtrip, form-roundtrip and admin-write all
+  // write to and delete from this same disposable project, often in
+  // parallel, so another job renaming/hiding/deleting the borrowed category
+  // out from under this one made it fail intermittently with "at least one
+  // listing category should be visible on /all to borrow". Nothing else
+  // touches this category, so nothing else can race it. Restored in
+  // `finally` regardless (a rename is still a rename).
   const target = (categories as { id: string; pluralLabel: string; kind: string }[]).find(
-    (c) => c.kind === 'listing' && visibleLabels.includes(c.pluralLabel),
+    (c) => c.id === 'cache-roundtrip-seed',
   )
-  expect(target, 'at least one listing category should be visible on /all to borrow').toBeTruthy()
+  expect(target, 'the cache-roundtrip fixture category should exist — see run-test-project-server.mjs').toBeTruthy()
   const slug = target!.id
   const originalLabel = target!.pluralLabel
   const newLabel = `${originalLabel} (focus refresh ${Date.now() % 100000})`
