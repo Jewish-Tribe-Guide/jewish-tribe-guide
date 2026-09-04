@@ -273,10 +273,17 @@ test('an already-open tab picks up an admin edit when it regains focus', async (
   expect(catsRes.ok(), 'GET /api/categories should succeed').toBe(true)
   const { categories } = await catsRes.json()
 
-  // /all rather than home: home embeds a live Google Map, and a test origin
-  // isn't an authorized referer for the Maps key, which takes the whole page
-  // down to its error boundary. /all has no map and lists every category.
-  await page.goto(`/${community}/all`)
+  // A narrow (mobile-width) viewport rather than the default desktop one:
+  // desktop's home screen embeds a live Google Map, and a test origin isn't
+  // an authorized referer for the Maps key, which takes the whole page down
+  // to its error boundary. Below the `desktop:` breakpoint (globals.css —
+  // width or height under 640px), the map band never mounts (it's gated on
+  // an IntersectionObserver over a `display:none` element, which never
+  // intersects) and the full grouped category grid renders inline instead —
+  // this used to navigate to the standalone All Categories page for the same
+  // reason, which is gone now that "Browse everything" replaced it.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`/${community}`)
   // The location prompt overlays everything and swallows clicks (AGENTS.md
   // says the same about the mobile suite).
   const notNow = page.getByRole('button', { name: 'Not now' })

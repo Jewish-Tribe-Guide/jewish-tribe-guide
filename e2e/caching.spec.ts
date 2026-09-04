@@ -41,12 +41,10 @@ test.describe('the content screens are served from the cache', () => {
     }
   })
 
-  test('the map and the full category list are cached too', async ({ page, request }) => {
+  test('the map is cached too', async ({ page, request }) => {
     const community = await defaultCommunity(page)
-    for (const path of [`/${community}/map`, `/${community}/all`]) {
-      const res = await request.get(path)
-      expect(res.headers()['x-nextjs-cache'], path).toBe('HIT')
-    }
+    const res = await request.get(`/${community}/map`)
+    expect(res.headers()['x-nextjs-cache']).toBe('HIT')
   })
 
   test('a repeat visit gets byte-identical content, so nothing is being re-rendered', async ({ page, request }) => {

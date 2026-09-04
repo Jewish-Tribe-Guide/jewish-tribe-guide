@@ -25,11 +25,10 @@ const sections: CardSectionDef[] = [
 
 function renderTabs(overrides: Partial<Parameters<typeof SectionTabs>[0]> = {}) {
   const onOpenCard = vi.fn()
-  const onOpenSection = vi.fn()
   const utils = render(
-    <SectionTabs sections={sections} listings={null} onOpenCard={onOpenCard} onOpenSection={onOpenSection} {...overrides} />,
+    <SectionTabs sections={sections} listings={null} onOpenCard={onOpenCard} {...overrides} />,
   )
-  return { ...utils, onOpenCard, onOpenSection }
+  return { ...utils, onOpenCard }
 }
 
 describe('SectionTabs — mega-menu', () => {
@@ -46,12 +45,15 @@ describe('SectionTabs — mega-menu', () => {
     expect(onOpenCard).toHaveBeenCalledWith(sections[0]!.cards[0])
   })
 
-  it('still opens the section landing page on a plain tab click, unaffected by the tracking', async () => {
+  it('opens the mega-menu on a plain tab click, rather than navigating anywhere', async () => {
     const user = userEvent.setup()
-    const { onOpenSection } = renderTabs()
+    renderTabs()
+    const tab = screen.getByRole('button', { name: 'Food and Hospitality' })
 
-    await user.click(screen.getByRole('button', { name: 'Food and Hospitality' }))
+    expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument()
 
-    expect(onOpenSection).toHaveBeenCalledWith('Food and Hospitality')
+    await user.click(tab)
+
+    expect(await screen.findByText('Grocery Stores')).toBeInTheDocument()
   })
 })

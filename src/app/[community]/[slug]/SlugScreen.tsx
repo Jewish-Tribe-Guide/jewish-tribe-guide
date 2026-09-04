@@ -36,9 +36,9 @@ export default function SlugScreen({
   initialItemId?: string
 }) {
   const { anchor } = useLocation()
-  const { goHome, viewAllCategories, viewMapForCategory } = useSiteNavigation()
+  const { goHome, viewMapForCategory } = useSiteNavigation()
 
-  if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} viewAllCategories={viewAllCategories} />
+  if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} />
 
   // Not read directly by this component — see FindResourcesConnected, which
   // is what actually supplies ?item=/?q=/?hospital=/?form= once hydrated.
@@ -51,16 +51,15 @@ export default function SlugScreen({
     anchor,
     initialItemId,
     onUp: goHome,
-    onViewAllCategories: () => viewAllCategories(),
     onViewMap: viewMapForCategory,
   }
 
   return (
-    // max-w-6xl, not max-w-4xl: matches the header, home screen, and All
-    // Categories index (see SiteHeader/Landing/AllCategories) — this was the
-    // one screen still narrower than the rest of the site for no reason tied
-    // to its own content, and the desktop card grid (see GenericDirectory)
-    // was being squeezed into that narrower box along with everything else.
+    // max-w-6xl, not max-w-4xl: matches the header and home screen — this
+    // was the one screen still narrower than the rest of the site for no
+    // reason tied to its own content, and the desktop card grid (see
+    // GenericDirectory) was being squeezed into that narrower box along
+    // with everything else.
     <main className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
       {/* The fallback IS FindResources — a full, real render of this category
           with no query-string state, which is exactly what a plain
@@ -88,25 +87,18 @@ export default function SlugScreen({
 function FormScreen({
   slug,
   goHome,
-  viewAllCategories,
 }: {
   slug: string
   goHome: () => void
-  viewAllCategories: () => void
 }) {
   const params = useSearchParams()
   // Pre-checked needs arrive in the query string rather than history state,
   // so a link that opens the form with a need already selected is shareable.
   const preselect = params.get('need')?.split(',').filter(Boolean)
-  // Set by openFlow when the form was opened from the All Categories index
-  // (see useSiteNavigation), so closing the form returns there instead of
-  // always defaulting home — the form has no single fixed parent, since it
-  // can be reached from either screen.
-  const onClose = params.get('from') === 'all' ? () => viewAllCategories() : goHome
 
   // The two built-in forms have bespoke wizards; everything else is an
   // admin-created form rendered by the generic one.
-  if (slug === 'support') return <SupportWizard preselect={preselect} onClose={onClose} />
-  if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={onClose} />
-  return <GenericFormWizard formId={slug} onClose={onClose} />
+  if (slug === 'support') return <SupportWizard preselect={preselect} onClose={goHome} />
+  if (slug === 'volunteer') return <VolunteerWizard preselect={preselect} onClose={goHome} />
+  return <GenericFormWizard formId={slug} onClose={goHome} />
 }

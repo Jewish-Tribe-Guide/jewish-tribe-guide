@@ -10,10 +10,10 @@ import { CategoryGlyph } from '@/lib/categoryIcons'
 // One tab per admin-configured home section, each opening a mega-menu of that
 // section's categories on hover or focus.
 //
-// The mega-menu isn't decoration: with the card grid moved off the home screen
-// (see AllCategories), this bar is the primary way to reach a category on
-// desktop, so every category has to be listed here — a bar of six bare labels
-// would strand the other ~14 behind an extra page.
+// The mega-menu isn't decoration: it's kept alongside the flat "Browse
+// everything" grid below it (see Landing.tsx) as a second way to reach a
+// category, so every category has to be listed here — a bar of six bare
+// labels would strand the other ~14 with nothing pointing at them.
 //
 // Hover opens, but the menu is also fully keyboard-reachable: tabbing into a
 // tab opens it, Escape closes it, and the links inside are ordinary buttons in
@@ -29,7 +29,6 @@ export default function SectionTabs({
   sections,
   listings,
   onOpenCard,
-  onOpenSection,
 }: {
   sections: CardSectionDef[]
   /** Used for the per-category listing counts. Null while loading — counts are
@@ -37,8 +36,6 @@ export default function SectionTabs({
   listings: DirectoryResource[] | null
   /** Open one category (runs the card's own `go`). */
   onOpenCard: (card: CardSectionDef['cards'][number]) => void
-  /** Open the All Categories page scrolled to this section. */
-  onOpenSection: (title: string) => void
 }) {
   const [openTitle, setOpenTitle] = useState<string | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -92,7 +89,15 @@ export default function SectionTabs({
           return (
             <li key={section.title} className="relative">
               <button
-                onClick={() => onOpenSection(section.title)}
+                // Does what hover/focus already do — opens this tab's
+                // mega-menu — rather than navigating anywhere. Redundant with
+                // onFocus for a mouse click (focus fires first), but it's
+                // what makes the tab work on touch, which gets neither hover
+                // nor a synthetic focus.
+                onClick={() => {
+                  cancelClose()
+                  setOpenTitle(section.title)
+                }}
                 onMouseEnter={() => {
                   cancelClose()
                   setOpenTitle(section.title)

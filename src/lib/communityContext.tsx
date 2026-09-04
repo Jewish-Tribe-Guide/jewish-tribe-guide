@@ -92,7 +92,7 @@ export function useActiveCommunity(): ActiveCommunity {
       // by the time it runs there is a window, and its value is current.
       const rest = window.location.pathname.split('/').filter(Boolean).slice(1)
       const screen = rest[0]
-      const portable = rest.length === 1 && (screen === 'map' || screen === 'all' || screen === 'feedback')
+      const portable = rest.length === 1 && (screen === 'map' || screen === 'feedback')
       router.push(portable ? `/${next}/${screen}` : `/${next}`)
     },
     [router],

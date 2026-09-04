@@ -11,9 +11,9 @@ import { useSiteNavigation } from '@/lib/useSiteNavigation'
 // itself owns that split — see its own header comment.
 export default function HomeScreen() {
   const { coords, liveTracking, controls } = useLocation()
-  const { navigate, openFlow, viewAllCategories } = useSiteNavigation()
+  const { navigate, openFlow } = useSiteNavigation()
 
-  const landingProps = { onNavigate: navigate, onOpenFlow: openFlow, onViewAllCategories: viewAllCategories, coords, liveTracking, controls }
+  const landingProps = { onNavigate: navigate, onOpenFlow: openFlow, coords, liveTracking, controls }
 
   return (
     <div className="flex-1">

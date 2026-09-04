@@ -18,16 +18,16 @@ import { useSiteNavigation } from './useSiteNavigation'
 
 // A thin harness exposing openFlow as a button click — useSiteNavigation is
 // a hook, not a component, so this is the plain way to drive it under RTL.
-function OpenFlowHarness({ from }: { from?: 'all' }) {
+function OpenFlowHarness() {
   const { openFlow } = useSiteNavigation()
-  return <button onClick={() => openFlow('volunteer', undefined, from)}>Open</button>
+  return <button onClick={() => openFlow('volunteer')}>Open</button>
 }
 
-function renderHarness(from?: 'all') {
+function renderHarness() {
   const community = makeCommunity({ slug: 'test-community' })
   render(
     <CommunityProvider community={community} communities={[community]}>
-      <OpenFlowHarness from={from} />
+      <OpenFlowHarness />
     </CommunityProvider>,
   )
 }
@@ -38,25 +38,12 @@ afterEach(() => {
 })
 
 describe('useSiteNavigation — openFlow', () => {
-  // Regression test: closing a form (SlugScreen) used to always go home,
-  // even when opened from the All Categories index — see the `from` param
-  // this test drives, which SlugScreen reads to send the visitor back to
-  // where they actually came from.
-  it('pushes a plain slug URL with no `from` param by default', async () => {
+  it('pushes a plain slug URL', async () => {
     const user = userEvent.setup()
     renderHarness()
 
     await user.click(screen.getByRole('button', { name: 'Open' }))
 
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community/volunteer')
-  })
-
-  it('carries `from=all` in the query string when opened from the All Categories index', async () => {
-    const user = userEvent.setup()
-    renderHarness('all')
-
-    await user.click(screen.getByRole('button', { name: 'Open' }))
-
-    expect(mockRouter.push).toHaveBeenCalledWith('/test-community/volunteer?from=all')
   })
 })

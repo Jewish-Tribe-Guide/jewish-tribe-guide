@@ -14,7 +14,6 @@ import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWid
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
-import { useIsMobile } from '@/lib/useIsMobile'
 import { resolveCapabilities } from '@/lib/categories'
 import { community } from '@/community.config'
 
@@ -44,19 +43,11 @@ export type FindResourcesProps = {
    *  since it reflects an in-page navigation (e.g. Edit/Report closing) that
    *  happened after this screen mounted. */
   initialItemId?: string
-  /** Up from any resource view. On mobile this is the only "up" there is —
-   *  the home grid IS the index. On desktop it's the fallback for views that
-   *  aren't a category's own "All resources" (the unknown/loading states
-   *  below, which already say "Home") — see upToAllResources for the one
-   *  that matters more, a category's own listings/hospitals/eruv/zmanim. */
+  /** Up from any resource view — always home. Both mobile and desktop have a
+   *  real, complete category index on the home screen (mobile's own grid;
+   *  desktop's "Browse everything" — see Landing.tsx), so there's no longer
+   *  a separate "All resources" destination to distinguish from home. */
   onUp: () => void
-  /** Desktop only — opens the All Categories page. A category's own
-   *  "All resources" back button goes here instead of `onUp` (home) on
-   *  desktop, since desktop split what used to be one screen (the home grid
-   *  doubling as the index) into two: a short home gateway, and this
-   *  separate full index — see upToAllResources. Mobile has no such split
-   *  (its home screen still IS the full index), so it's simply unused there. */
-  onViewAllCategories?: () => void
   /** Navigate to the map screen pre-filtered to this category, carrying the
    *  directory's active search query and field filters. */
   onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
@@ -97,7 +88,6 @@ export default function FindResources({
   anchor,
   initialItemId,
   onUp,
-  onViewAllCategories,
   onViewMap,
   searchItem = null,
   searchQuery = null,
@@ -105,22 +95,6 @@ export default function FindResources({
   searchForm = null,
   onParamsChange = () => {},
 }: FindResourcesProps) {
-  // Every "All resources" button below means what it says — the actual list
-  // of every resource. On mobile that's still the home grid (onUp). On
-  // desktop, home is now a short gateway with just three featured cards, not
-  // the index, so "All resources" instead means the dedicated All Categories
-  // page (see onViewAllCategories) — going to onUp there would silently
-  // relabel "All resources" onto a screen that isn't one.
-  const isMobile = useIsMobile()
-  const upToAllResources = () => {
-    if (!isMobile && onViewAllCategories) onViewAllCategories()
-    else onUp()
-  }
-  // What upToAllResources above actually goes to, for the Up button's own
-  // label — mobile has no separate "All resources" page to name (see the
-  // comment above), so naming the button after the real destination avoids
-  // promising an index screen mobile doesn't have.
-  const upToAllResourcesLabel = isMobile ? 'Home' : 'All resources'
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
   // works for any community, with or without hospitals.
@@ -224,7 +198,7 @@ export default function FindResources({
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals' && !hospitalDetailId) {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} upLabel={upToAllResourcesLabel} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} upLabel="Home" onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'hospitals' && hospitalDetailId) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
@@ -243,7 +217,7 @@ export default function FindResources({
   }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
-    return <EruvInfo eruvim={eruvim} onUp={upToAllResources} upLabel={upToAllResourcesLabel} title={eruv?.pluralLabel} />
+    return <EruvInfo eruvim={eruvim} onUp={onUp} upLabel="Home" title={eruv?.pluralLabel} />
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
@@ -254,8 +228,8 @@ export default function FindResources({
         key={locationLabel}
         coords={zmanimCoords}
         locationLabel={locationLabel}
-        onUp={upToAllResources}
-        upLabel={upToAllResourcesLabel}
+        onUp={onUp}
+        upLabel="Home"
         title={zmanim?.pluralLabel}
       />
     )
@@ -302,8 +276,8 @@ export default function FindResources({
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
-          onUp={upToAllResources}
-          upLabel={upToAllResourcesLabel}
+          onUp={onUp}
+          upLabel="Home"
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}

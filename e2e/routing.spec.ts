@@ -161,7 +161,7 @@ test.describe('URLs', () => {
   test('reserved screens are not treated as categories', async ({ page }) => {
     const community = await defaultCommunity(page)
 
-    for (const screen of ['map', 'all', 'feedback']) {
+    for (const screen of ['map', 'feedback']) {
       const response = await page.goto(`/${community}/${screen}`)
       expect(response?.status(), `/${community}/${screen} should be a real screen`).toBe(200)
     }
@@ -207,7 +207,10 @@ test.describe('URLs', () => {
     test.skip(!eruv, `no eruv-kind category configured for ${community}`)
     if (!eruv) return
 
-    await page.goto(`/${community}/all`)
+    // The home screen has the full category index — desktop's "Browse
+    // everything" grid, mobile's own grid inline — so it's where this tile
+    // lives now that there's no separate All Categories page.
+    await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
     // A real <a>, not a <button> — see sections.tsx's CardDef.href, added so
     // cmd/ctrl/middle-click "open in new tab" works on these tiles, which a

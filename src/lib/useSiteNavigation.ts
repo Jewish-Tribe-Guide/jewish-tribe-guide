@@ -29,12 +29,10 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
       return routes.map(community)
     case 'feedback':
       return routes.feedback(community)
-    case 'all-categories':
-      return routes.allCategories(community)
     case 'find': {
       // 'find' means "open a category directory"; which one is in `extra`.
       const view = typeof extra?.findView === 'string' ? extra.findView : null
-      if (!view) return routes.allCategories(community)
+      if (!view) return routes.home(community)
       // findQuery/findItemId (set when navigating from a search result) become
       // the same ?q=/?item= params FindResources reads on mount, so the target
       // category opens pre-filtered with the tapped listing already expanded.
@@ -60,12 +58,9 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
 export type SiteNavigation = {
   /** The shared NavigateFn every screen takes. */
   navigate: NavigateFn
-  /** Opens a guided form — a category-or-form slug under the community.
-   *  `from: 'all'` marks it as opened from the All Categories index, so the
-   *  form's own close button returns there instead of defaulting to home. */
-  openFlow: (kind: string, preselect?: string[], from?: 'all') => void
+  /** Opens a guided form — a category-or-form slug under the community. */
+  openFlow: (kind: string, preselect?: string[]) => void
   goHome: (opts?: { at?: 'map' }) => void
-  viewAllCategories: (section?: string) => void
   viewListing: (categoryId: string, listingId: string) => void
   viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
@@ -82,15 +77,12 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const openFlow = useCallback(
-    (kind: string, preselect?: string[], from?: 'all') => {
+    (kind: string, preselect?: string[]) => {
       // A form's pre-checked needs ride in the query string so the link is
       // shareable and survives a reload — they used to live in history.state,
-      // which neither did. `from` rides alongside for the same reason: the
-      // form's own close button (SlugScreen) reads it to return to the All
-      // Categories index instead of always defaulting to home.
+      // which neither did.
       const params = new URLSearchParams()
       if (preselect?.length) params.set('need', preselect.join(','))
-      if (from) params.set('from', from)
       const qs = params.toString()
       router.push(`${routes.slug(community, kind)}${qs ? `?${qs}` : ''}`)
     },
@@ -121,19 +113,6 @@ export function useSiteNavigation(): SiteNavigation {
     [router, community],
   )
 
-  const viewAllCategories = useCallback(
-    (section?: string) => {
-      // A query param rather than a fragment: the sections load async, so the
-      // browser's native fragment scrolling would fire before the target
-      // exists, and AllCategories has to do the scroll itself once they're
-      // there. A param is also readable with useSearchParams, which a hash
-      // isn't. Either way the link is shareable, which history state was not.
-      const qs = section ? `?section=${encodeURIComponent(section)}` : ''
-      router.push(`${routes.allCategories(community)}${qs}`)
-    },
-    [router, community],
-  )
-
   const viewListing = useCallback(
     (categoryId: string, listingId: string) => {
       router.push(routes.listing(community, categoryId, listingId))
@@ -156,7 +135,7 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   return useMemo(
-    () => ({ navigate, openFlow, goHome, viewAllCategories, viewListing, viewMapForCategory }),
-    [navigate, openFlow, goHome, viewAllCategories, viewListing, viewMapForCategory],
+    () => ({ navigate, openFlow, goHome, viewListing, viewMapForCategory }),
+    [navigate, openFlow, goHome, viewListing, viewMapForCategory],
   )
 }

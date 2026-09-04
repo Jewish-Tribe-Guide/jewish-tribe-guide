@@ -50,7 +50,6 @@ afterEach(() => {
 const handlers = {
   onNavigate: vi.fn(),
   onOpenFlow: vi.fn(),
-  onViewAllCategories: vi.fn(),
   coords: null,
   liveTracking: { tracking: false, error: null, start: vi.fn(), stop: vi.fn() },
   controls: {
@@ -280,27 +279,4 @@ describe('Landing', () => {
     })
   })
 
-  // 'featured' ("Popular right now") is no longer in the default block set
-  // (see the "Browse everything" describe block above — it's now a
-  // redundant repeat of cards the flat grid already shows), so its own
-  // "Browse all categories" link no longer appears by default either. Still
-  // real, working code for a community that opts back into the block — this
-  // configures it explicitly rather than relying on the old default.
-  it('calls onViewAllCategories when "Popular right now"\'s "Browse all categories" is clicked, once opted back in', async () => {
-    const user = userEvent.setup()
-    const onViewAllCategories = vi.fn()
-    renderLanding(
-      { onViewAllCategories },
-      {
-        content: {
-          categories: [makeCategory()],
-          homeSections: [{ id: 'featured', kind: 'featured', title: 'Popular right now', sortOrder: 100, cardIds: [] }],
-        },
-      },
-    )
-
-    await user.click(screen.getByRole('button', { name: /Browse all categories/ }))
-
-    expect(onViewAllCategories).toHaveBeenCalledTimes(1)
-  })
 })

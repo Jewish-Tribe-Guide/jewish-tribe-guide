@@ -28,9 +28,6 @@ export type LandingProps = {
   onNavigate: NavigateFn
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
-  /** Desktop only — opens the All Categories page, optionally scrolled to one
-   *  section (passed when a section tab was clicked). */
-  onViewAllCategories: (section?: string) => void
   /** The visitor's location (from the header pill) — lets "Places" results show
    *  distance, exactly like the category directory does. */
   coords: { lat: number; lng: number } | null
@@ -61,20 +58,17 @@ export type LandingProps = {
 //   needed) → HomeBreak, two smaller cards side by side (the full daily
 //   Zmanim, and a "kept by the community" message) between the two main
 //   sections → "Explore the map", matching Browse everything's full weight
-//   → footer. The full card index also lives on its own page
-//   (AllCategories), reachable from the tabs or the "Browse all categories"
-//   button.
+//   → footer. The section tabs' mega-menus are a second way to reach a
+//   category, on top of the flat grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
-//   no map (it has its own tab for that). A phone has no tab bar to reach an
-//   All Categories page from, and its screen is a practical tool rather than a
-//   gateway, so the grid stays where it is.
+//   no map (it has its own tab for that).
 //
 // Typing filters the grid live against each card's hidden keywords (so "shul"
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, coords, liveTracking, controls, scrollTo }: LandingProps) {
+export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, controls, scrollTo }: LandingProps) {
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
@@ -149,10 +143,10 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   // The desktop gateway's own block order (admin-editable — see
-  // HomeSectionManager). Category sections don't interleave here — the
-  // gateway never shows them directly (only via this same `homeSections`
-  // list's OWN ordering, one page over, on AllCategories); this is just
-  // "which of the three singleton blocks show, in what order". A community
+  // HomeSectionManager). Category sections don't interleave here — the flat
+  // "Browse everything" grid below shows every category on its own, ordered
+  // by this same `homeSections` list; this is just "which of the three
+  // singleton blocks show, in what order". A community
   // that's never touched the ordering has all three, in their original
   // hardcoded order, via seed-home-blocks.mjs — and the same default order
   // is the fallback here too, for a deployment that hasn't run that script
@@ -215,14 +209,14 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
 
   return (
     <>
-      {/* ── Section tabs (desktop) — the primary way to reach a category now
-              that the grid lives on its own page. Full-bleed so the bar spans
-              the window while its contents stay aligned to the page. ─────── */}
+      {/* ── Section tabs (desktop) — kept alongside the flat "Browse
+              everything" grid below as a second way to reach a category (see
+              that section's own comment). Full-bleed so the bar spans the
+              window while its contents stay aligned to the page. ─────────── */}
       <SectionTabs
         sections={navSections}
         listings={listings}
         onOpenCard={(card) => card.go()}
-        onOpenSection={(title) => onViewAllCategories(title)}
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
@@ -291,7 +285,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
             // answer to what was typed.
             return !q && (
               <div key="featured" className="hidden desktop:block">
-                <FeaturedCards title={title} cards={featured} loading={loading} onShowAll={() => onViewAllCategories()} />
+                <FeaturedCards title={title} cards={featured} loading={loading} />
               </div>
             )
           }

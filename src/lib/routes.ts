@@ -105,7 +105,6 @@ export function assertUsableSlug(slug: string): void {
 
 export const routes = {
   home: (community: string) => `/${community}`,
-  allCategories: (community: string) => `/${community}/all`,
   map: (community: string) => `/${community}/map`,
   feedback: (community: string) => `/${community}/feedback`,
   /** A category directory or a form wizard — they share this namespace. */

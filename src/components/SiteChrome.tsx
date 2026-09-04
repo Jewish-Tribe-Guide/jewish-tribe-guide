@@ -37,7 +37,6 @@ function screenFromPath(pathname: string): { mode: AppMode; cardId: string | nul
   if (!first) return { mode: 'home', cardId: null }
   if (first === 'map') return { mode: 'map', cardId: null }
   if (first === 'feedback') return { mode: 'feedback', cardId: null }
-  if (first === 'all') return { mode: 'all-categories', cardId: null }
   // Anything else is a category or form slug.
   return { mode: 'find', cardId: first }
 }

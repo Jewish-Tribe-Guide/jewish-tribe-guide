@@ -330,7 +330,7 @@ export type MapFilters = {
   select?: Record<string, string[]>
 }
 
-export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback' | 'all-categories'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback'
 
 /** A guided form opened over the current page: 'support'/'volunteer' for the
  *  two built-in wizards, or any other form's id for an admin-created one.
