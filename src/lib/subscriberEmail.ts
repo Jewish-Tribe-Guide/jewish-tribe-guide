@@ -14,10 +14,14 @@ const BODY_STYLE = 'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-ser
 const HEADING_STYLE = 'color:#1d4ed8;margin-bottom:8px;'
 const TEXT_STYLE = 'color:#64748b;font-size:14px;line-height:1.6;margin:8px 0;'
 
+// One link, not two — /subscribers/manage carries its own "Unsubscribe from
+// everything" option (see ManageSubscriptionForm), so there's no separate
+// bare-unsubscribe link to make a visitor pick between "change what I get"
+// and "make it stop".
 function unsubscribeFooter(token: string): string {
-  const href = `${siteUrl()}/api/subscribers/unsubscribe?token=${token}`
+  const href = `${siteUrl()}/subscribers/manage?token=${token}`
   return `<p style="color:#94a3b8;font-size:12px;margin-top:24px;">You're getting this because you subscribed for updates on this guide.
-    <a href="${href}" style="color:#94a3b8;">Unsubscribe</a></p>`
+    <a href="${href}" style="color:#94a3b8;">Manage your subscription</a></p>`
 }
 
 // One email per subscriber, not a single batched send — each needs its own
