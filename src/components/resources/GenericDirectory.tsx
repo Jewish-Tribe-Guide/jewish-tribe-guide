@@ -689,30 +689,59 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // their detail in a dialog rather than expanding in place, so a card
         // growing taller never has to fight its grid neighbors for space.
         //
-        // auto-fill with a capped max (280–448px), not a fixed grid-cols-2/
-        // xl:grid-cols-3 and not auto-fit: a sparse category (Networking's 7
-        // plain name+link cards, WhatsApp Groups' 2) doesn't know how many
-        // items it has ahead of time, so a fixed column count left short
-        // categories with cards pinned to the top-left of a max-w-6xl row and
-        // a wide dead gap where the unused columns would have been.
+        // auto-fill, not auto-fit and not a fixed grid-cols-2/xl:grid-cols-3.
         //
-        // auto-fit was tried first and had the opposite problem: it hands
-        // the tracks that DO exist a share of the FULL row (each track is
-        // `1fr`), so one or two listings stretched edge-to-edge or centered
-        // in an oversized column instead of just sitting at a normal card
-        // width — a single listing filling the whole row reads as broken,
-        // not as "wide-ish." auto-fill doesn't collapse its unused tracks the
-        // way auto-fit does, but that turns out not to matter: those tracks
-        // just never get a grid item placed in them, so nothing about them
-        // renders at all — no visible gap, no reserved whitespace, just a
-        // normal row that runs out of cards and stops. `justify-start` keeps
-        // the real cards packed against the left edge rather than letting an
-        // implicit `justify-content: normal` (which behaves like `stretch`
-        // for grid, the same stretching this was meant to avoid) space them
-        // across the row.
-        <div className="space-y-2 lg:space-y-0 lg:grid lg:justify-start lg:gap-3 lg:grid-cols-[repeat(auto-fill,minmax(280px,448px))]">
+        // Not fixed columns: a sparse category (Networking's 7 plain
+        // name+link cards, WhatsApp Groups' 2) doesn't know how many items
+        // it has ahead of time, and a fixed column count left short
+        // categories with cards pinned to the top-left of a max-w-6xl row.
+        //
+        // Not a definite max like 448px in place of 1fr (tried and reverted
+        // — see git history if this comes up again): how many tracks
+        // auto-fill/auto-fit even creates is computed from a track's MAX
+        // sizing function when it's definite — swap in a definite max and
+        // the browser counts columns using THAT instead of the 280px
+        // minimum, so a full 72-listing category collapsed from its normal
+        // 3-up layout down to 2 much-wider columns with dead space reserved
+        // on the right (`getComputedStyle` showed `448px 448px`, not three
+        // tracks). `1fr` is a flex value, not definite, so the count falls
+        // back to the 280px minimum, same as before any of this.
+        //
+        // Not auto-fit: auto-fit COLLAPSES a track with nothing placed in
+        // it, and a collapsed track's `1fr` share gets redistributed to
+        // whatever tracks remain — so with only 1-2 real listings, the
+        // handful of tracks that DO exist grow to split the ENTIRE row
+        // between just them, each item then sitting left-aligned in an
+        // oversized track (confirmed live: a 2-item row left a 118px gap
+        // between the cards, not the normal 12px). auto-fill reserves the
+        // SAME number of tracks a full row would (still computed from the
+        // 280px minimum) whether or not there's a card to put in each one —
+        // an unfilled trailing track keeps its normal 1fr share as empty
+        // space at the END of the row, not redistributed into the cards
+        // that do exist, so 1-2 real listings render at the exact same
+        // width and gap a full row's cards would, just followed by blank
+        // space instead of more cards. Verified live: 3 tracks reserved,
+        // each ~365px (the same width as the full 72-listing case), cards
+        // packed with the normal 12px gap between them.
+        //
+        // lg:max-w-md on each item below is a safety cap, not the mechanism
+        // doing the work here — it only matters on a viewport wide enough
+        // that even a properly-counted track's 1fr share would exceed a
+        // normal card's width.
+        <div className="space-y-2 lg:space-y-0 lg:grid lg:gap-3 lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
           {filtered.map((item, index) => (
-            <div key={item.id} ref={setItemRowRef(item.id)}>
+            // lg:max-w-md, no auto-margin: a 1fr track stretches to the
+            // grid's normal per-column share, which is fine once there are
+            // enough cards to fill it (the typical case) — capped here only
+            // matters when a sparse row hands one card way more than a
+            // normal card's worth of width. CSS Grid's default item
+            // alignment (justify-self: stretch) falls back to sitting at the
+            // START of an over-wide track once max-width stops it from
+            // actually filling that track — this needs nothing explicit to
+            // left-align, and previous attempts that added `mx-auto` here
+            // were undoing that default to center it instead, which is the
+            // opposite of what a normal packed-left layout looks like.
+            <div key={item.id} ref={setItemRowRef(item.id)} className="lg:max-w-md">
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
