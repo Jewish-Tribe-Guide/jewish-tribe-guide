@@ -671,7 +671,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // layout as before once there are enough to fill it.
         <div className="space-y-2 lg:space-y-0 lg:grid lg:gap-3 lg:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
           {filtered.map((item) => (
-            <div key={item.id} ref={setItemRowRef(item.id)}>
+            // lg:max-w-md lg:mx-auto: auto-fit hands a lone track its whole
+            // 1fr share of the row (see the grid's own comment above) — fine
+            // for two or three cards sharing the space, but a single listing
+            // stretching edge-to-edge on a max-w-6xl page reads as broken,
+            // not "wide-ish". Capping the card itself (not the track) keeps
+            // auto-fit's actual point — no dead gap where empty columns
+            // would've reserved space — while a lone card just centers in
+            // its own row instead of filling it.
+            <div key={item.id} ref={setItemRowRef(item.id)} className="lg:max-w-md lg:mx-auto lg:w-full">
             <GenericListingCard
               item={item}
               category={category}

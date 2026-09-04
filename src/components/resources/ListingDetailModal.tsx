@@ -89,13 +89,14 @@ export default function ListingDetailModal({
       role="presentation"
     >
       <div
-        // max-w-2xl (672px), not max-w-lg (512px) — the old width read as
-        // cramped once the page around it (see SlugScreen's max-w-6xl) had
-        // real room to spare, all the more so once the dialog is the one
-        // thing on a 1440px+ screen sitting in a sea of blurred backdrop.
-        // Still well short of the page's own width — it's a focused dialog,
-        // not a second page.
-        className="flex flex-col w-full max-w-2xl max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
+        // max-w-xl (576px) — between the original max-w-lg (512px, read as
+        // cramped once the page around it had real room to spare) and a
+        // later max-w-2xl (672px, tried as the fix for that and felt too
+        // wide/short the other way). Content here is single-column
+        // throughout (see PlaceDetailBody) — nothing depends on the wider
+        // measure, so this only affects how the action-button row and badge
+        // chips wrap, not the layout structure.
+        className="flex flex-col w-full max-w-xl max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label={name}
@@ -147,6 +148,11 @@ export default function ListingDetailModal({
             onFilterSelect={onFilterSelect}
             hideOpenStatus
             hiddenBadgeKeys={headerBadgeKeys}
+            // This modal replaces GenericListingCard's collapsed row
+            // entirely (the card behind it is hidden under the backdrop),
+            // so a showInHeader url field (e.g. Networking's Website link)
+            // has nowhere else left to show — see the prop's own comment.
+            includeHeaderUrlFields
           />
 
           <div className="pt-3 border-t border-slate-200 space-y-2.5">

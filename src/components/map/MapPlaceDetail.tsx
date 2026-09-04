@@ -160,7 +160,11 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start mt-[-2.75px]" />}
       </div>
 
-      <PlaceDetailBody item={item} category={category} />
+      {/* This has never had a persistent collapsed-row header the way
+          GenericListingCard's mobile accordion does — a showInHeader url
+          field (e.g. Networking's Website link) had nowhere to show at all
+          here. See the prop's own comment. */}
+      <PlaceDetailBody item={item} category={category} includeHeaderUrlFields />
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />

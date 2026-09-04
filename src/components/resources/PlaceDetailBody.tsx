@@ -133,6 +133,17 @@ type Props = {
   /** Signal-badge field keys to skip in the status row for the same reason —
    *  they're the ones already showing in the caller's own header. */
   hiddenBadgeKeys?: string[]
+  /** Include showInHeader url fields (e.g. a "Join group" link) in the
+   *  action-button row below, instead of assuming they're already visible
+   *  elsewhere. GenericListingCard's own collapsed row renders these
+   *  persistently above its inline mobile accordion, so leaving this off
+   *  (the default) is correct there — the link never actually disappears.
+   *  It's wrong for a caller with no such persistent header of its own:
+   *  ListingDetailModal replaces the collapsed row entirely (the card
+   *  behind it is hidden under the backdrop), and MapPlaceDetail never had
+   *  one to begin with — both left a "Website" field configured
+   *  showInHeader simply missing once opened, not shown twice. */
+  includeHeaderUrlFields?: boolean
 }
 
 /**
@@ -144,7 +155,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], includeHeaderUrlFields = false }: Props) {
   // null outside a LocationProvider (the admin's category preview) — see
   // useOptionalLocation's own doc comment.
   const location = useOptionalLocation()
@@ -153,8 +164,10 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const tagFields = fields.filter((f) => f.type === 'tags')
   // A url field already shown up top on the collapsed card (showInHeader —
   // see GenericListingCard) doesn't also get an expanded action button here;
-  // one link, one place, not both.
-  const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
+  // one link, one place, not both. Unless the caller says it has no such
+  // header of its own (includeHeaderUrlFields) — then this is the only
+  // place it can show at all.
+  const urlFields = fields.filter((f) => f.type === 'url' && (includeHeaderUrlFields || !f.showInHeader))
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const minyanimField = fields.find((f) => f.type === 'minyanim')
   // 'image' (the per-listing Photo field — see PHOTO_FIELD_KEY) is excluded

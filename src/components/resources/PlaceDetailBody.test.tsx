@@ -31,3 +31,30 @@ describe('PlaceDetailBody — "Synced from Google" note', () => {
     expect(screen.queryByText(/Synced from Google/)).not.toBeInTheDocument()
   })
 })
+
+// A showInHeader url field (e.g. a category's Website link) assumes its
+// caller has a persistent collapsed row showing it elsewhere — true for
+// GenericListingCard's own mobile accordion, false for anything that
+// doesn't have one (ListingDetailModal, MapPlaceDetail), which left the
+// field simply missing once opened. This is what caught it.
+describe('PlaceDetailBody — includeHeaderUrlFields', () => {
+  it('omits a showInHeader url field by default (the caller already shows it)', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'w', label: 'Website', type: 'url', showInHeader: true }],
+    })
+    const item = makeListing({ w: 'https://example.com' })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.queryByText('Website')).not.toBeInTheDocument()
+  })
+
+  it('includes it when the caller says it has no such header of its own', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'w', label: 'Website', type: 'url', showInHeader: true }],
+    })
+    const item = makeListing({ w: 'https://example.com' })
+    render(<PlaceDetailBody item={item} category={category} includeHeaderUrlFields />)
+
+    expect(screen.getByText('Website')).toBeInTheDocument()
+  })
+})
