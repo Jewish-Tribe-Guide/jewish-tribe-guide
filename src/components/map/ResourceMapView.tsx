@@ -1460,6 +1460,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // browser's own swipe-to-go-back gesture once it reaches
                 // this scroll boundary, even though the row's own wheel
                 // handler already calls preventDefault (see NearbyList).
+                //
+                // This WAS removed once, on the theory that the row-level
+                // handler's own `< 2` noise-floor threshold (see NearbyList's
+                // own comment) already closed that gap on its own — tested
+                // live and it didn't: without this, the row's own swipe
+                // itself started misbehaving (the back-gesture recognizer
+                // competing with it mid-drag), which is worse than losing
+                // back-swipe over this panel. Put back; a bare Google Maps
+                // embed has this same "no back-swipe over the interactive
+                // surface" limitation everywhere, so this screen having it
+                // too, specifically here, is a smaller cost than a broken
+                // row swipe.
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
