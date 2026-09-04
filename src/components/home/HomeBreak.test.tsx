@@ -118,9 +118,9 @@ describe('HomeBreak', () => {
   // a real, named action beats a paragraph pointing at capabilities that
   // live elsewhere, and stays true even unclicked (it's what teaches a
   // visitor who's never opened a category page that the site works this
-  // way at all). Each opens ContributePicker's category-choosing step —
-  // see that component's own tests for what happens after a category is
-  // picked.
+  // way at all). Add opens ContributePicker (a category search); Edit and
+  // Report open EditReportPicker instead (a listing search) — see each
+  // component's own tests for what happens after something is picked.
   describe('Add / Edit / Report', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
 
@@ -128,7 +128,7 @@ describe('HomeBreak', () => {
       ['Add', 'Add a listing'],
       ['Edit', 'Edit a listing'],
       ['Report', 'Report a listing'],
-    ])('opens ContributePicker to the right step from the %s button', async (buttonName, pickerTitle) => {
+    ])('opens the right picker from the %s button', async (buttonName, pickerTitle) => {
       const user = userEvent.setup()
       mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
       renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {

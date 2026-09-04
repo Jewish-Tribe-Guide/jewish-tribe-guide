@@ -4,8 +4,11 @@ import { useState } from 'react'
 import { useZmanim } from '@/lib/useZmanim'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import FeedbackForm from '@/components/FeedbackForm'
-import ContributePicker, { type ContributeAction } from './ContributePicker'
+import ContributePicker from './ContributePicker'
+import EditReportPicker from './EditReportPicker'
 import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
+
+type ContributeAction = 'create' | 'edit' | 'report'
 
 // ── The break between the two main things (Browse everything, Explore the
 // map) — two side-by-side cards, the full daily Zmanim on the left and the
@@ -22,10 +25,14 @@ import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 // what that form is for (it's explicitly NOT the fast path for a specific
 // listing — see FeedbackForm's own copy) and left the card looking thin.
 // Add/Edit/Report — the actions that actually keep listings current — are
-// real, named buttons here now, each opening ContributePicker (choose a
-// category, then land on that category's existing Add/Edit/Report flow).
-// Feedback stays as a small secondary link, correctly scoped to general
-// site feedback rather than the headline action.
+// real, named buttons here now. Add opens ContributePicker (search for a
+// category, land on that category's Add form) since there's no existing
+// listing to search for yet; Edit/Report open EditReportPicker instead
+// (search for the listing itself, category shown only as a disambiguator)
+// since editing/reporting starts from a specific business in mind, not
+// "which bucket is it filed under". Feedback stays as a small secondary
+// link, correctly scoped to general site feedback rather than the headline
+// action.
 export default function HomeBreak({
   coords,
   locationLabel,
@@ -152,7 +159,10 @@ export default function HomeBreak({
           onClose={() => setFeedbackOpen(false)}
         />
       )}
-      {contributeAction && <ContributePicker action={contributeAction} onClose={() => setContributeAction(null)} />}
+      {contributeAction === 'create' && <ContributePicker onClose={() => setContributeAction(null)} />}
+      {(contributeAction === 'edit' || contributeAction === 'report') && (
+        <EditReportPicker action={contributeAction} coords={coords} onClose={() => setContributeAction(null)} />
+      )}
     </div>
   )
 }
