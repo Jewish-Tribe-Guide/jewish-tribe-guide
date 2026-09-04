@@ -58,12 +58,12 @@ export type LandingProps = {
 //   beside a photo, see HeroHeading) → "Popular right now" if an admin has
 //   re-added it (off by default — see builtInOrder) → a flat "Browse
 //   everything" grid, full weight (every card, always visible, no hover
-//   needed) → HomeBreak, a quiet, unheaded strip (trimmed Zmanim + one line
-//   on who keeps the site current) that reads as a pause between the two
-//   main sections rather than a third one → "Explore the map", matching
-//   Browse everything's full weight → footer. The full card index also
-//   lives on its own page (AllCategories), reachable from the tabs or the
-//   "Browse all categories" button.
+//   needed) → HomeBreak, two smaller cards side by side (the full daily
+//   Zmanim, and a "kept by the community" message) between the two main
+//   sections → "Explore the map", matching Browse everything's full weight
+//   → footer. The full card index also lives on its own page
+//   (AllCategories), reachable from the tabs or the "Browse all categories"
+//   button.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that). A phone has no tab bar to reach an
@@ -262,10 +262,10 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 ResourceMapView itself (shared with the full map screen), and
                 nesting another card around it to hold a heading would double
                 the border instead of matching this one. HomeBreak, the
-                transition between them, deliberately stays unbordered
-                either way — a border there would undercut the whole point
-                of it reading as a pause rather than a third contained
-                section. */}
+                transition between them, uses the same card language (border,
+                rounded-2xl) as this section — see its own doc on why two
+                smaller cards there still reads as a pair, not a third
+                full-width peer section. */}
         {!isMobile && !q && (
           <section className="mt-12">
             <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
@@ -318,9 +318,8 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
               </div>
             )
           }
-          // Zmanim & Shabbos — HomeBreak's trimmed, unheaded strip here
-          // (see its own doc), not the full daily grid the real Zmanim &
-          // Shabbos category page shows. Falls back to the community
+          // Zmanim & Shabbos — HomeBreak's own full daily zmanim card here
+          // (see its own doc). Falls back to the community
           // center so it renders something real before the visitor has set
           // an address. Still a JS branch, unlike the other two, and
           // deliberately: HomeBreak calls useZmanim, which fetches

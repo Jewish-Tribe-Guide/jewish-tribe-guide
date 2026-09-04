@@ -13,11 +13,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// This is the quiet transition between the two main sections (Browse
-// everything, Explore the map) — see its own doc. The thing worth locking
-// down in a test is exactly what makes it "quiet": no <h2>, unlike every
-// other block on the page, and it still carries the "kept by the
-// community" line regardless of the zmanim fetch's own state.
+// The transition between the two main sections (Browse everything, Explore
+// the map) — two cards, full daily Zmanim on the left and the "kept by the
+// community" message on the right. The thing worth locking down in a test:
+// both cards render as their own headed sections, the full daily zmanim
+// list shows (not just a trimmed few), and the community message renders
+// regardless of the zmanim fetch's own state.
 
 const mockUseZmanim = vi.fn<(coords: unknown) => { data: ZmanimData | null; status: ZmanimStatus }>()
 vi.mock('@/lib/useZmanim', () => ({
@@ -45,19 +46,24 @@ const readyData: ZmanimData = {
 }
 
 describe('HomeBreak', () => {
-  it('renders no heading — this is the quiet break, not a peer section', () => {
+  it('renders both cards as their own headed sections', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Zmanim & Shabbos' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kept current by people like you' })).toBeInTheDocument()
   })
 
-  it('shows the Hebrew date, sunset, candle lighting, and havdalah once ready', () => {
+  it('shows the full daily zmanim list, not a trimmed few, plus candle lighting and havdalah', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(screen.getByText(/22 Elul 5786/)).toBeInTheDocument()
     expect(screen.getByText(/Philadelphia/)).toBeInTheDocument()
+    // Every entry in dailyZmanim, not just Sunset — this card is the "full"
+    // Zmanim treatment, unlike the earlier trimmed strip it replaced.
+    expect(screen.getByText('Sunrise')).toBeInTheDocument()
+    expect(screen.getByText('6:31 AM')).toBeInTheDocument()
     expect(screen.getByText('7:27 PM')).toBeInTheDocument()
     expect(screen.getByText('7:09 PM')).toBeInTheDocument()
     expect(screen.getByText('8:07 PM')).toBeInTheDocument()
@@ -67,7 +73,7 @@ describe('HomeBreak', () => {
     mockUseZmanim.mockReturnValue({ data: null, status: 'loading' })
     renderWithProviders(<HomeBreak coords={null} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText(/Kept current by the community/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kept current by people like you' })).toBeInTheDocument()
     const link = screen.getByRole('link', { name: /Suggest something/ })
     expect(link).toHaveAttribute('href', expect.stringMatching(/\/feedback$/))
   })
