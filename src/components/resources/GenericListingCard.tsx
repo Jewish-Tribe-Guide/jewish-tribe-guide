@@ -597,7 +597,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {/* Mobile-only: upvote count + distance/travel, stacked to the
                 LEFT of the chevron (its own two-line column, chevron
                 vertically centered beside it) rather than desktop's own
