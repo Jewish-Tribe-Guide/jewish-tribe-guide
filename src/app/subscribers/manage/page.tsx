@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import UpButton from '@/components/UpButton'
 import ManageSubscriptionForm from '@/components/ManageSubscriptionForm'
 import { getSubscriberByToken } from '@/lib/subscriberStore'
@@ -14,11 +15,28 @@ export const metadata = { title: 'Manage your subscription' }
 // token the plain unsubscribe link uses, so one link covers both editing
 // preferences and leaving entirely, rather than making someone hunt for a
 // second link to do the other thing.
-export default async function ManageSubscriptionPage({
+//
+// `searchParams` is a runtime API under Cache Components (see this app's own
+// AGENTS.md note on checking node_modules/next/dist/docs for framework
+// mechanics) — reading it at the top of the page would make the whole route
+// dynamic and fail to prerender. The fix, straight from that guide's own
+// "cookies, headers, and searchParams" section: pass the promise down
+// unread and await it inside a <Suspense>-wrapped child instead, so the
+// static shell (there isn't much of one here, but the pattern still holds)
+// can prerender and only the token-dependent part is request-bound.
+export default function ManageSubscriptionPage({
   searchParams,
 }: {
   searchParams: Promise<{ token?: string }>
 }) {
+  return (
+    <Suspense fallback={null}>
+      <ManageSubscriptionContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function ManageSubscriptionContent({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token } = await searchParams
   const subscriber = token ? await getSubscriberByToken(token) : null
 
