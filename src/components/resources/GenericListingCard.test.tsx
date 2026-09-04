@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -195,6 +195,69 @@ describe('GenericListingCard — collapsed', () => {
     // Expanding is a separate, unrelated interaction — clicking the name
     // alone shouldn't also toggle the row.
     expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+  })
+})
+
+describe('GenericListingCard — showInHeader text/textarea fields', () => {
+  // `text` keeps the single-line truncate a header field always had — a
+  // short tagline has a sensible one-line-or-nothing shape.
+  it('truncates a showInHeader "text" field to one line', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }],
+    })
+    const item = makeListing({ note: 'Sit-down glatt kosher steakhouse' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    for (const note of screen.getAllByText('Sit-down glatt kosher steakhouse')) {
+      expect(note).toHaveClass('truncate')
+    }
+  })
+
+  // `textarea` clamps to a few lines instead — a real free-form description
+  // (Networking's listings are just a name and a website otherwise) has no
+  // sensible one-line-or-nothing shape, and truncating it to one line would
+  // cut it off after a handful of words.
+  it('clamps a showInHeader "textarea" field to a few lines instead of truncating', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', showInHeader: true }],
+    })
+    const item = makeListing({ d: 'A network of young leaders and philanthropists giving back as they build connections and community.' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    // Rendered twice (a desktop version and a mobile twin — see
+    // GenericListingCard's own comment on why); both should carry the clamp.
+    for (const description of screen.getAllByText(/A network of young leaders/)) {
+      expect(description).toHaveClass('line-clamp-3')
+      expect(description).not.toHaveClass('truncate')
+    }
+  })
+})
+
+// The modal replaces GenericListingCard's own collapsed row entirely (the
+// card behind it is hidden under the backdrop), so a showInHeader url field
+// has to be restated somewhere in the dialog too — this is the "somewhere":
+// the same pill, next to the name, the collapsed row already used.
+describe('GenericListingCard — desktop modal header url field', () => {
+  it('shows a showInHeader url field as a pill next to the name in the dialog, not duplicated in the actions row', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({
+      detailFields: [{ key: 'w', label: 'Website', type: 'url', showInHeader: true }],
+    })
+    const item = makeListing({ w: 'https://example.com' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    const dialog = screen.getByRole('dialog')
+    const websiteLinks = within(dialog).getAllByRole('link', { name: 'Website' })
+    expect(websiteLinks).toHaveLength(1)
+    expect(websiteLinks[0]).toHaveAttribute('href', 'https://example.com')
   })
 })
 

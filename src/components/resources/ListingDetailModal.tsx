@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
-import type { CategoryConfig } from '@/lib/categories'
+import type { CategoryConfig, CategoryField } from '@/lib/categories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -28,6 +28,11 @@ type Props = {
    *  for why this is passed rather than recomputed. */
   badgeRow: ReactNode
   headerBadgeKeys: string[]
+  /** A showInHeader url field (e.g. "Join group") — same pill, same spot
+   *  next to the name, as GenericListingCard's own collapsed row. See the
+   *  render site's own comment for why this moved here instead of staying
+   *  in the actions row below. */
+  headerUrlFields: { f: CategoryField; href: string }[]
   onTagClick: (tag: string) => void
   onFilterOpen: () => void
   onFilterBool: (key: string) => void
@@ -73,6 +78,7 @@ export default function ListingDetailModal({
   subtitle,
   badgeRow,
   headerBadgeKeys,
+  headerUrlFields,
   onTagClick,
   onFilterOpen,
   onFilterBool,
@@ -185,7 +191,31 @@ export default function ListingDetailModal({
               className="h-10 w-10 text-xl shrink-0"
             />
             <div className="min-w-0">
-              <h2 className="font-semibold text-slate-900 text-lg">{name}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-semibold text-slate-900 text-lg">{name}</h2>
+                {/* Same pill, same spot relative to the name, as the
+                    collapsed card behind this dialog — see that component's
+                    own headerUrlFields comment. Was rendered as one of the
+                    actions-row icon buttons below instead (Directions/Call
+                    style) via includeHeaderUrlFields; moved back to sit with
+                    the name specifically because that row was the one place
+                    this dialog didn't otherwise match the card it opened
+                    from, and PlaceDetailBody's own default (excluding a
+                    showInHeader field from that row) already assumes
+                    there's a header spot like this one showing it instead. */}
+                {headerUrlFields.map(({ f, href }) => (
+                  <a
+                    key={f.key}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                  >
+                    {f.linkLabel ?? f.label}
+                  </a>
+                ))}
+              </div>
               {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
               {badgeRow && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -215,11 +245,10 @@ export default function ListingDetailModal({
             onFilterSelect={onFilterSelect}
             hideOpenStatus
             hiddenBadgeKeys={headerBadgeKeys}
-            // This modal replaces GenericListingCard's collapsed row
-            // entirely (the card behind it is hidden under the backdrop),
-            // so a showInHeader url field (e.g. Networking's Website link)
-            // has nowhere else left to show — see the prop's own comment.
-            includeHeaderUrlFields
+            // Not includeHeaderUrlFields here — that field now has a home in
+            // this dialog's own header, next to the name (see above), the
+            // same reason PlaceDetailBody's default excludes it from this
+            // row for GenericListingCard's mobile accordion too.
           />
 
           <div className="pt-3 border-t border-slate-200 space-y-2.5">

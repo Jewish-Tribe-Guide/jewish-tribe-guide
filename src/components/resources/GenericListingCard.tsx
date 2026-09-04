@@ -169,17 +169,26 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // text/textarea fields explicitly opted into the collapsed row — a short
   // note ("Sit-down glatt kosher steakhouse, under IKC supervision") that
   // says what the place actually is, without expanding the card first.
-  // Deliberately single-line: `truncate` (not a multi-line clamp) so the
-  // decision to keep this short lives in what gets typed, not in how long a
-  // line the layout happens to allow — the same one-line limit applies at
-  // every width, not just mobile's. `truncate` still applies even for a
-  // `headerMaxLength`-capped field (guaranteed to already fit, so normally a
-  // no-op) — cheap insurance against a value that predates the cap, or one
-  // written some other way than the submission form.
+  //
+  // `text` stays single-line (`truncate`): the same one-line limit applies
+  // at every width, so the decision to keep it short lives in what gets
+  // typed, not in how long a line the layout happens to allow — and it's
+  // normally already guaranteed to fit by `headerMaxLength` anyway (this
+  // just insures against a value that predates the cap, or one written some
+  // other way than the submission form).
+  //
+  // `textarea` clamps to a few lines instead (`headerTextClamp` below) — a
+  // real free-form description (Networking's listings are just a name and
+  // a website otherwise, with nothing else to fill the card) has no
+  // sensible one-line-or-nothing shape the way a short tagline does, and
+  // forcing one would cut it off after a handful of words. line-clamp's own
+  // ellipsis is the "…" that invites opening the card for the rest, not a
+  // separate affordance drawn on top of it.
   const headerTextFields = fields
     .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
     .filter((x): x is { f: CategoryField; text: string } => !!x.text)
+  const headerTextClamp = headerTextFields.some(({ f }) => f.type === 'textarea') ? 'line-clamp-3' : 'truncate'
   // Whether the CATEGORY has this field at all, independent of whether THIS
   // item filled it in. In the desktop grid, cards in the same row stretch to
   // match the tallest one (see the card's own h-full comment) — but only the
@@ -427,10 +436,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 row still starts at the same height as its grid row-mates. */}
             {headerTextFields.length > 0 ? (
               headerTextFields.map(({ f, text }) => (
-                <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
+                <p key={f.key} className={`hidden desktop:block ${headerTextClamp} text-sm text-slate-600 mt-2`}>{text}</p>
               ))
             ) : hasHeaderTextField ? (
-              <p aria-hidden="true" className="invisible hidden desktop:block truncate text-sm text-slate-600 mt-2">placeholder</p>
+              // A single word never actually wraps to 3 lines on its own —
+              // line-clamp only bounds overflow, it doesn't force a height —
+              // so the multi-line case needs an explicit min-height to
+              // reserve the same space a real 3-line description would.
+              <p
+                aria-hidden="true"
+                className={`invisible hidden desktop:block ${headerTextClamp} text-sm text-slate-600 mt-2 ${headerTextClamp === 'line-clamp-3' ? 'min-h-[3.75rem]' : ''}`}
+              >
+                placeholder
+              </p>
             ) : null}
           </div>
 
@@ -558,7 +576,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             comment there. Indented to align under the name/address (same
             52px = icon + gap as above). */}
         {headerTextFields.map(({ f, text }) => (
-          <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
+          <p key={f.key} className={`desktop:hidden ${headerTextClamp} text-sm text-slate-600 mt-2 pl-[52px]`}>{text}</p>
         ))}
 
         {/* Badge row — the only chips that survive collapsed: Open and any
@@ -628,6 +646,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           subtitle={subtitle}
           badgeRow={badgeRow}
           headerBadgeKeys={headerBadges.map((f) => f.key)}
+          headerUrlFields={headerUrlFields}
           onTagClick={onTagClick}
           onFilterOpen={onFilterOpen}
           onFilterBool={onFilterBool}
