@@ -1455,12 +1455,25 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList && (
-                // overscroll-contain: without it, a trackpad swipe closing a
-                // NearbyList row's pin action can still bleed into the
-                // browser's own swipe-to-go-back gesture once it reaches
-                // this scroll boundary, even though the row's own wheel
-                // handler already calls preventDefault (see NearbyList).
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+                // No overscroll-contain here (there used to be) — it blocked
+                // every trackpad swipe from ever reaching the browser's
+                // swipe-to-go-back gesture anywhere over this whole panel,
+                // not just while a NearbyList row was actively being
+                // dragged. Unlike a bare Google Maps embed, this screen has
+                // a real "back" (wherever the visitor came from before the
+                // map), so that's a real loss, not a non-issue. It was
+                // originally added because a row-close swipe could still
+                // leak into that gesture even with the row's own wheel
+                // handler calling preventDefault — but that handler was
+                // later tightened to claim the gesture on its first couple
+                // of ticks instead of waiting for deltaX to clearly dominate
+                // (see NearbyList's own comment on the `< 2` noise floor),
+                // which is the same gap this container-level block existed
+                // to paper over. Removed on the theory that fix already
+                // covers it; if a row-close swipe is ever observed to
+                // trigger the browser's back navigation again, that theory
+                // was wrong and this needs to come back.
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
                       item={desktopSelected.raw}

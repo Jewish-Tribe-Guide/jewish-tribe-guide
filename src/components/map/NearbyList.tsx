@@ -262,9 +262,18 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   // than React's onWheel prop — React attaches wheel handlers passively by
   // default, which silently ignores preventDefault() and lets the sidebar
   // scroll sideways underneath the swipe.
+  //
+  // On `wrapperRef`, not `contentRef` — once a row is open, the content div
+  // has slid REVEAL_WIDTH out from under the cursor, and the Pin/Share
+  // buttons revealed behind it sit in a separate sibling with no wheel
+  // listener of their own. A swipe-to-close gesture starting with the
+  // pointer already over those buttons landed on that sibling instead and
+  // never reached this handler at all — it simply did nothing. `wrapperRef`
+  // spans the whole row (content and the revealed strip both) regardless of
+  // dragX, so a swipe closes the row no matter where over it it starts.
   useEffect(() => {
     if (!hoverCapable || !canPin) return
-    const el = contentRef.current
+    const el = wrapperRef.current
     if (!el) return
     function onWheel(e: WheelEvent) {
       // Any real horizontal component gets prevented, not just events where
@@ -314,7 +323,21 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   }
 
   return (
-    <div ref={wrapperRef} className="relative overflow-hidden bg-white">
+    <div
+      ref={wrapperRef}
+      className="relative overflow-hidden bg-white touch-pan-y"
+      // Pointer handlers live here, not on the content div below, for the
+      // same reason the wheel listener moved up (see its own comment): once
+      // a row is open, a swipe/drag starting over the revealed Pin/Share
+      // buttons needs to close it too, and only this wrapper spans that area
+      // regardless of dragX. `touch-pan-y` matches — a touch beginning on
+      // those buttons needs the same "vertical scroll stays native, I claim
+      // horizontal" contract the content div already declared for itself.
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
       {canPin && (
         <div className="absolute inset-y-0 right-0 flex" style={{ width: REVEAL_WIDTH }}>
           {/* Doesn't close the row on its own, unlike Pin below — the
@@ -359,10 +382,6 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           // eslint-disable-next-line react-hooks/refs
           transition: activeGestureRef.current ? 'none' : 'transform 200ms ease',
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
         onClickCapture={onRowClickCapture}
       >
         {/* Name + category + address — tappable when a directory exists.
