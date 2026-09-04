@@ -1455,25 +1455,24 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   padding is part of the same scrolling content. ────────── */}
               <div className="h-16 shrink-0" />
               {ui.map.nearbyList && (
-                // No overscroll-contain here (there used to be) — it blocked
-                // every trackpad swipe from ever reaching the browser's
-                // swipe-to-go-back gesture anywhere over this whole panel,
-                // not just while a NearbyList row was actively being
-                // dragged. Unlike a bare Google Maps embed, this screen has
-                // a real "back" (wherever the visitor came from before the
-                // map), so that's a real loss, not a non-issue. It was
-                // originally added because a row-close swipe could still
-                // leak into that gesture even with the row's own wheel
-                // handler calling preventDefault — but that handler was
-                // later tightened to claim the gesture on its first couple
-                // of ticks instead of waiting for deltaX to clearly dominate
-                // (see NearbyList's own comment on the `< 2` noise floor),
-                // which is the same gap this container-level block existed
-                // to paper over. Removed on the theory that fix already
-                // covers it; if a row-close swipe is ever observed to
-                // trigger the browser's back navigation again, that theory
-                // was wrong and this needs to come back.
-                <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+                // overscroll-contain: without it, a trackpad swipe closing a
+                // NearbyList row's pin action can still bleed into the
+                // browser's own swipe-to-go-back gesture once it reaches
+                // this scroll boundary, even though the row's own wheel
+                // handler already calls preventDefault (see NearbyList).
+                //
+                // This WAS removed once, on the theory that the row-level
+                // handler's own `< 2` noise-floor threshold (see NearbyList's
+                // own comment) already closed that gap on its own — tested
+                // live and it didn't: without this, the row's own swipe
+                // itself started misbehaving (the back-gesture recognizer
+                // competing with it mid-drag), which is worse than losing
+                // back-swipe over this panel. Put back; a bare Google Maps
+                // embed has this same "no back-swipe over the interactive
+                // surface" limitation everywhere, so this screen having it
+                // too, specifically here, is a smaller cost than a broken
+                // row swipe.
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
                       item={desktopSelected.raw}

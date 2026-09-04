@@ -1140,8 +1140,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           <div
             ref={contextMenuRef}
             role="menu"
-            style={{ position: 'fixed', top: contextMenu.y, left: contextMenu.x }}
-            className="z-50 -translate-y-1/2 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            // Offset a few px down-right of the cursor, not centered on it —
+            // a menu straddling the click point (this used to be
+            // -translate-y-1/2, vertically centered) sits half over the pin
+            // itself and whatever's near it on the map, which is exactly
+            // the "overlays a lot of the listing" complaint. Down-right
+            // matches how a native right-click menu opens.
+            style={{ position: 'fixed', top: contextMenu.y + 4, left: contextMenu.x + 4 }}
+            className="z-50 overflow-hidden rounded-md border border-slate-200 bg-white py-0.5 shadow-lg"
           >
             <button
               type="button"
@@ -1150,9 +1156,9 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
                 onLongPressPointRef.current?.(contextMenu.point)
                 setContextMenu(null)
               }}
-              className="flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <PinIcon filled={contextMenu.point.pinned} className="h-4 w-4 text-slate-500" />
+              <PinIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
               {contextMenu.point.pinned ? 'Unpin' : 'Pin'}
             </button>
           </div>,
