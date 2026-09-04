@@ -105,12 +105,36 @@ export default function Wizard({
   const [idx, setIdx] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+  // Lazy initializer, not `useState(false)`: `submitted` used to always
+  // start false, which is right for a fresh visit but wrong for a reload —
+  // reloading the success screen remounted this component from scratch and
+  // landed back on step 1 of the actual form, answers gone, reading as "it
+  // sent me back to the form" (which it did). history.state (not a query
+  // param — see goToStep's own use of it below for the same reasoning)
+  // survives a reload of the same document, unlike component state, so a
+  // reload can tell it's re-arriving at an already-submitted session
+  // instead of a fresh one.
+  const [submitted, setSubmitted] = useState(
+    () => typeof window !== 'undefined' && !!(window.history.state as { submitted?: boolean } | null)?.submitted,
+  )
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Fires once per wizard open, not per step — this is "a visitor started this
   // form," which pairs with the submit event below to give a start→finish rate.
   useEffect(() => { track('form_started', { form: formLabel ?? 'unknown' }) }, [formLabel])
+
+  // A reload landing back on the success screen (see the lazy initializer
+  // above) — most visitors reload specifically to get OFF a "submitted"
+  // confirmation and back to wherever they were, not to see it a second
+  // time. Redirects immediately rather than re-rendering it. Deliberately
+  // `[]`: this is about where THIS MOUNT started, not about `submitted`
+  // turning true later from an actual submit in the same session — that
+  // path already shows the confirmation the normal way, and shouldn't also
+  // bounce the visitor straight through it.
+  useEffect(() => {
+    if (submitted) onClose()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Steps visible given the current answers — branching recomputes this live.
   const visible = useMemo(() => steps.filter((s) => stepIsVisible(s, answers)), [steps, answers])
@@ -166,6 +190,11 @@ export default function Wizard({
       try {
         await onSubmit(answers)
         setSubmitted(true)
+        // Marks history.state so a reload from here knows to redirect
+        // instead of restarting the form — see the mount effect above.
+        // replaceState, not pushState: this isn't a new place for Back to
+        // return to, just a fact about the entry already on screen.
+        history.replaceState({ ...(window.history.state ?? {}), submitted: true }, '')
         track('form_submitted', { form: formLabel ?? 'unknown' })
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
