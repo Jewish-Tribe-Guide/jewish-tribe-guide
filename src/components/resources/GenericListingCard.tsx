@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -32,30 +32,18 @@ function shortAddress(addr: string): string {
   return parts.length <= 2 ? parts.join(', ') : `${parts[0]}, ${parts[1]}`
 }
 
-// ── Collapsible listing card ────────────────────────────────────────────────────
-// Collapsed row is styled after the map's NearbyList row (icon avatar, name,
-// "category · address" subtitle, distance) so a place looks the same whether
-// you found it here or on the map. The only chips that still show collapsed
-// are ones tied to an actual filter control (Open, filterable badges) — every
-// other badge/tag waits behind the expand, in PlaceDetailBody, same as
-// MapPlaceDetail's full detail view.
-export function GenericListingCard({
-  item,
-  category,
-  upvotes,
-  count,
-  defaultExpanded,
-  onVote,
-  onTagClick,
-  onFilterOpen,
-  onFilterBool,
-  onFilterSelect,
-  onEdit,
-  onReport,
-  showCategoryLabel = true,
-  showDistanceSlot = false,
-  onNameClick,
-}: {
+/** Imperative handle for opening/closing this card's detail from OUTSIDE it —
+ *  specifically GenericDirectory's arrow-key next/prev (see ListingDetailModal's
+ *  onNavigate), which needs to close THIS card and open a SIBLING one it has
+ *  no other way to reach: `expanded` is local state, and there's no shared
+ *  "currently open" state to lift without every card re-rendering on every
+ *  other card's open/close. */
+export type GenericListingCardHandle = {
+  open: () => void
+  close: () => void
+}
+
+type Props = {
   item: DirectoryResource
   category: CategoryConfig
   upvotes: boolean
@@ -100,8 +88,36 @@ export function GenericListingCard({
   onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
   onReport: () => void
-}) {
+  /** Desktop only (see ListingDetailModal's own doc comment) — arrow-key
+   *  next/prev while this card's dialog is open. Wired by GenericDirectory,
+   *  which is the only thing that knows the current filtered/sorted order
+   *  and every sibling card's GenericListingCardHandle. */
+  onNavigate?: (direction: 1 | -1) => void
+}
+
+export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
+  item,
+  category,
+  upvotes,
+  count,
+  defaultExpanded,
+  onVote,
+  onTagClick,
+  onFilterOpen,
+  onFilterBool,
+  onFilterSelect,
+  onEdit,
+  onReport,
+  showCategoryLabel = true,
+  showDistanceSlot = false,
+  onNameClick,
+  onNavigate,
+}, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  useImperativeHandle(ref, () => ({
+    open: () => setExpanded(true),
+    close: () => setExpanded(false),
+  }))
   const categories = useCategories()
   const community = useCommunitySlug()
   // Which UI opens on click: a single-column mobile list has room to push an
@@ -613,8 +629,9 @@ export function GenericListingCard({
           onReport={onReport}
           canEdit={canEdit}
           canReport={canReport}
+          onNavigate={onNavigate}
         />
       )}
     </div>
   )
-}
+})

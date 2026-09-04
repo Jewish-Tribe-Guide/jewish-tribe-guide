@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+import { createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
-import { GenericListingCard } from './GenericListingCard'
+import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -359,6 +360,43 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: /edit/i }))
 
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+  })
+
+  // Desktop's ListingDetailModal — real here, not mocked, since this is
+  // exactly the wiring under test: an arrow key while the dialog is open
+  // reaches GenericDirectory's onNavigate through it.
+  it('calls onNavigate(1)/onNavigate(-1) on ArrowRight/ArrowLeft while the dialog is open', async () => {
+    const user = userEvent.setup()
+    const onNavigate = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={onNavigate} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.keyboard('{ArrowRight}')
+    await user.keyboard('{ArrowLeft}')
+
+    expect(onNavigate).toHaveBeenNthCalledWith(1, 1)
+    expect(onNavigate).toHaveBeenNthCalledWith(2, -1)
+  })
+
+  // GenericDirectory needs to close THIS card and open a sibling from
+  // outside it — the whole reason GenericListingCard exposes a ref handle.
+  it('opens and closes via an imperative ref handle', async () => {
+    const category = makeCategory()
+    const item = makeListing()
+    const ref = createRef<GenericListingCardHandle>()
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    act(() => ref.current!.open())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    act(() => ref.current!.close())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 

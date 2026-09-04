@@ -9,7 +9,7 @@ import { isMinyanim } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
-import { GenericListingCard } from './GenericListingCard'
+import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import UpButton from '@/components/UpButton'
 import { PlusIcon, ClockIcon } from '@/components/icons'
@@ -129,6 +129,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
 
+  // Every rendered card's open/close handle, keyed by listing id — same
+  // "callback ref in a Map, not an array" shape as itemRowRefs above, and
+  // for the same reason (found by id, not position, after a re-sort).
+  // Desktop-only in practice (see GenericListingCardHandle's own comment):
+  // arrow-key next/prev needs to close ONE card and open a SIBLING it has
+  // no other way to reach, since `expanded` is that card's own local state
+  // rather than something lifted here.
+  const cardRefs = useRef(new Map<string, GenericListingCardHandle>())
+  const setCardRef = (id: string) => (handle: GenericListingCardHandle | null) => {
+    if (handle) cardRefs.current.set(id, handle)
+    else cardRefs.current.delete(id)
+  }
+
   useEffect(() => {
     if (reopenItemId) scrollItemIntoView(reopenItemId, 'instant')
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,6 +257,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)
     })
+
+  // fromId is the card issuing the request (arrow key pressed while ITS
+  // dialog is open) — direction moves through `filtered`, the same order
+  // rendered below, so "next" always matches what's actually next on
+  // screen. A no-op past either end rather than wrapping: looping from the
+  // last listing back to the first (or vice versa) reads as the arrow key
+  // doing something unrelated to what was just on screen, not as "there's
+  // more."
+  const navigateFromCard = (fromId: string, direction: 1 | -1) => {
+    const index = filtered.findIndex((i) => i.id === fromId)
+    const target = filtered[index + direction]
+    if (index === -1 || !target) return
+    cardRefs.current.get(fromId)?.close()
+    cardRefs.current.get(target.id)?.open()
+    scrollItemIntoView(target.id, 'smooth')
+  }
 
   // Log searches that match no listing in this category — by the search text
   // alone, so an active filter (open-now, cert, etc.) doesn't look like a miss.
@@ -681,6 +710,8 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             // its own row instead of filling it.
             <div key={item.id} ref={setItemRowRef(item.id)} className="lg:max-w-md lg:mx-auto lg:w-full">
             <GenericListingCard
+              ref={setCardRef(item.id)}
+              onNavigate={(direction) => navigateFromCard(item.id, direction)}
               item={item}
               category={category}
               showCategoryLabel={false}

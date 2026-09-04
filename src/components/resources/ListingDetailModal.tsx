@@ -36,6 +36,16 @@ type Props = {
   onReport: () => void
   canEdit: boolean
   canReport: boolean
+  /** Left/Right arrow while this dialog is focused moves to the previous/
+   *  next card in whatever order is currently on screen — the lightbox
+   *  pattern (Google Photos, Gmail's message view). Omitted where there's
+   *  no well-defined "next" (none today — GenericListingCard always passes
+   *  one — but kept optional so a future caller isn't forced to). Up/Down
+   *  are deliberately left alone: the desktop grid has neighbors in those
+   *  directions too, but "next" reading a multi-column grid top-to-bottom,
+   *  left-to-right is the one order a visitor actually recognizes as
+   *  "what I was just scrolling past," and that's what the arrows follow. */
+  onNavigate?: (direction: 1 | -1) => void
 }
 
 /** Desktop's counterpart to the card's inline expand. A multi-column grid has
@@ -65,6 +75,7 @@ export default function ListingDetailModal({
   onReport,
   canEdit,
   canReport,
+  onNavigate,
 }: Props) {
   const community = useCommunitySlug()
 
@@ -75,10 +86,23 @@ export default function ListingDetailModal({
 
   useEffect(() => {
     if (!isOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      // Guards against a text input inside the dialog someday capturing the
+      // arrow keys for cursor movement instead of navigation — nothing here
+      // currently has one, but a global keydown listener shouldn't assume
+      // that stays true.
+      const target = e.target as HTMLElement | null
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
+      if (e.key === 'ArrowLeft') onNavigate?.(-1)
+      else if (e.key === 'ArrowRight') onNavigate?.(1)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, onNavigate])
 
   if (!isOpen) return null
 
