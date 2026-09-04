@@ -652,7 +652,12 @@ describe('GenericListingCard — distance slot', () => {
         {...requiredHandlers}
       />,
     )
-    expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
+    // Two copies exist in the DOM — desktop's own row and mobile's inline
+    // version, each hidden from the other viewport by CSS alone (see
+    // upvoteDistanceContent's own doc) — jsdom doesn't apply that CSS, so
+    // both are "present" here. Real content, not a bug: only one is ever
+    // actually visible in a real browser at a time.
+    expect(screen.getAllByRole('button', { name: slotLabel })).toHaveLength(2)
   })
 
   it('shows the real distance instead once there is one', () => {
@@ -666,7 +671,7 @@ describe('GenericListingCard — distance slot', () => {
         {...requiredHandlers}
       />,
     )
-    expect(screen.getByText(/0\.4 mi/)).toBeInTheDocument()
+    expect(screen.getAllByText(/0\.4 mi/)).toHaveLength(2)
     expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
   })
 
@@ -701,7 +706,9 @@ describe('GenericListingCard — distance slot', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: slotLabel }))
+    // Click whichever copy is first — see the earlier test's own comment on
+    // why two exist in jsdom (desktop row + mobile inline version).
+    await user.click(screen.getAllByRole('button', { name: slotLabel })[0])
 
     expect(opened).toHaveBeenCalledTimes(1)
     // The row's own click handler expands the card. A tap meant for the slot

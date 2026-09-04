@@ -213,6 +213,58 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const travel = travelParts(item)
   const hasUpvoteRow = upvotes || travel.length > 0 || showDistanceSlot
 
+  // Shared between the desktop full-width row (below, own row under the
+  // icon — see that row's own comment on why) and the mobile inline version
+  // (rendered right under the name/subtitle instead — see its own comment).
+  // Desktop needs the dedicated row so a longer name doesn't fight a
+  // squeezed-in column for space in a multi-column grid; mobile has no such
+  // grid (a single full-width column) so there's nothing to protect the
+  // name from, and the old inline placement reads as more compact there.
+  const upvoteDistanceContent = (
+    <>
+      {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
+      {upvotes && (travel.length > 0 || showDistanceSlot) && (
+        <span aria-hidden="true" className="text-slate-300">|</span>
+      )}
+      {travel.length > 0 ? (
+        <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
+          {travel.map((t) => <span key={t}>{t}</span>)}
+        </div>
+      ) : showDistanceSlot ? (
+        // Deliberately quiet — muted, not the amber of the header's prompt.
+        // This is the column not yet filled in, repeated down the list; it
+        // should read as a gap the visitor can close, never as the site
+        // asking again.
+        //
+        // No underline. It first carried a dotted rule meaning "a blank to
+        // fill in", and that failed the only test that mattered: the person
+        // who designed this app looked at it and asked what the stray line
+        // was. An affordance nobody recognises is just an artifact, and an
+        // artifact is something people learn to ignore. The repetition down
+        // the rows is what does the work here, not the decoration.
+        <button
+          type="button"
+          aria-label="Set your location to see distances"
+          onClick={(e) => {
+            // The row's own handler expands the card. This tap was for the
+            // picker, not for this listing's details.
+            e.stopPropagation()
+            document.dispatchEvent(new CustomEvent('jpc:open-location'))
+          }}
+          // -my-2 py-2: the label itself is 17px tall, under the 24px
+          // WCAG-recommended tap target. Padding grows the real hit area to
+          // ~33px; the negative margin cancels it out of the layout so the
+          // row's height doesn't shift. Same technique, and same reason, as
+          // the chevron above.
+          className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-muted transition-colors hover:text-slate-600 cursor-pointer"
+        >
+          <span aria-hidden="true">📍</span>
+          <span aria-hidden="true">—</span>
+        </button>
+      ) : null}
+    </>
+  )
+
   // url fields explicitly opted into the collapsed row (showInHeader) — a
   // quick way to reach something like a WhatsApp "Join group" link without
   // expanding the card first. Unchecked (the default) leaves a url field
@@ -493,6 +545,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               )}
             </p>
             {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
+            {/* Mobile-only: upvote count + distance/travel, inline right
+                under the name/subtitle rather than desktop's own dedicated
+                row below the icon (see that row's own comment on why they
+                differ) — mobile has no multi-column grid squeezing this
+                against the name, so there's nothing to protect the name
+                from, and inline reads as more compact on a phone-width
+                card. */}
+            {hasUpvoteRow && (
+              <div className="desktop:hidden mt-1 flex items-center gap-2 text-xs font-medium text-slate-600">
+                {upvoteDistanceContent}
+              </div>
+            )}
             {/* mt-2: enough gap that this reads as its own beat after the
                 name+address fact, not a third bullet inside it — but no
                 border/section treatment, which is reserved for the hairline
@@ -574,79 +638,36 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           </div>
         </div>
 
-        {/* Upvote count + distance/travel — its own row, left-aligned under
-            the icon (pl-[52px] = the 40px icon + 12px gap it sits next to
-            above, same offset the badge row used to use), rather than a
-            column squeezed in beside the name. That column used to sit
-            inline with the name (see git history), which was fine while the
-            card spanned the page's full width; once desktop cards became one
-            of 2-3 grid columns (see GenericDirectory) the same column left
-            the name only a third of a viewport-width's worth of room, and a
+        {/* Upvote count + distance/travel — desktop only, its own row
+            left-aligned under the icon (pl-[52px] = the 40px icon + 12px gap
+            it sits next to above), rather than a column squeezed in beside
+            the name. A column squeezed in beside the name is exactly what
+            this used to be (see git history) — fine while the card spanned
+            the page's full width, but once desktop cards became one of 2-3
+            grid columns (see GenericDirectory) that same column left the
+            name only a third of a viewport-width's worth of room, and a
             longer business name wrapped to three or four lines fighting it
             for space. Its own row gives it the whole card width instead, so
-            it never competes with the name at any card width, viewport-based
-            breakpoint or not. Left-aligned under the address/description,
-            not right-aligned against the card edge — a distance/upvote line
-            reads as more of a fact about the place, alongside its address,
-            than a stat pinned to the card's corner. */}
+            it never competes with the name. Left-aligned under the
+            address/description, not right-aligned against the card edge — a
+            distance/upvote line reads as more of a fact about the place,
+            alongside its address, than a stat pinned to the card's corner.
+            Mobile has no grid to squeeze columns in (a single full-width
+            column), so there's nothing here to protect the name from —
+            mobile gets the old inline-with-name placement instead (see
+            "Mobile-only" comment further up, next to the subtitle). */}
         {hasUpvoteRow && (
           <>
             {/* Segment-1 spacer — see GenericListingCardHandle's own doc.
                 Real gap here, between the address/header-text block above
                 and this row, so the popularity/distance LINE itself lands
                 at the same height across a row of cards — not just the
-                badges further down. */}
-            <div ref={upvoteSpacerRef} aria-hidden="true" />
-            <div ref={upvoteRowRef} className="mt-1.5 flex justify-start pl-[52px]">
-            {/* Stacked on mobile to save horizontal space; side by side from
-                desktop up, close together with a thin "|" between — the
-                upvote count and the distance are two short facts read as one
-                line, not two columns needing their own aligned width. */}
-            <div className="flex flex-col items-start gap-1 desktop:flex-row desktop:items-center desktop:gap-2">
-              {upvotes && (
-                <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-              )}
-              {upvotes && (travel.length > 0 || showDistanceSlot) && (
-                <span aria-hidden="true" className="hidden desktop:inline text-slate-300">|</span>
-              )}
-              {travel.length > 0 ? (
-                <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                  {travel.map((t) => <span key={t}>{t}</span>)}
-                </div>
-              ) : showDistanceSlot ? (
-                // Deliberately quiet — muted, not the amber of the header's
-                // prompt. This is the column not yet filled in, repeated
-                // down the list; it should read as a gap the visitor can
-                // close, never as the site asking again.
-                //
-                // No underline. It first carried a dotted rule meaning "a
-                // blank to fill in", and that failed the only test that
-                // mattered: the person who designed this app looked at it
-                // and asked what the stray line was. An affordance nobody
-                // recognises is just an artifact, and an artifact is
-                // something people learn to ignore. The repetition down the
-                // rows is what does the work here, not the decoration.
-                <button
-                  type="button"
-                  aria-label="Set your location to see distances"
-                  onClick={(e) => {
-                    // The row's own handler expands the card. This tap was
-                    // for the picker, not for this listing's details.
-                    e.stopPropagation()
-                    document.dispatchEvent(new CustomEvent('jpc:open-location'))
-                  }}
-                  // -my-2 py-2: the label itself is 17px tall, under the
-                  // 24px WCAG-recommended tap target. Padding grows the real
-                  // hit area to ~33px; the negative margin cancels it out of
-                  // the layout so the row's height doesn't shift. Same
-                  // technique, and same reason, as the chevron above.
-                  className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer"
-                >
-                  <span aria-hidden="true">📍</span>
-                  <span aria-hidden="true">—</span>
-                </button>
-              ) : null}
-            </div>
+                badges further down. Desktop-only, like the row it pads. */}
+            <div ref={upvoteSpacerRef} aria-hidden="true" className="hidden desktop:block" />
+            <div ref={upvoteRowRef} className="hidden desktop:flex mt-1.5 justify-start pl-[52px]">
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                {upvoteDistanceContent}
+              </div>
             </div>
           </>
         )}

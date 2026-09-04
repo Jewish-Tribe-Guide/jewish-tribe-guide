@@ -66,18 +66,27 @@ export default function SearchSection({
   return (
     <section className="mt-8 hidden desktop:block">
       <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">{heroTitle}</h2>
-        <div className="max-w-[480px]">
+        {/* Centered, not left-aligned like Browse everything/the map below —
+            those are grids that fill the card's full width on their own;
+            this card's only real content is one ~480px input, so left-aligning
+            it left most of a full-width card sitting empty to the right.
+            Centering the heading and button along with it keeps the whole
+            card reading as one composed unit instead of a wide box with a
+            small thing floating in its corner. */}
+        <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
+        <div className="mx-auto max-w-[480px]">
           <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
         </div>
         {mapIcon != null && (
-          <button
-            onClick={onViewMap}
-            className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-          >
-            <span aria-hidden="true">{mapIcon}</span>
-            View Map
-          </button>
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={onViewMap}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+            >
+              <span aria-hidden="true">{mapIcon}</span>
+              View Map
+            </button>
+          </div>
         )}
         {results && <div className="mt-6 border-t border-slate-100 pt-6">{results}</div>}
       </div>
