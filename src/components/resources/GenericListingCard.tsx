@@ -231,7 +231,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         <span aria-hidden="true" className="text-slate-300">|</span>
       )}
       {travel.length > 0 ? (
-        <div className={`flex flex-col ${stacked ? 'items-end' : 'items-start'} gap-0.5 whitespace-nowrap`}>
+        <div className={`flex flex-col ${stacked ? 'items-end' : 'items-start'} gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap`}>
           {travel.map((t) => <span key={t}>{t}</span>)}
         </div>
       ) : showDistanceSlot ? (
@@ -260,7 +260,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           // ~33px; the negative margin cancels it out of the layout so the
           // row's height doesn't shift. Same technique, and same reason, as
           // the chevron above.
-          className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-muted transition-colors hover:text-slate-600 cursor-pointer"
+          className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer"
         >
           <span aria-hidden="true">📍</span>
           <span aria-hidden="true">—</span>
@@ -608,7 +608,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 alongside the name rather than a fact competing with the
                 address line below for space. */}
             {hasUpvoteRow && (
-              <div className="desktop:hidden flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600">
+              <div className="desktop:hidden flex flex-col items-end gap-0.5">
                 {renderUpvoteDistanceContent(true)}
               </div>
             )}
