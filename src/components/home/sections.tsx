@@ -392,9 +392,18 @@ export function searchListings(
 export function PlacesResults({
   hits,
   onOpen,
+  showDistanceSlot,
 }: {
   hits: ListingHit[]
   onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
+  /** No location set yet — hold each distance-based hit's distance column
+   *  open with a tappable placeholder instead of omitting it, same as
+   *  GenericDirectory's own `addressPrompt` (see GenericListingCard's
+   *  `showDistanceSlot` doc). A mixed-category list can mix distance-based
+   *  hits with ones that have no address at all (e.g. WhatsApp groups), so
+   *  this is combined per-hit with that hit's own `category.hasAddress`
+   *  rather than applied blindly to every card. */
+  showDistanceSlot?: boolean
 }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
 
@@ -403,23 +412,29 @@ export function PlacesResults({
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Places
       </h2>
-      <div className="space-y-2">
+      {/* desktop: a grid instead of a single column, same reasoning (and same
+          track-sizing pitfalls, already solved once) as GenericDirectory's
+          own listing grid — see that component's own doc for why
+          auto-fill/minmax/1fr, not a fixed column count or auto-fit. */}
+      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
         {hits.map((hit) => (
-          <GenericListingCard
-            key={hit.item.id}
-            item={hit.item}
-            category={hit.category}
-            upvotes={!!hit.category.upvotesEnabled}
-            count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-            onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-            onTagClick={(tag) => onOpen({ ...hit, term: tag })}
-            onNameClick={() => onOpen(hit)}
-            onFilterOpen={() => onOpen(hit)}
-            onFilterBool={() => onOpen(hit)}
-            onFilterSelect={() => onOpen(hit)}
-            onEdit={() => onOpen(hit, 'edit')}
-            onReport={() => onOpen(hit, 'report')}
-          />
+          <div key={hit.item.id} className="desktop:max-w-md">
+            <GenericListingCard
+              item={hit.item}
+              category={hit.category}
+              showDistanceSlot={!!showDistanceSlot && hit.category.hasAddress !== false}
+              upvotes={!!hit.category.upvotesEnabled}
+              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
+              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
+              onNameClick={() => onOpen(hit)}
+              onFilterOpen={() => onOpen(hit)}
+              onFilterBool={() => onOpen(hit)}
+              onFilterSelect={() => onOpen(hit)}
+              onEdit={() => onOpen(hit, 'edit')}
+              onReport={() => onOpen(hit, 'report')}
+            />
+          </div>
         ))}
       </div>
     </section>

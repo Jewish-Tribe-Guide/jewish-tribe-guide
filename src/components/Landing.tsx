@@ -181,7 +181,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       Nothing matches “{q}”. Try a different word or clear the filter.
     </p>
   )
-  const placesNode = placeHits.length > 0 && <PlacesResults hits={placeHits} onOpen={openPlace} />
+  // No location set yet — same signal GenericDirectory's own addressPrompt
+  // uses to hold each distance-based card's distance column open with a
+  // placeholder instead of omitting it outright (see PlacesResults' own doc).
+  const placesNode = placeHits.length > 0 && (
+    <PlacesResults hits={placeHits} onOpen={openPlace} showDistanceSlot={!anchor.label} />
+  )
 
   // Mobile's own permanent grid — this doubles as its whole "browse
   // everything", not just search results, so it always renders regardless
@@ -275,16 +280,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-        {/* ── Search + Browse everything (desktop), one card ────────────────
+        {/* ── Browse everything + Search (desktop), one card ────────────────
                 These used to be two separate white boxes stacked with a gap
                 between them, but they're really one thing to a visitor: "how
-                do I find what I need" — type it, or scan the flat list below.
-                Sharing a card says that. `SearchSection` renders `bare` here
-                (no card/section shell of its own) so it mounts once, as a
-                stable sibling of the Browse-everything block below, and
-                never gets swapped out as a whole subtree when `q` changes —
-                that would unmount the input mid-keystroke and drop focus.
-                Only the divider + Browse-everything content toggle.
+                do I find what I need" — scan the flat list, or type it below.
+                Sharing a card with no divider between them says that; Browse
+                everything leads because it's the primary way most visitors
+                get around, and stacked spacing (not a border) keeps them
+                reading as one continuous card rather than two sections
+                glued together. `SearchSection` renders `bare` here (no
+                card/section shell of its own) so it mounts once, as a stable
+                sibling of the Browse-everything block above, and never gets
+                swapped out as a whole subtree when `q` changes — that would
+                unmount the input mid-keystroke and drop focus.
 
                 Browse everything itself is a flat, always-visible grid of
                 every card: every real category, Patient & Family Support,
@@ -317,15 +325,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 a pair, not a third full-width peer section. */}
         <section className="mt-8 hidden desktop:block">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-            <SearchSection
-              bare
-              heroTitle={settings.heroTitle}
-              query={query}
-              onQueryChange={setQuery}
-              results={!isMobile ? desktopResultsNode : undefined}
-            />
             {!isMobile && !q && (
-              <div className={ui.search.landing ? 'mt-6 border-t border-slate-100 pt-6' : ''}>
+              <div className={ui.search.landing ? 'mb-6' : ''}>
                 <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
                 <CompactCardGrid
                   cards={loading ? entryCards : (filtered ?? [])}
@@ -334,6 +335,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 />
               </div>
             )}
+            <SearchSection
+              bare
+              heroTitle={settings.heroTitle}
+              query={query}
+              onQueryChange={setQuery}
+              results={!isMobile ? desktopResultsNode : undefined}
+            />
           </div>
         </section>
 
