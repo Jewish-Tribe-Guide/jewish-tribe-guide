@@ -22,11 +22,11 @@ afterEach(() => {
 // HomeBreak's Edit/Report step — a direct listing search (not a category
 // picker; see ContributePicker, Add-only now), reusing the exact search the
 // homepage's own hero search already does across every category. What
-// matters: nothing shows before typing (this isn't "browse everything"
-// again), a match's category renders alongside its name as a disambiguator,
-// only listings whose category actually allows the action show up, and
-// picking one deep-links straight into that listing's Edit/Report form —
-// the same `findView`/`findItemId`/`findAction` navigation a search
+// matters: before typing, a "browse by category" fallback shows instead of
+// a dead empty box, a match's category renders alongside its name as a
+// disambiguator, only listings/categories whose action is actually enabled
+// show up, and picking a listing deep-links straight into its Edit/Report
+// form — the same `findView`/`findItemId`/`findAction` navigation a search
 // result's own Edit/Report button already uses elsewhere.
 
 function renderPicker(
@@ -44,12 +44,37 @@ function renderPicker(
 }
 
 describe('EditReportPicker', () => {
-  it('shows nothing until a name is typed', () => {
+  it('shows a "browse by category" fallback before typing, not an empty box', () => {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     renderPicker('edit', [makeListing({ id: 'l1', name: 'Acme Grocery', category: 'grocery' })], [grocery])
 
-    expect(screen.getByText(/Start typing/)).toBeInTheDocument()
+    expect(screen.getByText('Or browse by category')).toBeInTheDocument()
+    expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.queryByText('Acme Grocery')).not.toBeInTheDocument()
+  })
+
+  it('the fallback only lists categories where the action is actually enabled', () => {
+    const noEdit = makeCategory({
+      id: 'synagogue',
+      pluralLabel: 'Synagogues',
+      capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true },
+    })
+    renderPicker('edit', [], [noEdit])
+
+    expect(screen.getByText('Start typing a business name.')).toBeInTheDocument()
+    expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
+  })
+
+  it('picking a category from the fallback opens that category and closes', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderPicker('edit', [], [grocery], onClose)
+
+    await user.click(screen.getByText('Grocery Stores'))
+
+    expect(mockRouter.push).toHaveBeenCalledWith(expect.stringContaining('/grocery'))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('shows a matching listing with its category as a disambiguator, once typed', async () => {

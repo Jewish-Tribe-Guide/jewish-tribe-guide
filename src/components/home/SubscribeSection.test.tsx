@@ -28,21 +28,50 @@ const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
 const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
 
 describe('SubscribeSection', () => {
-  it('defaults to "All categories" checked, with the per-category list hidden', () => {
+  it('defaults to a closed "All categories" picker', () => {
     renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
 
-    expect(screen.getByRole('checkbox', { name: 'All categories' })).toBeChecked()
+    expect(screen.getByRole('button', { name: /All categories/ })).toBeInTheDocument()
     expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument()
   })
 
-  it('unchecking "All categories" reveals the per-category checkboxes', async () => {
+  it('opening the picker shows every category, checking one switches the button label to a count', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
 
-    await user.click(screen.getByRole('checkbox', { name: 'All categories' }))
-
+    await user.click(screen.getByRole('button', { name: /All categories/ }))
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.getByText('Synagogues')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Grocery Stores'))
+    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument()
+  })
+
+  // The picker used to have no independent "closed" state — the only way
+  // to collapse the list was re-checking "All categories", which threw
+  // away whatever specific categories had just been picked. Closing it now
+  // (Escape, or a click outside) must leave the selection intact.
+  it('closing the picker (Escape) keeps the picked categories, not resetting to "All categories"', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
+
+    await user.click(screen.getByRole('button', { name: /All categories/ }))
+    await user.click(screen.getByText('Grocery Stores'))
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument() // panel closed
+    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument() // selection survived
+  })
+
+  it('checking "All categories" inside the picker clears any specific picks', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
+
+    await user.click(screen.getByRole('button', { name: /All categories/ }))
+    await user.click(screen.getByText('Grocery Stores'))
+    await user.click(screen.getByRole('checkbox', { name: 'All categories' }))
+
+    expect(screen.getByRole('button', { name: /All categories/ })).toBeInTheDocument()
   })
 
   it('submits categories: null when "All categories" stays checked', async () => {
@@ -65,14 +94,15 @@ describe('SubscribeSection', () => {
     expect(await screen.findByText(/You're subscribed/)).toBeInTheDocument()
   })
 
-  it('submits only the picked categories once "All categories" is unchecked', async () => {
+  it('submits only the picked categories once specific ones are chosen', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
 
     await user.type(screen.getByLabelText('Email address'), 'person@example.com')
-    await user.click(screen.getByRole('checkbox', { name: 'All categories' }))
+    await user.click(screen.getByRole('button', { name: /All categories/ }))
     await user.click(screen.getByText('Grocery Stores'))
+    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'Subscribe' }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))

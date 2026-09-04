@@ -173,25 +173,21 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       ? configuredBuiltIns
       : (['zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
-  // The same result set two different homes render, depending on breakpoint:
-  // mobile shows it always (this doubles as its whole "browse everything"),
-  // desktop only once there's a query, inside SearchSection's own white box
-  // (see that component's own doc on why — a search whose answer shows up
-  // somewhere else on the page reads as disconnected). Built once here and
-  // handed to whichever one actually mounts it, so the cards (real images,
-  // not free) render exactly once rather than twice — unlike Browse
-  // everything/the map, an `isMobile` JS branch decides which one that is
-  // rather than a CSS-only dual render, and it's safe to: this content only
-  // ever needs to be right once a visitor has typed (mobile's own copy is
-  // the exception, see below), by which point hydration has long finished
-  // resolving `isMobile` for real.
-  const resultsNode = (
+  // Shared between mobile's permanent grid and desktop's search results —
+  // see below for why the two don't share one JSX node any more.
+  const noMatchesMessage = q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
+    <p className="text-center text-sm text-slate-500">
+      Nothing matches “{q}”. Try a different word or clear the filter.
+    </p>
+  )
+  const placesNode = placeHits.length > 0 && <PlacesResults hits={placeHits} onOpen={openPlace} />
+
+  // Mobile's own permanent grid — this doubles as its whole "browse
+  // everything", not just search results, so it always renders regardless
+  // of `q`. Full CardGrid tiles, unchanged from before.
+  const mobileResultsNode = (
     <>
-      {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-        <p className="text-center text-sm text-slate-500">
-          Nothing matches “{q}”. Try a different word or clear the filter.
-        </p>
-      )}
+      {noMatchesMessage}
       {loading ? (
         <CardGrid cards={entryCards} loadingCount={6} />
       ) : (
@@ -202,9 +198,34 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           </div>
         ))
       )}
-      {placeHits.length > 0 && <PlacesResults hits={placeHits} onOpen={openPlace} />}
+      {placesNode}
     </>
   )
+
+  // Desktop's own copy, shown only once there's a query, inside
+  // SearchSection's own white box (see that component's own doc on why — a
+  // search whose answer shows up somewhere else on the page reads as
+  // disconnected). CompactCardGrid, not CardGrid: search results used to
+  // fall back to the heavier photo-tile grid mobile uses, which read as a
+  // jarring style switch from Browse everything's own small icon-avatar
+  // rows the moment you typed anything — this keeps desktop looking like
+  // desktop whether you're browsing or searching.
+  const desktopResultsNode = q ? (
+    <>
+      {noMatchesMessage}
+      {sections.map((s) => (
+        <div key={s.title}>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">{s.title}</h2>
+          <CompactCardGrid
+            cards={s.cards}
+            categories={categories}
+            onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+          />
+        </div>
+      ))}
+      {placesNode}
+    </>
+  ) : undefined
 
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
@@ -245,7 +266,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         onOpenCard={(card) => card.go()}
       />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
+      {/* pb-24 clears mobile's fixed bottom tab bar so the last card isn't
+          hidden behind it — desktop has no such bar, so that padding just
+          stacked on top of the footer's own mt-16/border-t below, leaving a
+          much bigger gap after the last section than the footer intended. */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
@@ -258,7 +283,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           heroTitle={settings.heroTitle}
           query={query}
           onQueryChange={setQuery}
-          results={!isMobile && q ? resultsNode : undefined}
+          results={!isMobile ? desktopResultsNode : undefined}
         />
 
         {/* ── Browse everything (desktop) — a flat, always-visible grid of
@@ -330,9 +355,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           if (kind === 'map') {
             // The real full map screen, right on the home screen. Desktop
             // only: mobile reaches the same map via its own tab bar entry, so
-            // it's dropped from this scroll to avoid showing it twice. Hidden
-            // while searching so results aren't pushed below a full-height
-            // map. `scroll-mt` clears the sticky site header, so scrolling
+            // it's dropped from this scroll to avoid showing it twice. Stays
+            // up while searching, unlike Browse everything above it — search
+            // results are now their own thing (see SearchSection's own
+            // `results` slot), not something this needs to make room for by
+            // disappearing; the map is independent content, not an answer to
+            // what was typed. `scroll-mt` clears the sticky site header, so scrolling
             // this band into view (arriving from a collapsed fullscreen map)
             // doesn't tuck its heading underneath it.
             //
@@ -349,7 +377,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // fullscreen expand-in-place transition either: fullscreen goes
             // `fixed inset-0`, which escapes this ancestor's overflow/rounding
             // entirely regardless of what wraps it.
-            return hasMap && !q && (
+            return hasMap && (
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
                 <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
                   <h2 className="px-5 pt-5 pb-4 text-lg font-semibold text-slate-900">{title}</h2>
@@ -379,7 +407,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           // The one-frame correction is the cheaper error here, and nothing
           // above the fold moves when it happens.
           return (
-            !isMobile && !q && zmanimCategory && (
+            !isMobile && zmanimCategory && (
               <HomeBreak
                 key="zmanim"
                 coords={coords ?? community.mapCenter}
@@ -392,20 +420,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── Stay in the loop — desktop only, bottom of the page's own
                 content (after all three of the reorderable blocks above,
                 regardless of their admin-configured order) — see
-                SubscribeSection's own doc. Hidden while searching, same as
-                Browse everything/the map above it. ─────────────────────── */}
-        {!isMobile && !q && <SubscribeSection />}
+                SubscribeSection's own doc. Stays up while searching too,
+                same as the map/Zmanim above it — see that block's own note
+                on why only Browse everything (the one thing search results
+                actually replace) hides. ──────────────────────────────── */}
+        {!isMobile && <SubscribeSection />}
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search
                 narrows each section's cards and hides any section left
-                empty. Desktop's own copy of this same content now lives
-                inside SearchSection above instead — see resultsNode's own
-                doc on why this stays a plain CSS `desktop:hidden`, not an
-                isMobile branch: mobile needs this correct on the very first
-                paint, with no prior interaction, which only a CSS media
-                query (not a value React doesn't know for certain until
-                after hydration) can guarantee. ───────────────────────────── */}
-        <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{resultsNode}</section>
+                empty. Desktop's own copy of this same content (styled
+                differently — see desktopResultsNode's own doc) lives inside
+                SearchSection above instead. Plain CSS `desktop:hidden`, not
+                an isMobile branch: mobile needs this correct on the very
+                first paint, with no prior interaction, which only a CSS
+                media query (not a value React doesn't know for certain
+                until after hydration) can guarantee. ─────────────────────── */}
+        <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>
       </main>
     </>
   )
