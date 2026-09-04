@@ -181,12 +181,6 @@ export default function SubscribeSection() {
                     aria-expanded={pickerOpen}
                     className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-primary text-[10px] text-white"
-                    >
-                      ✓
-                    </span>
                     {allCategories ? 'All categories' : `${selected.length} checked`}
                     <span aria-hidden="true" className="text-slate-400">
                       {pickerOpen ? '▲' : '▼'}
