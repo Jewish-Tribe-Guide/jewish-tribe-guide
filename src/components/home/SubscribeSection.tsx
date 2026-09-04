@@ -179,7 +179,7 @@ export default function SubscribeSection() {
                     type="button"
                     onClick={() => setPickerOpen((o) => !o)}
                     aria-expanded={pickerOpen}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    className="flex cursor-pointer items-center gap-1 text-sm text-slate-700 transition-colors hover:text-slate-900"
                   >
                     {allCategories ? 'All categories' : `${selected.length} checked`}
                     <span aria-hidden="true" className="text-slate-400">
