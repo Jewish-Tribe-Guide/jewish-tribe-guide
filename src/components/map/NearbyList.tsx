@@ -325,7 +325,20 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
   return (
     <div
       ref={wrapperRef}
-      className="relative overflow-hidden bg-white touch-pan-y"
+      // overscroll-x-none, not just the sidebar's own overscroll-contain
+      // (see ResourceMapView): `contain` stops a real scroll from chaining
+      // to an ancestor once it hits ITS OWN boundary, but this row has no
+      // horizontal scroll range to begin with, so there's no boundary for
+      // it to "hit" — the browser's swipe-navigation gesture recognizer
+      // (the elastic full-page slide during a trackpad swipe, distinct from
+      // actually completing a navigation) isn't a scroll-chaining question
+      // at all, and doesn't reliably back off just because the wheel event
+      // was preventDefault()'d down here. `none` opts this element's own
+      // axis fully out of the browser's native overscroll handling,
+      // independent of scroll chaining — the documented way sites suppress
+      // exactly this "whole page rubber-bands during a horizontal gesture"
+      // glitch (Gmail, X/Twitter, etc. do the same for their own swipe UI).
+      className="relative overflow-hidden overscroll-x-none bg-white touch-pan-y"
       // Pointer handlers live here, not on the content div below, for the
       // same reason the wheel listener moved up (see its own comment): once
       // a row is open, a swipe/drag starting over the revealed Pin/Share
