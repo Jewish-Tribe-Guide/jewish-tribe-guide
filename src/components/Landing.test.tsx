@@ -23,7 +23,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// HomeMap and ZmanimStrip are mocked out — both pull in real network/SDK
+// HomeMap and HomeBreak are mocked out — both pull in real network/SDK
 // dependencies of their own (Google Maps, the uncached /api/zmanim fetch)
 // that are their own components' concerns, not Landing's. What's under test
 // here is Landing's own composition/filtering logic: which sections render,
@@ -34,12 +34,12 @@ vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('@/components/home/HomeMap', () => ({
   default: () => <div data-testid="home-map-stub" />,
 }))
-vi.mock('@/components/home/ZmanimStrip', () => ({
-  // Renders the real `title` prop (unlike coords/locationLabel, which pull
-  // in the network dependency this mock exists to avoid) — Landing passes
-  // the admin-renamed topic title through here, and a test needs to see it
-  // to prove that wiring, not just that the stub is present.
-  default: ({ title }: { title: string }) => <div data-testid="zmanim-strip-stub">{title}</div>,
+vi.mock('@/components/home/HomeBreak', () => ({
+  // HomeBreak dropped the admin-renamed `title` prop entirely (it's the
+  // quiet, unheaded break now — see its own doc on why showing a topic
+  // title there would undo the point), so unlike the old ZmanimStrip mock
+  // this stub has nothing to prove beyond "it rendered".
+  default: () => <div data-testid="home-break-stub" />,
 }))
 
 afterEach(() => {
@@ -92,8 +92,11 @@ describe('Landing', () => {
       },
     })
 
-    expect(screen.getByText('Welcome to the directory')).toBeInTheDocument()
-    expect(screen.getByText('Everything nearby')).toBeInTheDocument()
+    // getAllByText, not getByText: HeroHeading renders both its mobile and
+    // desktop layouts in the DOM at once (toggled by CSS, not JS — see that
+    // component's own doc), so the heading/mission text exists twice.
+    expect(screen.getAllByText('Welcome to the directory').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Everything nearby').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
@@ -103,7 +106,13 @@ describe('Landing', () => {
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    await user.type(screen.getByLabelText('Search resources'), 'grocery')
+    // getAllByLabelText, not getByLabelText: HeroHeading now renders the
+    // search box twice in the DOM (mobile's plain block and desktop's warm
+    // band), toggled with `desktop:hidden`/`hidden desktop:` classes rather
+    // than a JS branch — see that component's own doc on why. jsdom doesn't
+    // apply CSS, so both are genuinely present; either one drives the same
+    // Landing state, so the first is as good as any for a test.
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
@@ -113,7 +122,7 @@ describe('Landing', () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
 
-    await user.type(screen.getByLabelText('Search resources'), 'xyznotreal')
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal')
 
     expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
   })
@@ -136,14 +145,14 @@ describe('Landing', () => {
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
   })
 
-  it('renders the zmanim strip only when the community has a zmanim pseudo-category', () => {
+  it('renders the zmanim break only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
-    expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
+    expect(screen.getByTestId('home-break-stub')).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    expect(screen.queryByTestId('zmanim-strip-stub')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-break-stub')).not.toBeInTheDocument()
   })
 
   describe('the gateway block order (Explore the map / Zmanim & Shabbos)', () => {
@@ -162,7 +171,7 @@ describe('Landing', () => {
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      expect(html.indexOf('data-testid="home-break-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
     })
 
     it('follows the admin-configured order — zmanim before map', () => {
@@ -178,10 +187,13 @@ describe('Landing', () => {
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      expect(html.indexOf('data-testid="home-break-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
     })
 
-    it('renders an admin-renamed topic’s own title, not the built-in default', () => {
+    // Only the map half of this is still meaningful — HomeBreak dropped the
+    // admin-renamed title entirely (it's the quiet, unheaded break now), so
+    // an admin renaming that block has nothing left to prove on screen.
+    it('renders the map’s admin-renamed title, not the built-in default', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
@@ -194,7 +206,6 @@ describe('Landing', () => {
 
       expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Explore the map' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('zmanim-strip-stub')).toHaveTextContent('Shabbos Times')
     })
 
     it('hides a built-in block that was configured out (removed), even though its category exists', () => {
@@ -205,7 +216,7 @@ describe('Landing', () => {
         },
       })
 
-      expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
+      expect(screen.getByTestId('home-break-stub')).toBeInTheDocument()
       expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
     })
   })
@@ -253,7 +264,7 @@ describe('Landing', () => {
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
       expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
-      await user.type(screen.getByLabelText('Search resources'), 'grocery')
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
       expect(screen.queryByRole('heading', { name: 'Browse everything' })).not.toBeInTheDocument()
     })
 

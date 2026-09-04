@@ -8,7 +8,7 @@ import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
 import FeaturedCards from '@/components/home/FeaturedCards'
-import ZmanimStrip from '@/components/home/ZmanimStrip'
+import HomeBreak from '@/components/home/HomeBreak'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -54,12 +54,16 @@ export type LandingProps = {
 //
 //   Desktop — section tabs (hover mega-menus, kept alongside the grid below
 //   rather than replaced by it — see the "keep it just in case" note on the
-//   grid itself) → hero + search → a flat "Browse everything" grid (every
-//   card, always visible, no hover needed) → "Popular right now" (three
-//   featured cards) → Zmanim & Shabbos → "Explore the map" → footer, each
-//   labeled so the page reads as distinct sections rather than one long
-//   blur. The full card index also lives on its own page (AllCategories),
-//   reachable from the tabs or the "Browse all categories" button.
+//   grid itself) → a two-column warm hero (headline + mission + search
+//   beside a photo, see HeroHeading) → "Popular right now" if an admin has
+//   re-added it (off by default — see builtInOrder) → a flat "Browse
+//   everything" grid, full weight (every card, always visible, no hover
+//   needed) → HomeBreak, a quiet, unheaded strip (trimmed Zmanim + one line
+//   on who keeps the site current) that reads as a pause between the two
+//   main sections rather than a third one → "Explore the map", matching
+//   Browse everything's full weight → footer. The full card index also
+//   lives on its own page (AllCategories), reachable from the tabs or the
+//   "Browse all categories" button.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that). A phone has no tab bar to reach an
@@ -296,25 +300,24 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
               </div>
             )
           }
-          // Zmanim & Shabbos — the full card's content (not a trimmed
-          // preview), contained to the same max-w-6xl width as the map and
-          // category grid above it. Falls back to the community center so it
-          // renders something real before the visitor has set an address.
-          // Still a JS branch, unlike the other two, and deliberately:
-          // ZmanimStrip calls useZmanim, which fetches /api/zmanim —
-          // uncached, straight through to Hebcal. Rendering it and hiding it
-          // with `sm:` would cost every phone visitor a round-trip for a
-          // section they never see. CSS should own a layout difference; it
-          // shouldn't own one that costs a request. The one-frame correction
-          // is the cheaper error here, and nothing above the fold moves when
-          // it happens.
+          // Zmanim & Shabbos — HomeBreak's trimmed, unheaded strip here
+          // (see its own doc), not the full daily grid the real Zmanim &
+          // Shabbos category page shows. Falls back to the community
+          // center so it renders something real before the visitor has set
+          // an address. Still a JS branch, unlike the other two, and
+          // deliberately: HomeBreak calls useZmanim, which fetches
+          // /api/zmanim — uncached, straight through to Hebcal. Rendering it
+          // and hiding it with `sm:` would cost every phone visitor a
+          // round-trip for a section they never see. CSS should own a
+          // layout difference; it shouldn't own one that costs a request.
+          // The one-frame correction is the cheaper error here, and nothing
+          // above the fold moves when it happens.
           return (
             !isMobile && !q && zmanimCategory && (
-              <ZmanimStrip
+              <HomeBreak
                 key="zmanim"
                 coords={coords ?? community.mapCenter}
                 locationLabel={zmanimLocationLabel}
-                title={title}
               />
             )
           )
