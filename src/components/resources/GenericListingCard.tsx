@@ -226,7 +226,26 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // side-by-side.
   const renderUpvoteDistanceContent = (stacked: boolean) => (
     <>
-      {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
+      {upvotes && (
+        stacked ? (
+          // Wrapped in a plain block div, not rendered as a bare flex item —
+          // found by diffing computed styles against production directly:
+          // prod wraps this exact button in the same div (there for an
+          // unrelated desktop reason — a fixed-width column so counts align
+          // across a row — that doesn't apply to this stacked corner), and
+          // the button's own -m-2 negative margin collapses through a plain
+          // block parent in a way it never does across a flex boundary. The
+          // visible effect is a taller stat stack with more breathing room
+          // between the two lines; without this wrapper the button sits
+          // directly as a flex item and that collapse can't happen, which is
+          // exactly the "prod has more space" gap reported against this.
+          <div className="desktop:flex desktop:w-10 desktop:justify-end">
+            <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+          </div>
+        ) : (
+          <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
+        )
+      )}
       {!stacked && upvotes && (travel.length > 0 || showDistanceSlot) && (
         <span aria-hidden="true" className="text-slate-300">|</span>
       )}
