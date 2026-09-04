@@ -25,7 +25,7 @@ type Props = {
   subtitle: string | null
   /** The card's own Open/closure/filterable-badge row, already built by
    *  GenericListingCard — restated here since the card behind this dialog
-   *  sits under its backdrop blur. See that component's `badgeRow` comment
+   *  sits under its dim backdrop. See that component's `badgeRow` comment
    *  for why this is passed rather than recomputed. */
   badgeRow: ReactNode
   headerBadgeKeys: string[]
@@ -132,7 +132,7 @@ export default function ListingDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
