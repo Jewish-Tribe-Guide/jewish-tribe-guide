@@ -322,7 +322,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 a pair, not a third full-width peer section. */}
         <section className="mt-8 hidden desktop:block">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
+            <h2 className="mb-6 text-lg font-semibold text-slate-900">Browse everything</h2>
             <SearchSection
               bare
               showHeading={false}
