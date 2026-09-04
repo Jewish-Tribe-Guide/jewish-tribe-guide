@@ -220,7 +220,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
     .filter((x): x is { f: CategoryField; text: string } => !!x.text)
-  const headerTextIsMultiline = headerTextFields.some(({ f }) => f.type === 'textarea')
   // Not a `line-clamp-3` className on the same element as `hidden
   // desktop:block` — line-clamp needs `display: -webkit-box` to do
   // anything at all (confirmed live: every -webkit-line-clamp/box-orient/
@@ -232,14 +231,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // removed from the classes doing responsive show/hide, so the two
   // display values are never fighting over the same element to begin with.
   const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' } as const
-  // Whether the CATEGORY has this field at all, independent of whether THIS
-  // item filled it in. In the desktop grid, cards in the same row stretch to
-  // match the tallest one (see the card's own h-full comment) — but only the
-  // outer box, not where each line of content falls inside it, so one card
-  // having this line and its row-mate not having it still left their badge
-  // rows starting at different heights, the divider above the badges landing
-  // a whole line apart between neighbors. See the spacer below.
-  const hasHeaderTextField = fields.some((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
 
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
@@ -484,32 +475,27 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 vs. scannable chips). Hidden on mobile: on a narrow card this
                 can run to 2-3 lines. The desktop:hidden twin further down
                 renders it instead, outside this row.
-                invisible, not omitted, when the category has this field but
-                THIS listing left it blank — see hasHeaderTextField's own
-                comment: reserves the same line so a shorter card's badge
-                row still starts at the same height as its grid row-mates. */}
-            {headerTextFields.length > 0 ? (
-              headerTextFields.map(({ f, text }) =>
-                f.type === 'textarea' ? (
-                  <p key={f.key} className="hidden desktop:block text-sm text-slate-600 mt-2">
-                    <span style={headerTextClampStyle}>{text}</span>
-                  </p>
-                ) : (
-                  <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
-                ),
-              )
-            ) : hasHeaderTextField ? (
-              // A single word never actually wraps to 3 lines on its own —
-              // line-clamp only bounds overflow, it doesn't force a height —
-              // so the multi-line case needs an explicit min-height to
-              // reserve the same space a real 3-line description would.
-              <p
-                aria-hidden="true"
-                className={`invisible hidden desktop:block text-sm text-slate-600 mt-2 ${headerTextIsMultiline ? 'min-h-[3.75rem]' : 'truncate'}`}
-              >
-                placeholder
-              </p>
-            ) : null}
+                No invisible placeholder any more when this listing left the
+                field blank — that used to reserve a category-wide guessed
+                height (see git history), which meant EVERY card in a
+                category paid for it the moment ANY listing had this field
+                filled in, whether or not that card's own row-mates did.
+                GenericDirectory's row-alignment pass (see its own alignRows
+                doc) now measures actual rendered height per row and pads
+                only the cards that fall short of their row's tallest
+                natural card — a blank field here just means less natural
+                height, exactly like a short name does, and the same real
+                measurement handles both instead of two different
+                mechanisms guessing at the same problem. */}
+            {headerTextFields.map(({ f, text }) =>
+              f.type === 'textarea' ? (
+                <p key={f.key} className="hidden desktop:block text-sm text-slate-600 mt-2">
+                  <span style={headerTextClampStyle}>{text}</span>
+                </p>
+              ) : (
+                <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
+              ),
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
