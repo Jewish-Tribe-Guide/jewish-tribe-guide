@@ -505,13 +505,31 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         // which is exactly what read as "the whole card isn't clickable."
         className={`h-full w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
-        <div className="flex items-start gap-3">
+        {/* items-center, not items-start, on mobile: the row's only ever
+            2 lines there (name + subtitle — headerTextFields below is
+            `hidden desktop:block`, so the 3-line case items-start exists for
+            never reaches mobile at all), and centering is what makes the
+            trailing upvote/distance/chevron column read as lined up against
+            the name+address block instead of pinned to its top corner (this
+            exact "ours looks higher than it should" complaint already
+            happened once — see fb8113f, reverted by a later desktop-grid fix
+            that reapplied items-start unconditionally). desktop:items-start
+            is for the desktop grid instead: a header text field DOES render
+            there, occasionally making this block 3 lines instead of 2, and
+            without items-start the icon (and the trailing column) drift
+            toward the middle of that taller block instead of staying
+            anchored near the name's own line. */}
+        <div className="flex items-center desktop:items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
-              thing here and on the map. mt-0.5 nudges it those last couple
-              pixels: the name's own line-height leaves a little leading
-              above the visible text, so even with matching box tops the
-              glyph itself starts lower than the icon. */}
+              thing here and on the map. self-start (overriding the row's own
+              items-center on mobile, and reinforcing its own items-start on
+              desktop) keeps it pinned near the name's own line regardless of
+              how tall the block next to it gets — an avatar anchored to the
+              title reads right at any height. mt-0.5 nudges it those last
+              couple pixels: the name's own line-height leaves a little
+              leading above the visible text, so even with matching box tops
+              the glyph itself starts lower than the icon. */}
           <CategoryIcon
             icon={category.icon}
             categoryId={category.id}
