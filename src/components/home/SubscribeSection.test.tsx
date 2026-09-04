@@ -110,6 +110,22 @@ describe('SubscribeSection', () => {
     expect(body.categories).toEqual(['grocery'])
   })
 
+  it('refuses to submit with zero categories checked (picked then unpicked, without re-checking "All categories")', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch({ ok: true })
+    renderWithProviders(<SubscribeSection />, { content: { categories: [grocery] } })
+
+    await user.type(screen.getByLabelText('Email address'), 'person@example.com')
+    await user.click(screen.getByRole('button', { name: /All categories/ }))
+    await user.click(screen.getByText('Grocery Stores')) // pick
+    await user.click(screen.getByText('Grocery Stores')) // unpick — 0 left, still not "All categories"
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Subscribe' }))
+
+    expect(screen.getByText('Pick at least one category, or choose "All categories".')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('refuses to submit when both New listings and Closures are unchecked', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })

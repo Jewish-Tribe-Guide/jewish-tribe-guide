@@ -81,6 +81,15 @@ export default function SubscribeSection() {
       setError('Pick at least one thing to be notified about.')
       return
     }
+    // Reachable by unchecking every individual category without re-checking
+    // "All categories" — the server would quietly treat an empty list as
+    // "all" anyway (see subscriberStore's own upsert), but submitting that
+    // silently is worse than just asking for a real choice: the button
+    // would read "0 checked" for a subscription that's actually unlimited.
+    if (!allCategories && selected.length === 0) {
+      setError('Pick at least one category, or choose "All categories".')
+      return
+    }
 
     setSubmitting(true)
     try {

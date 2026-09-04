@@ -161,7 +161,7 @@ export default function HomeBreak({
       )}
       {contributeAction === 'create' && <ContributePicker onClose={() => setContributeAction(null)} />}
       {(contributeAction === 'edit' || contributeAction === 'report') && (
-        <EditReportPicker action={contributeAction} coords={coords} onClose={() => setContributeAction(null)} />
+        <EditReportPicker action={contributeAction} onClose={() => setContributeAction(null)} />
       )}
     </div>
   )
