@@ -258,7 +258,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         : travelCompare(a, b)
     })
 
-  // Aligns each visual row's badge rows to the same height — real per-card
+  // Aligns each visual row's content to the same height — real per-card
   // measurement (see GenericListingCardHandle's own doc), not a guess based
   // on name length or anything else static. An earlier version reserved a
   // fixed 2-line name height across an entire CATEGORY the moment any one
@@ -266,10 +266,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the name and address on every OTHER card in that category too, most of
   // which were nowhere near the actual long-named listing and never needed
   // it. This only ever adjusts a card that's actually sharing a row with a
-  // taller one, and never touches the name/address gap at all — the spacer
-  // sits between the address/header-text block and the badge row (see
-  // GenericListingCard's own placement), matching where the existing
-  // header-text placeholder already reserves space for the same reason.
+  // taller one, and never touches the name/address gap at all.
+  //
+  // Two independent spacer segments, not one — the popularity/distance LINE
+  // itself needs to land at the same height across a row (not just the
+  // badges further down it), so the single old spacer (address/header-text
+  // block → badge row) is split into segment 1 (→ upvote/distance row) and
+  // segment 2 (upvote/distance row → badge row). Segment 2 is measured and
+  // applied AFTER segment 1 is applied, not in the same pass — its "from"
+  // point is the upvote row's own rendered bottom edge, which shifts once
+  // segment 1's spacer above it changes height.
   //
   // Row membership is read from the DOM (itemRowRefs' own getBoundingClientRect
   // top, rounded, grouped) rather than computed from column count — this
@@ -278,12 +284,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // already laid it out.
   const filteredIds = filtered.map((item) => item.id).join(',')
   useLayoutEffect(() => {
-    function alignRows() {
-      // Reset every spacer first — a stale spacer from a previous pass
-      // (or a previous, wider layout) would otherwise inflate this pass's
-      // own reading of "natural" content height.
-      for (const item of filtered) cardRefs.current.get(item.id)?.setSpacerHeight(0)
-
+    function groupRows() {
       const rows = new Map<number, string[]>()
       for (const item of filtered) {
         const rowEl = itemRowRefs.current.get(item.id)
@@ -293,13 +294,49 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         if (existing) existing.push(item.id)
         else rows.set(top, [item.id])
       }
+      return [...rows.values()]
+    }
 
-      for (const ids of rows.values()) {
-        if (ids.length < 2) continue // nothing to align a lone card to
-        const heights = ids.map((id) => [id, cardRefs.current.get(id)?.measureContentHeight() ?? 0] as const)
+    function alignRows() {
+      // Reset every spacer first — a stale spacer from a previous pass
+      // (or a previous, wider layout) would otherwise inflate this pass's
+      // own reading of "natural" content height.
+      for (const item of filtered) {
+        cardRefs.current.get(item.id)?.setUpvoteSpacerHeight(0)
+        cardRefs.current.get(item.id)?.setBadgeSpacerHeight(0)
+      }
+
+      const rows = groupRows()
+
+      // Segment 1: card root → upvote/distance row. Only among cards that
+      // actually have one — a card with no upvote row has nothing to align
+      // at this segment, and gets its total height caught up entirely by
+      // segment 2 instead (measureBadgeGap falls back to the card root when
+      // there's no upvote row).
+      for (const ids of rows) {
+        if (ids.length < 2) continue
+        const heights = ids
+          .map((id) => [id, cardRefs.current.get(id)?.measureUpvoteRowOffset()] as const)
+          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
+        if (heights.length < 2) continue
         const max = Math.max(...heights.map(([, h]) => h))
         for (const [id, h] of heights) {
-          if (max - h > 0) cardRefs.current.get(id)?.setSpacerHeight(max - h)
+          if (max - h > 0) cardRefs.current.get(id)?.setUpvoteSpacerHeight(max - h)
+        }
+      }
+
+      // Segment 2: upvote/distance row's own bottom (or the card root, for
+      // a card with no upvote row) → badge row. Measured after segment 1 is
+      // applied, since it reads the upvote row's real rendered position.
+      for (const ids of rows) {
+        if (ids.length < 2) continue
+        const heights = ids
+          .map((id) => [id, cardRefs.current.get(id)?.measureBadgeGap()] as const)
+          .filter((pair): pair is [string, number] => pair[1] !== null && pair[1] !== undefined)
+        if (heights.length < 2) continue
+        const max = Math.max(...heights.map(([, h]) => h))
+        for (const [id, h] of heights) {
+          if (max - h > 0) cardRefs.current.get(id)?.setBadgeSpacerHeight(max - h)
         }
       }
     }

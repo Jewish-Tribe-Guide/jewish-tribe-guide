@@ -39,23 +39,35 @@ function shortAddress(addr: string): string {
  *  "currently open" state to lift without every card re-rendering on every
  *  other card's open/close.
  *
- *  measureContentHeight/setSpacerHeight are GenericDirectory's row-alignment
- *  pair — see its own alignRows doc for why this is a real per-row DOM
- *  measurement rather than a heuristic guess. */
+ *  The measure-and-set spacer-height pairs are GenericDirectory's row-alignment
+ *  mechanism — see its own alignRows doc for why this is a real per-row DOM
+ *  measurement, not a heuristic guess. Two independent SEGMENTS, not one
+ *  shared spacer: segment 1 is "icon/name/address/header text" (the part
+ *  that actually varies — a long name, a filled-in vs. blank header field),
+ *  segment 2 is "the upvote/distance row's own content" (normally the same
+ *  height everywhere, but travel text can still wrap for one listing and
+ *  not its row-mates). Aligning them separately is what makes the
+ *  popularity/distance LINE itself land at the same height across a row —
+ *  not just the badges below it — with the actual padding falling as a
+ *  real gap between the address block and that line, not a single lump
+ *  shoved in at the very bottom right before the badges. */
 export type GenericListingCardHandle = {
   open: () => void
   close: () => void
-  /** Pixel height of everything above the badge row (icon, name, address,
-   *  header text, upvote row) with this card's own spacer at 0 — null when
-   *  there's no badge row to align in the first place (nothing to measure
-   *  against). Callers must zero every card's spacer in the same pass
-   *  before measuring any of them, or an earlier card's stale spacer value
-   *  corrupts this reading. */
-  measureContentHeight: () => number | null
-  /** Sets (or clears, at 0) the invisible spacer directly above the badge
-   *  row, so this card's badge row starts at the same height as its row's
-   *  tallest card. */
-  setSpacerHeight: (px: number) => void
+  /** Segment 1: pixel height from the card root to the upvote/distance
+   *  row, with both this card's own spacers at 0 — null when there's no
+   *  upvote/distance row to align to (falls back to measuring straight to
+   *  the badge row instead, via measureBadgeGap). */
+  measureUpvoteRowOffset: () => number | null
+  /** Segment 2: pixel height from the upvote/distance row's own bottom (or
+   *  the card root, when there's no upvote/distance row) to the badge row,
+   *  with both spacers at 0 — null when there's no badge row. */
+  measureBadgeGap: () => number | null
+  /** Sets (or clears, at 0) the spacer directly above the upvote/distance
+   *  row. */
+  setUpvoteSpacerHeight: (px: number) => void
+  /** Sets (or clears, at 0) the spacer directly above the badge row. */
+  setBadgeSpacerHeight: (px: number) => void
 }
 
 type Props = {
@@ -136,25 +148,37 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   hasNext,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
-  // The card's own root (the clickable row) and the badge row itself — the
-  // distance between them, measured live, is "everything above the
-  // badges" GenericDirectory compares across a row's cards. spacerRef is
-  // the invisible block directly above the badge row whose height that
-  // comparison sets, so a shorter card's badge row starts at the same
-  // height as its tallest row-mate's — see GenericListingCardHandle's own
-  // doc for why this is a measurement, not a heuristic guess.
+  // Two independent alignment segments — see GenericListingCardHandle's own
+  // doc for why this is two spacers, not one. cardRootRef anchors segment
+  // 1 (icon/name/address/header text, ending at the upvote row); the
+  // upvote row's own bottom anchors segment 2 (its own content, ending at
+  // the badge row).
   const cardRootRef = useRef<HTMLDivElement>(null)
+  const upvoteRowRef = useRef<HTMLDivElement>(null)
   const badgeRowRef = useRef<HTMLDivElement>(null)
-  const spacerRef = useRef<HTMLDivElement>(null)
+  const upvoteSpacerRef = useRef<HTMLDivElement>(null)
+  const badgeSpacerRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => ({
     open: () => setExpanded(true),
     close: () => setExpanded(false),
-    measureContentHeight: () => {
-      if (!cardRootRef.current || !badgeRowRef.current) return null
-      return badgeRowRef.current.getBoundingClientRect().top - cardRootRef.current.getBoundingClientRect().top
+    measureUpvoteRowOffset: () => {
+      if (!cardRootRef.current || !upvoteRowRef.current) return null
+      return upvoteRowRef.current.getBoundingClientRect().top - cardRootRef.current.getBoundingClientRect().top
     },
-    setSpacerHeight: (px: number) => {
-      if (spacerRef.current) spacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
+    measureBadgeGap: () => {
+      if (!badgeRowRef.current) return null
+      const from = upvoteRowRef.current ?? cardRootRef.current
+      if (!from) return null
+      const fromBottom = upvoteRowRef.current
+        ? upvoteRowRef.current.getBoundingClientRect().bottom
+        : from.getBoundingClientRect().top
+      return badgeRowRef.current.getBoundingClientRect().top - fromBottom
+    },
+    setUpvoteSpacerHeight: (px: number) => {
+      if (upvoteSpacerRef.current) upvoteSpacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
+    },
+    setBadgeSpacerHeight: (px: number) => {
+      if (badgeSpacerRef.current) badgeSpacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
     },
   }))
   const categories = useCategories()
@@ -187,6 +211,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // served from the CDN or the service worker's cache long after it was built.
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
   const travel = travelParts(item)
+  const hasUpvoteRow = upvotes || travel.length > 0 || showDistanceSlot
 
   // url fields explicitly opted into the collapsed row (showInHeader) — a
   // quick way to reach something like a WhatsApp "Join group" link without
@@ -564,8 +589,15 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             not right-aligned against the card edge — a distance/upvote line
             reads as more of a fact about the place, alongside its address,
             than a stat pinned to the card's corner. */}
-        {(upvotes || travel.length > 0 || showDistanceSlot) && (
-          <div className="mt-1.5 flex justify-start pl-[52px]">
+        {hasUpvoteRow && (
+          <>
+            {/* Segment-1 spacer — see GenericListingCardHandle's own doc.
+                Real gap here, between the address/header-text block above
+                and this row, so the popularity/distance LINE itself lands
+                at the same height across a row of cards — not just the
+                badges further down. */}
+            <div ref={upvoteSpacerRef} aria-hidden="true" />
+            <div ref={upvoteRowRef} className="mt-1.5 flex justify-start pl-[52px]">
             {/* Stacked on mobile to save horizontal space; side by side from
                 desktop up, close together with a thin "|" between — the
                 upvote count and the distance are two short facts read as one
@@ -615,7 +647,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 </button>
               ) : null}
             </div>
-          </div>
+            </div>
+          </>
         )}
 
         {/* Mobile-only twin of the headerTextFields loop above — see the
@@ -642,12 +675,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             page width" is now the normal case on desktop, not just mobile). */}
         {badgeRow && (
           <>
-            {/* Row-alignment spacer — height set imperatively by
-                GenericDirectory (see setSpacerHeight), never by React state,
-                so a measure/set pass doesn't itself trigger a re-render.
-                0 height (and therefore invisible) until a taller row-mate
-                exists. */}
-            <div ref={spacerRef} aria-hidden="true" />
+            {/* Segment-2 spacer — usually 0 in practice, since the upvote
+                row's own content is nearly always the same height across a
+                category; catches the rare case (e.g. travel text wrapping
+                to 2 lines for one listing) segment 1 alone wouldn't. Height
+                set imperatively by GenericDirectory (see
+                setBadgeSpacerHeight), never by React state, so a measure/
+                set pass doesn't itself trigger a re-render. */}
+            <div ref={badgeSpacerRef} aria-hidden="true" />
             <div ref={badgeRowRef} className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
               {badgeRow}
             </div>

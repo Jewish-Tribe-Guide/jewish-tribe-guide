@@ -263,32 +263,57 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
 })
 
 // The row-alignment handle GenericDirectory uses to measure each card's
-// content height and set an invisible spacer directly above the badge row —
-// see GenericListingCardHandle's own doc for why this replaced an earlier
-// heuristic (reserving 2-line name height category-wide) that reserved a
-// visible gap between the NAME and ADDRESS on every card in a category, not
-// just the row that actually needed it.
+// content height and set two independent invisible spacers — one above the
+// upvote/distance row, one above the badge row — see GenericListingCardHandle's
+// own doc for why this is two segments rather than one shared spacer: it's
+// what makes the popularity/distance LINE itself land at the same height
+// across a row of cards, not just the badges further down. An earlier
+// heuristic (reserving 2-line name height category-wide) reserved a visible
+// gap between the NAME and ADDRESS on every card in a category, not just the
+// row that actually needed it — that's gone.
 describe('GenericListingCard — row-alignment handle', () => {
-  it('measureContentHeight reads the real gap between the card root and the badge row', () => {
+  it('measureUpvoteRowOffset reads the real gap between the card root and the upvote/distance row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: true })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // jsdom lays out everything at 0×0 (no real geometry engine), so the
+    // meaningful assertion here isn't a specific pixel value — it's that
+    // the handle actually returns a number instead of null, i.e. it found
+    // both the card root and a real upvote/distance row to measure between.
+    // A category with nothing there (see the next test) is what null is for.
+    expect(ref.current?.measureUpvoteRowOffset()).not.toBeNull()
+  })
+
+  it('measureUpvoteRowOffset is null when there is no upvote/distance row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: false })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(ref.current?.measureUpvoteRowOffset()).toBeNull()
+  })
+
+  it('measureBadgeGap reads the gap to the badge row, falling back to the card root when there is no upvote row', () => {
     const ref = createRef<GenericListingCardHandle>()
     const category = makeCategory({
       detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+      upvotesEnabled: false,
     })
     const item = makeListing({ name: 'Acme', isKosher: true })
     renderWithProviders(
       <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    // jsdom lays out everything at 0×0 (no real geometry engine), so the
-    // meaningful assertion here isn't a specific pixel value — it's that
-    // the handle actually returns a number instead of null, i.e. it found
-    // both the card root and a real badge row to measure between. A
-    // category with nothing to badge (see the next test) is what null
-    // is for.
-    expect(ref.current?.measureContentHeight()).not.toBeNull()
+    expect(ref.current?.measureBadgeGap()).not.toBeNull()
   })
 
-  it('measureContentHeight is null when there is no badge row to align', () => {
+  it('measureBadgeGap is null when there is no badge row to align', () => {
     const ref = createRef<GenericListingCardHandle>()
     // No hours/filterable fields and upvotes off — nothing to put in the
     // badge row (see badgeRow's own gating further up this file).
@@ -298,10 +323,31 @@ describe('GenericListingCard — row-alignment handle', () => {
       <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(ref.current?.measureContentHeight()).toBeNull()
+    expect(ref.current?.measureBadgeGap()).toBeNull()
   })
 
-  it("setSpacerHeight sets the spacer element's inline height, clamped at 0", () => {
+  it("setUpvoteSpacerHeight sets the spacer directly above the upvote/distance row, clamped at 0", () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: true })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // The spacer is the aria-hidden div immediately before the upvote row's
+    // own container — there's nothing else in the card carrying that exact
+    // pairing to identify it by.
+    const upvoteRow = document.querySelector('[class*="pl-[52px]"]')
+    const spacer = upvoteRow?.previousElementSibling
+
+    act(() => ref.current?.setUpvoteSpacerHeight(24))
+    expect(spacer).toHaveStyle({ height: '24px' })
+
+    act(() => ref.current?.setUpvoteSpacerHeight(-5))
+    expect(spacer).toHaveStyle({ height: '0px' })
+  })
+
+  it("setBadgeSpacerHeight sets the spacer directly above the badge row, clamped at 0", () => {
     const ref = createRef<GenericListingCardHandle>()
     const category = makeCategory({
       detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
@@ -317,10 +363,10 @@ describe('GenericListingCard — row-alignment handle', () => {
     const badgeContainer = document.querySelector('.border-t.border-slate-100')
     const spacer = badgeContainer?.previousElementSibling
 
-    act(() => ref.current?.setSpacerHeight(24))
+    act(() => ref.current?.setBadgeSpacerHeight(24))
     expect(spacer).toHaveStyle({ height: '24px' })
 
-    act(() => ref.current?.setSpacerHeight(-5))
+    act(() => ref.current?.setBadgeSpacerHeight(-5))
     expect(spacer).toHaveStyle({ height: '0px' })
   })
 })
