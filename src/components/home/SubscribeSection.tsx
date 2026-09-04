@@ -179,10 +179,30 @@ export default function SubscribeSection() {
                     type="button"
                     onClick={() => setPickerOpen((o) => !o)}
                     aria-expanded={pickerOpen}
-                    className="flex cursor-pointer items-center gap-1 text-sm text-slate-700 transition-colors hover:text-slate-900"
+                    className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 transition-colors hover:text-slate-900"
                   >
+                    {/* A real checkbox, styled exactly like the New
+                        listings/Closures ones beside it — not a fake
+                        decorative glyph — so the three read as the same
+                        kind of control. readOnly + pointer-events-none: it's
+                        just a preview of `allCategories`, not a second way
+                        to toggle it (an <input> can't be a <button>'s own
+                        interactive child per ARIA's nested-interactive
+                        rule); the button's own onClick above is what opens
+                        the real picker where the actual toggle lives. */}
+                    <input
+                      type="checkbox"
+                      checked={allCategories}
+                      readOnly
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="pointer-events-none"
+                    />
                     {allCategories ? 'All categories' : `${selected.length} checked`}
-                    <span aria-hidden="true" className="text-slate-400">
+                    {/* text-[10px]: this is just "opens a menu," not a
+                        heading — at the default text-sm size it read as
+                        bigger than the affordance needed. */}
+                    <span aria-hidden="true" className="text-[10px] text-slate-400">
                       {pickerOpen ? '▲' : '▼'}
                     </span>
                   </button>
