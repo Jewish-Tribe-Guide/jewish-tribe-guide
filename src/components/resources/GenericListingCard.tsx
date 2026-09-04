@@ -388,7 +388,17 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           if (!p) track('listing_opened', { listing: item.name, category: category.id })
           return !p
         })}
-        className={`w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
+        // h-full: on desktop this row is the ENTIRE visible card (the outer
+        // wrapper's own h-full — see its comment — only stretches the
+        // invisible container to match the grid row; this inner div is what
+        // actually paints the border-to-border clickable/hoverable surface).
+        // Without it, a card whose content is shorter than its tallest
+        // row-mate — even with the invisible headerTextField placeholder
+        // below reserving a line for the description — left a dead strip at
+        // the bottom of the card: inside the visible border, past where this
+        // div's own content ended, unclickable and with no hover state,
+        // which is exactly what read as "the whole card isn't clickable."
+        className={`h-full w-full px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${expanded && isMobile ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         <div className="flex items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's

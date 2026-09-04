@@ -20,20 +20,27 @@ export function useBodyScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return
     lockCount += 1
-    document.body.style.overflow = 'hidden'
-    // overflow: hidden alone stops real scrolling but not this: a trackpad
-    // swipe over the page is also how Chrome/Safari recognize "you might be
-    // swiping back," a gesture-preview animation that visibly slides the
-    // whole page — separate from actual scrolling, and not something
-    // overflow:hidden opts out of. Without this, that swipe read as "the
-    // background is scrolling" behind an open dialog, most noticeable
-    // moving left/right (a vertical scroll has nowhere to go regardless).
-    document.body.style.overscrollBehaviorX = 'none'
+    // documentElement, not body: `document.scrollingElement` in this app is
+    // <html> (globals.css sets `overflow-x: hidden` there, which per CSS
+    // Overflow 3 computes its own `overflow-y` to `auto` — see that file's
+    // long comment on why that pairing lives on <html>, deliberately not on
+    // <body>). Locking body.style.overflow was a no-op for real scrolling:
+    // confirmed live, a scroll gesture over an "open" dialog still moved
+    // window.scrollY, because the element that was actually locked wasn't
+    // the one doing the scrolling.
+    //
+    // No overscroll-behavior-x here. That was tried once already, to paper
+    // over the same scroll leak (a trackpad swipe looked like "the
+    // background scrolling"), and it disabled the trackpad back-navigation
+    // gesture site-wide while any dialog was open — the exact regression
+    // globals.css's <html> comment already documents once (commit
+    // d6261b6). Locking the real scrolling element removes the leak at its
+    // source, so there's nothing left for overscroll-behavior to paper over.
+    document.documentElement.style.overflow = 'hidden'
     return () => {
       lockCount -= 1
       if (lockCount === 0) {
-        document.body.style.overflow = ''
-        document.body.style.overscrollBehaviorX = ''
+        document.documentElement.style.overflow = ''
       }
     }
   }, [active])

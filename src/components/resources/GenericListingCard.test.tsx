@@ -66,6 +66,26 @@ describe('GenericListingCard — collapsed', () => {
     expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
   })
 
+  // The outer card wrapper stretches to match its row-mates in the desktop
+  // grid (CSS Grid's default row-stretch — see the wrapper's own h-full
+  // comment), but a plain block child doesn't inherit that automatically.
+  // Without h-full on this inner row too, a card shorter than its tallest
+  // neighbor left a dead strip at the card's own bottom — inside the visible
+  // border, past where this div's content ended — with no onClick and no
+  // hover state, which is what read as "the whole card isn't clickable."
+  it('the clickable row stretches to fill the card (h-full), not just its own content', () => {
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    const toggle = screen.getByRole('button', { expanded: false })
+    const row = toggle.closest('div[class*="cursor-pointer"]')
+    expect(row).not.toBeNull()
+    expect(row).toHaveClass('h-full')
+  })
+
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
     const item = makeListing()
