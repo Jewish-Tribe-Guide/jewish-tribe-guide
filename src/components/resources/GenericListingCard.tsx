@@ -177,7 +177,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // just insures against a value that predates the cap, or one written some
   // other way than the submission form).
   //
-  // `textarea` clamps to a few lines instead (`headerTextClamp` below) — a
+  // `textarea` clamps to a few lines instead (`headerTextClampStyle` below) — a
   // real free-form description (Networking's listings are just a name and
   // a website otherwise, with nothing else to fill the card) has no
   // sensible one-line-or-nothing shape the way a short tagline does, and
@@ -188,7 +188,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     .filter((f) => (f.type === 'text' || f.type === 'textarea') && f.showInHeader)
     .map((f) => ({ f, text: (item[f.key] as string | undefined)?.trim() }))
     .filter((x): x is { f: CategoryField; text: string } => !!x.text)
-  const headerTextClamp = headerTextFields.some(({ f }) => f.type === 'textarea') ? 'line-clamp-3' : 'truncate'
+  const headerTextIsMultiline = headerTextFields.some(({ f }) => f.type === 'textarea')
+  // Not a `line-clamp-3` className on the same element as `hidden
+  // desktop:block` — line-clamp needs `display: -webkit-box` to do
+  // anything at all (confirmed live: every -webkit-line-clamp/box-orient/
+  // overflow property was present in computed style, but `display` came
+  // out `block`, and line-clamp is a silent no-op — the full text just
+  // rendered — without that specific display value), and `block` is what
+  // wins the cascade when both are plain utility classes on one element.
+  // Kept as inline style on an INNER element below instead, one level
+  // removed from the classes doing responsive show/hide, so the two
+  // display values are never fighting over the same element to begin with.
+  const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' } as const
   // Whether the CATEGORY has this field at all, independent of whether THIS
   // item filled it in. In the desktop grid, cards in the same row stretch to
   // match the tallest one (see the card's own h-full comment) — but only the
@@ -435,9 +446,15 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 comment: reserves the same line so a shorter card's badge
                 row still starts at the same height as its grid row-mates. */}
             {headerTextFields.length > 0 ? (
-              headerTextFields.map(({ f, text }) => (
-                <p key={f.key} className={`hidden desktop:block ${headerTextClamp} text-sm text-slate-600 mt-2`}>{text}</p>
-              ))
+              headerTextFields.map(({ f, text }) =>
+                f.type === 'textarea' ? (
+                  <p key={f.key} className="hidden desktop:block text-sm text-slate-600 mt-2">
+                    <span style={headerTextClampStyle}>{text}</span>
+                  </p>
+                ) : (
+                  <p key={f.key} className="hidden desktop:block truncate text-sm text-slate-600 mt-2">{text}</p>
+                ),
+              )
             ) : hasHeaderTextField ? (
               // A single word never actually wraps to 3 lines on its own —
               // line-clamp only bounds overflow, it doesn't force a height —
@@ -445,7 +462,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               // reserve the same space a real 3-line description would.
               <p
                 aria-hidden="true"
-                className={`invisible hidden desktop:block ${headerTextClamp} text-sm text-slate-600 mt-2 ${headerTextClamp === 'line-clamp-3' ? 'min-h-[3.75rem]' : ''}`}
+                className={`invisible hidden desktop:block text-sm text-slate-600 mt-2 ${headerTextIsMultiline ? 'min-h-[3.75rem]' : 'truncate'}`}
               >
                 placeholder
               </p>
@@ -575,9 +592,15 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         {/* Mobile-only twin of the headerTextFields loop above — see the
             comment there. Indented to align under the name/address (same
             52px = icon + gap as above). */}
-        {headerTextFields.map(({ f, text }) => (
-          <p key={f.key} className={`desktop:hidden ${headerTextClamp} text-sm text-slate-600 mt-2 pl-[52px]`}>{text}</p>
-        ))}
+        {headerTextFields.map(({ f, text }) =>
+          f.type === 'textarea' ? (
+            <p key={f.key} className="desktop:hidden text-sm text-slate-600 mt-2 pl-[52px]">
+              <span style={headerTextClampStyle}>{text}</span>
+            </p>
+          ) : (
+            <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
+          ),
+        )}
 
         {/* Badge row — the only chips that survive collapsed: Open and any
             badge tied to an actual filter control. Below the name row

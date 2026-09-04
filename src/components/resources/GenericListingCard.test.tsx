@@ -230,8 +230,13 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
 
     // Rendered twice (a desktop version and a mobile twin — see
     // GenericListingCard's own comment on why); both should carry the clamp.
+    // Inline style, not a `line-clamp-3` className — see
+    // headerTextClampStyle's own comment on why className-based line-clamp
+    // silently did nothing here (a `desktop:block`/`desktop:hidden` display
+    // utility on the same element won the cascade over line-clamp's own
+    // required `display: -webkit-box`).
     for (const description of screen.getAllByText(/A network of young leaders/)) {
-      expect(description).toHaveClass('line-clamp-3')
+      expect(description).toHaveStyle({ WebkitLineClamp: '3', display: '-webkit-box' })
       expect(description).not.toHaveClass('truncate')
     }
   })

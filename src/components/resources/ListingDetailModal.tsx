@@ -195,30 +195,39 @@ export default function ListingDetailModal({
               className="h-10 w-10 text-xl shrink-0"
             />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-semibold text-slate-900 text-lg">{name}</h2>
-                {/* Same pill, same spot relative to the name, as the
-                    collapsed card behind this dialog — see that component's
-                    own headerUrlFields comment. Was rendered as one of the
-                    actions-row icon buttons below instead (Directions/Call
-                    style) via includeHeaderUrlFields; moved back to sit with
-                    the name specifically because that row was the one place
-                    this dialog didn't otherwise match the card it opened
-                    from, and PlaceDetailBody's own default (excluding a
-                    showInHeader field from that row) already assumes
-                    there's a header spot like this one showing it instead. */}
-                {headerUrlFields.map(({ f, href }) => (
-                  <a
-                    key={f.key}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                  >
-                    {f.linkLabel ?? f.label}
-                  </a>
-                ))}
+              {/* Two columns, not one wrapping flex row — matching the
+                  collapsed card behind this dialog exactly (see that
+                  component's own headerUrlFields comment): the name gets its
+                  own flexible column and wraps onto a second line there if
+                  it needs to, while the pill stays put in a fixed column at
+                  the right, instead of the two crowding onto the same line
+                  and the pill getting pushed wherever there happened to be
+                  room. Was rendered as one of the actions-row icon buttons
+                  below instead (Directions/Call style) via
+                  includeHeaderUrlFields; moved back to sit with the name
+                  specifically because that row was the one place this
+                  dialog didn't otherwise match the card it opened from, and
+                  PlaceDetailBody's own default (excluding a showInHeader
+                  field from that row) already assumes there's a header spot
+                  like this one showing it instead. */}
+              <div className="flex items-start gap-2">
+                <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
+                {headerUrlFields.length > 0 && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    {headerUrlFields.map(({ f, href }) => (
+                      <a
+                        key={f.key}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                      >
+                        {f.linkLabel ?? f.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
               {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
               {badgeRow && (

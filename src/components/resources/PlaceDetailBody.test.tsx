@@ -58,3 +58,28 @@ describe('PlaceDetailBody — includeHeaderUrlFields', () => {
     expect(screen.getByText('Website')).toBeInTheDocument()
   })
 })
+
+// A section's guard is usually `condition && (<div>...)`, which correctly
+// short-circuits to the boolean `false` when empty — except addressSection's
+// condition is an OR-chain ending in `syncedNote`, and `a || b || c` returns
+// the LAST operand when every one is falsy, not necessarily `false` itself.
+// With nothing to show, that chain evaluated to `null` (syncedNote's own
+// empty value) — which passed a `s !== false` filter that only ever meant
+// to exclude `false` — so an entirely empty addressSection still counted as
+// a real section for divider placement, and the section after it got a
+// stray `<hr>` above it with nothing rendered between the two. Caught live:
+// Networking's "The Chevra" (no address/phone/hours) showed exactly this.
+describe('PlaceDetailBody — no stray divider from an entirely empty section', () => {
+  it('renders no <hr> when the only real content is a single row field', () => {
+    const category = makeCategory({
+      hasAddress: false,
+      hasPhone: false,
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', renderAs: 'row' }],
+    })
+    const item = makeListing({ address: '', d: 'A description with no address, phone, or hours nearby.' })
+    const { container } = render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(container.querySelectorAll('hr')).toHaveLength(0)
+    expect(screen.getByText(/A description with no address/)).toBeInTheDocument()
+  })
+})

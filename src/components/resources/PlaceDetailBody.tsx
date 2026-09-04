@@ -497,8 +497,21 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // have content — never before the first or after the last — so a section
   // only ever gets a separating line when there's actually something on
   // both sides of it to separate.
+  //
+  // Filtered on truthiness (`Boolean`), not `s !== false`: most of these are
+  // `condition && (<div>...)`, where a false condition short-circuits to the
+  // boolean `false` — but addressSection's condition is an OR-chain ending
+  // in `syncedNote`, and `a || b || c` returns the LAST operand when every
+  // one is falsy, not necessarily the literal `false`. With nothing to show,
+  // that chain evaluates to `null` (syncedNote's own empty value), not
+  // `false` — `s !== false` let it through as a real section that rendered
+  // nothing, and the section AFTER it still got a divider drawn above it as
+  // if there'd been real content in this empty one to separate it from.
+  // Caught live: Networking's "The Chevra" (no address/phone/hours — an
+  // empty addressSection) showed a stray `<hr>` before its Description
+  // with nothing above it.
   const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, tagsSection, caveatSection]
-    .filter((s): s is Exclude<typeof s, false> => s !== false)
+    .filter((s): s is Exclude<typeof s, false | null | undefined> => !!s)
 
   return (
     <div className="space-y-4">
