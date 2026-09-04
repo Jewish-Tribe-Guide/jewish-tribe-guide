@@ -64,6 +64,15 @@ export default function HomeBreak({
                 </div>
               )}
             </div>
+            {/* Same attribution/link as the real Zmanim & Shabbos page
+                (ZmanimBody) — this card shows the same Hebcal-sourced data,
+                so it carries the same credit. */}
+            <p className="pt-3 text-[11px] text-muted">
+              Zmanim from{' '}
+              <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                Hebcal.com
+              </a>
+            </p>
           </>
         ) : (
           <p className="text-[13px] text-muted">Zmanim are unavailable right now. Please try again in a moment.</p>

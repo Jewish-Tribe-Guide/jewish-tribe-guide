@@ -69,6 +69,14 @@ describe('HomeBreak', () => {
     expect(screen.getByText('8:07 PM')).toBeInTheDocument()
   })
 
+  it('credits Hebcal.com, same as the real Zmanim & Shabbos page, once ready', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    const link = screen.getByRole('link', { name: 'Hebcal.com' })
+    expect(link).toHaveAttribute('href', 'https://www.hebcal.com')
+  })
+
   it('shows the community-run line and a working "Suggest something" link regardless of zmanim status', () => {
     mockUseZmanim.mockReturnValue({ data: null, status: 'loading' })
     renderWithProviders(<HomeBreak coords={null} locationLabel="Philadelphia" />)
