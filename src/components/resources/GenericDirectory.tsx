@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -215,6 +215,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     const hay = listingSearchText(item, category)
     return tokens.every((t) => hay.includes(t))
   }
+
+  // Whether any listing's own name in this category is long enough to
+  // likely wrap to a second line — if so, every card reserves a full
+  // 2-line name height (see GenericListingCard's reserveTwoLineName), so
+  // one long-named listing's real wrap doesn't leave it taller than its
+  // short-named row-mates for no reason a visitor can see. Off when nothing
+  // in the category is long enough to need it, so a category of all-short
+  // names (most of them) doesn't pay a blank reserved line for nothing.
+  //
+  // A character-count heuristic, not a measured one — the narrowest card
+  // this grid renders is 280px (see the grid's own minmax comment below),
+  // minus ~52px for the icon+gap leaves ~228px for semibold text, which
+  // fits roughly 26 characters per line at this app's type scale. Same
+  // spirit as the header-text placeholder just below (a fixed guess, not a
+  // DOM measurement) — genuine per-row measurement would need a
+  // ResizeObserver and real layout passes, a much bigger lift for a
+  // low-stakes alignment detail. Computed from the category's full `items`,
+  // not the currently `filtered` view, so it doesn't flicker on/off as
+  // filters narrow the visible set.
+  const anyNameNeedsTwoLines = useMemo(() => items.some((item) => item.name.length > 26), [items])
 
   const filtered = items
     .filter((item) => {
@@ -771,6 +791,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               }
               onEdit={() => onEdit(item)}
               onReport={() => onReport(item)}
+              reserveTwoLineName={anyNameNeedsTwoLines}
             />
             </div>
           ))}

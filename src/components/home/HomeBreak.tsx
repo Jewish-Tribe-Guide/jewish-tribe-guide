@@ -115,36 +115,45 @@ export default function HomeBreak({
           Zmanim one, and centering its content made "Kept current by
           people like you" start lower than "Zmanim & Shabbos", so the two
           headings didn't line up. Top-aligned, like the other card, so
-          they do regardless of which one ends up taller. */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
-        <h3 className="mb-3 text-lg font-semibold text-slate-900">Kept current by people like you</h3>
-        <p className="mb-4 text-[13.5px] leading-relaxed text-muted">
+          they do regardless of which one ends up taller.
+          Roomier than the Zmanim card's own rhythm on purpose — that one's
+          height comes from real data rows; this one has to earn its height
+          from spacing instead, the same way centercityeruv.com's own
+          "Get Eruv Updates" card reads as substantial through generous
+          padding and line-height rather than more text. Larger body copy,
+          more room between the eyebrow/heading/body/buttons, and taller
+          buttons — not more content, just more breathing room around the
+          same content, so the card fills its box instead of floating a
+          short block inside a tall one. */}
+      <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept current by people like you</h3>
+        <p className="mb-6 text-sm leading-relaxed text-muted">
           A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
           from the community that actually uses this guide.
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           <button
             onClick={() => setContributeAction('create')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
           >
             <PlusIcon className="h-3.5 w-3.5" /> Add
           </button>
           <button
             onClick={() => setContributeAction('edit')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
           >
             <PencilIcon className="h-3.5 w-3.5" /> Edit
           </button>
           <button
             onClick={() => setContributeAction('report')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
           >
             <FlagIcon className="h-3.5 w-3.5" /> Report
           </button>
         </div>
         {settings.feedbackEnabled && (
-          <p className="mt-4 text-xs text-muted">
+          <p className="mt-6 text-xs text-muted">
             Notice something else, or have general feedback about the site?{' '}
             <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-amber-800 hover:underline">
               Send a note →

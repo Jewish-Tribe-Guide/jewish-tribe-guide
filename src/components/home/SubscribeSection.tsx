@@ -63,9 +63,17 @@ export default function SubscribeSection() {
 
   if (eligible.length === 0) return null
 
+  // Unchecking the last remaining specific category falls back to "All
+  // categories" instead of leaving the picker at zero — nobody actually
+  // wants to be subscribed to nothing, and re-checking "All categories" by
+  // hand for the same result was just an extra step for the one outcome
+  // this could otherwise land on.
   function toggleCategory(id: string) {
-    setAllCategories(false)
-    setSelected((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
+    setSelected((prev) => {
+      const next = prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+      setAllCategories(next.length === 0)
+      return next
+    })
   }
 
   function chooseAllCategories() {
@@ -81,11 +89,10 @@ export default function SubscribeSection() {
       setError('Pick at least one thing to be notified about.')
       return
     }
-    // Reachable by unchecking every individual category without re-checking
-    // "All categories" — the server would quietly treat an empty list as
-    // "all" anyway (see subscriberStore's own upsert), but submitting that
-    // silently is worse than just asking for a real choice: the button
-    // would read "0 checked" for a subscription that's actually unlimited.
+    // Shouldn't be reachable through the UI any more — toggleCategory falls
+    // back to "All categories" itself the moment the last specific pick is
+    // unchecked — but kept as a safety net rather than trusting that no
+    // future change to that logic can reintroduce a zero-category submit.
     if (!allCategories && selected.length === 0) {
       setError('Pick at least one category, or choose "All categories".')
       return

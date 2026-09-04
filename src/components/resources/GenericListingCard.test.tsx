@@ -262,6 +262,40 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
   })
 })
 
+// reserveTwoLineName — set by GenericDirectory when at least one listing in
+// the category has a long enough name that it's likely to wrap to 2 lines,
+// so a short-named card's own name doesn't stop reserving the same height
+// and throw off the badge-row alignment the header-text placeholder above
+// is trying to protect (see GenericDirectory's own doc on the heuristic).
+describe('GenericListingCard — reserveTwoLineName', () => {
+  it('off by default: a short name gets no reserved height', () => {
+    const category = makeCategory()
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('Acme').closest('p')).not.toHaveClass('min-h-[3rem]')
+  })
+
+  it('reserves a 2-line height for a short name when the prop is set', () => {
+    const category = makeCategory()
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard
+        item={item}
+        category={category}
+        upvotes={false}
+        count={0}
+        reserveTwoLineName
+        {...requiredHandlers}
+      />,
+    )
+
+    expect(screen.getByText('Acme').closest('p')).toHaveClass('min-h-[3rem]')
+  })
+})
+
 // The modal replaces GenericListingCard's own collapsed row entirely (the
 // card behind it is hidden under the backdrop), so a showInHeader url field
 // has to be restated somewhere in the dialog too — this is the "somewhere":

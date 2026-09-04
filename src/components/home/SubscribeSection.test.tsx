@@ -110,7 +110,11 @@ describe('SubscribeSection', () => {
     expect(body.categories).toEqual(['grocery'])
   })
 
-  it('refuses to submit with zero categories checked (picked then unpicked, without re-checking "All categories")', async () => {
+  // Nobody actually wants to be subscribed to nothing — unchecking the last
+  // specific pick falls back to "All categories" on its own, rather than
+  // leaving the picker at a confusing "0 checked" that would still need a
+  // separate step (re-checking "All categories" by hand) to fix.
+  it('unchecking the last specific category falls back to "All categories" on its own', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     renderWithProviders(<SubscribeSection />, { content: { categories: [grocery] } })
@@ -118,12 +122,18 @@ describe('SubscribeSection', () => {
     await user.type(screen.getByLabelText('Email address'), 'person@example.com')
     await user.click(screen.getByRole('button', { name: /All categories/ }))
     await user.click(screen.getByText('Grocery Stores')) // pick
-    await user.click(screen.getByText('Grocery Stores')) // unpick — 0 left, still not "All categories"
+    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument()
+
+    await user.click(screen.getByText('Grocery Stores')) // unpick the only one
+    expect(screen.getByRole('button', { name: /^All categories/ })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'All categories' })).toBeChecked()
+
     await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'Subscribe' }))
 
-    expect(screen.getByText('Pick at least one category, or choose "All categories".')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalled()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.categories).toBeNull()
   })
 
   it('refuses to submit when both New listings and Closures are unchecked', async () => {

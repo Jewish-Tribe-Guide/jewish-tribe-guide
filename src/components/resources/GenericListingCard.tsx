@@ -98,6 +98,17 @@ type Props = {
    *  inert arrow at either end instead of no arrow at all. */
   hasPrev?: boolean
   hasNext?: boolean
+  /** Reserves a full 2-line height for the name (line-clamp-2's own max),
+   *  even when THIS listing's name is short enough to sit on one line — set
+   *  by the directory grid when at least one listing in the same list
+   *  actually needs 2 lines, so that one card's real wrap doesn't leave it
+   *  taller than short-named siblings whose badge rows were otherwise
+   *  aligned by the header-text placeholder below (see that placeholder's
+   *  own comment) but not by name height, which it never accounted for.
+   *  Off by default — most categories never have a long enough name to
+   *  need it, and reserving a blank second line on every card in THOSE
+   *  categories would trade one alignment problem for a wasted one. */
+  reserveTwoLineName?: boolean
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -119,6 +130,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onNavigate,
   hasPrev,
   hasNext,
+  reserveTwoLineName = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   useImperativeHandle(ref, () => ({
@@ -426,7 +438,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               throwing every card in the row wildly out of proportion with its
               neighbors. */}
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900 line-clamp-2">
+            <p className={`font-semibold text-slate-900 line-clamp-2 ${reserveTwoLineName ? 'min-h-[3rem]' : ''}`}>
               {onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
                 // is block-level and stretches to fill the row, which would
