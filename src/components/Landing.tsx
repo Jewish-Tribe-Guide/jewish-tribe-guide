@@ -249,15 +249,26 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 as a wall of mismatched photo tiles (real photos, flat tints,
                 still-loading placeholders, side by side). See that
                 component's own doc for why a small icon-avatar row instead
-                of a full photo tile is the fix. */}
+                of a full photo tile is the fix.
+
+                The ring-1/rounded-2xl wrapper matches the map placeholder's
+                own container below — the two are meant to read as equal
+                "main things", and until now only the map had a soft
+                boundary defining it as a contained block; this one just sat
+                directly on the page background. HomeBreak, the transition
+                between them, deliberately stays unbordered — a border there
+                would undercut the whole point of it reading as a pause
+                rather than a third contained section. */}
         {!isMobile && !q && (
           <section className="mt-12">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
-            <CompactCardGrid
-              cards={loading ? entryCards : (filtered ?? [])}
-              categories={categories}
-              onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-            />
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+              <CompactCardGrid
+                cards={loading ? entryCards : (filtered ?? [])}
+                categories={categories}
+                onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+              />
+            </div>
           </section>
         )}
 
