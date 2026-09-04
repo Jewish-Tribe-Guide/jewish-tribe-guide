@@ -25,6 +25,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import type { NavigateFn } from '@/types'
 import type { Flow } from '@/types'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { ui } from '@/lib/uiConfig'
 
 export type LandingProps = {
   onNavigate: NavigateFn
@@ -274,19 +275,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-        {/* ── Search (desktop) — its own headed section now, not folded into
-                the hero band above — see that component's own doc. Carries
-                the results themselves too once there's a query, so the
-                answer shows up in the same box as the question instead of
-                somewhere else on the page. */}
-        <SearchSection
-          heroTitle={settings.heroTitle}
-          query={query}
-          onQueryChange={setQuery}
-          results={!isMobile ? desktopResultsNode : undefined}
-        />
+        {/* ── Search + Browse everything (desktop), one card ────────────────
+                These used to be two separate white boxes stacked with a gap
+                between them, but they're really one thing to a visitor: "how
+                do I find what I need" — type it, or scan the flat list below.
+                Sharing a card says that. `SearchSection` renders `bare` here
+                (no card/section shell of its own) so it mounts once, as a
+                stable sibling of the Browse-everything block below, and
+                never gets swapped out as a whole subtree when `q` changes —
+                that would unmount the input mid-keystroke and drop focus.
+                Only the divider + Browse-everything content toggle.
 
-        {/* ── Browse everything (desktop) — a flat, always-visible grid of
+                Browse everything itself is a flat, always-visible grid of
                 every card: every real category, Patient & Family Support,
                 Volunteer, custom forms. Not grouped under the section tabs'
                 own umbrella labels above ("Jewish Institutions and
@@ -296,10 +296,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 to reach the same destinations for anyone who doesn't think to
                 hover, not a replacement. Hidden while actively searching —
                 the grouped grid further down already serves as live search
-                results and is unchanged. `source: 'grid'` on the click lets
-                the admin Metrics tab compare actual usage against the tab
-                nav's own `source: 'tab-nav'` (see SectionTabs), so keeping
-                both isn't a permanent guess.
+                results, and this card shows the search box's own `results`
+                slot instead. `source: 'grid'` on the click lets the admin
+                Metrics tab compare actual usage against the tab nav's own
+                `source: 'tab-nav'` (see SectionTabs), so keeping both isn't a
+                permanent guess.
 
                 CompactCardGrid, not CardGrid — a list meant to hold every
                 card at once got heavier with every category added and read
@@ -310,31 +311,31 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
                 The ring-1/rounded-2xl wrapper matches the map's own
                 container below — the two are meant to read as equal "main
-                things". The heading sits INSIDE the card (not above it) so
-                the whole thing — heading plus grid — reads as one
-                self-contained unit, the same way centercityeruv.com puts
-                its "Boundary Map" heading inside that section's own bordered
-                card rather than floating it above. Map's heading stays
-                outside its own border for now — that border belongs to
-                ResourceMapView itself (shared with the full map screen), and
-                nesting another card around it to hold a heading would double
-                the border instead of matching this one. HomeBreak, the
-                transition between them, uses the same card language (border,
-                rounded-2xl) as this section — see its own doc on why two
-                smaller cards there still reads as a pair, not a third
-                full-width peer section. */}
-        {!isMobile && !q && (
-          <section className="mt-12">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-              <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
-              <CompactCardGrid
-                cards={loading ? entryCards : (filtered ?? [])}
-                categories={categories}
-                onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-              />
-            </div>
-          </section>
-        )}
+                things". HomeBreak, the transition between them, uses the
+                same card language (border, rounded-2xl) as this section —
+                see its own doc on why two smaller cards there still reads as
+                a pair, not a third full-width peer section. */}
+        <section className="mt-8 hidden desktop:block">
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+            <SearchSection
+              bare
+              heroTitle={settings.heroTitle}
+              query={query}
+              onQueryChange={setQuery}
+              results={!isMobile ? desktopResultsNode : undefined}
+            />
+            {!isMobile && !q && (
+              <div className={ui.search.landing ? 'mt-6 border-t border-slate-100 pt-6' : ''}>
+                <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
+                <CompactCardGrid
+                  cards={loading ? entryCards : (filtered ?? [])}
+                  categories={categories}
+                  onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+                />
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* ── The desktop gateway's three singleton blocks — featured cards,
                 the embedded map, Zmanim & Shabbos — in the admin-configured

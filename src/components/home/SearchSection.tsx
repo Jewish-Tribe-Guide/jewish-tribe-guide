@@ -42,6 +42,7 @@ export default function SearchSection({
   mapIcon,
   onViewMap,
   results,
+  bare = false,
 }: {
   heroTitle: string
   query: string
@@ -60,36 +61,48 @@ export default function SearchSection({
    *  empty) when there's nothing to show, so this renders no extra space
    *  ahead of the first keystroke. */
   results?: ReactNode
+  /** Skip this section's own outer `<section>`/card shell and render just the
+   *  heading + box + button + results — for a caller (Landing, merging this
+   *  with "Browse everything" into one card) that owns the shared shell and
+   *  wants this mounted as a stable sibling inside it, not swapped in and out
+   *  as a whole tree (which would remount the input and drop focus mid-type). */
+  bare?: boolean
 }) {
   if (!ui.search.landing) return null
 
+  const content = (
+    <>
+      {/* Centered, not left-aligned like Browse everything/the map below —
+          those are grids that fill the card's full width on their own;
+          this card's only real content is one ~480px input, so left-aligning
+          it left most of a full-width card sitting empty to the right.
+          Centering the heading and button along with it keeps the whole
+          card reading as one composed unit instead of a wide box with a
+          small thing floating in its corner. */}
+      <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
+      <div className="mx-auto max-w-[480px]">
+        <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
+      </div>
+      {mapIcon != null && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={onViewMap}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+          >
+            <span aria-hidden="true">{mapIcon}</span>
+            View Map
+          </button>
+        </div>
+      )}
+      {results && <div className="mt-6 border-t border-slate-100 pt-6">{results}</div>}
+    </>
+  )
+
+  if (bare) return content
+
   return (
     <section className="mt-8 hidden desktop:block">
-      <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-        {/* Centered, not left-aligned like Browse everything/the map below —
-            those are grids that fill the card's full width on their own;
-            this card's only real content is one ~480px input, so left-aligning
-            it left most of a full-width card sitting empty to the right.
-            Centering the heading and button along with it keeps the whole
-            card reading as one composed unit instead of a wide box with a
-            small thing floating in its corner. */}
-        <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
-        <div className="mx-auto max-w-[480px]">
-          <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
-        </div>
-        {mapIcon != null && (
-          <div className="mt-4 flex justify-center">
-            <button
-              onClick={onViewMap}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-            >
-              <span aria-hidden="true">{mapIcon}</span>
-              View Map
-            </button>
-          </div>
-        )}
-        {results && <div className="mt-6 border-t border-slate-100 pt-6">{results}</div>}
-      </div>
+      <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">{content}</div>
     </section>
   )
 }
