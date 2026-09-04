@@ -5,6 +5,7 @@ import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import SearchSection from '@/components/home/SearchSection'
+import SubscribeSection from '@/components/home/SubscribeSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
@@ -355,6 +356,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             )
           )
         })}
+
+        {/* ── Stay in the loop — desktop only, bottom of the page's own
+                content (after all three of the reorderable blocks above,
+                regardless of their admin-configured order) — see
+                SubscribeSection's own doc. Hidden while searching, same as
+                Browse everything/the map above it. ─────────────────────── */}
+        {!isMobile && !q && <SubscribeSection />}
 
         {/* ── The grid — grouped into labeled sections; a search narrows each
                 section's cards and hides any section left empty. ──────────── */}

@@ -1,0 +1,159 @@
+'use client'
+
+import { useState } from 'react'
+import type { CategoryConfig } from '@/lib/categories'
+import { useCategories } from '@/lib/useCategories'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { withCommunity } from '@/lib/useCommunityData'
+import Honeypot from '@/components/Honeypot'
+
+// ── "Stay in the loop" signup — desktop only, right after the map ──────────
+// The home screen ends at the map with nothing after it but the footer; this
+// puts that space to use. A visitor gives an email, picks which categories
+// they care about (or leaves "All categories" checked), and opts into new
+// listings and/or closures for those — deliberately not edits, which felt
+// excessive for what this is meant to be.
+//
+// Desktop only for now — mobile stays as it is; this can come to mobile
+// later if a good spot for it turns up there, but the goal for mobile is to
+// stay simple rather than add another section.
+//
+// Instant, per-event email (see src/app/api/admin/submissions/[id]/route.ts's
+// post-approval hook and subscriberEmail.ts) — no digest/cron, so this is
+// the entire signup surface; nothing else to configure after submitting
+// besides the unsubscribe link every notification carries.
+export default function SubscribeSection() {
+  const categories = useCategories()
+  const community = useCommunitySlug()
+  const [email, setEmail] = useState('')
+  const [allCategories, setAllCategories] = useState(true)
+  const [selected, setSelected] = useState<string[]>([])
+  const [notifyAdd, setNotifyAdd] = useState(true)
+  const [notifyClosure, setNotifyClosure] = useState(true)
+  const [honeypot, setHoneypot] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  const eligible = (categories ?? []).filter((c: CategoryConfig) => c.kind === 'listing')
+  if (eligible.length === 0) return null
+
+  function toggleCategory(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    if (!notifyAdd && !notifyClosure) {
+      setError('Pick at least one thing to be notified about.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch(withCommunity('/api/subscribers', community), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          categories: allCategories ? null : selected,
+          notifyAdd,
+          notifyClosure,
+          company: honeypot,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok || !body.ok) {
+        setError((body.errors ?? ['Something went wrong.']).join(' '))
+        return
+      }
+      setDone(true)
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <section className="mt-14">
+      <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the loop</h2>
+
+        {done ? (
+          <p className="text-sm text-muted">
+            You&apos;re subscribed. We&apos;ll email you when something you picked changes — every email
+            has an unsubscribe link.
+          </p>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-muted">
+              Get an email when a new listing is added, or one closes, in the categories you pick.
+            </p>
+            <form onSubmit={handleSubmit} className="max-w-[560px] space-y-4">
+              <Honeypot value={honeypot} onChange={setHoneypot} />
+
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                aria-label="Email address"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={allCategories}
+                    onChange={(e) => setAllCategories(e.target.checked)}
+                  />
+                  All categories
+                </label>
+                {!allCategories && (
+                  <div className="mt-2 grid max-h-40 grid-cols-2 gap-x-4 gap-y-1.5 overflow-y-auto rounded-lg border border-slate-100 p-3">
+                    {eligible.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(c.id)}
+                          onChange={() => toggleCategory(c.id)}
+                        />
+                        <span className="truncate">{c.pluralLabel}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={notifyAdd} onChange={(e) => setNotifyAdd(e.target.checked)} />
+                  New listings
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={notifyClosure} onChange={(e) => setNotifyClosure(e.target.checked)} />
+                  Closures
+                </label>
+              </div>
+
+              {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-60"
+              >
+                {submitting ? 'Subscribing…' : 'Subscribe'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}

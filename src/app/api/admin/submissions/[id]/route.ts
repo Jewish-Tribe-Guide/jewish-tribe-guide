@@ -6,6 +6,12 @@ import { sendDecisionEmail } from '@/lib/confirmationEmail'
 import { sendReviewActionNotification, sendStatusChangeDigest } from '@/lib/email'
 import { loadSyncableListing, syncOneListing } from '@/lib/syncListing'
 import { communitySlugFromRequest, resolveCommunity } from '@/lib/communityStore'
+import { getResourceRowById } from '@/lib/resourceStore'
+import { getCategoryById } from '@/lib/categoryStore'
+import { listSubscribersForCategory } from '@/lib/subscriberStore'
+import { sendNewListingNotification, sendClosureNotification } from '@/lib/subscriberEmail'
+import { siteUrl } from '@/lib/siteUrl'
+import { routes } from '@/lib/routes'
 
 // PATCH /api/admin/submissions/:id
 // body: { status: 'approved' | 'rejected', reason?: string }
@@ -62,6 +68,36 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
       ),
     ])
   })
+
+  // Notify category subscribers (see SubscribeSection.tsx / subscriberStore.ts)
+  // — a new listing they picked, or one closing. Best-effort, scheduled with
+  // after() same as the decision/review emails above; a lookup or send
+  // failure here must never affect the approval that already happened.
+  // 'update' is deliberately excluded — subscribers only opted into add/
+  // closure, never edits.
+  if (decision === 'approved' && (submission.operation === 'create' || submission.operation === 'delete')) {
+    after(async () => {
+      try {
+        const resource = submission.target_id ? await getResourceRowById(submission.target_id, community.slug) : null
+        if (!resource) return
+        const category = await getCategoryById(community.slug, resource.category)
+        if (!category) return
+
+        const kind = submission.operation === 'create' ? 'add' : 'closure'
+        const subscribers = await listSubscribersForCategory(community.slug, resource.category, kind)
+        if (subscribers.length === 0) return
+
+        if (kind === 'add') {
+          const url = `${siteUrl()}${routes.listing(community.slug, resource.category, resource.id)}`
+          await sendNewListingNotification(subscribers, { name: resource.name, url }, category.pluralLabel)
+        } else {
+          await sendClosureNotification(subscribers, { name: resource.name }, category.pluralLabel)
+        }
+      } catch (err) {
+        console.error('[admin/submissions/:id] Subscriber notification failed:', err)
+      }
+    })
+  }
 
   // Sync the listing against Google when there's something new to learn.
   //
