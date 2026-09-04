@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, type RenderResult } from '@testing-library/react'
+import { act, cleanup, screen, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
@@ -151,7 +152,7 @@ describe('Landing', () => {
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
     ]
 
-    it('defaults to map before zmanim when nothing is configured (no built-in rows at all)', () => {
+    it('defaults to zmanim before map when nothing is configured (no built-in rows at all)', () => {
       const { container } = renderLanding(undefined, {
         content: { categories: withMapAndZmanim, homeSections: [] },
       })
@@ -161,7 +162,7 @@ describe('Landing', () => {
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="zmanim-strip-stub"'))
+      expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
     })
 
     it('follows the admin-configured order — zmanim before map', () => {
@@ -206,6 +207,48 @@ describe('Landing', () => {
 
       expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
       expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('the "Browse everything" flat grid (desktop)', () => {
+    // The tab nav above already lists every category too, grouped under
+    // invented umbrella labels and hidden until hover — this grid exists
+    // specifically so nothing is grouped and nothing needs hovering. Its own
+    // describe block, not folded into the "narrows the grid" test above,
+    // because that test's assertions are about the mobile/search grid one
+    // section down, not this one.
+    it('shows every card flat, not grouped under a section heading', () => {
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+      renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
+
+      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      // Both cards render as siblings under the ONE "Browse everything"
+      // heading — not under their own admin-configured section titles
+      // ("Food and Hospitality", etc.), which is what "flat" means here.
+      const grid = heading.parentElement!
+      expect(within(grid).getByText('Grocery Stores')).toBeInTheDocument()
+      expect(within(grid).getByText('Synagogues')).toBeInTheDocument()
+    })
+
+    it('hides while actively searching — the grouped grid below already serves as results', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
+
+      expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
+      await user.type(screen.getByLabelText('Search resources'), 'grocery')
+      expect(screen.queryByRole('heading', { name: 'Browse everything' })).not.toBeInTheDocument()
+    })
+
+    it('tracks category_opened with source "grid" on a card click', async () => {
+      const user = userEvent.setup()
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+
+      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
+
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })
     })
   })
 

@@ -1,9 +1,11 @@
 // Seeds the three built-in home-screen blocks (featured cards, the embedded
-// map, Zmanim & Shabbos) into `home_section`, at the position they've always
-// had as hardcoded fixed spots in Landing.tsx (featured + map first, zmanim
-// last) — so an existing site's home screen renders identically after this
-// migration as it did before it, until an admin actually reorders something
-// via the new unified block list in /admin.
+// map, Zmanim & Shabbos) into `home_section`, at Landing.tsx's current
+// default order (featured, then zmanim, then map) — so a fresh community
+// (never touched the ordering in /admin) matches what a new visitor sees on
+// the home page without needing a manual reorder first. An existing site
+// that already has these rows is untouched by this script (see the idempotent
+// note below) — reorder those via the admin's own block list, same as any
+// other admin edit, not by re-running this.
 //
 // Idempotent: upserts by (community_id, id), safe to run again (e.g. after
 // adding a second community) without disturbing an admin's own reordering —
@@ -23,15 +25,15 @@ if (!url || !serviceRoleKey) {
 
 const supabase = createClient(url, serviceRoleKey, { auth: { persistSession: false } })
 
-// Same sort_order values Landing.tsx used to hardcode this order with:
-// featured and map both ahead of every category section (which start at
-// sort_order 100, in steps of 100 — see homeSectionStore.ts), zmanim after
-// all of them. Only matters until the first admin save, which renumbers
-// everything to clean multiples of 100 based on final on-screen order.
+// Negative sort_order so all three sit ahead of every category section
+// (which start at sort_order 100, in steps of 100 — see
+// homeSectionStore.ts): featured, then zmanim, then map. Only matters until
+// the first admin save, which renumbers everything to clean multiples of 100
+// based on final on-screen order.
 const BUILT_INS = [
   { id: 'featured', kind: 'featured', title: 'Popular right now', sort_order: -300, card_ids: [] },
-  { id: 'map', kind: 'map', title: 'Explore the map', sort_order: -200, card_ids: [] },
-  { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sort_order: 999999, card_ids: [] },
+  { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sort_order: -200, card_ids: [] },
+  { id: 'map', kind: 'map', title: 'Explore the map', sort_order: -100, card_ids: [] },
 ]
 
 const { data: existing, error: readErr } = await supabase

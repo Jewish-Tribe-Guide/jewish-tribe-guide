@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { track } from '@vercel/analytics'
 import type { CardSectionDef } from './sections'
 import type { DirectoryResource } from '@/types'
 import { CategoryGlyph } from '@/lib/categoryIcons'
@@ -131,6 +132,12 @@ export default function SectionTabs({
                           <button
                             onClick={() => {
                               setOpenTitle(null)
+                              // See Landing.tsx's "Browse everything" grid —
+                              // its own click tags `source: 'grid'` for the
+                              // same category_opened event, so the admin
+                              // Metrics tab can compare actual usage between
+                              // the two instead of guessing which nav to keep.
+                              track('category_opened', { category: card.id ?? card.title, source: 'tab-nav' })
                               onOpenCard(card)
                             }}
                             className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-slate-50"

@@ -52,10 +52,13 @@ export type LandingProps = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — a short gateway: section tabs → hero + search → "Popular right
-//   now" (three featured cards) → "Explore the map" → Zmanim & Shabbos →
-//   footer, each labeled so the page reads as distinct sections rather than
-//   one long blur. The full card index lives on its own page (AllCategories),
+//   Desktop — section tabs (hover mega-menus, kept alongside the grid below
+//   rather than replaced by it — see the "keep it just in case" note on the
+//   grid itself) → hero + search → a flat "Browse everything" grid (every
+//   card, always visible, no hover needed) → "Popular right now" (three
+//   featured cards) → Zmanim & Shabbos → "Explore the map" → footer, each
+//   labeled so the page reads as distinct sections rather than one long
+//   blur. The full card index also lives on its own page (AllCategories),
 //   reachable from the tabs or the "Browse all categories" button.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
@@ -162,7 +165,7 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const builtInOrder =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['featured', 'map', 'zmanim'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
+      : (['featured', 'zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
   // The card grid shows inline on mobile always, and on desktop only as search
   // results (see the component note above). Expressed as a class rather than a
@@ -215,6 +218,34 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+
+        {/* ── Browse everything (desktop) — a flat, always-visible grid of
+                every card: every real category, Patient & Family Support,
+                Volunteer, custom forms. Not grouped under the section tabs'
+                own umbrella labels above ("Jewish Institutions and
+                Information", etc.) — a visitor wants "Synagogues", not which
+                invented group it lives under. The tab nav's hover mega-menus
+                stay exactly as they are; this is a second, always-visible way
+                to reach the same destinations for anyone who doesn't think to
+                hover, not a replacement. Hidden while actively searching —
+                the grouped grid further down already serves as live search
+                results and is unchanged. `source: 'grid'` on the click lets
+                the admin Metrics tab compare actual usage against the tab
+                nav's own `source: 'tab-nav'` (see SectionTabs), so keeping
+                both isn't a permanent guess. */}
+        {!isMobile && !q && (
+          <section className="mt-12">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
+            {loading ? (
+              <CardGrid cards={entryCards} loadingCount={6} />
+            ) : (
+              <CardGrid
+                cards={filtered ?? []}
+                onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+              />
+            )}
+          </section>
+        )}
 
         {/* ── The desktop gateway's three singleton blocks — featured cards,
                 the embedded map, Zmanim & Shabbos — in the admin-configured

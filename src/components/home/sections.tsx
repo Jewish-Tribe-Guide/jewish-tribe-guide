@@ -54,7 +54,23 @@ export type CardDef = {
 // Soft tile tints, cycled per card across the grid.
 export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
-export function Card({ card, tint, priority = false }: { card: CardDef; tint: string; priority?: boolean }) {
+export function Card({
+  card,
+  tint,
+  priority = false,
+  onCardClick,
+}: {
+  card: CardDef
+  tint: string
+  priority?: boolean
+  /** Fired on click, alongside the real navigation (not instead of it) —
+   *  callers use this to tag which on-screen surface a card was opened
+   *  from (e.g. the tab nav's mega-menu vs. the always-visible desktop
+   *  grid — see CardGrid's own doc). Optional: most callers of Card don't
+   *  need this, so it defaults to nothing rather than every render site
+   *  having to pass a no-op. */
+  onCardClick?: (card: CardDef) => void
+}) {
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
   return (
@@ -64,7 +80,11 @@ export function Card({ card, tint, priority = false }: { card: CardDef; tint: st
     // the tile itself now navigates the normal way: Link already knows to
     // leave a modified click (cmd/ctrl/middle) to the browser and only
     // intercept a plain one, which a click handler can never do on its own.
-    <Link href={card.href} className="group block w-full cursor-pointer">
+    <Link
+      href={card.href}
+      className="group block w-full cursor-pointer"
+      onClick={onCardClick ? () => onCardClick(card) : undefined}
+    >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
@@ -132,9 +152,12 @@ export function CardSkeleton() {
 export function CardGrid({
   cards,
   loadingCount = 0,
+  onCardClick,
 }: {
   cards: CardDef[]
   loadingCount?: number
+  /** See Card's own doc — threaded straight through. */
+  onCardClick?: (card: CardDef) => void
 }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
@@ -146,6 +169,7 @@ export function CardGrid({
           // The first row is above the fold at every breakpoint (4 cards is the
           // widest row the grid ever renders), so those load eagerly.
           priority={i < 4}
+          onCardClick={onCardClick}
         />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
