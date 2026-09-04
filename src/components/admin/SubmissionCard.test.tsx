@@ -224,6 +224,15 @@ describe('read-only history card — who reviewed it', () => {
     renderHistoryCard({ reviewed_by: null })
     expect(screen.queryByText(/^by /)).not.toBeInTheDocument()
   })
+
+  // How long something's been sitting matters most in the live moderation
+  // queue (a reviewer deciding what's overdue), but this line isn't gated on
+  // onModerate — it's the same "when was this submitted" fact either way,
+  // so the history view gets it too rather than needing a second code path.
+  it('shows when it was submitted, separately from when it was reviewed', () => {
+    renderHistoryCard({ created_at: '2026-01-05T14:30:00Z', reviewed_at: '2026-01-06T09:00:00Z' })
+    expect(screen.getByText(/Submitted Jan 5, 2026/)).toBeInTheDocument()
+  })
 })
 
 // Real bug, seen by a moderator: a davening-times edit rendered
