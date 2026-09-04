@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
+import SearchSection from '@/components/home/SearchSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
@@ -222,6 +223,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+
+        {/* ── Search (desktop) — its own headed section now, not folded into
+                the hero band above — see that component's own doc. */}
+        <SearchSection heroTitle={settings.heroTitle} query={query} onQueryChange={setQuery} />
 
         {/* ── Browse everything (desktop) — a flat, always-visible grid of
                 every card: every real category, Patient & Family Support,
