@@ -382,6 +382,36 @@ describe('GenericListingCard — expanded', () => {
     expect(onNavigate).toHaveBeenNthCalledWith(2, -1)
   })
 
+  // A visible arrow at either end of the list would look clickable but
+  // silently do nothing — this is what's supposed to stop that, not just
+  // the boundary check inside GenericDirectory's own navigateFromCard.
+  it('disables the Previous/Next buttons per hasPrev/hasNext, and clicking Next calls onNavigate(1)', async () => {
+    const user = userEvent.setup()
+    const onNavigate = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard
+        item={item}
+        category={category}
+        upvotes={false}
+        count={0}
+        onNavigate={onNavigate}
+        hasPrev={false}
+        hasNext={true}
+        {...requiredHandlers}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    expect(screen.getByRole('button', { name: 'Previous listing' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next listing' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Next listing' }))
+    expect(onNavigate).toHaveBeenCalledWith(1)
+  })
+
   // GenericDirectory needs to close THIS card and open a sibling from
   // outside it — the whole reason GenericListingCard exposes a ref handle.
   it('opens and closes via an imperative ref handle', async () => {

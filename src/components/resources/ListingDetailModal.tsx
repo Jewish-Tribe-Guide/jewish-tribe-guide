@@ -11,7 +11,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ShareButton from './ShareButton'
-import { PencilIcon, FlagIcon } from '@/components/icons'
+import { PencilIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 
 type Props = {
   isOpen: boolean
@@ -46,6 +46,12 @@ type Props = {
    *  left-to-right is the one order a visitor actually recognizes as
    *  "what I was just scrolling past," and that's what the arrows follow. */
   onNavigate?: (direction: 1 | -1) => void
+  /** Whether there's actually a previous/next card to move to — draws the
+   *  arrow buttons below dimmed and inert at either end, rather than a
+   *  clickable-looking arrow that visibly does nothing when tapped. Only
+   *  meaningful together with onNavigate; ignored otherwise. */
+  hasPrev?: boolean
+  hasNext?: boolean
 }
 
 /** Desktop's counterpart to the card's inline expand. A multi-column grid has
@@ -76,6 +82,8 @@ export default function ListingDetailModal({
   canEdit,
   canReport,
   onNavigate,
+  hasPrev,
+  hasNext,
 }: Props) {
   const community = useCommunitySlug()
 
@@ -106,21 +114,56 @@ export default function ListingDetailModal({
 
   if (!isOpen) return null
 
+  // Visible only when there's actually somewhere for them to go — see
+  // onNavigate's own comment on why a dimmed, inert arrow beats hiding it
+  // outright (a missing button at one end while browsing reads as a glitch;
+  // a visibly-disabled one reads as "you've reached the end").
+  const showNav = !!onNavigate
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
+      {/* Lightbox-style arrows, fixed to the viewport rather than anchored to
+          the dialog card itself — keeps them in the same reachable spot
+          however wide or narrow the card ends up (see its own width
+          comment), the same way Google Photos' don't move with the image. */}
+      {showNav && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
+          disabled={!hasPrev}
+          aria-label="Previous listing"
+          className="fixed left-4 top-1/2 z-50 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+        >
+          <ChevronLeftIcon className="h-5 w-5" />
+        </button>
+      )}
+      {showNav && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
+          disabled={!hasNext}
+          aria-label="Next listing"
+          className="fixed right-4 top-1/2 z-50 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+        >
+          <ChevronRightIcon className="h-5 w-5" />
+        </button>
+      )}
       <div
-        // max-w-xl (576px) — between the original max-w-lg (512px, read as
-        // cramped once the page around it had real room to spare) and a
-        // later max-w-2xl (672px, tried as the fix for that and felt too
-        // wide/short the other way). Content here is single-column
-        // throughout (see PlaceDetailBody) — nothing depends on the wider
-        // measure, so this only affects how the action-button row and badge
-        // chips wrap, not the layout structure.
-        className="flex flex-col w-full max-w-xl max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
+        // max-w-md (448px) — this went 512 (cramped, page had room to
+        // spare) → 672 (fixed that, but read too wide/short the other way)
+        // → 576 → here. The narrower widths above all sized the dialog for
+        // its widest-content listing; a sparse one (an address, a phone, no
+        // description) then rendered short *and* wide at that same fixed
+        // width — proportioned like a business card lying on its side, not
+        // like a focused dialog. 448px is narrow enough that even a sparse
+        // listing reads as a normal vertical card shape, and was checked
+        // against the busiest real case (4 action buttons + a cert badge)
+        // to confirm nothing wraps awkwardly at this width.
+        className="flex flex-col w-full max-w-md max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label={name}

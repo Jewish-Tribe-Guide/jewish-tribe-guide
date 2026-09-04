@@ -711,11 +711,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // for grid, the same stretching this was meant to avoid) space them
         // across the row.
         <div className="space-y-2 lg:space-y-0 lg:grid lg:justify-start lg:gap-3 lg:grid-cols-[repeat(auto-fill,minmax(280px,448px))]">
-          {filtered.map((item) => (
+          {filtered.map((item, index) => (
             <div key={item.id} ref={setItemRowRef(item.id)}>
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}
+              hasPrev={index > 0}
+              hasNext={index < filtered.length - 1}
               item={item}
               category={category}
               showCategoryLabel={false}

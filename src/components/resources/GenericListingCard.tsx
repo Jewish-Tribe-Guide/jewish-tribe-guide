@@ -93,6 +93,11 @@ type Props = {
    *  which is the only thing that knows the current filtered/sorted order
    *  and every sibling card's GenericListingCardHandle. */
   onNavigate?: (direction: 1 | -1) => void
+  /** Whether onNavigate actually has somewhere to go — see
+   *  ListingDetailModal's own doc comment on why this draws a dimmed,
+   *  inert arrow at either end instead of no arrow at all. */
+  hasPrev?: boolean
+  hasNext?: boolean
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -112,6 +117,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   showDistanceSlot = false,
   onNameClick,
   onNavigate,
+  hasPrev,
+  hasNext,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   useImperativeHandle(ref, () => ({
@@ -630,6 +637,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           canEdit={canEdit}
           canReport={canReport}
           onNavigate={onNavigate}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
         />
       )}
     </div>
