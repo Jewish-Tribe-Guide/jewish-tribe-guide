@@ -5,7 +5,7 @@ import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 type Props = {
-  settings: Pick<SiteSettings, 'heroTitle' | 'mission'>
+  settings: Pick<SiteSettings, 'name' | 'heroTitle' | 'mission'>
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the search box inert (nothing to filter in a
@@ -24,10 +24,18 @@ type Props = {
 // own component so the admin Site preview can render the exact same markup
 // the live home screen does, fed by a draft instead of the saved settings.
 //
-// Desktop gets a warm two-column band (headline/mission/search beside a
-// photo panel) instead of mobile's plain centered block — mobile has to
-// stay practical in a narrow, scroll-cost-sensitive space; desktop has the
-// width to spend on a real sense of place before the practical part starts.
+// Desktop gets a warm two-column band (name/mission/search beside a photo
+// panel) instead of mobile's plain centered block — mobile has to stay
+// practical in a narrow, scroll-cost-sensitive space, so it leads with
+// `heroTitle` (the practical "what are you looking for" prompt) the same
+// way it always has; the site's actual name is already one small line in
+// the sticky header above it, and repeating it large would just spend
+// mobile's scarcer vertical space restating something already on screen.
+// Desktop can afford both: it leads with `settings.name` — nowhere else on
+// the page says who this is at any size — with `heroTitle` demoted to a
+// small label heading its own search section below, rather than doubling
+// as the page's main heading the way it does on mobile.
+//
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render
 // (SSR-safe), so branching here would flash the desktop layout on a phone
@@ -106,12 +114,17 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
       <section className="mt-7 hidden overflow-hidden rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-amber-100/60 desktop:grid desktop:grid-cols-[1.15fr_1fr] desktop:items-stretch">
         <div className="flex flex-col justify-center px-12 py-14">
           <h1 className="text-4xl font-semibold leading-[1.1] text-slate-900 text-balance">
-            {settings.heroTitle}
+            {settings.name}
           </h1>
           <p className="mt-4 max-w-[46ch] text-base leading-relaxed text-slate-600">
             {settings.mission}
           </p>
-          {ui.search.landing && <div className="mt-7 max-w-[480px]">{searchBox}</div>}
+          {ui.search.landing && (
+            <div className="mt-8 max-w-[480px]">
+              <h2 className="mb-2.5 text-sm font-semibold text-slate-700">{settings.heroTitle}</h2>
+              {searchBox}
+            </div>
+          )}
           {viewMapButton}
         </div>
         {/* A CSS pattern stand-in, not a real photo — see the component doc.

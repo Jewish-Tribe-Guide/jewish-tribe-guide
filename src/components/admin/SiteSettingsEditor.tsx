@@ -274,7 +274,9 @@ export default function SiteSettingsEditor({
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
           <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">The big heading on the home screen.</span>
+          <span className="block text-[11px] text-muted mt-1">
+            The big heading on mobile; labels the search box on desktop, where the site name leads instead.
+          </span>
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
