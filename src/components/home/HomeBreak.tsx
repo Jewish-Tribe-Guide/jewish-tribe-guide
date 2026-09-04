@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useZmanim } from '@/lib/useZmanim'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import FeedbackForm from '@/components/FeedbackForm'
@@ -33,6 +33,17 @@ type ContributeAction = 'create' | 'edit' | 'report'
 // "which bucket is it filed under". Feedback stays as a small secondary
 // link, correctly scoped to general site feedback rather than the headline
 // action.
+//
+// Both pickers render as an anchored dropdown under the button row (see
+// pickerRef below), not a full backdrop modal the way they first shipped —
+// picking a result still deep-links to a real full-page form (Add/Edit's
+// ListingForm, Report's own screen), and a dark-backdrop dialog dissolving
+// straight into an unrelated page read as two different interaction models
+// stitched together. A lighter dropdown reads as "choosing where to go"
+// instead, so landing on the form after feels like a continuation rather
+// than a jump. The form itself stays exactly as it was — still the one
+// shared mechanism reached from a search result's own Edit/Report button
+// too, so the destination behaves the same regardless of entry point.
 export default function HomeBreak({
   coords,
   locationLabel,
@@ -56,6 +67,31 @@ export default function HomeBreak({
   // category directory wouldn't know exist yet — even unclicked, seeing
   // these here is what teaches that the site works this way at all.
   const [contributeAction, setContributeAction] = useState<ContributeAction | null>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
+
+  // Closes on Escape or a click/tap outside the button row + its open
+  // picker — the picker used to be a real backdrop modal, which handled
+  // this itself; now that it's an anchored dropdown (see ContributePicker/
+  // EditReportPicker's own doc on why) there's no backdrop to catch that,
+  // so this owns it instead. `pointerdown` in the capture phase, not
+  // `click`, matches LocationControl's own popover — it closes before a
+  // click on one of the OTHER two buttons fires its own handler, so
+  // switching straight from Add to Edit doesn't flash both states.
+  useEffect(() => {
+    if (!contributeAction) return
+    function onDown(e: PointerEvent) {
+      if (!pickerRef.current?.contains(e.target as Node)) setContributeAction(null)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setContributeAction(null)
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [contributeAction])
 
   return (
     <div className="my-12 grid grid-cols-2 gap-4">
@@ -123,7 +159,7 @@ export default function HomeBreak({
           A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
           from the community that actually uses this guide.
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div ref={pickerRef} className="relative flex flex-wrap gap-2">
           <button
             onClick={() => setContributeAction('create')}
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
@@ -142,6 +178,11 @@ export default function HomeBreak({
           >
             <FlagIcon className="h-3.5 w-3.5" /> Report
           </button>
+
+          {contributeAction === 'create' && <ContributePicker onClose={() => setContributeAction(null)} />}
+          {(contributeAction === 'edit' || contributeAction === 'report') && (
+            <EditReportPicker action={contributeAction} coords={coords} onClose={() => setContributeAction(null)} />
+          )}
         </div>
         {settings.feedbackEnabled && (
           <p className="mt-4 text-xs text-muted">
@@ -158,10 +199,6 @@ export default function HomeBreak({
           successMessage={settings.feedbackSuccessMessage}
           onClose={() => setFeedbackOpen(false)}
         />
-      )}
-      {contributeAction === 'create' && <ContributePicker onClose={() => setContributeAction(null)} />}
-      {(contributeAction === 'edit' || contributeAction === 'report') && (
-        <EditReportPicker action={contributeAction} coords={coords} onClose={() => setContributeAction(null)} />
       )}
     </div>
   )

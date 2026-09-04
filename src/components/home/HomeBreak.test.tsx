@@ -140,5 +140,53 @@ describe('HomeBreak', () => {
 
       expect(screen.getByRole('dialog', { name: pickerTitle })).toBeInTheDocument()
     })
+
+    // The picker used to be a real backdrop modal, which closed itself on a
+    // backdrop click. It's an anchored dropdown now (see HomeBreak's own
+    // doc on why — a dark-backdrop dialog dissolving straight into an
+    // unrelated full-page form read as two different interaction models
+    // stitched together), so HomeBreak owns closing it instead.
+    it('closes the open picker on Escape', async () => {
+      const user = userEvent.setup()
+      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+      renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
+        content: { categories: [grocery] },
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Add' }))
+      expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('closes the open picker on a click outside it', async () => {
+      const user = userEvent.setup()
+      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+      renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
+        content: { categories: [grocery] },
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Add' }))
+      expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('heading', { name: 'Zmanim & Shabbos' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('switches straight from one picker to another without both flashing open', async () => {
+      const user = userEvent.setup()
+      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+      renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
+        content: { categories: [grocery] },
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Add' }))
+      expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Edit' }))
+      expect(screen.queryByRole('dialog', { name: 'Add a listing' })).not.toBeInTheDocument()
+      expect(screen.getByRole('dialog', { name: 'Edit a listing' })).toBeInTheDocument()
+    })
   })
 })
