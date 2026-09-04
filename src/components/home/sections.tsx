@@ -16,6 +16,8 @@ import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import CategoryIcon from '@/components/CategoryIcon'
+import { getCategoryColor } from '@/lib/categoryColor'
 
 export type CardDef = {
   title: string
@@ -174,6 +176,78 @@ export function CardGrid({
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />
+      ))}
+    </div>
+  )
+}
+
+/** One row in CompactCardGrid — icon avatar (never the uploaded photo; see
+ *  that component's own note), name, nothing else. */
+function CompactCard({
+  card,
+  color,
+  onCardClick,
+}: {
+  card: CardDef
+  color: string
+  onCardClick?: (card: CardDef) => void
+}) {
+  return (
+    // No border/background at rest — this is navigation, not content; a
+    // border on every one of 15+ rows just moves the "too many different
+    // things crammed in" problem from photos to boxes. Background-only on
+    // hover, same as the tab nav's own mega-menu items and its section
+    // buttons — a click target still reads clearly without a permanent box
+    // around it.
+    <Link
+      href={card.href}
+      className="group flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-colors hover:bg-slate-50"
+      onClick={onCardClick ? () => onCardClick(card) : undefined}
+    >
+      {card.icon ? (
+        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-8 w-8 text-base shrink-0" sizePx={32} />
+      ) : (
+        <span className="h-8 w-8 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+      )}
+      <span className="min-w-0 truncate text-sm font-medium text-slate-800 group-hover:text-primary transition-colors">
+        {card.title}
+      </span>
+    </Link>
+  )
+}
+
+/** A dense alternative to CardGrid — icon + name in a small bordered row
+ *  instead of a full photo tile, tiled many-per-line rather than 2-4 wide.
+ *  For a list meant to hold EVERY card at once (see Landing's "Browse
+ *  everything"), not a curated few: a wall of full-size photo tiles reads as
+ *  "trying to fit too many different things in one place" (an admin-uploaded
+ *  photo, a flat tint, a test fixture's placeholder — all at hero-card size,
+ *  side by side) and only gets heavier as more categories are added. This
+ *  stays calm at any count because every row costs the same, small amount of
+ *  space regardless of what's behind it — never the uploaded photo, always
+ *  just the same icon avatar every listing card already uses, so growing the
+ *  list doesn't grow the visual noise. CardGrid's rich photo treatment is
+ *  still exactly right for a SMALL curated set ("Popular right now") where a
+ *  handful of considered photos are the point, not a liability. */
+export function CompactCardGrid({
+  cards,
+  categories,
+  onCardClick,
+}: {
+  cards: CardDef[]
+  /** Resolves each card's icon-avatar tint — see getCategoryColor. */
+  categories: CategoryConfig[] | null
+  onCardClick?: (card: CardDef) => void
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {cards.map((card) => (
+        <CompactCard
+          key={card.id ?? card.title}
+          card={card}
+          color={getCategoryColor(categories, card.id ?? '')}
+          onCardClick={onCardClick}
+        />
       ))}
     </div>
   )

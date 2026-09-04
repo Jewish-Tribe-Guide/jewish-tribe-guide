@@ -1,11 +1,15 @@
-// Seeds the three built-in home-screen blocks (featured cards, the embedded
-// map, Zmanim & Shabbos) into `home_section`, at Landing.tsx's current
-// default order (featured, then zmanim, then map) — so a fresh community
-// (never touched the ordering in /admin) matches what a new visitor sees on
-// the home page without needing a manual reorder first. An existing site
-// that already has these rows is untouched by this script (see the idempotent
-// note below) — reorder those via the admin's own block list, same as any
-// other admin edit, not by re-running this.
+// Seeds the built-in home-screen blocks (the embedded map, Zmanim & Shabbos)
+// into `home_section`, at Landing.tsx's current default order (zmanim, then
+// map) — so a fresh community (never touched the ordering in /admin) matches
+// what a new visitor sees on the home page without needing a manual reorder
+// first. 'featured' ("Popular right now") isn't seeded by default any more —
+// Landing.tsx's own "Browse everything" grid already shows every card flat,
+// so a curated repeat of three of them right below it added nothing; an
+// admin who still wants a curated highlight can add the block back from the
+// Desktop & mobile tab's "+ Add" button. An existing site that already has
+// these rows is untouched by this script (see the idempotent note below) —
+// reorder or remove those via the admin's own block list, same as any other
+// admin edit, not by re-running this.
 //
 // Idempotent: upserts by (community_id, id), safe to run again (e.g. after
 // adding a second community) without disturbing an admin's own reordering —

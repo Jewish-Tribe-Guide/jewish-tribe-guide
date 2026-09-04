@@ -146,7 +146,7 @@ describe('Landing', () => {
     expect(screen.queryByTestId('zmanim-strip-stub')).not.toBeInTheDocument()
   })
 
-  describe('the gateway block order (Popular right now / Explore the map / Zmanim & Shabbos)', () => {
+  describe('the gateway block order (Explore the map / Zmanim & Shabbos)', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
@@ -231,6 +231,23 @@ describe('Landing', () => {
       expect(within(grid).getByText('Synagogues')).toBeInTheDocument()
     })
 
+    // A list meant to hold every card at once (13+ real categories, growing)
+    // reads as "too many different things crammed together" the moment each
+    // row gets its own bordered box — that's the exact complaint that moved
+    // this section from CardGrid's photo tiles to CompactCardGrid in the
+    // first place. A border re-added later, even a subtle one, quietly
+    // reintroduces the same crowding at scale.
+    it('rows have no border/background at rest — only on hover, like the tab nav\'s own menu items', () => {
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+
+      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      const row = within(heading.parentElement!).getByText('Grocery Stores').closest('a')!
+      expect(row.className).not.toMatch(/\bborder\b/)
+      expect(row.className).not.toMatch(/\bbg-white\b/)
+      expect(row.className).toMatch(/hover:bg-slate-50/)
+    })
+
     it('hides while actively searching — the grouped grid below already serves as results', async () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
@@ -252,12 +269,23 @@ describe('Landing', () => {
     })
   })
 
-  it('calls onViewAllCategories when "Browse all categories" is clicked', async () => {
+  // 'featured' ("Popular right now") is no longer in the default block set
+  // (see the "Browse everything" describe block above — it's now a
+  // redundant repeat of cards the flat grid already shows), so its own
+  // "Browse all categories" link no longer appears by default either. Still
+  // real, working code for a community that opts back into the block — this
+  // configures it explicitly rather than relying on the old default.
+  it('calls onViewAllCategories when "Popular right now"\'s "Browse all categories" is clicked, once opted back in', async () => {
     const user = userEvent.setup()
     const onViewAllCategories = vi.fn()
     renderLanding(
       { onViewAllCategories },
-      { content: { categories: [makeCategory()] } },
+      {
+        content: {
+          categories: [makeCategory()],
+          homeSections: [{ id: 'featured', kind: 'featured', title: 'Popular right now', sortOrder: 100, cardIds: [] }],
+        },
+      },
     )
 
     await user.click(screen.getByRole('button', { name: /Browse all categories/ }))

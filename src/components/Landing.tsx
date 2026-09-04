@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -162,10 +162,16 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title }))
+  // 'featured' ("Popular right now") isn't in this default any more — it's a
+  // curated subset of exactly what the "Browse everything" grid above
+  // already shows in full, so on a fresh community it would just repeat
+  // three of those same cards a second time. Still fully supported: an admin
+  // can add it back from the "+ Add" built-in-block button in the Desktop &
+  // mobile tab for a community that wants a curated highlight anyway.
   const builtInOrder =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['featured', 'zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
+      : (['zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
   // The card grid shows inline on mobile always, and on desktop only as search
   // results (see the component note above). Expressed as a class rather than a
@@ -232,18 +238,22 @@ export default function Landing({ onNavigate, onOpenFlow, onViewAllCategories, c
                 results and is unchanged. `source: 'grid'` on the click lets
                 the admin Metrics tab compare actual usage against the tab
                 nav's own `source: 'tab-nav'` (see SectionTabs), so keeping
-                both isn't a permanent guess. */}
+                both isn't a permanent guess.
+
+                CompactCardGrid, not CardGrid — a list meant to hold every
+                card at once got heavier with every category added and read
+                as a wall of mismatched photo tiles (real photos, flat tints,
+                still-loading placeholders, side by side). See that
+                component's own doc for why a small icon-avatar row instead
+                of a full photo tile is the fix. */}
         {!isMobile && !q && (
           <section className="mt-12">
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
-            {loading ? (
-              <CardGrid cards={entryCards} loadingCount={6} />
-            ) : (
-              <CardGrid
-                cards={filtered ?? []}
-                onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-              />
-            )}
+            <CompactCardGrid
+              cards={loading ? entryCards : (filtered ?? [])}
+              categories={categories}
+              onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+            />
           </section>
         )}
 
