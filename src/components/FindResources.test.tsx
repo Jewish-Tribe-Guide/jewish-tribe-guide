@@ -119,6 +119,20 @@ describe('FindResources — a real listing category', () => {
     expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' })
   })
 
+  // Unlike edit/report, 'create' has no listing to resolve — HomeBreak's
+  // Add/Edit/Report picker (ContributePicker) links straight to
+  // `?form=create` with no `?item=`, expecting the create form to just be
+  // there on arrival, the same way a deep-linked edit/report already is.
+  it('resolves a deep-linked create (searchForm="create", no searchItem) straight to the Add form', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} searchForm="create" />,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
+  })
+
   it('resolves a deep-linked edit (searchForm="edit", searchItem=<id>) to the matching listing, with no explicit openAction call', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(

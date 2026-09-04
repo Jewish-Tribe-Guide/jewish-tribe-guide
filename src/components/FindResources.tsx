@@ -181,7 +181,17 @@ export default function FindResources({
   const action =
     formParam !== null
       ? (actionSubject ??
-        (deepLinkListing ? ({ mode: formParam, listing: deepLinkListing } as ListingAction) : null))
+        // 'create' deep-links straight in with no listing to resolve first —
+        // unlike edit/report, which need `reopenItemId` to look one up. This
+        // is what lets the home screen's Add/Edit/Report picker (HomeBreak)
+        // land directly on the create form via `?form=create`, the same way
+        // a search result's Edit/Report button already deep-links into
+        // those.
+        (formParam === 'create'
+          ? ({ mode: 'create' } as ListingAction)
+          : deepLinkListing
+            ? ({ mode: formParam, listing: deepLinkListing } as ListingAction)
+            : null))
       : null
 
   // Open one hospital's About page (from the Hospitals list).

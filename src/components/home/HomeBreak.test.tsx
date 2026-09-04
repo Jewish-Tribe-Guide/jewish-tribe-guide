@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import type { ZmanimData } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
 import { renderWithProviders } from '@/test/renderWithProviders'
+import { makeCategory } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import HomeBreak from './HomeBreak'
@@ -96,7 +97,7 @@ describe('HomeBreak', () => {
     renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Suggest something/ }))
+    await user.click(screen.getByRole('button', { name: /Send a note/ }))
 
     // The Zmanim card is still in the document underneath the modal — a
     // real navigation would have unmounted it.
@@ -104,12 +105,40 @@ describe('HomeBreak', () => {
     expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
   })
 
-  it('hides the button entirely when an admin has turned feedback off', () => {
+  it('hides the feedback link entirely when an admin has turned feedback off', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
       content: { settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: false } },
     })
 
-    expect(screen.queryByRole('button', { name: /Suggest something/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Send a note/ })).not.toBeInTheDocument()
+  })
+
+  // Add/Edit/Report replaced the old single "Suggest something" button —
+  // a real, named action beats a paragraph pointing at capabilities that
+  // live elsewhere, and stays true even unclicked (it's what teaches a
+  // visitor who's never opened a category page that the site works this
+  // way at all). Each opens ContributePicker's category-choosing step —
+  // see that component's own tests for what happens after a category is
+  // picked.
+  describe('Add / Edit / Report', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+
+    it.each([
+      ['Add', 'Add a listing'],
+      ['Edit', 'Edit a listing'],
+      ['Report', 'Report a listing'],
+    ])('opens ContributePicker to the right step from the %s button', async (buttonName, pickerTitle) => {
+      const user = userEvent.setup()
+      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+      renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
+        content: { categories: [grocery] },
+      })
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: new RegExp(`^${buttonName}$`) }))
+
+      expect(screen.getByRole('dialog', { name: pickerTitle })).toBeInTheDocument()
+    })
   })
 })
