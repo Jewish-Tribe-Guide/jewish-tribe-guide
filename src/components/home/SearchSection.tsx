@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { ui } from '@/lib/uiConfig'
 import SearchBox from './SearchBox'
 
@@ -22,6 +23,17 @@ import SearchBox from './SearchBox'
 // heroTitle ("What are you looking for?" by default) is this section's own
 // heading now — the same string that used to sit inside the hero band as a
 // small search-box label continues to do that job, just one level up.
+//
+// `results` renders inside this same white box, below the search box, once
+// there's a query — typing and having the answer show up somewhere else on
+// the page read as disconnected (see Landing.tsx's own doc on why this is a
+// real placement move, not a style tweak). It's a plain slot rather than
+// this component owning the query/filtering logic itself: Landing already
+// computes the same result set mobile's own always-visible grid uses, and
+// passing it in means that work — and the CardGrid instances it renders —
+// isn't duplicated for a second, desktop-only copy. `isMobile` at the call
+// site is what keeps this prop unset (and therefore unmounted) on a phone,
+// where the grid already has its own permanent home further down the page.
 export default function SearchSection({
   heroTitle,
   query,
@@ -29,6 +41,7 @@ export default function SearchSection({
   interactive = true,
   mapIcon,
   onViewMap,
+  results,
 }: {
   heroTitle: string
   query: string
@@ -43,6 +56,10 @@ export default function SearchSection({
   /** Preview mode has nothing to navigate to, so it's left undefined there —
    *  the button still renders (for visual fidelity) but doesn't do anything. */
   onViewMap?: () => void
+  /** The matching cards/places for the current query — omitted (not just
+   *  empty) when there's nothing to show, so this renders no extra space
+   *  ahead of the first keystroke. */
+  results?: ReactNode
 }) {
   if (!ui.search.landing) return null
 
@@ -62,6 +79,7 @@ export default function SearchSection({
             View Map
           </button>
         )}
+        {results && <div className="mt-6 border-t border-slate-100 pt-6">{results}</div>}
       </div>
     </section>
   )

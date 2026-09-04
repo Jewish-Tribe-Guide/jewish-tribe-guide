@@ -173,14 +173,38 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       ? configuredBuiltIns
       : (['zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
-  // The card grid shows inline on mobile always, and on desktop only as search
-  // results (see the component note above). Expressed as a class rather than a
-  // branch: `isMobile` starts false on every render, including on a phone, so
-  // branching here meant a phone laid out the desktop home screen on its first
-  // React render and corrected itself a frame later. The media query is right
-  // the first time, so there is no correction to see. `desktop:` (not `sm:`)
-  // so a phone rotated to landscape doesn't lose the grid — see globals.css.
-  const inlineGridClass = q ? '' : ' desktop:hidden'
+  // The same result set two different homes render, depending on breakpoint:
+  // mobile shows it always (this doubles as its whole "browse everything"),
+  // desktop only once there's a query, inside SearchSection's own white box
+  // (see that component's own doc on why — a search whose answer shows up
+  // somewhere else on the page reads as disconnected). Built once here and
+  // handed to whichever one actually mounts it, so the cards (real images,
+  // not free) render exactly once rather than twice — unlike Browse
+  // everything/the map, an `isMobile` JS branch decides which one that is
+  // rather than a CSS-only dual render, and it's safe to: this content only
+  // ever needs to be right once a visitor has typed (mobile's own copy is
+  // the exception, see below), by which point hydration has long finished
+  // resolving `isMobile` for real.
+  const resultsNode = (
+    <>
+      {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
+        <p className="text-center text-sm text-slate-500">
+          Nothing matches “{q}”. Try a different word or clear the filter.
+        </p>
+      )}
+      {loading ? (
+        <CardGrid cards={entryCards} loadingCount={6} />
+      ) : (
+        sections.map((s) => (
+          <div key={s.title}>
+            <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
+            <CardGrid cards={s.cards} />
+          </div>
+        ))
+      )}
+      {placeHits.length > 0 && <PlacesResults hits={placeHits} onOpen={openPlace} />}
+    </>
+  )
 
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
@@ -226,8 +250,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
         {/* ── Search (desktop) — its own headed section now, not folded into
-                the hero band above — see that component's own doc. */}
-        <SearchSection heroTitle={settings.heroTitle} query={query} onQueryChange={setQuery} />
+                the hero band above — see that component's own doc. Carries
+                the results themselves too once there's a query, so the
+                answer shows up in the same box as the question instead of
+                somewhere else on the page. */}
+        <SearchSection
+          heroTitle={settings.heroTitle}
+          query={query}
+          onQueryChange={setQuery}
+          results={!isMobile && q ? resultsNode : undefined}
+        />
 
         {/* ── Browse everything (desktop) — a flat, always-visible grid of
                 every card: every real category, Patient & Family Support,
@@ -364,30 +396,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 Browse everything/the map above it. ─────────────────────── */}
         {!isMobile && !q && <SubscribeSection />}
 
-        {/* ── The grid — grouped into labeled sections; a search narrows each
-                section's cards and hides any section left empty. ──────────── */}
-        <section className={`mt-12 sm:mt-14 space-y-10${inlineGridClass}`}>
-            {q && (filtered?.length ?? 0) === 0 && placeHits.length === 0 && (
-              <p className="text-center text-sm text-slate-500">
-                Nothing matches “{q}”. Try a different word or clear the filter.
-              </p>
-            )}
-            {loading ? (
-              <CardGrid cards={entryCards} loadingCount={6} />
-            ) : (
-              sections.map((s) => (
-                <div key={s.title}>
-                  <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-                  <CardGrid cards={s.cards} />
-                </div>
-              ))
-            )}
-        </section>
-
-        {/* ── Matching places (individual listings within the cards) ─────────── */}
-        {placeHits.length > 0 && (
-          <PlacesResults hits={placeHits} onOpen={openPlace} />
-        )}
+        {/* ── The grid (mobile) — grouped into labeled sections; a search
+                narrows each section's cards and hides any section left
+                empty. Desktop's own copy of this same content now lives
+                inside SearchSection above instead — see resultsNode's own
+                doc on why this stays a plain CSS `desktop:hidden`, not an
+                isMobile branch: mobile needs this correct on the very first
+                paint, with no prior interaction, which only a CSS media
+                query (not a value React doesn't know for certain until
+                after hydration) can guarantee. ───────────────────────────── */}
+        <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{resultsNode}</section>
       </main>
     </>
   )

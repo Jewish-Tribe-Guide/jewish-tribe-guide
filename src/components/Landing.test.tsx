@@ -113,7 +113,13 @@ describe('Landing', () => {
     // Landing state, so the first is as good as any for a test.
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
-    expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
+    // getAllByText, not getByText: the same result set now renders twice in
+    // the DOM once there's a query — mobile's own permanent grid section,
+    // and desktop's copy inside SearchSection's white box (see Landing's
+    // resultsNode doc on why: a single mount can't live in two different
+    // places in the tree, so this is genuine, deliberate duplication, not a
+    // bug). jsdom doesn't apply CSS, so both are visible to a query here.
+    expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
   })
 
@@ -123,7 +129,7 @@ describe('Landing', () => {
 
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal')
 
-    expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
   })
 
   it('renders the map band only when the community has a Map pseudo-category, deferring HomeMap itself until scrolled near', () => {
