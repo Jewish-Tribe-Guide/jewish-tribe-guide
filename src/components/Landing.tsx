@@ -283,13 +283,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 "Browse everything" titles the WHOLE card now, not just the
                 grid below — search sits right under that title as the first
-                thing in the section, framed as "search within these
-                categories" rather than a separately-headed thing of its own.
-                `SearchSection` renders `bare` + `showHeading={false}` here
-                (no card shell or heading of its own) so it mounts once, as a
-                stable sibling of the grid below, and never gets swapped out
-                as a whole subtree when `q` changes — that would unmount the
-                input mid-keystroke and drop focus.
+                thing in the section, its own "What are you looking for?"
+                heading intact (kept on purpose: the box read as bare without
+                it). `SearchSection` renders `bare` here (no card/section
+                shell of its own) so it mounts once, as a stable sibling of
+                the grid below, and never gets swapped out as a whole subtree
+                when `q` changes — that would unmount the input mid-keystroke
+                and drop focus.
 
                 The grid itself is a flat, always-visible index of every
                 card: every real category, Patient & Family Support,
@@ -325,7 +325,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             <h2 className="mb-6 text-lg font-semibold text-slate-900">Browse everything</h2>
             <SearchSection
               bare
-              showHeading={false}
               heroTitle={settings.heroTitle}
               query={query}
               onQueryChange={setQuery}
