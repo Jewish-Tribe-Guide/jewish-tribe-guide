@@ -26,7 +26,6 @@ vi.mock('./GenericListingCard', () => ({
     onTagClick,
     onFilterBool,
     showDistanceSlot,
-    reserveTwoLineName,
   }: {
     item: DirectoryResource
     onEdit: () => void
@@ -34,12 +33,10 @@ vi.mock('./GenericListingCard', () => ({
     onTagClick: (t: string) => void
     onFilterBool: (key: string) => void
     showDistanceSlot?: boolean
-    reserveTwoLineName?: boolean
   }) => (
     <div>
       <span>{item.name}</span>
       {showDistanceSlot && <span>distance-slot {item.name}</span>}
-      <span>reserveTwoLineName={String(!!reserveTwoLineName)} for {item.name}</span>
       <button onClick={onEdit}>Edit {item.name}</button>
       <button onClick={onReport}>Report {item.name}</button>
       <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
@@ -248,35 +245,6 @@ describe('GenericDirectory', () => {
     const href = screen.getAllByRole('link', { name: /Map/ })[0].getAttribute('href')
     expect(href).toContain(`cat=${category.id}`)
     expect(href).toContain('q=mart')
-  })
-})
-
-// See GenericListingCard's own reserveTwoLineName doc: a category where at
-// least one listing's name is long enough to likely wrap gets every card
-// reserving the same 2-line height, so a short-named card doesn't stop
-// reserving it and throw off badge-row alignment with its long-named
-// row-mate. Computed once from the category's full item list, so every card
-// in the grid agrees regardless of which one is actually long.
-describe('GenericDirectory — reserveTwoLineName heuristic', () => {
-  it('off for every card when no listing in the category has a long name', () => {
-    const category = makeCategory()
-    const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
-    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-    expect(screen.getByText('reserveTwoLineName=false for Kosher Mart')).toBeInTheDocument()
-    expect(screen.getByText('reserveTwoLineName=false for Trader Joe')).toBeInTheDocument()
-  })
-
-  it('on for every card, including short-named ones, once any listing has a long enough name', () => {
-    const category = makeCategory()
-    const items = [
-      makeListing({ id: 'a', name: 'Mart' }),
-      makeListing({ id: 'b', name: 'Cheezy Vegan Cafe & Comfort Food Lab' }),
-    ]
-    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
-
-    expect(screen.getByText('reserveTwoLineName=true for Mart')).toBeInTheDocument()
-    expect(screen.getByText('reserveTwoLineName=true for Cheezy Vegan Cafe & Comfort Food Lab')).toBeInTheDocument()
   })
 })
 

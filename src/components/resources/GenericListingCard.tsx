@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useImperativeHandle, useState } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -37,10 +37,25 @@ function shortAddress(addr: string): string {
  *  onNavigate), which needs to close THIS card and open a SIBLING one it has
  *  no other way to reach: `expanded` is local state, and there's no shared
  *  "currently open" state to lift without every card re-rendering on every
- *  other card's open/close. */
+ *  other card's open/close.
+ *
+ *  measureContentHeight/setSpacerHeight are GenericDirectory's row-alignment
+ *  pair — see its own alignRows doc for why this is a real per-row DOM
+ *  measurement rather than a heuristic guess. */
 export type GenericListingCardHandle = {
   open: () => void
   close: () => void
+  /** Pixel height of everything above the badge row (icon, name, address,
+   *  header text, upvote row) with this card's own spacer at 0 — null when
+   *  there's no badge row to align in the first place (nothing to measure
+   *  against). Callers must zero every card's spacer in the same pass
+   *  before measuring any of them, or an earlier card's stale spacer value
+   *  corrupts this reading. */
+  measureContentHeight: () => number | null
+  /** Sets (or clears, at 0) the invisible spacer directly above the badge
+   *  row, so this card's badge row starts at the same height as its row's
+   *  tallest card. */
+  setSpacerHeight: (px: number) => void
 }
 
 type Props = {
@@ -98,17 +113,6 @@ type Props = {
    *  inert arrow at either end instead of no arrow at all. */
   hasPrev?: boolean
   hasNext?: boolean
-  /** Reserves a full 2-line height for the name (line-clamp-2's own max),
-   *  even when THIS listing's name is short enough to sit on one line — set
-   *  by the directory grid when at least one listing in the same list
-   *  actually needs 2 lines, so that one card's real wrap doesn't leave it
-   *  taller than short-named siblings whose badge rows were otherwise
-   *  aligned by the header-text placeholder below (see that placeholder's
-   *  own comment) but not by name height, which it never accounted for.
-   *  Off by default — most categories never have a long enough name to
-   *  need it, and reserving a blank second line on every card in THOSE
-   *  categories would trade one alignment problem for a wasted one. */
-  reserveTwoLineName?: boolean
 }
 
 export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(function GenericListingCard({
@@ -130,12 +134,28 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onNavigate,
   hasPrev,
   hasNext,
-  reserveTwoLineName = false,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  // The card's own root (the clickable row) and the badge row itself — the
+  // distance between them, measured live, is "everything above the
+  // badges" GenericDirectory compares across a row's cards. spacerRef is
+  // the invisible block directly above the badge row whose height that
+  // comparison sets, so a shorter card's badge row starts at the same
+  // height as its tallest row-mate's — see GenericListingCardHandle's own
+  // doc for why this is a measurement, not a heuristic guess.
+  const cardRootRef = useRef<HTMLDivElement>(null)
+  const badgeRowRef = useRef<HTMLDivElement>(null)
+  const spacerRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => ({
     open: () => setExpanded(true),
     close: () => setExpanded(false),
+    measureContentHeight: () => {
+      if (!cardRootRef.current || !badgeRowRef.current) return null
+      return badgeRowRef.current.getBoundingClientRect().top - cardRootRef.current.getBoundingClientRect().top
+    },
+    setSpacerHeight: (px: number) => {
+      if (spacerRef.current) spacerRef.current.style.height = px > 0 ? `${px}px` : '0px'
+    },
   }))
   const categories = useCategories()
   const community = useCommunitySlug()
@@ -396,6 +416,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           bubbles right up to this handler, so there's exactly one place the
           toggle logic lives, not two copies to keep in sync. */}
       <div
+        ref={cardRootRef}
         onClick={() => setExpanded((p) => {
           if (!p) track('listing_opened', { listing: item.name, category: category.id })
           return !p
@@ -438,7 +459,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               throwing every card in the row wildly out of proportion with its
               neighbors. */}
           <div className="min-w-0 flex-1">
-            <p className={`font-semibold text-slate-900 line-clamp-2 ${reserveTwoLineName ? 'min-h-[3rem]' : ''}`}>
+            <p className="font-semibold text-slate-900 line-clamp-2">
               {onNameClick ? (
                 // A span, not the whole <p>, carries the click/hover — the <p>
                 // is block-level and stretches to fill the row, which would
@@ -634,9 +655,17 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             the upvote/distance row above for why "narrower than the full
             page width" is now the normal case on desktop, not just mobile). */}
         {badgeRow && (
-          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
-            {badgeRow}
-          </div>
+          <>
+            {/* Row-alignment spacer — height set imperatively by
+                GenericDirectory (see setSpacerHeight), never by React state,
+                so a measure/set pass doesn't itself trigger a re-render.
+                0 height (and therefore invisible) until a taller row-mate
+                exists. */}
+            <div ref={spacerRef} aria-hidden="true" />
+            <div ref={badgeRowRef} className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+              {badgeRow}
+            </div>
+          </>
         )}
       </div>
 

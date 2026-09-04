@@ -262,37 +262,66 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
   })
 })
 
-// reserveTwoLineName — set by GenericDirectory when at least one listing in
-// the category has a long enough name that it's likely to wrap to 2 lines,
-// so a short-named card's own name doesn't stop reserving the same height
-// and throw off the badge-row alignment the header-text placeholder above
-// is trying to protect (see GenericDirectory's own doc on the heuristic).
-describe('GenericListingCard — reserveTwoLineName', () => {
-  it('off by default: a short name gets no reserved height', () => {
-    const category = makeCategory()
-    const item = makeListing({ name: 'Acme' })
+// The row-alignment handle GenericDirectory uses to measure each card's
+// content height and set an invisible spacer directly above the badge row —
+// see GenericListingCardHandle's own doc for why this replaced an earlier
+// heuristic (reserving 2-line name height category-wide) that reserved a
+// visible gap between the NAME and ADDRESS on every card in a category, not
+// just the row that actually needed it.
+describe('GenericListingCard — row-alignment handle', () => {
+  it('measureContentHeight reads the real gap between the card root and the badge row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({
+      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+    })
+    const item = makeListing({ name: 'Acme', isKosher: true })
     renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('Acme').closest('p')).not.toHaveClass('min-h-[3rem]')
+    // jsdom lays out everything at 0×0 (no real geometry engine), so the
+    // meaningful assertion here isn't a specific pixel value — it's that
+    // the handle actually returns a number instead of null, i.e. it found
+    // both the card root and a real badge row to measure between. A
+    // category with nothing to badge (see the next test) is what null
+    // is for.
+    expect(ref.current?.measureContentHeight()).not.toBeNull()
   })
 
-  it('reserves a 2-line height for a short name when the prop is set', () => {
-    const category = makeCategory()
+  it('measureContentHeight is null when there is no badge row to align', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    // No hours/filterable fields and upvotes off — nothing to put in the
+    // badge row (see badgeRow's own gating further up this file).
+    const category = makeCategory({ detailFields: [], upvotesEnabled: false })
     const item = makeListing({ name: 'Acme' })
     renderWithProviders(
-      <GenericListingCard
-        item={item}
-        category={category}
-        upvotes={false}
-        count={0}
-        reserveTwoLineName
-        {...requiredHandlers}
-      />,
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    expect(screen.getByText('Acme').closest('p')).toHaveClass('min-h-[3rem]')
+    expect(ref.current?.measureContentHeight()).toBeNull()
+  })
+
+  it("setSpacerHeight sets the spacer element's inline height, clamped at 0", () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({
+      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+    })
+    const item = makeListing({ name: 'Acme', isKosher: true })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    // The spacer is the aria-hidden div immediately before the badge row's
+    // own border-t container — there's nothing else in the card carrying
+    // that exact pairing to identify it by.
+    const badgeContainer = document.querySelector('.border-t.border-slate-100')
+    const spacer = badgeContainer?.previousElementSibling
+
+    act(() => ref.current?.setSpacerHeight(24))
+    expect(spacer).toHaveStyle({ height: '24px' })
+
+    act(() => ref.current?.setSpacerHeight(-5))
+    expect(spacer).toHaveStyle({ height: '0px' })
   })
 })
 

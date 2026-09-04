@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -216,26 +216,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     return tokens.every((t) => hay.includes(t))
   }
 
-  // Whether any listing's own name in this category is long enough to
-  // likely wrap to a second line — if so, every card reserves a full
-  // 2-line name height (see GenericListingCard's reserveTwoLineName), so
-  // one long-named listing's real wrap doesn't leave it taller than its
-  // short-named row-mates for no reason a visitor can see. Off when nothing
-  // in the category is long enough to need it, so a category of all-short
-  // names (most of them) doesn't pay a blank reserved line for nothing.
-  //
-  // A character-count heuristic, not a measured one — the narrowest card
-  // this grid renders is 280px (see the grid's own minmax comment below),
-  // minus ~52px for the icon+gap leaves ~228px for semibold text, which
-  // fits roughly 26 characters per line at this app's type scale. Same
-  // spirit as the header-text placeholder just below (a fixed guess, not a
-  // DOM measurement) — genuine per-row measurement would need a
-  // ResizeObserver and real layout passes, a much bigger lift for a
-  // low-stakes alignment detail. Computed from the category's full `items`,
-  // not the currently `filtered` view, so it doesn't flicker on/off as
-  // filters narrow the visible set.
-  const anyNameNeedsTwoLines = useMemo(() => items.some((item) => item.name.length > 26), [items])
-
   const filtered = items
     .filter((item) => {
       if (!matchesSearch(item)) return false
@@ -277,6 +257,68 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)
     })
+
+  // Aligns each visual row's badge rows to the same height — real per-card
+  // measurement (see GenericListingCardHandle's own doc), not a guess based
+  // on name length or anything else static. An earlier version reserved a
+  // fixed 2-line name height across an entire CATEGORY the moment any one
+  // listing's name was long enough to wrap — which put a blank gap between
+  // the name and address on every OTHER card in that category too, most of
+  // which were nowhere near the actual long-named listing and never needed
+  // it. This only ever adjusts a card that's actually sharing a row with a
+  // taller one, and never touches the name/address gap at all — the spacer
+  // sits between the address/header-text block and the badge row (see
+  // GenericListingCard's own placement), matching where the existing
+  // header-text placeholder already reserves space for the same reason.
+  //
+  // Row membership is read from the DOM (itemRowRefs' own getBoundingClientRect
+  // top, rounded, grouped) rather than computed from column count — this
+  // grid's auto-fill column count depends on the container's actual pixel
+  // width, which isn't something to re-derive here when the browser has
+  // already laid it out.
+  const filteredIds = filtered.map((item) => item.id).join(',')
+  useLayoutEffect(() => {
+    function alignRows() {
+      // Reset every spacer first — a stale spacer from a previous pass
+      // (or a previous, wider layout) would otherwise inflate this pass's
+      // own reading of "natural" content height.
+      for (const item of filtered) cardRefs.current.get(item.id)?.setSpacerHeight(0)
+
+      const rows = new Map<number, string[]>()
+      for (const item of filtered) {
+        const rowEl = itemRowRefs.current.get(item.id)
+        if (!rowEl) continue
+        const top = Math.round(rowEl.getBoundingClientRect().top)
+        const existing = rows.get(top)
+        if (existing) existing.push(item.id)
+        else rows.set(top, [item.id])
+      }
+
+      for (const ids of rows.values()) {
+        if (ids.length < 2) continue // nothing to align a lone card to
+        const heights = ids.map((id) => [id, cardRefs.current.get(id)?.measureContentHeight() ?? 0] as const)
+        const max = Math.max(...heights.map(([, h]) => h))
+        for (const [id, h] of heights) {
+          if (max - h > 0) cardRefs.current.get(id)?.setSpacerHeight(max - h)
+        }
+      }
+    }
+
+    alignRows()
+
+    // Column count (and therefore row membership) depends on the grid's
+    // actual pixel width, which only a real resize can change — window
+    // resize, not a ResizeObserver on any one card, is what should trigger
+    // a re-pass here.
+    window.addEventListener('resize', alignRows)
+    return () => window.removeEventListener('resize', alignRows)
+    // Re-aligns when the actual rendered SET of listings changes
+    // (filter/search/sort narrows or reorders it) — filteredIds, not
+    // filtered itself: a vote-count-only re-render produces a new array
+    // reference with the same ids in the same order, which shouldn't
+    // trigger a re-pass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredIds])
 
   // fromId is the card issuing the request (arrow key pressed while ITS
   // dialog is open) — direction moves through `filtered`, the same order
@@ -791,7 +833,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               }
               onEdit={() => onEdit(item)}
               onReport={() => onReport(item)}
-              reserveTwoLineName={anyNameNeedsTwoLines}
             />
             </div>
           ))}
