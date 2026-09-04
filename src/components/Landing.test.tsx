@@ -264,13 +264,18 @@ describe('Landing', () => {
       expect(row.className).toMatch(/hover:bg-slate-50/)
     })
 
-    it('hides while actively searching — the grouped grid below already serves as results', async () => {
+    // "Browse everything" now titles the whole merged card — search sits
+    // under it as the first thing in the section, framed as "search within
+    // these categories" — not just this flat grid, so unlike the flat grid
+    // itself (still replaced by the grouped results grid while there's a
+    // query — see "narrows the grid" above), the heading no longer hides.
+    it('keeps its heading as the section title while actively searching', async () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
       expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.queryByRole('heading', { name: 'Browse everything' })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {

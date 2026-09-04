@@ -43,6 +43,7 @@ export default function SearchSection({
   onViewMap,
   results,
   bare = false,
+  showHeading = true,
 }: {
   heroTitle: string
   query: string
@@ -67,6 +68,12 @@ export default function SearchSection({
    *  wants this mounted as a stable sibling inside it, not swapped in and out
    *  as a whole tree (which would remount the input and drop focus mid-type). */
   bare?: boolean
+  /** Off when a caller (Landing) already renders its own heading above this
+   *  section and `heroTitle` would just be a second, redundant one — e.g.
+   *  "Browse everything" now titles the whole merged card, and the search
+   *  box sits inside it as "search within these categories" rather than a
+   *  separately-headed thing. */
+  showHeading?: boolean
 }) {
   if (!ui.search.landing) return null
 
@@ -79,7 +86,9 @@ export default function SearchSection({
           Centering the heading and button along with it keeps the whole
           card reading as one composed unit instead of a wide box with a
           small thing floating in its corner. */}
-      <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
+      {showHeading && (
+        <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
+      )}
       <div className="mx-auto max-w-[480px]">
         <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
       </div>

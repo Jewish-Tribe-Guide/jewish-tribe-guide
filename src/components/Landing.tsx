@@ -280,22 +280,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
-        {/* ── Browse everything + Search (desktop), one card ────────────────
-                These used to be two separate white boxes stacked with a gap
-                between them, but they're really one thing to a visitor: "how
-                do I find what I need" — scan the flat list, or type it below.
-                Sharing a card with no divider between them says that; Browse
-                everything leads because it's the primary way most visitors
-                get around, and stacked spacing (not a border) keeps them
-                reading as one continuous card rather than two sections
-                glued together. `SearchSection` renders `bare` here (no
-                card/section shell of its own) so it mounts once, as a stable
-                sibling of the Browse-everything block above, and never gets
-                swapped out as a whole subtree when `q` changes — that would
-                unmount the input mid-keystroke and drop focus.
+        {/* ── Browse everything (desktop), one card ──────────────────────────
+                "Browse everything" titles the WHOLE card now, not just the
+                grid below — search sits right under that title as the first
+                thing in the section, framed as "search within these
+                categories" rather than a separately-headed thing of its own.
+                `SearchSection` renders `bare` + `showHeading={false}` here
+                (no card shell or heading of its own) so it mounts once, as a
+                stable sibling of the grid below, and never gets swapped out
+                as a whole subtree when `q` changes — that would unmount the
+                input mid-keystroke and drop focus.
 
-                Browse everything itself is a flat, always-visible grid of
-                every card: every real category, Patient & Family Support,
+                The grid itself is a flat, always-visible index of every
+                card: every real category, Patient & Family Support,
                 Volunteer, custom forms. Not grouped under the section tabs'
                 own umbrella labels above ("Jewish Institutions and
                 Information", etc.) — a visitor wants "Synagogues", not which
@@ -325,9 +322,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 a pair, not a third full-width peer section. */}
         <section className="mt-8 hidden desktop:block">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
+            <SearchSection
+              bare
+              showHeading={false}
+              heroTitle={settings.heroTitle}
+              query={query}
+              onQueryChange={setQuery}
+              results={!isMobile ? desktopResultsNode : undefined}
+            />
             {!isMobile && !q && (
-              <div className={ui.search.landing ? 'mb-6' : ''}>
-                <h2 className="mb-4 text-lg font-semibold text-slate-900">Browse everything</h2>
+              <div className={ui.search.landing ? 'mt-6' : ''}>
                 <CompactCardGrid
                   cards={loading ? entryCards : (filtered ?? [])}
                   categories={categories}
@@ -335,13 +340,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 />
               </div>
             )}
-            <SearchSection
-              bare
-              heroTitle={settings.heroTitle}
-              query={query}
-              onQueryChange={setQuery}
-              results={!isMobile ? desktopResultsNode : undefined}
-            />
           </div>
         </section>
 
