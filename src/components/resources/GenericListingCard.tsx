@@ -579,9 +579,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
           </div>
 
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {/* Mobile-only: upvote count + distance/travel, stacked in this
-                top-right corner above the chevron rather than desktop's own
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Mobile-only: upvote count + distance/travel, stacked to the
+                LEFT of the chevron (its own two-line column, chevron
+                vertically centered beside it) rather than desktop's own
                 dedicated row below the icon (see that row's own comment on
                 why they differ) — mobile has no multi-column grid squeezing
                 this against the name, so there's nothing to protect the name
