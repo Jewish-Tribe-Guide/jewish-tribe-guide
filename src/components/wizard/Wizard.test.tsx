@@ -11,7 +11,17 @@ import Wizard, { type Step } from './Wizard'
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 
-afterEach(cleanup)
+// history is a real singleton jsdom doesn't reset between tests on its own —
+// and a real submit now writes `submitted: true` to it (see goNext), so
+// without this, one test's successful submission leaks into whichever test
+// runs next, which then mounts believing IT is a reload of an
+// already-submitted session. Caught exactly this way while adding the reload
+// tests below: an unrelated, already-passing submit test started failing to
+// find the first question at all.
+afterEach(() => {
+  cleanup()
+  history.replaceState(null, '')
+})
 
 const textStep: Step = { id: 'name', kind: 'text', question: 'What is your name?' }
 const singleStep: Step = {
@@ -159,6 +169,45 @@ describe('Wizard — submit', () => {
     await user.click(screen.getByRole('button', { name: /submit/i }))
 
     expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument()
+  })
+})
+
+// A reload used to always show step 1 of a blank form — `submitted` was
+// plain component state, so remounting after a real submit reset it to
+// false just like a genuinely fresh visit, and there was nothing to tell
+// the two apart. Real bug, reported live: "you submit something, reload the
+// page, and it takes you back to the form."
+describe('Wizard — reload after a real submit', () => {
+  it('redirects immediately via onClose, without ever showing step 1, when history.state says this session already submitted', () => {
+    // Simulates a reload landing back on the same entry goNext's success
+    // path left behind — see that code's own history.replaceState call.
+    history.replaceState({ submitted: true }, '')
+    const { onClose } = renderWizard()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('What is your name?')).not.toBeInTheDocument()
+  })
+
+  it('shows the form normally, and never calls onClose, on an ordinary fresh visit', () => {
+    const { onClose } = renderWizard()
+
+    expect(screen.getByText('What is your name?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('marks history.state once a real submit succeeds, so a later reload has something to read', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await user.type(screen.getByRole('textbox'), 'Rivka')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByRole('button', { name: 'Meals' }))
+    await waitFor(() => expect(screen.getByText('How can we reach you?')).toBeInTheDocument())
+    await user.type(screen.getByLabelText(/email/i), 'a@example.com')
+
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+
+    await screen.findByText('All set')
+    expect((window.history.state as { submitted?: boolean } | null)?.submitted).toBe(true)
   })
 })
 

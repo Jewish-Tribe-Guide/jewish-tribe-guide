@@ -93,11 +93,15 @@ export function SubmissionCard({
             </div>
           )}
 
-          {(s.submitted_by?.name || s.submitted_by?.email) && (
-            <p className="text-xs text-muted mt-2 italic">
-              by {s.submitted_by.name || s.submitted_by.email}
-            </p>
-          )}
+          {/* Always shows — created_at exists on every row — so a reviewer
+              can tell how long something's been sitting in the queue without
+              having to guess from the queue's own scroll position. Same
+              dateFormatter as reviewed_at below, for the same "when" a
+              reviewer already reads there. */}
+          <p className="text-xs text-muted mt-2 italic">
+            Submitted {dateFormatter.format(new Date(s.created_at))}
+            {(s.submitted_by?.name || s.submitted_by?.email) && ` by ${s.submitted_by.name || s.submitted_by.email}`}
+          </p>
 
           {/* Two-step reject: reason input appears inline below the details */}
           {onModerate && pendingReject && (
