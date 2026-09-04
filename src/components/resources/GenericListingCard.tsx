@@ -214,20 +214,24 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const hasUpvoteRow = upvotes || travel.length > 0 || showDistanceSlot
 
   // Shared between the desktop full-width row (below, own row under the
-  // icon — see that row's own comment on why) and the mobile inline version
-  // (rendered right under the name/subtitle instead — see its own comment).
-  // Desktop needs the dedicated row so a longer name doesn't fight a
-  // squeezed-in column for space in a multi-column grid; mobile has no such
-  // grid (a single full-width column) so there's nothing to protect the
-  // name from, and the old inline placement reads as more compact there.
-  const upvoteDistanceContent = (
+  // icon — see that row's own comment on why) and mobile's own top-right
+  // corner column (stacked above the chevron — see its own comment). Desktop
+  // needs the dedicated row so a longer name doesn't fight a squeezed-in
+  // column for space in a multi-column grid; mobile has no such grid (a
+  // single full-width column) so there's nothing to protect the name from,
+  // and the corner reads as a compact "stat" rather than a fact competing
+  // with the address line for space. `stacked` drops the "|" separator
+  // (meaningless once the two sit on their own lines instead of side by
+  // side) and stacks the count above the distance/travel instead of
+  // side-by-side.
+  const renderUpvoteDistanceContent = (stacked: boolean) => (
     <>
       {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
-      {upvotes && (travel.length > 0 || showDistanceSlot) && (
+      {!stacked && upvotes && (travel.length > 0 || showDistanceSlot) && (
         <span aria-hidden="true" className="text-slate-300">|</span>
       )}
       {travel.length > 0 ? (
-        <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
+        <div className={`flex flex-col ${stacked ? 'items-end' : 'items-start'} gap-0.5 whitespace-nowrap`}>
           {travel.map((t) => <span key={t}>{t}</span>)}
         </div>
       ) : showDistanceSlot ? (
@@ -545,18 +549,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               )}
             </p>
             {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
-            {/* Mobile-only: upvote count + distance/travel, inline right
-                under the name/subtitle rather than desktop's own dedicated
-                row below the icon (see that row's own comment on why they
-                differ) — mobile has no multi-column grid squeezing this
-                against the name, so there's nothing to protect the name
-                from, and inline reads as more compact on a phone-width
-                card. */}
-            {hasUpvoteRow && (
-              <div className="desktop:hidden mt-1 flex items-center gap-2 text-xs font-medium text-slate-600">
-                {upvoteDistanceContent}
-              </div>
-            )}
             {/* mt-2: enough gap that this reads as its own beat after the
                 name+address fact, not a third bullet inside it — but no
                 border/section treatment, which is reserved for the hairline
@@ -587,54 +579,69 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {headerUrlFields.map(({ f, href }) => (
-              <a
-                key={f.key}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {/* Mobile-only: upvote count + distance/travel, stacked in this
+                top-right corner above the chevron rather than desktop's own
+                dedicated row below the icon (see that row's own comment on
+                why they differ) — mobile has no multi-column grid squeezing
+                this against the name, so there's nothing to protect the name
+                from, and the corner reads as a quick stat glanced at
+                alongside the name rather than a fact competing with the
+                address line below for space. */}
+            {hasUpvoteRow && (
+              <div className="desktop:hidden flex flex-col items-end gap-0.5 text-xs font-medium text-slate-600">
+                {renderUpvoteDistanceContent(true)}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              {headerUrlFields.map(({ f, href }) => (
+                <a
+                  key={f.key}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                >
+                  {f.linkLabel ?? f.label}
+                </a>
+              ))}
+              {/* The row's actual accessible toggle — see the row div's own
+                  comment above. No onClick: relies on the native click a
+                  button dispatches on mouse activation or Enter/Space
+                  bubbling up to the row's handler, which does the real work.
+                  Still present and still carries aria-expanded/aria-label on
+                  desktop even though its chevron doesn't render there —
+                  removing the button itself, not just its icon, would leave
+                  keyboard/screen-reader visitors with no way to open the
+                  dialog at all (the row can't be a button — see that same
+                  comment on why), and GenericListingCard.test.tsx queries this
+                  exact button by role. */}
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
+                // -m-2.5 p-2.5: the icon itself is 16px, well under the
+                // 24px WCAG-recommended tap target — padding grows the real
+                // hit area to ~36px without the negative margin's opposite
+                // effect shifting anything in the row around it.
+                className="-m-2.5 cursor-pointer p-2.5"
               >
-                {f.linkLabel ?? f.label}
-              </a>
-            ))}
-            {/* The row's actual accessible toggle — see the row div's own
-                comment above. No onClick: relies on the native click a
-                button dispatches on mouse activation or Enter/Space
-                bubbling up to the row's handler, which does the real work.
-                Still present and still carries aria-expanded/aria-label on
-                desktop even though its chevron doesn't render there —
-                removing the button itself, not just its icon, would leave
-                keyboard/screen-reader visitors with no way to open the
-                dialog at all (the row can't be a button — see that same
-                comment on why), and GenericListingCard.test.tsx queries this
-                exact button by role. */}
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
-              // -m-2.5 p-2.5: the icon itself is 16px, well under the
-              // 24px WCAG-recommended tap target — padding grows the real
-              // hit area to ~36px without the negative margin's opposite
-              // effect shifting anything in the row around it.
-              className="-m-2.5 cursor-pointer p-2.5"
-            >
-              {/* Mobile only — a chevron that rotates open/closed reads
-                  right for the inline accordion (see the isMobile branch
-                  further down). Desktop opens a dialog instead, which a
-                  rotating "this expands right here" arrow no longer
-                  describes, and the whole card is already clickable with its
-                  own hover state, so there's nothing left for it to point
-                  at. */}
-              <svg
-                className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
-                fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                {/* Mobile only — a chevron that rotates open/closed reads
+                    right for the inline accordion (see the isMobile branch
+                    further down). Desktop opens a dialog instead, which a
+                    rotating "this expands right here" arrow no longer
+                    describes, and the whole card is already clickable with its
+                    own hover state, so there's nothing left for it to point
+                    at. */}
+                <svg
+                  className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -654,8 +661,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             alongside its address, than a stat pinned to the card's corner.
             Mobile has no grid to squeeze columns in (a single full-width
             column), so there's nothing here to protect the name from —
-            mobile gets the old inline-with-name placement instead (see
-            "Mobile-only" comment further up, next to the subtitle). */}
+            mobile gets its own top-right corner instead, stacked above the
+            chevron (see "Mobile-only" comment further up, next to the
+            header-url-fields/chevron row). */}
         {hasUpvoteRow && (
           <>
             {/* Segment-1 spacer — see GenericListingCardHandle's own doc.
@@ -666,7 +674,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             <div ref={upvoteSpacerRef} aria-hidden="true" className="hidden desktop:block" />
             <div ref={upvoteRowRef} className="hidden desktop:flex mt-1.5 justify-start pl-[52px]">
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                {upvoteDistanceContent}
+                {renderUpvoteDistanceContent(false)}
               </div>
             </div>
           </>
