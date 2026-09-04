@@ -12,6 +12,7 @@ import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ShareButton from './ShareButton'
 import { PencilIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
 type Props = {
   isOpen: boolean
@@ -93,10 +94,13 @@ export default function ListingDetailModal({
 }: Props) {
   const community = useCommunitySlug()
 
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
+  // Reference-counted, not a plain `document.body.style.overflow = isOpen ?
+  // 'hidden' : ''` — GenericDirectory can mount dozens of these (one per
+  // card), and arrow-key next/prev closes one and opens another in the same
+  // commit. Two instances both writing that one global property in the same
+  // tick raced, and whichever happened to run last could leave the page
+  // scrollable while a dialog was still open — see the hook's own comment.
+  useBodyScrollLock(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
