@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { useZmanim } from '@/lib/useZmanim'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { routes } from '@/lib/routes'
+import { useSiteSettings } from '@/lib/useSiteSettings'
+import FeedbackForm from '@/components/FeedbackForm'
 
 // ── The break between the two main things (Browse everything, Explore the
 // map) — two side-by-side cards, the full daily Zmanim on the left and the
@@ -23,7 +24,13 @@ export default function HomeBreak({
   locationLabel: string
 }) {
   const { data, status } = useZmanim(coords)
-  const community = useCommunitySlug()
+  const settings = useSiteSettings()
+  // Opens FeedbackForm as the same in-place modal SiteFooter's own
+  // FeedbackButton does — not a link to routes.feedback(), which is a real
+  // page navigation and would leave the two-card break (and everything else
+  // on this page) behind entirely, dropping the visitor onto a bare
+  // feedback screen instead of a dialog over the page they were just on.
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   return (
     <div className="my-12 grid grid-cols-2 gap-4">
@@ -79,20 +86,34 @@ export default function HomeBreak({
         )}
       </div>
 
-      <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-white p-6">
+      {/* No justify-center — this card is naturally shorter than the
+          Zmanim one, and centering its content made "Kept current by
+          people like you" start lower than "Zmanim & Shabbos", so the two
+          headings didn't line up. Top-aligned, like the other card, so
+          they do regardless of which one ends up taller. */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
         <h3 className="mb-3 text-lg font-semibold text-slate-900">Kept current by people like you</h3>
         <p className="mb-5 text-[13.5px] leading-relaxed text-muted">
           A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
           from the community that actually uses this guide.
         </p>
-        <a
-          href={routes.feedback(community)}
-          className="inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
-        >
-          Suggest something →
-        </a>
+        {settings.feedbackEnabled && (
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+          >
+            Suggest something →
+          </button>
+        )}
       </div>
+      {feedbackOpen && (
+        <FeedbackForm
+          heading={settings.feedbackHeading}
+          successMessage={settings.feedbackSuccessMessage}
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
     </div>
   )
 }

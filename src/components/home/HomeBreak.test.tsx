@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ZmanimData } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import HomeBreak from './HomeBreak'
 
 vi.mock('next/navigation', () => ({
@@ -77,12 +79,37 @@ describe('HomeBreak', () => {
     expect(link).toHaveAttribute('href', 'https://www.hebcal.com')
   })
 
-  it('shows the community-run line and a working "Suggest something" link regardless of zmanim status', () => {
+  it('shows the community-run line regardless of zmanim status', () => {
     mockUseZmanim.mockReturnValue({ data: null, status: 'loading' })
     renderWithProviders(<HomeBreak coords={null} locationLabel="Philadelphia" />)
 
     expect(screen.getByRole('heading', { name: 'Kept current by people like you' })).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: /Suggest something/ })
-    expect(link).toHaveAttribute('href', expect.stringMatching(/\/feedback$/))
+  })
+
+  // Was a plain <a href="/feedback">, a real page navigation that left this
+  // whole break (and everything else on the page) behind — clicking it
+  // should open the same in-place modal SiteFooter's own FeedbackButton
+  // does, not send the visitor to a bare page.
+  it('opens the feedback form as an in-place modal, not a page navigation', async () => {
+    const user = userEvent.setup()
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Suggest something/ }))
+
+    // The Zmanim card is still in the document underneath the modal — a
+    // real navigation would have unmounted it.
+    expect(screen.getByRole('heading', { name: 'Zmanim & Shabbos' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
+  })
+
+  it('hides the button entirely when an admin has turned feedback off', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />, {
+      content: { settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: false } },
+    })
+
+    expect(screen.queryByRole('button', { name: /Suggest something/ })).not.toBeInTheDocument()
   })
 })
