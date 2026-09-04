@@ -464,17 +464,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   ) : null
 
   return (
-    // No border/shadow/bg-white box any more — the chevron already says
-    // "this expands," and a bordered white box around every one of 15+ rows
-    // was the exact "too many different things crammed into boxes" problem
-    // the flat "Browse everything" list (see CompactCardGrid) was already
-    // fixed for; a directory of listings had just never gotten the same
-    // treatment. GenericDirectory's own `space-y-2`/`gap-3` between cards is
-    // what separates rows now, the same way it always separated the boxes;
-    // the expanded panel below still gets its own `bg-slate-50` + border-top
-    // so opening a card is still visually obvious without a box to open
-    // "inside".
-    //
     // No `overflow-hidden`: it would clip the cert badge's hover tooltip on a
     // collapsed card. Corners stay clean because the header and expanded panel
     // round their own edges below. h-full: in the desktop grid (see
@@ -482,11 +471,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
     // item, and a CSS grid row already stretches that wrapper to match its
     // tallest neighbor — but a plain block child doesn't inherit that height
     // on its own, so without this the wrapper was the right height and the
-    // visible card inside it wasn't, leaving cards in the same row looking
-    // mismatched even though their invisible containers matched. A no-op
-    // everywhere the card isn't a stretched grid item (mobile's single
+    // visible bordered card inside it wasn't, leaving cards in the same row
+    // looking mismatched even though their invisible containers matched. A
+    // no-op everywhere the card isn't a stretched grid item (mobile's single
     // column, the admin category preview).
-    <div className="h-full">
+    <div className="h-full border border-slate-200 rounded-lg bg-white shadow-sm">
       {/* Not role="button"/tabIndex any more — the row also contains real
           interactive children (UpvoteButton, an external-link <a>, the
           Open/badge Chips), and an ARIA button role can't legally contain
