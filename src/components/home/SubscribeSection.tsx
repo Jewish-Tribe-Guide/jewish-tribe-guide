@@ -184,15 +184,21 @@ export default function SubscribeSection() {
                     {/* A real checkbox, styled exactly like the New
                         listings/Closures ones beside it — not a fake
                         decorative glyph — so the three read as the same
-                        kind of control. readOnly + pointer-events-none: it's
-                        just a preview of `allCategories`, not a second way
-                        to toggle it (an <input> can't be a <button>'s own
-                        interactive child per ARIA's nested-interactive
-                        rule); the button's own onClick above is what opens
-                        the real picker where the actual toggle lives. */}
+                        kind of control. Always checked, regardless of
+                        `allCategories`: this row is always "on" (there's
+                        always some category selection driving the
+                        subscription, whether that's literally all of them
+                        or a specific few) — the label text next to it is
+                        what actually communicates which, the same way the
+                        other two checkboxes' own labels do the explaining.
+                        readOnly + pointer-events-none: it's decorative, not
+                        a second way to toggle anything (an <input> can't be
+                        a <button>'s own interactive child per ARIA's
+                        nested-interactive rule); the button's own onClick
+                        above is what opens the real picker. */}
                     <input
                       type="checkbox"
-                      checked={allCategories}
+                      checked
                       readOnly
                       tabIndex={-1}
                       aria-hidden="true"
