@@ -67,4 +67,31 @@ describe('PlaceDetailBody — "N {countLabel}" count chip', () => {
 
     expect(screen.queryByText(/kosher item/)).not.toBeInTheDocument()
   })
+
+  // A count already says "yes, kosher" — the badge countReplacesKey points at
+  // would just repeat that in a less useful form. GenericListingCard already
+  // covered this for its own collapsed header; this is the same rule inside
+  // PlaceDetailBody itself, so a caller that doesn't set hiddenBadgeKeys
+  // (the map's place-detail popup) doesn't show both the count AND the raw
+  // badge it replaces.
+  it('suppresses the badge the count replaces, even when the caller sets no hiddenBadgeKeys', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'isKosher', label: 'Kosher', type: 'boolean', renderAs: 'badge', filterable: true },
+        {
+          key: 'items',
+          label: 'Kosher items available',
+          type: 'tags',
+          showCountInHeader: true,
+          countLabel: 'kosher item',
+          countReplacesKey: 'isKosher',
+        },
+      ],
+    })
+    const item = makeListing({ isKosher: true, items: ['Milk', 'Bread'] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
+    expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
+  })
 })

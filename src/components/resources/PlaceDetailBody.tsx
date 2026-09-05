@@ -197,10 +197,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
-  // The subset of signal badges actually shown in this status row — excludes
-  // whichever ones the caller says it already shows elsewhere (see
-  // `hiddenBadgeKeys`), so a filterable badge doesn't appear twice.
-  const visibleSignalBadges = signalBadges.filter((f) => !hiddenBadgeKeys.includes(f.key))
 
   // "N {items}" — same calculation as GenericListingCard's own collapsed
   // header (see that component's countHeaderField doc for the full
@@ -212,6 +208,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     ? selectValues(item[countHeaderField.key]).length + selectValues(item[countHeaderField.key + '_sometimes']).length
     : 0
   const showCountBadge = countHeaderCount > 0 && !!countHeaderField && !hideCountBadge
+  // The badge the count above replaces (e.g. a "Kosher Items" store-type
+  // badge next to "2 kosher items") — suppressed here too, not just in
+  // whichever caller happens to also show the count, so the two callers
+  // (map sheet, directory card) agree on what "showing the count" means.
+  const suppressedBadgeKey = showCountBadge ? countHeaderField?.countReplacesKey : undefined
+  // The subset of signal badges actually shown in this status row — excludes
+  // whichever ones the caller says it already shows elsewhere (see
+  // `hiddenBadgeKeys`) and whichever one the count above already covers, so
+  // a filterable badge doesn't appear twice and the same fact isn't said in
+  // two different ways in the same row.
+  const visibleSignalBadges = signalBadges.filter((f) => !hiddenBadgeKeys.includes(f.key) && f.key !== suppressedBadgeKey)
 
   const caveatNote = (f: CategoryField): string | null => {
     if (!f.caveat || !item[f.caveat.flagField]) return null
