@@ -1130,10 +1130,19 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           the map tile imagery Google renders inside this div as a long-
           press-able image and pops its own Save/Copy/Share sheet instead of
           letting our pointerdown-timer long-press-to-pin handlers (below)
-          fire. */}
+          fire.
+          overscroll-x-none: a two-finger trackpad pan is a horizontal wheel
+          gesture same as any other, and Google Maps calling preventDefault
+          on it to actually pan doesn't reliably stop the browser's SEPARATE
+          swipe-navigation gesture recognizer (the elastic full-page slide
+          that can fire alongside/despite the pan) — same distinction
+          NearbyList's own overscroll-x-none doc makes for exactly this
+          "consumed the event but the browser still tried to navigate" gap.
+          Without it, panning the map itself could trigger a back navigation
+          mid-pan, on top of the actual map, on desktop trackpads. */}
       <div
         ref={containerRef}
-        className="w-full min-h-0 flex-1 rounded-2xl select-none"
+        className="w-full min-h-0 flex-1 overscroll-x-none rounded-2xl select-none"
         style={{ WebkitTouchCallout: 'none' }}
       />
       {ready && userLocation && (
