@@ -31,3 +31,40 @@ describe('PlaceDetailBody — "Synced from Google" note', () => {
     expect(screen.queryByText(/Synced from Google/)).not.toBeInTheDocument()
   })
 })
+
+describe('PlaceDetailBody — "N {countLabel}" count chip', () => {
+  // Same split-text-node situation as GenericListingCard's own count-badge
+  // tests — see that file's own comment on why a function matcher is needed.
+  function chipText(text: string) {
+    return (_: string, element: Element | null) => element?.tagName === 'SPAN' && element.textContent === text
+  }
+
+  // The map's place-detail popup (MapPlaceDetail) has no collapsed header of
+  // its own — it renders PlaceDetailBody as the ENTIRE view — so unlike
+  // GenericListingCard, which shows this count in its own header and passes
+  // hideCountBadge to suppress a duplicate here, the map had nowhere this
+  // count ever showed at all.
+  it('shows the count chip by default', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText(chipText('3 kosher items'))).toBeInTheDocument()
+  })
+
+  it('hides the count chip when the caller already shows it elsewhere', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread', 'Cheese'] })
+    render(<PlaceDetailBody item={item} category={category} hideCountBadge />)
+
+    expect(screen.queryByText(/kosher item/)).not.toBeInTheDocument()
+  })
+})

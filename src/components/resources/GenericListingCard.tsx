@@ -512,6 +512,9 @@ export function GenericListingCard({
             // twice" duplication the count was built to avoid, just one tap
             // later instead of never.
             hiddenBadgeKeys={headerBadges.map((f) => f.key)}
+            // Same reasoning as hideOpenStatus — the collapsed header above
+            // already shows the "N kosher items" count.
+            hideCountBadge
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
