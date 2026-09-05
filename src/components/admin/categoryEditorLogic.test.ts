@@ -234,7 +234,14 @@ describe('validateDraft', () => {
   })
 
   it('passes for a valid draft', () => {
-    expect(validateDraft(baseDraft({ pluralLabel: 'Groceries', fields: [] }))).toEqual([])
+    expect(validateDraft(baseDraft({ id: 'groceries', pluralLabel: 'Groceries', fields: [] }))).toEqual([])
+  })
+
+  it('rejects a blank or invalid URL slug', () => {
+    expect(validateDraft(baseDraft({ id: '', pluralLabel: 'Groceries' }))).toContain('A URL slug is required.')
+    expect(
+      validateDraft(baseDraft({ id: 'Not A Slug!', pluralLabel: 'Groceries' })).some((e) => e.includes('lowercase letters')),
+    ).toBe(true)
   })
 })
 

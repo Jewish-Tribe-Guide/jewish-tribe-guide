@@ -129,3 +129,56 @@ export function RenameConfirm({
     </div>
   )
 }
+
+// Blocks the save until the admin confirms renaming a category's own URL
+// slug — see renameCategoryId's own doc for why this cascades to every
+// listing under it, not just this row. Same neutral/blue treatment as
+// RenameConfirm (a deliberate admin action, not data loss) but with no
+// "save without updating" escape hatch: unlike an option rename, there's no
+// legitimate reading of "change the id but leave the listings under the old
+// one" — that would just orphan them.
+export function IdRenameConfirm({
+  rename,
+  saving,
+  onCancel,
+  onConfirm,
+}: {
+  rename: { oldId: string; newId: string; count: number }
+  saving: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 space-y-3">
+      <p className="text-sm font-medium text-sky-900">Rename this category's URL?</p>
+      <p className="text-sm text-sky-800">
+        <code className="rounded bg-sky-100 px-1 py-0.5">/{rename.oldId}</code>
+        {' → '}
+        <code className="rounded bg-sky-100 px-1 py-0.5">/{rename.newId}</code>
+        {rename.count > 0
+          ? ` — ${rename.count} listing${rename.count !== 1 ? 's' : ''} will move to the new URL`
+          : ' — no listings are filed under this category yet'}
+      </p>
+      <p className="text-xs text-sky-700">
+        Any link or bookmark to the old URL will stop working. This can&rsquo;t be undone automatically — renaming
+        back is its own separate rename.
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={saving}
+          className="text-sm font-medium bg-primary text-white rounded-md px-4 py-2 hover:bg-primary/90 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          {saving ? 'Saving…' : 'Rename & save'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}

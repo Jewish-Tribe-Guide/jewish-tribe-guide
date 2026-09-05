@@ -40,6 +40,7 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
+  renameCategoryId,
 } = await import('./categoryStore')
 
 afterEach(() => {
@@ -248,6 +249,35 @@ describe('createCategory', () => {
     )
   })
 
+  // An admin-chosen slug (typed directly into the editor's new URL-slug
+  // field — see CategoryEditor) is used as-is, not silently deduped with a
+  // "-2" suffix the way a label-derived default is: they explicitly picked
+  // it, so a collision should be a clear error to fix, not a surprise swap.
+  it('uses an explicit id as-is instead of deriving one from the label', async () => {
+    let call = 0
+    const insertBuilder = chainable({ data: { ...rawRow, id: 'food-truck' }, error: null })
+    mockFrom.mockImplementation(() => {
+      call += 1
+      if (call === 1) return chainable({ data: null, error: null }) // no collision
+      return insertBuilder
+    })
+
+    const result = await createCategory('philly', { label: 'Food', id: 'food-truck' })
+    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ id: 'food-truck' }))
+    expect(result.id).toBe('food-truck')
+  })
+
+  it('rejects an explicit id already used by another category, rather than deduping it', async () => {
+    mockFrom.mockImplementation(() => chainable({ data: { id: 'food' }, error: null }))
+    await expect(createCategory('philly', { label: 'Food', id: 'food' })).rejects.toThrow(
+      '"food" is already used by another category.',
+    )
+  })
+
+  it('rejects an explicit id that is a reserved/invalid slug', async () => {
+    await expect(createCategory('philly', { label: 'Map Alternative', id: 'map' })).rejects.toThrow()
+  })
+
   it('applies defaults: hasAddress/hasPhone true, upvotesEnabled false, icon falls back to the default', async () => {
     let call = 0
     const insertBuilder = chainable({ data: rawRow, error: null })
@@ -401,5 +431,68 @@ describe('deleteCategory', () => {
     await expect(deleteCategory('philly', 'synagogue')).rejects.toThrow(
       'Failed to delete category: category fk violation',
     )
+  })
+})
+
+// ── renameCategoryId ─────────────────────────────────────────────────────────
+
+describe('renameCategoryId', () => {
+  it('renames the category row and cascades the id to every listing under it', async () => {
+    const calls: { table: string; args: unknown[] }[] = []
+    const categoryUpdateBuilder = chainable({ error: null })
+    const resourceUpdateBuilder = chainable({ error: null })
+    let call = 0
+    mockFrom.mockImplementation((table: string) => {
+      call += 1
+      calls.push({ table, args: [] })
+      if (call === 1) return chainable({ data: null, error: null }) // collision check: none
+      if (call === 2) return chainable({ count: 4, error: null, data: null }) // listing count
+      if (call === 3) return categoryUpdateBuilder // category.id update
+      return resourceUpdateBuilder // resource.category update
+    })
+
+    const result = await renameCategoryId('philly', 'restaurant', 'food')
+
+    expect(result).toEqual({ listings: 4 })
+    expect(categoryUpdateBuilder.update).toHaveBeenCalledWith({ id: 'food' })
+    expect(resourceUpdateBuilder.update).toHaveBeenCalledWith({ category: 'food' })
+    // Category renamed before listings migrated — see the function's own doc
+    // on why this ordering is the safer one to fail partway through.
+    expect(calls.map((c) => c.table)).toEqual(['category', 'resource', 'category', 'resource'])
+  })
+
+  it('is a no-op when the new id is the same as the old one', async () => {
+    expect(await renameCategoryId('philly', 'food', 'food')).toEqual({ listings: 0 })
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('rejects a reserved/invalid new slug before touching the database', async () => {
+    await expect(renameCategoryId('philly', 'restaurant', 'map')).rejects.toThrow()
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('rejects when the new id is already used by another category, without migrating anything', async () => {
+    mockFrom.mockImplementation(() => chainable({ data: { id: 'food' }, error: null }))
+    await expect(renameCategoryId('philly', 'restaurant', 'food')).rejects.toThrow(
+      '"food" is already used by another category.',
+    )
+    expect(mockFrom).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops before migrating listings if the category rename itself fails', async () => {
+    let call = 0
+    let resourceUpdateCalled = false
+    mockFrom.mockImplementation((table: string) => {
+      call += 1
+      if (call === 1) return chainable({ data: null, error: null }) // no collision
+      if (call === 2) return chainable({ count: 2, error: null, data: null }) // listing count
+      if (table === 'resource') resourceUpdateCalled = true
+      return chainable({ error: { message: 'category locked' } })
+    })
+
+    await expect(renameCategoryId('philly', 'restaurant', 'food')).rejects.toThrow(
+      'Failed to rename category: category locked',
+    )
+    expect(resourceUpdateCalled).toBe(false)
   })
 })
