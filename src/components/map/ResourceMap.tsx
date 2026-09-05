@@ -239,6 +239,27 @@ function buildInfoContent(
   return wrap
 }
 
+// AdvancedMarkerElement has no stable default stacking order: left unset, it
+// falls back to each marker's live SCREEN position (Google's own docs:
+// "displayed according to their vertical position on screen"), recomputed
+// every frame during a zoom. Two markers close enough together project to
+// nearly the same screen Y, and which one rounds "lower" (therefore "in
+// front") can flip frame to frame as the map animates — seen live as the two
+// pins visibly swapping which is on top mid-zoom. A zIndex derived from
+// latitude is stable across zoom/pan (it never changes unless the marker's
+// own coordinates do), eliminating the flicker; negative so a more-southern
+// (further "down" on a north-up map) pin still reads as "in front", matching
+// the default convention's own intent. `+SELECTED_Z_BOOST` keeps the
+// currently-selected pin on top of any neighbor regardless of latitude, so
+// selecting it never leaves it visually behind an unselected one beside it.
+// Bigger than the largest possible latitude-based spread (180° × 1e6 = 1.8e8,
+// pole to pole) — otherwise a selected point could still rank behind a
+// distant unselected one instead of always winning.
+export const SELECTED_Z_BOOST = 1e9
+export function markerZIndex(p: MapPoint, isSelected: boolean): number {
+  return Math.round(-p.lat * 1e6) + (isSelected ? SELECTED_Z_BOOST : 0)
+}
+
 // A category pin — noticeably bigger AND wrapped in a pulsing color halo plus
 // a one-time drop-bounce when it's the place currently shown in the mobile
 // sheet. Scale alone (the old behavior) read as "a little bigger", easy to
@@ -645,6 +666,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         position: { lat: p.lat, lng: p.lng },
         title: p.name,
         content: buildPin(p, p.id === selectedIdRef.current),
+        zIndex: markerZIndex(p, p.id === selectedIdRef.current),
       })
 
       // Press-and-hold to toggle Pinned, without also opening the place's
@@ -832,12 +854,16 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     const prevId = prevSelectedIdRef.current
     if (prevId && prevId !== selectedId) {
       const prev = markersByIdRef.current.get(prevId)
-      if (prev) prev.marker.content = buildPin(prev.point, false)
+      if (prev) {
+        prev.marker.content = buildPin(prev.point, false)
+        prev.marker.zIndex = markerZIndex(prev.point, false)
+      }
     }
     if (selectedId && selectedId !== prevId) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)
+        current.marker.zIndex = markerZIndex(current.point, true)
         const shouldFrame = frameToken !== consumedFrameTokenRef.current
         consumedFrameTokenRef.current = frameToken
         if (shouldFrame) {

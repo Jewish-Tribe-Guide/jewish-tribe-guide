@@ -299,14 +299,17 @@ describe('ResourceMapView — selecting a place', () => {
     expect(await screen.findByText('1 Main St')).toBeInTheDocument()
   })
 
-  // A pin tapped directly on the map is already visible right where it is —
-  // reframing to fit it alongside the visitor's location would yank the view
-  // they just tapped into. A listing picked from the sidebar list, on the
-  // other hand, isn't necessarily on screen at all, so that one should still
-  // reframe. ResourceMap itself only decides whether to actually move the
-  // camera (mocked away here, see the vi.mock above) — this asserts the
-  // frameToken signal ResourceMapView sends it distinguishes the two.
-  it('bumps frameToken for a sidebar list pick but not for a map pin tap', async () => {
+  // A pin tapped directly on the map is already visible right where it is,
+  // and so is desktop's own sidebar list sitting right beside the map —
+  // reframing on either would yank a view the visitor already positioned
+  // themselves, which is exactly the "map jumps around" complaint that
+  // moved the sidebar list from "reframe like a search/deep-link jump" to
+  // "don't, like a pin tap" (see selectPlace's own doc for the full list of
+  // which picks still reframe and why). ResourceMap itself only decides
+  // whether to actually move the camera (mocked away here, see the vi.mock
+  // above) — this asserts the frameToken signal ResourceMapView sends it
+  // stays flat for both.
+  it('does not bump frameToken for a map pin tap or a desktop sidebar list pick', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
@@ -330,14 +333,14 @@ describe('ResourceMapView — selecting a place', () => {
     expect(screen.getByTestId('frame-token').textContent).toBe(initialFrameToken)
 
     // Back to the list, then pick the OTHER listing from the real sidebar
-    // row — that one should bump the token.
+    // row — that one must not bump the token either.
     await user.click(screen.getByRole('button', { name: 'Back to list' }))
     // MobileNearbySheet stays mounted (CSS-hidden, not unmounted) even on
     // desktop, so its own copy of this row exists in the DOM too — the
     // sidebar's own row is the first of the two.
     await user.click(screen.getAllByRole('button', { name: /^Beth Shalom/ })[0]!)
     expect(await screen.findByRole('button', { name: 'Back to list' })).toBeInTheDocument()
-    expect(screen.getByTestId('frame-token').textContent).not.toBe(initialFrameToken)
+    expect(screen.getByTestId('frame-token').textContent).toBe(initialFrameToken)
   })
 })
 

@@ -409,10 +409,14 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // search suggestion — routes to whichever "show this place's details"
   // surface the current platform actually has: mobile's bottom sheet, or
   // desktop's sidebar detail panel. `frame` (default true) says whether this
-  // selection should also reframe the map camera; every caller here is a
-  // list/sidebar/search pick, so it stays on unless a caller opts out — see
-  // the pin-tap handler passed to ResourceMap below, which is the one place
-  // that does.
+  // selection should also reframe the map camera. Left on for a pick whose
+  // target isn't already visible (a deep-link/search-suggestion jump, or —
+  // mobile only — the sheet's own list, which covers most of the map).
+  // Opted out for anything already fully in view without moving the
+  // camera: a pin tapped directly on the map (see the handler passed to
+  // ResourceMap below), and desktop's sidebar list (see its onSelectPlace
+  // below) — that sidebar sits right next to the map, so reframing on a
+  // pick there just yanked a view the visitor had positioned themselves.
   const selectPlace = (p: SelectablePoint, frame = true) => {
     if (isMobile) nearbySheetRef.current?.selectPoint(p, frame)
     else {
@@ -1491,7 +1495,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         points={visiblePoints}
                         userLocation={activeLocation}
                         onViewListing={onViewListing}
-                        onSelectPlace={selectPlace}
+                        // frame=false: this list sits right next to the map,
+                        // already fully in view — reframing to fit the pick
+                        // (like the initial-deep-link/search-suggestion picks
+                        // still do) yanked a view the visitor had positioned
+                        // themselves, the same disorienting jump the map
+                        // pin-tap handler above was already written to avoid.
+                        onSelectPlace={(p) => selectPlace(p, false)}
                       />
                     </>
                   )}
