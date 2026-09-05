@@ -190,12 +190,28 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
   // Mobile's own permanent grid — this doubles as its whole "browse
   // everything", not just search results, so it always renders regardless
-  // of `q`. Full CardGrid tiles, unchanged from before.
+  // of `q`. Full CardGrid tiles, unchanged from before. Browsing (no query)
+  // keeps the admin-configured section titles as real, large headings —
+  // useful information architecture when there's no "Places" heading next
+  // to it to clash with. Once there's a query, though, `placesNode` brings
+  // its own small-caps "Places" heading into the same list, and a section
+  // title sitting next to that read as a style mismatch — same fix as
+  // desktop's own "Categories" vs "Food and Hospitality" (see
+  // desktopResultsNode's own comment): one flat "Categories" heading,
+  // styled like "Places", over every matching card regardless of section.
   const mobileResultsNode = (
     <>
       {noMatchesMessage}
       {loading ? (
         <CardGrid cards={entryCards} loadingCount={6} />
+      ) : q ? (
+        filtered &&
+        filtered.length > 0 && (
+          <div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
+            <CardGrid cards={filtered} />
+          </div>
+        )
       ) : (
         sections.map((s) => (
           <div key={s.title}>
