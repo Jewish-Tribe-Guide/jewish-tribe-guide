@@ -143,6 +143,39 @@ describe('ResourceMapView — plotting listings', () => {
   })
 })
 
+describe('ResourceMapView — desktop search/filter bar position', () => {
+  // The bar is `position:absolute` relative to the whole row, not a sibling
+  // of the sidebar it sits beside — so its left offset has to track the
+  // sidebar's own width by hand, or its leftmost chips render ON TOP of the
+  // sidebar's top edge the moment it opens (measured live: sidebar 0-380px,
+  // bar 12-1336px, a real overlap). Confirmed this fails without the
+  // sidebar-aware offset, then restored.
+  it('shifts right of the sidebar once one opens, and sits at the map edge when it is not', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(<ResourceMapView onUp={vi.fn()} />, [], [grocery])
+
+    const bar = () => container.querySelector('[class*="right-16"][class*="z-20"]')
+    expect(bar()?.className).toMatch(/\bleft-3\b/)
+    expect(bar()?.className).not.toMatch(/left-\[392px\]/)
+  })
+
+  it('uses the sidebar-clearing offset once the sidebar is showing', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const bar = container.querySelector('[class*="right-16"][class*="z-20"]')
+    expect(bar?.className).toMatch(/left-\[392px\]/)
+    expect(bar?.className).not.toMatch(/\bleft-3\b/)
+  })
+})
+
 describe('ResourceMapView — category filtering', () => {
   it('tapping one chip while everything is shown narrows straight down to just that category', async () => {
     // Deliberate, documented behavior (see ResourceMapView's own `toggle`

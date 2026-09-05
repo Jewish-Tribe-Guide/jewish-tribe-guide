@@ -1541,8 +1541,22 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           {!isMobile && (
             // right-16 (not right-3): leaves clearance so the chip row's
             // scroll area doesn't run under the fullscreen button, which
-            // shares this same top-right corner of the map.
-            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 desktop:flex">
+            // shares this same top-right corner of the map. left tracks
+            // the sidebar's own width/transition (380px + this row's own
+            // left-3 gap) instead of a fixed left-3 regardless of whether
+            // the sidebar is showing — that fixed offset used to let this
+            // row's leftmost chips sit ON TOP of the sidebar's own top edge
+            // the moment it opened (it's `position:absolute` relative to
+            // the whole row, unaware of the sidebar mounted as a sibling
+            // beside it), which read as the two glitching into each other
+            // rather than the sidebar sliding in cleanly underneath. Same
+            // 200ms/ease-in-out as the sidebar's own width transition so
+            // the two move together instead of one jumping ahead.
+            <div
+              className={`absolute right-16 top-3 z-20 hidden items-start gap-2 transition-[left] duration-200 ease-in-out desktop:flex ${
+                sidebarVisible ? 'left-[392px]' : 'left-3'
+              }`}
+            >
               <div className="w-72 shrink-0">{desktopSearchForm}</div>
               {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
             </div>
