@@ -204,7 +204,7 @@ export default function SubscribeSection() {
                       aria-hidden="true"
                       className="pointer-events-none"
                     />
-                    {allCategories ? 'All categories' : `${selected.length} checked`}
+                    {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     {/* text-[10px]: this is just "opens a menu," not a
                         heading — at the default text-sm size it read as
                         bigger than the affordance needed. */}

@@ -216,19 +216,26 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // jarring style switch from Browse everything's own small icon-avatar
   // rows the moment you typed anything — this keeps desktop looking like
   // desktop whether you're browsing or searching.
+  //
+  // One flat "Categories" heading over every matching card, not `sections`'
+  // own admin-configured group titles ("Food and Hospitality", etc.) — those
+  // exist to organize the tab nav's mega-menus and mobile's permanent grid,
+  // and showing one here reads as a mismatch against "Places" right below
+  // it, which is never split by category either. `filtered`, not `sections`,
+  // is the flat list this needs (the same one `sections` itself groups from).
   const desktopResultsNode = q ? (
     <>
       {noMatchesMessage}
-      {sections.map((s) => (
-        <div key={s.title}>
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">{s.title}</h2>
+      {filtered && filtered.length > 0 && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
           <CompactCardGrid
-            cards={s.cards}
+            cards={filtered}
             categories={categories}
             onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
           />
         </div>
-      ))}
+      )}
       {placesNode}
     </>
   ) : undefined

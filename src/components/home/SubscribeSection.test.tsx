@@ -44,7 +44,7 @@ describe('SubscribeSection', () => {
     expect(screen.getByText('Synagogues')).toBeInTheDocument()
 
     await user.click(screen.getByText('Grocery Stores'))
-    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /1 category/ })).toBeInTheDocument()
   })
 
   // The picker used to have no independent "closed" state — the only way
@@ -60,7 +60,7 @@ describe('SubscribeSection', () => {
     await user.keyboard('{Escape}')
 
     expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument() // panel closed
-    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument() // selection survived
+    expect(screen.getByRole('button', { name: /1 category/ })).toBeInTheDocument() // selection survived
   })
 
   it('checking "All categories" inside the picker clears any specific picks', async () => {
@@ -112,7 +112,7 @@ describe('SubscribeSection', () => {
 
   // Nobody actually wants to be subscribed to nothing — unchecking the last
   // specific pick falls back to "All categories" on its own, rather than
-  // leaving the picker at a confusing "0 checked" that would still need a
+  // leaving the picker at a confusing "0 categories" that would still need a
   // separate step (re-checking "All categories" by hand) to fix.
   it('unchecking the last specific category falls back to "All categories" on its own', async () => {
     const user = userEvent.setup()
@@ -122,7 +122,7 @@ describe('SubscribeSection', () => {
     await user.type(screen.getByLabelText('Email address'), 'person@example.com')
     await user.click(screen.getByRole('button', { name: /All categories/ }))
     await user.click(screen.getByText('Grocery Stores')) // pick
-    expect(screen.getByRole('button', { name: /1 checked/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /1 category/ })).toBeInTheDocument()
 
     await user.click(screen.getByText('Grocery Stores')) // unpick the only one
     expect(screen.getByRole('button', { name: /^All categories/ })).toBeInTheDocument()
