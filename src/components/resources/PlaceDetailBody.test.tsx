@@ -94,4 +94,35 @@ describe('PlaceDetailBody — "N {countLabel}" count chip', () => {
     expect(screen.getByText(chipText('2 kosher items'))).toBeInTheDocument()
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
+
+  // The count chip landed ahead of "Open" when it was first added here — Open
+  // is the most time-sensitive, highest-priority fact about a listing, and
+  // GenericListingCard's own collapsed header has always led with it, so the
+  // two callers disagreeing about which comes first read as a regression
+  // (spotted comparing this branch against prod, not caught by either of the
+  // count-chip tests above since neither one also renders an Open badge).
+  it('always renders "Open" before the count chip when both apply', () => {
+    vi.useFakeTimers()
+    try {
+      // A Friday, mid-afternoon, for a place open 09:00-17:00 that day.
+      vi.setSystemTime(new Date('2026-08-28T14:00:00'))
+      const category = makeCategory({
+        detailFields: [
+          { key: 'hours', label: 'Hours', type: 'hours', renderAs: 'row' },
+          { key: 'items', label: 'Kosher items available', type: 'tags', showCountInHeader: true, countLabel: 'kosher item' },
+        ],
+      })
+      const item = makeListing({
+        hours: { fri: { open: '09:00', close: '17:00' } },
+        items: ['Milk', 'Bread', 'Cheese'],
+      })
+      render(<PlaceDetailBody item={item} category={category} />)
+
+      const openChip = screen.getByText('Open')
+      const countChip = screen.getByText(chipText('3 kosher items'))
+      expect(openChip.compareDocumentPosition(countChip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

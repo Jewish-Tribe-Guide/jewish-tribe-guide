@@ -263,17 +263,11 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // ── Status + signal badges ─────────────────────────────────────────────
   const statusSection = (showOpenChip || visibleSignalBadges.length > 0 || showCountBadge) && (
     <div className="flex flex-wrap gap-1.5">
-      {showCountBadge && (() => {
-        // See GenericListingCard's own countHeaderField doc for the
-        // pluralization reasoning — same rule, same fallback.
-        const noun = countHeaderField!.countLabel ?? countHeaderField!.label.toLowerCase()
-        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
-        return (
-          <Chip tone="slate" title={`See which ${plural} this place has`}>
-            <span className="font-semibold">{countHeaderCount}</span> {plural}
-          </Chip>
-        )
-      })()}
+      {/* Open/Closes Soon first, same order as GenericListingCard's own
+          collapsed header — that one has always led with Open, so the
+          count chip (added here later, see its own comment below) has to
+          come after it rather than before, or the two callers would
+          disagree about which fact leads. */}
       {showOpenChip && (closing?.closesSoon ? (
         <span className="relative group/tip">
           <Chip tone="greenSolid" onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}>
@@ -292,6 +286,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           Open
         </Chip>
       ))}
+      {showCountBadge && (() => {
+        // See GenericListingCard's own countHeaderField doc for the
+        // pluralization reasoning — same rule, same fallback.
+        const noun = countHeaderField!.countLabel ?? countHeaderField!.label.toLowerCase()
+        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
+        return (
+          <Chip tone="slate" title={`See which ${plural} this place has`}>
+            <span className="font-semibold">{countHeaderCount}</span> {plural}
+          </Chip>
+        )
+      })()}
       {visibleSignalBadges.flatMap((f) => {
         const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
         // Resolve to the option's CURRENT label — see the matching comment in
