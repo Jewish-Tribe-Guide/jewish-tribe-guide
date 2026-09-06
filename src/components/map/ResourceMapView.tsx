@@ -1543,32 +1543,37 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           )}
 
           {/* ── Floating search (desktop) — fixed at left-3/top-3, always,
-                  sized to the sidebar's own 380px width (minus this left
-                  inset, so its right edge lines up with the sidebar's right
-                  edge exactly: 12px + 368px = 380px) and stacked above it in
-                  z-order (z-40 vs. the sidebar's z-30). It reads as sitting
-                  on top of the sidebar's own top edge, the same way Google
-                  Maps' own search box spans the width of its results panel
-                  rather than sitting beside it. Neither this nor the chips
-                  below ever move now — the sidebar sliding in and out
-                  underneath is what changes, not these. ────────────────── */}
+                  stacked above the sidebar in z-order (z-40 vs. the
+                  sidebar's z-30) so it reads as sitting on top of the
+                  sidebar's own top edge, the same way Google Maps' own
+                  search box sits over its results panel. Deliberately
+                  narrower than the sidebar (336px, not the full 368px that
+                  would put its right edge flush with the sidebar's own
+                  right edge at 380px) — flush left no visible gap between
+                  the end of the search box and the sidebar's white below
+                  it, unlike Google Maps' own search box, which leaves a
+                  real margin on both sides. left-3 + 336px = 348px, 32px
+                  short of the sidebar's 380px edge. Neither this nor the
+                  chips below ever move now — the sidebar sliding in and
+                  out underneath is what changes, not these. ───────────── */}
           {!isMobile && (
-            <div className="absolute left-3 top-3 z-40 hidden w-[368px] desktop:block">{desktopSearchForm}</div>
+            <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
           )}
 
-          {/* ── Floating category chips (desktop) — fixed just past the
-                  search box's right edge (left-3 + 368px + this row's own
-                  gap = 392px), same as Google Maps' own chip row starting
-                  right after its panel (see the reference screenshot).
-                  Fixed, not sidebar-tracking: the search box above is
-                  already sized to fully cover the sidebar's width, so the
-                  sidebar can never reach far enough right to need this to
-                  get out of its way. right-16 (not right-3): leaves
-                  clearance so the chip row's scroll area doesn't run under
-                  the fullscreen button, which shares this same top-right
-                  corner of the map. ─────────────────────────────────────── */}
+          {/* ── Floating category chips (desktop) — fixed well clear of the
+                  sidebar's right edge (380px + a real 32px gap = 412px,
+                  matching the same-size margin left between the search box
+                  and the sidebar's edge above), same as Google Maps' own
+                  chip row starting with real breathing room past its panel
+                  (see the reference screenshot) rather than hugging it.
+                  Fixed, not sidebar-tracking: the search box and this gap
+                  are already sized so the sidebar can never reach far
+                  enough right to need this to get out of its way. right-16
+                  (not right-3): leaves clearance so the chip row's scroll
+                  area doesn't run under the fullscreen button, which shares
+                  this same top-right corner of the map. ────────────────── */}
           {!isMobile && desktopCategoryChips && (
-            <div className="absolute left-[392px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
+            <div className="absolute left-[412px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
               {desktopCategoryChips}
             </div>
           )}

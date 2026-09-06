@@ -148,13 +148,13 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
   // closes anymore — both used to shift right to dodge the sidebar (first
   // together, then just the chips), which kept reading as things getting
   // "pushed" every time the sidebar appeared. Instead the search box is
-  // widened to the sidebar's own width (368px content + this row's own
-  // left-3 inset = 380px, matching the sidebar's desktop:w-[380px] exactly)
-  // and stacked above it in z-order, so the sidebar can never peek out from
-  // under it — same as Google Maps' own search box spanning its results
-  // panel's width. The chips then have a fixed, permanently-safe starting
-  // point just past it. Confirmed both fail against the old sidebar-tracking
-  // offsets, then restored.
+  // sized narrower than the sidebar's own width, and the chips fixed well
+  // past the sidebar's edge, both with a real gap — flush edges (search box
+  // exactly as wide as the sidebar, chips starting exactly where it ends)
+  // left no visible margin anywhere, unlike Google Maps' own search box and
+  // chip row, which both sit with real breathing room around the panel (see
+  // the reference screenshots). Confirmed both fail against the old
+  // sidebar-tracking offsets, then restored.
   it('keeps the search box and chips at the same position whether or not the sidebar is open', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
@@ -164,7 +164,7 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
       [grocery],
     )
 
-    const search = () => container.querySelector('[class*="w-\\[368px\\]"]')
+    const search = () => container.querySelector('[class*="w-\\[336px\\]"]')
     const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]')
     const classesBefore = [search()?.className, chips()?.className]
 
@@ -172,17 +172,17 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
 
     expect([search()?.className, chips()?.className]).toEqual(classesBefore)
     expect(search()?.className).toMatch(/\bleft-3\b/)
-    expect(chips()?.className).toMatch(/left-\[392px\]/)
+    expect(chips()?.className).toMatch(/left-\[412px\]/)
   })
 
-  // The invariant that actually prevents the overlap: the sidebar's full
-  // width has to fit entirely underneath the search box (left inset + its
-  // width), and the chips' fixed start has to sit at or past that same
-  // point. Widening the sidebar later without widening the search box to
-  // match would silently reopen the overlap this describe block exists to
-  // prevent — this fails immediately if that ever drifts, instead of
-  // waiting for someone to notice it visually.
-  it("fits the sidebar's full width entirely under the search box, with the chips starting no earlier than that", async () => {
+  // The invariant that actually prevents both the overlap AND the flush,
+  // no-breathing-room look: there has to be a real gap between the search
+  // box's right edge and the sidebar's own right edge, and another real gap
+  // between the sidebar's right edge and where the chips start. Widening the
+  // sidebar, or narrowing either gap, later without adjusting to match would
+  // silently reopen one of those two problems — this fails immediately if
+  // that ever drifts, instead of waiting for someone to notice it visually.
+  it('leaves a real gap on both sides of the sidebar — search box to sidebar edge, and sidebar edge to chips', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -194,16 +194,17 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
     const aside = container.querySelector('aside')
-    const search = container.querySelector('[class*="w-\\[368px\\]"]')
+    const search = container.querySelector('[class*="w-\\[336px\\]"]')
     const chips = container.querySelector('[class*="right-16"][class*="z-20"]')
 
     const sidebarWidth = Number(aside?.className.match(/desktop:w-\[(\d+)px\]/)?.[1])
     const searchLeft = Number(search?.className.match(/\bleft-(\d+)\b/)?.[1]) * 4 // Tailwind spacing unit -> px
     const searchWidth = Number(search?.className.match(/w-\[(\d+)px\]/)?.[1])
     const chipsLeft = Number(chips?.className.match(/left-\[(\d+)px\]/)?.[1])
+    const MIN_GAP_PX = 16
 
-    expect(searchLeft + searchWidth).toBeGreaterThanOrEqual(sidebarWidth)
-    expect(chipsLeft).toBeGreaterThanOrEqual(searchLeft + searchWidth)
+    expect(sidebarWidth - (searchLeft + searchWidth)).toBeGreaterThanOrEqual(MIN_GAP_PX)
+    expect(chipsLeft - sidebarWidth).toBeGreaterThanOrEqual(MIN_GAP_PX)
   })
 
   // The sidebar used to be a real flex sibling of the map, so opening it
