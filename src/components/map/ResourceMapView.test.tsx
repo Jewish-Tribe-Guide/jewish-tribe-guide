@@ -172,7 +172,7 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
 
     expect([search()?.className, chips()?.className]).toEqual(classesBefore)
     expect(search()?.className).toMatch(/\bleft-3\b/)
-    expect(chips()?.className).toMatch(/left-\[412px\]/)
+    expect(chips()?.className).toMatch(/left-\[396px\]/)
   })
 
   // The invariant that actually prevents both the overlap AND the flush,

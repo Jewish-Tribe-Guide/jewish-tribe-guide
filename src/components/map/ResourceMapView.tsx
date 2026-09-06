@@ -1560,20 +1560,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
           )}
 
-          {/* ── Floating category chips (desktop) — fixed well clear of the
-                  sidebar's right edge (380px + a real 32px gap = 412px,
-                  matching the same-size margin left between the search box
-                  and the sidebar's edge above), same as Google Maps' own
-                  chip row starting with real breathing room past its panel
-                  (see the reference screenshot) rather than hugging it.
-                  Fixed, not sidebar-tracking: the search box and this gap
-                  are already sized so the sidebar can never reach far
-                  enough right to need this to get out of its way. right-16
-                  (not right-3): leaves clearance so the chip row's scroll
-                  area doesn't run under the fullscreen button, which shares
-                  this same top-right corner of the map. ────────────────── */}
+          {/* ── Floating category chips (desktop) — fixed just clear of the
+                  sidebar's right edge (380px + a 16px gap = 396px), matching
+                  how tight Google Maps' own chip row sits after its panel
+                  (see the reference screenshot) — closer than the margin
+                  left between the search box and the sidebar's edge above,
+                  which is a separate, deliberately larger gap. Fixed, not
+                  sidebar-tracking: the search box and this gap are already
+                  sized so the sidebar can never reach far enough right to
+                  need this to get out of its way. right-16 (not right-3):
+                  leaves clearance so the chip row's scroll area doesn't run
+                  under the fullscreen button, which shares this same
+                  top-right corner of the map. ───────────────────────────── */}
           {!isMobile && desktopCategoryChips && (
-            <div className="absolute left-[412px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
+            <div className="absolute left-[396px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
               {desktopCategoryChips}
             </div>
           )}
