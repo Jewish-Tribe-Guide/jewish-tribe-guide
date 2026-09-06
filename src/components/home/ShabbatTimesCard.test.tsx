@@ -82,3 +82,37 @@ describe('ShabbatTimesCard', () => {
     expect(screen.getByText(/unavailable right now/)).toBeInTheDocument()
   })
 })
+
+// Both rows show every day of the week — only the highlight moves. This
+// used to give both rows the amber treatment regardless of the day, which
+// claimed "this is happening imminently" on a Tuesday exactly as loudly as
+// on the Friday it's actually true.
+describe('ShabbatTimesCard — the highlight follows the day, not both rows always', () => {
+  const rowFor = (label: string) => screen.getByText(label, { exact: false }).closest('div')!
+
+  it('midweek: neither row is highlighted, and both still show', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' }) // isFriday/isShabbos both false
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(rowFor('Candles')).toHaveClass('bg-slate-50')
+    expect(rowFor('Havdalah')).toHaveClass('bg-slate-50')
+    expect(screen.getByText('7:09 PM')).toBeInTheDocument()
+    expect(screen.getByText('8:07 PM')).toBeInTheDocument()
+  })
+
+  it('Friday: candle lighting is highlighted, havdalah is not', () => {
+    mockUseZmanim.mockReturnValue({ data: { ...readyData, isFriday: true }, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(rowFor('Candles')).toHaveClass('bg-amber-50')
+    expect(rowFor('Havdalah')).toHaveClass('bg-slate-50')
+  })
+
+  it('Shabbos: havdalah is highlighted, candle lighting is not', () => {
+    mockUseZmanim.mockReturnValue({ data: { ...readyData, isShabbos: true }, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(rowFor('Candles')).toHaveClass('bg-slate-50')
+    expect(rowFor('Havdalah')).toHaveClass('bg-amber-50')
+  })
+})

@@ -10,16 +10,21 @@ import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 
 type ContributeAction = 'create' | 'edit' | 'report'
 
-// Icon + a short word by default, the full phrase once a wide-enough
-// desktop gives this half-width card room for it. `aria-label` is fixed to
-// the short word regardless of which visual variant is showing, so the
-// accessible name never depends on viewport width. Same technique as the
-// "All davening times" toolbar button (GenericDirectory.tsx), which hides
-// its own full label below a width breakpoint rather than swapping in a
-// second, shorter one — this needs the swap because "Add"/"Edit"/"Report"
-// bare is also a fine label, not just a fallback for no room. Module-scope,
-// not defined inside HomeBreak, so it isn't a new component type — and
-// doesn't remount its buttons — on every HomeBreak render.
+// The full phrase, always — this used to swap down to a bare icon+word
+// ("Add") below a `min-[900px]` viewport breakpoint, on the reasoning that
+// the long phrase needed "a wide-enough desktop" to have room. That
+// breakpoint was checking the wrong thing: it's the VIEWPORT's width, not
+// this half-width card's, and the card's own width is fixed by the 2-up
+// grid it sits in (roughly half of Landing's max-w-6xl content column)
+// regardless of how wide the browser window gets past ~900px — so on any
+// normal desktop monitor the long-phrase branch was always the one
+// rendering, into a box that was never actually measured against it. All
+// three phrases fit today with room to spare (measured at ~445px against a
+// ~486px row) — `aria-label` still carries the plain word (`short`)
+// independent of the visible phrase, since a screen reader doesn't need
+// "Add a place" when "Add" already says what the control does. Module-
+// scope, not defined inside HomeBreak, so it isn't a new component type —
+// and doesn't remount its buttons — on every HomeBreak render.
 function ContributeButton({ onClick, icon, short, long, primary }: {
   onClick: () => void
   icon: React.ReactNode
@@ -33,13 +38,12 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
       aria-label={short}
       className={
         primary
-          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800'
-          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50'
+          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800'
+          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50'
       }
     >
       {icon}
-      <span className="min-[900px]:hidden">{short}</span>
-      <span className="hidden min-[900px]:inline">{long}</span>
+      {long}
     </button>
   )
 }

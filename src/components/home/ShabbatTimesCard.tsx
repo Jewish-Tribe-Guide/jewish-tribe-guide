@@ -10,6 +10,14 @@ import { useZmanim } from '@/lib/useZmanim'
 // lighting/havdalah on the reasoning that a card meant to be glanced at
 // shouldn't need to be read.
 //
+// Both rows show every day of the week — see the render's own comment on
+// why the `&&` guards below aren't a real "sometimes missing" case — but
+// only one gets the amber highlight, and only on the day it actually
+// applies (Friday for candle lighting, Saturday for havdalah). The rest of
+// the week both render in a plain, equally-weighted style: candle lighting
+// and havdalah are both worth knowing on, say, a Tuesday, but neither is
+// "happening imminently" the way the highlight used to claim every day.
+//
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening
 // Times and the community card. Split out into its own component when it
@@ -43,17 +51,46 @@ export default function ShabbatTimesCard({
         </div>
       ) : status === 'ready' && data ? (
         <>
+          {/* Both rows always show — Hebcal's own /shabbat response always
+              carries the upcoming Shabbos's candle lighting AND the
+              following havdalah together, every day of the week, so the
+              `&&` guards below are type-narrowing, not a real "sometimes
+              missing" case. What used to vary was styling: both rows always
+              got the amber highlight regardless of the day, which read as
+              "both of these are happening imminently" on a Tuesday just as
+              loudly as on the Friday it's actually true. Highlighted now
+              only on the day it applies — `isFriday` for candle lighting,
+              `isShabbos` for havdalah — with a plain row the rest of the
+              week. Never hides the other row: the point is always knowing
+              both times, just not being told twice a week that "right now"
+              is imminent when it isn't. */}
           <div className="space-y-1.5">
             {data.shabbos.candleLighting && (
-              <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
-                <span className="text-[13px] font-semibold text-amber-800">Candles {data.shabbos.candleLighting.label}</span>
-                <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.candleLighting.time}</span>
+              <div
+                className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
+                  data.isFriday ? 'bg-amber-50' : 'bg-slate-50'
+                }`}
+              >
+                <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                  Candles {data.shabbos.candleLighting.label}
+                </span>
+                <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                  {data.shabbos.candleLighting.time}
+                </span>
               </div>
             )}
             {data.shabbos.havdalah && (
-              <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
-                <span className="text-[13px] font-semibold text-amber-800">Havdalah {data.shabbos.havdalah.label}</span>
-                <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.havdalah.time}</span>
+              <div
+                className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
+                  data.isShabbos ? 'bg-amber-50' : 'bg-slate-50'
+                }`}
+              >
+                <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                  Havdalah {data.shabbos.havdalah.label}
+                </span>
+                <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                  {data.shabbos.havdalah.time}
+                </span>
               </div>
             )}
           </div>
