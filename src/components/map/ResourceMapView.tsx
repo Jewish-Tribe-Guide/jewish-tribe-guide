@@ -1551,24 +1551,22 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   it's not — never resizing or relocating either way, unlike
                   having two separate copies. ─────────────────────────────── */}
           {!isMobile && (
+            // Fixed at left-3 always — never shifts for the sidebar. It used
+            // to slide right to 392px so it wouldn't sit under the sidebar's
+            // top edge, but that read as the search bar getting "pushed"
+            // every time the sidebar opened, which is exactly the kind of
+            // movement the sidebar-overlay change above was meant to get rid
+            // of. Sitting above the sidebar in z-order (z-40 vs. the
+            // sidebar's z-30) is what actually fixes the overlap instead:
+            // the sidebar's own h-16 spacer (below) already reserves the
+            // vertical space this row occupies, so when the sidebar slides
+            // in underneath, it's sliding under empty space, not under this
+            // bar — same as Google Maps, where the search box never moves
+            // when the results panel appears.
             // right-16 (not right-3): leaves clearance so the chip row's
             // scroll area doesn't run under the fullscreen button, which
-            // shares this same top-right corner of the map. left tracks
-            // the sidebar's own width/transition (380px + this row's own
-            // left-3 gap) instead of a fixed left-3 regardless of whether
-            // the sidebar is showing — that fixed offset used to let this
-            // row's leftmost chips sit ON TOP of the sidebar's own top edge
-            // the moment it opened (it's `position:absolute` relative to
-            // the whole row, unaware of the sidebar mounted as a sibling
-            // beside it), which read as the two glitching into each other
-            // rather than the sidebar sliding in cleanly underneath. Same
-            // 200ms/ease-in-out as the sidebar's own width transition so
-            // the two move together instead of one jumping ahead.
-            <div
-              className={`absolute right-16 top-3 z-20 hidden items-start gap-2 transition-[left] duration-200 ease-in-out desktop:flex ${
-                sidebarVisible ? 'left-[392px]' : 'left-3'
-              }`}
-            >
+            // shares this same top-right corner of the map.
+            <div className="absolute left-3 right-16 top-3 z-40 hidden items-start gap-2 desktop:flex">
               <div className="w-72 shrink-0">{desktopSearchForm}</div>
               {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
             </div>

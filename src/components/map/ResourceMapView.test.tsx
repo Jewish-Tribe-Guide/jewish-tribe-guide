@@ -144,22 +144,33 @@ describe('ResourceMapView — plotting listings', () => {
 })
 
 describe('ResourceMapView — desktop search/filter bar position', () => {
-  // The bar is `position:absolute` relative to the whole row, not a sibling
-  // of the sidebar it sits beside — so its left offset has to track the
-  // sidebar's own width by hand, or its leftmost chips render ON TOP of the
-  // sidebar's top edge the moment it opens (measured live: sidebar 0-380px,
-  // bar 12-1336px, a real overlap). Confirmed this fails without the
-  // sidebar-aware offset, then restored.
-  it('shifts right of the sidebar once one opens, and sits at the map edge when it is not', () => {
+  // The bar used to shift its left offset to 392px whenever the sidebar
+  // opened, to avoid sitting under the sidebar's top edge — but that read as
+  // the search bar getting visibly "pushed" every time the sidebar appeared,
+  // which is exactly the kind of movement the sidebar-overlay fix (below)
+  // was meant to eliminate. It must stay at a fixed left-3 regardless of the
+  // sidebar, and instead sit above it in z-order (its own z-40 vs. the
+  // sidebar's z-30) so the sidebar slides in underneath without disturbing
+  // it — the sidebar's own top spacer already reserves that space. Confirmed
+  // this fails against the old sidebar-tracking offset, then restored.
+  it('stays at a fixed left offset whether or not the sidebar is open', async () => {
+    const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
-    const { container } = renderMap(<ResourceMapView onUp={vi.fn()} />, [], [grocery])
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
 
-    const bar = () => container.querySelector('[class*="right-16"][class*="z-20"]')
+    const bar = () => container.querySelector('[class*="right-16"][class*="top-3"]')
     expect(bar()?.className).toMatch(/\bleft-3\b/)
-    expect(bar()?.className).not.toMatch(/left-\[392px\]/)
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    expect(bar()?.className).toMatch(/\bleft-3\b/)
   })
 
-  it('uses the sidebar-clearing offset once the sidebar is showing', async () => {
+  it('renders above the sidebar in z-order, so the sidebar can never cover it', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const { container } = renderMap(
@@ -170,9 +181,12 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    const bar = container.querySelector('[class*="right-16"][class*="z-20"]')
-    expect(bar?.className).toMatch(/left-\[392px\]/)
-    expect(bar?.className).not.toMatch(/\bleft-3\b/)
+    const bar = container.querySelector('[class*="right-16"][class*="top-3"]')
+    const barZ = Number(bar?.className.match(/\bz-(\d+)\b/)?.[1])
+    const aside = container.querySelector('aside')
+    const asideZ = Number(aside?.className.match(/desktop:z-(\d+)\b/)?.[1])
+
+    expect(barZ).toBeGreaterThan(asideZ)
   })
 
   // The sidebar used to be a real flex sibling of the map, so opening it
