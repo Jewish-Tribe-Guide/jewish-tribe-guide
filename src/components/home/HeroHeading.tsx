@@ -8,8 +8,27 @@ import { community } from '@/community.config'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import SearchBox from './SearchBox'
 
+/** Splits a mission string on its first " — " into a bold headline clause
+ *  and a smaller supporting one, for desktop's promoted-headline treatment
+ *  below. `subhead` is `null` when there's no dash to split on, so a
+ *  mission written as one plain sentence renders as a headline alone
+ *  rather than guessing where to break it.
+ *
+ *  Not invented copy: this community's actual mission ("Your guide to
+ *  Jewish Philadelphia — kept current by you, and by the community that
+ *  uses it") is already written as a headline clause plus a supporting
+ *  one, joined by a dash — splitting on it is mechanical, not editorial. A
+ *  community whose mission is one plain sentence with no dash gets the
+ *  no-split fallback instead of a headline missing its second half. */
+export function splitMission(mission: string): { headline: string; subhead: string | null } {
+  const trimmed = mission.trim()
+  const i = trimmed.indexOf(' — ')
+  if (i === -1) return { headline: trimmed, subhead: null }
+  return { headline: trimmed.slice(0, i).trim(), subhead: trimmed.slice(i + 3).trim() }
+}
+
 type Props = {
-  settings: Pick<SiteSettings, 'name' | 'heroTitle' | 'mission'>
+  settings: Pick<SiteSettings, 'heroTitle' | 'mission'>
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the search box inert (nothing to filter in a
@@ -31,20 +50,31 @@ type Props = {
 // the exact same markup the live home screen does, fed by a draft instead of
 // the saved settings.
 //
-// Desktop gets a warm two-column band (name/mission beside a photo panel)
-// instead of mobile's plain centered block — mobile has to stay practical in
-// a narrow, scroll-cost-sensitive space, so it leads with `heroTitle` (the
+// Desktop gets a warm two-column band (mission beside a photo panel) instead
+// of mobile's plain centered block — mobile has to stay practical in a
+// narrow, scroll-cost-sensitive space, so it leads with `heroTitle` (the
 // practical "what are you looking for" prompt) the same way it always has,
 // with the search box directly under it; the site's actual name is already
 // one small line in the sticky header above it, and repeating it large would
 // just spend mobile's scarcer vertical space restating something already on
-// screen. Desktop can afford the name instead — nowhere else on that layout
-// says who this is at any size — but search doesn't belong folded into that
-// branding band either: it's a real third thing this app offers, on par with
-// the category grid and the map below it, not an accessory bolted onto the
-// hero. See SearchSection (rendered by Landing, right after this component)
-// for where it lives on desktop now — same headed-card treatment as Browse
-// everything, so it reads as a peer section instead of a hero accessory.
+// screen.
+//
+// Desktop used to lead with `settings.name` here too, on the reasoning that
+// nowhere else on that layout said who this is at any size. That stopped
+// being true once the header's own tagline line was dropped (see
+// SiteHeader's own doc) — SiteHeader already names the site, right above
+// this section, so this band's job became saying what it's FOR instead:
+// `settings.mission` is the headline now, split (see splitMission below)
+// into a bold clause and a smaller supporting one rather than set as one
+// giant run-on sentence — `settings.name` still isn't dead, it's the
+// header, the footer, and the browser tab, just never repeated here.
+//
+// Search doesn't belong folded into this band either: it's a real third
+// thing this app offers, on par with the category grid and the map below
+// it, not an accessory bolted onto the hero. See SearchSection (rendered by
+// Landing, right after this component) for where it lives on desktop now —
+// same headed-card treatment as Browse everything, so it reads as a peer
+// section instead of a hero accessory.
 //
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render
@@ -57,6 +87,7 @@ type Props = {
 // fresh community with no photo yet never renders broken.
 export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap }: Props) {
   const isMobile = useIsMobile()
+  const { headline, subhead } = splitMission(settings.mission)
 
   const viewMapButton = mapIcon != null && (
     <button
@@ -86,16 +117,21 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
         {viewMapButton}
       </section>
 
-      {/* Desktop — a warm two-column band. Just the name/mission now — see
-          the component doc for why search moved out into its own section. */}
+      {/* Desktop — a warm two-column band. Mission is the headline now
+          (split into a bold clause and a smaller supporting one — see
+          splitMission's own doc), not the site name — see the component
+          doc for why (the header beside it already names the site, and
+          search moved out into its own section). */}
       <section className="mt-7 hidden overflow-hidden rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-amber-100/60 desktop:grid desktop:grid-cols-[1.15fr_1fr] desktop:items-stretch">
         <div className="flex flex-col justify-center px-12 py-14">
-          <h1 className="text-4xl font-semibold leading-[1.1] text-slate-900 text-balance">
-            {settings.name}
+          <h1 className="text-4xl font-semibold leading-[1.15] text-slate-900 text-balance">
+            {headline}
           </h1>
-          <p className="mt-4 max-w-[46ch] text-base leading-relaxed text-slate-600">
-            {settings.mission}
-          </p>
+          {subhead && (
+            <p className="mt-4 max-w-[46ch] text-base leading-relaxed text-slate-600">
+              {subhead}
+            </p>
+          )}
         </div>
         {community.heroImage ? (
           // A real photo: it has content to describe, so it's a genuine

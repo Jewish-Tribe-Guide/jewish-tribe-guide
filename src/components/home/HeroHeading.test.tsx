@@ -1,30 +1,71 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import HeroHeading from './HeroHeading'
+import HeroHeading, { splitMission } from './HeroHeading'
 
 afterEach(() => cleanup())
 
-// Desktop can afford to say who this is — nothing else on the page does, at
-// any size — so its hero leads with the site name; `heroTitle` (the
-// practical "what are you looking for" prompt) moved out entirely, into its
-// own SearchSection below this component (see that component's own test for
-// its heading). Mobile has to stay lean, so it keeps `heroTitle` as its one
-// big heading, search box directly under it — the name already has its own
-// line in the sticky header above it, and repeating it large would just cost
-// mobile's scarcer vertical space to restate something already on screen.
-describe('HeroHeading — name vs. heroTitle placement', () => {
-  const settings = { name: 'Philly Jewish Guide', heroTitle: 'What are you looking for?', mission: 'Your guide to Jewish Philadelphia' }
+describe('splitMission', () => {
+  it('splits a dash-joined mission into a headline and a subhead', () => {
+    // The real, live mission on this deployment — not invented for the
+    // test. Splitting on it is mechanical, not editorial: see the
+    // function's own doc for why this isn't the same thing as writing new
+    // marketing copy.
+    expect(splitMission('Your guide to Jewish Philadelphia — kept current by you, and by the community that uses it')).toEqual({
+      headline: 'Your guide to Jewish Philadelphia',
+      subhead: 'kept current by you, and by the community that uses it',
+    })
+  })
 
-  it('desktop: the site name is the big heading; heroTitle is not repeated here at all', () => {
+  it('falls back to the whole string as the headline when there is no dash to split on', () => {
+    expect(splitMission('A guide to Jewish Philadelphia')).toEqual({
+      headline: 'A guide to Jewish Philadelphia',
+      subhead: null,
+    })
+  })
+
+  it('trims surrounding whitespace, including a trailing newline from the admin textarea', () => {
+    expect(splitMission('Your guide to Jewish Philadelphia — kept current by you\n')).toEqual({
+      headline: 'Your guide to Jewish Philadelphia',
+      subhead: 'kept current by you',
+    })
+  })
+})
+
+// Desktop used to lead with the site name here, on the reasoning that
+// nowhere else on that layout said who this is. That stopped being true once
+// SiteHeader dropped its own tagline line (see that component's own doc) —
+// the header already names the site, right beside this section — so desktop
+// now leads with `mission` instead, split into a bold headline clause and a
+// smaller supporting one (see splitMission above) rather than the site name
+// again, which would be exactly the redundancy this change removes. Mobile
+// is unaffected: it already led with `heroTitle` (the practical "what are
+// you looking for" prompt), never the name, for the same "already in the
+// header" reasoning — see the mobile assertion below.
+describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia — kept current by you, and by the community that uses it',
+  }
+
+  it('desktop: mission splits into a bold headline and a smaller subhead; the site name is not repeated here at all', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
 
     // Both layouts render at once (CSS-only mobile/desktop split — see the
     // component's own doc), so headings are scoped by heading level: the
-    // desktop band's <h1> is the only <h1> carrying the name (mobile's own
-    // lead line is a different <h1> — see the mobile assertion below).
+    // desktop band's <h1> carries only the headline clause, not the whole
+    // mission run-on — the rest shows up as a separate paragraph (mobile's
+    // own lead line, a different <h1>, carries heroTitle instead — see the
+    // mobile assertion below).
     const h1s = screen.getAllByRole('heading', { level: 1 })
-    expect(h1s.some((h) => h.textContent === settings.name)).toBe(true)
+    expect(h1s.some((h) => h.textContent === 'Your guide to Jewish Philadelphia')).toBe(true)
+    expect(h1s.some((h) => h.textContent === settings.mission)).toBe(false)
+    expect(screen.getByText('kept current by you, and by the community that uses it').tagName).toBe('P')
+
+    // The site name doesn't render anywhere in this component any more —
+    // SiteHeader is where it lives now, once and only once.
+    expect(screen.queryByText(settings.name)).not.toBeInTheDocument()
 
     // heroTitle used to surface as a small <h2> label here too — it doesn't
     // any more, since search (and the label heading it) moved out to its own
@@ -32,17 +73,18 @@ describe('HeroHeading — name vs. heroTitle placement', () => {
     expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
   })
 
-  it('mobile: heroTitle is still the one big heading — the name is not repeated there', () => {
+  it('mobile: heroTitle is still the one big heading — mission stays one plain, unsplit paragraph under it', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
 
     // Both layouts are in the DOM; heroTitle appears as an <h1> (mobile's
-    // lead line) — never a second <h1> carrying the site name, which would
-    // mean mobile got a name heading too.
+    // lead line) — never a second <h1> carrying any part of the mission.
     const h1sWithHeroTitle = screen.getAllByRole('heading', { level: 1 }).filter((h) => h.textContent === settings.heroTitle)
     expect(h1sWithHeroTitle.length).toBe(1)
 
-    const h1sWithName = screen.getAllByRole('heading', { level: 1 }).filter((h) => h.textContent === settings.name)
-    expect(h1sWithName.length).toBe(1) // desktop's own <h1> only — not a second one for mobile
+    // Mobile shows the FULL, unsplit mission as a plain paragraph — the
+    // dash-splitting above is a desktop-only headline treatment, not a
+    // change to what mobile has always shown.
+    expect(screen.getByText(settings.mission).tagName).toBe('P')
   })
 })
 
