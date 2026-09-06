@@ -143,6 +143,94 @@ describe('ResourceMapView — plotting listings', () => {
   })
 })
 
+describe('ResourceMapView — desktop search/filter bar position', () => {
+  // Neither the search box nor the chips move when the sidebar opens or
+  // closes anymore — both used to shift right to dodge the sidebar (first
+  // together, then just the chips), which kept reading as things getting
+  // "pushed" every time the sidebar appeared. Instead the search box is
+  // sized narrower than the sidebar's own width, and the chips fixed well
+  // past the sidebar's edge, both with a real gap — flush edges (search box
+  // exactly as wide as the sidebar, chips starting exactly where it ends)
+  // left no visible margin anywhere, unlike Google Maps' own search box and
+  // chip row, which both sit with real breathing room around the panel (see
+  // the reference screenshots). Confirmed both fail against the old
+  // sidebar-tracking offsets, then restored.
+  it('keeps the search box and chips at the same position whether or not the sidebar is open', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    const search = () => container.querySelector('[class*="w-\\[336px\\]"]')
+    const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]')
+    const classesBefore = [search()?.className, chips()?.className]
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    expect([search()?.className, chips()?.className]).toEqual(classesBefore)
+    expect(search()?.className).toMatch(/\bleft-3\b/)
+    expect(chips()?.className).toMatch(/left-\[396px\]/)
+  })
+
+  // The invariant that actually prevents both the overlap AND the flush,
+  // no-breathing-room look: there has to be a real gap between the search
+  // box's right edge and the sidebar's own right edge, and another real gap
+  // between the sidebar's right edge and where the chips start. Widening the
+  // sidebar, or narrowing either gap, later without adjusting to match would
+  // silently reopen one of those two problems — this fails immediately if
+  // that ever drifts, instead of waiting for someone to notice it visually.
+  it('leaves a real gap on both sides of the sidebar — search box to sidebar edge, and sidebar edge to chips', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const aside = container.querySelector('aside')
+    const search = container.querySelector('[class*="w-\\[336px\\]"]')
+    const chips = container.querySelector('[class*="right-16"][class*="z-20"]')
+
+    const sidebarWidth = Number(aside?.className.match(/desktop:w-\[(\d+)px\]/)?.[1])
+    const searchLeft = Number(search?.className.match(/\bleft-(\d+)\b/)?.[1]) * 4 // Tailwind spacing unit -> px
+    const searchWidth = Number(search?.className.match(/w-\[(\d+)px\]/)?.[1])
+    const chipsLeft = Number(chips?.className.match(/left-\[(\d+)px\]/)?.[1])
+    const MIN_GAP_PX = 16
+
+    expect(sidebarWidth - (searchLeft + searchWidth)).toBeGreaterThanOrEqual(MIN_GAP_PX)
+    expect(chipsLeft - sidebarWidth).toBeGreaterThanOrEqual(MIN_GAP_PX)
+  })
+
+  // The sidebar used to be a real flex sibling of the map, so opening it
+  // (0 -> 380px) shrank the map's own container — which resizes the map's
+  // real DOM box and makes ResourceMap's ResizeObserver re-center the map to
+  // refresh its tile layer (see that component's own comment), so the whole
+  // map visibly shifted whenever the sidebar opened or closed. It must be an
+  // out-of-flow overlay instead, like Google Maps' own results panel, so the
+  // map's box never changes size and nothing under it moves.
+  it('overlays the map instead of sitting in flex flow beside it, so opening it cannot resize the map', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const aside = container.querySelector('aside')
+    expect(aside?.className).toMatch(/desktop:absolute/)
+    expect(aside?.className).not.toMatch(/\bshrink-0\b/)
+  })
+})
+
 describe('ResourceMapView — category filtering', () => {
   it('tapping one chip while everything is shown narrows straight down to just that category', async () => {
     // Deliberate, documented behavior (see ResourceMapView's own `toggle`

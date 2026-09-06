@@ -5,8 +5,17 @@ import { createClient } from '@supabase/supabase-js'
 // real person, not shared with the app's real SUPERADMIN_EMAILS. Exists only
 // inside that test project (see run-test-project-server.mjs, which boots
 // every one of these suites' server, and each suite's own auth.setup.ts).
-// Safe to share across suites: each runs as its own process/port and the
-// test project is never touched by two of them concurrently.
+// Each runs as its own process/port, so sharing this identity is safe for
+// ordinary reads/writes — but NOT for minting the session itself: cache-
+// roundtrip's and admin-write's auth.setup.ts both call generateLink +
+// verifyOtp for whatever resolveDefaultCommunityAdminEmail resolves to
+// (often this same address), and a fresh magic-link token invalidates
+// whichever one was already outstanding for that user. The two jobs used to
+// run in CI at the same instant (both `needs: unit`, no dependency on each
+// other), so whichever setup's verifyOtp lost that race failed with
+// "invalid or has expired" nearly every run — see ci.yml's own comment on
+// admin-write's `needs: [unit, cache-roundtrip]`, which is what actually
+// prevents this now, not anything about the identity itself.
 export const CACHE_TEST_ADMIN_EMAIL = 'cache-roundtrip-admin@test.invalid'
 
 // The email actually authorized to administer the "default" community on

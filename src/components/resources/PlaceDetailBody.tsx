@@ -133,6 +133,12 @@ type Props = {
   /** Signal-badge field keys to skip in the status row for the same reason —
    *  they're the ones already showing in the caller's own header. */
   hiddenBadgeKeys?: string[]
+  /** Skip the "N kosher items" count chip (see GenericListingCard's own
+   *  countHeaderField doc) — set by a caller whose own collapsed header
+   *  already shows it. The map's place-detail popup has no collapsed state
+   *  at all, so it leaves this off and gets the chip here instead — it was
+   *  otherwise invisible there entirely, not just duplicated. */
+  hideCountBadge?: boolean
 }
 
 /**
@@ -144,7 +150,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [] }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], hideCountBadge }: Props) {
   // null outside a LocationProvider (the admin's category preview) — see
   // useOptionalLocation's own doc comment.
   const location = useOptionalLocation()
@@ -191,10 +197,28 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
   const detailBadges = badgeFields.filter((f) => !signalBadges.includes(f))
+
+  // "N {items}" — same calculation as GenericListingCard's own collapsed
+  // header (see that component's countHeaderField doc for the full
+  // reasoning); duplicated rather than shared because it's a handful of
+  // lines and the two callers otherwise have nothing else in common to
+  // factor it through.
+  const countHeaderField = tagFields.find((f) => f.showCountInHeader)
+  const countHeaderCount = countHeaderField
+    ? selectValues(item[countHeaderField.key]).length + selectValues(item[countHeaderField.key + '_sometimes']).length
+    : 0
+  const showCountBadge = countHeaderCount > 0 && !!countHeaderField && !hideCountBadge
+  // The badge the count above replaces (e.g. a "Kosher Items" store-type
+  // badge next to "2 kosher items") — suppressed here too, not just in
+  // whichever caller happens to also show the count, so the two callers
+  // (map sheet, directory card) agree on what "showing the count" means.
+  const suppressedBadgeKey = showCountBadge ? countHeaderField?.countReplacesKey : undefined
   // The subset of signal badges actually shown in this status row — excludes
   // whichever ones the caller says it already shows elsewhere (see
-  // `hiddenBadgeKeys`), so a filterable badge doesn't appear twice.
-  const visibleSignalBadges = signalBadges.filter((f) => !hiddenBadgeKeys.includes(f.key))
+  // `hiddenBadgeKeys`) and whichever one the count above already covers, so
+  // a filterable badge doesn't appear twice and the same fact isn't said in
+  // two different ways in the same row.
+  const visibleSignalBadges = signalBadges.filter((f) => !hiddenBadgeKeys.includes(f.key) && f.key !== suppressedBadgeKey)
 
   const caveatNote = (f: CategoryField): string | null => {
     if (!f.caveat || !item[f.caveat.flagField]) return null
@@ -237,8 +261,13 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     .filter((x): x is { f: CategoryField; note: string } => x.note !== null)
 
   // ── Status + signal badges ─────────────────────────────────────────────
-  const statusSection = (showOpenChip || visibleSignalBadges.length > 0) && (
+  const statusSection = (showOpenChip || visibleSignalBadges.length > 0 || showCountBadge) && (
     <div className="flex flex-wrap gap-1.5">
+      {/* Open/Closes Soon first, same order as GenericListingCard's own
+          collapsed header — that one has always led with Open, so the
+          count chip (added here later, see its own comment below) has to
+          come after it rather than before, or the two callers would
+          disagree about which fact leads. */}
       {showOpenChip && (closing?.closesSoon ? (
         <span className="relative group/tip">
           <Chip tone="greenSolid" onClick={onFilterOpen && ((e) => { e.stopPropagation(); onFilterOpen() })}>
@@ -257,6 +286,17 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
           Open
         </Chip>
       ))}
+      {showCountBadge && (() => {
+        // See GenericListingCard's own countHeaderField doc for the
+        // pluralization reasoning — same rule, same fallback.
+        const noun = countHeaderField!.countLabel ?? countHeaderField!.label.toLowerCase()
+        const plural = countHeaderCount === 1 || noun.endsWith('s') ? noun : `${noun}s`
+        return (
+          <Chip tone="slate" title={`See which ${plural} this place has`}>
+            <span className="font-semibold">{countHeaderCount}</span> {plural}
+          </Chip>
+        )
+      })()}
       {visibleSignalBadges.flatMap((f) => {
         const values = f.type === 'select' ? selectValues(item[f.key]) : [f.filterLabel ?? f.label]
         // Resolve to the option's CURRENT label — see the matching comment in
