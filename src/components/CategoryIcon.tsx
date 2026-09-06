@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
-import { categoryTint } from '@/lib/categoryColor'
+import { categoryTint, categoryRing } from '@/lib/categoryColor'
 
 type Props = {
   icon: string
@@ -25,6 +25,19 @@ type Props = {
   /** Pixel size passed to next/image's `sizes` — should match the box size
    *  implied by `className`. */
   sizePx?: number
+  /** Draws a hairline ring in the category's own colour around the circle.
+   *
+   *  The tint fill alone disappears against white once the circle is small
+   *  and the thing inside it is a photo: an uploaded logo is mostly white
+   *  itself, so it covers the tint entirely and the avatar loses every trace
+   *  of the colour that ties it to its map pin. The ring survives that,
+   *  because it sits on the edge where the image can't reach.
+   *
+   *  On by default so the colour is a property of the avatar rather than
+   *  something each of fifteen call sites has to remember; a caller drawing
+   *  these at chip size, where a second edge next to the chip's own border
+   *  is noise rather than information, passes false. */
+  ring?: boolean
 }
 
 /** The circular category avatar — a category's line icon (or, lacking one,
@@ -33,12 +46,12 @@ type Props = {
  *  list/place detail, category chips) shows a place the same way regardless
  *  of which it's using, and so the image-vs-icon-vs-emoji fallback logic
  *  exists exactly once. */
-export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40 }: Props) {
+export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true }: Props) {
   const hasImage = !!iconImageUrl?.trim()
   return (
     <span
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}
-      style={{ backgroundColor: categoryTint(color), color }}
+      style={{ backgroundColor: categoryTint(color), color, ...(ring ? { boxShadow: categoryRing(color) } : {}) }}
       aria-hidden="true"
     >
       {hasImage ? (

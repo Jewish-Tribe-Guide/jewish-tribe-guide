@@ -51,6 +51,16 @@ export type CardDef = {
    *  for photos where white doesn't read well). Ignored without an image, and
    *  doesn't affect the icon — that always renders as a white silhouette. */
   cardTextColor?: string | null
+  /** How much is behind this card, already worded — "22 places", "19 groups".
+   *  Shown only by CompactCard (the flat browse index); the full photo tiles
+   *  have a different job.
+   *
+   *  A pre-worded string rather than a number, because the right noun is the
+   *  caller's to know: WhatsApp Groups are not "places", and the counted
+   *  cards sit in the same array as ones that count nothing at all. Leave it
+   *  undefined for those — see CompactCard on why "0 places" is worse than
+   *  saying nothing. */
+  count?: string
 }
 
 // Soft tile tints, cycled per card across the grid.
@@ -181,9 +191,23 @@ export function CardGrid({
   )
 }
 
-/** One row in CompactCardGrid — a small avatar (the admin-set home-screen
- *  card photo, cropped to a circle, where one's set; the tinted icon glyph
- *  otherwise), name, nothing else. */
+/** One row in CompactCardGrid — the tinted, colour-ringed icon glyph, the
+ *  category's name, and how many places are in it.
+ *
+ *  This used to prefer the admin-set home-screen photo, cropped to a 32px
+ *  circle, on the reasoning that an avatar that small costs the same visual
+ *  weight as the glyph it replaces. It does cost the same weight — but it
+ *  does not carry the same information, and that's the part that was wrong.
+ *  Rendered at 32px in a 1440px viewport, this community's twelve category
+ *  photos (Food, Childcare, Hospitals, Schools, Hotels, Grocery…) all resolve
+ *  to the same indistinct brown-grey disc: a photograph needs a subject you
+ *  can make out, and at 32px there is no subject, only average colour. The
+ *  glyph is legible at that size and the category's own `pinColor` makes each
+ *  row distinguishable at a glance, which is what an index is for.
+ *
+ *  The photos are not the problem — their size is. `CardGrid`'s full tile is
+ *  still exactly right for a small curated set, where a photo has room to be
+ *  one. See `count` below for the other half of what a row here should say. */
 function CompactCard({
   card,
   color,
@@ -205,30 +229,28 @@ function CompactCard({
       className="group flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-colors hover:bg-slate-50"
       onClick={onCardClick ? () => onCardClick(card) : undefined}
     >
-      {card.cardImageUrl ? (
-        // A 32px circular crop, not the full tile CardGrid uses — the
-        // "wall of full-size photo tiles" problem this grid exists to avoid
-        // (see this component's own doc) is about SIZE, not photos
-        // outright; an avatar this small costs the same visual weight as
-        // the icon glyph it replaces; it just happens to be a place's own
-        // photo instead of a generic category symbol.
-        <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-100">
-          <Image
-            src={card.cardImageUrl}
-            alt=""
-            fill
-            sizes="32px"
-            className="object-cover"
-            unoptimized={!isOptimizableImage(card.cardImageUrl)}
-          />
-        </span>
-      ) : card.icon ? (
-        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-8 w-8 text-base shrink-0" sizePx={32} />
+      {card.icon ? (
+        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
       ) : (
-        <span className="h-8 w-8 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+        <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
       )}
-      <span className="min-w-0 truncate text-sm font-medium text-slate-800 group-hover:text-primary transition-colors">
-        {card.title}
+      {/* min-w-0 on the COLUMN, not just the label: without it the flex item
+          takes its content's intrinsic width and the truncate below never
+          fires, so a long category name pushes the row wider than its grid
+          track instead of ellipsing. */}
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium text-slate-800 group-hover:text-primary transition-colors">
+          {card.title}
+        </span>
+        {/* Absent, not zero-filled, when the caller has no count for this
+            card — the pseudo-categories (Map, Zmanim, Eruv) and the Support/
+            Volunteer entry cards aren't collections of places and have
+            nothing true to say here, and "0 places" on one of those would be
+            a worse answer than silence. Same reason the count is hidden
+            while listings are still loading rather than flashing "0". */}
+        {card.count != null && (
+          <span className="truncate text-xs text-slate-400 tabular-nums">{card.count}</span>
+        )}
       </span>
     </Link>
   )
@@ -482,6 +504,23 @@ function labelWords(c: CategoryConfig): string[] {
     .filter((w) => w.length >= 3)
 }
 
+/** "22 places" / "19 listings" for a category's browse-index row, or
+ *  undefined when there's nothing honest to say.
+ *
+ *  Two nouns, picked off `hasAddress` rather than off a hardcoded list of
+ *  category ids: a category whose listings have no address isn't a set of
+ *  places you can go to — WhatsApp Groups and Networking are the live cases —
+ *  and calling them places would be wrong in the one word the row exists to
+ *  add. Any future address-less category gets the right noun for free.
+ *
+ *  Undefined (not "0") when counts haven't loaded or the category has none:
+ *  see CompactCard on why silence beats a zero here. */
+export function cardCount(c: CategoryConfig, counts: Record<string, number> | null | undefined): string | undefined {
+  const n = counts?.[c.id]
+  if (!n) return undefined
+  return `${n} ${c.hasAddress === false ? (n === 1 ? 'listing' : 'listings') : (n === 1 ? 'place' : 'places')}`
+}
+
 /** Resource cards: every live category (restaurants, groceries, hotels, …)
  *  plus the hand-curated pages. Returns null while categories are loading
  *  (show skeletons). */
@@ -492,6 +531,12 @@ export function resourceCards(
   // hood — see CardDef.href's own comment for why this is threaded in
   // alongside `nav` rather than derived from it.
   communitySlug: string,
+  // How many approved listings each category holds, keyed by category id —
+  // null while listings are still loading, which is why `cardCount` below
+  // returns undefined rather than "0 places" for a missing entry. Threaded in
+  // rather than fetched here because Landing already holds the full listing
+  // set for its own search.
+  counts?: Record<string, number> | null,
 ): CardDef[] | null {
   if (categories === null) return null
 
@@ -522,6 +567,7 @@ export function resourceCards(
       title: c.pluralLabel,
       id: c.id,
       icon: c.icon,
+      count: cardCount(c, counts),
       cardImageUrl: c.cardImageUrl,
       cardTextColor: c.cardTextColor,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],

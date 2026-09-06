@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -100,7 +100,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // never the site's own name.
   const zmanimLocationLabel = anchor.label || community.region
 
-  const resources = resourceCards(onNavigate, categories, communitySlug)
+  // How many listings sit behind each category, for the browse index's count
+  // line. Derived from the listing set this component already holds for its
+  // own search rather than a second request — and `useMemo`'d because
+  // `listings` is the whole community (several hundred rows) and this runs on
+  // every keystroke in the search box otherwise.
+  const listingCounts = useMemo(() => {
+    if (!listings) return null
+    const counts: Record<string, number> = {}
+    for (const l of listings) counts[l.category] = (counts[l.category] ?? 0) + 1
+    return counts
+  }, [listings])
+
+  const resources = resourceCards(onNavigate, categories, communitySlug, listingCounts)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
   // into the admin-configured labeled groups for the grid.
   const allCards = resources ? [...entryCards, ...resources] : null
