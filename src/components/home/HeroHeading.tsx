@@ -1,8 +1,11 @@
 'use client'
 
+import Image from 'next/image'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
+import { community } from '@/community.config'
+import { isOptimizableImage } from '@/lib/imageHosts'
 import SearchBox from './SearchBox'
 
 type Props = {
@@ -48,10 +51,10 @@ type Props = {
 // (SSR-safe), so branching here would flash the desktop layout on a phone
 // for one frame — the same reasoning as Landing's own inlineGridClass.
 //
-// The photo panel is a CSS pattern, not a real photo — swapping in actual
-// community photography here is still the single biggest warmth lever this
-// app hasn't spent (flagged back when this app's desktop redesign first
-// started, still true).
+// The photo panel shows community.heroImage when a deployment has set one
+// (see that field's own doc — code-level branding, not admin-editable), and
+// falls back to the original CSS gradient + watermark star otherwise, so a
+// fresh community with no photo yet never renders broken.
 export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap }: Props) {
   const isMobile = useIsMobile()
 
@@ -94,22 +97,39 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
             {settings.mission}
           </p>
         </div>
-        {/* A CSS pattern stand-in, not a real photo — see the component doc.
-            aria-hidden, not role="img": there's no real image content here
-            to describe (a real photo, once one replaces this, should carry
-            a genuine alt/aria-label instead) — role="img" with no name is
-            exactly the axe violation ("role=img elements must have
-            alternative text") that shipped here once already. */}
-        <div
-          aria-hidden="true"
-          className="relative min-h-[280px] bg-gradient-to-br from-amber-200/60 via-amber-300/40 to-amber-700/40"
-        >
-          <div className="absolute inset-0 flex items-center justify-center opacity-15">
-            <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
-              <polygon points="50,6 61,35 92,35 67,54 77,84 50,65 23,84 33,54 8,35 39,35" />
-            </svg>
+        {community.heroImage ? (
+          // A real photo: it has content to describe, so it's a genuine
+          // `alt`, not aria-hidden — the opposite of the placeholder below.
+          <div className="relative min-h-[280px]">
+            <Image
+              src={community.heroImage.url}
+              alt={community.heroImage.alt}
+              fill
+              sizes="(min-width: 640px) 40vw, 0px"
+              className="object-cover"
+              // Above the fold on every desktop load — worth the priority
+              // fetch the same way a hero image normally is.
+              priority
+              unoptimized={!isOptimizableImage(community.heroImage.url)}
+            />
           </div>
-        </div>
+        ) : (
+          // A CSS pattern stand-in, not a real photo. aria-hidden, not
+          // role="img": there's no real image content here to describe —
+          // role="img" with no name is exactly the axe violation
+          // ("role=img elements must have alternative text") that shipped
+          // here once already.
+          <div
+            aria-hidden="true"
+            className="relative min-h-[280px] bg-gradient-to-br from-amber-200/60 via-amber-300/40 to-amber-700/40"
+          >
+            <div className="absolute inset-0 flex items-center justify-center opacity-15">
+              <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
+                <polygon points="50,6 61,35 92,35 67,54 77,84 50,65 23,84 33,54 8,35 39,35" />
+              </svg>
+            </div>
+          </div>
+        )}
       </section>
     </>
   )

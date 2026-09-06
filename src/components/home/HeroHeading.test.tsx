@@ -45,3 +45,40 @@ describe('HeroHeading — name vs. heroTitle placement', () => {
     expect(h1sWithName.length).toBe(1) // desktop's own <h1> only — not a second one for mobile
   })
 })
+
+// The hero's photo panel — see community.config.ts's own `heroImage` doc for
+// why this is a code-level per-deployment field (like themeColor) rather
+// than an admin-editable one. Two things matter here: a real photo gets a
+// real, describable alt (never aria-hidden — that combination is exactly
+// the axe violation this file's placeholder already shipped once), and a
+// deployment with nothing set still renders instead of breaking.
+describe('HeroHeading — the photo panel', () => {
+  const settings = { name: 'Philly Jewish Guide', heroTitle: 'What are you looking for?', mission: 'Your guide to Jewish Philadelphia' }
+
+  it('renders the configured photo with a real alt, not aria-hidden', async () => {
+    vi.resetModules()
+    vi.doMock('@/community.config', () => ({
+      community: { heroImage: { url: 'https://images.unsplash.com/photo-test', alt: 'A test skyline' } },
+    }))
+    const { default: HeroHeadingWithPhoto } = await import('./HeroHeading')
+    render(<HeroHeadingWithPhoto settings={settings} query="" onQueryChange={vi.fn()} />)
+
+    const img = screen.getByAltText('A test skyline')
+    expect(img).toBeTruthy()
+    expect(img.closest('[aria-hidden]')).toBeNull()
+    vi.doUnmock('@/community.config')
+  })
+
+  it('falls back to the aria-hidden placeholder when no photo is configured', async () => {
+    vi.resetModules()
+    vi.doMock('@/community.config', () => ({ community: { heroImage: null } }))
+    const { default: HeroHeadingNoPhoto } = await import('./HeroHeading')
+    const { container } = render(<HeroHeadingNoPhoto settings={settings} query="" onQueryChange={vi.fn()} />)
+
+    // No <img> at all — the placeholder is a CSS gradient + inline SVG, not
+    // an <img> with an empty/missing alt (which would be its own violation).
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+    vi.doUnmock('@/community.config')
+  })
+})

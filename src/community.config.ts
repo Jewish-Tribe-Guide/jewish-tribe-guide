@@ -48,6 +48,20 @@ export const community = {
   themeColor: '#1d4ed8',
   /** App background color for the PWA splash screen. */
   backgroundColor: '#f8fafc',
+  /** Desktop home screen only — a real photo shown beside the hero
+   *  headline/mission, replacing the flat gradient placeholder. Optional:
+   *  unset falls back to that placeholder (see HeroHeading.tsx), so a fresh
+   *  `npm run setup` for a new community never breaks over a missing image.
+   *  Deliberately a code-level asset like `themeColor` above, not an
+   *  admin-editable one like SiteSettings.logoUrl — this is deployment
+   *  branding chosen once when standing up a community, not something an
+   *  admin is expected to swap week to week. */
+  heroImage: {
+    url: 'https://images.unsplash.com/photo-1517009572053-93fb56dfef49?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.1.0',
+    /** Required alongside `url` — see HeroHeading's aria-hidden note for why
+     *  the placeholder it replaces carries none, and a real photo must. */
+    alt: 'Philadelphia City Hall tower rising above a street with cars and a crosswalk',
+  } as { url: string; alt: string } | null,
 
   /** Optional modules — turn a hand-built card/flow off for a community that
    *  doesn't need it. (Database categories like restaurants or mikvah are
