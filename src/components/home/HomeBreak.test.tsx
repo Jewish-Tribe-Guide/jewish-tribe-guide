@@ -2,8 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ZmanimData } from '@/types'
-import type { ZmanimStatus } from '@/lib/useZmanim'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -18,81 +16,21 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// The transition between the two main sections (Browse everything, Explore
-// the map) — a 2×2 grid of four cards: Davening Times, the "kept by the
-// community" message, Stay in the loop, and Shabbat Times. The things worth
-// locking down: every card renders as its own headed section, Shabbat Times
-// shows only candle lighting and havdalah (not the old five-row daily
-// grid), and the community message renders regardless of the zmanim
-// fetch's own state. Davening Times has its own describe block below, since
-// its content depends on real synagogue data rather than just settings.
-
-const mockUseZmanim = vi.fn<(coords: unknown) => { data: ZmanimData | null; status: ZmanimStatus }>()
-vi.mock('@/lib/useZmanim', () => ({
-  useZmanim: (coords: unknown) => mockUseZmanim(coords),
-}))
+// The break between the two main sections (Browse everything, Explore the
+// map) — Davening Times and the "kept by the community" message. Shabbat
+// Times and Stay in the loop used to live in this same grid; they moved to
+// their own row below the map (see ShabbatTimesCard.test.tsx and
+// SubscribeSection.test.tsx) and no longer share a component or a test
+// file with this one.
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
 })
 
-const readyData: ZmanimData = {
-  hebrewDate: '22 Elul 5786',
-  dayOfWeek: 3,
-  isFriday: false,
-  isShabbos: false,
-  dailyZmanim: [
-    { label: 'Sunrise', time: '6:31 AM' },
-    { label: 'Sunset', time: '7:27 PM' },
-  ],
-  shabbos: {
-    candleLighting: { label: 'Friday', time: '7:09 PM' },
-    havdalah: { label: 'Saturday', time: '8:07 PM' },
-  },
-}
-
 describe('HomeBreak', () => {
-  it('renders the community and Shabbat Times cards as their own headed sections', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />)
-
-    expect(screen.getByRole('heading', { name: 'Shabbat Times' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Kept by the community' })).toBeInTheDocument()
-  })
-
-  it('renders the Stay in the loop signup as part of this grid, not a separate section', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />)
-
-    expect(screen.getByRole('heading', { name: 'Stay in the loop' })).toBeInTheDocument()
-  })
-
-  it('shows only candle lighting and havdalah — not the old five-row daily zmanim grid', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />)
-
-    expect(screen.getByText(/22 Elul 5786/)).toBeInTheDocument()
-    expect(screen.getByText(/Philadelphia/)).toBeInTheDocument()
-    expect(screen.getByText('7:09 PM')).toBeInTheDocument()
-    expect(screen.getByText('8:07 PM')).toBeInTheDocument()
-    // The five daily rows nobody asked about — gone.
-    expect(screen.queryByText('Sunrise')).not.toBeInTheDocument()
-    expect(screen.queryByText('6:31 AM')).not.toBeInTheDocument()
-    expect(screen.queryByText('7:27 PM')).not.toBeInTheDocument()
-  })
-
-  it('credits Hebcal.com, same as the real Zmanim & Shabbos page, once ready', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />)
-
-    const link = screen.getByRole('link', { name: 'Hebcal.com' })
-    expect(link).toHaveAttribute('href', 'https://www.hebcal.com')
-  })
-
-  it('shows the community-run line regardless of zmanim status', () => {
-    mockUseZmanim.mockReturnValue({ data: null, status: 'loading' })
-    renderWithProviders(<HomeBreak coords={null} visitorCoords={null} locationLabel="Philadelphia" />)
+  it('renders the community card as its own headed section', () => {
+    renderWithProviders(<HomeBreak coords={null} />)
 
     expect(screen.getByRole('heading', { name: 'Kept by the community' })).toBeInTheDocument()
   })
@@ -103,21 +41,19 @@ describe('HomeBreak', () => {
   // does, not send the visitor to a bare page.
   it('opens the feedback form as an in-place modal, not a page navigation', async () => {
     const user = userEvent.setup()
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />)
+    renderWithProviders(<HomeBreak coords={null} />)
 
     expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Send a note/ }))
 
-    // Shabbat Times is still in the document underneath the modal — a real
-    // navigation would have unmounted it.
-    expect(screen.getByRole('heading', { name: 'Shabbat Times' })).toBeInTheDocument()
+    // The community card is still in the document underneath the modal — a
+    // real navigation would have unmounted it.
+    expect(screen.getByRole('heading', { name: 'Kept by the community' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
   })
 
   it('hides the feedback link entirely when an admin has turned feedback off', () => {
-    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-    renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />, {
+    renderWithProviders(<HomeBreak coords={null} />, {
       content: { settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: false } },
     })
 
@@ -145,8 +81,7 @@ describe('HomeBreak', () => {
       ['Report', 'Report a listing'],
     ])('opens the right picker from the %s button', async (buttonName, pickerTitle) => {
       const user = userEvent.setup()
-      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
-      renderWithProviders(<HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />, {
+      renderWithProviders(<HomeBreak coords={null} />, {
         content: { categories: [grocery] },
       })
 
@@ -168,10 +103,9 @@ describe('HomeBreak', () => {
     })
 
     it('does not render when no category has a minyanim field — a real "not set up", not a loading state', () => {
-      mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
       renderWithProviders(
         <ListingsProvider listings={[]}>
-          <HomeBreak coords={{ lat: 1, lng: 2 }} visitorCoords={null} locationLabel="Philadelphia" />
+          <HomeBreak coords={null} />
         </ListingsProvider>,
         { content: { categories: [makeCategory()] } }, // grocery only, no minyanim field
       )
@@ -183,7 +117,6 @@ describe('HomeBreak', () => {
       vi.useFakeTimers()
       try {
         vi.setSystemTime(new Date('2026-09-08T13:00:00')) // a Tuesday, 1:00 PM
-        mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
         const shul = makeListing({
           id: 'shul-1',
           category: 'synagogue',
@@ -196,7 +129,7 @@ describe('HomeBreak', () => {
 
         renderWithProviders(
           <ListingsProvider listings={[shul]}>
-            <HomeBreak coords={null} visitorCoords={null} locationLabel="Philadelphia" />
+            <HomeBreak coords={null} />
           </ListingsProvider>,
           { content: { categories: [synagogue] } },
         )
@@ -215,7 +148,6 @@ describe('HomeBreak', () => {
       vi.useFakeTimers()
       try {
         vi.setSystemTime(new Date('2026-09-08T13:00:00'))
-        mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
         const shuls = [
           makeListing({ id: 's1', category: 'synagogue', name: 'Shul A', minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }] }),
           makeListing({ id: 's2', category: 'synagogue', name: 'Shul B', minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }] }),
@@ -223,7 +155,7 @@ describe('HomeBreak', () => {
 
         renderWithProviders(
           <ListingsProvider listings={shuls}>
-            <HomeBreak coords={null} visitorCoords={null} locationLabel="Philadelphia" />
+            <HomeBreak coords={null} />
           </ListingsProvider>,
           { content: { categories: [synagogue] } },
         )
@@ -240,7 +172,6 @@ describe('HomeBreak', () => {
       vi.useFakeTimers()
       try {
         vi.setSystemTime(new Date('2026-09-08T13:00:00'))
-        mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
         const shulGeo = { lat: 40.0, lng: -75.0 }
         const coords = { lat: 40.01, lng: -75.0 }
         const shul = makeListing({
@@ -253,7 +184,7 @@ describe('HomeBreak', () => {
 
         const { rerenderWithProviders } = renderWithProviders(
           <ListingsProvider listings={[shul]}>
-            <HomeBreak coords={null} visitorCoords={null} locationLabel="Philadelphia" />
+            <HomeBreak coords={null} />
           </ListingsProvider>,
           { content: { categories: [synagogue] } },
         )
@@ -262,7 +193,7 @@ describe('HomeBreak', () => {
         const expectedMiles = distanceMiles(coords, shulGeo)
         rerenderWithProviders(
           <ListingsProvider listings={[shul]}>
-            <HomeBreak coords={null} visitorCoords={coords} locationLabel="Philadelphia" />
+            <HomeBreak coords={coords} />
           </ListingsProvider>,
         )
         expect(screen.getByText(new RegExp(`${expectedMiles} mi$`))).toBeInTheDocument()
@@ -275,7 +206,6 @@ describe('HomeBreak', () => {
       vi.useFakeTimers()
       try {
         vi.setSystemTime(new Date('2026-09-08T13:00:00'))
-        mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
         const shul = makeListing({
           id: 'shul-1',
           category: 'synagogue',
@@ -285,7 +215,7 @@ describe('HomeBreak', () => {
 
         renderWithProviders(
           <ListingsProvider listings={[shul]}>
-            <HomeBreak coords={null} visitorCoords={null} locationLabel="Philadelphia" />
+            <HomeBreak coords={null} />
           </ListingsProvider>,
           { content: { categories: [synagogue] } },
         )

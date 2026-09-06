@@ -1,0 +1,75 @@
+'use client'
+
+import { useZmanim } from '@/lib/useZmanim'
+
+// ── Shabbat Times — candle lighting and havdalah, nothing else. ────────────
+//
+// Used to be the full daily Zmanim (sunrise, latest Shema, latest Shacharis,
+// sunset, nightfall) plus these two — five rows nobody asked about, next to
+// the two anyone actually checks this card for. Trimmed to just candle
+// lighting/havdalah on the reasoning that a card meant to be glanced at
+// shouldn't need to be read.
+//
+// Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
+// it used to sit above the map, in the HomeBreak grid, alongside Davening
+// Times and the community card. Split out into its own component when it
+// moved, rather than staying a prop-gated branch of HomeBreak: the two halves
+// no longer render adjacent to each other, so there was no longer a shared
+// parent that made sense to hold both.
+export default function ShabbatTimesCard({
+  coords,
+  locationLabel,
+}: {
+  /** The visitor's address, or the community center — see Landing, which
+   *  falls back so this never renders a "set your location" prompt. A
+   *  city-wide approximation is fine for candle lighting. */
+  coords: { lat: number; lng: number } | null
+  locationLabel: string
+}) {
+  const { data, status } = useZmanim(coords)
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+        {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
+      </p>
+      <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat Times</h3>
+
+      {status === 'loading' ? (
+        <div className="space-y-2" aria-live="polite" aria-busy="true">
+          <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+          <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+          <span className="sr-only">Loading zmanim…</span>
+        </div>
+      ) : status === 'ready' && data ? (
+        <>
+          <div className="space-y-1.5">
+            {data.shabbos.candleLighting && (
+              <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
+                <span className="text-[13px] font-semibold text-amber-800">Candles {data.shabbos.candleLighting.label}</span>
+                <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.candleLighting.time}</span>
+              </div>
+            )}
+            {data.shabbos.havdalah && (
+              <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
+                <span className="text-[13px] font-semibold text-amber-800">Havdalah {data.shabbos.havdalah.label}</span>
+                <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.havdalah.time}</span>
+              </div>
+            )}
+          </div>
+          {/* Same attribution/link as the real Zmanim & Shabbos page
+              (ZmanimBody) — this card shows the same Hebcal-sourced data, so
+              it carries the same credit. */}
+          <p className="pt-3 text-[11px] text-muted">
+            Zmanim from{' '}
+            <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+              Hebcal.com
+            </a>
+          </p>
+        </>
+      ) : (
+        <p className="text-[13px] text-muted">Zmanim are unavailable right now. Please try again in a moment.</p>
+      )}
+    </div>
+  )
+}

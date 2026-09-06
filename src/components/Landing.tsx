@@ -10,6 +10,8 @@ import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
 import FeaturedCards from '@/components/home/FeaturedCards'
 import HomeBreak from '@/components/home/HomeBreak'
+import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
+import SubscribeSection from '@/components/home/SubscribeSection'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -57,12 +59,11 @@ export type LandingProps = {
 //   beside a photo, see HeroHeading) → "Popular right now" if an admin has
 //   re-added it (off by default — see builtInOrder) → a flat "Browse
 //   everything" grid, full weight (every card, always visible, no hover
-//   needed) → HomeBreak, a 2×2 grid of four smaller cards (Davening Times,
-//   a "kept by the community" message, the Stay in the loop signup, and
-//   Shabbat Times) between the two main sections → "Explore the map",
-//   matching Browse everything's full weight → footer. The section tabs'
-//   mega-menus are a second way to reach a category, on top of the flat
-//   grid.
+//   needed) → HomeBreak (Davening Times + a "kept by the community"
+//   message) → "Explore the map", matching Browse everything's full weight
+//   → Stay in the loop + Shabbat Times, a second two-card break in the same
+//   visual language as HomeBreak → footer. The section tabs' mega-menus are
+//   a second way to reach a category, on top of the flat grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -436,36 +437,43 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               </div>
             )
           }
-          // HomeBreak — its Shabbat Times card is what needs `coords`;
-          // falls back to the community center so it renders something real
-          // before the visitor has set an address. Still a JS branch, unlike
-          // the other two, and deliberately: HomeBreak calls useZmanim, which
-          // fetches /api/zmanim — uncached, straight through to Hebcal.
-          // Rendering it and hiding it with `sm:` would cost every phone
-          // visitor a round-trip for a section they never see. CSS should own
-          // a layout difference; it shouldn't own one that costs a request.
-          // The one-frame correction is the cheaper error here, and nothing
-          // above the fold moves when it happens.
-          //
-          // `visitorCoords` is the real, ungated value — null until the
-          // visitor actually sets an address — passed separately from the
-          // Zmanim-only `coords` above precisely because they need different
-          // "no location" behavior: Shabbat Times always wants a location
-          // (the community center reads fine as "candle lighting for
-          // Philadelphia in general"), but the Davening Times card's
-          // distance-to-a-shul would be actively misleading measured from a
-          // city center the visitor never told the app they were at.
+          // HomeBreak — Davening Times and the community card. `coords` is
+          // the real, ungated visitor location (null until they've actually
+          // set an address): Davening Times' distance-to-a-shul would be
+          // actively misleading measured from a fallback the visitor never
+          // chose, unlike ShabbatTimesCard below, which is fine reading a
+          // community-wide default as "candle lighting for Philadelphia in
+          // general". Gated on zmanimCategory same as before this split —
+          // see this block's own history if that coupling is ever worth
+          // untangling; the community card doesn't strictly need it either.
           return (
-            !isMobile && zmanimCategory && (
-              <HomeBreak
-                key="zmanim"
-                coords={coords ?? community.mapCenter}
-                visitorCoords={coords}
-                locationLabel={zmanimLocationLabel}
-              />
-            )
+            !isMobile && zmanimCategory && <HomeBreak key="zmanim" coords={coords} />
           )
         })}
+
+        {/* ── Stay in the loop + Shabbat Times — desktop only, right after
+                the map (which is why this sits outside the reorderable
+                builtInOrder walk above, unconditionally last: Stay in the
+                loop used to live here alone before HomeBreak briefly grew to
+                a 2×2 grid holding all four cards between Browse everything
+                and the map; both moved back to their own row below the map).
+                Same two-card, rounded-2xl treatment as HomeBreak above, so
+                the two breaks read as one visual language even though
+                they're no longer one component — see ShabbatTimesCard's own
+                doc for why they split. Still a JS branch on zmanimCategory
+                for the same reason HomeBreak's own Zmanim card always was:
+                useZmanim fetches /api/zmanim uncached, straight through to
+                Hebcal, and hiding it with `sm:` would cost every phone
+                visitor a round-trip for a section they never see (mobile
+                has no equivalent of this row at all). ─────────────────── */}
+        {!isMobile && zmanimCategory && (
+          <div className="my-12 grid grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <SubscribeSection bare />
+            </div>
+            <ShabbatTimesCard coords={coords ?? community.mapCenter} locationLabel={zmanimLocationLabel} />
+          </div>
+        )}
 
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search

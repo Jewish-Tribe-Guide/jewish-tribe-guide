@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useZmanim } from '@/lib/useZmanim'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import FeedbackForm from '@/components/FeedbackForm'
 import ContributePicker from './ContributePicker'
 import EditReportPicker from './EditReportPicker'
 import DaveningTimesCard from './DaveningTimesCard'
-import SubscribeSection from './SubscribeSection'
 import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 
 type ContributeAction = 'create' | 'edit' | 'report'
@@ -47,24 +45,18 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
 }
 
 // ── The break between the two main things (Browse everything, Explore the
-// map) — a 2×2 grid of four smaller cards rather than one full-width
-// section each. Top row: Davening Times, and the "kept by the community"
-// message. Bottom row: the Stay in the loop signup (moved here from its own
-// full-width section after the map — see SubscribeSection's own `bare` prop)
-// and Shabbat Times, trimmed to just candle lighting and havdalah. Went
-// through a few lighter treatments first (a single unheaded strip, stacked
-// bands, a 2-card version of this same row) before landing here — see the
-// memory/decision history if reviving one of those. Deliberately the same
-// card language (border, rounded-2xl) as Browse everything and the map
-// below it, just four smaller cards rather than full-width ones, so this
-// still reads as a distinct break rather than a third full-width peer
-// section.
-//
-// Shabbat Times used to be the full daily Zmanim (sunrise, latest Shema,
-// latest Shacharis, sunset, nightfall) plus candle lighting/havdalah — five
-// rows nobody asked about, next to the two anyone actually checks this card
-// for. Trimmed to just those two on the reasoning that a card meant to be
-// glanced at shouldn't need to be read.
+// map) — two smaller cards: Davening Times, and the "kept by the community"
+// message. Went through a few other treatments first (a single unheaded
+// strip, stacked bands, a 2×2 grid that also carried Stay in the loop and
+// Shabbat Times) before landing here — see the memory/decision history if
+// reviving one of those. Stay in the loop and Shabbat Times moved out to
+// their own row below the map instead (see Landing.tsx and
+// ShabbatTimesCard.tsx) — this break and that one are visually identical
+// (same two-card, rounded-2xl treatment) but are no longer the same
+// component, since they don't render adjacent to each other any more.
+// Deliberately the same card language (border, rounded-2xl) as Browse
+// everything and the map below it, so this still reads as a distinct break
+// rather than a third full-width peer section.
 //
 // The community card's own action went through a few rounds too: a single
 // "Suggest something" button opening the general feedback form overclaimed
@@ -81,21 +73,14 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
 // action.
 export default function HomeBreak({
   coords,
-  visitorCoords,
-  locationLabel,
 }: {
-  /** For Shabbat Times: the visitor's address, or the community center — see
-   *  Landing, which falls back so this never renders a "set your location"
-   *  prompt. A city-wide approximation is fine for candle lighting. */
+  /** The visitor's real location — null until they've actually set an
+   *  address. Distance to a specific shul measured from a fallback the
+   *  visitor never chose would be actively misleading, not just imprecise,
+   *  so unlike ShabbatTimesCard's own `coords` this is never coalesced to
+   *  the community center before it gets here. */
   coords: { lat: number; lng: number } | null
-  /** For Davening Times: the real, ungated value — null until the visitor
-   *  actually sets an address. Distance to a specific shul measured from the
-   *  community-center fallback above would be actively misleading, not just
-   *  imprecise, so that card needs to know the difference. */
-  visitorCoords: { lat: number; lng: number } | null
-  locationLabel: string
 }) {
-  const { data, status } = useZmanim(coords)
   const settings = useSiteSettings()
   // Opens FeedbackForm as the same in-place modal SiteFooter's own
   // FeedbackButton does — not a link to routes.feedback(), which is a real
@@ -112,7 +97,7 @@ export default function HomeBreak({
 
   return (
     <div className="my-12 grid grid-cols-2 gap-4">
-      <DaveningTimesCard coords={visitorCoords} />
+      <DaveningTimesCard coords={coords} />
 
       {/* No justify-center — this card is naturally shorter than the
           Davening Times one, and centering its content made "Kept by the
@@ -147,53 +132,6 @@ export default function HomeBreak({
               Send a note →
             </button>
           </p>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <SubscribeSection bare />
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-          {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
-        </p>
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat Times</h3>
-
-        {status === 'loading' ? (
-          <div className="space-y-2" aria-live="polite" aria-busy="true">
-            <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-            <span className="sr-only">Loading zmanim…</span>
-          </div>
-        ) : status === 'ready' && data ? (
-          <>
-            <div className="space-y-1.5">
-              {data.shabbos.candleLighting && (
-                <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
-                  <span className="text-[13px] font-semibold text-amber-800">Candles {data.shabbos.candleLighting.label}</span>
-                  <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.candleLighting.time}</span>
-                </div>
-              )}
-              {data.shabbos.havdalah && (
-                <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
-                  <span className="text-[13px] font-semibold text-amber-800">Havdalah {data.shabbos.havdalah.label}</span>
-                  <span className="text-[13px] font-semibold tabular-nums text-amber-800">{data.shabbos.havdalah.time}</span>
-                </div>
-              )}
-            </div>
-            {/* Same attribution/link as the real Zmanim & Shabbos page
-                (ZmanimBody) — this card shows the same Hebcal-sourced data,
-                so it carries the same credit. */}
-            <p className="pt-3 text-[11px] text-muted">
-              Zmanim from{' '}
-              <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-                Hebcal.com
-              </a>
-            </p>
-          </>
-        ) : (
-          <p className="text-[13px] text-muted">Zmanim are unavailable right now. Please try again in a moment.</p>
         )}
       </div>
 
