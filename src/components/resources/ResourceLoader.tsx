@@ -22,6 +22,9 @@ type Props = {
   reopenItemId?: string | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
+  /** Mount with "All davening times" already open — see GenericDirectory's
+   *  own doc on this prop. */
+  openDaveningModal?: boolean
   onUp: () => void
   /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
    *  index there), "All resources" on desktop (a separate index page). See
@@ -37,7 +40,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, openDaveningModal, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -97,6 +100,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} openDaveningModal={openDaveningModal} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
   )
 }

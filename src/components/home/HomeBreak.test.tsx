@@ -110,7 +110,7 @@ describe('HomeBreak', () => {
         { content: { categories: [makeCategory()] } }, // grocery only, no minyanim field
       )
 
-      expect(screen.queryByRole('heading', { name: 'Davening Times' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Upcoming Davening' })).not.toBeInTheDocument()
     })
 
     it('shows the next upcoming minyan today, skipping one that already passed', () => {
@@ -134,7 +134,7 @@ describe('HomeBreak', () => {
           { content: { categories: [synagogue] } },
         )
 
-        expect(screen.getByRole('heading', { name: 'Davening Times' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Upcoming Davening' })).toBeInTheDocument()
         expect(screen.getByText('Mincha')).toBeInTheDocument()
         expect(screen.getByText('Kahal Kadosh Mikveh Israel')).toBeInTheDocument()
         expect(screen.getByText('2:00pm')).toBeInTheDocument()
@@ -202,7 +202,7 @@ describe('HomeBreak', () => {
       }
     })
 
-    it('links "All davening times" to the category page with the minyanim field', () => {
+    it('links "All davening times" to the category page with the minyanim field, opening the modal on arrival', () => {
       vi.useFakeTimers()
       try {
         vi.setSystemTime(new Date('2026-09-08T13:00:00'))
@@ -220,8 +220,12 @@ describe('HomeBreak', () => {
           { content: { categories: [synagogue] } },
         )
 
+        // `?davening=1` is what makes this actually land on the sheet the
+        // link names, rather than a bare category page the visitor then has
+        // to find the same button on again — see GenericDirectory's own
+        // `openDaveningModal` doc.
         const link = screen.getByRole('link', { name: /All davening times/ })
-        expect(link).toHaveAttribute('href', '/test-community/synagogue')
+        expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1')
       } finally {
         vi.useRealTimers()
       }

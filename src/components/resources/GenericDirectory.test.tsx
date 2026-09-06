@@ -228,6 +228,33 @@ describe('GenericDirectory', () => {
     expect(screen.getByText('davening modal open')).toBeInTheDocument()
   })
 
+  // The home screen's DaveningTimesCard links here with `?davening=1` so
+  // "See all" actually lands on the sheet it names — before this, the link
+  // opened a bare category page and the visitor had to find the same
+  // button on it a second time. `openDaveningModal` is how that arrives,
+  // once FindResourcesConnected has read the query string.
+  it('opens the davening-times modal on arrival when openDaveningModal is set', () => {
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(<GenericDirectory category={category} items={[item]} openDaveningModal {...handlers} />)
+
+    expect(screen.getByText('davening modal open')).toBeInTheDocument()
+  })
+
+  it('does not open the modal on arrival for an ordinary visit (no query param)', () => {
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} />)
+
+    expect(screen.queryByText('davening modal open')).not.toBeInTheDocument()
+  })
+
   it('shows a Map link with the current search baked into its href when a Map pseudo-category exists', async () => {
     const user = userEvent.setup()
     const category = makeCategory({ hasAddress: true })

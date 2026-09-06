@@ -72,6 +72,9 @@ export type FindResourcesProps = {
   searchHospital?: string | null
   /** `?form=` */
   searchForm?: string | null
+  /** `?davening=` — "1" opens "All davening times" on arrival. See
+   *  GenericDirectory's own doc on `openDaveningModal`, which this becomes. */
+  searchDavening?: string | null
   /** Pushes a change to these query params, keeping the path — a no-op
    *  default is safe: nothing in the fallback render (no query string yet)
    *  can be interacted with before hydration swaps in the real, connected
@@ -93,6 +96,7 @@ export default function FindResources({
   searchQuery = null,
   searchHospital = null,
   searchForm = null,
+  searchDavening = null,
   onParamsChange = () => {},
 }: FindResourcesProps) {
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
@@ -127,8 +131,10 @@ export default function FindResources({
   //   ?q=<text>       pre-fill the category's search box
   //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit/report form is open over the list
+  //   ?davening=1     "All davening times" is open over the list
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
+  const openDaveningModal = searchDavening === '1'
   const hospitalDetailId = searchHospital
 
   const setParams = onParamsChange
@@ -270,12 +276,13 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (initialSearch ?? '')}
+          key={category.id + (initialSearch ?? '') + (openDaveningModal ? '-davening' : '')}
           category={category}
           items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
+          openDaveningModal={openDaveningModal}
           onUp={onUp}
           upLabel="Home"
           onAdd={() => openAction({ mode: 'create' })}

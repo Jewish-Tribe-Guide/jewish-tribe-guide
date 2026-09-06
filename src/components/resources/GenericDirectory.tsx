@@ -36,6 +36,13 @@ type Props = {
   reopenItemId?: string | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
+  /** Mount with the "All davening times" modal already open — the home
+   *  screen's DaveningTimesCard links here with `?davening=1` (see
+   *  routes.ts's own daveningTimes helper) so "See all" actually lands on
+   *  the sheet it names, instead of a bare category page the visitor then
+   *  has to find the same button on again. No-op for a category with no
+   *  minyanim field to show a modal for. */
+  openDaveningModal?: boolean
   onUp: () => void
   /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
    *  index there), "All resources" on desktop (a separate index page). See
@@ -53,7 +60,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
   const communitySlug = useCommunitySlug()
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
@@ -86,7 +93,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [anchorLabel])
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [daveningModalOpen, setDaveningModalOpen] = useState(false)
+  // A plain lazy initializer here would only ever see the FIRST render:
+  // SlugScreen's Suspense fallback renders this tree once with the query
+  // string not yet read (openDaveningModal is undefined then, same as
+  // `initialSearch` is at that point — see FindResources' own doc), then
+  // FindResourcesConnected hydrates and this same component instance
+  // re-renders with the real value — too late for a lazy initializer to
+  // catch. Solved the same way `initialSearch` already is: FindResources
+  // folds `openDaveningModal` into the `key` it gives ResourceLoader, so
+  // the value arriving forces a fresh mount of this whole subtree instead
+  // of an update to the existing one, and the lazy initializer below runs
+  // again with the real value.
+  const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
   const isMobile = useIsMobile()
   const categories = useCategories()
   const hasMapCategory = !!categories?.some((c) => c.kind === 'map')
