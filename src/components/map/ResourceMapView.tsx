@@ -1542,33 +1542,34 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </button>
           )}
 
-          {/* ── Floating search + chips (desktop) — positioned relative to
-                  the whole row (not the map div, and not inside the sidebar
-                  above), so it sits in the exact same spot whether or not
-                  the sidebar is showing. It floats on top of the sidebar
-                  when the sidebar's present (see that panel's own pt-16,
-                  which clears space for this) or directly on the map when
-                  it's not — never resizing or relocating either way, unlike
-                  having two separate copies. ─────────────────────────────── */}
+          {/* ── Floating search (desktop) — fixed at left-3/top-3, always,
+                  sized to the sidebar's own 380px width (minus this left
+                  inset, so its right edge lines up with the sidebar's right
+                  edge exactly: 12px + 368px = 380px) and stacked above it in
+                  z-order (z-40 vs. the sidebar's z-30). It reads as sitting
+                  on top of the sidebar's own top edge, the same way Google
+                  Maps' own search box spans the width of its results panel
+                  rather than sitting beside it. Neither this nor the chips
+                  below ever move now — the sidebar sliding in and out
+                  underneath is what changes, not these. ────────────────── */}
           {!isMobile && (
-            // Fixed at left-3 always — never shifts for the sidebar. It used
-            // to slide right to 392px so it wouldn't sit under the sidebar's
-            // top edge, but that read as the search bar getting "pushed"
-            // every time the sidebar opened, which is exactly the kind of
-            // movement the sidebar-overlay change above was meant to get rid
-            // of. Sitting above the sidebar in z-order (z-40 vs. the
-            // sidebar's z-30) is what actually fixes the overlap instead:
-            // the sidebar's own h-16 spacer (below) already reserves the
-            // vertical space this row occupies, so when the sidebar slides
-            // in underneath, it's sliding under empty space, not under this
-            // bar — same as Google Maps, where the search box never moves
-            // when the results panel appears.
-            // right-16 (not right-3): leaves clearance so the chip row's
-            // scroll area doesn't run under the fullscreen button, which
-            // shares this same top-right corner of the map.
-            <div className="absolute left-3 right-16 top-3 z-40 hidden items-start gap-2 desktop:flex">
-              <div className="w-72 shrink-0">{desktopSearchForm}</div>
-              {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
+            <div className="absolute left-3 top-3 z-40 hidden w-[368px] desktop:block">{desktopSearchForm}</div>
+          )}
+
+          {/* ── Floating category chips (desktop) — fixed just past the
+                  search box's right edge (left-3 + 368px + this row's own
+                  gap = 392px), same as Google Maps' own chip row starting
+                  right after its panel (see the reference screenshot).
+                  Fixed, not sidebar-tracking: the search box above is
+                  already sized to fully cover the sidebar's width, so the
+                  sidebar can never reach far enough right to need this to
+                  get out of its way. right-16 (not right-3): leaves
+                  clearance so the chip row's scroll area doesn't run under
+                  the fullscreen button, which shares this same top-right
+                  corner of the map. ─────────────────────────────────────── */}
+          {!isMobile && desktopCategoryChips && (
+            <div className="absolute left-[392px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
+              {desktopCategoryChips}
             </div>
           )}
 
