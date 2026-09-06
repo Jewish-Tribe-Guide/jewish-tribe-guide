@@ -54,6 +54,21 @@ export type ZmanimData = {
    *  callers never have to string-match Hebcal's naming — see the note there
    *  about Erev Rosh Chodesh. */
   isRoshChodesh?: boolean
+  /** The next Yom Tov period landing within the lookahead window (see
+   *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
+   *  `null` when there isn't one, which is the common case most weeks.
+   *  Deliberately begin/end only, not a day-by-day breakdown: the Shabbat
+   *  & Holiday Times card is meant to be glanced at, and the full detail
+   *  already has a home on the real Zmanim & Shabbos page. */
+  holidayPeriod?: {
+    /** e.g. "Rosh Hashana" — normalized from Hebcal's own title, which
+     *  carries a year or day-number suffix ("Rosh Hashana 5787",
+     *  "Sukkot II") that isn't meaningful to a visitor glancing at this
+     *  card. See lib/zmanim.ts's own normalizer for exactly what it strips. */
+    name: string
+    begins: ZmanEntry
+    ends: ZmanEntry
+  } | null
   // ── Future-friendly slots (not yet populated) ──
   fastDay?: { label: string; start: string; end: string } | null
 }

@@ -14,6 +14,15 @@ const HEBCAL_BASE = 'https://www.hebcal.com'
 // fixed, so there's no need to hit Hebcal on every request.
 const FETCH_OPTS: RequestInit = { next: { revalidate: 1800 } } as RequestInit
 
+// How far past the real lookahead window the holiday-calendar query reaches,
+// purely so a period starting right at the window's edge still has room to
+// show its own close-out havdalah — see the holidayUrl comment in
+// getZmanimData for the full reasoning. 3 covers the longest a period this
+// card cares about actually runs past its first candle-lighting: a 2-day
+// Rosh Hashana/Pesach/Sukkot-opening ends on day 2, so 3 is a day of slack
+// on top of the longest real case, not a tuned-to-the-exact-day number.
+const HOLIDAY_QUERY_PAD_DAYS = 3
+
 export type ZmanimCoords = {
   latitude: number
   longitude: number
@@ -32,6 +41,15 @@ type HebcalShabbatItem = {
 }
 
 type HebcalShabbat = {
+  items?: HebcalShabbatItem[]
+}
+
+// The /hebcal calendar endpoint returns the same {category, title, date}
+// item shape as /shabbat, just for an explicit date range instead of
+// "whatever the next Shabbos-relevant cycle is" — see `getZmanimData`'s own
+// comment on why that distinction is exactly why this needs a second
+// endpoint rather than reusing the /shabbat response for holiday detection.
+type HebcalCalendar = {
   items?: HebcalShabbatItem[]
 }
 
@@ -64,6 +82,19 @@ function weekdayName(iso: string, tz: string): string {
   )
 }
 
+/** Abbreviated weekday + calendar date (e.g. "Fri, Sep 11") for an ISO
+ *  datetime — used only for `holidayPeriod.begins`/`ends`, not the regular
+ *  `shabbos.candleLighting`/`havdalah` fields (which stay the plain
+ *  `weekdayName` they've always been). A holiday period spans several days
+ *  and the same weekday name recurs across weeks, so "Friday" alone doesn't
+ *  say WHICH Friday the way it's enough to for "this week's" ordinary
+ *  candle lighting. */
+function weekdayAndDate(iso: string, tz: string): string {
+  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: tz }).format(
+    new Date(iso),
+  )
+}
+
 /** Today's civil date (YYYY-MM-DD) and weekday index in the given timezone. */
 function todayInTimezone(tz: string): { dateStr: string; dayOfWeek: number } {
   const now = new Date()
@@ -80,6 +111,112 @@ function todayInTimezone(tz: string): { dateStr: string; dayOfWeek: number } {
     timeZone: tz,
   }).format(now)
   return { dateStr, dayOfWeek: WEEKDAY_INDEX.indexOf(shortDow) }
+}
+
+/** Adds `days` civil days to a "YYYY-MM-DD" string, returning the same
+ *  shape. Calendar-day arithmetic only — deliberately not timezone-aware
+ *  (there's no instant here to convert, just a date to walk forward from),
+ *  which is why this parses the parts by hand into Date.UTC rather than
+ *  letting `new Date(dateStr)` interpret the string in the machine's own
+ *  local time and risk landing on the wrong civil day. */
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const shifted = new Date(Date.UTC(y, m - 1, d + days))
+  return shifted.toISOString().slice(0, 10)
+}
+
+/** How many days ahead the Shabbat & Holiday Times card looks for an
+ *  upcoming Yom Tov: through the end of the current week (Sunday–Saturday),
+ *  or 3 days, whichever is more.
+ *
+ *  The 3-day floor exists specifically for a holiday landing early the
+ *  following week — checked from Thursday or Friday, "days left in this
+ *  week" alone shrinks to 1–2, which would give almost no advance notice of
+ *  a holiday starting the coming Sunday or Monday. The floor guarantees at
+ *  least 3 days of notice regardless of where in the week today falls; the
+ *  week-length half is what lets it see further on a Sunday or Monday, when
+ *  there's a full week of runway to look across (up to 6 days, reaching all
+ *  the way to that Saturday's Havdalah).
+ *
+ *  `dayOfWeek` is 0 (Sunday) through 6 (Saturday), same convention as
+ *  `todayInTimezone`'s own return value and WEEKDAY_INDEX above. */
+export function lookaheadDays(dayOfWeek: number): number {
+  const daysLeftInWeek = 6 - dayOfWeek
+  return Math.max(daysLeftInWeek, 3)
+}
+
+/** Hebcal's holiday titles carry a suffix that means nothing to a visitor
+ *  glancing at a compact card: a Hebrew year ("Rosh Hashana 5787"), a day
+ *  number ("Sukkot II", "Pesach VII"), or a chol hamoed marker
+ *  ("Sukkot III (CH'M)"). Strips those down to the plain name Zmanim &
+ *  Shabbos' own fuller page can still expand on. An "Erev "-prefixed title
+ *  is preferred to KEEP its prefix when it's the only holiday name found in
+ *  the period (see `findHolidayPeriod`) — this normalizer only ever runs on
+ *  a title the caller has already decided is the one to show. */
+function normalizeHolidayName(title: string): string {
+  return title
+    .replace(/\s*\(CH['’]M\)\s*$/i, '')
+    .replace(/\s+(I|II|III|IV|V|VI|VII|VIII)$/, '')
+    .replace(/\s+\d{4}$/, '')
+    .trim()
+}
+
+/** Groups a date-ranged Hebcal response into the next complete Yom Tov
+ *  period — a `candles` item, everything after it up to and including the
+ *  next `havdalah` — and names it from whichever `holiday` item in that
+ *  stretch isn't an "Erev " one (falling back to the Erev title itself, if
+ *  that's all there is).
+ *
+ *  `windowEnd` ("YYYY-MM-DD") is the real lookahead boundary — the one a
+ *  visitor was actually promised — which is deliberately NOT the same date
+ *  the Hebcal query itself was asked for. A period's own `begins` can land
+ *  exactly on the last day of the window with its `ends` one or two days
+ *  past it (a 2-day Rosh Hashana starting Friday ends Sunday), so
+ *  `getZmanimData` queries a few days further than `windowEnd` specifically
+ *  to have a chance at seeing that close-out havdalah at all; the caller
+ *  would otherwise report a Yom Tov as having "no time to show" (see
+ *  `lookaheadDays`'s whole reason for existing) purely because its own
+ *  ending fell one calendar day outside an unpadded query. This is what
+ *  stops that padding from also silently pulling in a SECOND, later period
+ *  that starts after `windowEnd` — one that's genuinely not upcoming yet by
+ *  the window's own definition.
+ *
+ *  Returns `null` when there's no complete, in-window period: no `candles`
+ *  item at all (the ordinary case — no Yom Tov within the lookahead), a
+ *  `candles` with no `havdalah` following it anywhere in the padded
+ *  response (the period doesn't end within what Hebcal returned at all, so
+ *  there's nothing honest to put in "ends"), or a `candles` that starts
+ *  after `windowEnd` (a real period, just not an upcoming one yet). An
+ *  ordinary Friday with no `holiday` item anywhere in its span still forms
+ *  a "period" by this reading — the caller is the one that decides whether
+ *  a holiday-less period is worth surfacing here at all, since the regular
+ *  `shabbos.candleLighting`/`havdalah` fields already cover that case on
+ *  their own. */
+function findHolidayPeriod(items: HebcalShabbatItem[], timezone: string, windowEnd: string): ZmanimData['holidayPeriod'] {
+  const startIdx = items.findIndex((i) => i.category === 'candles')
+  if (startIdx === -1) return null
+  if (items[startIdx].date.slice(0, 10) > windowEnd) return null
+
+  const endIdx = items.findIndex((i, idx) => idx >= startIdx && i.category === 'havdalah')
+  if (endIdx === -1) return null
+
+  const span = items.slice(startIdx, endIdx + 1)
+  const holidayItems = span.filter((i) => i.category === 'holiday')
+  if (holidayItems.length === 0) return null
+
+  const named = holidayItems.find((i) => !i.title.startsWith('Erev ')) ?? holidayItems[0]
+
+  const toEntry = (item: HebcalShabbatItem): ZmanEntry => ({
+    label: weekdayAndDate(item.date, timezone),
+    time: formatTime(item.date, timezone),
+    iso: item.date,
+  })
+
+  return {
+    name: normalizeHolidayName(named.title),
+    begins: toEntry(span[0]),
+    ends: toEntry(span[span.length - 1]),
+  }
 }
 
 /** Adds `offsetMinutes` to a Hebcal instant and formats the result the same
@@ -116,11 +253,35 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   const zmanimUrl = `${HEBCAL_BASE}/zmanim?cfg=json&${geo}&date=${dateStr}`
   const shabbatUrl = `${HEBCAL_BASE}/shabbat?cfg=json&${geo}&b=18&M=on&gy=${gy}&gm=${gm}&gd=${gd}`
   const converterUrl = `${HEBCAL_BASE}/converter?cfg=json&date=${dateStr}&g2h=1`
+  // /shabbat (above) answers "what's the next Shabbos-relevant cycle", which
+  // is exactly wrong for holiday detection: from an ordinary Tuesday with a
+  // plain Friday two days out and a Yom Tov six days out, it returns only
+  // that Friday — the Yom Tov, further away, never appears, even though it's
+  // well inside the lookahead window. /hebcal takes an explicit start/end
+  // range instead, so this asks for exactly the window this card cares
+  // about rather than whatever cycle Hebcal decides is "next". c=on (candle
+  // lighting) + maj=on (major holidays, which is what actually carries the
+  // havdalah/second-candle items a period needs) with the minor-calendar
+  // categories turned off — nothing here is shown on the card, so there's
+  // no reason to ask Hebcal to compute it.
+  //
+  // The query itself reaches a few days PAST windowEnd (see
+  // HOLIDAY_QUERY_PAD_DAYS) — a period starting right at the edge of the
+  // real window can still end a day or two later (Rosh Hashana is 2 days),
+  // and without the padding that close-out havdalah would fall outside what
+  // Hebcal was even asked for, making an upcoming Yom Tov look like it had
+  // "no time to show" for a reason that has nothing to do with the
+  // 3-day-floor problem `lookaheadDays` actually solves. `findHolidayPeriod`
+  // is what keeps this padding from also surfacing a second, later period
+  // that starts past the real window.
+  const windowEnd = addDays(dateStr, lookaheadDays(dayOfWeek))
+  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${dateStr}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=off&d=off&o=off&F=off&D=off`
 
-  const [zmanim, shabbat, converter] = await Promise.all([
+  const [zmanim, shabbat, converter, holidayCalendar] = await Promise.all([
     fetchJson<HebcalZmanim>(zmanimUrl),
     fetchJson<HebcalShabbat>(shabbatUrl),
     fetchJson<HebcalConverter>(converterUrl),
+    fetchJson<HebcalCalendar>(holidayUrl),
   ])
 
   const t = zmanim.times
@@ -169,5 +330,6 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     // evening errs toward showing a row rather than hiding one only after the
     // fallback in useCalendarDays has already been resolved.
     isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
+    holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
   }
 }

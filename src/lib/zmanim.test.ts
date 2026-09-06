@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyOffsetMinutes, getZmanimData, type ZmanimCoords } from './zmanim'
+import { applyOffsetMinutes, getZmanimData, lookaheadDays, type ZmanimCoords } from './zmanim'
 
 const PHILADELPHIA: ZmanimCoords = {
   latitude: 39.9526,
@@ -30,17 +30,26 @@ const shabbatResponse = {
 
 const converterResponse = { hy: 5786, hm: 'Tamuz', hd: 9 }
 
-/** Routes each Hebcal endpoint to its canned response and records the URLs. */
-function mockHebcal(overrides: { zmanim?: unknown; shabbat?: unknown; converter?: unknown } = {}) {
+// Empty by default — an ordinary week has no Yom Tov in the lookahead
+// window, and that's the common case most tests below want.
+const holidayCalendarResponse = { items: [] }
+
+/** Routes each Hebcal endpoint to its canned response and records the URLs.
+ *  `/hebcal` (holiday-period detection) is checked before `/shabbat` and
+ *  `/zmanim`, neither of which is a substring match for it, but ordering
+ *  defensively matters less than being explicit about which comes first. */
+function mockHebcal(overrides: { zmanim?: unknown; shabbat?: unknown; converter?: unknown; holidayCalendar?: unknown } = {}) {
   const calls: string[] = []
   const fetchMock = vi.fn(async (url: string | URL) => {
     const href = String(url)
     calls.push(href)
-    const body = href.includes('/zmanim')
-      ? (overrides.zmanim ?? zmanimResponse)
-      : href.includes('/shabbat')
-        ? (overrides.shabbat ?? shabbatResponse)
-        : (overrides.converter ?? converterResponse)
+    const body = href.includes('/hebcal')
+      ? (overrides.holidayCalendar ?? holidayCalendarResponse)
+      : href.includes('/zmanim')
+        ? (overrides.zmanim ?? zmanimResponse)
+        : href.includes('/shabbat')
+          ? (overrides.shabbat ?? shabbatResponse)
+          : (overrides.converter ?? converterResponse)
     return { ok: true, status: 200, json: async () => body } as Response
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -205,5 +214,152 @@ describe('getZmanimData', () => {
       vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }) as Response),
     )
     await expect(getZmanimData(PHILADELPHIA)).rejects.toThrow(/Hebcal request failed \(503\)/)
+  })
+
+  describe('holidayPeriod', () => {
+    it('asks /hebcal for an explicit date range, padded past the real lookahead window, not the /shabbat "next cycle" the regular candle/havdalah fields use', async () => {
+      // Wednesday 2026-06-24, dayOfWeek 3 → lookaheadDays = max(6-3, 3) = 3,
+      // so the real window ends 2026-06-27 — but the query itself reaches 3
+      // days further (HOLIDAY_QUERY_PAD_DAYS), to 2026-06-30, so a period
+      // starting right at the window's edge still has room to show its own
+      // close-out havdalah. See the next test for why that padding matters.
+      const { calls } = mockHebcal()
+      await getZmanimData(PHILADELPHIA)
+
+      const holidayUrl = calls.find((c) => c.includes('/hebcal'))!
+      expect(holidayUrl).toContain('start=2026-06-24')
+      expect(holidayUrl).toContain('end=2026-06-30')
+    })
+
+    it('is null on an ordinary week with no Yom Tov in the window', async () => {
+      mockHebcal() // holidayCalendarResponse default: no items
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod).toBeNull()
+    })
+
+    it('groups a multi-day Yom Tov (candles → candles → havdalah) into one period, named from its non-Erev title', async () => {
+      // Sunday 2026-09-06 → lookaheadDays(0) = 6 → window ends 2026-09-12.
+      // Rosh Hashana begins 9/11 (inside the window) but its own havdalah
+      // isn't until 9/13 — one day PAST an unpadded window. This is the
+      // real bug this shape caught: querying only through windowEnd would
+      // return the two candle-lightings with no havdalah at all, and
+      // findHolidayPeriod would (correctly, by its own rule) report no
+      // period — an upcoming Yom Tov reported as absent for a reason that
+      // has nothing to do with whether it's actually upcoming. The response
+      // below is exactly what Hebcal returns once the query is padded far
+      // enough to include that havdalah.
+      vi.setSystemTime(new Date('2026-09-06T18:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Rosh Hashana', date: '2026-09-11' },
+            { category: 'candles', title: 'Candle lighting: 6:57pm', date: '2026-09-11T18:57:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana 5787', date: '2026-09-12' },
+            { category: 'candles', title: 'Candle lighting: 7:55pm', date: '2026-09-12T19:55:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana II', date: '2026-09-13' },
+            { category: 'havdalah', title: 'Havdalah: 7:53pm', date: '2026-09-13T19:53:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod).toEqual({
+        name: 'Rosh Hashana',
+        begins: { label: 'Fri, Sep 11', time: '6:57 PM', iso: '2026-09-11T18:57:00-04:00' },
+        ends: { label: 'Sun, Sep 13', time: '7:53 PM', iso: '2026-09-13T19:53:00-04:00' },
+      })
+    })
+
+    it('strips a chol hamoed / day-number suffix down to the plain holiday name', async () => {
+      // 2026-09-22 (Tuesday) → lookaheadDays(2) = 4 → window ends 9/26,
+      // comfortably covering Sukkot's 9/25 start.
+      vi.setSystemTime(new Date('2026-09-22T18:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Sukkot', date: '2026-09-25' },
+            { category: 'candles', title: 'Candle lighting: 6:34pm', date: '2026-09-25T18:34:00-04:00' },
+            { category: 'holiday', title: 'Sukkot I', date: '2026-09-26' },
+            { category: 'candles', title: 'Candle lighting: 7:31pm', date: '2026-09-26T19:31:00-04:00' },
+            { category: 'holiday', title: 'Sukkot II', date: '2026-09-27' },
+            { category: 'havdalah', title: 'Havdalah: 7:29pm', date: '2026-09-27T19:29:00-04:00' },
+            // Chol hamoed — genuinely no candles/havdalah item at all. Present
+            // here to prove it doesn't get pulled into the period above.
+            { category: 'holiday', title: 'Sukkot III (CH’’M)', date: '2026-09-28' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod?.name).toBe('Sukkot')
+      expect(data.holidayPeriod?.ends.iso).toBe('2026-09-27T19:29:00-04:00')
+    })
+
+    it('is null when a candle-lighting starts a period whose havdalah never appears, even in the padded response', async () => {
+      // The response ran out with no havdalah at all — nothing honest to
+      // put in "ends", so no period rather than a half-true one.
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Yom Kippur', date: '2026-06-25' },
+            { category: 'candles', title: 'Candle lighting: 6:42pm', date: '2026-06-25T18:42:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod).toBeNull()
+    })
+
+    it('does not treat an ordinary holiday-less Friday/Saturday as a period', async () => {
+      // Same shape the regular shabbos.candleLighting/havdalah fields
+      // already parse from /shabbat — no `holiday` item anywhere in the
+      // span, so this isn't a Yom Tov, and the regular fields already cover
+      // it; a redundant identical holidayPeriod would just duplicate them.
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'candles', title: 'Candle lighting: 8:14pm', date: '2026-06-26T20:14:00-04:00' },
+            { category: 'havdalah', title: 'Havdalah: 9:23pm', date: '2026-06-27T21:23:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod).toBeNull()
+    })
+
+    it('is null when the only candle-lighting in the padded response starts after the real window — a real period, just not upcoming yet', async () => {
+      // Wednesday 2026-06-24 → window ends 2026-06-27, but the query itself
+      // reaches to 2026-06-30 (the padding). A period starting on 6/29 is
+      // inside the PADDED response but past the window a visitor was
+      // actually promised — this is exactly the case the padding could
+      // wrongly surface if nothing checked the start against windowEnd.
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Shavuot', date: '2026-06-29' },
+            { category: 'candles', title: 'Candle lighting: 8:15pm', date: '2026-06-29T20:15:00-04:00' },
+            { category: 'holiday', title: 'Shavuot I', date: '2026-06-30' },
+            { category: 'havdalah', title: 'Havdalah: 9:20pm', date: '2026-06-30T21:20:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod).toBeNull()
+    })
+  })
+})
+
+describe('lookaheadDays', () => {
+  it('is the floor (3) on Thursday, Friday, and Saturday, when the week alone would give less notice', () => {
+    expect(lookaheadDays(4)).toBe(3) // Thursday: 6-4=2, floor wins
+    expect(lookaheadDays(5)).toBe(3) // Friday: 6-5=1, floor wins
+    expect(lookaheadDays(6)).toBe(3) // Saturday: 6-6=0, floor wins
+  })
+
+  it('is the days left in the week on Sunday through Wednesday, when that stretches further than the floor', () => {
+    expect(lookaheadDays(0)).toBe(6) // Sunday
+    expect(lookaheadDays(1)).toBe(5) // Monday
+    expect(lookaheadDays(2)).toBe(4) // Tuesday
+    expect(lookaheadDays(3)).toBe(3) // Wednesday: 6-3=3, ties the floor
   })
 })

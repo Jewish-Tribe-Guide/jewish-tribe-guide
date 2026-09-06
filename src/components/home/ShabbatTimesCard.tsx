@@ -2,7 +2,8 @@
 
 import { useZmanim } from '@/lib/useZmanim'
 
-// ── Shabbat Times — candle lighting and havdalah, nothing else. ────────────
+// ── Shabbat & Holiday Times — candle lighting and havdalah, plus the next
+// Yom Tov when there is one. ────────────────────────────────────────────────
 //
 // Used to be the full daily Zmanim (sunrise, latest Shema, latest Shacharis,
 // sunset, nightfall) plus these two — five rows nobody asked about, next to
@@ -10,13 +11,23 @@ import { useZmanim } from '@/lib/useZmanim'
 // lighting/havdalah on the reasoning that a card meant to be glanced at
 // shouldn't need to be read.
 //
-// Both rows show every day of the week — see the render's own comment on
-// why the `&&` guards below aren't a real "sometimes missing" case — but
-// only one gets the amber highlight, and only on the day it actually
-// applies (Friday for candle lighting, Saturday for havdalah). The rest of
-// the week both render in a plain, equally-weighted style: candle lighting
-// and havdalah are both worth knowing on, say, a Tuesday, but neither is
-// "happening imminently" the way the highlight used to claim every day.
+// The regular two rows show every day of the week — see the render's own
+// comment on why the `&&` guards below aren't a real "sometimes missing"
+// case — but only one gets the amber highlight, and only on the day it
+// actually applies (Friday for candle lighting, Saturday for havdalah). The
+// rest of the week both render in a plain, equally-weighted style: candle
+// lighting and havdalah are both worth knowing on, say, a Tuesday, but
+// neither is "happening imminently" the way the highlight used to claim
+// every day.
+//
+// `data.holidayPeriod` (see lib/zmanim.ts's own doc on how far ahead it
+// looks and how it's grouped) replaces those two rows entirely rather than
+// sitting alongside them, whenever there's an upcoming Yom Tov within the
+// window. The reason isn't just tidiness: on a week like Rosh Hashana,
+// Hebcal's own feed doesn't produce a plain "Friday candle lighting" AND a
+// separate holiday block — the holiday's own candle lighting IS that
+// Friday's. Showing both would repeat the identical fact in identical
+// words, one row apart.
 //
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening
@@ -41,7 +52,7 @@ export default function ShabbatTimesCard({
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
         {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
       </p>
-      <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat Times</h3>
+      <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat &amp; Holiday Times</h3>
 
       {status === 'loading' ? (
         <div className="space-y-2" aria-live="polite" aria-busy="true">
@@ -51,49 +62,65 @@ export default function ShabbatTimesCard({
         </div>
       ) : status === 'ready' && data ? (
         <>
-          {/* Both rows always show — Hebcal's own /shabbat response always
-              carries the upcoming Shabbos's candle lighting AND the
-              following havdalah together, every day of the week, so the
-              `&&` guards below are type-narrowing, not a real "sometimes
-              missing" case. What used to vary was styling: both rows always
-              got the amber highlight regardless of the day, which read as
-              "both of these are happening imminently" on a Tuesday just as
-              loudly as on the Friday it's actually true. Highlighted now
-              only on the day it applies — `isFriday` for candle lighting,
-              `isShabbos` for havdalah — with a plain row the rest of the
-              week. Never hides the other row: the point is always knowing
-              both times, just not being told twice a week that "right now"
-              is imminent when it isn't. */}
-          <div className="space-y-1.5">
-            {data.shabbos.candleLighting && (
-              <div
-                className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                  data.isFriday ? 'bg-amber-50' : 'bg-slate-50'
-                }`}
-              >
-                <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
-                  Candles {data.shabbos.candleLighting.label}
-                </span>
-                <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
-                  {data.shabbos.candleLighting.time}
-                </span>
+          {data.holidayPeriod ? (
+            <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+                {data.holidayPeriod.name}
+              </p>
+              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] text-slate-800">
+                <span>Begins {data.holidayPeriod.begins.label}</span>
+                <span className="tabular-nums text-slate-900">{data.holidayPeriod.begins.time}</span>
               </div>
-            )}
-            {data.shabbos.havdalah && (
-              <div
-                className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
-                  data.isShabbos ? 'bg-amber-50' : 'bg-slate-50'
-                }`}
-              >
-                <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
-                  Havdalah {data.shabbos.havdalah.label}
-                </span>
-                <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
-                  {data.shabbos.havdalah.time}
-                </span>
+              <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] text-slate-800">
+                <span>Ends {data.holidayPeriod.ends.label}</span>
+                <span className="tabular-nums text-slate-900">{data.holidayPeriod.ends.time}</span>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            // Both rows always show — Hebcal's own /shabbat response always
+            // carries the upcoming Shabbos's candle lighting AND the
+            // following havdalah together, every day of the week, so the
+            // `&&` guards below are type-narrowing, not a real "sometimes
+            // missing" case. What used to vary was styling: both rows always
+            // got the amber highlight regardless of the day, which read as
+            // "both of these are happening imminently" on a Tuesday just as
+            // loudly as on the Friday it's actually true. Highlighted now
+            // only on the day it applies — `isFriday` for candle lighting,
+            // `isShabbos` for havdalah — with a plain row the rest of the
+            // week. Never hides the other row: the point is always knowing
+            // both times, just not being told twice a week that "right now"
+            // is imminent when it isn't.
+            <div className="space-y-1.5">
+              {data.shabbos.candleLighting && (
+                <div
+                  className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
+                    data.isFriday ? 'bg-amber-50' : 'bg-slate-50'
+                  }`}
+                >
+                  <span className={`text-[13px] font-semibold ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                    Candles {data.shabbos.candleLighting.label}
+                  </span>
+                  <span className={`text-[13px] font-semibold tabular-nums ${data.isFriday ? 'text-amber-800' : 'text-slate-700'}`}>
+                    {data.shabbos.candleLighting.time}
+                  </span>
+                </div>
+              )}
+              {data.shabbos.havdalah && (
+                <div
+                  className={`flex items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 ${
+                    data.isShabbos ? 'bg-amber-50' : 'bg-slate-50'
+                  }`}
+                >
+                  <span className={`text-[13px] font-semibold ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                    Havdalah {data.shabbos.havdalah.label}
+                  </span>
+                  <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
+                    {data.shabbos.havdalah.time}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           {/* Same attribution/link as the real Zmanim & Shabbos page
               (ZmanimBody) — this card shows the same Hebcal-sourced data, so
               it carries the same credit. */}

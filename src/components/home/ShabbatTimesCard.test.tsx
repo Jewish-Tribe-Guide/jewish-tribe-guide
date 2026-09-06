@@ -36,6 +36,7 @@ const readyData: ZmanimData = {
     candleLighting: { label: 'Friday', time: '7:09 PM' },
     havdalah: { label: 'Saturday', time: '8:07 PM' },
   },
+  holidayPeriod: null,
 }
 
 describe('ShabbatTimesCard', () => {
@@ -43,7 +44,7 @@ describe('ShabbatTimesCard', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByRole('heading', { name: 'Shabbat Times' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
   })
 
   it('shows only candle lighting and havdalah — not the old five-row daily zmanim grid', () => {
@@ -114,5 +115,53 @@ describe('ShabbatTimesCard — the highlight follows the day, not both rows alwa
 
     expect(rowFor('Candles')).toHaveClass('bg-slate-50')
     expect(rowFor('Havdalah')).toHaveClass('bg-amber-50')
+  })
+})
+
+// The holiday block replaces the regular rows, rather than sitting beside
+// them — see ShabbatTimesCard's own doc on why: on a week like Rosh
+// Hashana, the holiday's own candle lighting IS the regular Friday one, so
+// showing both would repeat the identical fact in identical words.
+describe('ShabbatTimesCard — the holiday block', () => {
+  const withHoliday: ZmanimData = {
+    ...readyData,
+    isFriday: true,
+    holidayPeriod: {
+      name: 'Rosh Hashana',
+      begins: { label: 'Fri, Sep 11', time: '6:57 PM' },
+      ends: { label: 'Sun, Sep 13', time: '7:53 PM' },
+    },
+  }
+
+  it('shows the holiday name, and begins/ends on their own lines', () => {
+    mockUseZmanim.mockReturnValue({ data: withHoliday, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText('Rosh Hashana')).toBeInTheDocument()
+    expect(screen.getByText('Begins Fri, Sep 11')).toBeInTheDocument()
+    expect(screen.getByText('6:57 PM')).toBeInTheDocument()
+    expect(screen.getByText('Ends Sun, Sep 13')).toBeInTheDocument()
+    expect(screen.getByText('7:53 PM')).toBeInTheDocument()
+  })
+
+  it('replaces the regular Candles/Havdalah rows entirely, never shows both', () => {
+    mockUseZmanim.mockReturnValue({ data: withHoliday, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.queryByText(/^Candles /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Havdalah /)).not.toBeInTheDocument()
+    // The regular rows' own 7:09 PM/8:07 PM would prove it — they're a
+    // different time from the holiday's 6:57 PM/7:53 PM in this fixture on
+    // purpose, so a leftover regular row can't hide behind an identical value.
+    expect(screen.queryByText('7:09 PM')).not.toBeInTheDocument()
+    expect(screen.queryByText('8:07 PM')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the regular Candles/Havdalah rows when there is no holiday in the window', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' }) // holidayPeriod: null
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText(/^Candles /)).toBeInTheDocument()
+    expect(screen.getByText(/^Havdalah /)).toBeInTheDocument()
   })
 })
