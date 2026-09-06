@@ -174,6 +174,29 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     expect(bar?.className).toMatch(/left-\[392px\]/)
     expect(bar?.className).not.toMatch(/\bleft-3\b/)
   })
+
+  // The sidebar used to be a real flex sibling of the map, so opening it
+  // (0 -> 380px) shrank the map's own container — which resizes the map's
+  // real DOM box and makes ResourceMap's ResizeObserver re-center the map to
+  // refresh its tile layer (see that component's own comment), so the whole
+  // map visibly shifted whenever the sidebar opened or closed. It must be an
+  // out-of-flow overlay instead, like Google Maps' own results panel, so the
+  // map's box never changes size and nothing under it moves.
+  it('overlays the map instead of sitting in flex flow beside it, so opening it cannot resize the map', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    const aside = container.querySelector('aside')
+    expect(aside?.className).toMatch(/desktop:absolute/)
+    expect(aside?.className).not.toMatch(/\bshrink-0\b/)
+  })
 })
 
 describe('ResourceMapView — category filtering', () => {
