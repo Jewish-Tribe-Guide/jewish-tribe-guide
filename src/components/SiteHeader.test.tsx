@@ -46,7 +46,7 @@ function location(overrides: Partial<LocationControls> = {}): LocationControls {
 }
 
 describe('SiteHeader — a single community', () => {
-  it('renders the site name/tagline as one "go home" button, with no switcher', async () => {
+  it('renders the site name as one "go home" button, with no switcher', async () => {
     const user = userEvent.setup()
     const onGoHome = vi.fn()
     renderWithProviders(
@@ -57,11 +57,26 @@ describe('SiteHeader — a single community', () => {
     )
 
     expect(screen.getByText('Test Directory')).toBeInTheDocument()
-    expect(screen.getByText('Find what you need')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
 
     await user.click(screen.getByText('Test Directory'))
     expect(onGoHome).toHaveBeenCalledTimes(1)
+  })
+
+  // The tagline used to render as a second line under the name — it repeated
+  // roughly what the hero's mission line says a few pixels of scroll later.
+  // Dropped from the header for that reason (see SiteHeader's own comment);
+  // the field itself is untouched (still admin-editable, still set here),
+  // it just has no render site left.
+  it('no longer renders the tagline — that redundant second line is gone', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' } } },
+    )
+
+    expect(screen.queryByText('Find what you need')).not.toBeInTheDocument()
   })
 })
 

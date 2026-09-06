@@ -495,15 +495,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       />
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
-          on a long list instead of scrolling away above the fold. `top-16`
-          matches SiteHeader's own fixed `h-16` (see that component), which
+          on a long list instead of scrolling away above the fold. `top-14`
+          matches SiteHeader's own fixed `h-14` (see that component), which
           on desktop is always visible (never the scroll-hide behavior mobile
           gets), so this can sit at a fixed offset rather than measuring it.
           Not gated on the `desktop:` custom variant (640px) — that's wide
           enough to fit the sticky bar but too narrow for it to be worth the
           fixed screen real estate it costs; `lg:` (1024px) is where a phone
           landscape or small tablet stops paying more than it gets back. */}
-      <div className="mb-4 space-y-2 lg:sticky lg:top-16 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
+      <div className="mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
         {showSearch && (
           <div className="relative">
             <input

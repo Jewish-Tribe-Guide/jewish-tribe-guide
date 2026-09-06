@@ -134,12 +134,12 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
     <header
       className={className}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center">
         {/* On mobile the logo only hides while no location is set — that's when
-            the wide "Set location" pill competes with the full title + tagline
-            for the row, and dropping the mark frees the ~46px needed to keep
-            the text full. Once a location is set the pill collapses to just its
-            pin, so the logo comes back. Always shown from sm up. */}
+            the wide "Set location" pill competes with the name for the row,
+            and dropping the mark frees the ~46px needed to keep the text
+            full. Once a location is set the pill collapses to just its pin,
+            so the logo comes back. Always shown from sm up. */}
         {(() => {
           const mark = settings.logoUrl?.trim() ? (
             // next/image rather than a CSS background. Beyond the resizing and
@@ -183,14 +183,25 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
               <StarOfDavid className="h-5 w-5" />
             </span>
           )
+          // Tagline used to render as a second line here — dropped along
+          // with the header's own extra height (h-16 → h-14 below): it said
+          // roughly the same thing the hero's mission line says a few
+          // pixels of scroll later ("Guide for residents, visitors, and
+          // patients" next to the hero's own mission sentence), so the
+          // header carried the message twice before a visitor had read
+          // either in full.
+          //
+          // This WAS tagline's only render site — its own type doc in
+          // siteSettings.ts says exactly that ("Shown under the site name in
+          // the header"). Left admin-editable rather than removed (still
+          // shows in the Site tab, still round-trips to the database) since
+          // deleting a field is a bigger, separate decision than deciding
+          // not to render it — but as of this change it has no surface
+          // anywhere on the live site. Worth knowing before spending more
+          // time writing good taglines into a field nothing shows.
           const title = (
-            <span className="min-w-0 flex-1 leading-tight">
-              <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
-                {settings.name}
-              </span>
-              <span className="block truncate text-[11px] text-slate-500">
-                {settings.tagline}
-              </span>
+            <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+              {settings.name}
             </span>
           )
 
