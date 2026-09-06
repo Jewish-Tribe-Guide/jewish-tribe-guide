@@ -22,7 +22,13 @@ import Honeypot from '@/components/Honeypot'
 // post-approval hook and subscriberEmail.ts) — no digest/cron, so this is
 // the entire signup surface; nothing else to configure after submitting
 // besides the unsubscribe link every notification carries.
-export default function SubscribeSection() {
+export default function SubscribeSection({ bare = false }: {
+  /** Skip this section's own outer `<section>`/card shell and render just the
+   *  heading + form — for HomeBreak, which now places this in one cell of its
+   *  2×2 grid and owns the card border/padding itself, the same reason
+   *  SearchSection takes this prop when Landing merges it into another card. */
+  bare?: boolean
+} = {}) {
   const categories = useCategories()
   const community = useCommunitySlug()
   const [email, setEmail] = useState('')
@@ -124,9 +130,8 @@ export default function SubscribeSection() {
     }
   }
 
-  return (
-    <section className="mt-14">
-      <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+  const content = (
+    <>
         <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the loop</h2>
 
         {done ? (
@@ -251,7 +256,14 @@ export default function SubscribeSection() {
             </form>
           </>
         )}
-      </div>
+    </>
+  )
+
+  if (bare) return content
+
+  return (
+    <section className="mt-14">
+      <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">{content}</div>
     </section>
   )
 }

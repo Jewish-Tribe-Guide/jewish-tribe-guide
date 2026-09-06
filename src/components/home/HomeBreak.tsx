@@ -6,19 +6,65 @@ import { useSiteSettings } from '@/lib/useSiteSettings'
 import FeedbackForm from '@/components/FeedbackForm'
 import ContributePicker from './ContributePicker'
 import EditReportPicker from './EditReportPicker'
+import DaveningTimesCard from './DaveningTimesCard'
+import SubscribeSection from './SubscribeSection'
 import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 
 type ContributeAction = 'create' | 'edit' | 'report'
 
+// Icon + a short word by default, the full phrase once a wide-enough
+// desktop gives this half-width card room for it. `aria-label` is fixed to
+// the short word regardless of which visual variant is showing, so the
+// accessible name never depends on viewport width. Same technique as the
+// "All davening times" toolbar button (GenericDirectory.tsx), which hides
+// its own full label below a width breakpoint rather than swapping in a
+// second, shorter one — this needs the swap because "Add"/"Edit"/"Report"
+// bare is also a fine label, not just a fallback for no room. Module-scope,
+// not defined inside HomeBreak, so it isn't a new component type — and
+// doesn't remount its buttons — on every HomeBreak render.
+function ContributeButton({ onClick, icon, short, long, primary }: {
+  onClick: () => void
+  icon: React.ReactNode
+  short: string
+  long: string
+  primary?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={short}
+      className={
+        primary
+          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800'
+          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50'
+      }
+    >
+      {icon}
+      <span className="min-[900px]:hidden">{short}</span>
+      <span className="hidden min-[900px]:inline">{long}</span>
+    </button>
+  )
+}
+
 // ── The break between the two main things (Browse everything, Explore the
-// map) — two side-by-side cards, the full daily Zmanim on the left and the
-// "kept by the community" message on the right. Went through a few lighter
-// treatments first (a single unheaded strip, stacked bands) before landing
-// here — see the memory/decision history if reviving one of those. This is
-// deliberately the same card language (border, rounded-2xl) as Browse
-// everything and the map below it, just two smaller cards rather than one
-// full-width one, so it still reads as a distinct pair rather than a third
-// full-width peer section.
+// map) — a 2×2 grid of four smaller cards rather than one full-width
+// section each. Top row: Davening Times, and the "kept by the community"
+// message. Bottom row: the Stay in the loop signup (moved here from its own
+// full-width section after the map — see SubscribeSection's own `bare` prop)
+// and Shabbat Times, trimmed to just candle lighting and havdalah. Went
+// through a few lighter treatments first (a single unheaded strip, stacked
+// bands, a 2-card version of this same row) before landing here — see the
+// memory/decision history if reviving one of those. Deliberately the same
+// card language (border, rounded-2xl) as Browse everything and the map
+// below it, just four smaller cards rather than full-width ones, so this
+// still reads as a distinct break rather than a third full-width peer
+// section.
+//
+// Shabbat Times used to be the full daily Zmanim (sunrise, latest Shema,
+// latest Shacharis, sunset, nightfall) plus candle lighting/havdalah — five
+// rows nobody asked about, next to the two anyone actually checks this card
+// for. Trimmed to just those two on the reasoning that a card meant to be
+// glanced at shouldn't need to be read.
 //
 // The community card's own action went through a few rounds too: a single
 // "Suggest something" button opening the general feedback form overclaimed
@@ -35,11 +81,18 @@ type ContributeAction = 'create' | 'edit' | 'report'
 // action.
 export default function HomeBreak({
   coords,
+  visitorCoords,
   locationLabel,
 }: {
-  /** The visitor's address, or the community center — see Landing, which
-   *  falls back so this never renders a "set your location" prompt. */
+  /** For Shabbat Times: the visitor's address, or the community center — see
+   *  Landing, which falls back so this never renders a "set your location"
+   *  prompt. A city-wide approximation is fine for candle lighting. */
   coords: { lat: number; lng: number } | null
+  /** For Davening Times: the real, ungated value — null until the visitor
+   *  actually sets an address. Distance to a specific shul measured from the
+   *  community-center fallback above would be actively misleading, not just
+   *  imprecise, so that card needs to know the difference. */
+  visitorCoords: { lat: number; lng: number } | null
   locationLabel: string
 }) {
   const { data, status } = useZmanim(coords)
@@ -59,30 +112,63 @@ export default function HomeBreak({
 
   return (
     <div className="my-12 grid grid-cols-2 gap-4">
+      <DaveningTimesCard coords={visitorCoords} />
+
+      {/* No justify-center — this card is naturally shorter than the
+          Davening Times one, and centering its content made "Kept by the
+          community" start lower than "Davening Times", so the two headings
+          didn't line up. Top-aligned, like the other card, so they do
+          regardless of which one ends up taller.
+          Roomier than the other card's own rhythm on purpose — that one's
+          height comes from real data rows; this one has to earn its height
+          from spacing instead, the same way centercityeruv.com's own
+          "Get Eruv Updates" card reads as substantial through generous
+          padding and line-height rather than more text. Larger body copy,
+          more room between the eyebrow/heading/body/buttons, and taller
+          buttons — not more content, just more breathing room around the
+          same content, so the card fills its box instead of floating a
+          short block inside a tall one. */}
+      <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept by the community</h3>
+        <p className="mb-6 text-sm leading-relaxed text-muted">
+          A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
+          from the community that actually uses this guide.
+        </p>
+        <div className="flex flex-wrap gap-2.5">
+          <ContributeButton onClick={() => setContributeAction('create')} icon={<PlusIcon className="h-3.5 w-3.5" />} short="Add" long="Add a place" primary />
+          <ContributeButton onClick={() => setContributeAction('edit')} icon={<PencilIcon className="h-3.5 w-3.5" />} short="Edit" long="Suggest an edit" />
+          <ContributeButton onClick={() => setContributeAction('report')} icon={<FlagIcon className="h-3.5 w-3.5" />} short="Report" long="Report a problem" />
+        </div>
+        {settings.feedbackEnabled && (
+          <p className="mt-6 text-xs text-muted">
+            Notice something else, or have general feedback about the site?{' '}
+            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-amber-800 hover:underline">
+              Send a note →
+            </button>
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <SubscribeSection bare />
+      </div>
+
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
           {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
         </p>
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Zmanim & Shabbos</h3>
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat Times</h3>
 
         {status === 'loading' ? (
           <div className="space-y-2" aria-live="polite" aria-busy="true">
-            <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
             <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
             <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
             <span className="sr-only">Loading zmanim…</span>
           </div>
         ) : status === 'ready' && data ? (
           <>
-            <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5">
-              {data.dailyZmanim.map((z) => (
-                <div key={z.label} className="flex items-baseline justify-between gap-3 border-b border-dashed border-slate-100 py-1">
-                  <dt className="text-[13px] text-muted">{z.label}</dt>
-                  <dd className="text-[13px] font-semibold tabular-nums text-slate-900">{z.time}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-4 space-y-1.5">
+            <div className="space-y-1.5">
               {data.shabbos.candleLighting && (
                 <div className="flex items-baseline justify-between gap-3 rounded-lg bg-amber-50 px-3 py-1.5">
                   <span className="text-[13px] font-semibold text-amber-800">Candles {data.shabbos.candleLighting.label}</span>
@@ -111,56 +197,6 @@ export default function HomeBreak({
         )}
       </div>
 
-      {/* No justify-center — this card is naturally shorter than the
-          Zmanim one, and centering its content made "Kept current by
-          people like you" start lower than "Zmanim & Shabbos", so the two
-          headings didn't line up. Top-aligned, like the other card, so
-          they do regardless of which one ends up taller.
-          Roomier than the Zmanim card's own rhythm on purpose — that one's
-          height comes from real data rows; this one has to earn its height
-          from spacing instead, the same way centercityeruv.com's own
-          "Get Eruv Updates" card reads as substantial through generous
-          padding and line-height rather than more text. Larger body copy,
-          more room between the eyebrow/heading/body/buttons, and taller
-          buttons — not more content, just more breathing room around the
-          same content, so the card fills its box instead of floating a
-          short block inside a tall one. */}
-      <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept current by people like you</h3>
-        <p className="mb-6 text-sm leading-relaxed text-muted">
-          A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
-          from the community that actually uses this guide.
-        </p>
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            onClick={() => setContributeAction('create')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
-          >
-            <PlusIcon className="h-3.5 w-3.5" /> Add
-          </button>
-          <button
-            onClick={() => setContributeAction('edit')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
-          >
-            <PencilIcon className="h-3.5 w-3.5" /> Edit
-          </button>
-          <button
-            onClick={() => setContributeAction('report')}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-5 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50"
-          >
-            <FlagIcon className="h-3.5 w-3.5" /> Report
-          </button>
-        </div>
-        {settings.feedbackEnabled && (
-          <p className="mt-6 text-xs text-muted">
-            Notice something else, or have general feedback about the site?{' '}
-            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-amber-800 hover:underline">
-              Send a note →
-            </button>
-          </p>
-        )}
-      </div>
       {feedbackOpen && (
         <FeedbackForm
           heading={settings.feedbackHeading}

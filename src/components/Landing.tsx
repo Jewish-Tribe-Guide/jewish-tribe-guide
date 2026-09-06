@@ -5,7 +5,6 @@ import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import SearchSection from '@/components/home/SearchSection'
-import SubscribeSection from '@/components/home/SubscribeSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import SectionTabs from '@/components/home/SectionTabs'
@@ -58,11 +57,12 @@ export type LandingProps = {
 //   beside a photo, see HeroHeading) → "Popular right now" if an admin has
 //   re-added it (off by default — see builtInOrder) → a flat "Browse
 //   everything" grid, full weight (every card, always visible, no hover
-//   needed) → HomeBreak, two smaller cards side by side (the full daily
-//   Zmanim, and a "kept by the community" message) between the two main
-//   sections → "Explore the map", matching Browse everything's full weight
-//   → footer. The section tabs' mega-menus are a second way to reach a
-//   category, on top of the flat grid.
+//   needed) → HomeBreak, a 2×2 grid of four smaller cards (Davening Times,
+//   a "kept by the community" message, the Stay in the loop signup, and
+//   Shabbat Times) between the two main sections → "Explore the map",
+//   matching Browse everything's full weight → footer. The section tabs'
+//   mega-menus are a second way to reach a category, on top of the flat
+//   grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -353,8 +353,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 container below — the two are meant to read as equal "main
                 things". HomeBreak, the transition between them, uses the
                 same card language (border, rounded-2xl) as this section —
-                see its own doc on why two smaller cards there still reads as
-                a pair, not a third full-width peer section. */}
+                see its own doc on why a 2×2 grid of smaller cards there
+                still reads as a break, not a third full-width peer section. */}
         <section className="mt-8 hidden desktop:block">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
             <h2 className="mb-6 text-lg font-semibold text-slate-900">Browse everything</h2>
@@ -378,7 +378,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         </section>
 
         {/* ── The desktop gateway's three singleton blocks — featured cards,
-                the embedded map, Zmanim & Shabbos — in the admin-configured
+                the embedded map, HomeBreak — in the admin-configured
                 order (builtInOrder above). Each keeps its own existing gating
                 (hidden while searching, desktop-only, hasMap/zmanimCategory);
                 only the SEQUENCE they render in is now data-driven instead of
@@ -436,36 +436,37 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               </div>
             )
           }
-          // Zmanim & Shabbos — HomeBreak's own full daily zmanim card here
-          // (see its own doc). Falls back to the community
-          // center so it renders something real before the visitor has set
-          // an address. Still a JS branch, unlike the other two, and
-          // deliberately: HomeBreak calls useZmanim, which fetches
-          // /api/zmanim — uncached, straight through to Hebcal. Rendering it
-          // and hiding it with `sm:` would cost every phone visitor a
-          // round-trip for a section they never see. CSS should own a
-          // layout difference; it shouldn't own one that costs a request.
+          // HomeBreak — its Shabbat Times card is what needs `coords`;
+          // falls back to the community center so it renders something real
+          // before the visitor has set an address. Still a JS branch, unlike
+          // the other two, and deliberately: HomeBreak calls useZmanim, which
+          // fetches /api/zmanim — uncached, straight through to Hebcal.
+          // Rendering it and hiding it with `sm:` would cost every phone
+          // visitor a round-trip for a section they never see. CSS should own
+          // a layout difference; it shouldn't own one that costs a request.
           // The one-frame correction is the cheaper error here, and nothing
           // above the fold moves when it happens.
+          //
+          // `visitorCoords` is the real, ungated value — null until the
+          // visitor actually sets an address — passed separately from the
+          // Zmanim-only `coords` above precisely because they need different
+          // "no location" behavior: Shabbat Times always wants a location
+          // (the community center reads fine as "candle lighting for
+          // Philadelphia in general"), but the Davening Times card's
+          // distance-to-a-shul would be actively misleading measured from a
+          // city center the visitor never told the app they were at.
           return (
             !isMobile && zmanimCategory && (
               <HomeBreak
                 key="zmanim"
                 coords={coords ?? community.mapCenter}
+                visitorCoords={coords}
                 locationLabel={zmanimLocationLabel}
               />
             )
           )
         })}
 
-        {/* ── Stay in the loop — desktop only, bottom of the page's own
-                content (after all three of the reorderable blocks above,
-                regardless of their admin-configured order) — see
-                SubscribeSection's own doc. Stays up while searching too,
-                same as the map/Zmanim above it — see that block's own note
-                on why only Browse everything (the one thing search results
-                actually replace) hides. ──────────────────────────────── */}
-        {!isMobile && <SubscribeSection />}
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search
                 narrows each section's cards and hides any section left
