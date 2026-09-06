@@ -144,7 +144,21 @@ jobs:
     name: Admin console write behavior (approve/reject via the real UI)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.62.1-noble
-    needs: unit
+    # needs cache-roundtrip too (not just unit): both suites' auth.setup.ts
+    # mint a session by calling generateLink + verifyOtp against the SAME
+    # resolved admin email (see cacheE2eAdmin.mjs's resolveDefaultCommunityAdminEmail —
+    # they have to share an identity to test per-community authorization for
+    # real). Generating a new magic-link token for a user invalidates
+    # whichever one was already outstanding for them, so when this job ran
+    # in parallel with cache-roundtrip, whichever setup's verifyOtp lost the
+    # race failed with "Could not redeem the magic link: Email link is
+    # invalid or has expired" — reproducible basically every run, not an
+    # occasional flake, since both jobs start at the same instant. Same
+    # underlying class of bug as 03c2e99 (two suites colliding on a shared
+    # row in the same test project), just on an auth token instead of a row;
+    # running this job after cache-roundtrip removes the race the same way
+    # separating the rows did there.
+    needs: [unit, cache-roundtrip]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
