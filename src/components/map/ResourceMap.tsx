@@ -260,6 +260,33 @@ export function markerZIndex(p: MapPoint, isSelected: boolean): number {
   return Math.round(-p.lat * 1e6) + (isSelected ? SELECTED_Z_BOOST : 0)
 }
 
+// A far pick (one worth a real "jump there" zoom, whether that's because it's
+// far from the visitor's own location or because there's no location set at
+// all to judge distance by) gets zoomed to this level before panning.
+const FAR_PICK_ZOOM = 15
+// Below this, a pin selected with no location set can pan by only a few
+// screen pixels — geometrically correct, but at a city-wide zoom that's
+// indistinguishable from nothing happening at all.
+const ZOOMED_OUT_FLOOR = 13
+
+// Decides whether selecting a place should force a specific zoom level
+// before panning to it, or leave whatever zoom the visitor already chose
+// alone. Exported so ResourceMap.test.ts can cover this without a real
+// google.maps.Map instance, which nothing in this codebase mocks.
+//
+//  - A pick far from the visitor's own location always zooms in — there's no
+//    way the current view already shows anything useful about it.
+//  - No location set at all is different: nothing about picking a listing
+//    implies the visitor's chosen zoom is wrong, so this only forces a zoom
+//    when the current one is too far out for the pan to actually read as
+//    "took you there" — a visitor already zoomed in close (browsing a single
+//    neighborhood, say) keeps the zoom they set.
+export function resolveSelectionZoom(hasLocation: boolean, isFar: boolean, currentZoom: number): number | null {
+  if (isFar) return FAR_PICK_ZOOM
+  if (!hasLocation && currentZoom <= ZOOMED_OUT_FLOOR) return FAR_PICK_ZOOM
+  return null
+}
+
 // A category pin — noticeably bigger AND wrapped in a pulsing color halo plus
 // a one-time drop-bounce when it's the place currently shown in the mobile
 // sheet. Scale alone (the old behavior) read as "a little bigger", easy to
@@ -1008,14 +1035,18 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
               // A far pick needs a real zoom-in (it's arriving from whatever
               // the map happened to be showing before, which could be
               // anything) — same single-point convention used elsewhere in
-              // this file. No location set at all is different: nothing about
-              // this selection implies the visitor's chosen zoom is wrong, so
-              // that case leaves it alone rather than forcing one. Set BEFORE
-              // panToVisibleCenter, not after — see the zoom-floor branch
-              // above for why computing the offset at the OLD zoom (instead
-              // of the one it's about to jump to) turns a small padding
-              // correction into a real-world offset of a mile or more.
-              if (isFar) map.setZoom(15)
+              // this file. No location set at all used to leave the zoom
+              // alone unconditionally, on the theory that nothing about this
+              // selection implies the visitor's chosen zoom is wrong — but at
+              // a city-wide zoom, panning a few screen-pixels to center a pin
+              // doesn't read as "took you there" at all (see
+              // resolveSelectionZoom). Set BEFORE panToVisibleCenter, not
+              // after — see the zoom-floor branch above for why computing the
+              // offset at the OLD zoom (instead of the one it's about to jump
+              // to) turns a small padding correction into a real-world
+              // offset of a mile or more.
+              const forcedZoom = resolveSelectionZoom(!!userLocationRef.current, !!isFar, map.getZoom() ?? 0)
+              if (forcedZoom !== null) map.setZoom(forcedZoom)
               // Either no location set, or the pick is far enough that fitting
               // both wouldn't be useful — just center the pin itself, but
               // still account for the sheet and the top overlay: instead of

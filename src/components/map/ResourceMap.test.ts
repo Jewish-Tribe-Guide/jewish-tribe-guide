@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { haversineMiles } from '@/lib/geo'
-import { markerZIndex, pointsWithinZoomRadius, SELECTED_Z_BOOST, type MapPoint } from './ResourceMap'
+import { markerZIndex, pointsWithinZoomRadius, resolveSelectionZoom, SELECTED_Z_BOOST, type MapPoint } from './ResourceMap'
 
 function point(overrides: Partial<MapPoint> = {}): MapPoint {
   return { id: 'p1', lat: 40, lng: -75, name: 'Test Place', color: '#000', ...overrides }
@@ -84,5 +84,30 @@ describe('markerZIndex', () => {
   it('applies exactly SELECTED_Z_BOOST on top of the unselected value for the same point', () => {
     const p = point({ lat: 40 })
     expect(markerZIndex(p, true) - markerZIndex(p, false)).toBe(SELECTED_Z_BOOST)
+  })
+})
+
+// Picking a listing from the sidebar/sheet list is supposed to visibly "take
+// you there" on the map. With a location set and the pick far away, that
+// already forced a zoom-in — but with NO location set at all, the old code
+// left the zoom untouched unconditionally, so at a city-wide zoom the pan to
+// center the pin was only a few screen-pixels: geometrically correct, but
+// indistinguishable from nothing happening. Spotted comparing this branch
+// against prod, where the same gap exists.
+describe('resolveSelectionZoom', () => {
+  it('always zooms in for a pick far from the visitor\'s own location', () => {
+    expect(resolveSelectionZoom(true, true, 18)).toBe(15)
+  })
+
+  it('zooms in when there is no location set and the current zoom is too far out to show a real pan', () => {
+    expect(resolveSelectionZoom(false, false, 11)).toBe(15)
+  })
+
+  it('leaves the zoom alone with no location set if already zoomed in close enough to see the pan', () => {
+    expect(resolveSelectionZoom(false, false, 16)).toBeNull()
+  })
+
+  it('leaves the zoom alone for a nearby pick with a location set', () => {
+    expect(resolveSelectionZoom(true, false, 11)).toBeNull()
   })
 })
