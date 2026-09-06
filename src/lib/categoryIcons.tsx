@@ -139,7 +139,6 @@ export function CategoryGlyph({ categoryId, icon, className }: Props) {
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
-      // eslint-disable-next-line react/no-danger -- static, developer-authored markup, not user input
       dangerouslySetInnerHTML={{ __html: markup }}
     />
   )

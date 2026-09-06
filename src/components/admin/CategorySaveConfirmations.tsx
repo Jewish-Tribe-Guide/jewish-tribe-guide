@@ -150,7 +150,7 @@ export function IdRenameConfirm({
 }) {
   return (
     <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 space-y-3">
-      <p className="text-sm font-medium text-sky-900">Rename this category's URL?</p>
+      <p className="text-sm font-medium text-sky-900">Rename this category&apos;s URL?</p>
       <p className="text-sm text-sky-800">
         <code className="rounded bg-sky-100 px-1 py-0.5">/{rename.oldId}</code>
         {' → '}
