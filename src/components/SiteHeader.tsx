@@ -143,7 +143,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
     <header
       className={className}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         {/* On mobile the logo only hides while no location is set — that's when
             the wide "Set location" pill competes with the name for the row,
             and dropping the mark frees the ~46px needed to keep the text
@@ -238,7 +238,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
               <Link
                 href={routes.home(community.slug)}
                 onClick={goHomeClick}
-                className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer group text-left"
+                className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
               >
                 {mark}
                 {title}
@@ -251,7 +251,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // Split into two controls rather than one because a button can't
           // nest inside a button.
           return (
-            <div className="flex min-w-0 flex-1 items-center gap-2.5 group">
+            <div className="flex min-w-0 shrink items-center gap-2.5 group">
               <Link href={routes.home(community.slug)} onClick={goHomeClick} aria-label="Home" className="contents cursor-pointer">
                 {mark}
               </Link>
