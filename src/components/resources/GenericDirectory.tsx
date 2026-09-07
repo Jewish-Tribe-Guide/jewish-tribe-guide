@@ -43,14 +43,17 @@ type Props = {
    *  has to find the same button on again. No-op for a category with no
    *  minyanim field to show a modal for. */
   openDaveningModal?: boolean
-  /** Mount the modal already filtered to this one day — DaveningTimesCard
+  /** Mount the modal already filtered to this day (or days) — DaveningTimesCard
    *  sets it to tomorrow's key when ITS OWN result is tomorrow's earliest
    *  minyan (result.isTomorrow), so a visitor who followed a "tomorrow"
    *  time here doesn't land on the modal's own "Today" default, which would
-   *  show nothing left for today and no visible reason why. Only ever
-   *  applied on arrival (see the `key` this feeds in FindResources.tsx) —
-   *  the modal's own day filter otherwise persists across opens by design
-   *  (see DaveningTimesModal's own doc), which this doesn't touch for the
+   *  show nothing left for today and no visible reason why. Comma-separated
+   *  when tomorrow is also a secular holiday (DaveningTimesCard appends
+   *  `,holiday`), so a shul's holiday-specific minyan isn't invisible on a
+   *  view that's otherwise correctly showing tomorrow. Only ever applied on
+   *  arrival (see the `key` this feeds in FindResources.tsx) — the modal's
+   *  own day filter otherwise persists across opens by design (see
+   *  DaveningTimesModal's own doc), which this doesn't touch for the
    *  ordinary in-page "All davening times" button. */
   initialDaveningDay?: string
   onUp: () => void
@@ -956,15 +959,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           isOpen={daveningModalOpen}
           onClose={() => setDaveningModalOpen(false)}
           initialDenomination={selectFilters['denomination']?.[0] ?? ''}
-          // Validated against the real day-key set, not a bare cast — this
+          // Comma-separated (see this prop's own doc), each piece validated
+          // against the real day-key set rather than a bare cast — this
           // came in through a URL query param, so it's untrusted input, and
-          // a garbage value should mean "no filter" rather than being
-          // handed to the modal as if it were a real MinyanDayKey.
-          initialDayFilter={
-            initialDaveningDay && (ALL_MINYAN_DAYS as string[]).includes(initialDaveningDay)
-              ? [initialDaveningDay as MinyanDayKey]
-              : undefined
-          }
+          // a garbage piece should just drop out rather than being handed
+          // to the modal as if it were a real MinyanDayKey. undefined (not
+          // an empty array) when nothing valid survives, so the modal falls
+          // back to its own "Today" default instead of an empty filter.
+          initialDayFilter={(() => {
+            const days = (initialDaveningDay ?? '')
+              .split(',')
+              .filter((d): d is MinyanDayKey => (ALL_MINYAN_DAYS as string[]).includes(d))
+            return days.length > 0 ? days : undefined
+          })()}
         />
       )}
     </div>

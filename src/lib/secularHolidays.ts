@@ -65,3 +65,31 @@ export function secularHoliday(date: Date): string | null {
   }
   return null
 }
+
+/** The holiday falling on the calendar day after `now`, in `timezone` — NOT
+ *  the caller's own device timezone (see dayAndMinutesInTimezone's own doc
+ *  for why that distinction matters here specifically). Scoped to exactly
+ *  this one case: DaveningTimesCard already knows "tomorrow" because it
+ *  shows tomorrow's earliest minyan when today's have all passed, and
+ *  linking from there straight into the modal's own "Today" filter would
+ *  silently drop a shul's holiday-specific minyan if tomorrow happens to be
+ *  one. This is not a general "any future day" capability — Rosh Chodesh's
+ *  answer comes from Hebcal, which this app only ever queries for today, so
+ *  a real "what does the calendar say about day N" would need that API
+ *  call extended first. Secular holidays need no such thing: every one is a
+ *  fixed date or an nth-weekday rule, computable for any date with nothing
+ *  to fetch. */
+export function secularHolidayTomorrow(now: number, timezone: string): string | null {
+  const tomorrow = new Date(now + 24 * 60 * 60 * 1000)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(tomorrow)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  // Constructed from explicit Y/M/D, not parsed from an ISO string — this
+  // makes `secularHoliday`'s own local getFullYear/getMonth/getDate reads
+  // return exactly these values regardless of the machine's own timezone.
+  return secularHoliday(new Date(get('year'), get('month') - 1, get('day')))
+}

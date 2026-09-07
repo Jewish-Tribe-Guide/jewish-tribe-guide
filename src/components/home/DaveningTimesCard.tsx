@@ -9,6 +9,7 @@ import { currentSeason } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
+import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import { distanceMiles, type LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
@@ -112,7 +113,15 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   // modal defaulting to its own "Today" filter would land the visitor on a
   // day with nothing left to see and no visible reason why — see
   // GenericDirectory's own `initialDaveningDay` doc.
-  const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowKey}` : ''}`
+  //
+  // Comma-separated, not just the weekday: if tomorrow is also a secular
+  // holiday, a shul's holiday-specific minyan (days: ['holiday']) needs
+  // that pseudo-day in the filter too, or it's invisible on a view that's
+  // otherwise correctly showing tomorrow. Rosh Chodesh isn't included here
+  // for the same reason — see secularHolidayTomorrow's own doc.
+  const tomorrowHoliday = result?.isTomorrow ? secularHolidayTomorrow(now, community.timezone) : null
+  const tomorrowDayParam = [tomorrowKey, ...(tomorrowHoliday ? ['holiday'] : [])].join(',')
+  const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">

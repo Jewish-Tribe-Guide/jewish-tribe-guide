@@ -49,9 +49,12 @@ vi.mock('./GenericListingCard', () => ({
 }))
 
 // DaveningTimesModal pulls in its own heavy davening-time rendering — out of
-// scope here, GenericDirectory only cares whether it opens, not what's in it.
+// scope here, GenericDirectory only cares whether it opens (and, for the
+// initialDayFilter parsing tests below, what it's told to open TO), not what's
+// in it.
 vi.mock('@/components/synagogues/DaveningTimesModal', () => ({
-  default: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div>davening modal open</div> : null),
+  default: ({ isOpen, initialDayFilter }: { isOpen: boolean; initialDayFilter?: string[] }) =>
+    isOpen ? <div>davening modal open{initialDayFilter ? `: ${initialDayFilter.join(',')}` : ''}</div> : null,
 }))
 
 afterEach(() => cleanup())
@@ -256,6 +259,50 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} />)
 
     expect(screen.queryByText('davening modal open')).not.toBeInTheDocument()
+  })
+
+  // Comma-separated: DaveningTimesCard appends `,holiday` to the day it
+  // links to when tomorrow is also a secular holiday, so a shul's
+  // holiday-specific minyan isn't invisible on a view that's otherwise
+  // correctly showing tomorrow. Each piece is validated independently
+  // against the real day-key set — this arrives through a URL query param.
+  it('splits initialDaveningDay on commas into the modal\'s day filter', () => {
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(
+      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="tue,holiday" {...handlers} />,
+    )
+
+    expect(screen.getByText('davening modal open: tue,holiday')).toBeInTheDocument()
+  })
+
+  it('drops an invalid piece rather than passing it through as if it were real', () => {
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(
+      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="tue,nonsense" {...handlers} />,
+    )
+
+    expect(screen.getByText('davening modal open: tue')).toBeInTheDocument()
+  })
+
+  it('falls back to no filter (undefined, not an empty array) when nothing valid survives', () => {
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(
+      <GenericDirectory category={category} items={[item]} openDaveningModal initialDaveningDay="nonsense" {...handlers} />,
+    )
+
+    expect(screen.getByText('davening modal open')).toBeInTheDocument()
   })
 
   it('shows a Map link with the current search baked into its href when a Map pseudo-category exists', async () => {
