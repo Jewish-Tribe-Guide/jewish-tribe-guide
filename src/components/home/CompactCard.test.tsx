@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { CompactCardGrid, cardCount } from './sections'
 import type { CardDef } from './sections'
 import type { CategoryConfig } from '@/lib/categories'
@@ -104,31 +103,28 @@ describe('CompactCard — the browse index row', () => {
   })
 })
 
-describe('CompactCardGrid — collapses a long list behind "Show more"', () => {
+// CompactCardGrid collapses past ROWS_WHEN_COLLAPSED rows by measuring each
+// card's real rendered row position (same technique GenericDirectory's own
+// alignRows uses) and clipping the grid's height, rather than slicing which
+// cards render — a fixed item count would be wrong on its own terms here,
+// since this grid runs 2/3/4 columns depending on viewport width. jsdom
+// doesn't compute real layout (getBoundingClientRect is always zero), so
+// there's no row for it to measure and the collapse never engages — the
+// same reason alignRows itself has no unit test. What IS testable here,
+// and worth pinning down: every card stays mounted regardless of expanded
+// state, since the collapse is a CSS clip, not conditional rendering — a
+// future change back to slicing would silently drop this. The actual
+// collapse-at-N-rows behavior is covered by an e2e test instead (see
+// e2e/home.spec.ts), where a real browser lays the grid out for real.
+describe('CompactCardGrid — the collapse clips height, it does not unmount cards', () => {
   const manyCards = (n: number): CardDef[] =>
     Array.from({ length: n }, (_, i) => card({ title: `Category ${i}`, id: `cat-${i}` }))
 
-  it('shows everything, with no button, when the list is short', () => {
-    render(<CompactCardGrid cards={manyCards(16)} categories={[category()]} />)
+  it('keeps every card in the DOM even when there are many more than fit collapsed', () => {
+    render(<CompactCardGrid cards={manyCards(40)} categories={[category()]} />)
 
-    expect(screen.getByText('Category 15')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Show/ })).not.toBeInTheDocument()
-  })
-
-  it('collapses past the threshold, and "Show more" reveals the rest', async () => {
-    const user = userEvent.setup()
-    render(<CompactCardGrid cards={manyCards(20)} categories={[category()]} />)
-
-    expect(screen.getByText('Category 15')).toBeInTheDocument()
-    expect(screen.queryByText('Category 16')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Show 4 more' }))
-
-    expect(screen.getByText('Category 19')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Show less' }))
-
-    expect(screen.queryByText('Category 16')).not.toBeInTheDocument()
+    expect(screen.getByText('Category 0')).toBeInTheDocument()
+    expect(screen.getByText('Category 39')).toBeInTheDocument()
   })
 })
 

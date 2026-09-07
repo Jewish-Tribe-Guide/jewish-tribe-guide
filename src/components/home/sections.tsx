@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
@@ -270,12 +270,8 @@ function CompactCard({
  *  glyph otherwise. CardGrid's rich full-tile photo treatment is still
  *  exactly right for a SMALL curated set ("Popular right now") where a
  *  handful of considered photos are the point, not a liability. */
-// Collapsed height, in items — four rows at the grid's own widest column
-// count (lg:grid-cols-4). The grid drops to 3 or 2 columns at narrower
-// widths, so this reads as "roughly four rows" rather than exactly four
-// there; that's fine, it's a growing community's full category list this
-// is holding back, not a layout that has to land on a precise line.
-const COLLAPSED_CARD_COUNT = 16
+// How many rows to show before collapsing.
+const ROWS_WHEN_COLLAPSED = 4
 
 export function CompactCardGrid({
   cards,
@@ -289,19 +285,68 @@ export function CompactCardGrid({
 }) {
   // Collapsed by default — a community with a dozen-plus categories turned
   // this from "an index" into a wall of rows below the fold before a
-  // visitor got to the map or anything else on the page. `isCollapsible`
-  // gates both the slice and the button, so a shorter card list later
-  // (e.g. a category count dropping below the threshold) shows everything
-  // regardless of stale `expanded` state, rather than hiding rows with no
-  // button left to reveal them.
+  // visitor got to the map or anything else on the page.
   const [expanded, setExpanded] = useState(false)
-  const isCollapsible = cards.length > COLLAPSED_CARD_COUNT
-  const visibleCards = isCollapsible && !expanded ? cards.slice(0, COLLAPSED_CARD_COUNT) : cards
+  const gridRef = useRef<HTMLDivElement>(null)
+  // Pixel height that clips the grid to exactly ROWS_WHEN_COLLAPSED rows, or
+  // null when there's nothing to collapse (four rows or fewer already, or
+  // not yet measured). A fixed ITEM count here would be wrong on its own
+  // terms — this grid runs 2/3/4 columns depending on viewport width (see
+  // its own className below), so "16 items" is four rows at the widest
+  // column count and well over four at the narrowest. Measuring the real
+  // rendered row positions instead — same technique GenericDirectory's own
+  // alignRows already uses for "how many cards share a row" — gets the
+  // right cutoff at any width instead of guessing one.
+  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    function measure() {
+      const grid = gridRef.current
+      if (!grid) return
+      const children = Array.from(grid.children) as HTMLElement[]
+      if (children.length === 0) {
+        setCollapsedHeight(null)
+        return
+      }
+      const gridTop = grid.getBoundingClientRect().top
+      const rowTops: number[] = []
+      for (const child of children) {
+        const top = Math.round(child.getBoundingClientRect().top)
+        if (!rowTops.includes(top)) rowTops.push(top)
+      }
+      if (rowTops.length <= ROWS_WHEN_COLLAPSED) {
+        setCollapsedHeight(null)
+        return
+      }
+      // Bottom of the last child whose row is among the first
+      // ROWS_WHEN_COLLAPSED — everything after that gets clipped.
+      const lastVisibleRowTop = rowTops[ROWS_WHEN_COLLAPSED - 1]
+      let bottom = 0
+      for (const child of children) {
+        if (Math.round(child.getBoundingClientRect().top) <= lastVisibleRowTop) {
+          bottom = Math.max(bottom, child.getBoundingClientRect().bottom)
+        }
+      }
+      setCollapsedHeight(bottom - gridTop)
+    }
+    measure()
+    // Column count depends on the grid's actual pixel width, which only a
+    // real resize can change — same reasoning as GenericDirectory's own
+    // alignRows re-pass.
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [cards.length])
+
+  const isCollapsible = collapsedHeight != null
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {visibleCards.map((card) => (
+      <div
+        ref={gridRef}
+        className="grid grid-cols-2 gap-2 overflow-hidden sm:grid-cols-3 lg:grid-cols-4"
+        style={!expanded && collapsedHeight != null ? { maxHeight: collapsedHeight } : undefined}
+      >
+        {cards.map((card) => (
           <CompactCard
             key={card.id ?? card.title}
             card={card}
@@ -316,7 +361,7 @@ export function CompactCardGrid({
           onClick={() => setExpanded((e) => !e)}
           className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-xl py-2.5 text-sm font-medium text-primary transition-colors hover:bg-slate-50"
         >
-          {expanded ? 'Show less' : `Show ${cards.length - COLLAPSED_CARD_COUNT} more`}
+          {expanded ? 'Show less' : 'Show more'}
           <span aria-hidden="true" className="text-[10px]">
             {expanded ? '▴' : '▾'}
           </span>
