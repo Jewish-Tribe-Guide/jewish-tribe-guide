@@ -89,6 +89,26 @@ describe('HeaderNav — Categories', () => {
     renderWithProviders(<HeaderNav />, { content: { categories: [], homeSections: [] } })
     expect(screen.queryByRole('button', { name: /Categories/ })).not.toBeInTheDocument()
   })
+
+  // Was centered under the trigger (left-1/2 -translate-x-1/2) — the
+  // Categories button sits close to the page's own left edge (right after
+  // the logo/title), so centering a wide panel under it pushed most of it
+  // off the left side of the viewport. Anchored to the trigger's left edge
+  // instead. jsdom doesn't compute real layout, so this asserts on the
+  // classes that control the fix rather than on a rendered position.
+  it('anchors the panel to the trigger\'s left edge, not centered under it', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], homeSections: [foodSection] },
+    })
+
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+
+    const panel = screen.getByText('Grocery Stores').closest('.absolute')
+    expect(panel).toHaveClass('left-0')
+    expect(panel).not.toHaveClass('left-1/2')
+    expect(panel).not.toHaveClass('-translate-x-1/2')
+  })
 })
 
 describe('HeaderNav — Map', () => {
@@ -107,7 +127,7 @@ describe('HeaderNav — More', () => {
   it('offers About and Privacy as real links, and opens feedback as an in-place modal', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {
-      content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true, feedbackButtonLabel: 'Send feedback' } },
+      content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true } },
     })
 
     await user.click(screen.getByRole('button', { name: /More/ }))
@@ -118,8 +138,12 @@ describe('HeaderNav — More', () => {
     // Opens the same in-place FeedbackForm modal the footer's own
     // FeedbackButton does — not a page navigation, so this component (and
     // everything else on the page) stays mounted underneath it.
+    //
+    // This menu item is a fixed "Feedback", not settings.feedbackButtonLabel
+    // — that's a full sentence meant for SiteFooter's wider button, not this
+    // compact dropdown (see HeaderNav's own comment on it).
     expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    await user.click(screen.getByRole('button', { name: 'Feedback' }))
     expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
   })
 
@@ -130,7 +154,7 @@ describe('HeaderNav — More', () => {
     })
 
     await user.click(screen.getByRole('button', { name: /More/ }))
-    expect(screen.queryByRole('button', { name: SITE_SETTINGS_DEFAULTS.feedbackButtonLabel })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Feedback' })).not.toBeInTheDocument()
     // About/Privacy are unaffected by that flag.
     expect(screen.getByRole('link', { name: 'About' })).toBeInTheDocument()
   })

@@ -130,7 +130,12 @@ export default function HeaderNav() {
           {open === 'categories' && (
             <div
               onMouseEnter={cancelClose}
-              className="absolute left-1/2 top-full z-30 mt-3 w-[min(90vw,900px)] max-h-[70vh] -translate-x-1/2 overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+              // Anchored to the trigger's left edge, not centered under it —
+              // this button sits close to the page's own left edge (right
+              // after the logo/title), so centering a 900px-wide panel under
+              // it pushed most of that width off the left side of the
+              // viewport instead.
+              className="absolute left-0 top-full z-30 mt-3 w-[min(90vw,900px)] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
             >
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
                 {sections.map((section) => (
@@ -203,7 +208,12 @@ export default function HeaderNav() {
                 }}
                 className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
               >
-                {settings.feedbackButtonLabel}
+                {/* This menu is compact by design, unlike SiteFooter's own
+                    feedback button — settings.feedbackButtonLabel is a full
+                    sentence meant for that wider space, so this one stays a
+                    fixed short word rather than adopting the admin-configured
+                    label. */}
+                Feedback
               </button>
             )}
             <Link href="/privacy" onClick={() => setOpen(null)} className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50">

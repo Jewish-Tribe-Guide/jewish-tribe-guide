@@ -143,7 +143,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
     <header
       className={className}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-10">
         {/* On mobile the logo only hides while no location is set — that's when
             the wide "Set location" pill competes with the name for the row,
             and dropping the mark frees the ~46px needed to keep the text
@@ -209,7 +209,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // anywhere on the live site. Worth knowing before spending more
           // time writing good taglines into a field nothing shows.
           const title = (
-            <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+            <span className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               {settings.name}
             </span>
           )
