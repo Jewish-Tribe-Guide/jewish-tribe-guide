@@ -112,6 +112,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
     return counts
   }, [listings])
 
+  // The map card's own "N places across M categories" line — a real fact
+  // standing in for a header that otherwise has nothing to say beside the
+  // literal word "Map". Only `kind === 'listing'` categories count toward
+  // either number: Map, Zmanim, and Eruv are pseudo-categories with no
+  // listings of their own to add up.
+  const listingCategories = categories?.filter((c) => c.kind === 'listing') ?? []
+  const totalListings = listingCounts
+    ? listingCategories.reduce((sum, c) => sum + (listingCounts[c.id] ?? 0), 0)
+    : null
+
   const resources = resourceCards(onNavigate, categories, communitySlug, listingCounts)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
   // into the admin-configured labeled groups for the grid.
@@ -411,7 +421,25 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             return hasMap && (
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
                 <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
-                  <h2 className="px-5 pt-5 pb-4 text-lg font-semibold text-slate-900">{title}</h2>
+                  <div className="px-5 pt-5 pb-4">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Discover nearby</p>
+                    {/* Same eyebrow/heading rhythm as HomeBreak's "Today"/
+                        "Community run" cards — this card otherwise has
+                        nothing to say beside the literal word "Map". The
+                        count fades in once listings have loaded rather than
+                        reserving space for it; a header that's briefly one
+                        line shorter reads fine, a wrong number wouldn't. */}
+                    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+                      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+                      {totalListings != null && (
+                        <p className="text-sm text-slate-500">
+                          <span className="font-semibold text-slate-700">{totalListings.toLocaleString()}</span>{' '}
+                          place{totalListings === 1 ? '' : 's'} across {listingCategories.length}{' '}
+                          categor{listingCategories.length === 1 ? 'y' : 'ies'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                   {mapInView ? (
                     <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
                   ) : (

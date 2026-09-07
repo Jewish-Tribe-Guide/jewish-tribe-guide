@@ -5,9 +5,11 @@ import { act, cleanup, screen, within, type RenderResult } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { makeCategory } from '@/test/providerFixtures'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
+import { ListingsProvider } from '@/lib/listingsContext'
+import type { DirectoryResource } from '@/types'
 import { resetMockIntersectionObserver, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import { mockRouter } from '@/test/nextNavigationMock'
 import Landing from './Landing'
@@ -72,10 +74,16 @@ const handlers = {
 function renderLanding(
   props: Partial<ComponentProps<typeof Landing>> = {},
   options?: Parameters<typeof renderWithProviders>[1],
+  // Defaults to null (the same as no provider at all — see useAllListings'
+  // own doc) so every existing call site is unaffected; only the map card's
+  // "N places across M categories" line needs real listings supplied.
+  listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
     <LocationProvider>
-      <Landing {...handlers} {...props} />
+      <ListingsProvider listings={listings}>
+        <Landing {...handlers} {...props} />
+      </ListingsProvider>
     </LocationProvider>,
     options,
   )
@@ -148,6 +156,46 @@ describe('Landing', () => {
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
     act(() => triggerAllIntersections())
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+  })
+
+  describe('the map card\'s "N places across M categories" line', () => {
+    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', kind: 'listing', pluralLabel: 'Synagogues' })
+
+    it('counts real listings across listing-kind categories only, once they’ve loaded', () => {
+      const listings = [
+        makeListing({ id: 'l1', category: 'grocery' }),
+        makeListing({ id: 'l2', category: 'grocery' }),
+        makeListing({ id: 'l3', category: 'synagogue' }),
+        // A stray row filed under the Map pseudo-category itself — shouldn't
+        // happen in real data, but proves the count is driven by the
+        // category's own `kind`, not just whatever `listings` happens to hold.
+        makeListing({ id: 'l4', category: 'map' }),
+      ]
+      renderLanding(undefined, { content: { categories: [withMap, grocery, synagogue] } }, listings)
+
+      expect(
+        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '3 places across 2 categories'),
+      ).toBeInTheDocument()
+    })
+
+    it('pluralizes down to one place, one category', () => {
+      renderLanding(
+        undefined,
+        { content: { categories: [withMap, grocery] } },
+        [makeListing({ id: 'l1', category: 'grocery' })],
+      )
+
+      expect(
+        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '1 place across 1 category'),
+      ).toBeInTheDocument()
+    })
+
+    it('shows nothing yet while listings haven’t loaded, rather than claiming zero', () => {
+      renderLanding(undefined, { content: { categories: [withMap, grocery] } })
+      expect(screen.queryByText(/places across/)).not.toBeInTheDocument()
+    })
   })
 
   it('renders the zmanim break only when the community has a zmanim pseudo-category', () => {
