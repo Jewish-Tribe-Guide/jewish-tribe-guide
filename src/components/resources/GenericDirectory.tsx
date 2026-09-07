@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { DirectoryResource, MapFilters } from '@/types'
+import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
@@ -18,11 +18,7 @@ import { listingSearchText } from '@/lib/searchListing'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
-import { useCategories } from '@/lib/useCategories'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { useCommunitySlug } from '@/lib/communityContext'
-import { routes, mapQueryString } from '@/lib/routes'
-import Link from 'next/link'
 
 type Props = {
   category: CategoryConfig
@@ -66,15 +62,11 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen pre-filtered to this category. Carries the active
-   *  search query and field filters so the map opens showing the same results. */
-  onViewMap?: (query?: string, filters?: MapFilters) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
-  const communitySlug = useCommunitySlug()
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport }: Props) {
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -119,8 +111,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // again with the real value.
   const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
   const isMobile = useIsMobile()
-  const categories = useCategories()
-  const hasMapCategory = !!categories?.some((c) => c.kind === 'map')
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
@@ -495,12 +485,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the "Filters" toggle button itself so it doesn't show (opening onto an
   // empty panel) for a category with upvotes/minyanim but no filterable field.
   const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  // Whether the Map button has anywhere to render — moved into this row from
-  // the header (see its own comment further down), so a category with none
-  // of the other three things in this row (no filters, no upvotes, no
-  // minyanim) still needs the row to exist just to hold Map.
-  const hasMapButton = !!(onViewMap && hasMapCategory && category.hasAddress !== false && caps.map)
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || hasMapButton
+  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim
 
   const hasActiveFilters =
     search.trim() !== '' ||
@@ -518,29 +503,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setSelectFilters({})
     setOpenNow(false)
   }
-
-  // The active field filters in the shape the map consumes (see MapFilters).
-  const mapFilters = (): MapFilters => ({
-    openNow: openNow || undefined,
-    bool: Object.keys(boolFilters).filter((k) => boolFilters[k]),
-    select: Object.fromEntries(Object.entries(selectFilters).filter(([, v]) => v.length > 0)),
-  })
-
-  // The exact URL onViewMap navigates to under the hood — computed here too
-  // so the Map button below can be a real <Link>, not just a click handler.
-  // Only a real anchor gets cmd/ctrl/middle-click "open in new tab" from the
-  // browser; a click handler alone never does, regardless of what it
-  // navigates to. onViewMap itself is left in place for now (still called by
-  // the mobile map screen's own back button elsewhere), just not read here
-  // anymore.
-  const filters = mapFilters()
-  const mapHref = `${routes.map(communitySlug)}${mapQueryString({
-    categories: [category.id],
-    query: search.trim() || undefined,
-    openNow: filters.openNow,
-    bool: filters.bool,
-    select: filters.select,
-  })}`
 
   return (
     <div>
@@ -632,17 +594,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   )}
                 </button>
               )}
-              {/* A real <Link>, not a <button onClick>, is what makes cmd/
-                  ctrl/middle-click "open in new tab" work — see mapHref's
-                  own comment. */}
-              {onViewMap && hasMapButton && (
-                <Link
-                  href={mapHref}
-                  className="inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  🗺️ Map
-                </Link>
-              )}
+              {/* No mobile Map button here (desktop keeps its own, further
+                  down) — mobile already has a persistent, always-visible way
+                  to reach the map via the bottom tab bar, so this was a
+                  second copy of the same destination. Removed rather than
+                  made "smarter" (e.g. carrying the category along
+                  automatically): a global nav element quietly behaving
+                  differently depending on where you tapped it from breaks
+                  the one thing it's supposed to guarantee — that it always
+                  means the same thing. */}
               {category.externalLink && (
                 <a
                   href={category.externalLink.url}
@@ -769,22 +729,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   />
                 )
               })}
-              {/* Desktop only — this used to live in the header instead (top-right,
-                  beside Add), which put it above the sticky toolbar rather than in
-                  it: scroll a few rows down and it was gone until you scrolled back
-                  up, the same problem the sticky toolbar exists to solve for search/
-                  filters/sort. Mobile already had this right — its Map button has
-                  always lived in this same row (see the row above, mobile-only).
-                  A real <Link>, not a <button onClick> — see the mobile Map
-                  button's own comment on why, and mapHref's for the exact URL. */}
-              {onViewMap && hasMapButton && (
-                <Link
-                  href={mapHref}
-                  className="hidden desktop:inline-flex shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  🗺️ Map
-                </Link>
-              )}
+              {/* No desktop Map button either now — same reasoning as
+                  mobile's removal above: the header's own "Map" nav link
+                  (HeaderNav.tsx) is already a persistent, always-visible way
+                  to reach the map from any screen. One generic Map entry
+                  point per platform (the header link on desktop, the bottom
+                  tab on mobile), not a second copy scoped to whichever
+                  category you happen to be on. */}
               {category.externalLink && (
                 <a
                   href={category.externalLink.url}

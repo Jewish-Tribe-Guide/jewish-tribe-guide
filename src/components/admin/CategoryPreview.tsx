@@ -169,7 +169,6 @@ export default function CategoryPreview({
         onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
         onReport={(listing) => setAction({ mode: 'report', listing })}
-        onViewMap={(query, filters) => setAction({ mode: 'map', query, filters })}
       />
     )
   }

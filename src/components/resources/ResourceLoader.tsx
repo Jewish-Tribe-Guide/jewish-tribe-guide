@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
+import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { withMilesFromAddress } from '@/lib/listingTravel'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -36,14 +36,11 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen, carrying the directory's active search + field
-   *  filters so the map opens showing the same results. */
-  onViewMap?: (query?: string, filters?: MapFilters) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -103,6 +100,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} />
   )
 }

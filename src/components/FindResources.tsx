@@ -295,7 +295,6 @@ export default function FindResources({
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}
-          onViewMap={onViewMap ? (query, filters) => onViewMap(category.id, query, filters) : undefined}
         />
       </>
     )

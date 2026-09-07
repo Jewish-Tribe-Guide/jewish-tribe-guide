@@ -305,23 +305,19 @@ describe('GenericDirectory', () => {
     expect(screen.getByText('davening modal open')).toBeInTheDocument()
   })
 
-  it('shows a Map link with the current search baked into its href when a Map pseudo-category exists', async () => {
-    const user = userEvent.setup()
+  it('never shows its own Map link, even when a Map pseudo-category exists', () => {
+    // GenericDirectory used to render a "🗺️ Map" link (pre-filtered to this
+    // category) on both mobile and desktop. Removed on both: each platform
+    // already has exactly one persistent, always-visible way to reach the
+    // map — the header nav link on desktop, the bottom tab bar on mobile —
+    // so a second, category-scoped copy was redundant rather than useful.
+    // This guards against either one quietly coming back.
     const category = makeCategory({ hasAddress: true })
-    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onViewMap={vi.fn()} />, {
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />, {
       content: { categories: [category, makeCategory({ id: 'map', kind: 'map' })] },
     })
 
-    await user.type(screen.getByPlaceholderText('Search…'), 'mart')
-
-    // A real <Link>, not a <button onClick> — see GenericDirectory's own
-    // comment on mapHref: only a real href gets cmd/ctrl/middle-click "open
-    // in new tab" from the browser. Asserting on the href itself, not a
-    // callback, since clicking it no longer calls onViewMap at all —
-    // navigation happens natively through the link.
-    const href = screen.getAllByRole('link', { name: /Map/ })[0].getAttribute('href')
-    expect(href).toContain(`cat=${category.id}`)
-    expect(href).toContain('q=mart')
+    expect(screen.queryByRole('link', { name: /Map/ })).not.toBeInTheDocument()
   })
 })
 
