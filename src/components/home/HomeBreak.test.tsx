@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -89,6 +89,27 @@ describe('HomeBreak', () => {
       await user.click(screen.getByRole('button', { name: new RegExp(`^${buttonName}$`) }))
 
       expect(screen.getByRole('dialog', { name: pickerTitle })).toBeInTheDocument()
+    })
+
+    // Was a viewport breakpoint (`min-[900px]`) — checked the wrong box,
+    // since this card's own width is fixed by the 2-up grid it sits in and
+    // can be far narrower than the viewport at plenty of real window sizes.
+    // A container query measures the card itself instead. jsdom doesn't
+    // compute real layout/container queries, so this asserts on the
+    // mechanism (both labels present, gated by a `@container` ancestor and
+    // `@min-[…]` classes) rather than a resolved visibility — see
+    // e2e/home.spec.ts for the real swap against a real browser.
+    it('carries both the short and long label, gated by a container query rather than a viewport one', () => {
+      renderWithProviders(<HomeBreak coords={null} />, { content: { categories: [grocery] } })
+
+      const addButton = screen.getByRole('button', { name: 'Add' })
+      expect(addButton).toHaveTextContent('Add a place')
+      const longSpan = within(addButton).getByText('Add a place')
+      const shortSpan = within(addButton).getByText('Add', { selector: 'span' })
+      expect(longSpan).toHaveClass('hidden')
+      expect(longSpan.className).toMatch(/@min-\[\d+px\]:inline/)
+      expect(shortSpan.className).toMatch(/@min-\[\d+px\]:hidden/)
+      expect(addButton.closest('.\\@container')).not.toBeNull()
     })
   })
 

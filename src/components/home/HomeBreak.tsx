@@ -10,17 +10,14 @@ import { PencilIcon, FlagIcon, PlusIcon } from '@/components/icons'
 
 type ContributeAction = 'create' | 'edit' | 'report'
 
-// The full phrase, always — this used to swap down to a bare icon+word
-// ("Add") below a `min-[900px]` viewport breakpoint, on the reasoning that
-// the long phrase needed "a wide-enough desktop" to have room. That
-// breakpoint was checking the wrong thing: it's the VIEWPORT's width, not
-// this half-width card's, and the card's own width is fixed by the 2-up
-// grid it sits in (roughly half of Landing's max-w-6xl content column)
-// regardless of how wide the browser window gets past ~900px — so on any
-// normal desktop monitor the long-phrase branch was always the one
-// rendering, into a box that was never actually measured against it. All
-// three phrases fit today with room to spare (measured at ~445px against a
-// ~486px row) — `aria-label` still carries the plain word (`short`)
+// Swaps to the bare word ("Add") below a CONTAINER (not viewport) width —
+// this used to key off a `min-[900px]` viewport breakpoint, and that was
+// checking the wrong box: this card's own width is fixed by the 2-up grid
+// it sits in (roughly half of Landing's max-w-6xl content column), which
+// can be far narrower than the viewport at plenty of real window sizes —
+// a wide monitor with this card still cramped, or vice versa. A CSS
+// container query measures the card itself regardless of how wide the rest
+// of the page is. `aria-label` still carries the plain word (`short`)
 // independent of the visible phrase, since a screen reader doesn't need
 // "Add a place" when "Add" already says what the control does. Module-
 // scope, not defined inside HomeBreak, so it isn't a new component type —
@@ -43,7 +40,12 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
       }
     >
       {icon}
-      {long}
+      {/* Both always in the DOM, one hidden by CSS — not a conditional
+          render — so there's nothing here for a container-query-blind
+          crawler/test to miss and no layout jump as the container resizes
+          past the breakpoint. */}
+      <span className="hidden @min-[420px]:inline">{long}</span>
+      <span className="@min-[420px]:hidden">{short}</span>
     </button>
   )
 }
@@ -117,7 +119,7 @@ export default function HomeBreak({
           buttons — not more content, just more breathing room around the
           same content, so the card fills its box instead of floating a
           short block inside a tall one. */}
-      <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
+      <div className="@container flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept by the Community</h3>
         <p className="mb-6 text-sm leading-relaxed text-muted">

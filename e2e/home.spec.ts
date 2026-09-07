@@ -53,3 +53,42 @@ test.describe('home — Browse everything grid', () => {
     expect(reCollapsedHeight).toBeCloseTo(collapsedHeight, 0)
   })
 })
+
+// The "Kept by the Community" card's Add/Edit/Report buttons swap to their
+// bare word below a CSS CONTAINER width, not a viewport one — this card's
+// own width is fixed by the 2-up grid it sits in (HomeBreak), which can be
+// far narrower than the viewport at plenty of real window sizes. A prior
+// viewport-based version got this wrong (see ContributeButton's own doc)
+// and was effectively dead code: the long phrase always rendered on any
+// normal desktop window regardless of how cramped this particular card
+// actually was. jsdom can't compute real container queries, so the actual
+// swap only has coverage here.
+test.describe('home — Kept by the Community button labels', () => {
+  test.skip(({ isMobile }) => isMobile, 'desktop-only card (HomeBreak)')
+
+  test('shows the long label when the card has room, the short one when it doesn\'t', async ({ page }) => {
+    const community = await defaultCommunity(page)
+
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+    await ready(page)
+
+    // Both labels are always in the DOM (see ContributeButton's own doc) —
+    // one hidden by CSS, not conditionally rendered — so the assertion has
+    // to check which one is actually VISIBLE, not just present in
+    // textContent (Playwright's text matchers don't filter on CSS
+    // visibility, so `toContainText` would pass either way here).
+    const wideAdd = page.getByRole('button', { name: 'Add' })
+    await expect(wideAdd).toBeVisible()
+    await expect(wideAdd.getByText('Add a place')).toBeVisible()
+
+    // Narrow enough that the 2-up grid squeezes this card well under the
+    // ~420px container breakpoint, wide enough to stay past the `desktop:`
+    // gate (640px) this whole card is hidden below.
+    await page.setViewportSize({ width: 700, height: 900 })
+    const narrowAdd = page.getByRole('button', { name: 'Add' })
+    await expect(narrowAdd).toBeVisible()
+    await expect(narrowAdd.getByText('Add a place')).toBeHidden()
+    await expect(narrowAdd.getByText('Add', { exact: true })).toBeVisible()
+  })
+})
