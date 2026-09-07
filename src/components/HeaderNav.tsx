@@ -56,35 +56,36 @@ export default function HeaderNav() {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navRef = useRef<HTMLElement>(null)
   const categoriesWrapRef = useRef<HTMLDivElement>(null)
-  const categoriesPanelRef = useRef<HTMLDivElement>(null)
-  // Pixel offset from the trigger's own left edge (0 = flush with it, the
-  // common case). The panel's natural position is anchored there — see its
-  // own comment on why, not centered under the trigger — but that trigger
-  // sits well to the LEFT of center in this nav's layout, so a panel up to
-  // 900px wide can still run past the window's right edge on anything
-  // narrower than a full-width desktop window (a split-screen half, a
-  // resized browser). Measured and clamped on open and on resize, the same
-  // "real DOM, not a guessed breakpoint" approach GenericDirectory's own
-  // alignRows uses — a fixed viewport-width assumption is exactly what
-  // broke here already once.
+  // The panel spans the header's own content row — the same left/right
+  // edges as the logo-to-location-pill line above it — rather than being
+  // anchored to the "Categories" trigger's own (much narrower) footprint.
+  // That trigger sits well left of center in this nav's layout, so a panel
+  // merely flush with it, sized to its own content, reads as randomly
+  // placed: mostly empty space to its left, an arbitrary edge partway
+  // across the screen to its right, connected to nothing wider than an
+  // 80px-wide word. A full-width mega-menu — spanning the same bounds as
+  // the header bar it drops from — is the standard resolution for exactly
+  // this shape of menu (many columns, a narrow trigger): it reads as the
+  // header itself expanding downward, not as a card floating near one word
+  // in it. `left`/`width` are measured off the trigger's own containing
+  // block (`categoriesWrapRef`, which `left`'s offset is relative to) and
+  // the header content row (`navRef.current.parentElement` — see
+  // SiteHeader.tsx, HeaderNav's `<nav>` is always a direct child of that
+  // row), not assumed from a breakpoint — the same "real DOM, not a guessed
+  // viewport width" approach GenericDirectory's own alignRows uses.
   const [categoriesOffset, setCategoriesOffset] = useState(0)
+  const [categoriesWidth, setCategoriesWidth] = useState(0)
 
   useLayoutEffect(() => {
     if (open !== 'categories') return
     function reposition() {
       const wrap = categoriesWrapRef.current
-      const panel = categoriesPanelRef.current
-      if (!wrap || !panel) return
-      const margin = 12
+      const container = navRef.current?.parentElement
+      if (!wrap || !container) return
       const wrapLeft = wrap.getBoundingClientRect().left
-      const panelWidth = panel.offsetWidth
-      // Clamp the panel's viewport-relative left edge into
-      // [margin, window width - margin - panelWidth], preferring its
-      // natural position (flush with the trigger) when that already fits.
-      const naturalLeft = wrapLeft
-      const maxLeft = Math.max(margin, window.innerWidth - margin - panelWidth)
-      const clampedLeft = Math.min(naturalLeft, maxLeft)
-      setCategoriesOffset(Math.max(margin, clampedLeft) - wrapLeft)
+      const containerRect = container.getBoundingClientRect()
+      setCategoriesOffset(containerRect.left - wrapLeft)
+      setCategoriesWidth(containerRect.width)
     }
     reposition()
     window.addEventListener('resize', reposition)
@@ -164,19 +165,11 @@ export default function HeaderNav() {
 
           {open === 'categories' && (
             <div
-              ref={categoriesPanelRef}
               onMouseEnter={cancelClose}
-              // Anchored to the trigger's left edge by default, not centered
-              // under it — this button sits close to the page's own left
-              // edge (right after the logo/title), so centering a 900px-wide
-              // panel under it pushed most of that width off the LEFT side
-              // of the viewport instead. `categoriesOffset` (measured in the
-              // effect above) then shifts it left from there — but never
-              // past 0 back toward the trigger — just enough to keep it from
-              // running off the RIGHT edge on a narrower window, where
-              // flush-left alone isn't enough room for up to 900px.
-              className="absolute top-full z-30 mt-3 w-[min(90vw,900px)] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
-              style={{ left: categoriesOffset }}
+              // `left`/`width` (see the state's own doc above) span the
+              // header's content row, not this trigger's own footprint.
+              className="absolute top-full z-30 mt-3 max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+              style={{ left: categoriesOffset, width: categoriesWidth }}
             >
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
                 {sections.map((section) => (

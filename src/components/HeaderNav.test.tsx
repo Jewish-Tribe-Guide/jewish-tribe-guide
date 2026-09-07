@@ -90,20 +90,19 @@ describe('HeaderNav — Categories', () => {
     expect(screen.queryByRole('button', { name: /Categories/ })).not.toBeInTheDocument()
   })
 
-  // Was centered under the trigger (left-1/2 -translate-x-1/2) — the
-  // Categories button sits close to the page's own left edge (right after
-  // the logo/title), so centering a wide panel under it pushed most of it
-  // off the left side of the viewport.
+  // Was centered under the trigger (left-1/2 -translate-x-1/2), then flush
+  // with the trigger's own left edge, clamped only enough to avoid
+  // overflowing the viewport's right edge — the Categories button sits well
+  // left of center in this nav's layout, so both of those left the panel
+  // looking randomly placed: connected to nothing wider than the trigger's
+  // own ~80px word.
   //
-  // Anchored to the trigger's left edge by default now, but that alone
-  // wasn't enough either: on anything narrower than a full-width desktop
-  // window, a panel up to 900px wide could still run past the RIGHT edge
-  // from that same flush-left position. It's clamped at runtime instead —
-  // measuring the real trigger position and panel width and shifting left
-  // only as much as needed to stay on screen — the same "real DOM, not a
+  // Now spans the header's own content row instead (the same left/right
+  // edges as the logo-to-location-pill line above it) — measured at
+  // runtime off that row's real DOM position, the same "real DOM, not a
   // guessed breakpoint" approach GenericDirectory's own alignRows already
   // uses. jsdom doesn't compute real layout (every rect comes back zero),
-  // so that clamping arithmetic has no meaningful coverage here — see
+  // so that measurement has no meaningful coverage here — see
   // e2e/header.spec.ts, which checks it at several real viewport widths
   // against a real browser.
 })
