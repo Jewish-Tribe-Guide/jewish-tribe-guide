@@ -18,7 +18,7 @@ export type HomeBlockKind = 'section' | 'featured' | 'map' | 'zmanim'
  *  display order always comes from sortOrder. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {
   featured: { id: 'featured', title: 'Popular right now' },
-  map: { id: 'map', title: 'Explore the map' },
+  map: { id: 'map', title: 'Explore the Map' },
   zmanim: { id: 'zmanim', title: 'Zmanim & Shabbos' },
 }
 

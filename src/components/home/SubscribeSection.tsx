@@ -132,7 +132,7 @@ export default function SubscribeSection({ bare = false }: {
 
   const content = (
     <>
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the loop</h2>
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the Loop</h2>
 
         {done ? (
           <p className="text-sm text-muted">

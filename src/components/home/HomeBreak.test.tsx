@@ -32,7 +32,7 @@ describe('HomeBreak', () => {
   it('renders the community card as its own headed section', () => {
     renderWithProviders(<HomeBreak coords={null} />)
 
-    expect(screen.getByRole('heading', { name: 'Kept by the community' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kept by the Community' })).toBeInTheDocument()
   })
 
   // Was a plain <a href="/feedback">, a real page navigation that left this
@@ -48,7 +48,7 @@ describe('HomeBreak', () => {
 
     // The community card is still in the document underneath the modal — a
     // real navigation would have unmounted it.
-    expect(screen.getByRole('heading', { name: 'Kept by the community' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Kept by the Community' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
   })
 

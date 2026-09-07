@@ -238,7 +238,7 @@ describe('Landing', () => {
       const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
       renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      const heading = screen.getByRole('heading', { name: 'Browse Everything' })
       // Both cards render as siblings under the ONE "Browse everything"
       // heading — not under their own admin-configured section titles
       // ("Food and Hospitality", etc.), which is what "flat" means here.
@@ -257,7 +257,7 @@ describe('Landing', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      const heading = screen.getByRole('heading', { name: 'Browse Everything' })
       const row = within(heading.parentElement!).getByText('Grocery Stores').closest('a')!
       expect(row.className).not.toMatch(/\bborder\b/)
       expect(row.className).not.toMatch(/\bbg-white\b/)
@@ -273,9 +273,9 @@ describe('Landing', () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
-      expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Browse Everything' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.getByRole('heading', { name: 'Browse everything' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Browse Everything' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {
@@ -283,7 +283,7 @@ describe('Landing', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { name: 'Browse everything' })
+      const heading = screen.getByRole('heading', { name: 'Browse Everything' })
       await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })

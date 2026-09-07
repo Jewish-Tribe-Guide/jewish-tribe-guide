@@ -161,7 +161,7 @@ describe('createHomeSection', () => {
       const result = await createHomeSection('philly', { title: 'ignored', cardIds: ['ignored'], kind: 'map' })
 
       expect(upsertBuilder.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'map', kind: 'map', title: 'Explore the map', card_ids: [] }),
+        expect.objectContaining({ id: 'map', kind: 'map', title: 'Explore the Map', card_ids: [] }),
         { onConflict: 'community_id,id' },
       )
       expect(result.id).toBe('map')

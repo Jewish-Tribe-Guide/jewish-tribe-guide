@@ -22,7 +22,7 @@ test.describe('home — Browse everything grid', () => {
     await dismissLocationPrompt(page)
     await ready(page)
 
-    const heading = page.getByRole('heading', { name: 'Browse everything' })
+    const heading = page.getByRole('heading', { name: 'Browse Everything' })
     await expect(heading).toBeVisible()
     const grid = heading.locator('..').locator('.grid').first()
     await expect(grid).toBeVisible()

@@ -119,7 +119,7 @@ export default function HomeBreak({
           short block inside a tall one. */}
       <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
-        <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept by the community</h3>
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept by the Community</h3>
         <p className="mb-6 text-sm leading-relaxed text-muted">
           A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
           from the community that actually uses this guide.
