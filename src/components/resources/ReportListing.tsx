@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -72,7 +73,8 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
   if (done) {
     return (
       <div>
-        <UpButton label={upLabel} onClick={onSubmitted} />
+        <UpButton label={upLabel} onClick={onSubmitted} className="mb-4 desktop:hidden" />
+        <Breadcrumb upLabel={upLabel} onUp={onSubmitted} title="Thanks for the heads-up" />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thanks for the heads-up</h2>
@@ -84,7 +86,11 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton label={upLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      <Breadcrumb upLabel={upLabel} onUp={onUp} title="Report a problem" />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-1">Report a problem</h2>
       <p className="text-sm text-muted mb-2">

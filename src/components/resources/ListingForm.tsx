@@ -11,6 +11,7 @@ import AddressInput, { type PlaceSelectResult } from '@/components/intake/Addres
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
@@ -317,10 +318,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     }
   }
 
+  const heading =
+    mode === 'edit' ? 'Suggest an edit' : `Add a ${config?.label ?? 'listing'}`
+
   if (done) {
     return (
       <div>
-        <UpButton label={config.pluralLabel} onClick={onSubmitted} />
+        <UpButton label={config.pluralLabel} onClick={onSubmitted} className="mb-4 desktop:hidden" />
+        <Breadcrumb upLabel={config.pluralLabel} onUp={onSubmitted} title={heading} />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
@@ -333,12 +338,13 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     )
   }
 
-  const heading =
-    mode === 'edit' ? 'Suggest an edit' : `Add a ${config?.label ?? 'listing'}`
-
   return (
     <div>
-      <UpButton label={config.pluralLabel} onClick={onUp} />
+      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton label={config.pluralLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      <Breadcrumb upLabel={config.pluralLabel} onUp={onUp} title={heading} />
 
       <h2 className="text-xl font-semibold text-slate-800 mb-3">{heading}</h2>
       {/* Blue, not amber — this used to read as a warning (amber is this

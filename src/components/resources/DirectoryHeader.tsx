@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Breadcrumb from '@/components/Breadcrumb'
 import AddressPrompt from './AddressPrompt'
 
 type Props = {
@@ -14,16 +15,12 @@ type Props = {
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
-  /** Ancestor label for a desktop-only breadcrumb ("{upLabel} / {title}") above
-   *  the heading — mirrors the UpButton every caller already renders beside this
-   *  component ("Home" on mobile, "All resources" on desktop for most callers;
-   *  see GenericDirectory's own upLabel doc). Both this and onUp are required
-   *  together or omitted together; a caller that doesn't pass them just gets no
-   *  breadcrumb line, same as before this existed. Desktop-only, not shown on
-   *  mobile: the caller's own UpButton (hidden on desktop instead, so the two
-   *  don't both say "All resources" at once) already serves mobile, where a
-   *  second line would cost vertical space this component's mobile-density
-   *  comment below already treats as scarce. */
+  /** Ancestor label for the desktop-only Breadcrumb above the heading —
+   *  mirrors the UpButton every caller already renders beside this component
+   *  ("Home" on mobile, "All resources" on desktop for most callers; see
+   *  GenericDirectory's own upLabel doc). Both this and onUp are required
+   *  together or omitted together; a caller that doesn't pass them just gets
+   *  no breadcrumb line, same as before this existed. */
   upLabel?: string
   onUp?: () => void
 }
@@ -42,19 +39,7 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
 
   return (
     <div>
-      {upLabel && onUp && (
-        <div className="hidden desktop:flex items-center gap-1 text-sm mb-2">
-          <button
-            type="button"
-            onClick={onUp}
-            className="text-muted hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            {upLabel}
-          </button>
-          <span aria-hidden="true" className="text-muted mx-0.5">/</span>
-          <span className="text-slate-700">{title}</span>
-        </div>
-      )}
+      {upLabel && onUp && <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />}
       <div className="flex items-end justify-between gap-2 mb-2">
         <div>
           {/* h1, not h2: this is the page's own main heading (every category
