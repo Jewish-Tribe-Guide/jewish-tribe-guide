@@ -11,7 +11,6 @@ import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
-import UpButton from '@/components/UpButton'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
@@ -559,11 +558,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
   return (
     <div>
-      {/* desktop:hidden — DirectoryHeader renders the same destination as
-          its own "{upLabel} / {title}" breadcrumb at desktop widths, so
-          this stays for mobile only rather than the two both saying
-          "All resources". */}
-      <UpButton label={upLabel} onClick={onUp} className="desktop:hidden mb-4" />
+      {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
+          desktop:hidden) alongside DirectoryHeader's desktop-only Breadcrumb.
+          It's gone now that useSetScreenHeader (above) puts the same "‹
+          {title}" control directly in SiteHeader on mobile — this component
+          no longer needs to render its own copy of it. Desktop is
+          unaffected: Breadcrumb still renders exactly as before. */}
 
       <DirectoryHeader
         title={category.pluralLabel}
