@@ -157,6 +157,42 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
 
+  // Same target, but waits for the row's own position to stop moving first —
+  // for a scroll fired around the same moment something else can still
+  // reorder the list under it (distance-sort landing once geolocation
+  // resolves, "I'm here" re-anchoring below). A one-shot scroll measured
+  // before that settles targets where the row WAS, not where it ends up:
+  // the visitor lands scrolled past it, or short of it, off by however far
+  // the reorder moved it — with no sign the scroll even fired. Polls rather
+  // than guessing a delay, since what it's waiting on (a re-render a
+  // couple of contexts away) has no single fixed latency.
+  //
+  // setTimeout, not requestAnimationFrame: rAF is paused entirely while the
+  // tab is backgrounded, which would silently drop this if the visitor
+  // switched apps mid-wait and back.
+  const scrollItemIntoViewWhenSettled = (id: string, behavior: ScrollBehavior) => {
+    let timer = 0
+    let lastTop: number | null = null
+    let stableChecks = 0
+    const waitForSettled = () => {
+      const el = itemRowRefs.current.get(id)
+      if (!el) {
+        timer = window.setTimeout(waitForSettled, 32)
+        return
+      }
+      const top = el.getBoundingClientRect().top
+      stableChecks = lastTop !== null && Math.abs(top - lastTop) < 0.5 ? stableChecks + 1 : 0
+      lastTop = top
+      if (stableChecks >= 2) {
+        scrollItemIntoView(id, behavior)
+        return
+      }
+      timer = window.setTimeout(waitForSettled, 32)
+    }
+    timer = window.setTimeout(waitForSettled, 32)
+    return () => window.clearTimeout(timer)
+  }
+
   // Every rendered card's open/close handle, keyed by listing id — same
   // "callback ref in a Map, not an array" shape as itemRowRefs above, and
   // for the same reason (found by id, not position, after a re-sort).
@@ -171,7 +207,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }
 
   useEffect(() => {
-    if (reopenItemId) scrollItemIntoView(reopenItemId, 'instant')
+    // Settle-aware, not a plain one-shot scrollItemIntoView — this list can
+    // still reorder right after mount (distance sort landing once
+    // geolocation resolves is the common case: a `?item=` deep link into a
+    // distance-sorted category, opened before a location's ever been set).
+    // A scroll measured before that reorder lands targets the row's
+    // pre-reorder position, so the visitor ends up scrolled to wherever
+    // that used to be — short of or past where the reopened listing
+    // actually settled, off by however far the reorder moved it.
+    if (reopenItemId) return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally empty — only fire on mount
 
@@ -203,34 +247,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // new anchorLabel yet, so the tapped card's row is still at its OLD
     // position. A fixed delay isn't reliably enough: setting an anchor also
     // stops GPS tracking and touches several other contexts upstream (see
-    // setListingAnchor), and their re-renders can land a tick or two apart.
-    // Rather than guess a delay, poll until the card's own position has
-    // stopped moving for two consecutive checks — i.e. the reorder has
-    // actually finished painting — before scrolling to it.
-    //
-    // setTimeout, not requestAnimationFrame: rAF is paused entirely while the
-    // tab is backgrounded, which would silently drop this if the visitor
-    // switched apps mid-tap and back.
-    let timer = 0
-    let lastTop: number | null = null
-    let stableChecks = 0
-    const waitForSettled = () => {
-      const el = itemRowRefs.current.get(anchorListingId)
-      if (!el) {
-        timer = window.setTimeout(waitForSettled, 32)
-        return
-      }
-      const top = el.getBoundingClientRect().top
-      stableChecks = lastTop !== null && Math.abs(top - lastTop) < 0.5 ? stableChecks + 1 : 0
-      lastTop = top
-      if (stableChecks >= 2) {
-        scrollItemIntoView(anchorListingId, 'smooth')
-        return
-      }
-      timer = window.setTimeout(waitForSettled, 32)
-    }
-    timer = window.setTimeout(waitForSettled, 32)
-    return () => window.clearTimeout(timer)
+    // setListingAnchor), and their re-renders can land a tick or two apart —
+    // scrollItemIntoViewWhenSettled polls instead of guessing one.
+    return scrollItemIntoViewWhenSettled(anchorListingId, 'smooth')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only anchorListingId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
   }, [anchorListingId])
 
   const q = search.trim().toLowerCase()

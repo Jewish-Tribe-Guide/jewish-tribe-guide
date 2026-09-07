@@ -628,6 +628,27 @@ describe('GenericListingCard — expanded', () => {
     expect(onNavigate).toHaveBeenCalledWith(1)
   })
 
+  // Was `fixed left-4`/`fixed right-4` — pinned to the viewport's own edges
+  // regardless of how far that left them from the dialog card itself (which
+  // tops out at max-w-md and sits centered, so on a wide screen the arrows
+  // ended up hundreds of pixels away). They're flex siblings of the card
+  // now, inside the same centered row, so they land right next to it at any
+  // viewport width instead.
+  it('sits as a flex sibling of the dialog card, not pinned to the viewport edge', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={vi.fn()} hasPrev hasNext {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { expanded: false }))
+
+    const prevButton = screen.getByRole('button', { name: 'Previous listing' })
+    expect(prevButton).not.toHaveClass('fixed')
+    expect(prevButton.parentElement).toBe(screen.getByRole('dialog').parentElement)
+  })
+
   // GenericDirectory needs to close THIS card and open a sibling from
   // outside it — the whole reason GenericListingCard exposes a ref handle.
   it('opens and closes via an imperative ref handle', async () => {

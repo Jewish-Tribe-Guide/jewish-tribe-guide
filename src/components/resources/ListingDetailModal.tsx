@@ -132,34 +132,26 @@ export default function ListingDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
+      className="fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
-      {/* Lightbox-style arrows, fixed to the viewport rather than anchored to
-          the dialog card itself — keeps them in the same reachable spot
-          however wide or narrow the card ends up (see its own width
-          comment), the same way Google Photos' don't move with the image. */}
+      {/* Anchored right next to the card as flex siblings, not fixed to the
+          viewport's own edges — this dialog tops out at max-w-md (448px)
+          and sits centered in the full window, so pinning the arrows to
+          left-4/right-4 (Google Photos' pattern, for a photo that usually
+          fills most of the screen) left them stranded near the screen
+          edges, often hundreds of pixels from the card itself on a wide
+          monitor. */}
       {showNav && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
           disabled={!hasPrev}
           aria-label="Previous listing"
-          className="fixed left-4 top-1/2 z-50 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
         >
           <ChevronLeftIcon className="h-5 w-5" />
-        </button>
-      )}
-      {showNav && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
-          disabled={!hasNext}
-          aria-label="Next listing"
-          className="fixed right-4 top-1/2 z-50 -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
-        >
-          <ChevronRightIcon className="h-5 w-5" />
         </button>
       )}
       <div
@@ -278,6 +270,17 @@ export default function ListingDetailModal({
           </div>
         </div>
       </div>
+      {showNav && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
+          disabled={!hasNext}
+          aria-label="Next listing"
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+        >
+          <ChevronRightIcon className="h-5 w-5" />
+        </button>
+      )}
     </div>
   )
 }

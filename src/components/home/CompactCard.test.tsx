@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { CompactCardGrid, cardCount } from './sections'
 import type { CardDef } from './sections'
 import type { CategoryConfig } from '@/lib/categories'
@@ -100,6 +101,34 @@ describe('CompactCard — the browse index row', () => {
     expect(screen.getByText('22 places')).toBeTruthy()
     // The Map pseudo-category counts nothing; it must not read "0 places".
     expect(screen.queryByText(/0 places/)).toBeNull()
+  })
+})
+
+describe('CompactCardGrid — collapses a long list behind "Show more"', () => {
+  const manyCards = (n: number): CardDef[] =>
+    Array.from({ length: n }, (_, i) => card({ title: `Category ${i}`, id: `cat-${i}` }))
+
+  it('shows everything, with no button, when the list is short', () => {
+    render(<CompactCardGrid cards={manyCards(16)} categories={[category()]} />)
+
+    expect(screen.getByText('Category 15')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Show/ })).not.toBeInTheDocument()
+  })
+
+  it('collapses past the threshold, and "Show more" reveals the rest', async () => {
+    const user = userEvent.setup()
+    render(<CompactCardGrid cards={manyCards(20)} categories={[category()]} />)
+
+    expect(screen.getByText('Category 15')).toBeInTheDocument()
+    expect(screen.queryByText('Category 16')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show 4 more' }))
+
+    expect(screen.getByText('Category 19')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show less' }))
+
+    expect(screen.queryByText('Category 16')).not.toBeInTheDocument()
   })
 })
 

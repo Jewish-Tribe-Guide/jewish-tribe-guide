@@ -270,6 +270,13 @@ function CompactCard({
  *  glyph otherwise. CardGrid's rich full-tile photo treatment is still
  *  exactly right for a SMALL curated set ("Popular right now") where a
  *  handful of considered photos are the point, not a liability. */
+// Collapsed height, in items — four rows at the grid's own widest column
+// count (lg:grid-cols-4). The grid drops to 3 or 2 columns at narrower
+// widths, so this reads as "roughly four rows" rather than exactly four
+// there; that's fine, it's a growing community's full category list this
+// is holding back, not a layout that has to land on a precise line.
+const COLLAPSED_CARD_COUNT = 16
+
 export function CompactCardGrid({
   cards,
   categories,
@@ -280,16 +287,41 @@ export function CompactCardGrid({
   categories: CategoryConfig[] | null
   onCardClick?: (card: CardDef) => void
 }) {
+  // Collapsed by default — a community with a dozen-plus categories turned
+  // this from "an index" into a wall of rows below the fold before a
+  // visitor got to the map or anything else on the page. `isCollapsible`
+  // gates both the slice and the button, so a shorter card list later
+  // (e.g. a category count dropping below the threshold) shows everything
+  // regardless of stale `expanded` state, rather than hiding rows with no
+  // button left to reveal them.
+  const [expanded, setExpanded] = useState(false)
+  const isCollapsible = cards.length > COLLAPSED_CARD_COUNT
+  const visibleCards = isCollapsible && !expanded ? cards.slice(0, COLLAPSED_CARD_COUNT) : cards
+
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-      {cards.map((card) => (
-        <CompactCard
-          key={card.id ?? card.title}
-          card={card}
-          color={getCategoryColor(categories, card.id ?? '')}
-          onCardClick={onCardClick}
-        />
-      ))}
+    <div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {visibleCards.map((card) => (
+          <CompactCard
+            key={card.id ?? card.title}
+            card={card}
+            color={getCategoryColor(categories, card.id ?? '')}
+            onCardClick={onCardClick}
+          />
+        ))}
+      </div>
+      {isCollapsible && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-xl py-2.5 text-sm font-medium text-primary transition-colors hover:bg-slate-50"
+        >
+          {expanded ? 'Show less' : `Show ${cards.length - COLLAPSED_CARD_COUNT} more`}
+          <span aria-hidden="true" className="text-[10px]">
+            {expanded ? '▴' : '▾'}
+          </span>
+        </button>
+      )}
     </div>
   )
 }

@@ -275,6 +275,38 @@ describe('GenericDirectory', () => {
   })
 })
 
+// A `?item=` deep link (reopenItemId) scrolls that listing's row into view on
+// mount — but a distance-sorted category with no location set yet can still
+// reorder once geolocation resolves a moment later. A scroll fired before
+// that lands targets the row's pre-reorder position: the visitor ends up
+// scrolled to wherever it USED to be, off by however far the reorder moved
+// it, with the reopened listing itself off-screen. Fixed by waiting for the
+// row's position to stop moving (scrollItemIntoViewWhenSettled) instead of
+// scrolling synchronously on mount.
+describe('GenericDirectory — scrolling a reopened listing into view', () => {
+  it('waits for the list to settle before scrolling, rather than scrolling synchronously on mount', () => {
+    vi.useFakeTimers()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} reopenItemId="b" />)
+
+      // Not yet — the old code called scrollTo synchronously in this same
+      // mount effect, before anything had a chance to reorder.
+      expect(scrollTo).not.toHaveBeenCalled()
+
+      // Two settle-poll ticks (32ms apart) before it fires.
+      vi.advanceTimersByTime(100)
+      expect(scrollTo).toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+})
+
 // The card renders the empty distance slot; the directory decides whether it
 // should. Those are two separate failures — the card supporting it and nobody
 // passing the prop looks exactly like the bug it was built to fix, and the
