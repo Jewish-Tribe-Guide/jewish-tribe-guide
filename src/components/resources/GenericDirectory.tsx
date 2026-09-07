@@ -14,7 +14,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import UpButton from '@/components/UpButton'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useScrollShowHide } from '@/lib/headerVisibility'
+import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
 import { listingSearchText } from '@/lib/searchListing'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -68,6 +68,14 @@ type Props = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport }: Props) {
+  // Hands the shared header this screen's own title + "up" handler — on
+  // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
+  // name while this is mounted, and reverts automatically on unmount (see
+  // useSetScreenHeader's own doc). Always active: every caller of this
+  // component (categories, hospitals, synagogues) is a second-level screen a
+  // visitor drilled into, never the home grid itself.
+  useSetScreenHeader(true, category.pluralLabel, onUp)
+
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -600,7 +608,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         ref={controlsRef}
         className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:transition-transform lg:duration-300 ${
           controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'
-        } ${controlsStuck ? 'lg:border-b lg:border-slate-200 lg:shadow-sm' : ''}`}
+        } ${controlsStuck ? 'lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]' : ''}`}
       >
         {showSearch && (
           <div className="relative">

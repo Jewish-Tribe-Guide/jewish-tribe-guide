@@ -9,7 +9,7 @@ import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { useHeaderCollapsed, useScrollShowHide } from '@/lib/headerVisibility'
+import { useHeaderCollapsed, useScreenHeader, useScrollShowHide } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
@@ -45,6 +45,15 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
   const collapsed = useHeaderCollapsed()
   const isMobile = useIsMobile()
+
+  // On mobile, a category/hospital/synagogue directory screen (the only
+  // things that ever call useSetScreenHeader — see GenericDirectory) swaps
+  // the static site name for its own "‹ {title}", the same pattern the cRc
+  // Kosher app's own drill-down screens use. Desktop keeps the site name and
+  // relies on Breadcrumb ("{upLabel} / {title}") instead — there's already
+  // room there for both, so this only ever applies at mobile widths.
+  const screenHeader = useScreenHeader()
+  const showScreenHeader = isMobile && !!screenHeader
 
   // Hides the header while scrolling down — more room for what you're
   // reading — and brings it back the moment you scroll up, even slightly,
@@ -93,7 +102,26 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
             and dropping the mark frees the ~46px needed to keep the text
             full. Once a location is set the pill collapses to just its pin,
             so the logo comes back. Always shown from sm up. */}
-        {(() => {
+        {showScreenHeader && screenHeader ? (
+          <button
+            onClick={screenHeader.onBack}
+            className="flex min-w-0 shrink items-center gap-2 cursor-pointer group text-left"
+          >
+            <svg
+              className="h-5 w-5 shrink-0 text-primary"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900">
+              {screenHeader.title}
+            </span>
+          </button>
+        ) : (() => {
           const mark = settings.logoUrl?.trim() ? (
             // next/image rather than a CSS background. Beyond the resizing and
             // format negotiation, this also closes a small hole: the URL used
@@ -216,7 +244,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         {!hideNav && <HeaderNav />}
 
         <div className="ml-auto">
-          <LocationControl controls={location} />
+          <LocationControl controls={location} compact={showScreenHeader} />
         </div>
       </div>
     </header>

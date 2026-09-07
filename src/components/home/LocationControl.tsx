@@ -33,11 +33,18 @@ export type LocationControls = {
 
 type Props = {
   controls: LocationControls
+  /** Forces the label hidden on mobile even before an address is set — used
+   *  by SiteHeader on a category screen, where the back button + category
+   *  title already take the room the full "Set location" prompt would need.
+   *  A first-time visitor still sees the full prompt on the home screen
+   *  (where `compact` is left false), so this never removes the visitor's
+   *  only chance to discover the feature, only its second and later showings. */
+  compact?: boolean
 }
 
 // Header pill that anchors all distance sorting: the visitor shares their live
 // location or types an address, which powers the directory's proximity sorting.
-export default function LocationControl({ controls }: Props) {
+export default function LocationControl({ controls, compact }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const wasTracking = useRef(controls.tracking)
@@ -264,6 +271,15 @@ export default function LocationControl({ controls }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        // The label span below is `hidden` (display: none, not just visually
+        // hidden) once an address is set or `compact` is on, which drops it
+        // from the accessibility tree along with the screen — so the button's
+        // accessible name has to come from here, not from that text, or a
+        // screen reader announces this control as unlabeled. Axe's
+        // button-name rule caught exactly this once `compact` made the
+        // hidden-label state reachable on every category screen, not only
+        // after a visitor had set an address.
+        aria-label={label}
         className="flex max-w-[220px] items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2.5 text-xs sm:pl-2.5 sm:pr-3 sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
       >
         {/* Filled once an address is set — on mobile the label text collapses
@@ -280,9 +296,10 @@ export default function LocationControl({ controls }: Props) {
           <PinIcon filled={!!resolvedAddress} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
         )}
         {/* Show the "Set location" prompt on every size so first-time mobile
-            visitors discover it; once an address is set, collapse to just the
-            pin on mobile to save header space. */}
-        <span className={`truncate ${resolvedAddress ? 'hidden md:block' : 'block'}`}>{label}</span>
+            visitors discover it; once an address is set (or `compact` says
+            the header has no room to spare), collapse to just the pin on
+            mobile to save header space. */}
+        <span className={`truncate ${resolvedAddress || compact ? 'hidden md:block' : 'block'}`}>{label}</span>
       </button>
 
       {open && (

@@ -11,7 +11,7 @@ import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
-import { HeaderCollapseProvider } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider } from '@/lib/headerVisibility'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -149,7 +149,9 @@ export default function SiteChrome({
       <PinnedProvider>
         <DroppedPinsProvider>
           <HeaderCollapseProvider>
-            <Chrome year={year}>{children}</Chrome>
+            <ScreenHeaderProvider>
+              <Chrome year={year}>{children}</Chrome>
+            </ScreenHeaderProvider>
           </HeaderCollapseProvider>
         </DroppedPinsProvider>
       </PinnedProvider>
