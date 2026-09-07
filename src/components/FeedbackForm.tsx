@@ -71,16 +71,24 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
       // stopPropagation on the card below, so a click anywhere inside the
       // card (including future children that don't know to stop it) can
       // never accidentally fall through and close the whole thing.
+      // overflow-y-auto on THIS element, not a max-h + its own scroll on the
+      // card below (tried first, still reported cut off) — the form
+      // (message, email, Turnstile widget, submit, privacy note) can be
+      // taller than a short browser window, and a `vh`-based cap on a
+      // nested scrollable card is exactly the kind of thing that goes
+      // wrong on a real device in ways a desktop dev server won't show:
+      // mobile browsers resize the *visual* viewport as their address bar
+      // shows/hides without moving `vh`'s value, and a fixed-position
+      // ancestor's `inset-0` doesn't track that either. Making the
+      // fixed backdrop itself the one scrollable element sidesteps `vh`
+      // entirely — it's sized to the real viewport by definition, and a
+      // flex container with `items-center` still lets you scroll to reach
+      // content that centering would otherwise clip off above or below.
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
         onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
       >
-        {/* max-h + its own scroll, not just centered — the form (message,
-            email, Turnstile widget, submit, privacy note) is taller than a
-            short browser window, and centering a fixed-position card with no
-            cap on its height pushes the top out above the viewport with
-            nothing left to scroll it back into view. */}
-        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl">{children}</div>
+        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
       </div>
     ) : (
       <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>

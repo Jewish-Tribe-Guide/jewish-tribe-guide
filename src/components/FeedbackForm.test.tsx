@@ -51,16 +51,18 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
   })
 
-  // The modal card (message + email + Turnstile + submit + privacy note) is
-  // taller than a short browser window can fit — centering a card with no
-  // height cap pushed its top out above the viewport with nothing left to
-  // scroll it back into view. jsdom doesn't compute real layout/overflow, so
-  // this asserts on the classes that fix it rather than a measured position.
-  it('caps the card height and scrolls its own content instead of overflowing the viewport', () => {
+  // The form (message + email + Turnstile + submit + privacy note) can be
+  // taller than a short browser window can fit — centering a fixed-position
+  // backdrop with no scroll of its own pushed the card's top out above the
+  // viewport with nothing left to scroll it back into view. Fixed by making
+  // the backdrop itself the scrollable element (not a vh-capped inner card,
+  // tried first — see the component's own comment on why that's fragile on
+  // a real device). jsdom doesn't compute real layout/overflow, so this
+  // asserts on the class that fixes it rather than a measured position.
+  it('scrolls the backdrop itself instead of overflowing the viewport', () => {
     renderWithProviders(<FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />)
 
-    const card = screen.getByRole('heading', { name: 'Feedback' }).closest('.rounded-xl')
-    expect(card).toHaveClass('max-h-[90vh]')
-    expect(card).toHaveClass('overflow-y-auto')
+    const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
+    expect(backdrop).toHaveClass('overflow-y-auto')
   })
 })
