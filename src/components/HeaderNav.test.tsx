@@ -93,22 +93,19 @@ describe('HeaderNav — Categories', () => {
   // Was centered under the trigger (left-1/2 -translate-x-1/2) — the
   // Categories button sits close to the page's own left edge (right after
   // the logo/title), so centering a wide panel under it pushed most of it
-  // off the left side of the viewport. Anchored to the trigger's left edge
-  // instead. jsdom doesn't compute real layout, so this asserts on the
-  // classes that control the fix rather than on a rendered position.
-  it('anchors the panel to the trigger\'s left edge, not centered under it', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<HeaderNav />, {
-      content: { categories: [grocery], homeSections: [foodSection] },
-    })
-
-    await user.click(screen.getByRole('button', { name: /Categories/ }))
-
-    const panel = screen.getByText('Grocery Stores').closest('.absolute')
-    expect(panel).toHaveClass('left-0')
-    expect(panel).not.toHaveClass('left-1/2')
-    expect(panel).not.toHaveClass('-translate-x-1/2')
-  })
+  // off the left side of the viewport.
+  //
+  // Anchored to the trigger's left edge by default now, but that alone
+  // wasn't enough either: on anything narrower than a full-width desktop
+  // window, a panel up to 900px wide could still run past the RIGHT edge
+  // from that same flush-left position. It's clamped at runtime instead —
+  // measuring the real trigger position and panel width and shifting left
+  // only as much as needed to stay on screen — the same "real DOM, not a
+  // guessed breakpoint" approach GenericDirectory's own alignRows already
+  // uses. jsdom doesn't compute real layout (every rect comes back zero),
+  // so that clamping arithmetic has no meaningful coverage here — see
+  // e2e/header.spec.ts, which checks it at several real viewport widths
+  // against a real browser.
 })
 
 describe('HeaderNav — Map', () => {

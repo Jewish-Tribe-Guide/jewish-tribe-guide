@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { track } from '@vercel/analytics'
 import { resourceCards, groupCardsIntoSections, useEntryCards } from '@/components/home/sections'
@@ -55,6 +55,41 @@ export default function HeaderNav() {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const navRef = useRef<HTMLElement>(null)
+  const categoriesWrapRef = useRef<HTMLDivElement>(null)
+  const categoriesPanelRef = useRef<HTMLDivElement>(null)
+  // Pixel offset from the trigger's own left edge (0 = flush with it, the
+  // common case). The panel's natural position is anchored there — see its
+  // own comment on why, not centered under the trigger — but that trigger
+  // sits well to the LEFT of center in this nav's layout, so a panel up to
+  // 900px wide can still run past the window's right edge on anything
+  // narrower than a full-width desktop window (a split-screen half, a
+  // resized browser). Measured and clamped on open and on resize, the same
+  // "real DOM, not a guessed breakpoint" approach GenericDirectory's own
+  // alignRows uses — a fixed viewport-width assumption is exactly what
+  // broke here already once.
+  const [categoriesOffset, setCategoriesOffset] = useState(0)
+
+  useLayoutEffect(() => {
+    if (open !== 'categories') return
+    function reposition() {
+      const wrap = categoriesWrapRef.current
+      const panel = categoriesPanelRef.current
+      if (!wrap || !panel) return
+      const margin = 12
+      const wrapLeft = wrap.getBoundingClientRect().left
+      const panelWidth = panel.offsetWidth
+      // Clamp the panel's viewport-relative left edge into
+      // [margin, window width - margin - panelWidth], preferring its
+      // natural position (flush with the trigger) when that already fits.
+      const naturalLeft = wrapLeft
+      const maxLeft = Math.max(margin, window.innerWidth - margin - panelWidth)
+      const clampedLeft = Math.min(naturalLeft, maxLeft)
+      setCategoriesOffset(Math.max(margin, clampedLeft) - wrapLeft)
+    }
+    reposition()
+    window.addEventListener('resize', reposition)
+    return () => window.removeEventListener('resize', reposition)
+  }, [open])
 
   const cancelClose = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current)
@@ -105,7 +140,7 @@ export default function HeaderNav() {
       onMouseLeave={scheduleClose}
     >
       {sections.length > 0 && (
-        <div className="relative">
+        <div className="relative" ref={categoriesWrapRef}>
           <button
             // Unconditionally opens rather than toggling — a toggle here
             // fights onFocus/onMouseEnter, which a real pointer click fires
@@ -129,13 +164,19 @@ export default function HeaderNav() {
 
           {open === 'categories' && (
             <div
+              ref={categoriesPanelRef}
               onMouseEnter={cancelClose}
-              // Anchored to the trigger's left edge, not centered under it —
-              // this button sits close to the page's own left edge (right
-              // after the logo/title), so centering a 900px-wide panel under
-              // it pushed most of that width off the left side of the
-              // viewport instead.
-              className="absolute left-0 top-full z-30 mt-3 w-[min(90vw,900px)] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+              // Anchored to the trigger's left edge by default, not centered
+              // under it — this button sits close to the page's own left
+              // edge (right after the logo/title), so centering a 900px-wide
+              // panel under it pushed most of that width off the LEFT side
+              // of the viewport instead. `categoriesOffset` (measured in the
+              // effect above) then shifts it left from there — but never
+              // past 0 back toward the trigger — just enough to keep it from
+              // running off the RIGHT edge on a narrower window, where
+              // flush-left alone isn't enough room for up to 900px.
+              className="absolute top-full z-30 mt-3 w-[min(90vw,900px)] max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+              style={{ left: categoriesOffset }}
             >
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
                 {sections.map((section) => (
