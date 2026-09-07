@@ -1,5 +1,6 @@
 import type { EruvRecord } from '@/types'
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import { ExternalIcon } from '@/components/icons'
 import { community } from '@/community.config'
 
@@ -38,7 +39,11 @@ function EruvCard({ eruv }: { eruv: EruvRecord }) {
 export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information' }: Props) {
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton label={upLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />
       <h2 className="text-xl font-semibold text-slate-800 mb-1">{title}</h2>
       <p className="mb-4 text-sm text-muted">
         Check the current status of the {community.region}-area eruvim before Shabbos.

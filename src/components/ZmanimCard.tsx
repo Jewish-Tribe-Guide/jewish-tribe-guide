@@ -1,6 +1,7 @@
 'use client'
 
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import ZmanimBody from '@/components/ZmanimBody'
 import { useZmanim } from '@/lib/useZmanim'
 
@@ -25,7 +26,11 @@ export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton label={upLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />
 
       {/* Heading */}
       <div className="mb-6">
