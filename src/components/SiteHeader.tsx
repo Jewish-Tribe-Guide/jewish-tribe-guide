@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
@@ -9,7 +9,7 @@ import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { nextHeaderVisible, useHeaderCollapsed } from '@/lib/headerVisibility'
+import { useHeaderCollapsed, useScrollShowHide } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
@@ -45,71 +45,15 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
   const collapsed = useHeaderCollapsed()
   const isMobile = useIsMobile()
-  const [scrollVisible, setScrollVisible] = useState(true)
 
   // Hides the header while scrolling down — more room for what you're
   // reading — and brings it back the moment you scroll up, even slightly,
   // the same pattern most mobile browsers use for their own address bar.
   // Desktop keeps the header pinned; scrolling behaves differently there and
-  // there's no cramped-screen problem to solve.
-  useEffect(() => {
-    // No listener needed on desktop — `visible` below ignores scrollVisible
-    // there, so there's nothing for one to drive.
-    if (!isMobile) return
-
-    // `anchorY` is where the current run of scrolling in one direction began —
-    // NOT the position at the previous event. The threshold in
-    // nextHeaderVisible is meant to be "how far have you scrolled this way",
-    // and a browser fires a scroll event roughly per frame: a finger drag or
-    // a trackpad moves single-digit pixels per event, so comparing against
-    // the previous event's position means the 8px slack is essentially never
-    // cleared and the header only ever reacts to a hard flick. Measuring from
-    // the start of the run is what makes an ordinary, unhurried scroll work.
-    let lastY = window.scrollY
-    let anchorY = lastY
-    let goingDown = true
-
-    // Deliberately no rAF/ticking-flag throttle here. That pattern schedules
-    // the actual work on the next animation frame and guards re-entry with a
-    // boolean that only that frame clears — and a frame can simply never
-    // come (the tab going to the background mid-scroll, which a phone does
-    // constantly: a notification pull-down, switching apps, the screen
-    // locking). Then the flag is stuck true forever and every future scroll
-    // event is silently ignored — the header dies hidden, or dies shown, and
-    // nothing in the UI says why. The work here is a couple of comparisons
-    // and a setState; it doesn't need deferring, and running it inline can't
-    // get stuck.
-    function onScroll() {
-      const y = window.scrollY
-      if (y !== lastY) {
-        const down = y > lastY
-        // Reversing restarts the measurement from where the reversal
-        // happened, so "scroll up a little to get the header back" costs the
-        // same small distance no matter how far down the page you already
-        // are.
-        if (down !== goingDown) {
-          goingDown = down
-          anchorY = lastY
-        }
-        lastY = y
-      }
-      // Read into a const before handing it to the updater. React runs a
-      // functional updater immediately only when nothing else is queued for
-      // this fiber, and otherwise defers it to render — an updater closing
-      // over the mutable `anchorY` would then read whatever it had become by
-      // then, rather than its value at the moment of this event.
-      const anchor = anchorY
-      setScrollVisible((prev) => nextHeaderVisible(y, anchor, prev))
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isMobile])
-
-  // On desktop `scrollVisible` just isn't consulted, rather than an effect
-  // fighting to keep resetting it to true — one less thing that could race
-  // the isMobile flip on a resize across the breakpoint.
-  const scrollHideVisible = !isMobile || scrollVisible
+  // there's no cramped-screen problem to solve. See useScrollShowHide's own
+  // doc for the scroll-anchor mechanism this shares with the category
+  // directory's sticky filter bar (GenericDirectory.tsx).
+  const scrollHideVisible = useScrollShowHide(isMobile)
 
   // `collapsed` (a whole screen, like the mobile map, saying "get out of the
   // way for as long as I'm mounted") is `invisible h-0`, not `hidden`

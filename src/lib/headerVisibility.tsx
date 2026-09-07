@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useLayoutEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lets a screen tell the shared header to get out of the way for as long as
@@ -96,4 +96,46 @@ export function nextHeaderVisible(y: number, anchorY: number, visible: boolean, 
   if (y > anchorY + threshold) return false
   if (y < anchorY - threshold) return true
   return visible
+}
+
+/** The hide-on-scroll-down/reveal-on-scroll-up behavior above, generalized
+ *  for any pinned strip that wants it — not just SiteHeader, which now just
+ *  calls this instead of running its own copy of the same effect. `enabled`
+ *  lets a caller gate the behavior on its own condition (SiteHeader used to
+ *  inline this as "no listener needed on desktop"); when it's false this
+ *  always returns true and tears down any existing listener, so a caller
+ *  never has to separately reset state when its own condition flips off.
+ *
+ *  Kept in this file (not a new one) since it's the same scroll-anchor
+ *  mechanism `nextHeaderVisible` implements, just wired to a live listener —
+ *  splitting the pure math from the effect is what let this be reused at all. */
+export function useScrollShowHide(enabled: boolean): boolean {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    if (!enabled) return
+
+    let lastY = window.scrollY
+    let anchorY = lastY
+    let goingDown = true
+
+    function onScroll() {
+      const y = window.scrollY
+      if (y !== lastY) {
+        const down = y > lastY
+        if (down !== goingDown) {
+          goingDown = down
+          anchorY = lastY
+        }
+        lastY = y
+      }
+      const anchor = anchorY
+      setVisible((prev) => nextHeaderVisible(y, anchor, prev))
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [enabled])
+
+  return !enabled || visible
 }

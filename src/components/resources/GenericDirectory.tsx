@@ -14,6 +14,7 @@ import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
 import UpButton from '@/components/UpButton'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useScrollShowHide } from '@/lib/headerVisibility'
 import { listingSearchText } from '@/lib/searchListing'
 import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -111,6 +112,20 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // again with the real value.
   const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
   const isMobile = useIsMobile()
+  // Whether the sticky controls bar below is actually capable of being stuck
+  // right now — matches its own `lg:sticky` breakpoint (1024px), not
+  // useIsMobile's default (640px, the `desktop:` custom variant elsewhere in
+  // this file). Gates both the scroll-hide listener (no point tracking
+  // scroll direction on a width where the bar just scrolls away normally)
+  // and the "is it actually stuck" border below.
+  const controlsCanStick = !useIsMobile('(max-width: 1023px)')
+  // Same hide-on-scroll-down/reveal-on-scroll-up behavior as SiteHeader's
+  // mobile header (see useScrollShowHide's own doc) — applied here on
+  // desktop instead, where this bar is the thing pinned to the top of the
+  // screen. Keeps "always there" from meaning "permanently glued to the top
+  // no matter what you're doing," and matches an interaction the site
+  // already teaches elsewhere rather than inventing a second one.
+  const controlsVisible = useScrollShowHide(controlsCanStick)
 
   const fields = category.detailFields
   const tagFields = fields.filter((f) => f.type === 'tags')
@@ -151,6 +166,36 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // us whether it's actually occupying that fixed strip right now, since
   // `lg:` isn't this component's only breakpoint concern to keep in sync.
   const controlsRef = useRef<HTMLDivElement>(null)
+  // Whether the controls bar is currently actually pinned against content
+  // scrolling underneath it, vs. still sitting inline before you've scrolled
+  // to it — a plain `window.innerWidth`/breakpoint check can't tell the two
+  // apart, only "has this specific element's own sticky position engaged."
+  // Drives the border/shadow below: without it, a border on an element still
+  // in normal flow reads as a stray line floating in whitespace rather than
+  // a bar visibly docked against the cards below it.
+  //
+  // A sentinel + IntersectionObserver, not the `position === 'sticky'` check
+  // scrollItemIntoView uses above: that one is read imperatively at the
+  // moment of a click, which is fine for a one-off measurement, but this
+  // needs to re-render whenever stuck-ness actually changes — polling
+  // getComputedStyle on every scroll frame just to catch that would be far
+  // more work for the same answer an observer gives you for free.
+  const controlsSentinelRef = useRef<HTMLDivElement>(null)
+  const [controlsStuck, setControlsStuck] = useState(false)
+  useEffect(() => {
+    const sentinel = controlsSentinelRef.current
+    if (!sentinel) return
+    // rootMargin's top matches `lg:top-14` (56px) below — the sentinel sits
+    // in normal flow immediately above the controls bar, so it stops
+    // "intersecting" at exactly the scroll position where the bar's own
+    // sticky offset would engage, not a moment before or after.
+    const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
+      threshold: 0,
+      rootMargin: '-56px 0px 0px 0px',
+    })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [])
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
     const el = itemRowRefs.current.get(id)
     if (!el) return
@@ -535,14 +580,28 @@ export default function GenericDirectory({ category, items, anchorLabel, address
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
-          matches SiteHeader's own fixed `h-14` (see that component), which
-          on desktop is always visible (never the scroll-hide behavior mobile
-          gets), so this can sit at a fixed offset rather than measuring it.
+          matches SiteHeader's own fixed `h-14` (see that component) — on
+          desktop SiteHeader itself stays pinned (no scroll-hide there), so
+          this can sit at a fixed offset rather than measuring it. This bar
+          gets its own scroll-hide instead (controlsVisible), so "always
+          reachable" doesn't also mean "permanently glued to the top of the
+          screen" while you're just reading down the list.
           Not gated on the `desktop:` custom variant (640px) — that's wide
           enough to fit the sticky bar but too narrow for it to be worth the
           fixed screen real estate it costs; `lg:` (1024px) is where a phone
-          landscape or small tablet stops paying more than it gets back. */}
-      <div ref={controlsRef} className="mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
+          landscape or small tablet stops paying more than it gets back.
+          The sentinel above it is a 1px scroll marker, not truly zero-height
+          — an actual zero-area target can report `isIntersecting` as
+          unreliably always-false in some browsers, since there's no overlap
+          area to compute a ratio from. See controlsStuck's own doc for what
+          it's for. */}
+      <div ref={controlsSentinelRef} aria-hidden className="lg:h-px" />
+      <div
+        ref={controlsRef}
+        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:transition-transform lg:duration-300 ${
+          controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'
+        } ${controlsStuck ? 'lg:border-b lg:border-slate-200 lg:shadow-sm' : ''}`}
+      >
         {showSearch && (
           <div className="relative">
             <input

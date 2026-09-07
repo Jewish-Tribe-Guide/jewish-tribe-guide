@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
+import { resetMockIntersectionObserver, setAllIntersecting } from '@/test/intersectionObserverMock'
 import type { DirectoryResource } from '@/types'
 import GenericDirectory from './GenericDirectory'
 
@@ -57,7 +58,10 @@ vi.mock('@/components/synagogues/DaveningTimesModal', () => ({
     isOpen ? <div>davening modal open{initialDayFilter ? `: ${initialDayFilter.join(',')}` : ''}</div> : null,
 }))
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  resetMockIntersectionObserver()
+})
 
 const handlers = {
   onUp: vi.fn(),
@@ -318,6 +322,32 @@ describe('GenericDirectory', () => {
     })
 
     expect(screen.queryByRole('link', { name: /Map/ })).not.toBeInTheDocument()
+  })
+
+  it('adds a border/shadow to the sticky controls bar only once it is actually stuck', () => {
+    // controlsStuck is driven by a sentinel + IntersectionObserver, not a
+    // breakpoint guess — see GenericDirectory's own doc for why (a plain
+    // width check can't tell "wide enough to stick" apart from "currently
+    // stuck", and this got that distinction wrong once already: a genuinely
+    // zero-height sentinel reported isIntersecting as always-false in real
+    // testing, making the bar permanently look "stuck" from the moment it
+    // mounted, before any scrolling at all).
+    const category = makeCategory({ hasAddress: true })
+    const { container } = renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    const controlsBar = container.querySelector('[class*="lg:sticky"]')
+    expect(controlsBar).not.toBeNull()
+    expect(controlsBar).not.toHaveClass('lg:border-b')
+
+    // The sentinel scrolling out of view (isIntersecting: false) is what a
+    // real scroll-past looks like to the observer — see the sentinel's own
+    // rootMargin comment for why "out of view" here means "the bar just
+    // engaged its sticky position", not literally off-screen.
+    act(() => setAllIntersecting(false))
+    expect(controlsBar).toHaveClass('lg:border-b')
+
+    act(() => setAllIntersecting(true))
+    expect(controlsBar).not.toHaveClass('lg:border-b')
   })
 })
 
