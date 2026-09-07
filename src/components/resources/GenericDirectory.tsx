@@ -418,7 +418,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (index === -1 || !target) return
     cardRefs.current.get(fromId)?.close()
     cardRefs.current.get(target.id)?.open()
-    scrollItemIntoView(target.id, 'smooth')
+    // Settle-aware, not a one-shot scrollItemIntoView — a row's own listing
+    // photo can still be loading when this fires, and an image with no
+    // reserved aspect ratio grows the row (and everything below it) once it
+    // arrives. A scroll measured against the shorter, image-not-yet-loaded
+    // layout overshoots once that settles: the target ends up further down
+    // than where this scrolled to, with the top of it — often most of it —
+    // above the viewport instead of visible.
+    //
+    // 'instant', not 'smooth' — confirmed live: closing one card's dialog
+    // and opening the next's mutates enough DOM in the same moment that
+    // Chrome cancels an in-flight 'smooth' scrollTo outright, snapping the
+    // page back to wherever it started (scrollY 0 in testing) rather than
+    // reaching the target at all. An animated scroll can't survive a
+    // concurrent modal swap; a synchronous one isn't vulnerable to being
+    // cancelled mid-flight because there's no "mid-flight" for it to be in.
+    scrollItemIntoViewWhenSettled(target.id, 'instant')
   }
 
   // Log searches that match no listing in this category — by the search text

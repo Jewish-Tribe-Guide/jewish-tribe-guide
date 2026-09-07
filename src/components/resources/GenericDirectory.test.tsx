@@ -25,6 +25,7 @@ vi.mock('./GenericListingCard', () => ({
     onReport,
     onTagClick,
     onFilterBool,
+    onNavigate,
     showDistanceSlot,
   }: {
     item: DirectoryResource
@@ -32,6 +33,7 @@ vi.mock('./GenericListingCard', () => ({
     onReport: () => void
     onTagClick: (t: string) => void
     onFilterBool: (key: string) => void
+    onNavigate?: (direction: 1 | -1) => void
     showDistanceSlot?: boolean
   }) => (
     <div>
@@ -41,6 +43,7 @@ vi.mock('./GenericListingCard', () => ({
       <button onClick={onReport}>Report {item.name}</button>
       <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
       <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
+      {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
     </div>
   ),
 }))
@@ -300,6 +303,34 @@ describe('GenericDirectory — scrolling a reopened listing into view', () => {
       // Two settle-poll ticks (32ms apart) before it fires.
       vi.advanceTimersByTime(100)
       expect(scrollTo).toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+})
+
+// Arrow-key/arrow-button navigation between cards (ListingDetailModal's
+// Previous/Next) closes one card's dialog and opens the next's in the same
+// moment — confirmed live: that's enough DOM mutation for Chrome to cancel
+// an in-flight 'smooth' scrollTo outright, snapping the page back to
+// wherever it started instead of ever reaching the target. 'instant' isn't
+// vulnerable to being cancelled mid-flight, because there's no "mid-flight"
+// for a synchronous scroll to be in.
+describe('GenericDirectory — scrolling to the next/previous card', () => {
+  it('scrolls instantly, not smoothly, when navigating between cards', () => {
+    vi.useFakeTimers()
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
+    try {
+      const category = makeCategory()
+      const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
+      renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+      screen.getByRole('button', { name: 'Next listing from Kosher Mart' }).click()
+      vi.advanceTimersByTime(100)
+
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'instant' }))
     } finally {
       vi.unstubAllGlobals()
       vi.useRealTimers()
