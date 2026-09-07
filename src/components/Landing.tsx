@@ -357,6 +357,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 still reads as a break, not a third full-width peer section. */}
         <section className="mt-8 hidden desktop:block">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+            {/* Same amber eyebrow every other home-screen card now carries
+                ("Today", "Community run", "Discover nearby") — this was the
+                one section still missing it. */}
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Get started</p>
             <h2 className="mb-6 text-lg font-semibold text-slate-900">Browse Everything</h2>
             <SearchSection
               bare

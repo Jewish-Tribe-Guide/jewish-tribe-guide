@@ -132,6 +132,10 @@ export default function SubscribeSection({ bare = false }: {
 
   const content = (
     <>
+        {/* Same amber eyebrow every other home-screen card now carries
+            ("Today", "Community run", "Discover nearby", "Get started") —
+            this was the one section still missing it. */}
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Email updates</p>
         <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the Loop</h2>
 
         {done ? (
