@@ -324,7 +324,7 @@ describe('GenericDirectory', () => {
     expect(screen.queryByRole('link', { name: /Map/ })).not.toBeInTheDocument()
   })
 
-  it('adds a border/shadow to the sticky controls bar only once it is actually stuck', () => {
+  it('only docks the sticky controls bar (background, shadow, hide-on-scroll) once it is actually stuck', () => {
     // controlsStuck is driven by a sentinel + IntersectionObserver, not a
     // breakpoint guess — see GenericDirectory's own doc for why (a plain
     // width check can't tell "wide enough to stick" apart from "currently
@@ -332,22 +332,31 @@ describe('GenericDirectory', () => {
     // zero-height sentinel reported isIntersecting as always-false in real
     // testing, making the bar permanently look "stuck" from the moment it
     // mounted, before any scrolling at all).
+    //
+    // The whole "docked" look (not just the shadow) is gated on controlsStuck
+    // now — it used to apply `lg:bg-white`/`lg:-mt-3` unconditionally, which
+    // pulled the bar's own solid background up 12px regardless of scroll
+    // position and overlapped whatever sat directly above it (the Add
+    // button) even before any scrolling happened at all.
     const category = makeCategory({ hasAddress: true })
     const { container } = renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
 
     const controlsBar = container.querySelector('[class*="lg:sticky"]')
     expect(controlsBar).not.toBeNull()
-    expect(controlsBar).not.toHaveClass('lg:border-b')
+    expect(controlsBar).not.toHaveClass('lg:bg-white')
+    expect(controlsBar).not.toHaveClass('lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]')
 
     // The sentinel scrolling out of view (isIntersecting: false) is what a
     // real scroll-past looks like to the observer — see the sentinel's own
     // rootMargin comment for why "out of view" here means "the bar just
     // engaged its sticky position", not literally off-screen.
     act(() => setAllIntersecting(false))
-    expect(controlsBar).toHaveClass('lg:border-b')
+    expect(controlsBar).toHaveClass('lg:bg-white')
+    expect(controlsBar).toHaveClass('lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]')
 
     act(() => setAllIntersecting(true))
-    expect(controlsBar).not.toHaveClass('lg:border-b')
+    expect(controlsBar).not.toHaveClass('lg:bg-white')
+    expect(controlsBar).not.toHaveClass('lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]')
   })
 })
 

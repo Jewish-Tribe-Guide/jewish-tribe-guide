@@ -607,9 +607,25 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <div ref={controlsSentinelRef} aria-hidden className="lg:h-px" />
       <div
         ref={controlsRef}
-        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:transition-transform lg:duration-300 ${
-          controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'
-        } ${controlsStuck ? 'lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]' : ''}`}
+        // The "docked" look (white background, the padding it needs, the
+        // negative margin that pulls it flush against the header above, the
+        // shadow, and the hide-on-scroll transform) only ever applies once
+        // `controlsStuck` says the bar has actually engaged its sticky
+        // position. Applying `lg:-mt-3`/`lg:bg-white` unconditionally used to
+        // pull this bar's own solid background up 12px REGARDLESS of scroll
+        // position — while still sitting in normal flow, that overlapped
+        // whatever sat directly above it (DirectoryHeader's Add button),
+        // clipping its bottom few pixels even on a page load with no
+        // scrolling at all. The hide-on-scroll transform had the same bug in
+        // reverse: applied unconditionally, it reacted to ANY downward
+        // scroll on the page, so the bar slid away while a visitor was still
+        // scrolling through content well above it — before it had ever
+        // become sticky, let alone been scrolled past.
+        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-transform lg:duration-300 ${
+          controlsStuck
+            ? `lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
+            : 'lg:translate-y-0'
+        }`}
       >
         {showSearch && (
           <div className="relative">
