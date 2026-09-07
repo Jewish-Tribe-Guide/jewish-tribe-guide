@@ -75,7 +75,12 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
         onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
       >
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
+        {/* max-h + its own scroll, not just centered — the form (message,
+            email, Turnstile widget, submit, privacy note) is taller than a
+            short browser window, and centering a fixed-position card with no
+            cap on its height pushes the top out above the viewport with
+            nothing left to scroll it back into view. */}
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl">{children}</div>
       </div>
     ) : (
       <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>

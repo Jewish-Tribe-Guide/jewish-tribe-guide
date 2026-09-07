@@ -124,6 +124,23 @@ describe('HeaderNav — Map', () => {
 })
 
 describe('HeaderNav — More', () => {
+  // Was right-0, sized to the panel's own fixed width rather than to where
+  // its trigger sits — "More" is well clear of the viewport's right edge in
+  // this nav's layout, so right-anchoring only pulled the panel's left edge
+  // back near wherever the Categories panel happens to start instead,
+  // making the two look like they opened from the same spot rather than
+  // each hanging from its own tab.
+  it('anchors the panel to the trigger\'s left edge, not its own right edge', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, { content: { categories: [grocery] } })
+
+    await user.click(screen.getByRole('button', { name: /More/ }))
+
+    const panel = screen.getByRole('link', { name: 'About' }).closest('.absolute')
+    expect(panel).toHaveClass('left-0')
+    expect(panel).not.toHaveClass('right-0')
+  })
+
   it('offers About and Privacy as real links, and opens feedback as an in-place modal', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {

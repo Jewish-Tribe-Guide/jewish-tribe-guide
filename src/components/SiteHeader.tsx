@@ -209,7 +209,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // anywhere on the live site. Worth knowing before spending more
           // time writing good taglines into a field nothing shows.
           const title = (
-            <span className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
               {settings.name}
             </span>
           )

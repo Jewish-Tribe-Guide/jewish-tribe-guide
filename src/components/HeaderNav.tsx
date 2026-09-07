@@ -101,7 +101,7 @@ export default function HeaderNav() {
     <nav
       ref={navRef}
       aria-label="Site"
-      className="hidden items-center gap-5 desktop:flex"
+      className="hidden items-center gap-8 desktop:flex"
       onMouseLeave={scheduleClose}
     >
       {sections.length > 0 && (
@@ -195,7 +195,14 @@ export default function HeaderNav() {
         {open === 'more' && (
           <div
             onMouseEnter={cancelClose}
-            className="absolute right-0 top-full z-30 mt-3 w-48 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"
+            // left-0, not right-0: this trigger sits well clear of the
+            // viewport's right edge in this nav's layout (unlike a
+            // right-aligned nav bar, where right-anchoring exists to avoid
+            // overflow), so right-anchoring it here only pulled the panel's
+            // left edge back near wherever the OTHER menu (Categories)
+            // happens to start — the two looked like they opened from the
+            // same spot instead of each hanging from its own tab.
+            className="absolute left-0 top-full z-30 mt-3 w-48 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"
           >
             <Link href="/about" onClick={() => setOpen(null)} className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50">
               About
