@@ -83,12 +83,54 @@ test.describe('home — Kept by the Community button labels', () => {
     await expect(wideAdd.getByText('Add a place')).toBeVisible()
 
     // Narrow enough that the 2-up grid squeezes this card well under the
-    // ~420px container breakpoint, wide enough to stay past the `desktop:`
+    // ~470px container breakpoint, wide enough to stay past the `desktop:`
     // gate (640px) this whole card is hidden below.
     await page.setViewportSize({ width: 700, height: 900 })
     const narrowAdd = page.getByRole('button', { name: 'Add' })
     await expect(narrowAdd).toBeVisible()
     await expect(narrowAdd.getByText('Add a place')).toBeHidden()
     await expect(narrowAdd.getByText('Add', { exact: true })).toBeVisible()
+  })
+
+  // The bug a screenshot caught: the container query that swaps to the long
+  // labels used to fire before there was actually room for all three
+  // buttons on one row, so "Report a problem" wrapped to its own line while
+  // "Add a place"/"Suggest an edit" stayed on the first — a state where the
+  // labels ARE the long ones but the row still isn't a single line. Sweeps
+  // a range of viewport widths (not one magic number) specifically to catch
+  // that in-between zone regardless of exact font metrics in whatever
+  // browser runs this. See ContributeButton's own doc for the content-box
+  // vs. border-box measurement mismatch that caused it.
+  test('never shows the long labels wrapped onto a second row, at any width', async ({ page }) => {
+    const community = await defaultCommunity(page)
+
+    await page.goto(`/${community}`)
+    await dismissLocationPrompt(page)
+    await ready(page)
+
+    const addButton = page.getByRole('button', { name: 'Add' })
+    const editButton = page.getByRole('button', { name: 'Edit' })
+    const reportButton = page.getByRole('button', { name: 'Report' })
+
+    // Starts at 800, not narrower: below ~750px even the SHORT labels
+    // ("Add"/"Edit"/"Report") stop fitting on one row — a separate, narrower
+    // pre-existing issue (this card is barely visible at all below the
+    // `desktop:` 640px gate to begin with), not the long-label one this test
+    // targets.
+    for (const width of [800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(addButton).toBeVisible()
+      const [addBox, editBox, reportBox] = await Promise.all([
+        addButton.boundingBox(),
+        editButton.boundingBox(),
+        reportButton.boundingBox(),
+      ])
+      expect(addBox && editBox && reportBox, `buttons not all visible at ${width}px`).toBeTruthy()
+      // Same row means the same `y` — a fixed row height (~44px for these
+      // buttons) means an actually-wrapped button lands well below, not
+      // within a rounding error of, the others' y.
+      expect(Math.abs(addBox!.y - editBox!.y), `Edit wrapped at ${width}px`).toBeLessThan(5)
+      expect(Math.abs(addBox!.y - reportBox!.y), `Report wrapped at ${width}px`).toBeLessThan(5)
+    }
   })
 })

@@ -22,6 +22,18 @@ type ContributeAction = 'create' | 'edit' | 'report'
 // "Add a place" when "Add" already says what the control does. Module-
 // scope, not defined inside HomeBreak, so it isn't a new component type —
 // and doesn't remount its buttons — on every HomeBreak render.
+//
+// 470px, not a rounder-looking number, and not the 420px this first shipped
+// with: a `@container` query is evaluated against the container's own
+// CONTENT box (this card's width minus its own `p-7` padding, 56px), not
+// the border box `getBoundingClientRect` reports — so at a real 420px-wide
+// content box, the three buttons' actual rendered width (icons + long
+// labels + gaps, ~465px measured) still didn't fit on one row: the labels
+// had already swapped to long, but there wasn't room yet, so "Report a
+// problem" wrapped to its own line while "Add a place"/"Suggest an edit"
+// stayed on the first — the exact bug a screenshot caught. 470 is that
+// ~465px measured requirement plus a few px of slack, so the swap to long
+// labels never happens before there's actually room for all three.
 function ContributeButton({ onClick, icon, short, long, primary }: {
   onClick: () => void
   icon: React.ReactNode
@@ -44,8 +56,8 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
           render — so there's nothing here for a container-query-blind
           crawler/test to miss and no layout jump as the container resizes
           past the breakpoint. */}
-      <span className="hidden @min-[420px]:inline">{long}</span>
-      <span className="@min-[420px]:hidden">{short}</span>
+      <span className="hidden @min-[470px]:inline">{long}</span>
+      <span className="@min-[470px]:hidden">{short}</span>
     </button>
   )
 }
