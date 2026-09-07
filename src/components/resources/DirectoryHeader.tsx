@@ -23,6 +23,18 @@ type Props = {
    *  no breadcrumb line, same as before this existed. */
   upLabel?: string
   onUp?: () => void
+  /** True for a caller whose title is also shown in SiteHeader on mobile
+   *  (GenericDirectory, via useSetScreenHeader) — visually hiding a second,
+   *  identical "Food" directly under a mobile header already reading "‹
+   *  Food" recovers real space with nothing lost, since the h1 role still
+   *  needs to exist for a screen reader (`sr-only`, not removed) even where
+   *  it's redundant to a sighted visitor. Desktop never shows the title in
+   *  its header (Breadcrumb only names the "up" path, not this screen), so
+   *  the h1 there stays visible regardless of this prop. Left `false` for a
+   *  caller like HospitalsDirectory that still has its own mobile UpButton
+   *  instead of a header title — hiding its only visible title would leave
+   *  mobile with none at all. */
+  titleInHeader?: boolean
 }
 
 // Shared heading block for every directory: the title plus the location/count
@@ -34,7 +46,7 @@ type Props = {
 // screens (`hidden desktop:*`) to keep the header from crowding next to the
 // location label or the "Set location" prompt. The count always shows on
 // desktop.
-export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, upLabel, onUp }: Props) {
+export default function DirectoryHeader({ title, count, anchorLabel, addressPrompt, actions, upLabel, onUp, titleInHeader }: Props) {
   const countText = count != null ? `${count} listing${count !== 1 ? 's' : ''}` : null
 
   return (
@@ -49,7 +61,7 @@ export default function DirectoryHeader({ title, count, anchorLabel, addressProm
               uses h1 for the same role. A real gap, not a style choice: axe's
               page-has-heading-one caught every one of these pages having no
               h1 at all. */}
-          <h1 className="text-xl font-semibold text-slate-800">{title}</h1>
+          <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
             <p className="text-sm text-muted mt-0.5">
               {anchorLabel}

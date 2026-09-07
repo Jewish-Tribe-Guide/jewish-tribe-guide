@@ -572,6 +572,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         addressPrompt={addressPrompt}
         upLabel={upLabel}
         onUp={onUp}
+        titleInHeader
         actions={
           <>
             {canAdd && (
