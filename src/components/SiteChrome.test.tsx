@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
@@ -44,9 +44,15 @@ describe('SiteChrome', () => {
     // "Test Directory" renders in both the header and the footer.
     expect(screen.getAllByText('Test Directory').length).toBeGreaterThan(0)
     expect(screen.getByText('Page content')).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
-    expect(screen.getByText('Categories')).toBeInTheDocument()
-    expect(screen.getByText('Feedback')).toBeInTheDocument()
+    // Scoped to the mobile tab bar specifically — HeaderNav (desktop's own
+    // nav, "Site") renders unconditionally in jsdom too (there's no real
+    // viewport for its `desktop:` CSS gating to apply against), and it
+    // reuses the exact same words ("Categories", "Map") for its own trigger
+    // and link, so an unscoped query now matches both.
+    const mobileTabBar = screen.getByRole('navigation', { name: 'Primary' })
+    expect(mobileTabBar).toBeInTheDocument()
+    expect(within(mobileTabBar).getByText('Categories')).toBeInTheDocument()
+    expect(within(mobileTabBar).getByText('Feedback')).toBeInTheDocument()
   })
 
   it('does not show the Map tab when the community has no Map pseudo-category', () => {
@@ -57,6 +63,8 @@ describe('SiteChrome', () => {
       { content: { categories: [makeCategory({ id: 'grocery', kind: 'listing' })] } },
     )
 
+    // Neither nav should offer Map without a Map pseudo-category — HeaderNav
+    // has its own identical gate (see its own `hasMap` check).
     expect(screen.queryByText('Map')).not.toBeInTheDocument()
   })
 
@@ -68,7 +76,11 @@ describe('SiteChrome', () => {
       { content: { categories: [makeCategory({ id: 'map', kind: 'map' })] } },
     )
 
-    expect(screen.getByText('Map')).toBeInTheDocument()
+    // Both the mobile tab bar and HeaderNav's own "Map" link render "Map" —
+    // this is asserting the mobile tab bar's copy specifically shows up;
+    // HeaderNav.test.tsx covers its own Map link's presence/gating.
+    const mobileTabBar = screen.getByRole('navigation', { name: 'Primary' })
+    expect(within(mobileTabBar).getByText('Map')).toBeInTheDocument()
   })
 
   it('shows nothing from ContentFailureNotice when nothing failed', () => {

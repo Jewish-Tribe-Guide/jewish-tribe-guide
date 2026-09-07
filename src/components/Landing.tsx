@@ -7,7 +7,6 @@ import HeroHeading from '@/components/home/HeroHeading'
 import SearchSection from '@/components/home/SearchSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
-import SectionTabs from '@/components/home/SectionTabs'
 import FeaturedCards from '@/components/home/FeaturedCards'
 import HomeBreak from '@/components/home/HomeBreak'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
@@ -53,17 +52,17 @@ export type LandingProps = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — section tabs (hover mega-menus, kept alongside the grid below
-//   rather than replaced by it — see the "keep it just in case" note on the
-//   grid itself) → a two-column warm hero (headline + mission + search
-//   beside a photo, see HeroHeading) → "Popular right now" if an admin has
-//   re-added it (off by default — see builtInOrder) → a flat "Browse
-//   everything" grid, full weight (every card, always visible, no hover
-//   needed) → HomeBreak (Davening Times + a "kept by the community"
-//   message) → "Explore the map", matching Browse everything's full weight
-//   → Stay in the loop + Shabbat Times, a second two-card break in the same
-//   visual language as HomeBreak → footer. The section tabs' mega-menus are
-//   a second way to reach a category, on top of the flat grid.
+//   Desktop — a two-column warm hero (headline + mission + search beside a
+//   photo, see HeroHeading) → "Popular right now" if an admin has re-added
+//   it (off by default — see builtInOrder) → a flat "Browse everything"
+//   grid, full weight (every card, always visible, no hover needed) →
+//   HomeBreak (Davening Times + a "kept by the community" message) →
+//   "Explore the map", matching Browse everything's full weight → Stay in
+//   the loop + Shabbat Times, a second two-card break in the same visual
+//   language as HomeBreak → footer. HeaderNav's "Categories" mega-menu (in
+//   SiteHeader, on every screen — this page no longer owns any category nav
+//   of its own) is a second way to reach a category, on top of the flat
+//   grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -153,9 +152,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // Sections only exist once loading is done and there's something to group;
   // while loading, a single flat grid of entry cards + skeletons stands in.
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
-  // The tabs list every section regardless of the current search — they're
-  // site navigation, not search results, and shouldn't empty out mid-type.
-  const navSections = allCards ? groupCardsIntoSections(allCards, homeSections ?? []) : []
   const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   // The desktop gateway's own block order (admin-editable — see
@@ -298,16 +294,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
   return (
     <>
-      {/* ── Section tabs (desktop) — kept alongside the flat "Browse
-              everything" grid below as a second way to reach a category (see
-              that section's own comment). Full-bleed so the bar spans the
-              window while its contents stay aligned to the page. ─────────── */}
-      <SectionTabs
-        sections={navSections}
-        listings={listings}
-        onOpenCard={(card) => card.go()}
-      />
-
       {/* pb-24 clears mobile's fixed bottom tab bar so the last card isn't
           hidden behind it — desktop has no such bar, so that padding just
           stacked on top of the footer's own mt-16/border-t below, leaving a
@@ -329,19 +315,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
                 The grid itself is a flat, always-visible index of every
                 card: every real category, Patient & Family Support,
-                Volunteer, custom forms. Not grouped under the section tabs'
-                own umbrella labels above ("Jewish Institutions and
+                Volunteer, custom forms. Not grouped under the umbrella labels
+                HeaderNav's own Categories menu uses ("Jewish Institutions and
                 Information", etc.) — a visitor wants "Synagogues", not which
-                invented group it lives under. The tab nav's hover mega-menus
-                stay exactly as they are; this is a second, always-visible way
-                to reach the same destinations for anyone who doesn't think to
-                hover, not a replacement. Hidden while actively searching —
+                invented group it lives under. HeaderNav's own "Categories"
+                mega-menu (in SiteHeader now, on every screen — see that
+                component's own doc for why it replaced the old below-header
+                tab row) offers the same destinations grouped by those
+                umbrella labels; this is a second, always-visible flat way to
+                reach them for anyone who doesn't think to open that menu,
+                not a replacement for it. Hidden while actively searching —
                 the grouped grid further down already serves as live search
                 results, and this card shows the search box's own `results`
                 slot instead. `source: 'grid'` on the click lets the admin
-                Metrics tab compare actual usage against the tab nav's own
-                `source: 'tab-nav'` (see SectionTabs), so keeping both isn't a
-                permanent guess.
+                Metrics tab compare actual usage against HeaderNav's own
+                `source: 'header-nav'`, so keeping both isn't a permanent
+                guess.
 
                 CompactCardGrid, not CardGrid — a list meant to hold every
                 card at once got heavier with every category added and read

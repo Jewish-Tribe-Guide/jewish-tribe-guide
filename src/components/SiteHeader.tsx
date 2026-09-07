@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
+import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
@@ -23,9 +24,17 @@ type Props = {
   /** Admin-preview only: render with these settings instead of the live,
    *  fetched ones — used by the Site tab's Preview button. */
   previewSettings?: SiteSettings
+  /** Admin category preview only (CategoryPreview.tsx) — that tool renders
+   *  this header around one isolated category screen, and always has since
+   *  before HeaderNav existed (SectionTabs, its predecessor, never mounted
+   *  there either — it only ever lived on the home screen). A full
+   *  Categories/Map/More nav navigating out of that isolated preview isn't
+   *  something that tool ever offered, so this keeps it that way rather than
+   *  silently gaining site-wide nav chrome it wasn't designed around. */
+  hideNav?: boolean
 }
 
-export default function SiteHeader({ onGoHome, location, previewSettings }: Props) {
+export default function SiteHeader({ onGoHome, location, previewSettings, hideNav }: Props) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const { community, communities, setCommunity } = useActiveCommunity()
@@ -256,6 +265,11 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
             </div>
           )
         })()}
+
+        {/* Categories/Map/More — see HeaderNav's own doc for why this
+            replaces the old full-width tab row rather than sitting beside
+            it, and `hideNav`'s own doc for the one caller that opts out. */}
+        {!hideNav && <HeaderNav />}
 
         <div className="ml-auto">
           <LocationControl controls={location} />

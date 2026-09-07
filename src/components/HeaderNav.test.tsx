@@ -1,0 +1,137 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { track } from '@vercel/analytics'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { makeCategory } from '@/test/providerFixtures'
+import { mockRouter } from '@/test/nextNavigationMock'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
+import HeaderNav from './HeaderNav'
+
+// Replaces SectionTabs — see this component's own doc for why. The mega-menu
+// behavior (hover/click/focus opens, Escape and focus-out close, a click
+// tracks category_opened) is the same contract SectionTabs.test.tsx used to
+// cover; what's new here is Map and More, and that this now renders inside
+// SiteHeader on every screen rather than only on the home screen.
+
+vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+})
+
+const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+const mapCategory = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
+
+const foodSection = { id: 'food', kind: 'section' as const, title: 'Food and Hospitality', sortOrder: 1, cardIds: ['grocery'] }
+const institutionsSection = { id: 'institutions', kind: 'section' as const, title: 'Jewish Institutions', sortOrder: 2, cardIds: ['synagogue'] }
+
+describe('HeaderNav — Categories', () => {
+  it('opens on click and shows every group as its own labeled column', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery, synagogue], homeSections: [foodSection, institutionsSection] },
+    })
+
+    expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+
+    expect(screen.getByText('Food and Hospitality')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Grocery Stores/ })).toHaveAttribute('href', '/test-community/grocery')
+    expect(screen.getByText('Jewish Institutions')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Synagogues/ })).toHaveAttribute('href', '/test-community/synagogue')
+  })
+
+  it('tracks category_opened with source "header-nav" when a menu item is clicked', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], homeSections: [foodSection] },
+    })
+
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+    await user.click(screen.getByRole('link', { name: /Grocery Stores/ }))
+
+    expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'header-nav' })
+  })
+
+  it('opens on hover too, not just a click', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], homeSections: [foodSection] },
+    })
+
+    await user.hover(screen.getByRole('button', { name: /Categories/ }))
+    expect(await screen.findByText('Grocery Stores')).toBeInTheDocument()
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], homeSections: [foodSection] },
+    })
+
+    await user.click(screen.getByRole('button', { name: /Categories/ }))
+    expect(await screen.findByText('Grocery Stores')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByText('Grocery Stores')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing at all when there are no cards to show', () => {
+    renderWithProviders(<HeaderNav />, { content: { categories: [], homeSections: [] } })
+    expect(screen.queryByRole('button', { name: /Categories/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('HeaderNav — Map', () => {
+  it('links to the map when the community has a Map pseudo-category', () => {
+    renderWithProviders(<HeaderNav />, { content: { categories: [grocery, mapCategory] } })
+    expect(screen.getByRole('link', { name: 'Map' })).toHaveAttribute('href', '/test-community/map')
+  })
+
+  it('is absent when the community has no Map pseudo-category', () => {
+    renderWithProviders(<HeaderNav />, { content: { categories: [grocery] } })
+    expect(screen.queryByRole('link', { name: 'Map' })).not.toBeInTheDocument()
+  })
+})
+
+describe('HeaderNav — More', () => {
+  it('offers About and Privacy as real links, and opens feedback as an in-place modal', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true, feedbackButtonLabel: 'Send feedback' } },
+    })
+
+    await user.click(screen.getByRole('button', { name: /More/ }))
+
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about')
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+
+    // Opens the same in-place FeedbackForm modal the footer's own
+    // FeedbackButton does — not a page navigation, so this component (and
+    // everything else on the page) stays mounted underneath it.
+    expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Send feedback' }))
+    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
+  })
+
+  it('hides the feedback item when an admin has turned feedback off', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: { categories: [grocery], settings: { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: false } },
+    })
+
+    await user.click(screen.getByRole('button', { name: /More/ }))
+    expect(screen.queryByRole('button', { name: SITE_SETTINGS_DEFAULTS.feedbackButtonLabel })).not.toBeInTheDocument()
+    // About/Privacy are unaffected by that flag.
+    expect(screen.getByRole('link', { name: 'About' })).toBeInTheDocument()
+  })
+})

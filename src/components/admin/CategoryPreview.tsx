@@ -198,6 +198,7 @@ export default function CategoryPreview({
               <SiteHeader
                 onGoHome={onClose}
                 location={{ address, coords, onAddressChange: setAddress, onCoords: setCoords, tracking: false, geoError: null, geoErrorSilent: false, onStartTracking: () => {}, onStopTracking: () => {} }}
+                hideNav
               />
               <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-8">{content}</main>
               <SiteFooter year={new Date().getFullYear()} />
