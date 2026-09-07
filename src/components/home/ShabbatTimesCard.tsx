@@ -67,11 +67,11 @@ export default function ShabbatTimesCard({
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
                 {data.holidayPeriod.name}
               </p>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] text-slate-800">
+              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
                 <span>Begins {data.holidayPeriod.begins.label}</span>
                 <span className="tabular-nums text-slate-900">{data.holidayPeriod.begins.time}</span>
               </div>
-              <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] text-slate-800">
+              <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
                 <span>Ends {data.holidayPeriod.ends.label}</span>
                 <span className="tabular-nums text-slate-900">{data.holidayPeriod.ends.time}</span>
               </div>
