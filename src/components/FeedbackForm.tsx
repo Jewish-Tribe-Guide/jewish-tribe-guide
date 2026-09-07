@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Honeypot from './Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
@@ -66,30 +67,31 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
 
   const wrap = (children: React.ReactNode) =>
     variant === 'modal' ? (
-      // onClick on the backdrop itself (not bubbled up from the card) closes
-      // it, same as the ✕ — checking e.target === e.currentTarget rather than
-      // stopPropagation on the card below, so a click anywhere inside the
-      // card (including future children that don't know to stop it) can
-      // never accidentally fall through and close the whole thing.
-      // overflow-y-auto on THIS element, not a max-h + its own scroll on the
-      // card below (tried first, still reported cut off) — the form
-      // (message, email, Turnstile widget, submit, privacy note) can be
-      // taller than a short browser window, and a `vh`-based cap on a
-      // nested scrollable card is exactly the kind of thing that goes
-      // wrong on a real device in ways a desktop dev server won't show:
-      // mobile browsers resize the *visual* viewport as their address bar
-      // shows/hides without moving `vh`'s value, and a fixed-position
-      // ancestor's `inset-0` doesn't track that either. Making the
-      // fixed backdrop itself the one scrollable element sidesteps `vh`
-      // entirely — it's sized to the real viewport by definition, and a
-      // flex container with `items-center` still lets you scroll to reach
-      // content that centering would otherwise clip off above or below.
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
-      >
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
-      </div>
+      // Portaled to <body> — opened from HeaderNav's "More" menu, which
+      // lives inside SiteHeader, and that header carries `backdrop-blur`.
+      // A backdrop-filter (like a transform) establishes a containing
+      // block for `position: fixed` descendants, so `fixed inset-0` here
+      // was sizing itself to the ~65px header instead of the viewport: the
+      // backdrop dimmed only a strip at the top of the screen, and the
+      // card rendered inside that strip, cut off, with the rest of the
+      // page untouched below it. CommunitySwitcher hit the identical bug
+      // for the identical reason (see its own doc) — same fix here.
+      //
+      // overflow-y-auto on this element, not a max-h + its own scroll on
+      // the card below (tried first) — the form (message, email,
+      // Turnstile widget, submit, privacy note) can be taller than a
+      // short browser window, and a `vh`-based cap on a nested scrollable
+      // card doesn't reliably track the real visible viewport the way
+      // this element's own box (now correctly sized once portaled) does.
+      createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+        >
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
+        </div>,
+        document.body,
+      )
     ) : (
       <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>
     )

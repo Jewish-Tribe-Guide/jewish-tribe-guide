@@ -65,4 +65,28 @@ describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
     const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
     expect(backdrop).toHaveClass('overflow-y-auto')
   })
+
+  // Opened from HeaderNav's "More" menu, which lives inside SiteHeader — and
+  // that header carries backdrop-blur, which (like a transform) establishes
+  // a containing block for `position: fixed` descendants. Un-portaled, this
+  // modal's `fixed inset-0` sized itself to the ~65px header instead of the
+  // viewport: the backdrop dimmed only a strip at the top of the screen, and
+  // the card rendered inside that strip, cut off, with the rest of the page
+  // untouched below it — CommunitySwitcher hit the identical bug for the
+  // identical reason (see its own doc). jsdom doesn't compute real
+  // containing-block layout, so this can't assert on the visible clipping
+  // itself — but it can assert on the fix: portaled straight to `document.
+  // body`, this can never inherit a containing block from wherever in the
+  // tree it's rendered, header or otherwise.
+  it('portals to document.body, so a containing-block ancestor (e.g. the header\'s own backdrop-blur) can\'t clip it', () => {
+    const { container } = renderWithProviders(
+      <div style={{ transform: 'translateY(0)' }}>
+        <FeedbackForm heading="Feedback" successMessage="Thanks!" onClose={vi.fn()} />
+      </div>,
+    )
+
+    const backdrop = screen.getByRole('heading', { name: 'Feedback' }).closest('.fixed.inset-0')
+    expect(backdrop?.parentElement).toBe(document.body)
+    expect(container.contains(backdrop)).toBe(false)
+  })
 })
