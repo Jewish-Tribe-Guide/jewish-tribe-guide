@@ -1,7 +1,9 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
-import { assertUsableSlug } from './routes'
+import { assertUsableSlug, slugify } from './routes'
+
+export { slugify }
 import {
   DEFAULT_CATEGORY_ICON,
   resolveCapabilities,
@@ -108,15 +110,6 @@ export async function getCategoryById(community: string, id: string): Promise<Ca
   return data ? toConfig(data as CategoryRow) : null
 }
 
-// Turns a human label into a URL-safe slug, e.g. "Car Repair" → "car-repair".
-export function slugify(label: string): string {
-  return label
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
 // Creates a category, picking a unique slug derived from its label. Returns the
 // created config (with its final id). New categories start with no detail fields
 // (the owner can add fields later); they render via the generic card renderer.
@@ -130,6 +123,13 @@ const KIND_LABELS: Record<CategoryKind, string> = {
 
 export async function createCategory(community: string, input: {
   label: string
+  /** An admin-chosen URL slug (see CategoryEditor's id field) — validated and
+   *  used as-is rather than auto-deduped, since silently changing what they
+   *  explicitly typed would defeat the point of letting them choose it.
+   *  Omitted, the slug is derived from `label` as before (and auto-deduped
+   *  with a "-2" suffix on collision), for any caller that doesn't offer the
+   *  admin a slug field of its own (e.g. CategoryManager's singleton rows). */
+  id?: string
   pluralLabel?: string
   icon?: string
   description?: string
@@ -147,7 +147,6 @@ export async function createCategory(community: string, input: {
   iconImageUrl?: string | null
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
-  const base = slugify(input.label) || 'category'
   const kind = input.kind ?? 'listing'
 
   // Only a listing category's slug comes from an admin freely typing a label —
@@ -157,22 +156,31 @@ export async function createCategory(community: string, input: {
   // 'zmanim' (it IS the category that reserved word exists for — see
   // FIXED_VIEW_KINDS in routes.ts). Guarding every kind here would block that
   // singleton from ever being created.
-  if (kind === 'listing') assertUsableSlug(base)
+  let id: string
+  if (input.id) {
+    id = slugify(input.id) || input.id
+    if (kind === 'listing') assertUsableSlug(id)
+    const { data } = await supabase.from('category').select('id').eq('community_id', community).eq('id', id).maybeSingle()
+    if (data) throw new Error(`"${id}" is already used by another category.`)
+  } else {
+    const base = slugify(input.label) || 'category'
+    if (kind === 'listing') assertUsableSlug(base)
 
-  // Ensure a unique id within this community — the same slug is a separate
-  // row in another community (composite primary key), so the uniqueness
-  // check has to be scoped the same way or it'd wrongly refuse (or wrongly
-  // allow) a slug based on what a DIFFERENT community already has.
-  let id = base
-  for (let n = 2; ; n++) {
-    const { data } = await supabase
-      .from('category')
-      .select('id')
-      .eq('community_id', community)
-      .eq('id', id)
-      .maybeSingle()
-    if (!data) break
-    id = `${base}-${n}`
+    // Ensure a unique id within this community — the same slug is a separate
+    // row in another community (composite primary key), so the uniqueness
+    // check has to be scoped the same way or it'd wrongly refuse (or wrongly
+    // allow) a slug based on what a DIFFERENT community already has.
+    id = base
+    for (let n = 2; ; n++) {
+      const { data } = await supabase
+        .from('category')
+        .select('id')
+        .eq('community_id', community)
+        .eq('id', id)
+        .maybeSingle()
+      if (!data) break
+      id = `${base}-${n}`
+    }
   }
 
   const row = {
@@ -210,8 +218,9 @@ export async function createCategory(community: string, input: {
 }
 
 // Updates an existing category's presentation, fields, and capabilities. Only
-// the provided keys are changed. The slug (`id`) is immutable — it's referenced
-// by every listing's `resource.category`, so it's never rewritten here.
+// the provided keys are changed. The slug (`id`) isn't among them — renaming
+// it is its own, separate operation (see renameCategoryId below) since it has
+// to cascade to every listing's `resource.category`, not just update this row.
 export async function updateCategory(
   community: string,
   id: string,
@@ -274,6 +283,72 @@ export async function updateCategory(
 
   if (error) throw new Error(`Failed to update category: ${error.message}`)
   return data ? toConfig(data as CategoryRow) : null
+}
+
+// Renames a category's own URL slug, migrating every listing that currently
+// points at the old one (`resource.category` has no DB foreign key, so
+// nothing does this automatically — see the schema migration's own comment).
+// Called only when the admin explicitly changes the id field in
+// CategoryEditor, and only after they've confirmed against a listing count
+// (see the id-usage route) — same shape as applyFieldOptionRenames'
+// confirm-then-cascade flow, just for the category's own identity instead of
+// one field's option values.
+//
+// The category row is updated FIRST, then the listings — if the listings
+// update somehow failed after the id changed, the category would still
+// resolve at its new slug (nothing broken there), just with some listings
+// still filed under the stale id until a retry; the reverse order would risk
+// listings pointing at a category that briefly doesn't exist under the old
+// id yet either. Neither order is a true transaction (Supabase's JS client
+// has no multi-table one), but this is the safer of the two to fail
+// partway through.
+export async function renameCategoryId(community: string, oldId: string, newId: string): Promise<{ listings: number }> {
+  if (oldId === newId) return { listings: 0 }
+  assertUsableSlug(newId)
+  const supabase = getAdminClient()
+
+  const { data: collision } = await supabase
+    .from('category')
+    .select('id')
+    .eq('community_id', community)
+    .eq('id', newId)
+    .maybeSingle()
+  if (collision) throw new Error(`"${newId}" is already used by another category.`)
+
+  const { count } = await supabase
+    .from('resource')
+    .select('id', { count: 'exact', head: true })
+    .eq('community_id', community)
+    .eq('category', oldId)
+
+  const { error: catErr } = await supabase
+    .from('category')
+    .update({ id: newId })
+    .eq('community_id', community)
+    .eq('id', oldId)
+  if (catErr) throw new Error(`Failed to rename category: ${catErr.message}`)
+
+  const { error: resErr } = await supabase
+    .from('resource')
+    .update({ category: newId })
+    .eq('community_id', community)
+    .eq('category', oldId)
+  if (resErr) throw new Error(`Failed to migrate the category's listings: ${resErr.message}`)
+
+  return { listings: count ?? 0 }
+}
+
+// How many listings currently sit under this category id — checked before
+// offering to rename it (see the id-usage route), so the confirmation dialog
+// can tell the admin the real scope of the migration instead of a vague
+// warning.
+export async function countCategoryListings(community: string, id: string): Promise<number> {
+  const { count } = await getAdminClient()
+    .from('resource')
+    .select('id', { count: 'exact', head: true })
+    .eq('community_id', community)
+    .eq('category', id)
+  return count ?? 0
 }
 
 // Permanently deletes a category and every listing in it. Listings are removed

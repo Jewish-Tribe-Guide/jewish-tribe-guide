@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { haversineMiles } from '@/lib/geo'
-import { pointsWithinZoomRadius } from './ResourceMap'
+import { markerZIndex, pointsWithinZoomRadius, resolveSelectionZoom, SELECTED_Z_BOOST, type MapPoint } from './ResourceMap'
+
+function point(overrides: Partial<MapPoint> = {}): MapPoint {
+  return { id: 'p1', lat: 40, lng: -75, name: 'Test Place', color: '#000', ...overrides }
+}
 
 // Pure-function coverage for the admin's map zoom radius (site_settings.
 // map_zoom_radius_miles) — the piece that decides which points count toward
@@ -42,5 +46,68 @@ describe('pointsWithinZoomRadius', () => {
 
   it('returns an empty array unchanged when given no points', () => {
     expect(pointsWithinZoomRadius([], CENTER, 10)).toEqual([])
+  })
+})
+
+// AdvancedMarkerElement's own default stacking (screen position, recomputed
+// every zoom frame — see markerZIndex's own doc comment) has no stable
+// ordering for two markers close enough together to project to nearly the
+// same screen Y: which one rounds "in front" can flip frame to frame,
+// visible live as the pair swapping which is on top mid-zoom. markerZIndex
+// exists to make that deterministic instead.
+describe('markerZIndex', () => {
+  it('is deterministic — the same point/selection always yields the same value', () => {
+    const p = point({ lat: 40.123456 })
+    expect(markerZIndex(p, false)).toBe(markerZIndex(p, false))
+  })
+
+  it('gives a more-southern point a higher (more "in front") value than a more-northern one', () => {
+    const south = point({ lat: 39 })
+    const north = point({ lat: 41 })
+    expect(markerZIndex(south, false)).toBeGreaterThan(markerZIndex(north, false))
+  })
+
+  it('never depends on anything but latitude and selection — same lat, same value regardless of id/lng/name', () => {
+    const a = point({ id: 'a', lat: 40, lng: -75, name: 'A' })
+    const b = point({ id: 'b', lat: 40, lng: -73, name: 'B' })
+    expect(markerZIndex(a, false)).toBe(markerZIndex(b, false))
+  })
+
+  it('boosts a selected point above an unselected neighbor regardless of latitude', () => {
+    // The selected point is further NORTH — without the boost it would rank
+    // BELOW its southern, unselected neighbor; the boost must overcome that.
+    const selectedNorth = point({ id: 'sel', lat: 45 })
+    const unselectedSouth = point({ id: 'other', lat: 30 })
+    expect(markerZIndex(selectedNorth, true)).toBeGreaterThan(markerZIndex(unselectedSouth, false))
+  })
+
+  it('applies exactly SELECTED_Z_BOOST on top of the unselected value for the same point', () => {
+    const p = point({ lat: 40 })
+    expect(markerZIndex(p, true) - markerZIndex(p, false)).toBe(SELECTED_Z_BOOST)
+  })
+})
+
+// Picking a listing from the sidebar/sheet list is supposed to visibly "take
+// you there" on the map. With a location set and the pick far away, that
+// already forced a zoom-in — but with NO location set at all, the old code
+// left the zoom untouched unconditionally, so at a city-wide zoom the pan to
+// center the pin was only a few screen-pixels: geometrically correct, but
+// indistinguishable from nothing happening. Spotted comparing this branch
+// against prod, where the same gap exists.
+describe('resolveSelectionZoom', () => {
+  it('always zooms in for a pick far from the visitor\'s own location', () => {
+    expect(resolveSelectionZoom(true, true, 18)).toBe(15)
+  })
+
+  it('zooms in when there is no location set and the current zoom is too far out to show a real pan', () => {
+    expect(resolveSelectionZoom(false, false, 11)).toBe(15)
+  })
+
+  it('leaves the zoom alone with no location set if already zoomed in close enough to see the pan', () => {
+    expect(resolveSelectionZoom(false, false, 16)).toBeNull()
+  })
+
+  it('leaves the zoom alone for a nearby pick with a location set', () => {
+    expect(resolveSelectionZoom(true, false, 11)).toBeNull()
   })
 })

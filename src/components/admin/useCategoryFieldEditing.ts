@@ -8,6 +8,7 @@ import {
   type FieldType,
 } from '@/lib/categories'
 import { CATEGORY_TEMPLATES, type CategoryTemplate } from '@/lib/categoryTemplates'
+import { slugify } from '@/lib/routes'
 import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEditorLogic'
 
 // ── The draft state behind CategoryEditor and every mutation of it: naming,
@@ -17,7 +18,13 @@ import { photoInsertIndex, singularize, toDraft, type Draft } from './categoryEd
 // ever read this draft, never own it. ──
 
 export function useCategoryFieldEditing(initial: CategoryConfig | null) {
+  const isNew = initial === null
   const [draft, setDraft] = useState<Draft>(() => toDraft(initial))
+  // Whether the admin has directly edited the id field on a NEW category —
+  // once true, typing a name no longer overwrites whatever they chose. Only
+  // matters for isNew: an existing category's id already exists and never
+  // auto-follows the name, touched or not.
+  const [idTouched, setIdTouched] = useState(false)
   // The most recently applied template, if any — stays visible/pickable
   // afterward (see CategoryEditor's render) so switching to a different one is
   // just another click. Tracked so a *second* apply can tell "still the first
@@ -41,9 +48,31 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
   }
 
   // One "Name" field holds the plural (card title); the singular used in
-  // "Add a …" phrasing is derived by dropping a trailing "s".
+  // "Add a …" phrasing is derived by dropping a trailing "s". id follows
+  // along too, but only for a brand-new category the admin hasn't already
+  // hand-edited the slug on — matches the "food" → "/food" example that
+  // motivated this (see CategoryEditor's id field doc) without fighting a
+  // slug someone already customized.
   function setName(name: string) {
-    setDraft((d) => ({ ...d, pluralLabel: name, label: singularize(name) }))
+    setDraft((d) => ({
+      ...d,
+      pluralLabel: name,
+      label: singularize(name),
+      id: isNew && !idTouched ? slugify(name) : d.id,
+    }))
+  }
+
+  // Direct edits to the id field itself — always allowed (on a new category
+  // this also stops setName from overwriting it further; on an existing one
+  // it's the actual rename, cascaded on save — see renameCategoryId).
+  // Lowercased but NOT run through slugify() live: that collapses/strips
+  // hyphens on every keystroke, which eats a trailing "-" the instant it's
+  // typed (mid-way through typing "food-trucks", the "-" vanishes before the
+  // next letter lands). validateDraft (slugRejectionReason) catches anything
+  // left over at save time instead.
+  function setId(value: string) {
+    setIdTouched(true)
+    setDraft((d) => ({ ...d, id: value.toLowerCase() }))
   }
 
   function setCap(key: keyof CategoryCapabilities, value: boolean) {
@@ -329,6 +358,7 @@ export function useCategoryFieldEditing(initial: CategoryConfig | null) {
     setGroupForm,
     set,
     setName,
+    setId,
     setCap,
     applyTemplate,
     updateField,

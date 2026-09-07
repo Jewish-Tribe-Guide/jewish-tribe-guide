@@ -26,6 +26,9 @@ export async function GET(request: Request) {
 
 type CreateBody = {
   label?: string
+  /** Admin-chosen URL slug — see createCategory's own doc on how this differs
+   *  from the auto-derived default. */
+  id?: string
   pluralLabel?: string
   icon?: string
   description?: string
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
   try {
     const category = await createCategory(community.slug, {
       label: body.label,
+      id: body.id,
       pluralLabel: body.pluralLabel,
       icon: body.icon,
       description: body.description,

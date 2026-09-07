@@ -1450,8 +1450,20 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   something to animate FROM/TO — unmounting it outright
                   wouldn't animate, it'd just vanish. ────────────────────── */}
           {!isMobile && (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && (
+            // desktop:absolute (not a flex sibling that consumes row width
+            // anymore): this used to sit inline in the flex row, so opening
+            // it shrank the map div next to it — which resizes the map's
+            // real container, and ResourceMap's own ResizeObserver reacts to
+            // any container resize by re-centering the map on its (now
+            // off-center) geo center to refresh the tile layer (see that
+            // comment). The net effect was the whole map visibly shifting
+            // whenever the sidebar opened or closed, not just around a
+            // selection — Google Maps' own results panel floats over the
+            // map instead for exactly this reason. Overlaying it here (with
+            // its own elevation) means the map's box never changes size, so
+            // that ResizeObserver never fires and nothing under it moves.
             <aside
-              className={`hidden shrink-0 flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out desktop:flex desktop:min-h-0 ${
+              className={`hidden flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
                 sidebarVisible ? 'desktop:w-[380px] desktop:border-r desktop:border-slate-200' : 'desktop:w-0'
               }`}
             >
@@ -1471,6 +1483,18 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                 // browser's own swipe-to-go-back gesture once it reaches
                 // this scroll boundary, even though the row's own wheel
                 // handler already calls preventDefault (see NearbyList).
+                //
+                // This WAS removed once, on the theory that the row-level
+                // handler's own `< 2` noise-floor threshold (see NearbyList's
+                // own comment) already closed that gap on its own — tested
+                // live and it didn't: without this, the row's own swipe
+                // itself started misbehaving (the back-gesture recognizer
+                // competing with it mid-drag), which is worse than losing
+                // back-swipe over this panel. Put back; a bare Google Maps
+                // embed has this same "no back-swipe over the interactive
+                // surface" limitation everywhere, so this screen having it
+                // too, specifically here, is a smaller cost than a broken
+                // row swipe.
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
                   {desktopSelected && desktopSelected.raw && desktopSelectedCategory ? (
                     <MapPlaceDetail
@@ -1529,21 +1553,39 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </button>
           )}
 
-          {/* ── Floating search + chips (desktop) — positioned relative to
-                  the whole row (not the map div, and not inside the sidebar
-                  above), so it sits in the exact same spot whether or not
-                  the sidebar is showing. It floats on top of the sidebar
-                  when the sidebar's present (see that panel's own pt-16,
-                  which clears space for this) or directly on the map when
-                  it's not — never resizing or relocating either way, unlike
-                  having two separate copies. ─────────────────────────────── */}
+          {/* ── Floating search (desktop) — fixed at left-3/top-3, always,
+                  stacked above the sidebar in z-order (z-40 vs. the
+                  sidebar's z-30) so it reads as sitting on top of the
+                  sidebar's own top edge, the same way Google Maps' own
+                  search box sits over its results panel. Deliberately
+                  narrower than the sidebar (336px, not the full 368px that
+                  would put its right edge flush with the sidebar's own
+                  right edge at 380px) — flush left no visible gap between
+                  the end of the search box and the sidebar's white below
+                  it, unlike Google Maps' own search box, which leaves a
+                  real margin on both sides. left-3 + 336px = 348px, 32px
+                  short of the sidebar's 380px edge. Neither this nor the
+                  chips below ever move now — the sidebar sliding in and
+                  out underneath is what changes, not these. ───────────── */}
           {!isMobile && (
-            // right-16 (not right-3): leaves clearance so the chip row's
-            // scroll area doesn't run under the fullscreen button, which
-            // shares this same top-right corner of the map.
-            <div className="absolute left-3 right-16 top-3 z-20 hidden items-start gap-2 desktop:flex">
-              <div className="w-72 shrink-0">{desktopSearchForm}</div>
-              {desktopCategoryChips && <div className="min-w-0 flex-1 pt-0.5">{desktopCategoryChips}</div>}
+            <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
+          )}
+
+          {/* ── Floating category chips (desktop) — fixed just clear of the
+                  sidebar's right edge (380px + a 16px gap = 396px), matching
+                  how tight Google Maps' own chip row sits after its panel
+                  (see the reference screenshot) — closer than the margin
+                  left between the search box and the sidebar's edge above,
+                  which is a separate, deliberately larger gap. Fixed, not
+                  sidebar-tracking: the search box and this gap are already
+                  sized so the sidebar can never reach far enough right to
+                  need this to get out of its way. right-16 (not right-3):
+                  leaves clearance so the chip row's scroll area doesn't run
+                  under the fullscreen button, which shares this same
+                  top-right corner of the map. ───────────────────────────── */}
+          {!isMobile && desktopCategoryChips && (
+            <div className="absolute left-[396px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
+              {desktopCategoryChips}
             </div>
           )}
 

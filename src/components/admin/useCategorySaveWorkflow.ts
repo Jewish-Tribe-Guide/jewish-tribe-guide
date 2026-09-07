@@ -54,6 +54,12 @@ export function useCategorySaveWorkflow({
   const [pendingRename, setPendingRename] = useState<{
     renames: { fieldKey: string; fieldLabel: string; oldValue: string; newValue: string; count: number }[]
   } | null>(null)
+  // Set once a save attempt on an existing category finds the id field
+  // changed and has fetched how many existing listings currently sit under
+  // the OLD id — a confirmation gate before that migration (see
+  // renameCategoryId) runs for real. Cleared on cancel or once the confirmed
+  // save completes.
+  const [pendingIdRename, setPendingIdRename] = useState<{ oldId: string; newId: string; count: number } | null>(null)
 
   function cancelCleanup() {
     setPendingCleanup(null)
@@ -63,6 +69,10 @@ export function useCategorySaveWorkflow({
     setPendingRename(null)
   }
 
+  function cancelIdRename() {
+    setPendingIdRename(null)
+  }
+
   async function save(opts?: { skipRename?: boolean }) {
     const errs = validateDraft(draft)
     if (errs.length) {
@@ -70,6 +80,31 @@ export function useCategorySaveWorkflow({
       return
     }
     setErrors([])
+
+    // Editing an existing category and the id field changed: check how many
+    // existing listings currently sit under the OLD id before cascading the
+    // rename for real — skip once already confirmed (pendingIdRename is set).
+    // Checked first, ahead of the option-rename/field-cleanup gates below:
+    // those two key their own usage checks off the CURRENT id, which is
+    // about to change, so they need to run against whichever id survives
+    // this gate, not race it.
+    if (!isNew && !pendingIdRename && draft.id !== initial!.id) {
+      setSaving(true)
+      try {
+        const body = await fetchJson<{ count: number }>(
+          withCommunity(`/api/admin/categories/${initial!.id}/id-usage`, community),
+          { headers: { Authorization: `Bearer ${token}` } },
+          'Could not check existing listings.',
+        )
+        setPendingIdRename({ oldId: initial!.id, newId: draft.id, count: body.count })
+        return
+      } catch (err) {
+        setErrors([err instanceof Error ? err.message : 'Could not check existing listings.'])
+        return
+      } finally {
+        setSaving(false)
+      }
+    }
 
     // Editing an existing category and it looks like a select/tags option got
     // renamed: check how many existing listings still have the old value
@@ -146,6 +181,7 @@ export function useCategorySaveWorkflow({
     setSaving(true)
     try {
       const payload = {
+        ...(isNew && { id: draft.id }),
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,
@@ -186,6 +222,7 @@ export function useCategorySaveWorkflow({
               newValue,
             })),
           }),
+        ...(pendingIdRename && { newId: pendingIdRename.newId }),
       }
       await fetchJson(
         withCommunity(isNew ? '/api/admin/categories' : `/api/admin/categories/${initial!.id}`, community),
@@ -203,8 +240,9 @@ export function useCategorySaveWorkflow({
       setSaving(false)
       setPendingCleanup(null)
       setPendingRename(null)
+      setPendingIdRename(null)
     }
   }
 
-  return { saving, errors, pendingCleanup, pendingRename, save, cancelCleanup, cancelRename }
+  return { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename }
 }

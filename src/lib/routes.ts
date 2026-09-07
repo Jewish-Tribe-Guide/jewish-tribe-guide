@@ -77,6 +77,18 @@ export const RESERVED_SLUGS = new Set([
   'opengraph-image',
 ])
 
+/** Turns a human label into a URL-safe slug, e.g. "Car Repair" → "car-repair".
+ *  Lives here (not categoryStore, a server-only module) so the category
+ *  editor can preview/derive a slug client-side as an admin types, not just
+ *  once a save request round-trips to the server. */
+export function slugify(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 /** Why a slug can't be used, or null when it's fine. Checked by the admin
  *  category/form editors before saving, so a reserved slug is rejected at the
  *  point of creation rather than silently shadowing a real screen. */

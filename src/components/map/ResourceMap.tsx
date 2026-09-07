@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { loadGoogleMaps, MAPS_API_KEY, MAPS_MAP_ID, mapsAuthFailed, onMapsAuthFailure } from '@/lib/loadGoogleMaps'
 import { destinationQuery, directionsUrl, type LatLng } from '@/lib/googleMapsLinks'
 import { haversineMiles } from '@/lib/geo'
 import { community } from '@/community.config'
 import type { DirectoryResource } from '@/types'
 import { glyphElementFor, glyphTextFor } from '@/lib/categoryIcons'
+import { PinIcon } from '@/components/icons'
 
 /** One plottable place on the map. */
 export type MapPoint = {
@@ -237,6 +239,54 @@ function buildInfoContent(
   return wrap
 }
 
+// AdvancedMarkerElement has no stable default stacking order: left unset, it
+// falls back to each marker's live SCREEN position (Google's own docs:
+// "displayed according to their vertical position on screen"), recomputed
+// every frame during a zoom. Two markers close enough together project to
+// nearly the same screen Y, and which one rounds "lower" (therefore "in
+// front") can flip frame to frame as the map animates — seen live as the two
+// pins visibly swapping which is on top mid-zoom. A zIndex derived from
+// latitude is stable across zoom/pan (it never changes unless the marker's
+// own coordinates do), eliminating the flicker; negative so a more-southern
+// (further "down" on a north-up map) pin still reads as "in front", matching
+// the default convention's own intent. `+SELECTED_Z_BOOST` keeps the
+// currently-selected pin on top of any neighbor regardless of latitude, so
+// selecting it never leaves it visually behind an unselected one beside it.
+// Bigger than the largest possible latitude-based spread (180° × 1e6 = 1.8e8,
+// pole to pole) — otherwise a selected point could still rank behind a
+// distant unselected one instead of always winning.
+export const SELECTED_Z_BOOST = 1e9
+export function markerZIndex(p: MapPoint, isSelected: boolean): number {
+  return Math.round(-p.lat * 1e6) + (isSelected ? SELECTED_Z_BOOST : 0)
+}
+
+// A far pick (one worth a real "jump there" zoom, whether that's because it's
+// far from the visitor's own location or because there's no location set at
+// all to judge distance by) gets zoomed to this level before panning.
+const FAR_PICK_ZOOM = 15
+// Below this, a pin selected with no location set can pan by only a few
+// screen pixels — geometrically correct, but at a city-wide zoom that's
+// indistinguishable from nothing happening at all.
+const ZOOMED_OUT_FLOOR = 13
+
+// Decides whether selecting a place should force a specific zoom level
+// before panning to it, or leave whatever zoom the visitor already chose
+// alone. Exported so ResourceMap.test.ts can cover this without a real
+// google.maps.Map instance, which nothing in this codebase mocks.
+//
+//  - A pick far from the visitor's own location always zooms in — there's no
+//    way the current view already shows anything useful about it.
+//  - No location set at all is different: nothing about picking a listing
+//    implies the visitor's chosen zoom is wrong, so this only forces a zoom
+//    when the current one is too far out for the pan to actually read as
+//    "took you there" — a visitor already zoomed in close (browsing a single
+//    neighborhood, say) keeps the zoom they set.
+export function resolveSelectionZoom(hasLocation: boolean, isFar: boolean, currentZoom: number): number | null {
+  if (isFar) return FAR_PICK_ZOOM
+  if (!hasLocation && currentZoom <= ZOOMED_OUT_FLOOR) return FAR_PICK_ZOOM
+  return null
+}
+
 // A category pin — noticeably bigger AND wrapped in a pulsing color halo plus
 // a one-time drop-bounce when it's the place currently shown in the mobile
 // sheet. Scale alone (the old behavior) read as "a little bigger", easy to
@@ -431,6 +481,13 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [ready, setReady] = useState(false)
   const [authFailed, setAuthFailed] = useState(mapsAuthFailed())
+  // Right-click's Pin/Unpin menu — see the marker's 'contextmenu' listener
+  // below for how this opens. `point` carries whatever pinned state it had
+  // at the moment of the right-click; closing-and-reopening the menu after a
+  // toggle (rather than patching this in place) keeps it simple, and the
+  // menu is only ever open a click or two before it closes anyway.
+  const [contextMenu, setContextMenu] = useState<{ point: MapPoint; x: number; y: number } | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
 
   // Read these inside the marker effect via refs so it does NOT rebuild markers
   // when the live GPS position ticks or the callback identity changes — only
@@ -582,6 +639,48 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     // real synchronous work landing right as the visitor's looking at it,
     // which reads as the map freezing for a beat.
     if (syncedPointsRef.current === points) return
+
+    // A pin toggle produces a brand-new `points` array (see ResourceMapView's
+    // `allPoints` memo, which depends on `pinnedIds`) with the exact same
+    // places, only some `pinned` flags flipped — same identity problem the
+    // comment above already solved for an unrelated re-render, just from a
+    // different cause. Falling through to the full rebuild below for that
+    // tore down and recreated every marker (new custom elements, new
+    // pointerdown/pointermove/pointerup/contextmenu/gmp-click listeners) for
+    // a change that visually affects at most one pin. When every point still
+    // matches its previous counterpart 1:1 (same id, same geometry, same
+    // look) except for `pinned`, patch just the pins whose `pinned` actually
+    // changed — the same `marker.content = buildPin(...)` in-place technique
+    // the selection-highlight effect below already uses for the same reason.
+    const prevPoints = syncedPointsRef.current
+    if (prevPoints && prevPoints.length === points.length) {
+      let onlyPinnedChanged = true
+      for (let i = 0; i < points.length; i++) {
+        const a = prevPoints[i]
+        const b = points[i]
+        if (
+          a.id !== b.id || a.lat !== b.lat || a.lng !== b.lng || a.color !== b.color ||
+          a.glyph !== b.glyph || a.glyphSrc !== b.glyphSrc || a.name !== b.name
+        ) {
+          onlyPinnedChanged = false
+          break
+        }
+      }
+      if (onlyPinnedChanged) {
+        syncedPointsRef.current = points
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i]
+          const entry = markersByIdRef.current.get(p.id)
+          if (!entry) continue
+          entry.point = p
+          if (!!prevPoints[i].pinned !== !!p.pinned) {
+            entry.marker.content = buildPin(p, p.id === selectedIdRef.current)
+          }
+        }
+        return
+      }
+    }
+
     syncedPointsRef.current = points
 
     markersRef.current.forEach((m) => (m.map = null))
@@ -594,6 +693,7 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
         position: { lat: p.lat, lng: p.lng },
         title: p.name,
         content: buildPin(p, p.id === selectedIdRef.current),
+        zIndex: markerZIndex(p, p.id === selectedIdRef.current),
       })
 
       // Press-and-hold to toggle Pinned, without also opening the place's
@@ -608,6 +708,14 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       let longPressTimer: ReturnType<typeof setTimeout> | null = null
       let longPressFired = false
       let pressStart = { x: 0, y: 0 }
+      // Right-click already opens a proper menu with a Pin/Unpin option (see
+      // the 'contextmenu' listener below) — a mouse doesn't need the timer
+      // too, and 500ms of held-mouse-button is a touch-native pattern with
+      // no visible affordance hinting it does anything on desktop. Tracked
+      // per marker rather than checked once, since the same marker element
+      // outlives a visitor switching between mouse and touch (a laptop with
+      // a touchscreen, say).
+      let lastPointerType: string = 'touch'
       const LONG_PRESS_MS = 500
       const MOVE_CANCEL_PX = 10
       function cancelLongPress() {
@@ -618,7 +726,8 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       }
       marker.addEventListener('pointerdown', (e: Event) => {
         const pe = e as PointerEvent
-        if (!onLongPressPointRef.current) return
+        lastPointerType = pe.pointerType
+        if (!onLongPressPointRef.current || pe.pointerType === 'mouse') return
         longPressFired = false
         pressStart = { x: pe.clientX, y: pe.clientY }
         cancelLongPress()
@@ -640,11 +749,19 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
       // the browser's native 'contextmenu' event underneath our own timer
       // above, which would otherwise bubble up to the map container's own
       // 'contextmenu' listener (see onMapLongPress) and ALSO open "drop a
-      // pin here" at this exact spot. Swallowed here, before it can bubble.
+      // pin here" at this exact spot. Always swallowed here, before it can
+      // bubble — then, for an actual right-click specifically (not a touch
+      // long-press synthesizing the same event, which already toggled the
+      // pin directly above), open a small Pin/Unpin menu at the cursor: the
+      // desktop-native way to discover "there's a hidden action here" that a
+      // held mouse button never was.
       marker.addEventListener('contextmenu', (e: Event) => {
         if (!onLongPressPointRef.current) return
         e.preventDefault()
         e.stopPropagation()
+        if (lastPointerType !== 'mouse') return
+        const me = e as MouseEvent
+        setContextMenu({ point: p, x: me.clientX, y: me.clientY })
       })
 
       marker.addListener('gmp-click', () => {
@@ -764,12 +881,16 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     const prevId = prevSelectedIdRef.current
     if (prevId && prevId !== selectedId) {
       const prev = markersByIdRef.current.get(prevId)
-      if (prev) prev.marker.content = buildPin(prev.point, false)
+      if (prev) {
+        prev.marker.content = buildPin(prev.point, false)
+        prev.marker.zIndex = markerZIndex(prev.point, false)
+      }
     }
     if (selectedId && selectedId !== prevId) {
       const current = markersByIdRef.current.get(selectedId)
       if (current) {
         current.marker.content = buildPin(current.point, true)
+        current.marker.zIndex = markerZIndex(current.point, true)
         const shouldFrame = frameToken !== consumedFrameTokenRef.current
         consumedFrameTokenRef.current = frameToken
         if (shouldFrame) {
@@ -914,14 +1035,18 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
               // A far pick needs a real zoom-in (it's arriving from whatever
               // the map happened to be showing before, which could be
               // anything) — same single-point convention used elsewhere in
-              // this file. No location set at all is different: nothing about
-              // this selection implies the visitor's chosen zoom is wrong, so
-              // that case leaves it alone rather than forcing one. Set BEFORE
-              // panToVisibleCenter, not after — see the zoom-floor branch
-              // above for why computing the offset at the OLD zoom (instead
-              // of the one it's about to jump to) turns a small padding
-              // correction into a real-world offset of a mile or more.
-              if (isFar) map.setZoom(15)
+              // this file. No location set at all used to leave the zoom
+              // alone unconditionally, on the theory that nothing about this
+              // selection implies the visitor's chosen zoom is wrong — but at
+              // a city-wide zoom, panning a few screen-pixels to center a pin
+              // doesn't read as "took you there" at all (see
+              // resolveSelectionZoom). Set BEFORE panToVisibleCenter, not
+              // after — see the zoom-floor branch above for why computing the
+              // offset at the OLD zoom (instead of the one it's about to jump
+              // to) turns a small padding correction into a real-world
+              // offset of a mile or more.
+              const forcedZoom = resolveSelectionZoom(!!userLocationRef.current, !!isFar, map.getZoom() ?? 0)
+              if (forcedZoom !== null) map.setZoom(forcedZoom)
               // Either no location set, or the pick is far enough that fitting
               // both wouldn't be useful — just center the pin itself, but
               // still account for the sheet and the top overlay: instead of
@@ -982,6 +1107,31 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
     }
   }, [userLocation, follow, ready])
 
+  // Dismiss the right-click Pin/Unpin menu the same way any menu should: an
+  // outside click, Escape, or the map moving out from under it (panning or
+  // zooming would leave it pointing at empty space otherwise). Checked
+  // against contextMenuRef, not just "was this inside the menu" — a capture-
+  // phase mousedown fires before the menu's own onClick, so closing
+  // unconditionally here would unmount the button before its click ever
+  // gets to run, which is the actual bug this ref check exists to avoid.
+  useEffect(() => {
+    if (!contextMenu) return
+    const map = mapRef.current
+    function close(e?: MouseEvent) {
+      if (e && contextMenuRef.current?.contains(e.target as Node)) return
+      setContextMenu(null)
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close() }
+    document.addEventListener('mousedown', close, true)
+    document.addEventListener('keydown', onKey)
+    const listeners = map ? [map.addListener('bounds_changed', () => close())] : []
+    return () => {
+      document.removeEventListener('mousedown', close, true)
+      document.removeEventListener('keydown', onKey)
+      listeners.forEach((l) => l.remove())
+    }
+  }, [contextMenu])
+
   const centerOnMe = () => {
     const map = mapRef.current
     if (!map || !userLocation) return
@@ -1011,10 +1161,19 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           the map tile imagery Google renders inside this div as a long-
           press-able image and pops its own Save/Copy/Share sheet instead of
           letting our pointerdown-timer long-press-to-pin handlers (below)
-          fire. */}
+          fire.
+          overscroll-x-none: a two-finger trackpad pan is a horizontal wheel
+          gesture same as any other, and Google Maps calling preventDefault
+          on it to actually pan doesn't reliably stop the browser's SEPARATE
+          swipe-navigation gesture recognizer (the elastic full-page slide
+          that can fire alongside/despite the pan) — same distinction
+          NearbyList's own overscroll-x-none doc makes for exactly this
+          "consumed the event but the browser still tried to navigate" gap.
+          Without it, panning the map itself could trigger a back navigation
+          mid-pan, on top of the actual map, on desktop trackpads. */}
       <div
         ref={containerRef}
-        className="w-full min-h-0 flex-1 rounded-2xl select-none"
+        className="w-full min-h-0 flex-1 overscroll-x-none rounded-2xl select-none"
         style={{ WebkitTouchCallout: 'none' }}
       />
       {ready && userLocation && (
@@ -1037,6 +1196,40 @@ export default function ResourceMap({ points, userLocation, directionsOrigin, fo
           {follow ? 'Following' : 'Re-center'}
         </button>
       )}
+      {/* Portaled to <body>, same reasoning as CheckboxDropdown's popup: this
+          needs to sit above the map (a real DOM element with its own
+          stacking, not something z-index inside this component can reliably
+          out-rank) and be positioned by viewport coordinates, not wherever
+          it'd land in this component's own layout flow. */}
+      {contextMenu &&
+        createPortal(
+          <div
+            ref={contextMenuRef}
+            role="menu"
+            // Offset a few px down-right of the cursor, not centered on it —
+            // a menu straddling the click point (this used to be
+            // -translate-y-1/2, vertically centered) sits half over the pin
+            // itself and whatever's near it on the map, which is exactly
+            // the "overlays a lot of the listing" complaint. Down-right
+            // matches how a native right-click menu opens.
+            style={{ position: 'fixed', top: contextMenu.y + 4, left: contextMenu.x + 4 }}
+            className="z-50 overflow-hidden rounded-md border border-slate-200 bg-white py-0.5 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onLongPressPointRef.current?.(contextMenu.point)
+                setContextMenu(null)
+              }}
+              className="flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+            >
+              <PinIcon filled={contextMenu.point.pinned} className="h-3 w-3 text-slate-500" />
+              {contextMenu.point.pinned ? 'Unpin' : 'Pin'}
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

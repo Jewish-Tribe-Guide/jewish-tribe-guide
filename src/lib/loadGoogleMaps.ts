@@ -61,6 +61,40 @@ declare global {
   }
 }
 
+// `gm_authFailure` above is what the docs advertise, but Google only actually
+// calls it for a bad/missing/referrer-rejected key — NOT for a project whose
+// billing has lapsed. That case (confirmed live: a billing account going
+// inactive broke the map in every environment with no deploy involved) prints
+// a plain `console.error('Google Maps JavaScript API error: BillingNotEnabledMapError', ...)`
+// and pops Google's own blocking "This page can't load Google Maps correctly"
+// dialog instead — `mapsAuthFailed()` stayed false the whole time, so every
+// consumer kept rendering a live (but broken) map underneath that dialog
+// rather than the fallback built for exactly this. Watching console.error for
+// the error-class names Google's own error-messages docs enumerate is the
+// only hook available for these; there's no event or promise rejection to
+// listen for instead.
+const CONSOLE_ERROR_MAP_FAILURES = [
+  'BillingNotEnabledMapError',
+  'ApiNotActivatedMapError',
+  'InvalidKeyMapError',
+  'RefererNotAllowedMapError',
+  'ExpiredKeyMapError',
+  'MissingKeyMapError',
+]
+
+let consoleWatched = false
+function watchConsoleForMapFailures() {
+  if (consoleWatched) return
+  consoleWatched = true
+  const original = console.error
+  console.error = (...args: unknown[]) => {
+    if (args.some((a) => typeof a === 'string' && CONSOLE_ERROR_MAP_FAILURES.some((p) => a.includes(p)))) {
+      reportMapsAuthFailure()
+    }
+    original.apply(console, args)
+  }
+}
+
 // Load the Maps JS API once, then resolve only when `importLibrary` is
 // available. With `loading=async`, that function is attached shortly *after*
 // the script's load event fires, so resolving on `onload` alone would call
@@ -70,6 +104,8 @@ let scriptPromise: Promise<void> | null = null
 export function loadGoogleMaps(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
   if (scriptPromise) return scriptPromise
+
+  watchConsoleForMapFailures()
 
   scriptPromise = new Promise<void>((resolve, reject) => {
     // Google calls this global on auth failure (bad key, no billing, etc.).

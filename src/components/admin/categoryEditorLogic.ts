@@ -8,6 +8,7 @@ import {
   type CategoryField,
   type FieldType,
 } from '@/lib/categories'
+import { slugRejectionReason } from '@/lib/routes'
 
 // ── Pure logic behind CategoryEditor — draft shape, template/field
 // normalization, and the two destructive-change detectors (option rename,
@@ -15,6 +16,12 @@ import {
 // independently of the ~1000 lines of JSX that consume it. ──
 
 export type Draft = {
+  /** URL slug — see CategoryEditor's id field. Auto-follows `pluralLabel` on
+   *  a brand-new category until the admin touches this field directly (see
+   *  useCategoryFieldEditing's idTouched); always independently editable on
+   *  an existing one, since renaming it is now a supported (if migrating)
+   *  operation — see renameCategoryId. */
+  id: string
   label: string
   pluralLabel: string
   /** One emoji shown on the card (home grid, map legend, admin list). */
@@ -103,6 +110,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
       : fields.splice(existingPhotoIndex, 1)[0]!
   fields.splice(photoInsertIndex(fields), 0, photoField)
   return {
+    id: c?.id ?? '',
     label: c?.label ?? '',
     pluralLabel: c?.pluralLabel ?? '',
     icon: c?.icon ?? '',
@@ -209,6 +217,8 @@ export function parseOptions(text: string): { value: string; label: string }[] {
 export function validateDraft(draft: Draft): string[] {
   const errs: string[] = []
   if (!draft.pluralLabel.trim()) errs.push('Category name is required.')
+  const slugError = slugRejectionReason(draft.id)
+  if (slugError) errs.push(slugError)
   // Seed the key set with the preserved hidden fields so a new visible field
   // can't collide with a caveat note / minyanim key.
   const keys = new Set<string>(draft.hiddenFields.map((f) => f.key))

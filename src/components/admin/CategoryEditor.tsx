@@ -7,11 +7,12 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryPreview from './CategoryPreview'
 import { CardBackgroundField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
-import { CleanupConfirm, RenameConfirm } from './CategorySaveConfirmations'
+import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { CAPABILITY_LABELS, mergeFieldsWithHidden, normalizeField } from './categoryEditorLogic'
 import { useCategoryFieldEditing } from './useCategoryFieldEditing'
 import { useCategorySaveWorkflow } from './useCategorySaveWorkflow'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 
 export function CategoryEditor({
   token,
@@ -50,6 +51,7 @@ export function CategoryEditor({
     setGroupForm,
     set,
     setName,
+    setId,
     setCap,
     applyTemplate,
     updateField,
@@ -69,7 +71,7 @@ export function CategoryEditor({
     managedPhotoIndex,
   } = useCategoryFieldEditing(initial)
 
-  const { saving, errors, pendingCleanup, pendingRename, save, cancelCleanup, cancelRename } = useCategorySaveWorkflow({
+  const { saving, errors, pendingCleanup, pendingRename, pendingIdRename, save, cancelCleanup, cancelRename, cancelIdRename } = useCategorySaveWorkflow({
     draft,
     initial,
     isNew,
@@ -137,7 +139,6 @@ export function CategoryEditor({
 
       <h2 className="text-lg font-semibold text-slate-900 mb-4">
         {isNew ? 'New category' : `Edit “${initial!.pluralLabel}”`}
-        {!isNew && <span className="ml-2 text-xs font-normal text-muted">{initial!.id}</span>}
       </h2>
 
       <div className="space-y-6">
@@ -189,6 +190,16 @@ export function CategoryEditor({
             <input value={draft.pluralLabel} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. Schools" />
             <span className="block text-[11px] text-muted mt-1">
               Plural, as it appears on the card. The singular (for “Add a …”) is derived automatically.
+            </span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-700 mb-1">URL slug *</span>
+            <input value={draft.id} onChange={(e) => setId(e.target.value)} className={inputClass} placeholder="e.g. bike-repair" />
+            <span className="block text-[11px] text-muted mt-1">
+              {routes.slug(community, draft.id || '…')}.{' '}
+              {isNew
+                ? 'Filled in from the name above until you edit it directly.'
+                : 'Changing this moves every listing here to the new URL — old links stop working.'}
             </span>
           </label>
           <PinColorField
@@ -503,7 +514,14 @@ export function CategoryEditor({
           </ul>
         )}
 
-        {pendingRename ? (
+        {pendingIdRename ? (
+          <IdRenameConfirm
+            rename={pendingIdRename}
+            saving={saving}
+            onCancel={cancelIdRename}
+            onConfirm={() => save()}
+          />
+        ) : pendingRename ? (
           <RenameConfirm
             rename={pendingRename}
             saving={saving}

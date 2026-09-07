@@ -103,7 +103,10 @@ describe('ModerationQueue — a pending submission', () => {
     expect(await findTitleText('Acme Grocery')).toBeInTheDocument()
     expect(screen.getByText('➕ New listing')).toBeInTheDocument()
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
-    expect(screen.getByText('by Jane Doe')).toBeInTheDocument()
+    // "by Jane Doe" is part of the same "Submitted <date> by Jane Doe" line
+    // now (see SubmissionCard's own comment on why "when" always shows) —
+    // a regex, not the old exact string, since it's no longer standalone text.
+    expect(screen.getByText(/by Jane Doe/)).toBeInTheDocument()
   })
 
   it('renders an update as a before → after diff for a changed field', async () => {
