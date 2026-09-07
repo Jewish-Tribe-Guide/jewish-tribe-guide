@@ -104,7 +104,15 @@ function ReadyState({ data }: { data: ZmanimData }) {
               {holidayPeriod.name}
             </h3>
             <div className="space-y-1.5">
-              <ShabbosRow label="Begins" entry={holidayPeriod.begins} emphasized />
+              {/* One row per candle lighting, not just the first — a 2-day
+                  Yom Tov (Rosh Hashana; Sukkot/Pesach/Shavuot's opening and
+                  closing) lights again the second night at its own later
+                  time, and the row's own date (see ShabbosRow) is what
+                  distinguishes which night is which without needing a
+                  "Night 1"/"Night 2" label. */}
+              {holidayPeriod.candleLightings.map((entry, i) => (
+                <ShabbosRow key={entry.iso ?? i} label="Candles" entry={entry} emphasized={i === 0} />
+              ))}
               <ShabbosRow label="Ends" entry={holidayPeriod.ends} emphasized={false} />
             </div>
           </>
@@ -171,21 +179,27 @@ function ShabbosRow({
 }) {
   if (!entry) return null
 
-  const value = `${entry.label} ${entry.time}`
+  // The date/weekday sits next to the row's own label, time alone on the
+  // right — matching ShabbatTimesCard (the home screen's version of this
+  // same content), which has always split it this way. This used to
+  // combine `entry.label` into the time-column value instead ("Begins" |
+  // "Fri, Sep 11 6:57 PM"), which read differently from the other card
+  // showing the identical Hebcal data.
+  const rowLabel = `${label} ${entry.label}`
 
   if (emphasized) {
     return (
       <div className="flex items-baseline justify-between gap-3 rounded-lg bg-primary/10 px-3 py-1.5 -mx-1">
-        <span className="text-sm font-semibold text-primary">{label}</span>
-        <span className="text-sm font-semibold text-primary tabular-nums">{value}</span>
+        <span className="text-sm font-semibold text-primary">{rowLabel}</span>
+        <span className="text-sm font-semibold text-primary tabular-nums">{entry.time}</span>
       </div>
     )
   }
 
   return (
     <div className="flex items-baseline justify-between gap-3 px-3 -mx-1">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm font-medium text-slate-900 tabular-nums">{value}</span>
+      <span className="text-sm text-muted">{rowLabel}</span>
+      <span className="text-sm font-medium text-slate-900 tabular-nums">{entry.time}</span>
     </div>
   )
 }

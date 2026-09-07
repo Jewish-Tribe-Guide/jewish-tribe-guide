@@ -129,6 +129,10 @@ describe('ShabbatTimesCard — the holiday block', () => {
     holidayPeriod: {
       name: 'Rosh Hashana',
       begins: { label: 'Fri, Sep 11', time: '6:57 PM' },
+      candleLightings: [
+        { label: 'Fri, Sep 11', time: '6:57 PM' },
+        { label: 'Sat, Sep 12', time: '7:55 PM' },
+      ],
       ends: { label: 'Sun, Sep 13', time: '7:53 PM' },
     },
   }

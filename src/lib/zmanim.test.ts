@@ -266,8 +266,58 @@ describe('getZmanimData', () => {
       expect(data.holidayPeriod).toEqual({
         name: 'Rosh Hashana',
         begins: { label: 'Fri, Sep 11', time: '6:57 PM', iso: '2026-09-11T18:57:00-04:00' },
+        candleLightings: [
+          { label: 'Fri, Sep 11', time: '6:57 PM', iso: '2026-09-11T18:57:00-04:00' },
+          { label: 'Sat, Sep 12', time: '7:55 PM', iso: '2026-09-12T19:55:00-04:00' },
+        ],
         ends: { label: 'Sun, Sep 13', time: '7:53 PM', iso: '2026-09-13T19:53:00-04:00' },
       })
+    })
+
+    it('captures the second night’s candle lighting, at its own later time, not just the first', async () => {
+      // Same fixture as above — the assertion here is narrowly about
+      // candleLightings specifically, so a change to the surrounding
+      // begins/ends/name assertions above doesn't also silently cover this.
+      vi.setSystemTime(new Date('2026-09-06T18:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Rosh Hashana', date: '2026-09-11' },
+            { category: 'candles', title: 'Candle lighting: 6:57pm', date: '2026-09-11T18:57:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana 5787', date: '2026-09-12' },
+            { category: 'candles', title: 'Candle lighting: 7:55pm', date: '2026-09-12T19:55:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana II', date: '2026-09-13' },
+            { category: 'havdalah', title: 'Havdalah: 7:53pm', date: '2026-09-13T19:53:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod?.candleLightings).toHaveLength(2)
+      expect(data.holidayPeriod?.candleLightings[1].time).toBe('7:55 PM')
+      // begins stays the first night alone, for callers that only want one.
+      expect(data.holidayPeriod?.begins.time).toBe('6:57 PM')
+    })
+
+    it('has a single candleLightings entry for a one-day Yom Tov (Yom Kippur)', async () => {
+      // 2 days before — inside the window regardless of weekday, since
+      // lookaheadDays's floor is always at least 3.
+      vi.setSystemTime(new Date('2026-09-18T12:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', title: 'Erev Yom Kippur', date: '2026-09-20' },
+            { category: 'candles', title: 'Candle lighting: 6:42pm', date: '2026-09-20T18:42:00-04:00' },
+            { category: 'holiday', title: 'Yom Kippur', date: '2026-09-21' },
+            { category: 'havdalah', title: 'Havdalah: 7:39pm', date: '2026-09-21T19:39:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod?.candleLightings).toEqual([
+        { label: 'Sun, Sep 20', time: '6:42 PM', iso: '2026-09-20T18:42:00-04:00' },
+      ])
     })
 
     it('strips a chol hamoed / day-number suffix down to the plain holiday name', async () => {

@@ -27,8 +27,10 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
     render(<ZmanimBody data={readyData} status="ready" />)
 
     expect(screen.getByText('Upcoming Shabbos')).toBeInTheDocument()
-    expect(screen.getByText('Candle Lighting')).toBeInTheDocument()
-    expect(screen.getByText('Havdalah')).toBeInTheDocument()
+    // The date/weekday sits next to the row's own label — matching
+    // ShabbatTimesCard, the home screen's version of this same content.
+    expect(screen.getByText('Candle Lighting Friday')).toBeInTheDocument()
+    expect(screen.getByText('Havdalah Saturday')).toBeInTheDocument()
   })
 
   it('shows today’s own Jewish-calendar events (e.g. a Yom Tov day itself) under the Hebrew date', () => {
@@ -51,12 +53,18 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
   // saw an ordinary "Upcoming Shabbos" row and nothing telling them it was
   // Sukkot.
   describe('the holiday block', () => {
+    // Real Hebcal shape: Rosh Hashana lights again the second night, from an
+    // existing flame, at its own later time.
     const withHoliday: ZmanimData = {
       ...readyData,
       isFriday: true,
       holidayPeriod: {
         name: 'Rosh Hashana',
         begins: { label: 'Fri, Sep 11', time: '6:57 PM' },
+        candleLightings: [
+          { label: 'Fri, Sep 11', time: '6:57 PM' },
+          { label: 'Sat, Sep 12', time: '7:55 PM' },
+        ],
         ends: { label: 'Sun, Sep 13', time: '7:53 PM' },
       },
     }
@@ -65,18 +73,50 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
       render(<ZmanimBody data={withHoliday} status="ready" />)
 
       expect(screen.getByText('Rosh Hashana')).toBeInTheDocument()
-      expect(screen.getByText('Begins')).toBeInTheDocument()
-      expect(screen.getByText('Fri, Sep 11 6:57 PM')).toBeInTheDocument()
-      expect(screen.getByText('Ends')).toBeInTheDocument()
-      expect(screen.getByText('Sun, Sep 13 7:53 PM')).toBeInTheDocument()
+      expect(screen.getByText('Candles Fri, Sep 11')).toBeInTheDocument()
+      expect(screen.getByText('6:57 PM')).toBeInTheDocument()
+      expect(screen.getByText('Ends Sun, Sep 13')).toBeInTheDocument()
+      expect(screen.getByText('7:53 PM')).toBeInTheDocument()
+    })
+
+    // Before this existed, only `holidayPeriod.begins` (the first night)
+    // rendered — a visitor lighting candles the second night of Rosh Hashana
+    // saw nothing telling them a second, later time even applied.
+    it('shows every candle lighting, not just the first night', () => {
+      render(<ZmanimBody data={withHoliday} status="ready" />)
+
+      expect(screen.getByText('Candles Fri, Sep 11')).toBeInTheDocument()
+      expect(screen.getByText('6:57 PM')).toBeInTheDocument()
+      expect(screen.getByText('Candles Sat, Sep 12')).toBeInTheDocument()
+      expect(screen.getByText('7:55 PM')).toBeInTheDocument()
+    })
+
+    it('shows a single Candles row for a one-day Yom Tov (Yom Kippur)', () => {
+      render(
+        <ZmanimBody
+          data={{
+            ...readyData,
+            holidayPeriod: {
+              name: 'Yom Kippur',
+              begins: { label: 'Sun, Sep 20', time: '6:42 PM' },
+              candleLightings: [{ label: 'Sun, Sep 20', time: '6:42 PM' }],
+              ends: { label: 'Mon, Sep 21', time: '7:39 PM' },
+            },
+          }}
+          status="ready"
+        />,
+      )
+
+      expect(screen.getByText('Candles Sun, Sep 20')).toBeInTheDocument()
+      expect(screen.getAllByText(/^Candles /)).toHaveLength(1)
     })
 
     it('replaces the regular Candle Lighting/Havdalah rows entirely', () => {
       render(<ZmanimBody data={withHoliday} status="ready" />)
 
       expect(screen.queryByText('Upcoming Shabbos')).not.toBeInTheDocument()
-      expect(screen.queryByText('Candle Lighting')).not.toBeInTheDocument()
-      expect(screen.queryByText('Havdalah')).not.toBeInTheDocument()
+      expect(screen.queryByText('Candle Lighting Friday')).not.toBeInTheDocument()
+      expect(screen.queryByText(/^Havdalah/)).not.toBeInTheDocument()
       // The regular rows' own values would prove a leftover row is hiding
       // behind an identical time — this fixture's holiday times differ from
       // the regular ones on purpose.
@@ -103,17 +143,17 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
       render(<ZmanimBody data={withFast} status="ready" />)
 
       expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
-      expect(screen.getByText('Fast Begins')).toBeInTheDocument()
-      expect(screen.getByText('Mon, Sep 14 5:19 AM')).toBeInTheDocument()
-      expect(screen.getByText('Fast Ends')).toBeInTheDocument()
-      expect(screen.getByText('Mon, Sep 14 7:44 PM')).toBeInTheDocument()
+      expect(screen.getByText('Fast Begins Mon, Sep 14')).toBeInTheDocument()
+      expect(screen.getByText('5:19 AM')).toBeInTheDocument()
+      expect(screen.getByText('Fast Ends Mon, Sep 14')).toBeInTheDocument()
+      expect(screen.getByText('7:44 PM')).toBeInTheDocument()
     })
 
     it('shows alongside the regular Upcoming Shabbos block, not instead of it', () => {
       render(<ZmanimBody data={withFast} status="ready" />)
 
       expect(screen.getByText('Upcoming Shabbos')).toBeInTheDocument()
-      expect(screen.getByText('Candle Lighting')).toBeInTheDocument()
+      expect(screen.getByText('Candle Lighting Friday')).toBeInTheDocument()
     })
 
     it('shows alongside the holiday block too, when both apply the same week', () => {
@@ -124,6 +164,7 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
             holidayPeriod: {
               name: 'Rosh Hashana',
               begins: { label: 'Fri, Sep 11', time: '6:57 PM' },
+              candleLightings: [{ label: 'Fri, Sep 11', time: '6:57 PM' }],
               ends: { label: 'Sun, Sep 13', time: '7:53 PM' },
             },
           }}
@@ -144,13 +185,13 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
       )
 
       expect(screen.getByText('Ta’anit Bechorot')).toBeInTheDocument()
-      expect(screen.getByText('Fast Begins')).toBeInTheDocument()
-      expect(screen.queryByText('Fast Ends')).not.toBeInTheDocument()
+      expect(screen.getByText('Fast Begins Wed, Apr 21')).toBeInTheDocument()
+      expect(screen.queryByText(/^Fast Ends/)).not.toBeInTheDocument()
     })
 
     it('shows nothing when there is no fast in the window', () => {
       render(<ZmanimBody data={readyData} status="ready" />)
-      expect(screen.queryByText('Fast Begins')).not.toBeInTheDocument()
+      expect(screen.queryByText(/^Fast Begins/)).not.toBeInTheDocument()
     })
   })
 

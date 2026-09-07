@@ -247,9 +247,18 @@ function findHolidayPeriod(items: HebcalShabbatItem[], timezone: string, windowE
     iso: item.date,
   })
 
+  // Every `candles` item in the span, not just the first — a 2-day Yom Tov
+  // (Rosh Hashana, the opening/closing of Sukkot and Pesach, Shavuot) lights
+  // again the second night from an existing flame, at its own later time
+  // Hebcal reports separately from the first night's. `begins` stays the
+  // first one alone, for callers that only want a single "when does this
+  // start" fact.
+  const candleLightings = span.filter((i) => i.category === 'candles').map(toEntry)
+
   return {
     name: normalizeHolidayName(named.title),
     begins: toEntry(span[0]),
+    candleLightings,
     ends: toEntry(span[span.length - 1]),
   }
 }
