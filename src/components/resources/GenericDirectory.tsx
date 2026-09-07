@@ -149,11 +149,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (el) itemRowRefs.current.set(id, el)
     else itemRowRefs.current.delete(id)
   }
+  // The search/filter/sort controls below (`lg:sticky lg:top-14`) — this
+  // used to only account for the site header's own height, not this SECOND
+  // sticky bar sitting right under it on `lg:` widths. Every scroll target
+  // landed short by however tall that bar is: the target's row ended up
+  // tucked behind it, above the visible content, often the whole row.
+  // `position === 'sticky'` (not a `window.innerWidth` guess) is what tells
+  // us whether it's actually occupying that fixed strip right now, since
+  // `lg:` isn't this component's only breakpoint concern to keep in sync.
+  const controlsRef = useRef<HTMLDivElement>(null)
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
     const el = itemRowRefs.current.get(id)
     if (!el) return
     const headerH = (document.querySelector('header')?.getBoundingClientRect().height ?? 64) + 12
-    const top = el.getBoundingClientRect().top + window.scrollY - headerH
+    const controls = controlsRef.current
+    const controlsH = controls && getComputedStyle(controls).position === 'sticky' ? controls.offsetHeight : 0
+    const top = el.getBoundingClientRect().top + window.scrollY - headerH - controlsH
     window.scrollTo({ top: Math.max(0, top), behavior })
   }
 
@@ -566,7 +577,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           enough to fit the sticky bar but too narrow for it to be worth the
           fixed screen real estate it costs; `lg:` (1024px) is where a phone
           landscape or small tablet stops paying more than it gets back. */}
-      <div className="mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
+      <div ref={controlsRef} className="mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3">
         {showSearch && (
           <div className="relative">
             <input
