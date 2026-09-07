@@ -1,9 +1,9 @@
 'use client'
 
-import UpButton from '@/components/UpButton'
 import Breadcrumb from '@/components/Breadcrumb'
 import ZmanimBody from '@/components/ZmanimBody'
 import { useZmanim } from '@/lib/useZmanim'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   /** Coordinates to compute zmanim for — the visitor's typed address, or the
@@ -24,17 +24,21 @@ type Props = {
 export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos' }: Props) {
   const { data, status } = useZmanim(coords)
 
+  // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call, which this mirrors now that this screen has the same gap
+  // it used to (its own mobile UpButton, no header title).
+  useSetScreenHeader(true, title, onUp)
+
   return (
     <div>
-      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
-          destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. */}
-      <UpButton label={upLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      {/* Breadcrumb (desktop only) names the same destination the header's
+          "‹ {title}" now covers on mobile — see Breadcrumb's own doc for why
+          only one of the two ever shows at a time. */}
       <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />
 
       {/* Heading */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+        <h2 className="text-xl font-semibold text-slate-800 sr-only desktop:not-sr-only">{title}</h2>
         <p className="text-sm text-muted mt-0.5">{locationLabel}</p>
       </div>
 

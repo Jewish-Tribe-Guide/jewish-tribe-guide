@@ -1,5 +1,6 @@
 import type { HospitalInfo } from '@/types'
 import UpButton from '@/components/UpButton'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   hospitalName: string
@@ -22,10 +23,21 @@ function alwaysOpen(text: string): boolean {
 // (chaplain, bikkur cholim), then find where to pray and how to arrange kosher
 // & Shabbos support — with the staff directory last.
 export default function AboutYourHospital({ hospitalName, info, onUp, upLabel = 'Jewish Medical Resources' }: Props) {
+  // Puts "‹ {hospitalName}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call. Unlike the bare category title case, the hero below
+  // isn't hidden even though it repeats this name: it's a designed block
+  // (icon, eyebrow, gradient) rather than a naked duplicate, so there's real
+  // visual content to lose, not just words. This screen never had a desktop
+  // Breadcrumb (no second-level index to name it "up" from — the hospitals
+  // list mirrors this same "up" destination on desktop, so nothing else
+  // supplies it there), which is why the UpButton below stays, just scoped
+  // to desktop now that mobile has the header instead.
+  useSetScreenHeader(true, hospitalName, onUp)
+
   if (!info) {
     return (
       <div>
-        <UpButton label={upLabel} onClick={onUp} />
+        <UpButton label={upLabel} onClick={onUp} className="hidden desktop:flex mb-4" />
         <h2 className="text-xl font-semibold text-slate-800">{hospitalName}</h2>
         <p className="text-muted mt-2">No information available for this hospital yet.</p>
       </div>
@@ -34,7 +46,7 @@ export default function AboutYourHospital({ hospitalName, info, onUp, upLabel = 
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      <UpButton label={upLabel} onClick={onUp} className="hidden desktop:flex mb-4" />
 
       {/* Hero — the hospital leads, since the visitor already chose it. */}
       <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-dark px-5 py-6 sm:px-7 sm:py-7 text-white shadow-sm">

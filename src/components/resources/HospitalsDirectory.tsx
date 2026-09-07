@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { useHospitals } from '@/lib/useHospitals'
 import type { DirectoryAnchor, HospitalInfo } from '@/types'
 import { haversineMiles, roundMiles } from '@/lib/geo'
-import UpButton from '@/components/UpButton'
 import DirectoryHeader from './DirectoryHeader'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   anchor: DirectoryAnchor
@@ -36,7 +36,14 @@ function features(info?: HospitalInfo | null): string[] {
 // Lists every hospital, sorted by distance from the visitor's address (when set),
 // with a search box. Tapping one opens its Jewish-resources page. Framed as a
 // question so it reads as a clear first step, not a database listing.
+const TITLE = 'Which hospital?'
+
 export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = 'All resources', onViewMap }: Props) {
+  // Puts "‹ {TITLE}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call, which this mirrors now that this screen has the same gap
+  // it used to (its own mobile UpButton, no header title).
+  useSetScreenHeader(true, TITLE, onUp)
+
   const [search, setSearch] = useState('')
   const hospitals = useHospitals() ?? []
   const coords = anchor.coords
@@ -67,16 +74,13 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
 
   return (
     <div>
-      {/* desktop:hidden — see GenericDirectory's identical comment: DirectoryHeader
-          covers this same destination as a breadcrumb at desktop widths. */}
-      <UpButton label={upLabel} onClick={onUp} className="desktop:hidden mb-4" />
-
       <DirectoryHeader
-        title="Which hospital?"
+        title={TITLE}
         anchorLabel={coords && label ? label : undefined}
         addressPrompt
         upLabel={upLabel}
         onUp={onUp}
+        titleInHeader
       />
       {/* Description + Map sit on their own row here (not in the header's actions
           slot) because the explanatory copy is unique to this screen. */}

@@ -1,8 +1,8 @@
 import type { EruvRecord } from '@/types'
-import UpButton from '@/components/UpButton'
 import Breadcrumb from '@/components/Breadcrumb'
 import { ExternalIcon } from '@/components/icons'
 import { community } from '@/community.config'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   eruvim: EruvRecord[]
@@ -37,14 +37,18 @@ function EruvCard({ eruv }: { eruv: EruvRecord }) {
 }
 
 export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information' }: Props) {
+  // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call, which this mirrors now that this screen has the same gap
+  // it used to (its own mobile UpButton, no header title).
+  useSetScreenHeader(true, title, onUp)
+
   return (
     <div>
-      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
-          destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. */}
-      <UpButton label={upLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      {/* Breadcrumb (desktop only) names the same destination the header's
+          "‹ {title}" now covers on mobile — see Breadcrumb's own doc for why
+          only one of the two ever shows at a time. */}
       <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">{title}</h2>
+      <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">{title}</h2>
       <p className="mb-4 text-sm text-muted">
         Check the current status of the {community.region}-area eruvim before Shabbos.
       </p>
