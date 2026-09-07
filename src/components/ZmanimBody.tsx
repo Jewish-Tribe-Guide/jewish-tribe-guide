@@ -53,7 +53,7 @@ function ErrorState() {
 }
 
 function ReadyState({ data }: { data: ZmanimData }) {
-  const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos, holidays, holidayPeriod } = data
+  const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos, holidays, holidayPeriod, fastPeriod } = data
 
   // Today's own Jewish-calendar events (Rosh Chodesh, or a Yom Tov day
   // itself) — separate from `holidayPeriod` below, which is the NEXT
@@ -124,6 +124,26 @@ function ReadyState({ data }: { data: ZmanimData }) {
           </>
         )}
       </div>
+
+      {/* Upcoming Fast — a separate section from the one above, not a
+          replacement for it: a fast is a different kind of day than a Yom
+          Tov (no candle lighting, and it can land on an ordinary weekday
+          with nothing else on this page announcing it), so both can and do
+          show at once — e.g. Tzom Gedaliah lands right in Rosh Hashana's own
+          week. `ends` is nullable (see lib/zmanim.ts's findFastPeriod on
+          Ta'anit Bechorot); ShabbosRow already renders nothing for a null
+          entry, so this doesn't need its own conditional for that. */}
+      {fastPeriod && (
+        <div className="pt-3 border-t border-slate-100">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+            {fastPeriod.name}
+          </h3>
+          <div className="space-y-1.5">
+            <ShabbosRow label="Fast Begins" entry={fastPeriod.begins} emphasized />
+            <ShabbosRow label="Fast Ends" entry={fastPeriod.ends} emphasized={false} />
+          </div>
+        </div>
+      )}
 
       <p className="pt-1 text-[11px] text-muted">
         Zmanim from{' '}

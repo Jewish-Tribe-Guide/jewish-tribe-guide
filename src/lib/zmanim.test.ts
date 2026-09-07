@@ -348,6 +348,119 @@ describe('getZmanimData', () => {
     })
   })
 
+  describe('fastPeriod', () => {
+    it('is null on an ordinary week with no fast in the window', async () => {
+      mockHebcal() // holidayCalendarResponse default: no items
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod).toBeNull()
+    })
+
+    it('asks Hebcal for minor fasts (mf=on), not just major holidays', async () => {
+      const { calls } = mockHebcal()
+      await getZmanimData(PHILADELPHIA)
+      const holidayUrl = calls.find((c) => c.includes('/hebcal'))!
+      expect(holidayUrl).toContain('mf=on')
+    })
+
+    it('finds a plain fast — begins/ends share one name', async () => {
+      // Real Hebcal shape for Tzom Gedaliah, the day after Rosh Hashana.
+      vi.setSystemTime(new Date('2026-09-14T12:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2026-09-14T05:19:00-04:00', memo: 'Tzom Gedaliah' },
+            { category: 'holiday', subcat: 'fast', title: 'Tzom Gedaliah', date: '2026-09-14' },
+            { category: 'zmanim', subcat: 'fast', title: 'Fast ends', date: '2026-09-14T19:44:00-04:00', memo: 'Tzom Gedaliah' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.fastPeriod).toEqual({
+        name: 'Tzom Gedaliah',
+        begins: { label: 'Mon, Sep 14', time: '5:19 AM', iso: '2026-09-14T05:19:00-04:00' },
+        ends: { label: 'Mon, Sep 14', time: '7:44 PM', iso: '2026-09-14T19:44:00-04:00' },
+      })
+    })
+
+    it('names Tisha B’Av from the ends item, not the "Erev "-prefixed begins item', async () => {
+      // Real Hebcal shape — the fast starts the evening before, so "Fast
+      // begins" is memo'd "Erev Tish'a B'Av" while "Fast ends" is the plain
+      // "Tish'a B'Av". This is the one fast whose begins/ends names differ.
+      // 2 days before the fast begins — inside the window regardless of
+      // weekday, since lookaheadDays's floor is always at least 3.
+      vi.setSystemTime(new Date('2027-08-09T12:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2027-08-11T20:03:00-04:00', memo: 'Erev Tish’a B’Av' },
+            { category: 'holiday', subcat: 'major', title: 'Erev Tish’a B’Av', date: '2027-08-11' },
+            { category: 'holiday', subcat: 'major', title: 'Tish’a B’Av', date: '2027-08-12' },
+            { category: 'zmanim', subcat: 'fast', title: 'Fast ends', date: '2027-08-12T20:33:00-04:00', memo: 'Tish’a B’Av' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.fastPeriod?.name).toBe('Tish’a B’Av')
+      expect(data.fastPeriod?.begins.time).toBe('8:03 PM')
+      expect(data.fastPeriod?.ends?.time).toBe('8:33 PM')
+    })
+
+    it('has a begins with no ends for Ta’anit Bechorot, named from the stripped begins memo', async () => {
+      // Real Hebcal shape: no "Fast ends" item at all — traditionally ended
+      // early by a siyum, not a published zman. Other, unrelated zmanim
+      // items (erev-Pesach chametz deadlines) can legitimately sit between
+      // "Fast begins" and the next actual fast — this fixture proves those
+      // don't get mistaken for this fast's own end.
+      vi.setSystemTime(new Date('2027-04-19T12:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2027-04-21T04:47:00-04:00', memo: 'Ta’anit Bechorot' },
+            { category: 'holiday', subcat: 'fast', title: 'Ta’anit Bechorot', date: '2027-04-21' },
+            { category: 'zmanim', title: 'Finish eating chametz', date: '2027-04-21T10:45:00-04:00' },
+            { category: 'zmanim', title: 'Biur Chametz', date: '2027-04-21T11:52:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.fastPeriod?.name).toBe('Ta’anit Bechorot')
+      expect(data.fastPeriod?.begins.time).toBe('4:47 AM')
+      expect(data.fastPeriod?.ends).toBeNull()
+    })
+
+    it('does not mistake Yom Kippur’s candles/havdalah for a fast — Hebcal never pairs it with Fast begins/ends', async () => {
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'holiday', subcat: 'major', title: 'Erev Yom Kippur', date: '2026-09-20' },
+            { category: 'candles', title: 'Candle lighting: 6:42pm', date: '2026-09-20T18:42:00-04:00' },
+            { category: 'holiday', subcat: 'major', title: 'Yom Kippur', date: '2026-09-21' },
+            { category: 'havdalah', title: 'Havdalah: 7:39pm', date: '2026-09-21T19:39:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod).toBeNull()
+    })
+
+    it('is null when the fast starts after the real window, even though the padded query reaches it', async () => {
+      // Wednesday 2026-06-24 → window ends 2026-06-27, query reaches 2026-06-30.
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2026-06-29T04:00:00-04:00', memo: 'Some Fast' },
+            { category: 'zmanim', subcat: 'fast', title: 'Fast ends', date: '2026-06-29T21:00:00-04:00', memo: 'Some Fast' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod).toBeNull()
+    })
+  })
+
   describe('isYomTov', () => {
     it('is true on a full Yom Tov day', async () => {
       mockHebcal({ converter: { ...converterResponse, events: ['Sukkot I'] } })

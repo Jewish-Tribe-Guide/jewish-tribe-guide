@@ -85,6 +85,75 @@ describe('ZmanimBody — the "Prayer & Shabbat Times" page/strip content', () =>
     })
   })
 
+  // A fast is a separate section from the holiday block above, not a
+  // replacement for it — see the component's own doc. Before this test
+  // existed, `fastPeriod` was fetched but never rendered anywhere: a
+  // visitor on Tzom Gedaliah or Tisha B'Av saw nothing telling them so.
+  describe('the fast block', () => {
+    const withFast: ZmanimData = {
+      ...readyData,
+      fastPeriod: {
+        name: 'Tzom Gedaliah',
+        begins: { label: 'Mon, Sep 14', time: '5:19 AM' },
+        ends: { label: 'Mon, Sep 14', time: '7:44 PM' },
+      },
+    }
+
+    it('shows the fast name, and begins/ends on their own lines', () => {
+      render(<ZmanimBody data={withFast} status="ready" />)
+
+      expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
+      expect(screen.getByText('Fast Begins')).toBeInTheDocument()
+      expect(screen.getByText('Mon, Sep 14 5:19 AM')).toBeInTheDocument()
+      expect(screen.getByText('Fast Ends')).toBeInTheDocument()
+      expect(screen.getByText('Mon, Sep 14 7:44 PM')).toBeInTheDocument()
+    })
+
+    it('shows alongside the regular Upcoming Shabbos block, not instead of it', () => {
+      render(<ZmanimBody data={withFast} status="ready" />)
+
+      expect(screen.getByText('Upcoming Shabbos')).toBeInTheDocument()
+      expect(screen.getByText('Candle Lighting')).toBeInTheDocument()
+    })
+
+    it('shows alongside the holiday block too, when both apply the same week', () => {
+      render(
+        <ZmanimBody
+          data={{
+            ...withFast,
+            holidayPeriod: {
+              name: 'Rosh Hashana',
+              begins: { label: 'Fri, Sep 11', time: '6:57 PM' },
+              ends: { label: 'Sun, Sep 13', time: '7:53 PM' },
+            },
+          }}
+          status="ready"
+        />,
+      )
+
+      expect(screen.getByText('Rosh Hashana')).toBeInTheDocument()
+      expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
+    })
+
+    it('omits the "Fast Ends" row when Hebcal has no end time (Ta’anit Bechorot)', () => {
+      render(
+        <ZmanimBody
+          data={{ ...readyData, fastPeriod: { name: 'Ta’anit Bechorot', begins: { label: 'Wed, Apr 21', time: '4:47 AM' }, ends: null } }}
+          status="ready"
+        />,
+      )
+
+      expect(screen.getByText('Ta’anit Bechorot')).toBeInTheDocument()
+      expect(screen.getByText('Fast Begins')).toBeInTheDocument()
+      expect(screen.queryByText('Fast Ends')).not.toBeInTheDocument()
+    })
+
+    it('shows nothing when there is no fast in the window', () => {
+      render(<ZmanimBody data={readyData} status="ready" />)
+      expect(screen.queryByText('Fast Begins')).not.toBeInTheDocument()
+    })
+  })
+
   it('shows a loading state while zmanim are in flight', () => {
     render(<ZmanimBody data={null} status="loading" />)
     expect(screen.getByText('Loading zmanim…')).toBeInTheDocument()

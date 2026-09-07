@@ -165,3 +165,54 @@ describe('ShabbatTimesCard — the holiday block', () => {
     expect(screen.getByText(/^Havdalah /)).toBeInTheDocument()
   })
 })
+
+// A separate box from the holiday block above, not a replacement for it —
+// see the component's own doc. Before this existed, `fastPeriod` was
+// fetched but never rendered here either.
+describe('ShabbatTimesCard — the fast block', () => {
+  const withFast: ZmanimData = {
+    ...readyData,
+    fastPeriod: {
+      name: 'Tzom Gedaliah',
+      begins: { label: 'Mon, Sep 14', time: '5:19 AM' },
+      ends: { label: 'Mon, Sep 14', time: '7:44 PM' },
+    },
+  }
+
+  it('shows the fast name, and begins/ends on their own lines', () => {
+    mockUseZmanim.mockReturnValue({ data: withFast, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
+    expect(screen.getByText('Fast begins Mon, Sep 14')).toBeInTheDocument()
+    expect(screen.getByText('5:19 AM')).toBeInTheDocument()
+    expect(screen.getByText('Fast ends Mon, Sep 14')).toBeInTheDocument()
+    expect(screen.getByText('7:44 PM')).toBeInTheDocument()
+  })
+
+  it('shows alongside the regular Candles/Havdalah rows, not instead of them', () => {
+    mockUseZmanim.mockReturnValue({ data: withFast, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText(/^Candles /)).toBeInTheDocument()
+  })
+
+  it('omits the "Fast ends" row when Hebcal has no end time (Ta’anit Bechorot)', () => {
+    mockUseZmanim.mockReturnValue({
+      data: { ...readyData, fastPeriod: { name: 'Ta’anit Bechorot', begins: { label: 'Wed, Apr 21', time: '4:47 AM' }, ends: null } },
+      status: 'ready',
+    })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText('Ta’anit Bechorot')).toBeInTheDocument()
+    expect(screen.getByText('Fast begins Wed, Apr 21')).toBeInTheDocument()
+    expect(screen.queryByText(/^Fast ends /)).not.toBeInTheDocument()
+  })
+
+  it('shows nothing when there is no fast in the window', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.queryByText(/^Fast begins /)).not.toBeInTheDocument()
+  })
+})

@@ -121,6 +121,30 @@ export default function ShabbatTimesCard({
               )}
             </div>
           )}
+          {/* Upcoming Fast — a separate box, not a replacement for the block
+              above: unlike a Yom Tov, a fast has no candle lighting and can
+              land on an ordinary weekday, so nothing else on this card would
+              otherwise announce it. Both can and do show at once — e.g. Tzom
+              Gedaliah lands in Rosh Hashana's own week. `ends` is nullable
+              (see lib/zmanim.ts's findFastPeriod on Ta'anit Bechorot, ended
+              early by a siyum rather than a published zman). */}
+          {data.fastPeriod && (
+            <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+                {data.fastPeriod.name}
+              </p>
+              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
+                <span>Fast begins {data.fastPeriod.begins.label}</span>
+                <span className="tabular-nums text-slate-900">{data.fastPeriod.begins.time}</span>
+              </div>
+              {data.fastPeriod.ends && (
+                <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
+                  <span>Fast ends {data.fastPeriod.ends.label}</span>
+                  <span className="tabular-nums text-slate-900">{data.fastPeriod.ends.time}</span>
+                </div>
+              )}
+            </div>
+          )}
           {/* Same attribution/link as the real Zmanim & Shabbos page
               (ZmanimBody) — this card shows the same Hebcal-sourced data, so
               it carries the same credit. */}

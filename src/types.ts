@@ -76,8 +76,22 @@ export type ZmanimData = {
     begins: ZmanEntry
     ends: ZmanEntry
   } | null
-  // ── Future-friendly slots (not yet populated) ──
-  fastDay?: { label: string; start: string; end: string } | null
+  /** The next minor/major fast day (Tzom Gedaliah, Asara B'Tevet, Ta'anit
+   *  Esther, Shiva Asar B'Tammuz, Tisha B'Av — Ta'anit Bechorot too, when a
+   *  firstborn visitor would want it) landing within the same lookahead
+   *  window as `holidayPeriod`, or `null` when there isn't one. Separate
+   *  from `holidayPeriod`: Yom Kippur is a fast too, but it already has its
+   *  own candle-lighting/havdalah pair and shows up there, not here — see
+   *  lib/zmanim.ts's `findFastPeriod` for why Hebcal never double-reports
+   *  it. `ends` is nullable because Hebcal doesn't publish one for Ta'anit
+   *  Bechorot (traditionally ended early by a siyum, not a zman). */
+  fastPeriod?: {
+    /** e.g. "Tzom Gedaliah" — from Hebcal's own "Fast ends" item, which
+     *  (unlike "Fast begins") is never prefixed "Erev ". */
+    name: string
+    begins: ZmanEntry
+    ends: ZmanEntry | null
+  } | null
 }
 
 export type Resource = {

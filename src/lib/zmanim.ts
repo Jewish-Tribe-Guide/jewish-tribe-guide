@@ -38,6 +38,15 @@ type HebcalShabbatItem = {
   category: string
   title: string
   date: string
+  /** Only present on some items — e.g. "major" on a Yom Tov `holiday` item,
+   *  "fast" on a fast's `holiday`/`zmanim` items. Used here to find a fast's
+   *  "Fast begins"/"Fast ends" pair (see findFastPeriod). */
+  subcat?: string
+  /** Which named event a "Fast begins"/"Fast ends" `zmanim` item belongs to
+   *  — e.g. "Tzom Gedaliah", or "Erev Tish'a B'Av" on the begins item
+   *  specifically (Tisha B'Av's fast starts the evening before; every other
+   *  fast's begins/ends share one plain name). Absent on other categories. */
+  memo?: string
 }
 
 type HebcalShabbat = {
@@ -245,6 +254,65 @@ function findHolidayPeriod(items: HebcalShabbatItem[], timezone: string, windowE
   }
 }
 
+/** Finds the next fast day within the lookahead window — Tzom Gedaliah,
+ *  Asara B'Tevet, Ta'anit Esther, Shiva Asar B'Tammuz, Tisha B'Av, or
+ *  Ta'anit Bechorot. Hebcal reports these as a `category: 'zmanim',
+ *  subcat: 'fast'` pair titled literally "Fast begins"/"Fast ends", each
+ *  carrying the fast's name in `memo` — a different shape from
+ *  `findHolidayPeriod`'s candles/holiday/havdalah grouping, so this doesn't
+ *  reuse it. Two things that shape forces:
+ *
+ *  - Tisha B'Av's fast starts the evening before, so its "Fast begins" memo
+ *    is "Erev Tish'a B'Av" while "Fast ends" is the plain "Tish'a B'Av" —
+ *    every other fast's begins/ends share one identical name. Preferring
+ *    the end item's memo (falling back to the begin item's own, with any
+ *    "Erev " stripped) gets the plain name either way.
+ *  - Ta'anit Bechorot (the Fast of the Firstborn, Erev Pesach) has a
+ *    "Fast begins" with no "Fast ends" at all — it's traditionally ended
+ *    early by a siyum, not a published zman — so `ends` is nullable here,
+ *    unlike `findHolidayPeriod`'s `ends`, where a missing havdalah means no
+ *    period at all. A fast genuinely can lack a published end time; a
+ *    multi-day Yom Tov period missing its havdalah is just an unpadded
+ *    query, which is a real difference in what "missing" means between the
+ *    two.
+ *
+ *  Yom Kippur is a fast too, but Hebcal never gives it this "Fast begins"/
+ *  "Fast ends" pair — it's a `maj` holiday with its own candle-lighting/
+ *  havdalah, already covered by `holidayPeriod`, so nothing here would ever
+ *  double-report it. */
+function findFastPeriod(items: HebcalShabbatItem[], timezone: string, windowEnd: string): ZmanimData['fastPeriod'] {
+  const isFastZman = (i: HebcalShabbatItem) => i.category === 'zmanim' && i.subcat === 'fast'
+
+  const startIdx = items.findIndex((i) => isFastZman(i) && i.title === 'Fast begins')
+  if (startIdx === -1) return null
+  if (items[startIdx].date.slice(0, 10) > windowEnd) return null
+
+  // The next fast-related zmanim item is this fast's own end — unless it's
+  // actually a LATER fast's "Fast begins" (Ta'anit Bechorot's case), which
+  // means this one simply has no end time to find.
+  let endItem: HebcalShabbatItem | null = null
+  for (let i = startIdx + 1; i < items.length; i++) {
+    if (!isFastZman(items[i])) continue
+    if (items[i].title === 'Fast begins') break
+    if (items[i].title === 'Fast ends') {
+      endItem = items[i]
+      break
+    }
+  }
+
+  const toEntry = (item: HebcalShabbatItem): ZmanEntry => ({
+    label: weekdayAndDate(item.date, timezone),
+    time: formatTime(item.date, timezone),
+    iso: item.date,
+  })
+
+  return {
+    name: endItem?.memo ?? items[startIdx].memo?.replace(/^Erev\s+/, '') ?? 'Fast Day',
+    begins: toEntry(items[startIdx]),
+    ends: endItem ? toEntry(endItem) : null,
+  }
+}
+
 /** Adds `offsetMinutes` to a Hebcal instant and formats the result the same
  *  way `formatTime` does — used to turn an anchor (sunset/candle-lighting/
  *  havdalah) plus a signed offset into a real clock time for a minyan defined
@@ -287,9 +355,11 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   // range instead, so this asks for exactly the window this card cares
   // about rather than whatever cycle Hebcal decides is "next". c=on (candle
   // lighting) + maj=on (major holidays, which is what actually carries the
-  // havdalah/second-candle items a period needs) with the minor-calendar
-  // categories turned off — nothing here is shown on the card, so there's
-  // no reason to ask Hebcal to compute it.
+  // havdalah/second-candle items a period needs) + mf=on (minor fasts —
+  // Tzom Gedaliah, Asara B'Tevet, Ta'anit Esther, Shiva Asar B'Tammuz,
+  // Tisha B'Av, Ta'anit Bechorot; see findFastPeriod) with the rest of the
+  // minor-calendar categories turned off — nothing else here is shown on
+  // the card, so there's no reason to ask Hebcal to compute it.
   //
   // The query itself reaches a few days PAST windowEnd (see
   // HOLIDAY_QUERY_PAD_DAYS) — a period starting right at the edge of the
@@ -299,9 +369,11 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   // "no time to show" for a reason that has nothing to do with the
   // 3-day-floor problem `lookaheadDays` actually solves. `findHolidayPeriod`
   // is what keeps this padding from also surfacing a second, later period
-  // that starts past the real window.
+  // that starts past the real window; `findFastPeriod` needs no equivalent
+  // guard since a fast is always a single day, never a multi-day span that
+  // could straddle the window's edge the way a Yom Tov period can.
   const windowEnd = addDays(dateStr, lookaheadDays(dayOfWeek))
-  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${dateStr}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=off&d=off&o=off&F=off&D=off`
+  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${dateStr}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=on&d=off&o=off&F=off&D=off`
 
   const [zmanim, shabbat, converter, holidayCalendar] = await Promise.all([
     fetchJson<HebcalZmanim>(zmanimUrl),
@@ -358,5 +430,6 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
     isYomTov: (converter.events ?? []).some(isYomTovEvent),
     holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
+    fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
   }
 }
