@@ -75,6 +75,9 @@ export type FindResourcesProps = {
   /** `?davening=` — "1" opens "All davening times" on arrival. See
    *  GenericDirectory's own doc on `openDaveningModal`, which this becomes. */
   searchDavening?: string | null
+  /** `?day=` — filters that modal to one day on arrival. See
+   *  GenericDirectory's own doc on `initialDaveningDay`, which this becomes. */
+  searchDaveningDay?: string | null
   /** Pushes a change to these query params, keeping the path — a no-op
    *  default is safe: nothing in the fallback render (no query string yet)
    *  can be interacted with before hydration swaps in the real, connected
@@ -97,6 +100,7 @@ export default function FindResources({
   searchHospital = null,
   searchForm = null,
   searchDavening = null,
+  searchDaveningDay = null,
   onParamsChange = () => {},
 }: FindResourcesProps) {
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
@@ -132,9 +136,11 @@ export default function FindResources({
   //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit/report form is open over the list
   //   ?davening=1     "All davening times" is open over the list
+  //   ?day=<key>      that modal is filtered to one day
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
   const openDaveningModal = searchDavening === '1'
+  const initialDaveningDay = searchDaveningDay ?? undefined
   const hospitalDetailId = searchHospital
 
   const setParams = onParamsChange
@@ -276,13 +282,14 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (initialSearch ?? '') + (openDaveningModal ? '-davening' : '')}
+          key={category.id + (initialSearch ?? '') + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
           category={category}
           items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
           openDaveningModal={openDaveningModal}
+          initialDaveningDay={initialDaveningDay}
           onUp={onUp}
           upLabel="Home"
           onAdd={() => openAction({ mode: 'create' })}

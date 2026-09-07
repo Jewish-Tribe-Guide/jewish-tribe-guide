@@ -230,5 +230,80 @@ describe('HomeBreak', () => {
         vi.useRealTimers()
       }
     })
+
+    // When every minyan today has already passed, nextUpcomingDavening rolls
+    // over to tomorrow's earliest — "All davening times" needs `&day=` or it
+    // lands the visitor on the modal's default "Today" filter, showing
+    // nothing left and no visible reason why. See DaveningTimesCard's own
+    // `seeAllHref` doc.
+    it('adds &day= to "All davening times" when the shown minyan is tomorrow\'s', () => {
+      vi.useFakeTimers()
+      try {
+        // Tuesday 11pm — every minyan today has passed, so the next one is
+        // Wednesday's.
+        vi.setSystemTime(new Date('2026-09-08T23:00:00'))
+        const shul = makeListing({
+          id: 'shul-1',
+          category: 'synagogue',
+          name: 'Kahal Kadosh Mikveh Israel',
+          minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['wed'], time: '7:00am' }],
+        })
+
+        renderWithProviders(
+          <ListingsProvider listings={[shul]}>
+            <HomeBreak coords={null} />
+          </ListingsProvider>,
+          { content: { categories: [synagogue] } },
+        )
+
+        expect(screen.getByText('tmrw')).toBeInTheDocument()
+        const link = screen.getByRole('link', { name: /All davening times/ })
+        expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1&day=wed')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    // Root cause: this card used to read the day/hour off the VISITOR's own
+    // device clock (new Date(now).getDay()/.getHours()), not the community's
+    // configured timezone — so a visitor whose device timezone disagreed
+    // with the community's (a phone that travelled, a hospital kiosk set to
+    // UTC) could get handed tomorrow's minyan while it was still today, or
+    // vice versa. Pin the machine's own TZ to something far from the
+    // community's (America/New_York) and confirm the card still reads the
+    // community's wall-clock day/time, not the machine's.
+    it('reads the community\'s own timezone, not the visitor device clock, for "today"', () => {
+      const originalTz = process.env.TZ
+      process.env.TZ = 'Asia/Tokyo'
+      vi.useFakeTimers()
+      try {
+        // 2026-09-08T23:00:00 UTC is Tuesday 7:00 PM in America/New_York
+        // (the community's timezone) but already Wednesday 8:00 AM in
+        // Asia/Tokyo (the machine's timezone under this test).
+        vi.setSystemTime(new Date('2026-09-08T23:00:00Z'))
+        const shul = makeListing({
+          id: 'shul-1',
+          category: 'synagogue',
+          name: 'Kahal Kadosh Mikveh Israel',
+          minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '7:30pm' }],
+        })
+
+        renderWithProviders(
+          <ListingsProvider listings={[shul]}>
+            <HomeBreak coords={null} />
+          </ListingsProvider>,
+          { content: { categories: [synagogue] } },
+        )
+
+        // A device-local read would see Wednesday morning and find no match
+        // for Tuesday's minyan at all ("No davening times posted yet.").
+        // Reading the community's timezone finds it, still today.
+        expect(screen.getByText('7:30pm')).toBeInTheDocument()
+        expect(screen.queryByText('tmrw')).not.toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+        process.env.TZ = originalTz
+      }
+    })
   })
 })

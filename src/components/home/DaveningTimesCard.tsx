@@ -6,7 +6,7 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { useNow } from '@/lib/useNow'
 import { currentSeason } from '@/lib/season'
-import { DAY_KEYS } from '@/lib/hours'
+import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
@@ -77,10 +77,16 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
     .map((s) => geoOrCommunityDefault(s.geo))
   const anchors = useZmanAnchors(anchorGeos)
 
-  const nowDate = new Date(now)
-  const todayKey = DAY_KEYS[nowDate.getDay()]
-  const tomorrowKey = DAY_KEYS[(nowDate.getDay() + 1) % 7]
-  const nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes()
+  // In the community's own timezone, not the visitor's device — a visitor
+  // whose device timezone doesn't match (a phone that travelled, a hospital
+  // kiosk set to UTC) would otherwise get handed the wrong day's minyanim
+  // entirely, or a `nowMinutes` off by hours. See dayAndMinutesInTimezone's
+  // own doc for the exact symptom that traced back to here: a "this jumped
+  // to tomorrow" or "showed an afternoon time for a morning minyan" report
+  // that a plain `new Date(now).getDay()`/`.getHours()` would produce
+  // whenever the two timezones disagree.
+  const { day: todayKey, minutes: nowMinutes } = dayAndMinutesInTimezone(now, community.timezone)
+  const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
   const season = currentSeason(now, community.timezone)
 
   const result = nextUpcomingDavening(shuls, { today: todayKey, tomorrow: tomorrowKey, nowMinutes, season, anchors })
@@ -101,7 +107,12 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   // mounts (see GenericDirectory's own `openDaveningModal` doc) — without it
   // this landed on a bare category page and made the visitor find the same
   // button a second time to reach the thing this link's own label promised.
-  const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1`
+  // `&day=` additionally does the same for WHICH day it opens to: when this
+  // card is showing tomorrow's earliest minyan (result.isTomorrow), the
+  // modal defaulting to its own "Today" filter would land the visitor on a
+  // day with nothing left to see and no visible reason why — see
+  // GenericDirectory's own `initialDaveningDay` doc.
+  const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowKey}` : ''}`
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">

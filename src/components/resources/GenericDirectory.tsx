@@ -5,7 +5,7 @@ import type { DirectoryResource, MapFilters } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
-import { isMinyanim } from '@/lib/davening'
+import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
@@ -43,6 +43,16 @@ type Props = {
    *  has to find the same button on again. No-op for a category with no
    *  minyanim field to show a modal for. */
   openDaveningModal?: boolean
+  /** Mount the modal already filtered to this one day — DaveningTimesCard
+   *  sets it to tomorrow's key when ITS OWN result is tomorrow's earliest
+   *  minyan (result.isTomorrow), so a visitor who followed a "tomorrow"
+   *  time here doesn't land on the modal's own "Today" default, which would
+   *  show nothing left for today and no visible reason why. Only ever
+   *  applied on arrival (see the `key` this feeds in FindResources.tsx) —
+   *  the modal's own day filter otherwise persists across opens by design
+   *  (see DaveningTimesModal's own doc), which this doesn't touch for the
+   *  ordinary in-page "All davening times" button. */
+  initialDaveningDay?: string
   onUp: () => void
   /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
    *  index there), "All resources" on desktop (a separate index page). See
@@ -60,7 +70,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
   const communitySlug = useCommunitySlug()
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
@@ -900,6 +910,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           isOpen={daveningModalOpen}
           onClose={() => setDaveningModalOpen(false)}
           initialDenomination={selectFilters['denomination']?.[0] ?? ''}
+          // Validated against the real day-key set, not a bare cast — this
+          // came in through a URL query param, so it's untrusted input, and
+          // a garbage value should mean "no filter" rather than being
+          // handed to the modal as if it were a real MinyanDayKey.
+          initialDayFilter={
+            initialDaveningDay && (ALL_MINYAN_DAYS as string[]).includes(initialDaveningDay)
+              ? [initialDaveningDay as MinyanDayKey]
+              : undefined
+          }
         />
       )}
     </div>

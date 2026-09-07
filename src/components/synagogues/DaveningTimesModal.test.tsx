@@ -348,3 +348,76 @@ describe('DaveningTimesModal', () => {
     expect(screen.queryByText(/are calculated from today/)).not.toBeInTheDocument()
   })
 })
+
+// This used to toggle `document.body.style.overflow`, a no-op in this app —
+// the real scrolling element is <html> (see globals.css and
+// useBodyScrollLock's own doc) — so the page behind the sheet kept
+// scrolling, and once it had, the sheet's own internal scroll got stuck
+// until the lock "reset". useBodyScrollLock fixes it by locking
+// documentElement instead.
+describe('DaveningTimesModal — locks the real scrolling element while open', () => {
+  it('locks documentElement.style.overflow while open, and releases it on close', () => {
+    const listing = makeListing({ name: 'Test Shul', minyanim: [clockMinyan()] })
+    const { rerender } = render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} />)
+
+    expect(document.documentElement.style.overflow).toBe('hidden')
+
+    rerender(<DaveningTimesModal items={[listing]} isOpen={false} onClose={noop} />)
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+})
+
+// `?day=` deep-links here from the homepage's "Upcoming Davening" card when
+// it's showing tomorrow's minyan (see DaveningTimesCard's own `seeAllHref`
+// doc) — without this, the modal's own "defaults to today" behavior would
+// land the visitor on a day with nothing left to see.
+describe('DaveningTimesModal — initialDayFilter seeds which day is selected on open', () => {
+  it('selects the given day instead of defaulting to today', () => {
+    const listing = makeListing({ name: 'Wednesday Shul', minyanim: [clockMinyan({ days: ['wed'] })] })
+    render(<DaveningTimesModal items={[listing]} isOpen onClose={noop} initialDayFilter={['wed']} />)
+
+    // Today (Sunday, per the SUNDAY fixture) is off, Wednesday is on.
+    expect(screen.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('heading', { level: 3, name: 'Wednesday' })).toBeInTheDocument()
+    expect(screen.getByText('Wednesday Shul')).toBeInTheDocument()
+  })
+})
+
+// The sort inside each tefillah group used to key on the raw rule text
+// ("15 min before Sunset"), which parseTimeToMinutes can't turn into a
+// number at all for an anchor-based row — both sides came out Infinity, so
+// two different anchor times never actually got compared and whichever
+// happened to come first in the underlying array won, regardless of which
+// was actually earlier.
+describe('DaveningTimesModal — anchor rows sort by their calculated time, not the raw rule text', () => {
+  it('puts the earlier calculated time first even when it is NOT first in the underlying data', async () => {
+    // Sunset resolves to 7:30 PM (ZMANIM_RESPONSE). Shul B (10 min before →
+    // 7:20 PM) is listed FIRST but is chronologically LATER than Shul A (15
+    // min before → 7:15 PM), listed second — the exact shape that exposed
+    // the bug: both rule-text strings are equally unparseable, so the old
+    // sort left them in this (wrong) input order instead of correcting it.
+    const shulB = makeListing({
+      name: 'Shul B',
+      geo: { lat: 40.01, lng: -75.01 },
+      minyanim: [anchorMinyan({ id: 'b', tefillah: 'mincha', offsetMinutes: -10, time: formatAnchorRule('sunset', -10) })],
+    })
+    const shulA = makeListing({
+      name: 'Shul A',
+      geo: { lat: 40.02, lng: -75.02 },
+      minyanim: [anchorMinyan({ id: 'a', tefillah: 'mincha', offsetMinutes: -15, time: formatAnchorRule('sunset', -15) })],
+    })
+    render(<DaveningTimesModal items={[shulB, shulA]} isOpen onClose={noop} />)
+
+    // The anchor times resolve async (useZmanAnchors' fetch), so the rows
+    // render once unsorted (both raw rule texts equally unparseable) and
+    // again once the fetch settles and the real sort key is available —
+    // wait for that settle instead of asserting on the transient render.
+    await waitFor(() => {
+      const shulAName = screen.getByText('Shul A')
+      const shulBName = screen.getByText('Shul B')
+      // DOCUMENT_POSITION_FOLLOWING on B relative to A means A comes first —
+      // the earlier (7:15 PM) row above the later (7:20 PM) one.
+      expect(shulAName.compareDocumentPosition(shulBName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+  })
+})

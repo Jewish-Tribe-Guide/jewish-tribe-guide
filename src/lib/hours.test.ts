@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { businessClosure, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
+import { businessClosure, dayAndMinutesInTimezone, effectiveBusinessStatus, fmt12, formatHoursSummary, formatTodayHours, formatWeekHours, getOpenStatus, hoursClosing, hoursOpenNow, isStructuredHours, placesApiHoursToStructured, syncedLabel, type StructuredHours } from './hours'
 
 // Everything here reads `new Date()`, so each test pins the clock. The local
 // timezone matters: hoursOpenNow uses getDay()/getHours(), i.e. the *viewer's*
@@ -410,5 +410,47 @@ describe('an admin override outranks Google', () => {
     )
     expect(status.isOpen).toBe(false)
     expect(status.closure).toBe('temporary')
+  })
+})
+
+// Deliberately the OPPOSITE contract from hoursOpenNow above — see this
+// function's own doc for why: it answers for a fixed location (a shul's own
+// timezone), not the viewer's device, which is what upcomingDavening.ts
+// needs to match a community's posted schedule correctly regardless of
+// where the visitor's phone thinks it is.
+describe('dayAndMinutesInTimezone', () => {
+  const originalTZ = process.env.TZ
+
+  afterEach(() => {
+    process.env.TZ = originalTZ
+    vi.useRealTimers()
+  })
+
+  it('reads the given timezone, not the machine’s own', () => {
+    // 2026-09-07 01:30 UTC is Sunday 9:30 PM in New York (UTC-4 in
+    // September) but already Monday 10:30 AM in Tokyo (UTC+9) — a real
+    // instant where "what day is it" genuinely disagrees depending on which
+    // clock you ask, not just a formatting difference.
+    process.env.TZ = 'Asia/Tokyo'
+    vi.useFakeTimers()
+    const now = new Date('2026-09-07T01:30:00Z').getTime()
+    vi.setSystemTime(now)
+
+    // The machine's own local getDay()/getHours() would read Monday, 10:30
+    // — proving this isn't accidentally already timezone-safe by virtue of
+    // the test machine happening to run in America/New_York.
+    const machineLocal = new Date(now)
+    expect(machineLocal.getDay()).toBe(1) // Monday, per the machine's own TZ
+    expect(machineLocal.getHours()).toBe(10)
+
+    // The community's own timezone should say Sunday 9:30 PM regardless.
+    const result = dayAndMinutesInTimezone(now, 'America/New_York')
+    expect(result).toEqual({ day: 'sun', minutes: 21 * 60 + 30 })
+  })
+
+  it('normalizes midnight to minute 0, not 1440', () => {
+    const now = new Date('2026-09-07T04:00:00Z').getTime() // midnight in New York (EDT, UTC-4)
+    const result = dayAndMinutesInTimezone(now, 'America/New_York')
+    expect(result.minutes).toBe(0)
   })
 })
