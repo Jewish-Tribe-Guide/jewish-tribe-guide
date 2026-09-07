@@ -860,10 +860,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           </div>
         </div>
       ) : (
-        // lg+: a grid instead of a single column — see GenericListingCard's
-        // isMobile split, which is what makes this safe: desktop cards open
-        // their detail in a dialog rather than expanding in place, so a card
-        // growing taller never has to fight its grid neighbors for space.
+        // sm+ (640px — matches useIsMobile's own cutover, not an arbitrary
+        // choice), not lg+: a grid instead of a single column — see
+        // GenericListingCard's isMobile split, which is what makes this
+        // safe: desktop cards open their detail in a dialog rather than
+        // expanding in place, so a card growing taller never has to fight
+        // its grid neighbors for space. Anchoring the breakpoint to `lg`
+        // (1024px) instead of this made the grid jump straight from 3
+        // columns to 1 the moment the window narrowed past 1024 — nothing
+        // in between ever got a chance to be 2, since 1024px of content
+        // width is already comfortably enough for auto-fill to reserve all
+        // 3 of its 280px tracks. Starting the grid at `sm` instead means
+        // auto-fill (see its own doc below) does the same job it already
+        // does at 3 columns, just also at the narrower widths where only 2
+        // of those tracks actually fit — a real 3 → 2 → 1 progression
+        // driven by the same mechanism, not a second one bolted on.
         //
         // auto-fill, not auto-fit and not a fixed grid-cols-2/xl:grid-cols-3.
         //
@@ -904,9 +915,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // doing the work here — it only matters on a viewport wide enough
         // that even a properly-counted track's 1fr share would exceed a
         // normal card's width.
-        <div className="space-y-2 lg:space-y-0 lg:grid lg:gap-3 lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+        <div className="space-y-2 sm:space-y-0 sm:grid sm:gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
           {filtered.map((item, index) => (
-            // lg:max-w-md, no auto-margin: a 1fr track stretches to the
+            // sm:max-w-md (matches the grid's own breakpoint above), no
+            // auto-margin: a 1fr track stretches to the
             // grid's normal per-column share, which is fine once there are
             // enough cards to fill it (the typical case) — capped here only
             // matters when a sparse row hands one card way more than a
@@ -917,7 +929,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             // left-align, and previous attempts that added `mx-auto` here
             // were undoing that default to center it instead, which is the
             // opposite of what a normal packed-left layout looks like.
-            <div key={item.id} ref={setItemRowRef(item.id)} className="lg:max-w-md">
+            <div key={item.id} ref={setItemRowRef(item.id)} className="sm:max-w-md">
             <GenericListingCard
               ref={setCardRef(item.id)}
               onNavigate={(direction) => navigateFromCard(item.id, direction)}

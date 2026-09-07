@@ -71,6 +71,35 @@ test.describe('listing detail — desktop', () => {
     expect(columnCount, 'the directory grid should lay out more than one column at desktop width').toBeGreaterThan(1)
   })
 
+  // Was anchored to `lg` (1024px), a full breakpoint above where the grid
+  // even turns on for `isMobile` purposes (`sm`, 640px — see the grid's own
+  // doc). 1024px of content width is already comfortably enough for
+  // auto-fill to reserve all 3 of its 280px tracks, so nothing between
+  // "wide enough for 3" and "not a grid at all" ever got a chance to be 2 —
+  // the grid jumped straight from 3 columns to a single one. Aligning the
+  // grid's own breakpoint to `sm` lets auto-fill do the same job at the
+  // narrower widths where only 2 of those tracks fit.
+  test('narrows 3 columns to 2 before collapsing to 1, rather than jumping straight from 3 to 1', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await largestCategory(request, community)
+    const trigger = () => page.getByRole('button', { name: /^Show details for / }).first()
+    const columnsAt = async (width: number) => {
+      await page.setViewportSize({ width, height: 900 })
+      return trigger().evaluate((el) => {
+        let node: Element | null = el
+        while (node && getComputedStyle(node).display !== 'grid') node = node.parentElement
+        return node ? getComputedStyle(node).gridTemplateColumns.split(' ').length : 1
+      })
+    }
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    expect(await columnsAt(1400)).toBe(3)
+    expect(await columnsAt(750)).toBe(2)
+    expect(await columnsAt(600)).toBe(1)
+  })
+
   // Arrow navigation scrolls the next/previous card into view. That scroll
   // used to only clear the site header's own height — not the SEPARATE
   // sticky search/filter/sort bar directly under it (GenericDirectory's
