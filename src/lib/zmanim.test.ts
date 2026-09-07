@@ -347,6 +347,44 @@ describe('getZmanimData', () => {
       expect(data.holidayPeriod).toBeNull()
     })
   })
+
+  describe('isYomTov', () => {
+    it('is true on a full Yom Tov day', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Sukkot I'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(true)
+    })
+
+    it('is false on Erev Yom Tov — the lead-up, not the day itself', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Erev Sukkot'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on Chol HaMoed — a shul’s regular weekday schedule still applies', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Sukkot III (CH’M)'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on a minor holiday, where work is permitted', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Chanukah: 1 Candle'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on Rosh Chodesh alone — its own separate pseudo-day', async () => {
+      mockHebcal({ converter: { ...converterResponse, events: ['Rosh Chodesh Elul'] } })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+
+    it('is false on an ordinary day with no events', async () => {
+      mockHebcal()
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.isYomTov).toBe(false)
+    })
+  })
 })
 
 describe('lookaheadDays', () => {

@@ -91,8 +91,8 @@ const ANCHORS = Object.fromEntries(
 describe('nextUpcomingDavening', () => {
   it('1:15 PM: the single next thing, one shul, no tie', () => {
     const result = nextUpcomingDavening(ALL, {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 13 * 60 + 15,
       season: 'summer',
       anchors: ANCHORS,
@@ -110,8 +110,8 @@ describe('nextUpcomingDavening', () => {
 
   it('7:10 PM: two shuls tied at the identical resolved minute collapse; a five-minute-earlier one does not join them', () => {
     const result = nextUpcomingDavening(ALL, {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 19 * 60 + 10,
       season: 'summer',
       anchors: ANCHORS,
@@ -131,8 +131,8 @@ describe('nextUpcomingDavening', () => {
     // Wednesday Shacharis is a separate, later row this test doesn't carry —
     // so it correctly sits out of tomorrow's tie group here.
     const result = nextUpcomingDavening(ALL, {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 22 * 60 + 30,
       season: 'summer',
       anchors: ANCHORS,
@@ -147,8 +147,8 @@ describe('nextUpcomingDavening', () => {
 
   it('returns null when nothing resolves at all', () => {
     const result = nextUpcomingDavening([bnaiAbraham], {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 0,
       season: 'summer',
       anchors: {},
@@ -162,8 +162,8 @@ describe('nextUpcomingDavening', () => {
       minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '1:00pm', season: 'winter' }],
     }
     const result = nextUpcomingDavening([winterOnly], {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 12 * 60,
       season: 'summer',
       anchors: {},
@@ -177,8 +177,8 @@ describe('nextUpcomingDavening', () => {
       minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['rosh_chodesh'], time: '7:00am' }],
     }
     const result = nextUpcomingDavening([roshChodeshOnly], {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 0,
       season: 'summer',
       anchors: {},
@@ -186,12 +186,37 @@ describe('nextUpcomingDavening', () => {
     expect(result).toBeNull()
   })
 
+  it('matches a Yom Tov-only row when the caller has resolved today as Yom Tov', () => {
+    const yomTovOnly: ShulMinyanim = {
+      name: 'Yom Tov Shul',
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['yom_tov'], time: '8:30am' }],
+    }
+    const notYomTov = nextUpcomingDavening([yomTovOnly], {
+      today: ['tue'],
+      tomorrow: ['wed'],
+      nowMinutes: 0,
+      season: 'summer',
+      anchors: {},
+    })
+    expect(notYomTov).toBeNull()
+
+    const isYomTov = nextUpcomingDavening([yomTovOnly], {
+      today: ['tue', 'yom_tov'],
+      tomorrow: ['wed'],
+      nowMinutes: 0,
+      season: 'summer',
+      anchors: {},
+    })
+    expect(isYomTov?.time).toBe('8:30am')
+    expect(isYomTov?.shul?.name).toBe('Yom Tov Shul')
+  })
+
   it('joins distinct tefillah labels when different tefillah types genuinely tie', () => {
     const shulA: ShulMinyanim = { name: 'Shul A', minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['tue'], time: '6:45am' } as Minyan] }
     const shulB: ShulMinyanim = { name: 'Shul B', minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '6:45am' } as Minyan] }
     const result = nextUpcomingDavening([shulA, shulB], {
-      today: 'tue',
-      tomorrow: 'wed',
+      today: ['tue'],
+      tomorrow: ['wed'],
       nowMinutes: 0,
       season: 'summer',
       anchors: {},

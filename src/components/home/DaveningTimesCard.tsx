@@ -10,6 +10,7 @@ import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
 import { isMinyanim, type Minyan } from '@/lib/davening'
 import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
+import { useZmanim } from '@/lib/useZmanim'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import { distanceMiles, type LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
@@ -22,9 +23,14 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // field (today, just Synagogues, but nothing here assumes that's the only
 // one) and shows the single next minyan happening anywhere in the
 // community, not a per-category or per-tefillah breakdown. See
-// upcomingDavening.ts for the actual "what's next" logic and why it's
-// scoped to real weekdays only; this component's job is just wiring real
-// data into it and rendering the result as one row.
+// upcomingDavening.ts for the actual "what's next" logic, which matches
+// against whatever day keys this component resolves for "today"/"tomorrow"
+// — the plain weekday, plus 'yom_tov' once useZmanim confirms it (a Rosh
+// Chodesh-only or secular-holiday-only minyan still isn't a candidate here;
+// this component only ever resolves Yom Tov, the one pseudo-day this card
+// would otherwise show a flatly wrong "next minyan" for). This component's
+// job is wiring real data into that logic and rendering the result as one
+// row.
 //
 // Deliberately NOT the three-lines-per-tefillah design floated earlier —
 // the point of this card is that there is nothing to read, only one fact
@@ -90,7 +96,21 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
   const tomorrowKey = DAY_KEYS[(DAY_KEYS.indexOf(todayKey) + 1) % 7]
   const season = currentSeason(now, community.timezone)
 
-  const result = nextUpcomingDavening(shuls, { today: todayKey, tomorrow: tomorrowKey, nowMinutes, season, anchors })
+  // Falls back to the community's own default location, same as
+  // ShabbatTimesCard — whether today is Yom Tov doesn't depend on which
+  // exact address a visitor set (or hasn't), unlike `coords` above, which
+  // stays the real, ungated visitor location because `nearestMiles` below
+  // would be actively misleading measured from a fallback.
+  const { data: zmanimData } = useZmanim(coords ?? community.mapCenter)
+  const todayDayKeys = zmanimData?.isYomTov ? [todayKey, 'yom_tov' as const] : [todayKey]
+
+  const result = nextUpcomingDavening(shuls, {
+    today: todayDayKeys,
+    tomorrow: [tomorrowKey],
+    nowMinutes,
+    season,
+    anchors,
+  })
 
   // No category configured with a minyanim field at all — not a loading
   // state, a real "this community hasn't set this up" — so the card

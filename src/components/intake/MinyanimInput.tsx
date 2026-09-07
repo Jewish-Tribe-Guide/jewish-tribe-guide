@@ -50,6 +50,7 @@ const DAY_SHORT: Record<MinyanDayKey, string> = {
   fri: 'Fri',
   sat: 'Sat',
   rosh_chodesh: 'Rosh Chodesh',
+  yom_tov: 'Yom Tov',
   holiday: 'Holiday',
 }
 

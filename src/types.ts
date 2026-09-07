@@ -54,6 +54,13 @@ export type ZmanimData = {
    *  callers never have to string-match Hebcal's naming — see the note there
    *  about Erev Rosh Chodesh. */
   isRoshChodesh?: boolean
+  /** Whether today itself is a full Yom Tov day (Rosh Hashana, Yom Kippur,
+   *  the first/last days of Sukkot and Pesach, Shmini Atzeret, Simchat
+   *  Torah, Shavuot) — Erev Yom Tov and Chol HaMoed are deliberately
+   *  excluded, since a shul's "Yom Tov" minyan tag means the day work is
+   *  forbidden, not the lead-up or the intermediate days. Derived from
+   *  `holidays` in lib/zmanim, same as `isRoshChodesh`. */
+  isYomTov?: boolean
   /** The next Yom Tov period landing within the lookahead window (see
    *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
    *  `null` when there isn't one, which is the common case most weeks.

@@ -1,6 +1,5 @@
-import type { DayKey } from './hours'
 import { isOutOfSeason, type Season } from './season'
-import { parseTimeToMinutes, TEFILLAH_LABELS, type Minyan, type Tefillah } from './davening'
+import { parseTimeToMinutes, TEFILLAH_LABELS, type Minyan, type MinyanDayKey, type Tefillah } from './davening'
 import { geoKey, geoOrCommunityDefault, resolveAnchorTime, type AnchorTimes } from './useZmanAnchors'
 import type { LatLng } from './geo'
 
@@ -53,12 +52,14 @@ type Candidate = {
  * Merion's and Chabad of the Main Line's identical 10-minutes-before, and
  * showing all three as "the same" would be wrong, not just imprecise).
  *
- * Scoped to real weekdays only — `today`/`tomorrow` are plain DayKeys, and a
- * minyan that only runs on Rosh Chodesh or a secular holiday is never a
- * candidate here. Those pseudo-days need actual Jewish/secular calendar
- * lookups to resolve (see calendarDaysFor), which is exactly the kind of
- * machinery a one-line "what's next" home-screen card shouldn't need to
- * carry — the full "All Davening Times" modal already covers them.
+ * `today`/`tomorrow` are the full set of day keys that apply — a plain
+ * weekday plus whichever pseudo-days the caller has already resolved to be
+ * true (Rosh Chodesh, Yom Tov, a secular holiday; see calendarDaysFor). A
+ * minyan whose `days` don't intersect either set at all is never a
+ * candidate. Resolving those pseudo-days is deliberately the caller's job,
+ * not this function's — it stays pure and testable with plain arrays,
+ * the same reasoning `calendarDaysFor` itself documents for keeping the
+ * Jewish-calendar lookup out of the low-level day math.
  *
  * A row this function can't put a number on is never a candidate: an
  * out-of-season row (isOutOfSeason), and a free-text time like "Call to
@@ -74,8 +75,10 @@ type Candidate = {
 export function nextUpcomingDavening(
   shuls: ShulMinyanim[],
   opts: {
-    today: DayKey
-    tomorrow: DayKey
+    /** Every day key that applies to today — the plain weekday plus any
+     *  pseudo-days already resolved true (see calendarDaysFor). */
+    today: MinyanDayKey[]
+    tomorrow: MinyanDayKey[]
     nowMinutes: number
     season: Season | null
     /** Keyed by `geoKey` — see useZmanAnchors. A shul with anchor-based rows
@@ -100,14 +103,14 @@ export function nextUpcomingDavening(
 
 function collectCandidates(
   shuls: ShulMinyanim[],
-  day: DayKey,
+  dayKeys: MinyanDayKey[],
   season: Season | null,
   anchors: Record<string, AnchorTimes>,
 ): Candidate[] {
   const out: Candidate[] = []
   for (const shul of shuls) {
     for (const row of shul.minyanim) {
-      if (!(row.days as string[]).includes(day)) continue
+      if (!row.days.some((d) => dayKeys.includes(d))) continue
       if (isOutOfSeason(row.season, season)) continue
 
       let time: string | null = null

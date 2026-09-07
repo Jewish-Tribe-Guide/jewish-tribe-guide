@@ -161,6 +161,32 @@ function normalizeHolidayName(title: string): string {
     .trim()
 }
 
+/** Full Yom Tov day names the Hebrew-calendar converter can report for
+ *  today, matched by prefix the same way `isRoshChodesh` matches "Rosh
+ *  Chodesh" — deliberately excludes fasts (Yom Kippur is its own prefix, not
+ *  a fast-day one), Chanukah/Purim (minor holidays; work is permitted, so a
+ *  shul's ordinary weekday minyan still applies), and Rosh Chodesh itself
+ *  (already its own pseudo-day). */
+const YOM_TOV_PREFIXES = [
+  'Rosh Hashana',
+  'Yom Kippur',
+  'Sukkot',
+  'Shmini Atzeret',
+  'Simchat Torah',
+  'Pesach',
+  'Shavuot',
+]
+
+/** True for a full Yom Tov day event ("Sukkot I", "Pesach VIII"), false for
+ *  the lead-up ("Erev Sukkot") and the intermediate days Hebcal marks
+ *  "(CH'M)" — Chol HaMoed keeps a shul's regular weekday schedule (plus
+ *  Hallel), not its Yom Tov one. */
+function isYomTovEvent(event: string): boolean {
+  if (event.startsWith('Erev ')) return false
+  if (/\(CH['’]M\)/i.test(event)) return false
+  return YOM_TOV_PREFIXES.some((p) => event.startsWith(p))
+}
+
 /** Groups a date-ranged Hebcal response into the next complete Yom Tov
  *  period — a `candles` item, everything after it up to and including the
  *  next `havdalah` — and names it from whichever `holiday` item in that
@@ -330,6 +356,7 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     // evening errs toward showing a row rather than hiding one only after the
     // fallback in useCalendarDays has already been resolved.
     isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
+    isYomTov: (converter.events ?? []).some(isYomTovEvent),
     holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
   }
 }

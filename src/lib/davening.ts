@@ -15,16 +15,19 @@ export type { Season }
 // Alias so callers can import ALL_DAYS from here instead of hours.
 export { DAY_KEYS as ALL_DAYS }
 
-/** A minyan's `days` can be a real weekday, or one of two pseudo-days a shul
- *  posts a separate schedule for: Rosh Chodesh (a Jewish calendar event, not
- *  a weekday) and a secular Holiday (July 4th, Thanksgiving, etc.). Kept
- *  distinct from the plain `DayKey` used for hours-of-operation, which only
- *  ever means a real weekday. */
-export type MinyanDayKey = DayKey | 'rosh_chodesh' | 'holiday'
+/** A minyan's `days` can be a real weekday, or one of three pseudo-days a
+ *  shul posts a separate schedule for: Rosh Chodesh (a Jewish calendar
+ *  event, not a weekday), Yom Tov (a full Jewish holiday day — Rosh
+ *  Hashana, Yom Kippur, the first/last days of Sukkot and Pesach, Shmini
+ *  Atzeret, Simchat Torah, Shavuot — not Erev Yom Tov or Chol HaMoed, which
+ *  keep the regular weekday schedule), and a secular Holiday (July 4th,
+ *  Thanksgiving, etc.). Kept distinct from the plain `DayKey` used for
+ *  hours-of-operation, which only ever means a real weekday. */
+export type MinyanDayKey = DayKey | 'rosh_chodesh' | 'yom_tov' | 'holiday'
 
 /** Every selectable "day" for a minyan, in display/sort order — real weekdays
- *  first, then the two pseudo-days. */
-export const ALL_MINYAN_DAYS: MinyanDayKey[] = [...DAY_KEYS, 'rosh_chodesh', 'holiday']
+ *  first, then the three pseudo-days. */
+export const ALL_MINYAN_DAYS: MinyanDayKey[] = [...DAY_KEYS, 'rosh_chodesh', 'yom_tov', 'holiday']
 
 function isRealDay(d: MinyanDayKey): d is DayKey {
   return (DAY_KEYS as string[]).includes(d)
@@ -79,6 +82,7 @@ const DAY_FULL: Record<MinyanDayKey, string> = {
   fri: 'Friday',
   sat: 'Saturday',
   rosh_chodesh: 'Rosh Chodesh',
+  yom_tov: 'Yom Tov',
   holiday: 'Holiday',
 }
 
