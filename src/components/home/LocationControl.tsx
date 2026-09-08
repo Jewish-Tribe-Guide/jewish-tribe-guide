@@ -33,18 +33,11 @@ export type LocationControls = {
 
 type Props = {
   controls: LocationControls
-  /** Forces the label hidden on mobile even before an address is set — used
-   *  by SiteHeader on a category screen, where the back button + category
-   *  title already take the room the full "Set location" prompt would need.
-   *  A first-time visitor still sees the full prompt on the home screen
-   *  (where `compact` is left false), so this never removes the visitor's
-   *  only chance to discover the feature, only its second and later showings. */
-  compact?: boolean
 }
 
 // Header pill that anchors all distance sorting: the visitor shares their live
 // location or types an address, which powers the directory's proximity sorting.
-export default function LocationControl({ controls, compact }: Props) {
+export default function LocationControl({ controls }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const wasTracking = useRef(controls.tracking)
@@ -295,11 +288,11 @@ export default function LocationControl({ controls, compact }: Props) {
         ) : (
           <PinIcon filled={!!resolvedAddress} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
         )}
-        {/* Show the "Set location" prompt on every size so first-time mobile
-            visitors discover it; once an address is set (or `compact` says
-            the header has no room to spare), collapse to just the pin on
-            mobile to save header space. */}
-        <span className={`truncate ${resolvedAddress || compact ? 'hidden md:block' : 'block'}`}>{label}</span>
+        {/* Show the "Set location" (or "Live") prompt on every size and every
+            screen so a mobile visitor always has a way to discover and reach
+            this control; once an address is actually set, collapse to just
+            the pin on mobile to save header space. */}
+        <span className={`truncate ${resolvedAddress ? 'hidden md:block' : 'block'}`}>{label}</span>
       </button>
 
       {open && (

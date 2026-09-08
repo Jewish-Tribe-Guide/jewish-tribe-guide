@@ -211,7 +211,22 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
           // One community: the header is exactly what it always was — the whole
           // mark-plus-title block is a single "go home" link.
+          //
+          // On mobile, though, this block only ever renders on the home
+          // screen itself — every other screen swaps it for the back button
+          // above (showScreenHeader) or the header collapses entirely (the
+          // map) — so there's nowhere for "go home" to usefully go. Plain,
+          // non-interactive text there instead of a link to the page you're
+          // already on.
           if (!switchable || switchable.length < 2) {
+            if (isMobile) {
+              return (
+                <span className="flex min-w-0 shrink items-center gap-2.5">
+                  {mark}
+                  {title}
+                </span>
+              )
+            }
             return (
               <Link
                 href={routes.home(community.slug)}
@@ -250,7 +265,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         {!hideNav && <HeaderNav />}
 
         <div className="ml-auto">
-          <LocationControl controls={location} compact={showScreenHeader} />
+          <LocationControl controls={location} />
         </div>
       </div>
     </header>
