@@ -66,18 +66,12 @@ describe('SubscriberManager', () => {
 
     expect(screen.getByText('a@example.com')).toBeInTheDocument()
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
-    // a@example.com only has notifyAdd, not notifyClosure — matched by full
-    // element text (a function matcher, not a fixed date string, since
-    // toLocaleDateString() output depends on the runner's timezone) so it
-    // doesn't collide with b@example.com's "... · Closures" row below.
-    expect(
-      screen.getByText((_, el) => el?.tagName === 'P' && el.textContent?.startsWith('New listings — since') === true),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        (_, el) => el?.tagName === 'P' && el.textContent?.startsWith('New listings · Closures — since') === true,
-      ),
-    ).toBeInTheDocument()
+    // a@example.com only has notifyAdd, not notifyClosure — the
+    // Notifications column reads exactly "New listings" for that row, with
+    // nothing appended, so this doesn't collide with b@example.com's own
+    // "New listings · Closures" cell below.
+    expect(screen.getByText('New listings')).toBeInTheDocument()
+    expect(screen.getByText('New listings · Closures')).toBeInTheDocument()
 
     expect(screen.getByText('b@example.com')).toBeInTheDocument()
     expect(screen.getByText('All categories')).toBeInTheDocument()

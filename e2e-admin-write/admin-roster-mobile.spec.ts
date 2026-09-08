@@ -74,10 +74,13 @@ test.describe('admin roster on a phone', () => {
     const card = page.locator(`[data-community-slug="${slug}"]`)
     await expect(card).toBeVisible({ timeout: 15_000 })
 
-    // The Admins block is a collapsed-by-default CollapsibleSection now (see
-    // CollapsibleSection.tsx) — the roster table/add-admin form aren't in
-    // the document at all until this is clicked.
-    await card.getByRole('button', { name: 'Show Admins' }).click()
+    // Everything but the card's own identity (name/badges/slug/region/admin
+    // count) — Publish/Unpublish, Delete, the preview link, and the whole
+    // Admins roster — lives behind one collapsed-by-default "Show"/"Hide"
+    // toggle now (see CommunityManager.tsx's own comment on why). The
+    // roster table/add-admin form aren't in the document at all until this
+    // is clicked.
+    await card.getByRole('button', { name: /^show /i }).click()
 
     await card.getByPlaceholder('new-admin@example.com').fill(adminEmail)
     await card.getByRole('button', { name: 'Add admin' }).click()

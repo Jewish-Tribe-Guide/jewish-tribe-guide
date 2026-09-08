@@ -91,35 +91,58 @@ export default function SubscriberManager({ token }: { token: string }) {
           <p className="text-xs text-muted mb-2">
             {subscribers.length} subscriber{subscribers.length === 1 ? '' : 's'}
           </p>
-          <div className="space-y-2 max-w-3xl">
-            {subscribers.map((s) => (
-              <div
-                key={s.id}
-                className="bg-white border border-slate-200 rounded-lg p-3 flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{s.email}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    {s.categories && s.categories.length > 0
-                      ? s.categories.map(categoryLabel).join(', ')
-                      : 'All categories'}
-                  </p>
-                  <p className="text-[11px] text-muted mt-1">
-                    {[s.notifyAdd && 'New listings', s.notifyClosure && 'Closures'].filter(Boolean).join(' · ') ||
-                      'No notifications enabled'}
-                    {' — since '}
-                    {new Date(s.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => remove(s)}
-                  disabled={removingId === s.id}
-                  className="shrink-0 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {removingId === s.id ? 'Removing…' : 'Remove'}
-                </button>
-              </div>
-            ))}
+          {/* Same table shape as CommunityManager's Admins roster — a header
+              row naming each column beats a caption baked into every card,
+              and it's the pattern this admin console already established for
+              "list of people with a couple of attributes and a Remove". */}
+          <div className="overflow-x-auto max-w-3xl">
+            <table className="w-full text-xs max-sm:block">
+              <thead className="max-sm:hidden">
+                <tr className="text-left text-slate-400">
+                  <th className="font-medium pb-1">Email</th>
+                  <th className="font-medium pb-1">Categories</th>
+                  <th className="font-medium pb-1">Notifications</th>
+                  <th className="font-medium pb-1">Since</th>
+                  <th className="w-14" />
+                </tr>
+              </thead>
+              <tbody className="max-sm:block">
+                {subscribers.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-t border-slate-100 max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:py-1.5"
+                  >
+                    <td className="py-1.5 pr-3 font-medium text-slate-900 break-all max-sm:block max-sm:basis-full max-sm:pb-0">
+                      {s.email}
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted max-sm:block max-sm:basis-full">
+                      <span className="hidden max-sm:inline text-slate-400">Categories: </span>
+                      {s.categories && s.categories.length > 0
+                        ? s.categories.map(categoryLabel).join(', ')
+                        : 'All categories'}
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted max-sm:block max-sm:basis-full">
+                      <span className="hidden max-sm:inline text-slate-400">Notifications: </span>
+                      {[s.notifyAdd && 'New listings', s.notifyClosure && 'Closures'].filter(Boolean).join(' · ') ||
+                        'None enabled'}
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted whitespace-nowrap max-sm:block max-sm:basis-full">
+                      <span className="hidden max-sm:inline text-slate-400">Since: </span>
+                      {new Date(s.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-1.5 text-right max-sm:ml-auto max-sm:pt-1">
+                      <button
+                        onClick={() => remove(s)}
+                        disabled={removingId === s.id}
+                        className="font-medium text-muted hover:text-red-600 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {removingId === s.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </>
       )}

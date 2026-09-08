@@ -45,7 +45,9 @@ test('the Subscribers tab lists a real subscriber, and Remove deletes it for rea
 
   await page.goto('/philly/admin/subscribers')
 
-  const row = page.locator('div.rounded-lg', { hasText: email })
+  // A table row now (see SubscriberManager.tsx's own comment — matches
+  // CommunityManager's Admins roster shape), not a bare div.
+  const row = page.locator('tr', { hasText: email })
   await expect(row).toBeVisible({ timeout: 10_000 })
   await expect(row.getByText('All categories')).toBeVisible()
 

@@ -8,7 +8,6 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
-import CollapsibleSection from './CollapsibleSection'
 import type { Community } from '@/lib/communityStore'
 
 // GET /api/admin/communities adds adminEmails/previewToken on top of the
@@ -198,6 +197,25 @@ export default function CommunityManager({ token }: { token: string }) {
   // click-again-to-confirm shape as ArchivedListings.tsx's confirmDeleteId,
   // just keyed by a pair since the roster spans every community at once.
   const [confirmRemove, setConfirmRemove] = useState<{ slug: string; email: string } | null>(null)
+  // Which community cards are expanded — each one collapsed by default,
+  // independently toggleable (not one-at-a-time). Everything but identity
+  // (name/badges/slug/region/admin count) lives behind this: Publish/
+  // Unpublish, Delete, the preview link, and the whole Admins roster. The
+  // Admins roster used to have its own separate CollapsibleSection nested
+  // one level in — that meant two clicks to reach it and a redundant
+  // "Show" the outer card's own Show already implied. One toggle per card
+  // now, matching how CommunityManager.test.tsx exercises admin roster
+  // rows further down (via `card` scoping).
+  const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
+
+  function toggleExpanded(slug: string) {
+    setExpandedSlugs((s) => {
+      const next = new Set(s)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      return next
+    })
+  }
 
   const load = useCallback(async () => {
     setError(null)
@@ -762,64 +780,82 @@ export default function CommunityManager({ token }: { token: string }) {
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  /{c.slug} · {c.region}
+                  /{c.slug} · {c.region} ·{' '}
+                  {c.adminEmails.length > 0
+                    ? `${c.adminEmails.length} admin${c.adminEmails.length === 1 ? '' : 's'}`
+                    : 'no admins set'}
                 </p>
+              </Link>
+              {/* A plain toggle button, not the shared CollapsibleSection
+                  component — that component makes its whole header one
+                  <button>, and the Link above needs to stay a real, separate
+                  link (a button can't nest an <a>; axe's nested-interactive
+                  rule would flag exactly that). Everything but identity
+                  (name/badges/slug/region/admin count above) lives behind
+                  this single toggle: Publish/Unpublish, Delete, the preview
+                  link, and the whole Admins roster — that used to be two
+                  separate disclosures (this card's own always-visible
+                  actions, plus Admins' own nested Show/Hide), which meant an
+                  admin had to open a second box just to see who has access. */}
+              <button
+                onClick={() => toggleExpanded(c.slug)}
+                aria-expanded={expandedSlugs.has(c.slug)}
+                aria-label={`${expandedSlugs.has(c.slug) ? 'Hide' : 'Show'} ${c.name}`}
+                className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+              >
+                {expandedSlugs.has(c.slug) ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {expandedSlugs.has(c.slug) && (
+              <div className="mt-3 border-t border-slate-200 pt-3 space-y-3">
                 {!c.visible && (
-                  <p className="text-xs text-amber-700 mt-1">
+                  <p className="text-xs text-amber-700">
                     Not on the switcher or sitemap, and the public site 404s for anyone without the link below. The
                     admin console works normally regardless — sign in any time to keep building it out.
                   </p>
                 )}
-              </Link>
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => toggleVisibility(c.slug, !c.visible)}
-                  disabled={togglingSlug === c.slug}
-                  className="text-xs font-medium text-primary hover:underline cursor-pointer disabled:opacity-60"
-                >
-                  {togglingSlug === c.slug ? 'Saving…' : c.visible ? 'Unpublish' : 'Publish'}
-                </button>
-                {/* The default community can't be deleted at all (see
-                    deleteCommunity's own doc) — no button rather than one
-                    that always fails. */}
-                {!c.isDefault && !deletionDisabled && (
+
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => startDeleting(c.slug)}
-                    className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+                    onClick={() => toggleVisibility(c.slug, !c.visible)}
+                    disabled={togglingSlug === c.slug}
+                    className="text-xs font-medium text-primary hover:underline cursor-pointer disabled:opacity-60"
                   >
-                    Delete
+                    {togglingSlug === c.slug ? 'Saving…' : c.visible ? 'Unpublish' : 'Publish'}
                   </button>
+                  {/* The default community can't be deleted at all (see
+                      deleteCommunity's own doc) — no button rather than one
+                      that always fails. */}
+                  {!c.isDefault && !deletionDisabled && (
+                    <button
+                      onClick={() => startDeleting(c.slug)}
+                      className="text-xs font-medium text-red-600 hover:underline cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+
+                {!c.visible && c.previewToken && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={previewLink(c.slug, c.previewToken)}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="flex-1 min-w-0 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-mono text-slate-600"
+                    />
+                    <button
+                      onClick={() => copyPreviewLink(c.slug, c.previewToken!)}
+                      className="text-xs font-medium border border-slate-300 text-slate-600 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                    >
+                      {copiedSlug === c.slug ? 'Copied!' : 'Copy link'}
+                    </button>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {!c.visible && c.previewToken && (
-              <div className="mt-3 border-t border-slate-200 pt-3 flex items-center gap-2">
-                <input
-                  readOnly
-                  value={previewLink(c.slug, c.previewToken)}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 min-w-0 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-mono text-slate-600"
-                />
-                <button
-                  onClick={() => copyPreviewLink(c.slug, c.previewToken!)}
-                  className="text-xs font-medium border border-slate-300 text-slate-600 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
-                >
-                  {copiedSlug === c.slug ? 'Copied!' : 'Copy link'}
-                </button>
-              </div>
-            )}
-
-            <div className="mt-3 border-t border-slate-200 pt-3">
-            <CollapsibleSection
-              title="Admins"
-              description={
-                c.adminEmails.length > 0
-                  ? `${c.adminEmails.length} admin${c.adminEmails.length === 1 ? '' : 's'}`
-                  : 'None set — falls back to the superadmin list.'
-              }
-              contentClassName="p-4"
-            >
+                <div className="border-t border-slate-100 pt-3">
+              <p className="text-sm font-semibold text-slate-900 mb-2">Admins</p>
               {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
 
               {c.adminEmails.length > 0 ? (
@@ -949,43 +985,44 @@ export default function CommunityManager({ token }: { token: string }) {
                   Add admin
                 </button>
               </div>
-            </CollapsibleSection>
-            </div>
-
-            {deletingSlug === c.slug && (
-              <div className="mt-3 border-t border-slate-200 pt-3">
-                <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
-                  <p className="text-sm text-red-800">
-                    This permanently deletes <span className="font-semibold">{c.name}</span> and everything in
-                    it — every listing, category, form, and submission. This can&rsquo;t be undone.
-                  </p>
-                  <label className="block text-xs font-medium text-red-800">
-                    Type <span className="font-mono">{c.slug}</span> to confirm
-                    <input
-                      className="mt-1 w-full rounded-md border border-red-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-400"
-                      value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
-                      autoFocus
-                    />
-                  </label>
-                  {deleteError && <p className="text-xs text-red-700">{deleteError}</p>}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => confirmDelete(c.slug)}
-                      disabled={deleteConfirmText !== c.slug || deleting}
-                      className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer"
-                    >
-                      {deleting ? 'Deleting…' : 'Delete forever'}
-                    </button>
-                    <button
-                      onClick={cancelDeleting}
-                      disabled={deleting}
-                      className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
                 </div>
+
+                {deletingSlug === c.slug && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="bg-red-50 border border-red-200 rounded-md p-3 space-y-2">
+                      <p className="text-sm text-red-800">
+                        This permanently deletes <span className="font-semibold">{c.name}</span> and everything in
+                        it — every listing, category, form, and submission. This can&rsquo;t be undone.
+                      </p>
+                      <label className="block text-xs font-medium text-red-800">
+                        Type <span className="font-mono">{c.slug}</span> to confirm
+                        <input
+                          className="mt-1 w-full rounded-md border border-red-300 px-2.5 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-400"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          autoFocus
+                        />
+                      </label>
+                      {deleteError && <p className="text-xs text-red-700">{deleteError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => confirmDelete(c.slug)}
+                          disabled={deleteConfirmText !== c.slug || deleting}
+                          className="text-sm font-medium bg-red-600 text-white rounded-md px-3 py-1.5 hover:bg-red-700 transition-colors disabled:opacity-40 cursor-pointer"
+                        >
+                          {deleting ? 'Deleting…' : 'Delete forever'}
+                        </button>
+                        <button
+                          onClick={cancelDeleting}
+                          disabled={deleting}
+                          className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-1.5 hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
