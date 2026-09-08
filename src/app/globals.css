@@ -74,10 +74,11 @@ html {
      NOT the same value as --color-accent: this app's home screen already
      uses warm gold decoratively, and reusing that exact color for a
      safety-relevant caveat (is this actually kosher-certified?) would dilute
-     the one thing that color is supposed to signal there. Brick/clay — a
-     step short of leaning as close to this app's real error/closed red
-     (red-700, #b91c1c) as the oxblood candidate did. */
-  --color-caution: #9a2f1e;
+     the one thing that color is supposed to signal there. A deep rust —
+     darker and browner than home's own gold, without leaning as far toward
+     this app's real error/closed red (red-700, #b91c1c) as the oxblood and
+     brick/clay candidates this was picked over. */
+  --color-caution: #9a3412;
   /* Plain slate-50. Tried tinting this with a few percent of the community's
      brand color to make the page feel less neutral; at desktop widths, where
      a lot of the surface shows at once, it read as the whole site having gone
