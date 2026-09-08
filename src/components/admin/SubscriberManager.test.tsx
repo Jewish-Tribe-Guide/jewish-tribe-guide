@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -58,20 +58,25 @@ describe('SubscriberManager', () => {
     expect(screen.getByText('No one has subscribed yet.')).toBeInTheDocument()
   })
 
-  it('lists each subscriber by email, resolves category ids to labels, and shows notify kinds', async () => {
+  it('lists each subscriber by email, resolves category ids to labels, and shows each notify kind as its own On/Off pill', async () => {
     await renderAndWaitForList([
       makeSubscriber({ email: 'a@example.com', categories: ['grocery'], notifyAdd: true, notifyClosure: false }),
-      makeSubscriber({ id: '2', email: 'b@example.com', categories: null }),
+      makeSubscriber({ id: '2', email: 'b@example.com', categories: null, notifyAdd: true, notifyClosure: true }),
     ])
 
     expect(screen.getByText('a@example.com')).toBeInTheDocument()
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
-    // a@example.com only has notifyAdd, not notifyClosure — the
-    // Notifications column reads exactly "New listings" for that row, with
-    // nothing appended, so this doesn't collide with b@example.com's own
-    // "New listings · Closures" cell below.
-    expect(screen.getByText('New listings')).toBeInTheDocument()
-    expect(screen.getByText('New listings · Closures')).toBeInTheDocument()
+
+    // Same shape as CommunityManager's Admins roster — one On/Off pill per
+    // notification kind, not a single combined text cell, so a row scoped
+    // by email is the only reliable way to tell which pill belongs to whom.
+    const aRow = screen.getByText('a@example.com').closest('tr')!
+    const aPills = within(aRow).getAllByText(/^(On|Off)$/)
+    expect(aPills.map((p) => p.textContent)).toEqual(['On', 'Off'])
+
+    const bRow = screen.getByText('b@example.com').closest('tr')!
+    const bPills = within(bRow).getAllByText(/^(On|Off)$/)
+    expect(bPills.map((p) => p.textContent)).toEqual(['On', 'On'])
 
     expect(screen.getByText('b@example.com')).toBeInTheDocument()
     expect(screen.getByText('All categories')).toBeInTheDocument()
