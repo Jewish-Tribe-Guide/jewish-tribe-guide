@@ -97,11 +97,6 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
       className={className}
     >
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-10">
-        {/* On mobile the logo only hides while no location is set — that's when
-            the wide "Set location" pill competes with the name for the row,
-            and dropping the mark frees the ~46px needed to keep the text
-            full. Once a location is set the pill collapses to just its pin,
-            so the logo comes back. Always shown from sm up. */}
         {showScreenHeader && screenHeader ? (
           <button
             onClick={screenHeader.onBack}
@@ -140,7 +135,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
             // logo URL containing a ")" broke the rule, and the value was
             // never escaped. Here it's an attribute, handled by React.
             <span
-              className={`${location.address ? 'block' : 'hidden'} sm:block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl`}
+              className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl"
               aria-hidden="true"
             >
               <Image
@@ -171,7 +166,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
               />
             </span>
           ) : (
-            <span className={`${location.address ? 'grid' : 'hidden'} sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white`}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
               <StarOfDavid className="h-5 w-5" />
             </span>
           )
