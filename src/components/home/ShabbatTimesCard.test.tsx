@@ -47,6 +47,14 @@ describe('ShabbatTimesCard', () => {
     expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
   })
 
+  it('renders a custom heading when given one — admin-editable (Desktop tab)', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" heading="Zmanim & Holidays" />)
+
+    expect(screen.getByRole('heading', { name: 'Zmanim & Holidays' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
+  })
+
   it('shows only candle lighting and havdalah — not the old five-row daily zmanim grid', () => {
     mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)

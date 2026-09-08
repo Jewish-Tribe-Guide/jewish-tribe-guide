@@ -65,18 +65,18 @@ describe('listHomeSectionsUncached', () => {
 
     it('respects a built-in row’s own saved title — it’s real admin-renameable data, not fixed', async () => {
       mockFrom.mockReturnValue(
-        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: 'Shabbos Times' }], error: null }),
+        chainable({ data: [{ ...rawRow, id: 'davening', kind: 'davening', title: 'Next Minyan' }], error: null }),
       )
       const [section] = await listHomeSectionsUncached('philly')
-      expect(section.title).toBe('Shabbos Times')
+      expect(section.title).toBe('Next Minyan')
     })
 
     it('falls back to the BUILT_IN_BLOCKS default label when a built-in row has no title yet', async () => {
       mockFrom.mockReturnValue(
-        chainable({ data: [{ ...rawRow, id: 'zmanim', kind: 'zmanim', title: '' }], error: null }),
+        chainable({ data: [{ ...rawRow, id: 'davening', kind: 'davening', title: '' }], error: null }),
       )
       const [section] = await listHomeSectionsUncached('philly')
-      expect(section.title).toBe('Zmanim & Shabbos')
+      expect(section.title).toBe('Davening Times Card')
     })
   })
 })
@@ -151,7 +151,7 @@ describe('createHomeSection', () => {
   describe('built-in blocks (kind set)', () => {
     it('upserts with the fixed id/title from BUILT_IN_BLOCKS, ignoring the given title/cardIds', async () => {
       let call = 0
-      const upsertBuilder = chainable({ data: { id: 'map', kind: 'map', title: 'Explore the map', sort_order: 100, card_ids: [] }, error: null })
+      const upsertBuilder = chainable({ data: { id: 'map', kind: 'map', title: 'Map Card', sort_order: 100, card_ids: [] }, error: null })
       mockFrom.mockImplementation(() => {
         call += 1
         if (call === 1) return chainable({ count: 1, error: null, data: null })
@@ -161,7 +161,7 @@ describe('createHomeSection', () => {
       const result = await createHomeSection('philly', { title: 'ignored', cardIds: ['ignored'], kind: 'map' })
 
       expect(upsertBuilder.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'map', kind: 'map', title: 'Explore the Map', card_ids: [] }),
+        expect.objectContaining({ id: 'map', kind: 'map', title: 'Map Card', card_ids: [] }),
         { onConflict: 'community_id,id' },
       )
       expect(result.id).toBe('map')
@@ -175,8 +175,8 @@ describe('createHomeSection', () => {
         if (call === 1) return chainable({ count: 0, error: null, data: null })
         return chainable({ data: null, error: { message: 'boom' } })
       })
-      await expect(createHomeSection('philly', { title: '', kind: 'zmanim' })).rejects.toThrow(
-        'Failed to add Zmanim & Shabbos: boom',
+      await expect(createHomeSection('philly', { title: '', kind: 'davening' })).rejects.toThrow(
+        'Failed to add Davening Times Card: boom',
       )
     })
   })

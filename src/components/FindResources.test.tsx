@@ -119,7 +119,7 @@ describe('FindResources — a real listing category', () => {
     expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' })
   })
 
-  // Unlike edit/report, 'create' has no listing to resolve — HomeBreak's
+  // Unlike edit/report, 'create' has no listing to resolve — UpdateListingsCard's
   // Add/Edit/Report picker (ContributePicker) links straight to
   // `?form=create` with no `?item=`, expecting the create form to just be
   // there on arrival, the same way a deep-linked edit/report already is.

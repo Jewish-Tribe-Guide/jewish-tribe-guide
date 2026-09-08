@@ -6,31 +6,39 @@
 // `kind` widens this from "just titled category groups" to the desktop home
 // screen's full block order — a plain named section (kind 'section', the
 // original and by far the most common case) sits in the SAME ordered list as
-// three singleton built-in blocks: the featured-cards row, the embedded map,
-// and the Zmanim & Shabbos band. Reordering/toggling any of them is just
-// reordering/removing a row in this same list — see HomeSectionManager.tsx
-// and Landing.tsx's ordered block walk.
-export type HomeBlockKind = 'section' | 'featured' | 'map' | 'zmanim' | 'browse' | 'shabbat'
+// six singleton built-in blocks, one per desktop home-screen card. Reordering
+// or removing any of them is just reordering/removing a row in this same
+// list — see HomeSectionManager.tsx and Landing.tsx's ordered block walk.
+//
+// 'zmanim' (Davening Times + the community card, paired side-by-side),
+// 'shabbat' (Shabbat Times + Stay in the Loop, also paired), and 'featured'
+// (the "Popular right now" row) are gone as of this type — each pair split
+// into two fully independent cards ('davening'/'listings',
+// 'subscribe'/'jewishTimes'), and 'featured' was dropped outright (no
+// admin control was ever built for it, and it duplicated what the flat
+// "Browse everything" grid already shows). The DB CHECK constraint keeps
+// allowing the old values too, though (see the migration that added the
+// current set) — DDL here only ever widens, never narrows, so an existing
+// row with one of the old kinds doesn't fail to load; Landing.tsx's ordered
+// walk just no longer has a branch for it, so it silently renders nothing
+// until reseeded (see seed-home-blocks.mjs) or removed by hand.
+export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'map' | 'subscribe' | 'jewishTimes'
 
-/** The five singleton built-ins' fixed identity — id doubles as `kind` (there
- *  can only ever be one of each), and the title is fixed/not admin-editable
- *  (unlike a plain section's title). Order here is just documentation; actual
- *  display order always comes from sortOrder.
- *
- *  'browse' (the Browse/Search card) and 'shabbat' (Shabbat Times + Stay in
- *  the Loop) used to be hardcoded fixed-first/fixed-last in Landing.tsx
- *  rather than part of this reorderable set — see Landing.tsx's own doc on
- *  why they're each given an independent fallback position (unshift/push)
- *  instead of joining the all-or-nothing configuredBuiltIns fallback the
- *  original three use, so an existing community with, say, zmanim+map
- *  already configured doesn't lose its Browse card and Shabbat row the
- *  moment this shipped. */
+/** The six singleton built-ins' fixed identity — id doubles as `kind` (there
+ *  can only ever be one of each). `title` is only ever used as this row's
+ *  fallback label in the admin's own "+ Add" button and DB default — every
+ *  one of these six has its own dedicated eyebrow/heading fields in
+ *  SiteSettings now (see DesktopTopicsManager's CARD_META), not a
+ *  live-rendered `title` the way the old 'featured'/'map'/'zmanim' did.
+ *  Order here is just documentation; actual display order always comes from
+ *  sortOrder. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {
-  browse: { id: 'browse', title: 'Browse & search' },
-  featured: { id: 'featured', title: 'Popular right now' },
-  map: { id: 'map', title: 'Explore the Map' },
-  zmanim: { id: 'zmanim', title: 'Zmanim & Shabbos' },
-  shabbat: { id: 'shabbat', title: 'Shabbat Times & Stay in the Loop' },
+  browse: { id: 'browse', title: 'Categories and Search Card' },
+  davening: { id: 'davening', title: 'Davening Times Card' },
+  listings: { id: 'listings', title: 'Update Listings Card' },
+  map: { id: 'map', title: 'Map Card' },
+  subscribe: { id: 'subscribe', title: 'Email Signup Card' },
+  jewishTimes: { id: 'jewishTimes', title: 'Jewish Times Card' },
 }
 
 export type HomeSection = {

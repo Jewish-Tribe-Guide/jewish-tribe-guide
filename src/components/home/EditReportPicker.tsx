@@ -18,7 +18,7 @@ const COPY = {
 
 type Entry = { item: DirectoryResource; category: CategoryConfig; categoryLabel: string }
 
-/** HomeBreak's Edit/Report picker — a direct listing search, not a category
+/** UpdateListingsCard's Edit/Report picker — a direct listing search, not a category
  *  picker (see ContributePicker, which is Add-only now). Editing or
  *  reporting starts from a specific business in mind, not "which bucket is
  *  it filed under" — category-first made visitors do that translation for

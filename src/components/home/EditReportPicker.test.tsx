@@ -19,7 +19,7 @@ afterEach(() => {
   mockRouter.push.mockClear()
 })
 
-// HomeBreak's Edit/Report step — a direct listing search, not a category
+// UpdateListingsCard's Edit/Report step — a direct listing search, not a category
 // picker (see ContributePicker, Add-only now). What matters: every eligible
 // listing shows before typing (a scrollable list beats a dead empty box),
 // typing filters by NAME ONLY — not the shared searchListings' broader tag/

@@ -106,7 +106,7 @@ test.describe('admin console', () => {
   test('the Desktop tab loads without error', async ({ page }) => {
     await page.goto('/philly/admin/desktop')
 
-    await expect(page.getByText('Featured cards')).toBeVisible()
+    await expect(page.getByText('Home screen cards')).toBeVisible()
     await expect(page.getByText('Top nav bar')).toBeVisible()
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })

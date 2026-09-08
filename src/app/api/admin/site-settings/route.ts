@@ -96,11 +96,28 @@ export async function PATCH(request: Request) {
   if (body.searchPlaceholder !== undefined && !body.searchPlaceholder.trim()) {
     return Response.json({ ok: false, errors: ['Search placeholder cannot be empty.'] }, { status: 400 })
   }
-  if (body.desktopBrowseEyebrow !== undefined && !body.desktopBrowseEyebrow.trim()) {
-    return Response.json({ ok: false, errors: ['The Browse card’s eyebrow cannot be empty.'] }, { status: 400 })
-  }
-  if (body.desktopBrowseHeading !== undefined && !body.desktopBrowseHeading.trim()) {
-    return Response.json({ ok: false, errors: ['The Browse card’s heading cannot be empty.'] }, { status: 400 })
+  // Every desktop card's eyebrow/heading pair (Browse's own two, plus the
+  // five added when the old paired blocks split into independent cards —
+  // see homeSections.ts's own doc) — none of these has anywhere sensible to
+  // fall back to if saved blank, so all are required the same way.
+  const REQUIRED_CARD_TEXT_FIELDS: { key: keyof SiteSettings; label: string }[] = [
+    { key: 'desktopBrowseEyebrow', label: 'The Categories and Search card’s eyebrow' },
+    { key: 'desktopBrowseHeading', label: 'The Categories and Search card’s heading' },
+    { key: 'desktopDaveningEyebrow', label: 'The Davening Times card’s eyebrow' },
+    { key: 'desktopDaveningHeading', label: 'The Davening Times card’s heading' },
+    { key: 'desktopListingsEyebrow', label: 'The Update Listings card’s eyebrow' },
+    { key: 'desktopListingsHeading', label: 'The Update Listings card’s heading' },
+    { key: 'desktopMapEyebrow', label: 'The Map card’s eyebrow' },
+    { key: 'desktopMapHeading', label: 'The Map card’s heading' },
+    { key: 'desktopSubscribeEyebrow', label: 'The Email Signup card’s eyebrow' },
+    { key: 'desktopSubscribeHeading', label: 'The Email Signup card’s heading' },
+    { key: 'desktopJewishTimesHeading', label: 'The Jewish Times card’s heading' },
+  ]
+  for (const { key, label } of REQUIRED_CARD_TEXT_FIELDS) {
+    const value = body[key]
+    if (value !== undefined && !(value as string).trim()) {
+      return Response.json({ ok: false, errors: [`${label} cannot be empty.`] }, { status: 400 })
+    }
   }
   if (body.desktopHeroHeadline !== undefined && !body.desktopHeroHeadline.trim()) {
     return Response.json({ ok: false, errors: ['The hero headline cannot be empty.'] }, { status: 400 })

@@ -47,7 +47,17 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // field, so it isn't "Synagogues' own" the way a single-category card's
 // icon tint would be, and amber is what the rest of this row (the
 // community card beside it, "Today" above) already uses.
-export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
+export default function DaveningTimesCard({
+  coords,
+  eyebrow,
+  heading,
+}: {
+  coords: LatLng | null
+  /** settings.desktopDaveningEyebrow/Heading — admin-editable (Desktop
+   *  tab's Home screen cards). Defaults to "Today"/"Upcoming Davening". */
+  eyebrow: string
+  heading: string
+}) {
   const categories = useCategories()
   const listings = useAllListings()
   const communitySlug = useCommunitySlug()
@@ -145,9 +155,9 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Today</p>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{eyebrow}</p>
       <div className="mb-4 flex items-baseline gap-2">
-        <h3 className="text-lg font-semibold text-slate-900">Upcoming Davening</h3>
+        <h3 className="text-lg font-semibold text-slate-900">{heading}</h3>
         {/* Top-right, off the plaque's own line entirely — see the
             component doc for why this only shows for a single named shul
             (nearestMiles is already null for a "nearby shuls" tie). */}

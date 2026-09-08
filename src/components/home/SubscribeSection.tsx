@@ -22,12 +22,22 @@ import Honeypot from '@/components/Honeypot'
 // post-approval hook and subscriberEmail.ts) — no digest/cron, so this is
 // the entire signup surface; nothing else to configure after submitting
 // besides the unsubscribe link every notification carries.
-export default function SubscribeSection({ bare = false }: {
+export default function SubscribeSection({
+  bare = false,
+  eyebrow = 'Email updates',
+  heading = 'Stay in the Loop',
+}: {
   /** Skip this section's own outer `<section>`/card shell and render just the
-   *  heading + form — for HomeBreak, which now places this in one cell of its
-   *  2×2 grid and owns the card border/padding itself, the same reason
-   *  SearchSection takes this prop when Landing merges it into another card. */
+   *  heading + form — Landing renders this inside its own standalone card
+   *  now (own border/padding), the same reason SearchSection takes this
+   *  prop when Landing merges it into another card. */
   bare?: boolean
+  /** settings.desktopSubscribeEyebrow/Heading — admin-editable (Desktop
+   *  tab's Home screen cards). Optional with today's literal defaults
+   *  rather than required, so existing tests that render this in isolation
+   *  don't all need updating just to pass two more props. */
+  eyebrow?: string
+  heading?: string
 } = {}) {
   const categories = useCategories()
   const community = useCommunitySlug()
@@ -132,11 +142,10 @@ export default function SubscribeSection({ bare = false }: {
 
   const content = (
     <>
-        {/* Same amber eyebrow every other home-screen card now carries
-            ("Today", "Community run", "Discover nearby", "Get started") —
-            this was the one section still missing it. */}
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">Email updates</p>
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">Stay in the Loop</h2>
+        {/* Same amber eyebrow every other home-screen card carries — both
+            admin-editable now (Desktop tab's Home screen cards). */}
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent">{eyebrow}</p>
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">{heading}</h2>
 
         {done ? (
           <p className="text-sm text-muted">

@@ -184,15 +184,24 @@ describe('SiteSettingsEditor — the Site tab', () => {
 })
 
 describe('SiteSettingsEditor — the Desktop tab', () => {
-  it('shows the featured-cards picker, the top nav editor, and the hero/colors cards', async () => {
+  it('shows the top nav editor, hero, colors, and home screen cards sections — not Featured cards, which was removed', async () => {
     await renderEditor('desktop')
-    expect(screen.getByText('Featured cards')).toBeInTheDocument()
-    expect(screen.getByText('Slot 1')).toBeInTheDocument()
     expect(screen.getByText('Top nav bar')).toBeInTheDocument()
     expect(screen.getByText('Hero')).toBeInTheDocument()
     expect(screen.getByText('Colors')).toBeInTheDocument()
+    expect(screen.getByText('Home screen cards')).toBeInTheDocument()
+    expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
     // Mobile-only fields don't leak onto this tab.
     expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
+  })
+
+  it('orders Top nav bar, then Hero, then Colors, then Home screen cards', async () => {
+    await renderEditor('desktop')
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    const order = ['Top nav bar', 'Hero', 'Colors', 'Home screen cards']
+    const indices = order.map((label) => headings.indexOf(label))
+    expect(indices).toEqual([...indices].sort((a, b) => a - b))
+    expect(indices.every((i) => i !== -1)).toBe(true)
   })
 
   it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {

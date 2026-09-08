@@ -64,9 +64,10 @@ html {
      --color-primary-dark derives from whatever primary ends up being. */
   --color-primary: #1d4ed8;
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
-  /* The home screen's own warmth — eyebrows, the hero, HomeBreak/Subscribe's
-     CTAs. Matches those components' own literal amber-700/800 exactly, now
-     named instead of duplicated as raw Tailwind classes at each call site. */
+  /* The home screen's own warmth — eyebrows, the hero, Update Listings/
+     Subscribe's CTAs. Matches those components' own literal amber-700/800
+     exactly, now named instead of duplicated as raw Tailwind classes at
+     each call site. */
   --color-accent: #b45309;
   --color-accent-dark: #92400e;
   /* A second, distinct warm color for "verify this" — kosher cert caveats,

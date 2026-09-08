@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
 
 afterEach(() => cleanup())
 
-// HomeBreak's Add step (Edit/Report moved to EditReportPicker — a listing
+// UpdateListingsCard's Add step (Edit/Report moved to EditReportPicker — a listing
 // search, not a category picker; see that component's own tests). What
 // matters here: only categories where Add is actually enabled show up (the
 // same gate the real Add button already respects), the search field

@@ -26,12 +26,20 @@ type Row = {
   feedback_button_label: string
   feedback_heading: string
   feedback_success_message: string
-  featured_card_ids: string[] | null
   mobile_tabs: unknown
   search_placeholder: string | null
   desktop_nav_items: unknown
   desktop_browse_eyebrow: string | null
   desktop_browse_heading: string | null
+  desktop_davening_eyebrow: string | null
+  desktop_davening_heading: string | null
+  desktop_listings_eyebrow: string | null
+  desktop_listings_heading: string | null
+  desktop_map_eyebrow: string | null
+  desktop_map_heading: string | null
+  desktop_subscribe_eyebrow: string | null
+  desktop_subscribe_heading: string | null
+  desktop_jewish_times_heading: string | null
   desktop_hero_headline: string | null
   desktop_hero_subhead: string | null
   desktop_hero_image: unknown
@@ -98,14 +106,20 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     feedbackButtonLabel: row.feedback_button_label,
     feedbackHeading: row.feedback_heading,
     feedbackSuccessMessage: row.feedback_success_message,
-    // Null until the column's migration has been run (or before the first
-    // save) — normalized to [] so callers never have to null-check it.
-    featuredCardIds: row.featured_card_ids ?? [],
     mobileTabs: toMobileTabs(row.mobile_tabs),
     searchPlaceholder: row.search_placeholder || fallback.searchPlaceholder,
     desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
     desktopBrowseEyebrow: row.desktop_browse_eyebrow || fallback.desktopBrowseEyebrow,
     desktopBrowseHeading: row.desktop_browse_heading || row.hero_title,
+    desktopDaveningEyebrow: row.desktop_davening_eyebrow || fallback.desktopDaveningEyebrow,
+    desktopDaveningHeading: row.desktop_davening_heading || fallback.desktopDaveningHeading,
+    desktopListingsEyebrow: row.desktop_listings_eyebrow || fallback.desktopListingsEyebrow,
+    desktopListingsHeading: row.desktop_listings_heading || fallback.desktopListingsHeading,
+    desktopMapEyebrow: row.desktop_map_eyebrow || fallback.desktopMapEyebrow,
+    desktopMapHeading: row.desktop_map_heading || fallback.desktopMapHeading,
+    desktopSubscribeEyebrow: row.desktop_subscribe_eyebrow || fallback.desktopSubscribeEyebrow,
+    desktopSubscribeHeading: row.desktop_subscribe_heading || fallback.desktopSubscribeHeading,
+    desktopJewishTimesHeading: row.desktop_jewish_times_heading || fallback.desktopJewishTimesHeading,
     // Pre-migration/pre-first-save rows have no desktop hero fields of their
     // own yet — fall back to splitting this row's real mission, same as the
     // defaults object does at seed time, so an existing community's hero
@@ -187,12 +201,20 @@ export async function updateSiteSettings(
         feedback_button_label: merged.feedbackButtonLabel,
         feedback_heading: merged.feedbackHeading,
         feedback_success_message: merged.feedbackSuccessMessage,
-        featured_card_ids: merged.featuredCardIds,
         mobile_tabs: merged.mobileTabs,
         search_placeholder: merged.searchPlaceholder,
         desktop_nav_items: merged.desktopNavItems,
         desktop_browse_eyebrow: merged.desktopBrowseEyebrow,
         desktop_browse_heading: merged.desktopBrowseHeading,
+        desktop_davening_eyebrow: merged.desktopDaveningEyebrow,
+        desktop_davening_heading: merged.desktopDaveningHeading,
+        desktop_listings_eyebrow: merged.desktopListingsEyebrow,
+        desktop_listings_heading: merged.desktopListingsHeading,
+        desktop_map_eyebrow: merged.desktopMapEyebrow,
+        desktop_map_heading: merged.desktopMapHeading,
+        desktop_subscribe_eyebrow: merged.desktopSubscribeEyebrow,
+        desktop_subscribe_heading: merged.desktopSubscribeHeading,
+        desktop_jewish_times_heading: merged.desktopJewishTimesHeading,
         desktop_hero_headline: merged.desktopHeroHeadline,
         desktop_hero_subhead: merged.desktopHeroSubhead,
         desktop_hero_image: merged.desktopHeroImage,

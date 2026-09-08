@@ -28,6 +28,20 @@ const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
 const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
 
 describe('SubscribeSection', () => {
+  it('defaults to the literal "Email updates"/"Stay in the Loop" eyebrow/heading, admin-editable via props', () => {
+    renderWithProviders(<SubscribeSection />, { content: { categories: [grocery] } })
+    expect(screen.getByText('Email updates')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Stay in the Loop' })).toBeInTheDocument()
+  })
+
+  it('renders a custom eyebrow/heading when given one', () => {
+    renderWithProviders(<SubscribeSection eyebrow="Get notified" heading="Never miss a listing" />, {
+      content: { categories: [grocery] },
+    })
+    expect(screen.getByText('Get notified')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Never miss a listing' })).toBeInTheDocument()
+  })
+
   it('defaults to a closed "All categories" picker', () => {
     renderWithProviders(<SubscribeSection />, { content: { categories: [grocery, synagogue] } })
 

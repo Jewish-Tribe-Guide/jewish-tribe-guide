@@ -25,23 +25,24 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// HomeMap and HomeBreak are mocked out — both pull in real network/SDK
-// dependencies of their own (Google Maps, the uncached /api/zmanim fetch)
-// that are their own components' concerns, not Landing's. What's under test
-// here is Landing's own composition/filtering logic: which sections render,
-// whether typing narrows the grid, and whether the map/zmanim bands appear
-// only when the community actually has those pseudo-categories.
+// HomeMap and DaveningTimesCard are mocked out — both pull in real
+// network/SDK dependencies of their own (Google Maps, the community's real
+// listings/categories aggregation) that are their own components'
+// concerns, not Landing's. What's under test here is Landing's own
+// composition/filtering logic: which cards render, whether typing narrows
+// the grid, and whether the map/davening cards appear only when the
+// community actually has the relevant pseudo-category/data.
+//
+// ShabbatTimesCard/SubscribeSection/UpdateListingsCard are NOT mocked —
+// none of them ever were, even before the old zmanim+shabbat pairs split
+// into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('@/components/home/HomeMap', () => ({
   default: () => <div data-testid="home-map-stub" />,
 }))
-vi.mock('@/components/home/HomeBreak', () => ({
-  // HomeBreak dropped the admin-renamed `title` prop entirely (it's the
-  // quiet, unheaded break now — see its own doc on why showing a topic
-  // title there would undo the point), so unlike the old ZmanimStrip mock
-  // this stub has nothing to prove beyond "it rendered".
-  default: () => <div data-testid="home-break-stub" />,
+vi.mock('@/components/home/DaveningTimesCard', () => ({
+  default: () => <div data-testid="davening-stub" />,
 }))
 
 afterEach(() => {
@@ -198,23 +199,38 @@ describe('Landing', () => {
     })
   })
 
-  it('renders the zmanim break only when the community has a zmanim pseudo-category', () => {
+  // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
+  // still gated on a real Zmanim pseudo-category — it needs candle-lighting
+  // data that has nowhere to come from otherwise. Davening Times/Update
+  // Listings/Email Signup dropped that gate entirely when the old paired
+  // blocks split into independent cards (see homeSections.ts's own doc) —
+  // each now has only the gating it actually needs on its own merits.
+  it('renders the Jewish Times card only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
-    expect(screen.getByTestId('home-break-stub')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    expect(screen.queryByTestId('home-break-stub')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
   })
 
-  describe('the gateway block order (Explore the map / Zmanim & Shabbos)', () => {
+  it('renders Update Listings and (once a minyanim category exists) Davening Times with no zmanim category at all', () => {
+    // Regression: both used to share a component with the Jewish
+    // Times/Shabbat pair and were needlessly gated on zmanimCategory even
+    // though neither reads zmanim data — see homeSections.ts's own doc.
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }) // grocery only, no zmanim category
+    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).toBeInTheDocument()
+    expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+  })
+
+  describe('the gateway block order (Explore the map / Davening Times)', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
     ]
 
-    it('defaults to zmanim before map when nothing is configured (no built-in rows at all)', () => {
+    it('defaults to davening before map when nothing is configured (no built-in rows at all)', () => {
       const { container } = renderLanding(undefined, {
         content: { categories: withMapAndZmanim, homeSections: [] },
       })
@@ -224,53 +240,62 @@ describe('Landing', () => {
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-break-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
     })
 
-    it('follows the admin-configured order — zmanim before map', () => {
+    it('follows the admin-configured order — map before davening', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] },
-            { id: 'map', kind: 'map', title: 'Explore the map', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [] },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [] },
           ],
         },
       })
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-break-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="davening-stub"'))
     })
 
-    // Only the map half of this is still meaningful — HomeBreak dropped the
-    // admin-renamed title entirely (it's the quiet, unheaded break now), so
-    // an admin renaming that block has nothing left to prove on screen.
-    it('renders the map’s admin-renamed title, not the built-in default', () => {
+    it('renders the map’s admin-editable heading, not the built-in default', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
+          settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapHeading: 'See it on the map' },
           homeSections: [
-            { id: 'map', kind: 'map', title: 'See it on the map', sortOrder: 100, cardIds: [] },
-            { id: 'zmanim', kind: 'zmanim', title: 'Shabbos Times', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [] },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [] },
           ],
         },
       })
 
       expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Explore the map' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Explore the Map' })).not.toBeInTheDocument()
     })
 
-    it('hides a built-in block that was configured out (removed), even though its category exists', () => {
+    // Each kind falls back to its own default position independently — see
+    // Landing.tsx's own doc on why: a community that's only ever configured
+    // SOME of the six kinds (real state, not hypothetical — this is what a
+    // site that had 'browse'/'map' from before this change looks like)
+    // still gets the rest at their default positions, rather than losing
+    // them until every kind has a real row.
+    it('still shows a card with no row of its own even when a sibling kind is configured', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
-          homeSections: [{ id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] }],
+          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [] }],
         },
       })
+      // HomeMap itself doesn't mount until the band scrolls near (see
+      // useInView) — force it in so home-map-stub is there to find.
+      act(() => triggerAllIntersections())
 
-      expect(screen.getByTestId('home-break-stub')).toBeInTheDocument()
-      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+      expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+      // Map has no row of its own here, but still renders via its own
+      // independent default-position fallback.
+      expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
     })
   })
 

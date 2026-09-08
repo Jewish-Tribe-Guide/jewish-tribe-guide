@@ -48,7 +48,6 @@ const rawRow = {
   feedback_button_label: 'Feedback',
   feedback_heading: 'Tell us',
   feedback_success_message: 'Thanks!',
-  featured_card_ids: ['a', 'b'],
   mobile_tabs: [{ id: 'home', label: 'Home', target: '/' }],
 }
 
@@ -91,10 +90,10 @@ describe('getSiteSettingsUncached', () => {
     expect(settings.heroTitle).toBe(SITE_SETTINGS_DEFAULTS.heroTitle)
   })
 
-  it('maps a full row, normalizing null featured_card_ids to an empty array', async () => {
-    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, featured_card_ids: null }, error: null }))
+  it('maps a full row, falling back to defaults for any per-card copy column not yet set', async () => {
+    mockFrom.mockReturnValue(chainable({ data: { ...rawRow, desktop_davening_eyebrow: null }, error: null }))
     const settings = await getSiteSettingsUncached('philly')
-    expect(settings.featuredCardIds).toEqual([])
+    expect(settings.desktopDaveningEyebrow).toBe(SITE_SETTINGS_DEFAULTS.desktopDaveningEyebrow)
     expect(settings.name).toBe('My Community')
     expect(settings.mobileTabs).toEqual([{ id: 'home', label: 'Home', target: '/' }])
   })

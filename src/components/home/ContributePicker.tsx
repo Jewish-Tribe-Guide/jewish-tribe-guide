@@ -11,7 +11,7 @@ import { routes } from '@/lib/routes'
 import { ui } from '@/lib/uiConfig'
 import CategoryIcon from '@/components/CategoryIcon'
 
-/** Add step of HomeBreak's Add/Edit/Report picker — Edit/Report skip this
+/** Add step of UpdateListingsCard's Add/Edit/Report picker — Edit/Report skip this
  *  entirely now (see EditReportPicker: those search for the listing itself,
  *  category shown only as a disambiguator) since a category-first step made
  *  someone translate "which business" into "which bucket" for no reason.

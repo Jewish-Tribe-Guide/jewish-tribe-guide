@@ -65,19 +65,30 @@ test.describe('home — Browse everything grid', () => {
   })
 })
 
-// The "Kept by the Community" card's Add/Edit/Report buttons swap to their
-// bare word below a CSS CONTAINER width, not a viewport one — this card's
-// own width is fixed by the 2-up grid it sits in (HomeBreak), which can be
-// far narrower than the viewport at plenty of real window sizes. A prior
-// viewport-based version got this wrong (see ContributeButton's own doc)
-// and was effectively dead code: the long phrase always rendered on any
-// normal desktop window regardless of how cramped this particular card
-// actually was. jsdom can't compute real container queries, so the actual
-// swap only has coverage here.
-test.describe('home — Kept by the Community button labels', () => {
-  test.skip(({ isMobile }) => isMobile, 'desktop-only card (HomeBreak)')
+// The "Kept by the Community" (now Update Listings) card's Add/Edit/Report
+// buttons swap to their bare word below a CSS CONTAINER width, not a
+// viewport one — a prior viewport-based version got this wrong (see
+// ContributeButton's own doc) and was effectively dead code: the long
+// phrase always rendered on any normal desktop window regardless of how
+// cramped this particular card actually was. jsdom can't compute real
+// container queries, so the actual swap only has coverage here.
+//
+// The card used to be squeezed to roughly half the content column's width
+// (a 2-up grid it shared with DaveningTimesCard, inside HomeBreak) — narrow
+// enough that a real desktop window (700px) could still push its content
+// box under the ~470px breakpoint. It's a full-width standalone card now
+// (see homeSections.ts's own doc on why the pair split), so its content box
+// at the `desktop:` gate's own floor (640px viewport) measures ~536px —
+// still above the breakpoint. Measured directly against a real running
+// server: the short-label state is unreachable at any viewport where this
+// card is visible at all any more. The mechanism itself is untouched (still
+// correct if the layout ever narrows this card again) — only the "and
+// sometimes it's the short one" half of this test is gone, since there's
+// nothing left to reach it with.
+test.describe('home — Update Listings button labels', () => {
+  test.skip(({ isMobile }) => isMobile, 'desktop-only card')
 
-  test('shows the long label when the card has room, the short one when it doesn\'t', async ({ page }) => {
+  test('shows the long label at every viewport where the card is visible', async ({ page }) => {
     const community = await defaultCommunity(page)
 
     await page.goto(`/${community}`)
@@ -93,14 +104,12 @@ test.describe('home — Kept by the Community button labels', () => {
     await expect(wideAdd).toBeVisible()
     await expect(wideAdd.getByText('Add a place')).toBeVisible()
 
-    // Narrow enough that the 2-up grid squeezes this card well under the
-    // ~470px container breakpoint, wide enough to stay past the `desktop:`
-    // gate (640px) this whole card is hidden below.
-    await page.setViewportSize({ width: 700, height: 900 })
+    // The `desktop:` gate's own floor — the narrowest viewport this card
+    // shows at all. Still the long label here.
+    await page.setViewportSize({ width: 640, height: 640 })
     const narrowAdd = page.getByRole('button', { name: 'Add' })
     await expect(narrowAdd).toBeVisible()
-    await expect(narrowAdd.getByText('Add a place')).toBeHidden()
-    await expect(narrowAdd.getByText('Add', { exact: true })).toBeVisible()
+    await expect(narrowAdd.getByText('Add a place')).toBeVisible()
   })
 
   // The bug a screenshot caught: the container query that swaps to the long
@@ -123,11 +132,12 @@ test.describe('home — Kept by the Community button labels', () => {
     const editButton = page.getByRole('button', { name: 'Edit' })
     const reportButton = page.getByRole('button', { name: 'Report' })
 
-    // Starts at 800, not narrower: below ~750px even the SHORT labels
-    // ("Add"/"Edit"/"Report") stop fitting on one row — a separate, narrower
-    // pre-existing issue (this card is barely visible at all below the
-    // `desktop:` 640px gate to begin with), not the long-label one this test
-    // targets.
+    // Starts at 800, not narrower: below the `desktop:` 640px gate this
+    // card isn't visible at all, and the card is full-width now (see
+    // homeSections.ts's own doc) rather than squeezed into a 2-up grid, so
+    // there's more room at any given viewport than there used to be — 800
+    // is comfortably past the gate with margin to spare, not a boundary
+    // this test is trying to sit right on.
     for (const width of [800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await expect(addButton).toBeVisible()

@@ -22,7 +22,10 @@ export type SiteSettings = {
   tagline: string
   /** The big heading on the home screen, e.g. "What are you looking for?". */
   heroTitle: string
-  /** Shown under the home screen heading, and reused as the footer blurb. */
+  /** Mobile tab's "Subhead" field — shown under the home screen heading on
+   *  mobile, and reused as the footer blurb and &lt;meta description&gt;.
+   *  Desktop has its own separate hero headline/subhead (Desktop tab's Hero
+   *  card) and no longer reads this for anything shown on screen. */
   mission: string
   /** A pasted image URL shown in the header instead of the built-in Star of
    *  David mark. Null/empty keeps the default mark. */
@@ -36,12 +39,6 @@ export type SiteSettings = {
   feedbackHeading: string
   /** Shown after a successful feedback submission. */
   feedbackSuccessMessage: string
-  /** Desktop home screen only — the three cards shown between the search box
-   *  and the map, as ordered CardDef ids (category slugs, or fixed ids like
-   *  'support'). Empty falls back to the first three cards the home sections
-   *  list, so this never has to be configured for the row to look right.
-   *  Mobile's home screen shows the full grid and ignores this. */
-  featuredCardIds: string[]
   /** Mobile only — the bottom tab bar, in order. Empty falls back to
    *  DEFAULT_MOBILE_TABS, so this never has to be configured. Desktop has no
    *  tab bar and ignores this entirely. */
@@ -61,6 +58,28 @@ export type SiteSettings = {
    *  field as `heroTitle` (mobile's big heading); now separate so the two
    *  can read differently even though they're describing the same search. */
   desktopBrowseHeading: string
+  /** Desktop only — the Davening Times card's eyebrow/heading. */
+  desktopDaveningEyebrow: string
+  desktopDaveningHeading: string
+  /** Desktop only — the Update Listings card's eyebrow/heading (the
+   *  Add/Edit/Report card, "Kept by the Community" by default). */
+  desktopListingsEyebrow: string
+  desktopListingsHeading: string
+  /** Desktop only — the Map card's eyebrow/heading. Used to be a hardcoded
+   *  eyebrow string plus the heading read off the 'map' home_section row's
+   *  own `title` — both are dedicated fields now, same pattern as every
+   *  other card, so home_section.title is unused for any built-in block. */
+  desktopMapEyebrow: string
+  desktopMapHeading: string
+  /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
+   *  heading. */
+  desktopSubscribeEyebrow: string
+  desktopSubscribeHeading: string
+  /** Desktop only — the Jewish Times (ShabbatTimesCard) card's heading. No
+   *  matching eyebrow field: that card's own eyebrow is the computed
+   *  Hebrew date + location, not static text there's anything useful to
+   *  override. */
+  desktopJewishTimesHeading: string
   /** Desktop only — the warm hero band's bold headline. */
   desktopHeroHeadline: string
   /** Desktop only — the smaller supporting line under the headline. Empty
@@ -70,7 +89,7 @@ export type SiteSettings = {
    *  placeholder instead. */
   desktopHeroImage: { url: string; alt: string } | null
   /** Desktop only — the home screen's accent color (eyebrows, the hero
-   *  band, HomeBreak/Subscribe's CTAs), as a 6-digit hex. Lighter/darker
+   *  band, Update Listings/Subscribe's CTAs), as a 6-digit hex. Lighter/darker
    *  shades used alongside it are derived from this one value. */
   desktopAccentColor: string
 }
@@ -89,7 +108,7 @@ export type DesktopNavItem = {
   kind: 'categories-menu' | 'more-menu' | 'link'
   /** Only for kind 'link': a built-in destination (see
    *  BUILT_IN_DESKTOP_LINK_TARGETS) or a CardDef id (category slug / form
-   *  id), same targets a mobile tab or featured-card slot can point at. */
+   *  id), same targets a mobile tab can point at. */
   target?: string
   /** Only for kind 'more-menu': its own ordered sub-items, each kind
    *  'link' (never nested further). */
@@ -162,10 +181,6 @@ export const DEFAULT_MOBILE_TABS: MobileTabConfig[] = [
   { id: 'feedback', label: 'Feedback', target: 'feedback' },
 ]
 
-/** How many cards the desktop home screen features above the map. Shared by
- *  the fallback logic and the admin picker so the two can't drift. */
-export const FEATURED_CARD_COUNT = 3
-
 export const DEFAULT_HERO_TITLE = 'What are you looking for?'
 
 export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the site? Send a note'
@@ -175,6 +190,20 @@ export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and
 export const DEFAULT_SEARCH_PLACEHOLDER = 'Search — kosher food, mikvah, shuls, schools…'
 export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
 export const DEFAULT_DESKTOP_ACCENT_COLOR = '#b45309'
+
+// Every desktop card's default eyebrow/heading — exactly today's literal
+// strings, so nothing changes on screen until an admin edits one. See
+// DesktopTopicsManager's CARD_META for the admin labels ("Davening Times
+// Card", etc.) these fields' inputs are grouped under.
+export const DEFAULT_DESKTOP_DAVENING_EYEBROW = 'Today'
+export const DEFAULT_DESKTOP_DAVENING_HEADING = 'Upcoming Davening'
+export const DEFAULT_DESKTOP_LISTINGS_EYEBROW = 'Community run'
+export const DEFAULT_DESKTOP_LISTINGS_HEADING = 'Kept by the Community'
+export const DEFAULT_DESKTOP_MAP_EYEBROW = 'Discover nearby'
+export const DEFAULT_DESKTOP_MAP_HEADING = 'Explore the Map'
+export const DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW = 'Email updates'
+export const DEFAULT_DESKTOP_SUBSCRIBE_HEADING = 'Stay in the Loop'
+export const DEFAULT_DESKTOP_JEWISH_TIMES_HEADING = 'Shabbat & Holiday Times'
 
 /** A small curated set — same idea as CategoryEditor's PIN_COLORS — so the
  *  admin picker offers a one-click palette instead of demanding a hex value
@@ -214,12 +243,20 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   feedbackButtonLabel: DEFAULT_FEEDBACK_BUTTON_LABEL,
   feedbackHeading: DEFAULT_FEEDBACK_HEADING,
   feedbackSuccessMessage: DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
-  featuredCardIds: [],
   mobileTabs: DEFAULT_MOBILE_TABS,
   searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
   desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
   desktopBrowseEyebrow: DEFAULT_DESKTOP_BROWSE_EYEBROW,
   desktopBrowseHeading: DEFAULT_HERO_TITLE,
+  desktopDaveningEyebrow: DEFAULT_DESKTOP_DAVENING_EYEBROW,
+  desktopDaveningHeading: DEFAULT_DESKTOP_DAVENING_HEADING,
+  desktopListingsEyebrow: DEFAULT_DESKTOP_LISTINGS_EYEBROW,
+  desktopListingsHeading: DEFAULT_DESKTOP_LISTINGS_HEADING,
+  desktopMapEyebrow: DEFAULT_DESKTOP_MAP_EYEBROW,
+  desktopMapHeading: DEFAULT_DESKTOP_MAP_HEADING,
+  desktopSubscribeEyebrow: DEFAULT_DESKTOP_SUBSCRIBE_EYEBROW,
+  desktopSubscribeHeading: DEFAULT_DESKTOP_SUBSCRIBE_HEADING,
+  desktopJewishTimesHeading: DEFAULT_DESKTOP_JEWISH_TIMES_HEADING,
   desktopHeroHeadline: heroSplit.headline,
   desktopHeroSubhead: heroSplit.subhead,
   desktopHeroImage: community.heroImage,

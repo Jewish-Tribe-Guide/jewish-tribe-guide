@@ -11,7 +11,7 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 import { previewUrl, writePreviewDraft } from '@/lib/previewDraft'
 import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
-import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
+import HomeSectionManager from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
@@ -19,7 +19,6 @@ import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
   DESKTOP_ACCENT_PRESETS,
-  FEATURED_CARD_COUNT,
 } from '@/lib/siteSettings'
 
 // ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
@@ -297,12 +296,10 @@ export default function SiteSettingsEditor({
           <span className="block text-[11px] text-muted mt-1">Shown in the header and footer.</span>
         </label>
         <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
-          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
+          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
+          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            Shown under the home screen heading on mobile, and reused as the footer blurb and
-            &lt;meta description&gt;. Desktop has its own separate headline/subhead — see the Desktop
-            tab&rsquo;s Hero card.
+            Not currently shown anywhere on the site — kept here in case that changes.
           </span>
         </label>
         <label className="block">
@@ -402,41 +399,6 @@ export default function SiteSettingsEditor({
           <DesktopNavEditor
             items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
             onChange={(items) => set('desktopNavItems', items)}
-          />
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home screen cards</h3>
-          <p className="text-[11px] text-muted mb-2">
-            Browse &amp; search, Popular right now, Explore the map, Davening Times, and Shabbat
-            Times — the desktop home screen&rsquo;s cards, in order. Rename, reorder, or remove any
-            of them.
-          </p>
-          <DesktopTopicsManager
-            sections={sectionsDraft}
-            onChange={setSectionsAndClearNotice}
-            browseCopy={{
-              eyebrow: draft.desktopBrowseEyebrow,
-              heading: draft.desktopBrowseHeading,
-              onEyebrowChange: (value) => set('desktopBrowseEyebrow', value),
-              onHeadingChange: (value) => set('desktopBrowseHeading', value),
-            }}
-          />
-        </div>
-      )}
-
-      {isDesktop && (
-        <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
-          <p className="text-[11px] text-muted mb-2">
-            The “Popular right now” row between the search box and the map. Phones don’t show this
-            row at all — they get the full card grid instead.
-          </p>
-          <FeaturedCardsPicker
-            value={draft.featuredCardIds}
-            onChange={(ids) => set('featuredCardIds', ids)}
           />
         </div>
       )}
@@ -581,6 +543,23 @@ export default function SiteSettingsEditor({
         </div>
       )}
 
+      {isDesktop && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home screen cards</h3>
+          <p className="text-[11px] text-muted mb-2">
+            Categories &amp; Search, Davening Times, Update Listings, Map, Email Signup, and Jewish
+            Times — the desktop home screen&rsquo;s cards, in order. Rename each one&rsquo;s
+            eyebrow/heading, reorder, or remove it.
+          </p>
+          <DesktopTopicsManager
+            sections={sectionsDraft}
+            onChange={setSectionsAndClearNotice}
+            settings={draft}
+            onSettingChange={set}
+          />
+        </div>
+      )}
+
       {isMobile && (
       <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
         <label className="block">
@@ -592,10 +571,12 @@ export default function SiteSettingsEditor({
           </span>
         </label>
         <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
-          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
+          <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
+          <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            Not currently shown anywhere on the site — kept here in case that changes.
+            Shown under the home screen heading, and reused as the footer blurb and &lt;meta
+            description&gt;. Desktop has its own separate headline/subhead — see the Desktop tab&rsquo;s
+            Hero card.
           </span>
         </label>
       </div>
@@ -703,67 +684,6 @@ export default function SiteSettingsEditor({
           Screen” app name.
         </p>
       )}
-    </div>
-  )
-}
-
-// ── Featured cards picker ─────────────────────────────────────────────────────
-// The three cards the desktop home screen shows between the search box and the
-// map. One dropdown per slot, each offering the same card set the section
-// editor uses (see useCardOptions).
-//
-// Every slot can be left on "Auto", including all three — that's the default,
-// and it fills the row with the categories that have the most listings. So
-// this never has to be touched for the home screen to look deliberate, and a
-// half-configured row (one pick, two auto) still renders three cards.
-
-function FeaturedCardsPicker({
-  value,
-  onChange,
-}: {
-  value: string[]
-  onChange: (ids: string[]) => void
-}) {
-  const cardOptions = useCardOptions()
-
-  // Slots are positional, but `value` is a compact list (no holes) — an "Auto"
-  // slot simply isn't in it. Setting slot 2 while slot 1 is Auto therefore
-  // appends rather than writing to index 1; the home screen fills the rest
-  // from the same most-listings fallback either way.
-  const setSlot = (slot: number, id: string) => {
-    const next = [...value]
-    if (id === '') next.splice(slot, 1)
-    else if (slot < next.length) next[slot] = id
-    else next.push(id)
-    // A card picked twice would render the same tile twice — keep the first.
-    onChange([...new Set(next)].slice(0, FEATURED_CARD_COUNT))
-  }
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-      <p className="text-[11px] text-muted">
-        Shown on desktop between the search box and the map. Leave a slot on
-        &ldquo;Auto&rdquo; to fill it with the category that has the most listings.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {Array.from({ length: FEATURED_CARD_COUNT }, (_, slot) => (
-          <label key={slot} className="block">
-            <span className="block text-[11px] font-medium text-slate-600 mb-1">Slot {slot + 1}</span>
-            <select
-              value={value[slot] ?? ''}
-              onChange={(e) => setSlot(slot, e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Auto (most listings)</option>
-              {cardOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </div>
     </div>
   )
 }

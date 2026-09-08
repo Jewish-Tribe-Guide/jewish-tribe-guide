@@ -7,8 +7,8 @@ import HeroHeading from '@/components/home/HeroHeading'
 import SearchSection from '@/components/home/SearchSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
-import FeaturedCards from '@/components/home/FeaturedCards'
-import HomeBreak from '@/components/home/HomeBreak'
+import DaveningTimesCard from '@/components/home/DaveningTimesCard'
+import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
@@ -19,7 +19,6 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
-import { pickFeaturedCards } from '@/lib/featuredCards'
 import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import type { NavigateFn } from '@/types'
@@ -52,17 +51,15 @@ export type LandingProps = {
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
-//   Desktop — a two-column warm hero (headline + mission + search beside a
-//   photo, see HeroHeading) → "Popular right now" if an admin has re-added
-//   it (off by default — see builtInOrder) → a flat "Browse everything"
-//   grid, full weight (every card, always visible, no hover needed) →
-//   HomeBreak (Davening Times + a "kept by the community" message) →
-//   "Explore the map", matching Browse everything's full weight → Stay in
-//   the loop + Shabbat Times, a second two-card break in the same visual
-//   language as HomeBreak → footer. HeaderNav's "Categories" mega-menu (in
-//   SiteHeader, on every screen — this page no longer owns any category nav
-//   of its own) is a second way to reach a category, on top of the flat
-//   grid.
+//   Desktop — a two-column warm hero (headline + subhead + search beside a
+//   photo, see HeroHeading) → six independent, admin-orderable cards (see
+//   builtInOrder): Categories & Search (a flat "Browse everything" grid,
+//   full weight — every card, always visible, no hover needed), Davening
+//   Times, Update Listings ("kept by the community"), Explore the Map,
+//   Email Signup (Stay in the Loop), and Jewish Times (Shabbat & Holiday
+//   Times) — → footer. HeaderNav's "Categories" mega-menu (in SiteHeader, on
+//   every screen — this page no longer owns any category nav of its own) is
+//   a second way to reach a category, on top of the flat grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -162,52 +159,48 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // Sections only exist once loading is done and there's something to group;
   // while loading, a single flat grid of entry cards + skeletons stands in.
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
-  const featured = allCards ? pickFeaturedCards(allCards, listings, settings.featuredCardIds) : []
 
   // The desktop gateway's own block order (admin-editable — see
-  // HomeSectionManager). Category sections don't interleave here — the flat
-  // "Browse everything" grid below shows every category on its own, ordered
-  // by this same `homeSections` list; this is just "which of the three
-  // singleton blocks show, in what order". A community
-  // that's never touched the ordering has all three, in their original
-  // hardcoded order, via seed-home-blocks.mjs — and the same default order
-  // is the fallback here too, for a deployment that hasn't run that script
-  // (or a fixture/test that predates this) so the gateway still shows all
-  // three rather than silently going blank until someone runs a migration.
-  // Known tradeoff: this can't distinguish "never configured" from "an admin
-  // deliberately removed all three" — both look like zero built-in rows —
-  // so the rare case of removing every one of them reverts to the default
-  // set on the next load rather than staying empty. Removing one or two
-  // sticks; only removing all three hits this.
+  // HomeSectionManager/DesktopTopicsManager). Category sections don't
+  // interleave here — the flat "Browse everything" grid below shows every
+  // category on its own, ordered by this same `homeSections` list; this is
+  // just "which of the six singleton cards show, in what order".
+  //
+  // Each of the six kinds falls back to its own default position
+  // INDEPENDENTLY when this community has no row for that specific kind,
+  // rather than all-or-nothing: `missingDefaults` below only covers whatever
+  // kind is actually absent, appended after whatever IS configured (in its
+  // real saved order). This matters concretely, not just hypothetically —
+  // 'davening'/'listings'/'subscribe'/'jewishTimes' are new kinds as of this
+  // change, replacing 'zmanim'/'shabbat'/'featured'; a community that
+  // already has real 'browse'/'map' rows from before this change would, with
+  // a plain all-or-nothing fallback, lose all four new cards outright the
+  // moment this shipped — verified live against this project's own dev
+  // database, which already has 'browse'/'map' configured and nothing for
+  // the four new kinds. Independent fallback is what keeps them showing
+  // without needing every existing deployment reseeded first.
+  //
+  // Known, accepted tradeoff (same one this codebase already chose for
+  // 'browse'/'shabbat' before the pairs split further — see git history):
+  // there's no way to tell "this kind never had a row" from "an admin
+  // explicitly removed it" once at least one OTHER kind has a row, so
+  // Remove-ing a single card while others stay configured doesn't reliably
+  // stick — it can reappear at its default position on a later load. Given
+  // the choice between that and new cards silently vanishing from an
+  // already-customized site, this is the safer direction to be wrong in.
+  const DEFAULT_KIND_ORDER = ['browse', 'davening', 'listings', 'map', 'subscribe', 'jewishTimes'] as const
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
     .map((s) => ({ kind: s.kind, title: s.title }))
-  // 'featured' ("Popular right now") isn't in this default any more — it's a
-  // curated subset of exactly what the "Browse everything" grid above
-  // already shows in full, so on a fresh community it would just repeat
-  // three of those same cards a second time. Still fully supported: an admin
-  // can add it back from the "+ Add" built-in-block button in the Desktop
-  // tab for a community that wants a curated highlight anyway.
-  const hasBrowseRow = configuredBuiltIns.some((b) => b.kind === 'browse')
-  const hasShabbatRow = configuredBuiltIns.some((b) => b.kind === 'shabbat')
-  const otherKindsConfigured = configuredBuiltIns.some((b) => b.kind !== 'browse' && b.kind !== 'shabbat')
-  // 'browse' (the Browse/Search card) and 'shabbat' (Shabbat Times + Stay in
-  // the Loop) used to be hardcoded fixed-first/fixed-last, before either was
-  // part of this reorderable set — see homeSections.ts's own doc. So unlike
-  // 'featured'/'map'/'zmanim' (which fall back together, as a set, to the
-  // default order below), each of these two is patched in independently
-  // ONLY when this community genuinely has no row for that specific kind —
-  // an existing community that already configured zmanim+map keeps their
-  // real order untouched, it just also gets a Browse card up front and a
-  // Shabbat row at the end, exactly where both always rendered before.
-  const builtInOrder =
-    hasBrowseRow || hasShabbatRow || otherKindsConfigured
-      ? [
-          ...(hasBrowseRow ? [] : [{ kind: 'browse' as const, title: BUILT_IN_BLOCKS.browse.title }]),
-          ...configuredBuiltIns,
-          ...(hasShabbatRow ? [] : [{ kind: 'shabbat' as const, title: BUILT_IN_BLOCKS.shabbat.title }]),
-        ]
-      : (['browse', 'zmanim', 'map', 'shabbat'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
+  const configuredKinds = new Set(configuredBuiltIns.map((b) => b.kind))
+  const missingDefaults = DEFAULT_KIND_ORDER.filter((k) => !configuredKinds.has(k)).map((kind) => ({
+    kind,
+    title: BUILT_IN_BLOCKS[kind].title,
+  }))
+  // When nothing's configured, configuredBuiltIns is empty and missingDefaults
+  // already IS the full default order (every kind is "missing") — so this
+  // single expression covers both cases without a separate branch.
+  const builtInOrder = [...configuredBuiltIns, ...missingDefaults]
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
@@ -367,18 +360,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
                 The ring-1/rounded-2xl wrapper matches the map's own
                 container below — the two are meant to read as equal "main
-                things". HomeBreak, the transition between them, uses the
-                same card language (border, rounded-2xl) as this section —
-                see its own doc on why a 2×2 grid of smaller cards there
-                still reads as a break, not a third full-width peer section. */}
-        {/* ── The desktop gateway's five singleton blocks — Browse/search,
-                featured cards, the embedded map, HomeBreak, Shabbat
-                Times/Stay in the Loop — in the admin-configured order
-                (builtInOrder above). Each keeps its own existing gating
-                (hidden while searching, desktop-only, hasMap/zmanimCategory);
-                only the SEQUENCE they render in is data-driven instead of
-                hardcoded. ─────────────────────────────────────────────────── */}
-        {builtInOrder.map(({ kind, title }) => {
+                things". Every card between them (Davening Times, Update
+                Listings, Email Signup, Jewish Times) uses the same card
+                language (border, rounded-2xl) as this section, so the whole
+                stack reads as one family. */}
+        {/* ── The desktop gateway's six singleton cards — Categories &
+                Search, Davening Times, Update Listings, Map, Email Signup,
+                Jewish Times — in the admin-configured order (builtInOrder
+                above). Each is fully independent now (see homeSections.ts's
+                own doc on why the old Davening+Listings and
+                Subscribe+JewishTimes pairs split apart) and keeps only the
+                gating it actually needs on its own merits — Davening Times
+                self-gates on having a minyanim-bearing category at all
+                (inside DaveningTimesCard), Jewish Times gates on a real
+                Zmanim pseudo-category existing (candle-lighting data has
+                nowhere to come from otherwise), and Update Listings/Email
+                Signup need neither. Only the SEQUENCE these render in is
+                data-driven instead of hardcoded. ───────────────────────── */}
+        {builtInOrder.map(({ kind }) => {
           if (kind === 'browse') {
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
             // the WHOLE card, not just the grid below — search sits right
@@ -423,35 +422,70 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               </section>
             )
           }
-          if (kind === 'shabbat') {
-            // Same two-card, rounded-2xl treatment as HomeBreak — the two
-            // breaks read as one visual language even though they're not
-            // one component (see ShabbatTimesCard's own doc for why they
-            // split). Still a JS branch on zmanimCategory for the same
-            // reason HomeBreak's own Zmanim card always was: useZmanim
-            // fetches /api/zmanim uncached, straight through to Hebcal, and
-            // hiding it with `sm:` would cost every phone visitor a
-            // round-trip for a section they never see (mobile has no
-            // equivalent of this row at all).
+          if (kind === 'davening') {
+            // No outer zmanimCategory gate any more — that was this card's
+            // old shared-component sibling's requirement (ShabbatTimesCard's
+            // useZmanim), not this card's own. DaveningTimesCard already
+            // self-gates on having any minyanim-bearing category at all
+            // (returns null otherwise), which is the real requirement here.
             return (
-              !isMobile &&
-              zmanimCategory && (
-                <div key="shabbat" className="my-12 grid grid-cols-2 gap-4">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                    <SubscribeSection bare />
-                  </div>
-                  <ShabbatTimesCard coords={coords ?? community.mapCenter} locationLabel={zmanimLocationLabel} />
+              !isMobile && (
+                <div key="davening" className="my-12">
+                  <DaveningTimesCard
+                    coords={coords}
+                    eyebrow={settings.desktopDaveningEyebrow}
+                    heading={settings.desktopDaveningHeading}
+                  />
                 </div>
               )
             )
           }
-          if (kind === 'featured') {
-            // Hidden while searching, when the grid below takes over as the
-            // answer to what was typed.
-            return !q && (
-              <div key="featured" className="hidden desktop:block">
-                <FeaturedCards title={title} cards={featured} loading={loading} />
-              </div>
+          if (kind === 'listings') {
+            // Unconditional (no zmanimCategory gate) — this card has never
+            // depended on zmanim data; it was only ever gated because it
+            // used to share a component (HomeBreak) with Davening Times.
+            return !isMobile && (
+              <UpdateListingsCard
+                key="listings"
+                eyebrow={settings.desktopListingsEyebrow}
+                heading={settings.desktopListingsHeading}
+              />
+            )
+          }
+          if (kind === 'subscribe') {
+            // Also unconditional — SubscribeSection doesn't read zmanim
+            // data either; it only used to pair visually with
+            // ShabbatTimesCard, not depend on it.
+            return (
+              !isMobile && (
+                <div key="subscribe" className="my-12 rounded-2xl border border-slate-200 bg-white p-6">
+                  <SubscribeSection
+                    bare
+                    eyebrow={settings.desktopSubscribeEyebrow}
+                    heading={settings.desktopSubscribeHeading}
+                  />
+                </div>
+              )
+            )
+          }
+          if (kind === 'jewishTimes') {
+            // Still a JS branch on zmanimCategory: useZmanim fetches
+            // /api/zmanim uncached, straight through to Hebcal, and hiding
+            // this with CSS alone would cost every phone visitor a
+            // round-trip for a card they never see (mobile has no
+            // equivalent of this card at all) — same reasoning as before
+            // the Davening+Listings/Subscribe+JewishTimes pairs split.
+            return (
+              !isMobile &&
+              zmanimCategory && (
+                <div key="jewishTimes" className="my-12">
+                  <ShabbatTimesCard
+                    coords={coords ?? community.mapCenter}
+                    locationLabel={zmanimLocationLabel}
+                    heading={settings.desktopJewishTimesHeading}
+                  />
+                </div>
+              )
             )
           }
           if (kind === 'map') {
@@ -483,15 +517,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
                 <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
                   <div className="px-5 pt-5 pb-4">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Discover nearby</p>
-                    {/* Same eyebrow/heading rhythm as HomeBreak's "Today"/
-                        "Community run" cards — this card otherwise has
-                        nothing to say beside the literal word "Map". The
-                        count fades in once listings have loaded rather than
-                        reserving space for it; a header that's briefly one
-                        line shorter reads fine, a wrong number wouldn't. */}
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                      {settings.desktopMapEyebrow}
+                    </p>
+                    {/* Same eyebrow/heading rhythm as every other card —
+                        both admin-editable now (Desktop tab's Home screen
+                        cards), no longer a hardcoded eyebrow next to a
+                        home_section.title-driven heading. The count fades
+                        in once listings have loaded rather than reserving
+                        space for it; a header that's briefly one line
+                        shorter reads fine, a wrong number wouldn't. */}
                     <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">{settings.desktopMapHeading}</h2>
                       {totalListings != null && (
                         <p className="text-sm text-slate-500">
                           <span className="font-semibold text-slate-700">{totalListings.toLocaleString()}</span>{' '}
@@ -515,18 +552,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               </div>
             )
           }
-          // HomeBreak — Davening Times and the community card. `coords` is
-          // the real, ungated visitor location (null until they've actually
-          // set an address): Davening Times' distance-to-a-shul would be
-          // actively misleading measured from a fallback the visitor never
-          // chose, unlike ShabbatTimesCard below, which is fine reading a
-          // community-wide default as "candle lighting for Philadelphia in
-          // general". Gated on zmanimCategory same as before this split —
-          // see this block's own history if that coupling is ever worth
-          // untangling; the community card doesn't strictly need it either.
-          return (
-            !isMobile && zmanimCategory && <HomeBreak key="zmanim" coords={coords} />
-          )
+          return null
         })}
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search

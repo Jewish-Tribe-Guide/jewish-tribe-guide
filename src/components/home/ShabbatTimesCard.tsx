@@ -31,19 +31,26 @@ import { useZmanim } from '@/lib/useZmanim'
 //
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening
-// Times and the community card. Split out into its own component when it
-// moved, rather than staying a prop-gated branch of HomeBreak: the two halves
-// no longer render adjacent to each other, so there was no longer a shared
-// parent that made sense to hold both.
+// Times and the community card, then paired with SubscribeSection below the
+// map instead. Now fully independent — every desktop home-screen card is
+// (see homeSections.ts's own doc) — so it no longer assumes anything about
+// what renders beside it.
 export default function ShabbatTimesCard({
   coords,
   locationLabel,
+  heading = 'Shabbat & Holiday Times',
 }: {
   /** The visitor's address, or the community center — see Landing, which
    *  falls back so this never renders a "set your location" prompt. A
    *  city-wide approximation is fine for candle lighting. */
   coords: { lat: number; lng: number } | null
   locationLabel: string
+  /** settings.desktopJewishTimesHeading — admin-editable (Desktop tab's
+   *  Home screen cards). Optional with today's literal default, so existing
+   *  tests that render this in isolation don't all need updating. No
+   *  matching eyebrow prop — this card's own eyebrow (below) is the
+   *  computed Hebrew date + location, not static text worth overriding. */
+  heading?: string
 }) {
   const { data, status } = useZmanim(coords)
 
@@ -52,7 +59,7 @@ export default function ShabbatTimesCard({
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
         {status === 'ready' && data ? data.hebrewDate : 'Today'} · {locationLabel}
       </p>
-      <h3 className="mb-4 text-lg font-semibold text-slate-900">Shabbat &amp; Holiday Times</h3>
+      <h3 className="mb-4 text-lg font-semibold text-slate-900">{heading}</h3>
 
       {status === 'loading' ? (
         <div className="space-y-2" aria-live="polite" aria-busy="true">
