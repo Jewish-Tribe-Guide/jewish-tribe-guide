@@ -17,6 +17,7 @@ import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ShareButton from './ShareButton'
+import ListingActionsMenu from './ListingActionsMenu'
 import Chip from './Chip'
 import { PencilIcon, FlagIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
@@ -193,6 +194,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // one tick before settling into the inline panel — accepted the same way
   // the other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
+  // Shared by ListingActionsMenu's kebab and the expanded footer's own
+  // ShareButton — computed once here rather than each of those two
+  // recomputing the same expression separately.
+  const listingPath = routes.listing(community, category.id, listingSlug(item))
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -213,44 +218,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const travel = travelParts(item)
   const hasUpvoteRow = upvotes || travel.length > 0 || showDistanceSlot
 
-  // Shared between the desktop full-width row (below, own row under the
-  // icon — see that row's own comment on why) and mobile's own top-right
-  // corner column (stacked above the chevron — see its own comment). Desktop
-  // needs the dedicated row so a longer name doesn't fight a squeezed-in
-  // column for space in a multi-column grid; mobile has no such grid (a
-  // single full-width column) so there's nothing to protect the name from,
-  // and the corner reads as a compact "stat" rather than a fact competing
-  // with the address line for space. `stacked` drops the "|" separator
-  // (meaningless once the two sit on their own lines instead of side by
-  // side) and stacks the count above the distance/travel instead of
-  // side-by-side.
-  const renderUpvoteDistanceContent = (stacked: boolean) => (
+  // Its own full-width row under the icon (see that row's own comment on
+  // why), shared by mobile and desktop alike — a column squeezed into the
+  // collapsed row's corner is what this used to be on mobile, which crowded
+  // that corner out once a kebab menu needed the same spot (see this
+  // function's git history and GenericListingCard's own corner comment).
+  const renderUpvoteDistanceContent = () => (
     <>
-      {upvotes && (
-        stacked ? (
-          // Wrapped in a plain block div, not rendered as a bare flex item —
-          // found by diffing computed styles against production directly:
-          // prod wraps this exact button in the same div (there for an
-          // unrelated desktop reason — a fixed-width column so counts align
-          // across a row — that doesn't apply to this stacked corner), and
-          // the button's own -m-2 negative margin collapses through a plain
-          // block parent in a way it never does across a flex boundary. The
-          // visible effect is a taller stat stack with more breathing room
-          // between the two lines; without this wrapper the button sits
-          // directly as a flex item and that collapse can't happen, which is
-          // exactly the "prod has more space" gap reported against this.
-          <div className="desktop:flex desktop:w-10 desktop:justify-end">
-            <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-          </div>
-        ) : (
-          <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />
-        )
-      )}
-      {!stacked && upvotes && (travel.length > 0 || showDistanceSlot) && (
+      {upvotes && <UpvoteButton variant="inline" resourceId={item.id} count={count} onCountChange={onVote} />}
+      {upvotes && (travel.length > 0 || showDistanceSlot) && (
         <span aria-hidden="true" className="text-slate-300">|</span>
       )}
       {travel.length > 0 ? (
-        <div className={`flex flex-col ${stacked ? 'items-end' : 'items-start'} gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap`}>
+        <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
           {travel.map((t) => <span key={t}>{t}</span>)}
         </div>
       ) : showDistanceSlot ? (
@@ -625,20 +605,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {/* Mobile-only: upvote count + distance/travel, stacked to the
-                LEFT of the chevron (its own two-line column, chevron
-                vertically centered beside it) rather than desktop's own
-                dedicated row below the icon (see that row's own comment on
-                why they differ) — mobile has no multi-column grid squeezing
-                this against the name, so there's nothing to protect the name
-                from, and the corner reads as a quick stat glanced at
-                alongside the name rather than a fact competing with the
-                address line below for space. */}
-            {hasUpvoteRow && (
-              <div className="desktop:hidden flex flex-col items-end gap-0.5">
-                {renderUpvoteDistanceContent(true)}
-              </div>
-            )}
             <div className="flex items-center gap-2">
               {headerUrlFields.map(({ f, href }) => (
                 <a
@@ -652,75 +618,95 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                   {f.linkLabel ?? f.label}
                 </a>
               ))}
-              {/* The row's actual accessible toggle — see the row div's own
-                  comment above. No onClick: relies on the native click a
-                  button dispatches on mouse activation or Enter/Space
-                  bubbling up to the row's handler, which does the real work.
-                  Still present and still carries aria-expanded/aria-label on
-                  desktop even though its chevron doesn't render there —
-                  removing the button itself, not just its icon, would leave
-                  keyboard/screen-reader visitors with no way to open the
-                  dialog at all (the row can't be a button — see that same
-                  comment on why), and GenericListingCard.test.tsx queries this
-                  exact button by role. */}
-              <button
-                type="button"
-                aria-expanded={expanded}
-                aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
-                // -m-2.5 p-2.5: the icon itself is 16px, well under the
-                // 24px WCAG-recommended tap target — padding grows the real
-                // hit area to ~36px without the negative margin's opposite
-                // effect shifting anything in the row around it.
-                className="-m-2.5 cursor-pointer p-2.5"
-              >
-                {/* Mobile only — a chevron that rotates open/closed reads
-                    right for the inline accordion (see the isMobile branch
-                    further down). Desktop opens a dialog instead, which a
-                    rotating "this expands right here" arrow no longer
-                    describes, and the whole card is already clickable with its
-                    own hover state, so there's nothing left for it to point
-                    at. */}
-                <svg
-                  className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
-                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+              {/* Pin / Share / "I'm here" and the chevron both grow their own
+                  tap target with a negative margin (-m-2.5, 10px of
+                  invisible overflow on every side — see each button's own
+                  className below) — a real hit-testing browser (not jsdom,
+                  which never caught this) resolves overlapping invisible
+                  regions to whichever element sits on top, so with only
+                  gap-2 (8px) between two 10px overflows the kebab's own hit
+                  area swallowed clicks meant for the chevron next to it.
+                  gap-5 (20px) is the minimum that fully clears both. */}
+              <div className="flex items-center gap-5">
+                {/* Pin / Share / "I'm here" — reachable without expanding
+                    the card, on both mobile and desktop. Same corner slot
+                    as the chevron right next to it, which is exactly why
+                    the upvote/distance stat above no longer lives here on
+                    mobile (see renderUpvoteDistanceContent's own comment) —
+                    there's no room left in this corner for both. */}
+                <ListingActionsMenu item={item} category={category} path={listingPath} />
+                {/* The row's actual accessible toggle — see the row div's
+                    own comment above. No onClick: relies on the native
+                    click a button dispatches on mouse activation or Enter/
+                    Space bubbling up to the row's handler, which does the
+                    real work. Still present and still carries aria-expanded/
+                    aria-label on desktop even though its chevron doesn't
+                    render there — removing the button itself, not just its
+                    icon, would leave keyboard/screen-reader visitors with
+                    no way to open the dialog at all (the row can't be a
+                    button — see that same comment on why), and
+                    GenericListingCard.test.tsx queries this exact button by
+                    role. */}
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
+                  // -m-2.5 p-2.5: the icon itself is 16px, well under the
+                  // 24px WCAG-recommended tap target — padding grows the
+                  // real hit area to ~36px without the negative margin's
+                  // opposite effect shifting anything in the row around it.
+                  className="-m-2.5 cursor-pointer p-2.5"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                  {/* Mobile only — a chevron that rotates open/closed reads
+                      right for the inline accordion (see the isMobile branch
+                      further down). Desktop opens a dialog instead, which a
+                      rotating "this expands right here" arrow no longer
+                      describes, and the whole card is already clickable with
+                      its own hover state, so there's nothing left for it to
+                      point at. */}
+                  <svg
+                    className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Upvote count + distance/travel — desktop only, its own row
-            left-aligned under the icon (pl-[52px] = the 40px icon + 12px gap
-            it sits next to above), rather than a column squeezed in beside
-            the name. A column squeezed in beside the name is exactly what
-            this used to be (see git history) — fine while the card spanned
-            the page's full width, but once desktop cards became one of 2-3
-            grid columns (see GenericDirectory) that same column left the
-            name only a third of a viewport-width's worth of room, and a
-            longer business name wrapped to three or four lines fighting it
-            for space. Its own row gives it the whole card width instead, so
-            it never competes with the name. Left-aligned under the
-            address/description, not right-aligned against the card edge — a
+        {/* Upvote count + distance/travel — its own row left-aligned under
+            the icon (pl-[52px] = the 40px icon + 12px gap it sits next to
+            above), rather than a column squeezed in beside the name. A
+            column squeezed in beside the name is exactly what this used to
+            be on desktop (see git history) — fine while the card spanned the
+            page's full width, but once desktop cards became one of 2-3 grid
+            columns (see GenericDirectory) that same column left the name
+            only a third of a viewport-width's worth of room, and a longer
+            business name wrapped to three or four lines fighting it for
+            space. Its own row gives it the whole card width instead, so it
+            never competes with the name. Left-aligned under the address/
+            description, not right-aligned against the card edge — a
             distance/upvote line reads as more of a fact about the place,
             alongside its address, than a stat pinned to the card's corner.
-            Mobile has no grid to squeeze columns in (a single full-width
-            column), so there's nothing here to protect the name from —
-            mobile gets its own top-right corner instead, stacked above the
-            chevron (see "Mobile-only" comment further up, next to the
-            header-url-fields/chevron row). */}
+            Mobile used to get its own top-right corner instead, stacked
+            above the chevron — moved down to this same row once that corner
+            needed to fit a kebab menu too (see ListingActionsMenu and this
+            component's own corner comment); mobile has no grid to squeeze
+            columns in, so there was never anything here to protect the name
+            from either way. */}
         {hasUpvoteRow && (
           <>
             {/* Segment-1 spacer — see GenericListingCardHandle's own doc.
                 Real gap here, between the address/header-text block above
                 and this row, so the popularity/distance LINE itself lands
                 at the same height across a row of cards — not just the
-                badges further down. Desktop-only, like the row it pads. */}
-            <div ref={upvoteSpacerRef} aria-hidden="true" className="hidden desktop:block" />
-            <div ref={upvoteRowRef} className="hidden desktop:flex mt-1.5 justify-start pl-[52px]">
+                badges further down. */}
+            <div ref={upvoteSpacerRef} aria-hidden="true" />
+            <div ref={upvoteRowRef} className="flex mt-1.5 justify-start pl-[52px]">
               <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
-                {renderUpvoteDistanceContent(false)}
+                {renderUpvoteDistanceContent()}
               </div>
             </div>
           </>
@@ -794,7 +780,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
             <div className="flex gap-3">
-              <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
+              <ShareButton path={listingPath} title={item.name} />
               {canEdit && (
                 <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
               )}

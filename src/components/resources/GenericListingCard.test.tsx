@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 
 // The first component test built on the CommunityProvider/ContentProvider
@@ -60,10 +61,10 @@ describe('GenericListingCard — collapsed', () => {
     // why: it holds other real interactive children, so it can't also be
     // an ARIA button). Clicking it exercises the real accessible path,
     // not just the row's mouse-only onClick convenience.
-    const toggle = screen.getByRole('button', { expanded: false })
+    const toggle = screen.getByRole('button', { name: /show details for/i })
     await user.click(toggle)
 
-    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide details for/i })).toBeInTheDocument()
   })
 
   // The outer card wrapper stretches to match its row-mates in the desktop
@@ -80,7 +81,7 @@ describe('GenericListingCard — collapsed', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    const toggle = screen.getByRole('button', { expanded: false })
+    const toggle = screen.getByRole('button', { name: /show details for/i })
     const row = toggle.closest('div[class*="cursor-pointer"]')
     expect(row).not.toBeNull()
     expect(row).toHaveClass('h-full')
@@ -214,7 +215,7 @@ describe('GenericListingCard — collapsed', () => {
     expect(onNameClick).toHaveBeenCalledTimes(1)
     // Expanding is a separate, unrelated interaction — clicking the name
     // alone shouldn't also toggle the row.
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
   })
 })
 
@@ -386,7 +387,7 @@ describe('GenericListingCard — desktop modal header url field', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     const dialog = screen.getByRole('dialog')
     const websiteLinks = within(dialog).getAllByRole('link', { name: 'Website' })
@@ -544,7 +545,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
@@ -559,7 +560,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument()
@@ -590,7 +591,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={onNavigate} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
     await user.keyboard('{ArrowRight}')
     await user.keyboard('{ArrowLeft}')
 
@@ -619,7 +620,7 @@ describe('GenericListingCard — expanded', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.getByRole('button', { name: 'Previous listing' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Next listing' })).toBeEnabled()
@@ -642,7 +643,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={vi.fn()} hasPrev hasNext {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     const prevButton = screen.getByRole('button', { name: 'Previous listing' })
     expect(prevButton).not.toHaveClass('fixed')
@@ -692,12 +693,10 @@ describe('GenericListingCard — distance slot', () => {
         {...requiredHandlers}
       />,
     )
-    // Two copies exist in the DOM — desktop's own row and mobile's inline
-    // version, each hidden from the other viewport by CSS alone (see
-    // upvoteDistanceContent's own doc) — jsdom doesn't apply that CSS, so
-    // both are "present" here. Real content, not a bug: only one is ever
-    // actually visible in a real browser at a time.
-    expect(screen.getAllByRole('button', { name: slotLabel })).toHaveLength(2)
+    // One copy — mobile and desktop now share the same row (see
+    // renderUpvoteDistanceContent's own doc on why the mobile-only stacked
+    // corner version was removed: it needed to make room for the kebab menu).
+    expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
   })
 
   it('shows the real distance instead once there is one', () => {
@@ -711,7 +710,7 @@ describe('GenericListingCard — distance slot', () => {
         {...requiredHandlers}
       />,
     )
-    expect(screen.getAllByText(/0\.4 mi/)).toHaveLength(2)
+    expect(screen.getByText(/0\.4 mi/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: slotLabel })).not.toBeInTheDocument()
   })
 
@@ -746,16 +745,37 @@ describe('GenericListingCard — distance slot', () => {
       />,
     )
 
-    // Click whichever copy is first — see the earlier test's own comment on
-    // why two exist in jsdom (desktop row + mobile inline version).
-    await user.click(screen.getAllByRole('button', { name: slotLabel })[0])
+    await user.click(screen.getByRole('button', { name: slotLabel }))
 
     expect(opened).toHaveBeenCalledTimes(1)
     // The row's own click handler expands the card. A tap meant for the slot
     // must not also do that — the visitor asked for the location picker, not
     // for this listing's details.
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
 
     document.removeEventListener('jpc:open-location', opened)
+  })
+})
+
+// ── The collapsed row's actions kebab (Pin/Share/I'm here — see
+// ListingActionsMenu.tsx) and the layout change that made room for it: the
+// upvote/distance stat moved from a mobile-only corner column into the same
+// pl-[52px] row desktop already used, freeing the corner for the kebab on
+// both platforms. ──────────────────────────────────────────────────────────
+describe('GenericListingCard — actions menu corner', () => {
+  it('renders the actions kebab on desktop, in the collapsed row', () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
+  })
+
+  it('renders the actions kebab on mobile too, in the same collapsed row', () => {
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
   })
 })

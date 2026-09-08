@@ -227,3 +227,16 @@ export function CheckIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Three filled dots, not stroked paths like every icon above — a kebab menu
+// trigger reads as three small solid marks, not an outlined shape, so this
+// sets its own fill instead of using `base`'s stroke-only style.
+export function DotsIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  )
+}
