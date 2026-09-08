@@ -57,10 +57,19 @@ export const community = {
    *  branding chosen once when standing up a community, not something an
    *  admin is expected to swap week to week. */
   heroImage: {
-    url: 'https://images.unsplash.com/photo-1517009572053-93fb56dfef49?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.1.0',
+    // Was photo-1517009572053 (a tall/portrait street shot) — this hero
+    // slot is wide and short (see HeroHeading.tsx's grid), so that photo's
+    // default-center crop kept the clock but cut off the William Penn
+    // statue on top AND the street-level crosswalk below it, leaving mostly
+    // a bare tower shaft against sky. This one is closer to the hero's own
+    // aspect ratio to begin with — the same center crop keeps the full
+    // clock, most of the ornate tower and facade, and the flanking historic
+    // buildings that make it read as a real Philadelphia street rather than
+    // just "a tower."
+    url: 'https://images.unsplash.com/photo-1602704002454-95a38ac0163f?w=1400&auto=format&fit=crop&q=80&ixlib=rb-4.1.0',
     /** Required alongside `url` — see HeroHeading's aria-hidden note for why
      *  the placeholder it replaces carries none, and a real photo must. */
-    alt: 'Philadelphia City Hall tower rising above a street with cars and a crosswalk',
+    alt: 'Philadelphia City Hall clock tower framed by flanking buildings on a city street',
   } as { url: string; alt: string } | null,
 
   /** Optional modules — turn a hand-built card/flow off for a community that
