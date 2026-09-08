@@ -74,6 +74,11 @@ test.describe('admin roster on a phone', () => {
     const card = page.locator(`[data-community-slug="${slug}"]`)
     await expect(card).toBeVisible({ timeout: 15_000 })
 
+    // The Admins block is a collapsed-by-default CollapsibleSection now (see
+    // CollapsibleSection.tsx) — the roster table/add-admin form aren't in
+    // the document at all until this is clicked.
+    await card.getByRole('button', { name: 'Show Admins' }).click()
+
     await card.getByPlaceholder('new-admin@example.com').fill(adminEmail)
     await card.getByRole('button', { name: 'Add admin' }).click()
 
