@@ -45,10 +45,18 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
     <button
       onClick={onClick}
       aria-label={short}
+      // Blue (primary), not amber: these three buttons DO something — the
+      // eyebrow label and background above stay amber for the same "warm
+      // home screen" look, but an actionable button is exactly the case
+      // where the app's one "this is clickable" signal (bg-primary/
+      // text-primary everywhere else — the header, Add, Subscribe) needs to
+      // stay a single, unambiguous color rather than competing with a second
+      // one that means something else (amber is this app's caveat/verify-
+      // this tone in Chip and AddressPrompt) or nothing at all.
       className={
         primary
-          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800'
-          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-50'
+          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90'
+          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5'
       }
     >
       {icon}
@@ -146,7 +154,9 @@ export default function HomeBreak({
         {settings.feedbackEnabled && (
           <p className="mt-6 text-xs text-muted">
             Notice something else, or have general feedback about the site?{' '}
-            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-amber-800 hover:underline">
+            {/* Blue, same reasoning as the three buttons above — this is a
+                click target, not a label. */}
+            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-primary hover:underline">
               Send a note →
             </button>
           </p>
