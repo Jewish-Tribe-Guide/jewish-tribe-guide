@@ -72,14 +72,23 @@ type Props = {
    *  reorders this row. See the `order` state below for why an ordinary tap
    *  on a chip already in the row must NOT do the same. */
   resortToken?: number
-  /** Desktop only: a round chevron button pinned at the row's right edge,
-   *  matching Google Maps' own chip row, that scrolls it — replacing the
-   *  browser's native (and here invisible, since `chip-scroll` hides the
-   *  scrollbar) horizontal-scroll affordance with something a visitor can
-   *  actually see and click. Only renders once the row genuinely overflows
-   *  its container, so a short row with nothing to scroll to gets nothing
-   *  extra. Not meaningful together with `wrap` (the full-screen picker's
-   *  own multi-line layout has no scroll to reveal). */
+  /** Desktop only: a round button pinned at the row's right edge that scrolls
+   *  it — replacing the browser's native (and here invisible, since
+   *  `chip-scroll` hides the scrollbar) horizontal-scroll affordance with
+   *  something a visitor can actually see and click. Modeled directly on
+   *  Google Maps' own chip row (verified live, not from memory): a 32px
+   *  white circle, absolutely positioned OVER the row's right edge rather
+   *  than a flex sibling beside it — so it never changes, and can never
+   *  itself be changed by, the row's own layout width — and shown
+   *  unconditionally, whether or not the row actually has anything left to
+   *  scroll to. Google's own button stays visible and enabled even at a
+   *  width wide enough to fit every chip with room to spare; a first
+   *  attempt here tried to be "smarter" by only showing it when the row
+   *  measured as overflowing, which both didn't match Google and was the
+   *  root cause of a real bug (see CategoryFilter.test.tsx's own note on
+   *  the row-width feedback loop that caused). Not meaningful together with
+   *  `wrap` (the full-screen picker's own multi-line layout has no scroll
+   *  to reveal). */
   scrollArrow?: boolean
 }
 
@@ -218,23 +227,8 @@ export default function CategoryFilter({
   // outside-click check below.
   const popupRef = useRef<HTMLDivElement>(null)
 
-  // `scrollArrow`'s own row ref + whether it's currently worth rendering the
-  // button at all — a row that already fits everything has nowhere to
-  // scroll TO, so the button would be a dead click. Rechecked on resize and
-  // whenever the chip set itself changes (a category being added/hidden can
-  // flip either way), not just once on mount.
+  // `scrollArrow`'s own row ref, just to call `scrollBy` on click.
   const scrollRowRef = useRef<HTMLDivElement>(null)
-  const [canScrollRow, setCanScrollRow] = useState(false)
-  useEffect(() => {
-    if (!scrollArrow) return
-    const el = scrollRowRef.current
-    if (!el) return
-    const check = () => setCanScrollRow(el.scrollWidth > el.clientWidth + 1)
-    check()
-    const ro = new ResizeObserver(check)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [scrollArrow, optionIds])
 
   useEffect(() => {
     if (!openFilterFor) return
@@ -316,7 +310,11 @@ export default function CategoryFilter({
   const row = (
     <div
       ref={scrollArrow ? scrollRowRef : undefined}
-      className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}
+      className={
+        wrap
+          ? 'flex flex-wrap items-center gap-1.5'
+          : `chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 ${scrollArrow ? 'pr-9' : ''}`
+      }
     >
       {/* Always resets to everything — there's no "hide everything" state
           left to toggle to (unclicking the last chip already resets here,
@@ -530,32 +528,20 @@ export default function CategoryFilter({
 
   if (!scrollArrow) return row
 
-  // Sits OUTSIDE the scrollable row, not as its last chip — so it stays put
-  // at the row's right edge as a fixed, always-reachable "there's more"
-  // button rather than scrolling away with everything else the moment it's
-  // clicked once.
-  //
-  // Always MOUNTED (space reserved via `shrink-0`), only ever toggled
-  // `invisible` — not conditionally rendered. This button sits beside the
-  // row it measures, so mounting/unmounting it changes how much width the
-  // row itself has to lay out in, which changes its own scrollWidth/
-  // clientWidth, which is exactly what the effect above reacts to: adding
-  // the button could shrink the row into overflowing, and removing it could
-  // shrink it back out of overflowing, forever. `invisible` keeps its
-  // layout space constant regardless of `canScrollRow`, so the row's own
-  // width — and therefore the overflow verdict — never depends on whether
-  // this button happens to be showing right now.
+  // Absolutely positioned OVER the row's right edge, not a flex sibling
+  // beside it — matching Google Maps' own button exactly (verified live:
+  // `position: absolute; right: 0; width/height: 32px; border-radius: 16px`).
+  // An overlay can never change the row's own layout width, so unlike a
+  // flex sibling it can be shown unconditionally (see the prop's own doc)
+  // without risking the row-width feedback loop that caused a real bug the
+  // first time this shipped as a space-reserving sibling instead.
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="relative">
       {row}
       <button
         onClick={scrollMore}
         aria-label="Show more categories"
-        aria-hidden={!canScrollRow}
-        tabIndex={canScrollRow ? 0 : -1}
-        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer ${
-          canScrollRow ? '' : 'invisible pointer-events-none'
-        }`}
+        className="absolute right-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
       >
         <ChevronRightIcon className="h-4 w-4" />
       </button>
