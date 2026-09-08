@@ -568,6 +568,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       <DirectoryHeader
         title={category.pluralLabel}
         count={filtered.length}
+        hasAddress={category.hasAddress}
         anchorLabel={anchorLabel}
         addressPrompt={addressPrompt}
         upLabel={upLabel}

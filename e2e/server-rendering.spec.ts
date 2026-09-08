@@ -160,6 +160,9 @@ test.describe('content is server-rendered', () => {
     }
 
     // The header states the count; it should match what the API returns.
-    await expect(page.getByText(new RegExp(`${count}\\s+listings?`))).toBeVisible()
+    // "places" or "listings" depending on the category's own `hasAddress`
+    // (see DirectoryHeader's own doc) — this test doesn't care which noun,
+    // only that the number itself is right.
+    await expect(page.getByText(new RegExp(`${count}\\s+(?:listings?|places?)`))).toBeVisible()
   })
 })

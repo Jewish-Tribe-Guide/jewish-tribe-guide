@@ -82,9 +82,30 @@ describe('GenericDirectory', () => {
     // apply the breadcrumb's desktop-only CSS against, so both are "visible"
     // to testing-library regardless. The h1 is the one heading role either way.
     expect(screen.getByRole('heading', { name: 'Grocery Stores' })).toBeInTheDocument()
-    expect(screen.getByText('2 listings')).toBeInTheDocument()
+    // "places", not "listings" — this category has an address (the fixture
+    // default, same as almost every real category), and DirectoryHeader's
+    // count noun follows `hasAddress` the same way the home screen's own
+    // category tiles do (see home/sections.tsx's cardCount). It used to say
+    // "listings" unconditionally regardless of what the category actually
+    // was — see the regression test below for the case that noun is
+    // actually right for.
+    expect(screen.getByText('2 places')).toBeInTheDocument()
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.getByText('Trader Joe')).toBeInTheDocument()
+  })
+
+  // Regression coverage for DirectoryHeader always saying "N listings"
+  // regardless of category — right for WhatsApp Groups/Networking (no
+  // address, so "places" would be wrong), but the exact same wrong word
+  // for every category that does have one, including this test's own
+  // default fixture above.
+  it('says "listings", not "places", for a category with no address', () => {
+    const category = makeCategory({ pluralLabel: 'Networking', hasAddress: false })
+    const items = [makeListing({ id: 'a', name: 'Young Professionals Chat' })]
+    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+    expect(screen.getByText('1 listing')).toBeInTheDocument()
+    expect(screen.queryByText('1 place')).not.toBeInTheDocument()
   })
 
   it('filters the list by search text', async () => {
