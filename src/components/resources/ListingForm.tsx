@@ -10,13 +10,13 @@ import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
-import UpButton from '@/components/UpButton'
 import Breadcrumb from '@/components/Breadcrumb'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 // Whether the Turnstile challenge is actually active for this deploy — mirrors
 // TurnstileWidget's own check. When it's not configured, the widget renders
@@ -321,13 +321,26 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const heading =
     mode === 'edit' ? 'Suggest an edit' : `Add a ${config?.label ?? 'listing'}`
 
+  // Puts "‹ {heading}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call. Unlike ReportListing, this screen never had a distinct
+  // done-state title — both branches' Breadcrumb already said `heading`
+  // ("Add a Grocery Store" stays the destination name even once submitted),
+  // so the header matches that instead of introducing a new "Thank you!"
+  // title that would just repeat the h2 below and leave nothing for
+  // findByText('Thank you!') to disambiguate. Only the back target changes:
+  // onSubmitted once done, onUp before that.
+  useSetScreenHeader(true, heading, done ? onSubmitted : onUp)
+
   if (done) {
     return (
       <div>
-        <UpButton label={config.pluralLabel} onClick={onSubmitted} className="mb-4 desktop:hidden" />
         <Breadcrumb upLabel={config.pluralLabel} onUp={onSubmitted} title={heading} />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
+          {/* Not sr-only, unlike the other screens' bare title repeats: this
+              text ("Thank you!") is never what the header says — the header
+              keeps `heading` — so hiding it would remove the only place the
+              confirmation is actually named, not a duplicate of it. */}
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
           <p className="text-sm text-green-700">
             Your {mode === 'edit' ? 'suggested edit' : 'submission'} was received and will appear once
@@ -340,13 +353,12 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
   return (
     <div>
-      {/* UpButton (mobile) and Breadcrumb (desktop) name the same
-          destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. */}
-      <UpButton label={config.pluralLabel} onClick={onUp} className="mb-4 desktop:hidden" />
+      {/* Breadcrumb (desktop only) names the same destination the header's
+          "‹ {heading}" now covers on mobile — see Breadcrumb's own doc for
+          why only one of the two ever shows at a time. */}
       <Breadcrumb upLabel={config.pluralLabel} onUp={onUp} title={heading} />
 
-      <h2 className="text-xl font-semibold text-slate-800 mb-3">{heading}</h2>
+      <h2 className="text-xl font-semibold text-slate-800 mb-3 sr-only desktop:not-sr-only">{heading}</h2>
       {/* Blue, not amber — this used to read as a warning (amber is this
           app's caveat/verify-this color elsewhere, e.g. Chip's amber tone),
           when it's just process information: every submission goes through
