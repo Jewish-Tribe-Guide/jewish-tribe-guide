@@ -8,6 +8,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { adminBase } from '@/lib/adminNav'
 import AddressInput from '@/components/intake/AddressInput'
+import CollapsibleSection from './CollapsibleSection'
 import type { Community } from '@/lib/communityStore'
 
 // GET /api/admin/communities adds adminEmails/previewToken on top of the
@@ -810,8 +811,15 @@ export default function CommunityManager({ token }: { token: string }) {
             )}
 
             <div className="mt-3 border-t border-slate-200 pt-3">
-              <p className="text-xs font-semibold text-slate-700 mb-2">Admins</p>
-
+            <CollapsibleSection
+              title="Admins"
+              description={
+                c.adminEmails.length > 0
+                  ? `${c.adminEmails.length} admin${c.adminEmails.length === 1 ? '' : 's'}`
+                  : 'None set — falls back to the superadmin list.'
+              }
+              contentClassName="p-4"
+            >
               {rosterError[c.slug] && <p className="text-xs text-red-700 mb-2">{rosterError[c.slug]}</p>}
 
               {c.adminEmails.length > 0 ? (
@@ -941,6 +949,7 @@ export default function CommunityManager({ token }: { token: string }) {
                   Add admin
                 </button>
               </div>
+            </CollapsibleSection>
             </div>
 
             {deletingSlug === c.slug && (

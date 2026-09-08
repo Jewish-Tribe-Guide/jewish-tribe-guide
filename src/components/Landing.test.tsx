@@ -248,8 +248,8 @@ describe('Landing', () => {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [] },
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
@@ -265,8 +265,8 @@ describe('Landing', () => {
           categories: withMapAndZmanim,
           settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapHeading: 'See it on the map' },
           homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [] },
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
@@ -275,27 +275,92 @@ describe('Landing', () => {
       expect(screen.queryByRole('heading', { name: 'Explore the Map' })).not.toBeInTheDocument()
     })
 
-    // Each kind falls back to its own default position independently — see
-    // Landing.tsx's own doc on why: a community that's only ever configured
-    // SOME of the six kinds (real state, not hypothetical — this is what a
-    // site that had 'browse'/'map' from before this change looks like)
-    // still gets the rest at their default positions, rather than losing
-    // them until every kind has a real row.
-    it('still shows a card with no row of its own even when a sibling kind is configured', () => {
+    // All-or-nothing: the admin's Home screen cards list is authoritative
+    // the moment it has any row at all — a kind with no row is "not
+    // configured", not "default it in anyway". See Landing.tsx's own doc —
+    // an earlier version tried the independent-fallback approach and it
+    // meant the admin's own list stopped matching what the live site
+    // actually rendered, which is worse than a temporary gap.
+    it('hides a built-in card that has no row of its own, once a sibling kind is configured', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
-          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [] }],
+          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
         },
       })
-      // HomeMap itself doesn't mount until the band scrolls near (see
-      // useInView) — force it in so home-map-stub is there to find.
-      act(() => triggerAllIntersections())
 
       expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
-      // Map has no row of its own here, but still renders via its own
-      // independent default-position fallback.
-      expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
+      // Map has no row of its own here, so it doesn't render at all —
+      // configuring one kind doesn't implicitly configure the rest.
+      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('side-by-side cards (width: half)', () => {
+    const withMapAndZmanim = [
+      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
+      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+    ]
+
+    it('pairs two adjacent half-width cards into one row', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+          ],
+        },
+      })
+      act(() => triggerAllIntersections())
+
+      // Both stubs share the same grid row — a direct parent with grid
+      // classes containing both testids, not two separate my-12 rows.
+      const daveningStub = screen.getByTestId('davening-stub')
+      const mapStub = screen.getByTestId('home-map-stub')
+      const row = daveningStub.closest('.grid')
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(mapStub)
+      // Only one shared outer spacing wrapper for the pair, not one each.
+      expect(container.querySelectorAll('.my-12').length).toBe(1)
+    })
+
+    it('a half-width card with no half-width neighbor falls back to its own full-width row', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+      act(() => triggerAllIntersections())
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      // Not inside a grid — its own row, same as a full-width card.
+      expect(daveningStub.closest('.grid')).toBeNull()
+      expect(container.querySelectorAll('.my-12').length).toBe(2)
+    })
+
+    it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
+      // davening/map both 'half', but no zmanim category — davening is
+      // JS-gated on nothing here (it self-gates on minyanim data, mocked to
+      // always render), map self-gates on `hasMap`; drop the map category so
+      // map renders nothing at all, leaving davening the only real card.
+      renderLanding(undefined, {
+        content: {
+          categories: [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })], // no map category
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+          ],
+        },
+      })
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      expect(daveningStub.closest('.grid')).toBeNull()
+      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
     })
   })
 

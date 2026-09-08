@@ -52,13 +52,22 @@ export type HomeSection = {
    *  'medical') — which cards belong here, and in what order. Always empty
    *  for a built-in block; they aren't card groups. */
   cardIds: string[]
+  /** Desktop only, and only meaningful for a built-in card (kind !==
+   *  'section' — plain sections have their own layout, this doesn't apply).
+   *  'full' (the default) is its own row, edge to edge. Two 'half' cards
+   *  that land next to each other in sortOrder pair into one 2-column row —
+   *  see Landing.tsx's own row-pairing walk. A 'half' card with no 'half'
+   *  neighbor (the one before or after it in order is 'full', or it's first/
+   *  last) falls back to rendering full width alone, so a single unpaired
+   *  half-width card never looks like a mistake. */
+  width: 'full' | 'half'
 }
 
 /** The Home page tab's in-progress, unsaved copy of a section — order is
  *  implied by array position (no `sortOrder` yet), and `id` may be a
  *  temporary client-only placeholder (see `NEW_SECTION_PREFIX`) for a
  *  section that doesn't exist on the server yet. */
-export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds'>
+export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds' | 'width'>
 
 /** Prefix marking a draft section's id as client-only (not yet created on the
  *  server) — see saveHomeSections in homeSectionsDraft.ts, which creates a

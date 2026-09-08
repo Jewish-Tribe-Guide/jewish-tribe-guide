@@ -676,9 +676,19 @@ describe('CommunityManager — admin roster', () => {
     return screen.getByRole('link', { name }).parentElement!.parentElement!
   }
 
+  // The Admins block is a CollapsibleSection now (see CollapsibleSection.tsx
+  // — same "Show ▸ / Hide ▾" pattern as the Metrics tab's Sync Coverage
+  // report), collapsed by default — the roster table/add-admin form aren't
+  // in the document at all until this is clicked.
+  async function openAdmins(user: ReturnType<typeof userEvent.setup>, card: HTMLElement) {
+    await user.click(within(card).getByRole('button', { name: 'Show Admins' }))
+  }
+
   it('shows every admin with their own submission and review-action preference', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([ues])
     const card = cardFor(/upper east side/i)
+    await openAdmins(user, card)
 
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     expect(within(janeRow).getByText('Off')).toBeInTheDocument()
@@ -690,8 +700,10 @@ describe('CommunityManager — admin roster', () => {
   })
 
   it('shows the empty state when no admins are configured', async () => {
+    const user = userEvent.setup()
     const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
     await renderAndWaitForList([empty])
+    await openAdmins(user, cardFor(/empty community/i))
     expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
   })
 
@@ -703,6 +715,7 @@ describe('CommunityManager — admin roster', () => {
     })
 
     const card = cardFor(/upper east side/i)
+    await openAdmins(user, card)
     await user.type(within(card).getByPlaceholderText(/new-admin@example.com/i), 'new@example.com')
     await user.click(within(card).getByRole('button', { name: /^add admin$/i }))
 
@@ -721,6 +734,7 @@ describe('CommunityManager — admin roster', () => {
     })
 
     const card = cardFor(/upper east side/i)
+    await openAdmins(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     // Not sent yet — confirmation is required first.
@@ -740,6 +754,7 @@ describe('CommunityManager — admin roster', () => {
     await renderAndWaitForList([ues])
 
     const card = cardFor(/upper east side/i)
+    await openAdmins(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     await user.click(within(janeRow).getByRole('button', { name: /^cancel$/i }))
@@ -754,6 +769,7 @@ describe('CommunityManager — admin roster', () => {
     await renderAndWaitForList([ues])
 
     const card = cardFor(/upper east side/i)
+    await openAdmins(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))

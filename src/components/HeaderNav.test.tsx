@@ -31,8 +31,8 @@ const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
 const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
 const mapCategory = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
 
-const foodSection = { id: 'food', kind: 'section' as const, title: 'Food and Hospitality', sortOrder: 1, cardIds: ['grocery'] }
-const institutionsSection = { id: 'institutions', kind: 'section' as const, title: 'Jewish Institutions', sortOrder: 2, cardIds: ['synagogue'] }
+const foodSection = { id: 'food', kind: 'section' as const, title: 'Food and Hospitality', sortOrder: 1, cardIds: ['grocery'], width: 'full' as const }
+const institutionsSection = { id: 'institutions', kind: 'section' as const, title: 'Jewish Institutions', sortOrder: 2, cardIds: ['synagogue'], width: 'full' as const }
 
 describe('HeaderNav — Categories', () => {
   it('opens on click and shows every group as its own labeled column', async () => {

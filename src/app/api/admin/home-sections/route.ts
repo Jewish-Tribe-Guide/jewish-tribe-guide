@@ -25,11 +25,13 @@ export async function GET(request: Request) {
 type CreateBody = {
   title?: string
   cardIds?: string[]
-  /** A built-in block ('featured' | 'map' | 'zmanim') instead of a plain
-   *  named section — title/cardIds are ignored server-side when set (see
-   *  createHomeSection), so the client doesn't need to send real values for
-   *  either. */
+  /** A built-in block instead of a plain named section — title/cardIds are
+   *  ignored server-side when set (see createHomeSection), so the client
+   *  doesn't need to send real values for either. */
   kind?: HomeBlockKind
+  /** Only meaningful alongside `kind` (a built-in block) — see
+   *  homeSections.ts's own doc on side-by-side layout. */
+  width?: 'full' | 'half'
 }
 
 const BUILT_IN_KINDS = Object.keys(BUILT_IN_BLOCKS) as HomeBlockKind[]
@@ -54,12 +56,16 @@ export async function POST(request: Request) {
   if (!body.kind && !body.title?.trim()) {
     return Response.json({ ok: false, errors: ['Section title is required.'] }, { status: 400 })
   }
+  if (body.width !== undefined && body.width !== 'full' && body.width !== 'half') {
+    return Response.json({ ok: false, errors: ['Invalid width.'] }, { status: 400 })
+  }
 
   try {
     const section = await createHomeSection(community.slug, {
       title: body.title ?? '',
       cardIds: body.cardIds,
       kind: body.kind,
+      width: body.width,
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

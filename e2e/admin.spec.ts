@@ -93,6 +93,10 @@ test.describe('admin console', () => {
     const settings = body.settings as { name: string; searchPlaceholder: string }
 
     await page.goto('/philly/admin/site')
+    // Every settings block is a collapsed-by-default CollapsibleSection now
+    // (see CollapsibleSection.tsx) — the fields aren't in the document at
+    // all until "Show" is clicked.
+    await page.getByRole('button', { name: 'Show Branding' }).click()
 
     // Not getByLabel, and not a plain hasText filter: each <label> also
     // wraps its own trailing helper text, which folds into the computed
@@ -119,6 +123,7 @@ test.describe('admin console', () => {
     await page.goto('/philly/admin/mobile')
 
     await expect(page.getByText('Mobile tab bar')).toBeVisible()
+    await page.getByRole('button', { name: 'Show Branding' }).click()
     const headingLabel = page.locator('label').filter({ has: page.getByText('Home screen heading', { exact: true }) })
     await expect(headingLabel.locator('input')).toHaveValue(settings.heroTitle)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()

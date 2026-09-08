@@ -114,12 +114,21 @@ export default function DesktopTopicsManager({
 
   function addCard(kind: CardKind) {
     const b = BUILT_IN_BLOCKS[kind]
-    onChange([...sectionEntries, ...legacyEntries, ...cardEntries, { id: b.id, kind, title: b.title, cardIds: [] }])
+    onChange([
+      ...sectionEntries,
+      ...legacyEntries,
+      ...cardEntries,
+      { id: b.id, kind, title: b.title, cardIds: [], width: 'full' },
+    ])
   }
 
   function removeCard(id: string, label: string) {
     if (!confirm(`Remove "${label}" from the home page? You can add it back anytime with the button below.`)) return
     onChange(sections.filter((s) => s.id !== id))
+  }
+
+  function setWidth(id: string, width: 'full' | 'half') {
+    onChange(sections.map((s) => (s.id === id ? { ...s, width } : s)))
   }
 
   function moveCard(index: number, dir: -1 | 1) {
@@ -154,6 +163,27 @@ export default function DesktopTopicsManager({
                   </div>
                 </div>
                 {meta && <p className="text-xs text-muted mb-2">{meta.description}</p>}
+                <div className="mb-2 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
+                  {(['full', 'half'] as const).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setWidth(c.id, w)}
+                      aria-pressed={c.width === w}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors cursor-pointer ${
+                        c.width === w ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {w === 'full' ? 'Full width' : 'Half width'}
+                    </button>
+                  ))}
+                </div>
+                {c.width === 'half' && (
+                  <p className="text-[11px] text-muted mb-2">
+                    Pairs with a neighboring half-width card into one side-by-side row. On its own (no
+                    half-width neighbor), it just renders full width.
+                  </p>
+                )}
                 {meta && (
                   <div className={`grid grid-cols-1 gap-2 mt-2 ${meta.eyebrowKey ? 'sm:grid-cols-2' : ''}`}>
                     {meta.eyebrowKey && (

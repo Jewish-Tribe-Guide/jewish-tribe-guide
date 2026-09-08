@@ -15,6 +15,7 @@ import HomeSectionManager from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
+import CollapsibleSection from './CollapsibleSection'
 import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
@@ -289,7 +290,8 @@ export default function SiteSettingsEditor({
       )}
 
       {isSite && (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
+      <div className="max-w-2xl">
+      <CollapsibleSection title="Branding" description="Site name, tagline, search placeholder, and logo." contentClassName="p-4 space-y-3">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Site name</span>
           <input value={draft.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
@@ -373,6 +375,7 @@ export default function SiteSettingsEditor({
             Shown in the header instead of the default mark. Leave blank to keep the default.
           </span>
         </div>
+      </CollapsibleSection>
       </div>
       )}
 
@@ -380,37 +383,38 @@ export default function SiteSettingsEditor({
           live here with the rest of the settings that feed both devices. */}
       {isSite && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
-          <p className="text-[11px] text-muted mb-2">
-            One set of groups, shown differently per device: on desktop they’re the categories
-            mega-menu (see the Desktop tab&rsquo;s Top Nav bar); on mobile they’re the labelled card
-            grid running down the home screen. Renaming or regrouping changes both.
-          </p>
-          <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+          <CollapsibleSection
+            title="Home page sections"
+            description="One set of groups, shown differently per device: on desktop they’re the categories mega-menu (see the Desktop tab’s Top Nav bar); on mobile they’re the labelled card grid running down the home screen. Renaming or regrouping changes both."
+            contentClassName="p-4"
+          >
+            <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+          </CollapsibleSection>
         </div>
       )}
 
       {isDesktop && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Top nav bar</h3>
-          <p className="text-[11px] text-muted mb-2">
-            The header&rsquo;s top-level items, desktop only — Categories, Map, and More by default.
-          </p>
-          <DesktopNavEditor
-            items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
-            onChange={(items) => set('desktopNavItems', items)}
-          />
+          <CollapsibleSection
+            title="Top nav bar"
+            description="The header’s top-level items, desktop only — Categories, Map, and More by default."
+            contentClassName="p-4"
+          >
+            <DesktopNavEditor
+              items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
+              onChange={(items) => set('desktopNavItems', items)}
+            />
+          </CollapsibleSection>
         </div>
       )}
 
       {isDesktop && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Hero</h3>
-          <p className="text-[11px] text-muted mb-2">
-            The warm band at the top of the desktop home screen — its own headline/subhead, separate
-            from mobile&rsquo;s heading (Mobile tab), plus the photo beside it.
-          </p>
-          <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+          <CollapsibleSection
+            title="Hero"
+            description="The warm band at the top of the desktop home screen — its own headline/subhead, separate from mobile’s heading (Mobile tab), plus the photo beside it."
+            contentClassName="p-4 space-y-3"
+          >
             <label className="block">
               <span className="block text-xs font-medium text-slate-700 mb-1">Headline</span>
               <input
@@ -497,18 +501,17 @@ export default function SiteSettingsEditor({
                 Leave blank to show a plain gradient instead of a photo.
               </span>
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
       )}
 
       {isDesktop && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Colors</h3>
-          <p className="text-[11px] text-muted mb-2">
-            The home screen&rsquo;s accent color — the eyebrows above each card, the hero band, and
-            the Davening/Shabbat cards&rsquo; call-to-action buttons.
-          </p>
-          <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+          <CollapsibleSection
+            title="Colors"
+            description="The home screen’s accent color — the eyebrows above each card, the hero band, and the Davening/Shabbat cards’ call-to-action buttons."
+            contentClassName="p-4 space-y-3"
+          >
             <div className="flex flex-wrap items-center gap-2">
               {DESKTOP_ACCENT_PRESETS.map((hex) => (
                 <button
@@ -539,29 +542,30 @@ export default function SiteSettingsEditor({
                 />
               </label>
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
       )}
 
       {isDesktop && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home screen cards</h3>
-          <p className="text-[11px] text-muted mb-2">
-            Categories &amp; Search, Davening Times, Update Listings, Map, Email Signup, and Jewish
-            Times — the desktop home screen&rsquo;s cards, in order. Rename each one&rsquo;s
-            eyebrow/heading, reorder, or remove it.
-          </p>
-          <DesktopTopicsManager
-            sections={sectionsDraft}
-            onChange={setSectionsAndClearNotice}
-            settings={draft}
-            onSettingChange={set}
-          />
+          <CollapsibleSection
+            title="Home screen cards"
+            description="Categories & Search, Davening Times, Update Listings, Map, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
+            contentClassName="p-4"
+          >
+            <DesktopTopicsManager
+              sections={sectionsDraft}
+              onChange={setSectionsAndClearNotice}
+              settings={draft}
+              onSettingChange={set}
+            />
+          </CollapsibleSection>
         </div>
       )}
 
       {isMobile && (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
+      <div className="max-w-2xl">
+      <CollapsibleSection title="Branding" description="Home screen heading and subhead." contentClassName="p-4 space-y-3">
         <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
           <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
@@ -579,43 +583,41 @@ export default function SiteSettingsEditor({
             Hero card.
           </span>
         </label>
+      </CollapsibleSection>
       </div>
       )}
 
       {isMobile && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Mobile tab bar</h3>
-          <p className="text-[11px] text-muted mb-2">
-            Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no
-            tab bar — it navigates by the top nav instead (Desktop tab).
-          </p>
-          <MobileTabsEditor
-            tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
-            onChange={(tabs) => set('mobileTabs', tabs)}
-          />
+          <CollapsibleSection
+            title="Mobile tab bar"
+            description="Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no tab bar — it navigates by the top nav instead (Desktop tab)."
+            contentClassName="p-4"
+          >
+            <MobileTabsEditor
+              tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}
+              onChange={(tabs) => set('mobileTabs', tabs)}
+            />
+          </CollapsibleSection>
         </div>
       )}
 
       {isSite && (
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl mt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <span className="block text-sm font-medium text-slate-800">Feedback form</span>
-            <span className="block text-[11px] text-muted mt-0.5">
-              The &ldquo;Send feedback&rdquo; link and form shown in the footer. Turn it off to remove it
-              from the site entirely.
-            </span>
-          </div>
-          <label className="inline-flex items-center gap-2 shrink-0 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={draft.feedbackEnabled}
-              onChange={(e) => set('feedbackEnabled', e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-            />
-            <span className="text-xs font-medium text-slate-700">Enabled</span>
-          </label>
-        </div>
+      <div className="max-w-2xl mt-6">
+      <CollapsibleSection
+        title="Feedback form"
+        description={`The “Send feedback” link and form shown in the footer. Currently ${draft.feedbackEnabled ? 'enabled' : 'disabled'}.`}
+        contentClassName="p-4 space-y-3"
+      >
+        <label className="inline-flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={draft.feedbackEnabled}
+            onChange={(e) => set('feedbackEnabled', e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+          />
+          <span className="text-xs font-medium text-slate-700">Enabled</span>
+        </label>
 
         {draft.feedbackEnabled && (
           <>
@@ -650,6 +652,7 @@ export default function SiteSettingsEditor({
             </label>
           </>
         )}
+      </CollapsibleSection>
       </div>
       )}
 

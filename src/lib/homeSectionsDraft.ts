@@ -5,7 +5,7 @@ async function patchSection(
   token: string,
   community: string,
   id: string,
-  patch: Partial<Pick<HomeSection, 'title' | 'cardIds' | 'sortOrder'>>,
+  patch: Partial<Pick<HomeSection, 'title' | 'cardIds' | 'sortOrder' | 'width'>>,
 ): Promise<HomeSection> {
   const res = await fetch(withCommunity(`/api/admin/home-sections/${id}`, community), {
     method: 'PATCH',
@@ -23,13 +23,16 @@ async function createSection(
   title: string,
   cardIds: string[],
   kind: HomeBlockKind,
+  width: 'full' | 'half',
 ): Promise<HomeSection> {
   // A built-in block's own title/cardIds are fixed server-side (see
-  // createHomeSection) — sent along anyway is harmless, just ignored.
+  // createHomeSection) — sent along anyway is harmless, just ignored. width
+  // isn't meaningful for a plain section (kind === 'section'), so it's only
+  // sent alongside kind.
   const res = await fetch(withCommunity('/api/admin/home-sections', community), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind }),
+    body: JSON.stringify(kind === 'section' ? { title, cardIds } : { kind, width }),
   })
   const body = await res.json()
   if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not create a section.')
@@ -45,10 +48,14 @@ async function deleteSection(token: string, community: string, id: string): Prom
   if (!res.ok || !body.ok) throw new Error(body.errors?.join(' ') || 'Could not delete a section.')
 }
 
-/** True if the two sections' saved fields (title/cardIds) differ — ignores
- *  sortOrder, which is reconciled separately (see below). */
+/** True if the two sections' saved fields (title/cardIds/width) differ —
+ *  ignores sortOrder, which is reconciled separately (see below). */
 function changed(original: HomeSection, draft: DraftHomeSection): boolean {
-  return original.title !== draft.title || JSON.stringify(original.cardIds) !== JSON.stringify(draft.cardIds)
+  return (
+    original.title !== draft.title ||
+    JSON.stringify(original.cardIds) !== JSON.stringify(draft.cardIds) ||
+    original.width !== draft.width
+  )
 }
 
 /** Reconciles the Home page tab's local, unsaved section draft against the
@@ -77,9 +84,11 @@ export async function saveHomeSections(
   for (const d of draft) {
     const existing = originalById.get(d.id)
     if (!existing) {
-      savedInOrder.push(await createSection(token, community, d.title, d.cardIds, d.kind))
+      savedInOrder.push(await createSection(token, community, d.title, d.cardIds, d.kind, d.width))
     } else if (changed(existing, d)) {
-      savedInOrder.push(await patchSection(token, community, d.id, { title: d.title, cardIds: d.cardIds }))
+      savedInOrder.push(
+        await patchSection(token, community, d.id, { title: d.title, cardIds: d.cardIds, width: d.width }),
+      )
     } else {
       savedInOrder.push(existing)
     }

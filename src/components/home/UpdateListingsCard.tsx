@@ -101,7 +101,7 @@ export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: stri
   const [contributeAction, setContributeAction] = useState<ContributeAction | null>(null)
 
   return (
-    <div className="my-12">
+    <div>
       <div className="@container flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-accent">{eyebrow}</p>
         <h3 className="mb-4 text-lg font-semibold text-slate-900">{heading}</h3>

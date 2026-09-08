@@ -84,7 +84,11 @@ export default function HomeSectionManager({
 
   function addSection() {
     if (!newTitle.trim()) return
-    onChange([...sectionEntries, { id: newDraftSectionId(), kind: 'section', title: newTitle.trim(), cardIds: [] }, ...builtInEntries])
+    onChange([
+      ...sectionEntries,
+      { id: newDraftSectionId(), kind: 'section', title: newTitle.trim(), cardIds: [], width: 'full' },
+      ...builtInEntries,
+    ])
     setNewTitle('')
   }
 

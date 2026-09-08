@@ -161,46 +161,37 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const sections = filtered ? groupCardsIntoSections(filtered, homeSections ?? []) : []
 
   // The desktop gateway's own block order (admin-editable — see
-  // HomeSectionManager/DesktopTopicsManager). Category sections don't
-  // interleave here — the flat "Browse everything" grid below shows every
-  // category on its own, ordered by this same `homeSections` list; this is
-  // just "which of the six singleton cards show, in what order".
+  // HomeSectionManager/DesktopTopicsManager's Home screen cards list).
+  // Category sections don't interleave here — the flat "Browse everything"
+  // grid below shows every category on its own, ordered by this same
+  // `homeSections` list; this is just "which of the six singleton cards
+  // show, in what order".
   //
-  // Each of the six kinds falls back to its own default position
-  // INDEPENDENTLY when this community has no row for that specific kind,
-  // rather than all-or-nothing: `missingDefaults` below only covers whatever
-  // kind is actually absent, appended after whatever IS configured (in its
-  // real saved order). This matters concretely, not just hypothetically —
-  // 'davening'/'listings'/'subscribe'/'jewishTimes' are new kinds as of this
-  // change, replacing 'zmanim'/'shabbat'/'featured'; a community that
-  // already has real 'browse'/'map' rows from before this change would, with
-  // a plain all-or-nothing fallback, lose all four new cards outright the
-  // moment this shipped — verified live against this project's own dev
-  // database, which already has 'browse'/'map' configured and nothing for
-  // the four new kinds. Independent fallback is what keeps them showing
-  // without needing every existing deployment reseeded first.
-  //
-  // Known, accepted tradeoff (same one this codebase already chose for
-  // 'browse'/'shabbat' before the pairs split further — see git history):
-  // there's no way to tell "this kind never had a row" from "an admin
-  // explicitly removed it" once at least one OTHER kind has a row, so
-  // Remove-ing a single card while others stay configured doesn't reliably
-  // stick — it can reappear at its default position on a later load. Given
-  // the choice between that and new cards silently vanishing from an
-  // already-customized site, this is the safer direction to be wrong in.
-  const DEFAULT_KIND_ORDER = ['browse', 'davening', 'listings', 'map', 'subscribe', 'jewishTimes'] as const
+  // All-or-nothing: the admin's Home screen cards list is the authoritative
+  // answer to what's on the page — the moment ANY row exists, this trusts
+  // that as the complete configured state, not "plus whatever else might be
+  // missing". An earlier version of this tried to independently default-fill
+  // any kind with no row of its own, reasoning that a community which had
+  // only ever configured 'browse'/'map' (true of this project's own dev
+  // database at the time) shouldn't lose the other four cards the moment
+  // they shipped as new kinds. That backfired in practice: it meant the
+  // admin's own list — showing just the cards it actually has rows for —
+  // stopped matching what the live site rendered at all, which is a worse
+  // failure than a temporary gap. Removing (or simply never adding) a card
+  // in the admin's list now reliably keeps it off the live site; a
+  // community with zero rows at all still gets the full default set, so a
+  // fresh community never launches blank.
   const configuredBuiltIns = (homeSections ?? [])
     .filter((s): s is typeof s & { kind: Exclude<HomeBlockKind, 'section'> } => s.kind !== 'section')
-    .map((s) => ({ kind: s.kind, title: s.title }))
-  const configuredKinds = new Set(configuredBuiltIns.map((b) => b.kind))
-  const missingDefaults = DEFAULT_KIND_ORDER.filter((k) => !configuredKinds.has(k)).map((kind) => ({
-    kind,
-    title: BUILT_IN_BLOCKS[kind].title,
-  }))
-  // When nothing's configured, configuredBuiltIns is empty and missingDefaults
-  // already IS the full default order (every kind is "missing") — so this
-  // single expression covers both cases without a separate branch.
-  const builtInOrder = [...configuredBuiltIns, ...missingDefaults]
+    .map((s) => ({ kind: s.kind, title: s.title, width: s.width }))
+  const builtInOrder =
+    configuredBuiltIns.length > 0
+      ? configuredBuiltIns
+      : (['browse', 'davening', 'listings', 'map', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+          kind,
+          title: BUILT_IN_BLOCKS[kind].title,
+          width: 'full' as const,
+        }))
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
@@ -367,17 +358,26 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         {/* ── The desktop gateway's six singleton cards — Categories &
                 Search, Davening Times, Update Listings, Map, Email Signup,
                 Jewish Times — in the admin-configured order (builtInOrder
-                above). Each is fully independent now (see homeSections.ts's
-                own doc on why the old Davening+Listings and
-                Subscribe+JewishTimes pairs split apart) and keeps only the
+                above), and now optionally paired side by side (see
+                homeSections.ts's own `width` doc). Each card keeps only the
                 gating it actually needs on its own merits — Davening Times
                 self-gates on having a minyanim-bearing category at all
                 (inside DaveningTimesCard), Jewish Times gates on a real
                 Zmanim pseudo-category existing (candle-lighting data has
                 nowhere to come from otherwise), and Update Listings/Email
-                Signup need neither. Only the SEQUENCE these render in is
-                data-driven instead of hardcoded. ───────────────────────── */}
-        {builtInOrder.map(({ kind }) => {
+                Signup need neither.
+
+                cardKindContent below returns just each card's own inner box
+                — no outer margin, no row wrapper — so the SAME content can
+                land either in its own full-width row or share a 2-column
+                row with a neighbor. Pairing happens AFTER gating: two
+                'half' cards are only paired if BOTH actually rendered
+                something (cardKindContent didn't return null) — a 'half'
+                card whose would-be partner is gated off that render (or is
+                itself the last card) falls back to a full-width row of its
+                own, so a lone half-width card never looks like a mistake. */}
+        {(() => {
+          function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
             // the WHOLE card, not just the grid below — search sits right
@@ -394,8 +394,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // own doc for why a small icon-avatar row instead of a full
             // photo tile is the fix for a list this long.
             return (
-              <section key="browse" className="mt-8 hidden desktop:block">
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+              <div className="hidden desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
                     {settings.desktopBrowseEyebrow}
                   </p>
@@ -418,8 +417,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                       />
                     </div>
                   )}
-                </div>
-              </section>
+              </div>
             )
           }
           if (kind === 'davening') {
@@ -430,13 +428,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // (returns null otherwise), which is the real requirement here.
             return (
               !isMobile && (
-                <div key="davening" className="my-12">
-                  <DaveningTimesCard
-                    coords={coords}
-                    eyebrow={settings.desktopDaveningEyebrow}
-                    heading={settings.desktopDaveningHeading}
-                  />
-                </div>
+                <DaveningTimesCard
+                  coords={coords}
+                  eyebrow={settings.desktopDaveningEyebrow}
+                  heading={settings.desktopDaveningHeading}
+                />
               )
             )
           }
@@ -446,7 +442,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // used to share a component (HomeBreak) with Davening Times.
             return !isMobile && (
               <UpdateListingsCard
-                key="listings"
                 eyebrow={settings.desktopListingsEyebrow}
                 heading={settings.desktopListingsHeading}
               />
@@ -458,7 +453,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // ShabbatTimesCard, not depend on it.
             return (
               !isMobile && (
-                <div key="subscribe" className="my-12 rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-6">
                   <SubscribeSection
                     bare
                     eyebrow={settings.desktopSubscribeEyebrow}
@@ -478,13 +473,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             return (
               !isMobile &&
               zmanimCategory && (
-                <div key="jewishTimes" className="my-12">
-                  <ShabbatTimesCard
-                    coords={coords ?? community.mapCenter}
-                    locationLabel={zmanimLocationLabel}
-                    heading={settings.desktopJewishTimesHeading}
-                  />
-                </div>
+                <ShabbatTimesCard
+                  coords={coords ?? community.mapCenter}
+                  locationLabel={zmanimLocationLabel}
+                  heading={settings.desktopJewishTimesHeading}
+                />
               )
             )
           }
@@ -514,8 +507,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // `fixed inset-0`, which escapes this ancestor's overflow/rounding
             // entirely regardless of what wraps it.
             return hasMap && (
-              <div key="map" ref={mapBandRef} className="mt-14 hidden scroll-mt-20 desktop:block">
-                <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
+              <div ref={mapBandRef} className="hidden scroll-mt-20 desktop:block overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
                   <div className="px-5 pt-5 pb-4">
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
                       {settings.desktopMapEyebrow}
@@ -548,12 +540,45 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                     // its own now — the wrapping card above already owns that.
                     <div className="h-[70vh] min-h-[420px] bg-slate-100" />
                   )}
-                </div>
               </div>
             )
           }
           return null
-        })}
+          }
+
+          // Pairing happens AFTER gating (see the comment above) — build the
+          // rendered, non-empty cards first, THEN walk them looking for two
+          // adjacent 'half' cards to combine into one row.
+          const renderedCards = builtInOrder
+            .map(({ kind, width }) => ({ kind, width, node: cardKindContent(kind) }))
+            .filter((c): c is typeof c & { node: React.ReactElement } => Boolean(c.node))
+
+          const rows: { key: string; node: React.ReactNode }[] = []
+          for (let i = 0; i < renderedCards.length; i++) {
+            const cur = renderedCards[i]!
+            const next = renderedCards[i + 1]
+            if (cur.width === 'half' && next?.width === 'half') {
+              rows.push({
+                key: `${cur.kind}-${next.kind}`,
+                node: (
+                  <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
+                    {cur.node}
+                    {next.node}
+                  </div>
+                ),
+              })
+              i++ // consumed both
+            } else {
+              rows.push({ key: cur.kind, node: cur.node })
+            }
+          }
+
+          return rows.map((row) => (
+            <div key={row.key} className="my-12">
+              {row.node}
+            </div>
+          ))
+        })()}
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search
                 narrows each section's cards and hides any section left

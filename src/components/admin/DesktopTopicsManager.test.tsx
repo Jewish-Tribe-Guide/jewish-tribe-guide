@@ -70,8 +70,8 @@ describe('DesktopTopicsManager', () => {
   // (reading 'title')" before this fix — BUILT_IN_BLOCKS has no entry for
   // a retired kind, and the component read its `.title` unconditionally.
   it('does not crash on a row whose kind predates the current six (e.g. the old "zmanim")', () => {
-    const legacy: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const legacy: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     expect(() => renderManager([legacy, map])).not.toThrow()
     expect(screen.getByText('Map Card')).toBeInTheDocument()
     expect(screen.queryByText('Zmanim & Shabbos')).not.toBeInTheDocument()
@@ -79,8 +79,8 @@ describe('DesktopTopicsManager', () => {
 
   it('leaves a legacy-kind row untouched when reordering/adding/removing another card', async () => {
     const user = userEvent.setup()
-    const legacy: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const legacy: DraftHomeSection = { id: 'zmanim', kind: 'zmanim' as DraftHomeSection['kind'], title: 'Zmanim & Shabbos', cardIds: [], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([legacy, map])
 
     await user.click(screen.getByRole('button', { name: /Add “Davening Times Card”/ }))
@@ -88,12 +88,35 @@ describe('DesktopTopicsManager', () => {
     expect(onChange).toHaveBeenCalledWith([
       legacy,
       map,
-      { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [] },
+      { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' },
     ])
   })
 
+  it('defaults to Full width selected, and clicking Half width calls onChange with the updated card', async () => {
+    const user = userEvent.setup()
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
+    const { onChange } = renderManager([map])
+
+    expect(screen.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Half width' })).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'Half width' }))
+
+    expect(onChange).toHaveBeenCalledWith([{ ...map, width: 'half' }])
+  })
+
+  it('shows a hint explaining pairing only once a card is set to Half width', async () => {
+    const user = userEvent.setup()
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
+    render(<ManagerHarness initialSections={[map]} />)
+
+    expect(screen.queryByText(/pairs with a neighboring half-width card/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Half width' }))
+    expect(screen.getByText(/pairs with a neighboring half-width card/i)).toBeInTheDocument()
+  })
+
   it('lists each configured card by its fixed admin label, with a description under it', () => {
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map', cardIds: [], width: 'full' }
     renderManager([map])
 
     expect(screen.getByText('Map Card')).toBeInTheDocument()
@@ -101,7 +124,7 @@ describe('DesktopTopicsManager', () => {
   })
 
   it('shows Eyebrow and Heading inputs for a card that has both, seeded from settings', () => {
-    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [] }
+    const davening: DraftHomeSection = { id: 'davening', kind: 'davening', title: 'Davening Times Card', cardIds: [], width: 'full' }
     renderManager([davening], vi.fn(), { ...SITE_SETTINGS_DEFAULTS, desktopDaveningEyebrow: 'Right now', desktopDaveningHeading: 'Next Minyan' })
 
     expect(screen.getByDisplayValue('Right now')).toBeInTheDocument()
@@ -112,7 +135,7 @@ describe('DesktopTopicsManager', () => {
   // computed Hebrew date + location, not static text worth overriding (see
   // CARD_META's own doc).
   it('shows only a Heading input for the Jewish Times card, no Eyebrow field', () => {
-    const jewishTimes: DraftHomeSection = { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', cardIds: [] }
+    const jewishTimes: DraftHomeSection = { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', cardIds: [], width: 'full' }
     renderManager([jewishTimes])
 
     expect(screen.getByText('Heading')).toBeInTheDocument()
@@ -121,7 +144,7 @@ describe('DesktopTopicsManager', () => {
 
   it('editing a card\'s Heading input calls onSettingChange with the right key', async () => {
     const user = userEvent.setup()
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     render(<ManagerHarness initialSections={[map]} />)
 
     const headingInput = screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopMapHeading)
@@ -132,7 +155,7 @@ describe('DesktopTopicsManager', () => {
   })
 
   it('offers "+ Add" only for cards missing from the list, one button per missing kind', () => {
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     renderManager([map])
 
     expect(screen.queryByRole('button', { name: /Add “Map Card”/ })).not.toBeInTheDocument()
@@ -146,12 +169,12 @@ describe('DesktopTopicsManager', () => {
 
     await user.click(screen.getByRole('button', { name: /Add “Map Card”/ }))
 
-    expect(onChange).toHaveBeenCalledWith([{ id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }])
+    expect(onChange).toHaveBeenCalledWith([{ id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }])
   })
 
   it('removing a card asks for confirmation and removes it', async () => {
     const user = userEvent.setup()
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([map])
 
     await user.click(screen.getByRole('button', { name: 'Remove' }))
@@ -163,7 +186,7 @@ describe('DesktopTopicsManager', () => {
   it('leaves the card alone when the remove confirmation is declined', async () => {
     vi.stubGlobal('confirm', vi.fn(() => false))
     const user = userEvent.setup()
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([map])
 
     await user.click(screen.getByRole('button', { name: 'Remove' }))
@@ -173,8 +196,8 @@ describe('DesktopTopicsManager', () => {
 
   it('moving a card swaps its position with its neighbor', async () => {
     const user = userEvent.setup()
-    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories and Search Card', cardIds: [] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Categories and Search Card', cardIds: [], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([browse, map])
 
     const downButtons = screen.getAllByRole('button', { name: /Move .* down/ })
@@ -187,8 +210,8 @@ describe('DesktopTopicsManager', () => {
   // HomeSectionManager) — this component must never touch or reorder them.
   it('leaves a plain section entry riding along in the draft completely untouched', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery'] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [] }
+    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Food', cardIds: ['grocery'], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Map Card', cardIds: [], width: 'full' }
     const { onChange } = renderManager([section, map])
 
     await user.click(screen.getByRole('button', { name: 'Remove' }))

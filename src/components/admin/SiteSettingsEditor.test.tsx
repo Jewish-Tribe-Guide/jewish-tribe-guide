@@ -69,6 +69,17 @@ async function renderEditor(
   await screen.findByRole('button', { name: 'Save changes' })
 }
 
+// Every settings block is a CollapsibleSection now, collapsed by default
+// (same "Show ▸ / Hide ▾" pattern as the Metrics tab's Sync Coverage report)
+// — a field inside one isn't in the document at all until its own section
+// is opened. Tests that need to read/type into a field open everything
+// first, same as an admin clicking through every "Show" on the page.
+async function openAllSections(user: ReturnType<typeof userEvent.setup>) {
+  for (const button of screen.getAllByRole('button', { name: /^Show / })) {
+    await user.click(button)
+  }
+}
+
 beforeEach(() => {
   vi.mocked(fetchJson).mockResolvedValue({ ok: true })
 })
@@ -80,23 +91,35 @@ afterEach(() => {
 })
 
 describe('SiteSettingsEditor — the Site tab', () => {
-  it('loads and shows the current branding fields', async () => {
+  it('loads and shows the current branding fields once its section is opened', async () => {
+    const user = userEvent.setup()
     await renderEditor('site', {
       ...SITE_SETTINGS_DEFAULTS,
       name: 'Test Directory',
       searchPlaceholder: 'Search — find what you need',
     })
+    await openAllSections(user)
 
     expect(screen.getByDisplayValue('Test Directory')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Search — find what you need')).toBeInTheDocument()
   })
 
-  it('Save/Cancel start disabled, and editing a field enables them', async () => {
+  // Every settings block starts collapsed — the Branding section title is
+  // the one thing that's always in the document.
+  it('every block starts collapsed, behind a "Show" button', async () => {
     await renderEditor('site')
+    expect(screen.getByText('Branding')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.name)).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Show / }).length).toBeGreaterThan(0)
+  })
+
+  it('Save/Cancel start disabled, and editing a field enables them', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site')
+    await openAllSections(user)
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeDisabled()
 
-    const user = userEvent.setup()
     await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.searchPlaceholder), '!')
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
@@ -105,6 +128,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('Cancel reverts an edited field back to the loaded value', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
+    await openAllSections(user)
 
     const nameInput = screen.getByDisplayValue('Original Name')
     await user.clear(nameInput)
@@ -118,6 +142,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('Save sends only the settings PATCH when only settings changed, and shows a saved notice', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
+    await openAllSections(user)
 
     const nameInput = screen.getByDisplayValue('Original Name')
     await user.clear(nameInput)
@@ -141,6 +166,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('toggling feedback off hides the feedback sub-fields', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })
+    await openAllSections(user)
 
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Enabled' }))
@@ -205,9 +231,11 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
   })
 
   it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {
+    const user = userEvent.setup()
     await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
-      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [] },
+      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [], width: 'full' },
     ])
+    await openAllSections(user)
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
   })
@@ -215,8 +243,10 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
 
 describe('SiteSettingsEditor — the Mobile tab', () => {
   it('shows the mobile tab bar editor and the home screen heading, not desktop-only fields', async () => {
+    const user = userEvent.setup()
     await renderEditor('mobile')
     expect(screen.getByText('Mobile tab bar')).toBeInTheDocument()
+    await openAllSections(user)
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.heroTitle)).toBeInTheDocument()
     expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
     expect(screen.queryByText('Top nav bar')).not.toBeInTheDocument()
