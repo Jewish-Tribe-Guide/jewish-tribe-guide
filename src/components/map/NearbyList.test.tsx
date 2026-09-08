@@ -112,9 +112,9 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
   })
 
   // The left avatar's own PinnedBadge (see GenericListingCard's identical
-  // treatment) — additive on top of the row's existing right-side category
-  // badge, which already draws its own separate 📌 overlay when pinned; a
-  // pinned row now shows the glyph twice, once per badge.
+  // treatment) — the row's right-side category badge used to draw its own
+  // separate 📌 overlay too, which repeated the same fact twice on one row;
+  // that overlay is gone now, so a pinned row shows the glyph exactly once.
   it('shows a pin badge on the left avatar only when the point is pinned', () => {
     renderWithProviders(
       <PinnedProvider>
@@ -129,6 +129,6 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
         <NearbyList points={[makePoint({ pinned: true })]} userLocation={null} onViewListing={vi.fn()} />
       </PinnedProvider>,
     )
-    expect(screen.getAllByText('📌')).toHaveLength(2)
+    expect(screen.getByText('📌')).toBeInTheDocument()
   })
 })

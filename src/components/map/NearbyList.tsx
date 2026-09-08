@@ -450,25 +450,16 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
             two (color/shape read faster than digits), same as the pin
             markers on the map themselves sit above their labels. */}
         <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
+          {/* No pinned sub-badge here any more — the row's own left avatar
+              (see the CategoryIcon/PinnedBadge pairing above) already shows
+              it, and duplicating it on this second, smaller badge too just
+              repeated the same fact twice on one row. */}
           <span
-            className="relative flex h-6 w-6 items-center justify-center rounded-full text-xs"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-xs"
             style={{ backgroundColor: categoryTint(p.color), color: p.color }}
             aria-hidden="true"
           >
             <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-3.5 w-3.5" />
-            {/* Same small badge, same blue, as the pinned marker gets on
-                the map itself (see ResourceMap's buildPin) — this row's
-                own category badge is the closest equivalent spot to
-                overlay it here, so "pinned" reads the same way in both
-                places. */}
-            {p.pinned && (
-              <span
-                className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white text-[8px] leading-none text-white"
-                style={{ backgroundColor: '#2563eb' }}
-              >
-                📌
-              </span>
-            )}
           </span>
           {p.miles !== null && (
             <span className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>
