@@ -10,11 +10,13 @@ import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import CategoryIcon from '@/components/CategoryIcon'
+import PinnedBadge from '@/components/PinnedBadge'
 import { ChevronLeftIcon, PencilIcon, FlagIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { usePinned } from '@/lib/pinnedContext'
 
 type Props = {
   item: DirectoryResource
@@ -40,6 +42,8 @@ type Props = {
 export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
+  const { isPinned } = usePinned()
+  const pinned = isPinned(item.id)
   const iconImageUrl =
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
@@ -96,14 +100,20 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
-        <CategoryIcon
-          icon={category.icon}
-          categoryId={category.id}
-          iconImageUrl={iconImageUrl}
-          color={color}
-          className="h-12 w-12 text-2xl self-start"
-          sizePx={48}
-        />
+        {/* Same PinnedBadge GenericListingCard/NearbyList put on their own
+            avatars — self-start moved to this wrapper so the badge can
+            anchor to the same box without disturbing the icon's position. */}
+        <span className="relative shrink-0 self-start">
+          <CategoryIcon
+            icon={category.icon}
+            categoryId={category.id}
+            iconImageUrl={iconImageUrl}
+            color={color}
+            className="h-12 w-12 text-2xl"
+            sizePx={48}
+          />
+          {pinned && <PinnedBadge />}
+        </span>
         {/* min-w-0 but deliberately NOT flex-1 — same reasoning as the
             address row further down (see PlaceDetailBody): sizing to its
             own text lets Pin sit right after the name, closer to where

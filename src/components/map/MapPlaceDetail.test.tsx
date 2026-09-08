@@ -77,6 +77,23 @@ describe('MapPlaceDetail', () => {
     expect(document.querySelector('[class*="-right-1.5"][class*="-top-1.5"]')).not.toBeInTheDocument()
   })
 
+  // Same PinnedBadge GenericListingCard/NearbyList put on their own avatars
+  // (see each file's identical test) — shows up here too now.
+  it('shows a pin badge on the header avatar once the listing is pinned', () => {
+    const category = makeCategory({ id: 'grocery', label: 'Grocery Store' })
+    const item = makeListing({ id: 'goldi-1', name: 'Goldi Market' })
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'goldi-1', categoryId: 'grocery' }]))
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    expect(screen.getByText('📌')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
   it('shows the same FreshnessFooter/Edit/Report bottom section the category directory\'s expanded card shows, plus a Pin/Share/Set location kebab in the header', async () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
