@@ -123,6 +123,27 @@ test.describe('URLs', () => {
     expect(response?.status()).toBe(404)
   })
 
+  test('a 404 under a known community offers a way back into it, not just "/"', async ({ page }) => {
+    // Before this, the 404 page's only link was "Go home" → "/", which for a
+    // non-default community lands somewhere else entirely. This resolves the
+    // attempted slug client-side against /api/communities (not-found.tsx gets
+    // no params to do it server-side) and, when it matches, offers a link
+    // back into that same community instead of a generic escape hatch.
+    const community = await defaultCommunity(page)
+
+    await page.goto(`/${community}/not-a-real-category`)
+
+    await expect(page.locator(`a[href="/${community}"]`)).toBeVisible()
+    await expect(page.locator(`a[href="/${community}/map"]`)).toBeVisible()
+  })
+
+  test('a 404 for an unknown community only offers the generic home link', async ({ page }) => {
+    await page.goto('/not-a-real-community')
+
+    await expect(page.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/')
+    await expect(page.locator('a[href="/not-a-real-community"]')).toHaveCount(0)
+  })
+
   test('the map carries its filters in the URL', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     // Needs a category that actually plots pins (categoryWithListings would
