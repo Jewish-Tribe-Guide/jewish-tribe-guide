@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
 import type { MapPoint } from './ResourceMap'
 import CategoryFilterControls, { activeFilterEntries, categoryHasFilterableFields } from './CategoryFilterControls'
-import { ChevronRightIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 
@@ -72,23 +72,22 @@ type Props = {
    *  reorders this row. See the `order` state below for why an ordinary tap
    *  on a chip already in the row must NOT do the same. */
   resortToken?: number
-  /** Desktop only: a round button pinned at the row's right edge that scrolls
-   *  it — replacing the browser's native (and here invisible, since
+  /** Desktop only: round buttons pinned at the row's left/right edges that
+   *  scroll it — replacing the browser's native (and here invisible, since
    *  `chip-scroll` hides the scrollbar) horizontal-scroll affordance with
-   *  something a visitor can actually see and click. Modeled directly on
-   *  Google Maps' own chip row (verified live, not from memory): a 32px
-   *  white circle, absolutely positioned OVER the row's right edge rather
-   *  than a flex sibling beside it — so it never changes, and can never
-   *  itself be changed by, the row's own layout width — and shown
-   *  unconditionally, whether or not the row actually has anything left to
-   *  scroll to. Google's own button stays visible and enabled even at a
-   *  width wide enough to fit every chip with room to spare; a first
-   *  attempt here tried to be "smarter" by only showing it when the row
-   *  measured as overflowing, which both didn't match Google and was the
-   *  root cause of a real bug (see CategoryFilter.test.tsx's own note on
-   *  the row-width feedback loop that caused). Not meaningful together with
-   *  `wrap` (the full-screen picker's own multi-line layout has no scroll
-   *  to reveal). */
+   *  something a visitor can actually see and click. Each side's button
+   *  only shows once there's actually somewhere left to scroll TO on that
+   *  side — hidden at the very start (nothing to scroll back to) and the
+   *  very end (nothing left to scroll forward to), the same pattern most
+   *  carousel components use. Both are absolutely positioned OVER the row
+   *  rather than flex siblings beside it, so showing/hiding either one can
+   *  never change the row's own layout width — which is what makes toggling
+   *  them safe: an earlier version reserved the right button's space as a
+   *  flex sibling instead, and mounting/unmounting it changed the row's own
+   *  width, which is exactly what decided whether to mount it — a feedback
+   *  loop that visually shook (see CategoryFilter.test.tsx's own note).
+   *  Not meaningful together with `wrap` (the full-screen picker's own
+   *  multi-line layout has no scroll to reveal). */
   scrollArrow?: boolean
 }
 
@@ -227,8 +226,31 @@ export default function CategoryFilter({
   // outside-click check below.
   const popupRef = useRef<HTMLDivElement>(null)
 
-  // `scrollArrow`'s own row ref, just to call `scrollBy` on click.
+  // `scrollArrow`'s own row ref, plus which of the two edge buttons are
+  // currently worth showing — recomputed on scroll (the row itself moving)
+  // and on resize (the row's own width, or its content, changing). Starts
+  // both false: the true starting state is measured on mount, in the effect
+  // below, before anything has necessarily painted with a wrong guess.
   const scrollRowRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  useEffect(() => {
+    if (!scrollArrow) return
+    const el = scrollRowRef.current
+    if (!el) return
+    const check = () => {
+      setCanScrollLeft(el.scrollLeft > 1)
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    }
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', check)
+      ro.disconnect()
+    }
+  }, [scrollArrow, optionIds])
 
   useEffect(() => {
     if (!openFilterFor) return
@@ -301,10 +323,10 @@ export default function CategoryFilter({
 
   const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
 
-  const scrollMore = () => {
+  const scrollByDirection = (dir: 1 | -1) => {
     const el = scrollRowRef.current
     if (!el) return
-    el.scrollBy({ left: el.clientWidth * 0.8, behavior: 'smooth' })
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
   }
 
   const row = (
@@ -313,7 +335,14 @@ export default function CategoryFilter({
       className={
         wrap
           ? 'flex flex-wrap items-center gap-1.5'
-          : `chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 ${scrollArrow ? 'pr-9' : ''}`
+          // Padding reserved on BOTH sides unconditionally, regardless of
+          // canScrollLeft/canScrollRight — same reasoning as the buttons
+          // themselves being absolutely positioned: if this padding came
+          // and went with the buttons' own visibility, the row's width (and
+          // therefore its own scroll bounds) would change depending on
+          // state, which is exactly the kind of self-referential loop that
+          // caused the shaking bug this file's tests document.
+          : `chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 ${scrollArrow ? 'pl-9 pr-9' : ''}`
       }
     >
       {/* Always resets to everything — there's no "hide everything" state
@@ -528,23 +557,36 @@ export default function CategoryFilter({
 
   if (!scrollArrow) return row
 
-  // Absolutely positioned OVER the row's right edge, not a flex sibling
-  // beside it — matching Google Maps' own button exactly (verified live:
-  // `position: absolute; right: 0; width/height: 32px; border-radius: 16px`).
-  // An overlay can never change the row's own layout width, so unlike a
-  // flex sibling it can be shown unconditionally (see the prop's own doc)
-  // without risking the row-width feedback loop that caused a real bug the
-  // first time this shipped as a space-reserving sibling instead.
+  // Each button is absolutely positioned OVER the row rather than a flex
+  // sibling beside it (matching Google Maps' own right-edge button exactly —
+  // verified live: `position: absolute; right: 0; width/height: 32px;
+  // border-radius: 16px`) — an overlay can never change the row's own
+  // layout width, which is what makes conditionally showing/hiding either
+  // one safe: an earlier version reserved the right button's space as a
+  // flex sibling instead, and mounting/unmounting it changed the row's own
+  // width, which is exactly what decided whether to mount it — a feedback
+  // loop that visually shook (see CategoryFilter.test.tsx's own note).
   return (
     <div className="relative">
       {row}
-      <button
-        onClick={scrollMore}
-        aria-label="Show more categories"
-        className="absolute right-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
-      >
-        <ChevronRightIcon className="h-4 w-4" />
-      </button>
+      {canScrollLeft && (
+        <button
+          onClick={() => scrollByDirection(-1)}
+          aria-label="Show earlier categories"
+          className="absolute left-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </button>
+      )}
+      {canScrollRight && (
+        <button
+          onClick={() => scrollByDirection(1)}
+          aria-label="Show more categories"
+          className="absolute right-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      )}
     </div>
   )
 }

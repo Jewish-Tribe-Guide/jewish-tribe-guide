@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeCategory } from '@/test/providerFixtures'
 import type { CategoryField } from '@/lib/categories'
@@ -168,44 +168,92 @@ describe('CategoryFilter', () => {
     })
   })
 
-  describe('scrollArrow (modeled directly on Google Maps\' own chip row)', () => {
-    // Verified live against the real Google Maps, not from memory: its
-    // button stays visible AND enabled even at a width wide enough to fit
-    // every chip with room to spare — it is not conditionally shown based on
-    // whether the row actually overflows. A first attempt here tried to be
-    // "smarter" by measuring overflow and only showing the button then,
-    // which both didn't match Google and caused a real bug: the button was
-    // conditionally MOUNTED, and mounting/unmounting a flex sibling changes
-    // how much width the row next to it has to lay out in, which changed the
-    // row's own scrollWidth/clientWidth, which is exactly what decided
-    // whether to mount the button — every ResizeObserver tick could flip the
-    // verdict, which visually read as the last chip and the arrow shaking
-    // back and forth. The fix (see CategoryFilter.tsx's own doc on
-    // `scrollArrow`) makes the button an absolutely-positioned overlay
-    // instead of a flex sibling, which is what makes showing it
-    // unconditionally safe: an overlay can't change the row's width no
-    // matter how it's toggled, so there's no longer a loop to have.
-    it('is present even when the row already fits everything, matching Google Maps\' own always-shown button', () => {
+  describe('scrollArrow (left/right buttons that hide at their own scroll bound)', () => {
+    // jsdom never lays anything out — scrollWidth/clientWidth are always 0
+    // and equal — so these stub the row's own layout getters to say
+    // whatever this test needs "this row is 300px of content in a 100px
+    // box, scrolled to X" to mean. scrollLeft itself is a real, plain
+    // jsdom-backed property (not layout-derived), so it's just set
+    // directly, then a real 'scroll' event is dispatched — the component
+    // listens for that natively (not via React's synthetic system), same
+    // as a real scroll gesture would fire it.
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (HTMLElement.prototype as any).scrollWidth
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (HTMLElement.prototype as any).clientWidth
+    })
+
+    function stubLayout(scrollWidth: number, clientWidth: number) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, value: scrollWidth })
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: clientWidth })
+    }
+
+    function scrollRowTo(row: Element, left: number) {
+      Object.defineProperty(row, 'scrollLeft', { configurable: true, value: left })
+      fireEvent.scroll(row)
+    }
+
+    // Modeled on the carousel pattern the user described (not what live
+    // testing against the real Google Maps turned up — see the discussion
+    // this replaced): each side's button only shows once there's actually
+    // somewhere to scroll TO on that side.
+    it('shows neither button when the row already fits everything', () => {
+      stubLayout(100, 100)
       render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      expect(screen.queryByRole('button', { name: 'Show earlier categories' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
+    })
+
+    it('shows only the right button at the very start of an overflowing row', () => {
+      stubLayout(300, 100)
+      render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      expect(screen.queryByRole('button', { name: 'Show earlier categories' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Show more categories' })).toBeInTheDocument()
     })
 
-    it('scrolls the row when clicked', async () => {
-      const user = userEvent.setup()
-      render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+    it('shows both buttons once scrolled away from the start but short of the end', () => {
+      stubLayout(300, 100)
+      const { container } = render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      scrollRowTo(container.querySelector('.chip-scroll')!, 100)
 
-      const button = screen.getByRole('button', { name: 'Show more categories' })
-      const scrollBy = vi.fn()
-      // jsdom has no real scroll implementation to observe — assert the
-      // component asked the row to scroll, not that any pixel moved.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(button.previousSibling as any).scrollBy = scrollBy
-
-      await user.click(button)
-      expect(scrollBy).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: 'Show earlier categories' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show more categories' })).toBeInTheDocument()
     })
 
-    it('is absent without scrollArrow', () => {
+    it('hides the right button once scrolled all the way to the end', () => {
+      stubLayout(300, 100)
+      const { container } = render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      scrollRowTo(container.querySelector('.chip-scroll')!, 200)
+
+      expect(screen.getByRole('button', { name: 'Show earlier categories' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
+    })
+
+    it('scrolls the row forward/backward when each button is clicked', async () => {
+      stubLayout(300, 100)
+      const user = userEvent.setup()
+      const { container } = render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      const row = container.querySelector('.chip-scroll')!
+      scrollRowTo(row, 100)
+
+      const scrollBy = vi.fn()
+      // jsdom has no real scroll implementation to observe — assert the
+      // component asked the row to scroll, and which way, not that any
+      // pixel moved.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(row as any).scrollBy = scrollBy
+
+      await user.click(screen.getByRole('button', { name: 'Show more categories' }))
+      expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ left: expect.any(Number) }))
+      expect(scrollBy.mock.calls[0]![0].left).toBeGreaterThan(0)
+
+      await user.click(screen.getByRole('button', { name: 'Show earlier categories' }))
+      expect(scrollBy.mock.calls[1]![0].left).toBeLessThan(0)
+    })
+
+    it('is absent without scrollArrow, even when the row would overflow', () => {
+      stubLayout(300, 100)
       render(<CategoryFilter {...baseProps()} />)
       expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
     })
