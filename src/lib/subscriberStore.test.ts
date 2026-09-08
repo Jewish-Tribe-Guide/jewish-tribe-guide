@@ -7,6 +7,7 @@ function chainable(result: unknown) {
     select: vi.fn(self),
     eq: vi.fn(self),
     or: vi.fn(self),
+    order: vi.fn(self),
     upsert: vi.fn(self),
     update: vi.fn(self),
     delete: vi.fn(self),
@@ -39,8 +40,15 @@ vi.mock('./supabase/admin', () => ({
   getAdminClient: () => ({ from: mockFrom }),
 }))
 
-const { createSubscriber, deleteSubscriberByToken, getSubscriberByToken, updateSubscriberByToken, listSubscribersForCategory } =
-  await import('./subscriberStore')
+const {
+  createSubscriber,
+  deleteSubscriberByToken,
+  getSubscriberByToken,
+  updateSubscriberByToken,
+  listSubscribersForCategory,
+  listSubscribers,
+  deleteSubscriberById,
+} = await import('./subscriberStore')
 
 afterEach(() => {
   mockFrom.mockReset()
@@ -270,5 +278,80 @@ describe('listSubscribersForCategory', () => {
     await expect(listSubscribersForCategory('philly', 'grocery', 'add')).rejects.toThrow(
       'Failed to load subscribers: boom',
     )
+  })
+})
+
+describe('listSubscribers', () => {
+  it('filters on the community and orders newest first, for the admin tab', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await listSubscribers('philly')
+
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
+    expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: false })
+  })
+
+  it('maps rows to Subscriber shape, including createdAt', async () => {
+    mockFrom.mockReturnValue(
+      chainable({
+        data: [
+          {
+            id: '1',
+            community_id: 'philly',
+            email: 'a@b.com',
+            categories: ['grocery'],
+            notify_add: true,
+            notify_closure: false,
+            unsubscribe_token: 'tok',
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        error: null,
+      }),
+    )
+
+    expect(await listSubscribers('philly')).toEqual([
+      {
+        id: '1',
+        communityId: 'philly',
+        email: 'a@b.com',
+        categories: ['grocery'],
+        notifyAdd: true,
+        notifyClosure: false,
+        unsubscribeToken: 'tok',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(listSubscribers('philly')).rejects.toThrow('Failed to load subscribers: boom')
+  })
+})
+
+describe('deleteSubscriberById', () => {
+  it('scopes the delete to both the community and the id', async () => {
+    const builder = chainable({ data: [{ id: '1' }], error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await deleteSubscriberById('philly', '1')
+
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
+    expect(builder.eq).toHaveBeenCalledWith('id', '1')
+  })
+
+  it('returns true when a row was actually removed, false when nothing matched', async () => {
+    mockFrom.mockReturnValue(chainable({ data: [{ id: '1' }], error: null }))
+    expect(await deleteSubscriberById('philly', '1')).toBe(true)
+
+    mockFrom.mockReturnValue(chainable({ data: [], error: null }))
+    expect(await deleteSubscriberById('philly', 'nope')).toBe(false)
+  })
+
+  it('throws with the Supabase error message on failure', async () => {
+    mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
+    await expect(deleteSubscriberById('philly', '1')).rejects.toThrow('Failed to remove subscriber: boom')
   })
 })

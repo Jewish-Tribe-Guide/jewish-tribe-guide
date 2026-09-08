@@ -32,6 +32,7 @@ export type AdminTab =
   | 'site'
   | 'desktop'
   | 'mobile'
+  | 'subscribers'
   | 'metrics'
   | 'team'
   | 'communities'
@@ -59,6 +60,9 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'desktop', href: `${base}/desktop`, label: 'Desktop' },
     { tab: 'mobile', href: `${base}/mobile`, label: 'Mobile' },
     { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+    // Category-subscription signups (SubscribeSection, desktop-only) — view
+    // + remove only, see SubscriberManager's own doc.
+    { tab: 'subscribers', href: `${base}/subscribers`, label: 'Subscribers' },
     // Every one of THIS community's own admins can reach this — see
     // /api/admin/team's own comment — unlike Communities below, which is
     // superadmin-only underneath.
