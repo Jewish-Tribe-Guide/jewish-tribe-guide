@@ -105,18 +105,29 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
         {showScreenHeader && screenHeader ? (
           <button
             onClick={screenHeader.onBack}
-            className="flex min-w-0 shrink items-center gap-2 cursor-pointer group text-left"
+            className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
           >
-            <svg
-              className="h-5 w-5 shrink-0 text-primary"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+            {/* Same h-9 w-9 footprint and gap-2.5 as the logo mark below, so
+                the title lands at the exact x-position it does on the home
+                screen — a visitor's eye doesn't have to re-find it after a
+                back-navigation. Circular chip (border + white fill + shadow),
+                not a bare icon: mirrors LocationControl's own pill on the
+                opposite side of this row, so the two ends of the header read
+                as a matched pair rather than one polished control and one
+                plain glyph — the same "circular back button" treatment apps
+                like WhatsApp use. */}
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white shadow-sm">
+              <svg
+                className="h-5 w-5 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </span>
             <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900">
               {screenHeader.title}
             </span>
