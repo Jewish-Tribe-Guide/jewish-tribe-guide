@@ -27,4 +27,19 @@ describe('SearchSection', () => {
 
     expect(onQueryChange).toHaveBeenCalledWith('g')
   })
+
+  // Regression coverage for Landing's merged "Browse everything" card, which
+  // already renders `heroTitle` as its OWN heading (with the section's usual
+  // eyebrow above it) before mounting this section `bare` — without
+  // `hideHeading`, that same string rendered a second time a few pixels
+  // lower, the one place on the home screen with three stacked headings
+  // instead of the eyebrow+title every other section uses.
+  it('omits its own heading when hideHeading is set, without losing the box itself', () => {
+    render(
+      <SearchSection heroTitle="What are you looking for?" query="" onQueryChange={vi.fn()} hideHeading />,
+    )
+
+    expect(screen.queryByRole('heading', { name: 'What are you looking for?' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Search resources')).toBeInTheDocument()
+  })
 })

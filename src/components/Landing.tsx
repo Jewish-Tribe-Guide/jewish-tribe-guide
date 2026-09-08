@@ -313,13 +313,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
-                "Browse everything" titles the WHOLE card now, not just the
+                `settings.heroTitle` titles the WHOLE card now, not just the
                 grid below — search sits right under that title as the first
-                thing in the section, its own "What are you looking for?"
-                heading intact (kept on purpose: the box read as bare without
-                it). `SearchSection` renders `bare` here (no card/section
-                shell of its own) so it mounts once, as a stable sibling of
-                the grid below, and never gets swapped out as a whole subtree
+                thing in the section. `SearchSection` renders `bare` here (no
+                card/section shell, and no heading of its own — `hideHeading`,
+                since this card's own heading right above it already says the
+                same thing) so it mounts once, as a stable sibling of the
+                grid below, and never gets swapped out as a whole subtree
                 when `q` changes — that would unmount the input mid-keystroke
                 and drop focus.
 
@@ -359,11 +359,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
             {/* Same amber eyebrow every other home-screen card now carries
                 ("Today", "Community run", "Discover nearby") — this was the
-                one section still missing it. */}
+                one section still missing it. The heading itself is
+                `settings.heroTitle` ("What are you looking for?" by default)
+                rather than a separate hardcoded "Browse Everything" — this
+                card used to stack an eyebrow, that hardcoded title, AND
+                SearchSection's own heroTitle heading, three lines where
+                every other section on this screen has two. `hideHeading`
+                below keeps SearchSection from rendering that same string a
+                second time, right underneath. */}
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Get started</p>
-            <h2 className="mb-6 text-lg font-semibold text-slate-900">Browse Everything</h2>
+            <h2 className="mb-6 text-lg font-semibold text-slate-900">{settings.heroTitle}</h2>
             <SearchSection
               bare
+              hideHeading
               heroTitle={settings.heroTitle}
               query={query}
               onQueryChange={setQuery}

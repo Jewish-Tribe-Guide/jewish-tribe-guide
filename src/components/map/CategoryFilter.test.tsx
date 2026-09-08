@@ -167,4 +167,52 @@ describe('CategoryFilter', () => {
       expect(screen.queryByRole('button', { name: 'Grocery filters' })).not.toBeInTheDocument()
     })
   })
+
+  describe('scrollArrow (desktop Google-Maps-style "show more" button)', () => {
+    // jsdom never actually lays anything out — scrollWidth/clientWidth are
+    // both always 0 — so the row's real overflow check needs the DOM's own
+    // getters stubbed to say "this row doesn't fit," the same way a real
+    // browser would once there are enough chips to scroll. Scoped to just
+    // this describe block and restored after, so it can't leak into any
+    // other test's layout measurements.
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (HTMLElement.prototype as any).scrollWidth
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (HTMLElement.prototype as any).clientWidth
+    })
+
+    function stubOverflow(overflowing: boolean) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, value: overflowing ? 300 : 100 })
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 100 })
+    }
+
+    it('is absent when the row fits without scrolling', () => {
+      stubOverflow(false)
+      render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
+    })
+
+    it('appears once the row actually overflows, and scrolls it when clicked', async () => {
+      stubOverflow(true)
+      const user = userEvent.setup()
+      render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+
+      const button = screen.getByRole('button', { name: 'Show more categories' })
+      const scrollBy = vi.fn()
+      // jsdom has no real scroll implementation to observe — assert the
+      // component asked the row to scroll, not that any pixel moved.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(button.previousSibling as any).scrollBy = scrollBy
+
+      await user.click(button)
+      expect(scrollBy).toHaveBeenCalledTimes(1)
+    })
+
+    it('is absent without scrollArrow, even when the row would overflow', () => {
+      stubOverflow(true)
+      render(<CategoryFilter {...baseProps()} />)
+      expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
+    })
+  })
 })

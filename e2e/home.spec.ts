@@ -11,7 +11,10 @@ import { defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 test.describe('home — Browse everything grid', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
 
-  test('collapses past four rows at whatever column count this width lays out, and "Show more" reveals the rest', async ({ page }) => {
+  test('collapses past four rows at whatever column count this width lays out, and "Show more" reveals the rest', async ({
+    page,
+    request,
+  }) => {
     // Narrow enough to force the grid's 3-column breakpoint, not its
     // widest (4) — the point is that the collapse adapts to the ACTUAL
     // column count, not that four rows happens to hold everything at one
@@ -22,12 +25,20 @@ test.describe('home — Browse everything grid', () => {
     await dismissLocationPrompt(page)
     await ready(page)
 
-    const heading = page.getByRole('heading', { name: 'Browse Everything' })
+    // The card's heading is `settings.heroTitle`, admin-editable — not a
+    // hardcoded "Browse Everything" (see Landing.tsx's own comment on why
+    // that string is gone). Read it from the real site instead of
+    // hardcoding it here too.
+    const { settings } = await (await request.get(`/api/site-settings?community=${community}`)).json()
+    const heading = page.getByRole('heading', { level: 2, name: settings.heroTitle })
     await expect(heading).toBeVisible()
     const grid = heading.locator('..').locator('.grid').first()
     await expect(grid).toBeVisible()
 
-    const showMore = page.getByRole('button', { name: 'Show more' })
+    // Exact: the embedded map's own chip row (further down this same page)
+    // has an unrelated "Show more categories" button once its categories
+    // overflow — a substring match on "Show more" would catch both.
+    const showMore = page.getByRole('button', { name: 'Show more', exact: true })
     // This community's own category count decides whether four rows'
     // worth even needs collapsing at this width — skip rather than fail
     // if it doesn't, since the point is the mechanism, not this fixture

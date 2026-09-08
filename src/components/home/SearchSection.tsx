@@ -43,6 +43,7 @@ export default function SearchSection({
   onViewMap,
   results,
   bare = false,
+  hideHeading = false,
 }: {
   heroTitle: string
   query: string
@@ -67,6 +68,14 @@ export default function SearchSection({
    *  wants this mounted as a stable sibling inside it, not swapped in and out
    *  as a whole tree (which would remount the input and drop focus mid-type). */
   bare?: boolean
+  /** Landing's merged "Browse everything" card already renders `heroTitle`
+   *  as ITS OWN heading (left-aligned, with the section's usual eyebrow
+   *  above it) — so this section's normal heading would just repeat that
+   *  same text a few pixels lower, the one place on the home screen with
+   *  three stacked headings instead of the eyebrow+title every other
+   *  section uses. Only meaningful together with `bare`; the un-merged card
+   *  this section renders on its own has no other heading to defer to. */
+  hideHeading?: boolean
 }) {
   if (!ui.search.landing) return null
 
@@ -79,7 +88,7 @@ export default function SearchSection({
           Centering the heading and button along with it keeps the whole
           card reading as one composed unit instead of a wide box with a
           small thing floating in its corner. */}
-      <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>
+      {!hideHeading && <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>}
       <div className="mx-auto max-w-[480px]">
         <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
       </div>

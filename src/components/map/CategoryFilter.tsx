@@ -72,6 +72,15 @@ type Props = {
    *  reorders this row. See the `order` state below for why an ordinary tap
    *  on a chip already in the row must NOT do the same. */
   resortToken?: number
+  /** Desktop only: a round chevron button pinned at the row's right edge,
+   *  matching Google Maps' own chip row, that scrolls it — replacing the
+   *  browser's native (and here invisible, since `chip-scroll` hides the
+   *  scrollbar) horizontal-scroll affordance with something a visitor can
+   *  actually see and click. Only renders once the row genuinely overflows
+   *  its container, so a short row with nothing to scroll to gets nothing
+   *  extra. Not meaningful together with `wrap` (the full-screen picker's
+   *  own multi-line layout has no scroll to reveal). */
+  scrollArrow?: boolean
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
@@ -98,6 +107,7 @@ export default function CategoryFilter({
   pinnedChip,
   pinnedOn,
   resortToken,
+  scrollArrow,
 }: Props) {
   // Mobile keeps the original, simpler chip: a filter segment only shows up
   // once something's already active (spelled out, e.g. "IKC"), and tapping
@@ -208,6 +218,24 @@ export default function CategoryFilter({
   // outside-click check below.
   const popupRef = useRef<HTMLDivElement>(null)
 
+  // `scrollArrow`'s own row ref + whether it's currently worth rendering the
+  // button at all — a row that already fits everything has nowhere to
+  // scroll TO, so the button would be a dead click. Rechecked on resize and
+  // whenever the chip set itself changes (a category being added/hidden can
+  // flip either way), not just once on mount.
+  const scrollRowRef = useRef<HTMLDivElement>(null)
+  const [canScrollRow, setCanScrollRow] = useState(false)
+  useEffect(() => {
+    if (!scrollArrow) return
+    const el = scrollRowRef.current
+    if (!el) return
+    const check = () => setCanScrollRow(el.scrollWidth > el.clientWidth + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [scrollArrow, optionIds])
+
   useEffect(() => {
     if (!openFilterFor) return
     function handleClick(e: MouseEvent | TouchEvent) {
@@ -279,8 +307,17 @@ export default function CategoryFilter({
 
   const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
 
-  return (
-    <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
+  const scrollMore = () => {
+    const el = scrollRowRef.current
+    if (!el) return
+    el.scrollBy({ left: el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  const row = (
+    <div
+      ref={scrollArrow ? scrollRowRef : undefined}
+      className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}
+    >
       {/* Always resets to everything — there's no "hide everything" state
           left to toggle to (unclicking the last chip already resets here,
           see `toggle` in ResourceMapView), so this reads as a single "All"
@@ -488,6 +525,25 @@ export default function CategoryFilter({
           ⋯ More
         </button>
       )}
+    </div>
+  )
+
+  if (!scrollArrow || !canScrollRow) return row
+
+  // Sits OUTSIDE the scrollable row, not as its last chip — so it stays put
+  // at the row's right edge as a fixed, always-reachable "there's more"
+  // button rather than scrolling away with everything else the moment it's
+  // clicked once.
+  return (
+    <div className="flex items-center gap-1.5">
+      {row}
+      <button
+        onClick={scrollMore}
+        aria-label="Show more categories"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+      >
+        <ChevronRightIcon className="h-4 w-4" />
+      </button>
     </div>
   )
 }

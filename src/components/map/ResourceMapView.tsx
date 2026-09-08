@@ -1414,6 +1414,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onToggleSelectValue={toggleSelectValue}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
+      scrollArrow
     />
   )
 
