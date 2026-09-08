@@ -193,6 +193,31 @@ describe('CategoryFilter', () => {
       expect(screen.queryByRole('button', { name: 'Show more categories' })).not.toBeInTheDocument()
     })
 
+    // Regression test for a real bug found in a real browser (jsdom can't
+    // reproduce the actual feedback loop — see below): the button used to be
+    // conditionally MOUNTED, not just hidden. Mounting/unmounting it changes
+    // how much width its sibling row has to lay out in, which changes the
+    // row's own scrollWidth/clientWidth, which is exactly what decides
+    // whether the button mounts — so adding it could shrink the row into
+    // overflowing and removing it could shrink it back out, forever. Every
+    // ResizeObserver tick flipped the verdict, which visually read as the
+    // last chip and the arrow shaking back and forth. The fix keeps the
+    // button always mounted (reserving its layout space via `shrink-0`
+    // regardless of state) and only toggles `invisible`/`aria-hidden` —
+    // neither of which changes layout, so the row's own width, and the
+    // verdict measured from it, can no longer depend on the button's own
+    // visibility. This asserts the structural half of that fix (always
+    // mounted); the actual thrashing loop needs a real browser's layout
+    // engine to reproduce and isn't covered here.
+    it('stays mounted (just hidden) rather than unmounting when the row fits — so it can never itself change the row width it measures', () => {
+      stubOverflow(false)
+      const { container } = render(<CategoryFilter {...baseProps({ scrollArrow: true })} />)
+      const button = container.querySelector('[aria-label="Show more categories"]')
+      expect(button).not.toBeNull()
+      expect(button).toHaveAttribute('aria-hidden', 'true')
+      expect(button).toHaveClass('invisible')
+    })
+
     it('appears once the row actually overflows, and scrolls it when clicked', async () => {
       stubOverflow(true)
       const user = userEvent.setup()

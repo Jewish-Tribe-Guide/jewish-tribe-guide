@@ -528,19 +528,34 @@ export default function CategoryFilter({
     </div>
   )
 
-  if (!scrollArrow || !canScrollRow) return row
+  if (!scrollArrow) return row
 
   // Sits OUTSIDE the scrollable row, not as its last chip — so it stays put
   // at the row's right edge as a fixed, always-reachable "there's more"
   // button rather than scrolling away with everything else the moment it's
   // clicked once.
+  //
+  // Always MOUNTED (space reserved via `shrink-0`), only ever toggled
+  // `invisible` — not conditionally rendered. This button sits beside the
+  // row it measures, so mounting/unmounting it changes how much width the
+  // row itself has to lay out in, which changes its own scrollWidth/
+  // clientWidth, which is exactly what the effect above reacts to: adding
+  // the button could shrink the row into overflowing, and removing it could
+  // shrink it back out of overflowing, forever. `invisible` keeps its
+  // layout space constant regardless of `canScrollRow`, so the row's own
+  // width — and therefore the overflow verdict — never depends on whether
+  // this button happens to be showing right now.
   return (
     <div className="flex items-center gap-1.5">
       {row}
       <button
         onClick={scrollMore}
         aria-label="Show more categories"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+        aria-hidden={!canScrollRow}
+        tabIndex={canScrollRow ? 0 : -1}
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer ${
+          canScrollRow ? '' : 'invisible pointer-events-none'
+        }`}
       >
         <ChevronRightIcon className="h-4 w-4" />
       </button>
