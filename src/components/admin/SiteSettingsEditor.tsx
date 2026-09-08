@@ -36,7 +36,12 @@ const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
 function sectionsEqual(a: DraftHomeSection[], b: DraftHomeSection[]): boolean {
-  const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds }) => ({ id, title, cardIds }))
+  // Every field saveHomeSections actually persists (see its own `changed()`)
+  // has to be listed here too — width was added to DraftHomeSection for the
+  // side-by-side card layout and left out of this strip, so flipping a
+  // card's Full/Half toggle never marked the form dirty and Save stayed
+  // disabled.
+  const strip = (s: DraftHomeSection[]) => s.map(({ id, title, cardIds, width }) => ({ id, title, cardIds, width }))
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 

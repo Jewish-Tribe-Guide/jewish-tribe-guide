@@ -239,6 +239,23 @@ describe('SiteSettingsEditor — the Desktop tab', () => {
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
   })
+
+  // Regression: sectionsEqual's own strip() left `width` out of the fields
+  // it compares, so flipping a card between Full and Half width changed
+  // sectionsDraft but never made `dirty` true — Save stayed disabled and the
+  // toggle silently didn't persist.
+  it('toggling a card between Full and Half width enables Save', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
+      { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 0, cardIds: [], width: 'full' },
+    ])
+    await openAllSections(user)
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Half width' }))
+
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+  })
 })
 
 describe('SiteSettingsEditor — the Mobile tab', () => {
