@@ -57,6 +57,26 @@ describe('MapPlaceDetail', () => {
     expect(link).toHaveAttribute('href', '/test-community/grocery/goldi-market-abc123')
   })
 
+  // Regression: the header avatar used to overlay a small category-glyph
+  // badge on its own corner whenever a real photo was showing (see git
+  // history) — removed at the user's request, so a photo avatar here now
+  // renders as a plain circle with nothing else drawn on top of it.
+  it('shows the photo avatar with no category-glyph corner badge on top of it', () => {
+    const category = makeCategory({ id: 'grocery', label: 'Grocery Store' })
+    const item = makeListing({ name: 'Goldi Market', photo: 'https://example.com/goldi.jpg' })
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    // Not getByRole('img') — CategoryIcon's photo has alt="" (decorative),
+    // which drops it from the accessibility tree's img role entirely.
+    expect(document.querySelector('img')).toBeInTheDocument()
+    expect(document.querySelector('[class*="-right-1.5"][class*="-top-1.5"]')).not.toBeInTheDocument()
+  })
+
   it('shows the same FreshnessFooter/Edit/Report bottom section the category directory\'s expanded card shows, plus a Pin/Share/Set location kebab in the header', async () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
