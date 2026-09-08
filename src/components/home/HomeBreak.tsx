@@ -45,18 +45,14 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
     <button
       onClick={onClick}
       aria-label={short}
-      // Blue (primary), not amber: these three buttons DO something — the
-      // eyebrow label and background above stay amber for the same "warm
-      // home screen" look, but an actionable button is exactly the case
-      // where the app's one "this is clickable" signal (bg-primary/
-      // text-primary everywhere else — the header, Add, Subscribe) needs to
-      // stay a single, unambiguous color rather than competing with a second
-      // one that means something else (amber is this app's caveat/verify-
-      // this tone in Chip and AddressPrompt) or nothing at all.
+      // --color-accent, matching the home screen's own warm palette (eyebrow
+      // labels, card backgrounds, Subscribe) — not blue, which is reserved
+      // for every OTHER screen's interactive color. See SubscribeSection's
+      // own note on this same split.
       className={
         primary
-          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90'
-          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5'
+          ? 'inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-dark'
+          : 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-accent/25 bg-white px-4 py-2.5 text-sm font-semibold text-accent-dark transition-colors hover:bg-accent/10'
       }
     >
       {icon}
@@ -140,7 +136,7 @@ export default function HomeBreak({
           same content, so the card fills its box instead of floating a
           short block inside a tall one. */}
       <div className="@container flex flex-col rounded-2xl border border-slate-200 bg-white p-7">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">Community run</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-accent">Community run</p>
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Kept by the Community</h3>
         <p className="mb-6 text-sm leading-relaxed text-muted">
           A few admin volunteers keep the lights on, but every listing, correction, and update mostly comes
@@ -154,9 +150,7 @@ export default function HomeBreak({
         {settings.feedbackEnabled && (
           <p className="mt-6 text-xs text-muted">
             Notice something else, or have general feedback about the site?{' '}
-            {/* Blue, same reasoning as the three buttons above — this is a
-                click target, not a label. */}
-            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-primary hover:underline">
+            <button onClick={() => setFeedbackOpen(true)} className="cursor-pointer font-semibold text-accent-dark hover:underline">
               Send a note →
             </button>
           </p>

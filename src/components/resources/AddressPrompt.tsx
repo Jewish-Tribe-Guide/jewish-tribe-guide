@@ -11,7 +11,7 @@ export default function AddressPrompt() {
   return (
     <button
       onClick={handleClick}
-      className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 hover:border-amber-300 active:bg-amber-200 transition-colors cursor-pointer"
+      className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/10 px-2.5 py-1.5 text-xs font-medium text-caution hover:bg-caution/20 hover:border-caution/45 active:bg-caution/30 transition-colors cursor-pointer"
     >
       <span aria-hidden="true">📍</span>
       Set location to see distances

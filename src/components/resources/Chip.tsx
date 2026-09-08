@@ -14,7 +14,7 @@ export type ChipSize = 'header' | 'expanded'
 const TONE_BASE: Record<ChipTone, string> = {
   slate: 'bg-slate-100 text-slate-600 border-slate-200',
   slateMuted: 'bg-slate-100 text-slate-500 border-slate-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
+  amber: 'bg-caution/10 text-caution border-caution/30',
   green: 'bg-green-50 text-green-700 border-green-200',
   greenSolid: 'bg-green-600 text-white border-green-600',
   // Matches the "Permanently closed" badge PlaceDetailBody already renders, so
@@ -26,7 +26,7 @@ const TONE_BASE: Record<ChipTone, string> = {
 const TONE_HOVER: Record<ChipTone, string> = {
   slate: 'hover:bg-slate-200 active:bg-slate-300',
   slateMuted: 'hover:bg-slate-200 active:bg-slate-300',
-  amber: 'hover:bg-amber-100 active:bg-amber-200',
+  amber: 'hover:bg-caution/20 active:bg-caution/30',
   green: 'hover:bg-green-100 active:bg-green-200',
   greenSolid: 'hover:bg-green-700 active:bg-green-800',
   red: 'hover:bg-red-100 active:bg-red-200',

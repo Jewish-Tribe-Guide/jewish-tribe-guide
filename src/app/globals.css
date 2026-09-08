@@ -64,8 +64,21 @@ html {
      --color-primary-dark derives from whatever primary ends up being. */
   --color-primary: #1d4ed8;
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
-  --color-accent: #d97706;
-  --color-accent-dark: #b45309;
+  /* The home screen's own warmth — eyebrows, the hero, HomeBreak/Subscribe's
+     CTAs. Matches those components' own literal amber-700/800 exactly, now
+     named instead of duplicated as raw Tailwind classes at each call site. */
+  --color-accent: #b45309;
+  --color-accent-dark: #92400e;
+  /* A second, distinct warm color for "verify this" — kosher cert caveats,
+     the "sometimes in stock" tags, the "set location" prompt. Deliberately
+     NOT the same value as --color-accent: this app's home screen already
+     uses warm gold decoratively, and reusing that exact color for a
+     safety-relevant caveat (is this actually kosher-certified?) would dilute
+     the one thing that color is supposed to signal there. Chosen close to
+     this app's real error/closed color (red-700, #b91c1c) without landing on
+     it — darker and less saturated, so it reads as "check this," not
+     "something broke". */
+  --color-caution: #962319;
   /* Plain slate-50. Tried tinting this with a few percent of the community's
      brand color to make the page feel less neutral; at desktop widths, where
      a lot of the surface shows at once, it read as the whole site having gone

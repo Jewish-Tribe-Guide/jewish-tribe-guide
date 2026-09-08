@@ -1975,7 +1975,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </button>
           </div>
           {draftNoneSelected && (
-            <p className="shrink-0 px-4 pb-2 text-xs text-amber-600">
+            <p className="shrink-0 px-4 pb-2 text-xs text-caution">
               Select at least one category to see results.
             </p>
           )}

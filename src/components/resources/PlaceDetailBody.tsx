@@ -254,7 +254,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         cls:
           closure === 'permanent'
             ? 'bg-red-50 text-red-700 border-red-200'
-            : 'bg-amber-50 text-amber-700 border-amber-200',
+            : 'bg-caution/10 text-caution border-caution/30',
       }
     : null
   // Gated on placeId, not just the timestamp: a listing whose Google match
@@ -472,7 +472,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         ]}
       </ClampedChipRow>
       {tagsSometimes.length > 0 && (
-        <p className="text-[11px] text-amber-700 desktop:hidden">~not always in stock — call ahead</p>
+        <p className="text-[11px] text-caution desktop:hidden">~not always in stock — call ahead</p>
       )}
     </div>
   )
@@ -526,7 +526,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const caveatSection = caveatNotes.length > 0 && (
     <div className="space-y-1">
       {caveatNotes.map(({ f, note }) => (
-        <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
+        <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-caution">
           {note || 'Not everything here is kosher — please verify.'}
         </p>
       ))}
