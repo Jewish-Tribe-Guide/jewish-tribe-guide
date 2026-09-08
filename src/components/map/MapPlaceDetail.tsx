@@ -114,18 +114,19 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           />
           {pinned && <PinnedBadge />}
         </span>
-        {/* min-w-0 but deliberately NOT flex-1 — same reasoning as the
-            address row further down (see PlaceDetailBody): sizing to its
-            own text lets Pin sit right after the name, closer to where
-            "I'm here" sits relative to the address below it, rather than
-            pinned to the row's far right edge regardless of how short the
-            name is.
+        {/* min-w-0 flex-1 — the kebab used to sit right after the name
+            (back when this spot held a text-label Pin button, short and
+            meant to read as part of the name line) instead of at the row's
+            far edge. Now that it's an icon-only overflow menu, the far edge
+            is the more standard spot for it (same trailing placement the
+            directory card's own kebab already uses) — flex-1 here is what
+            pushes it there regardless of how short the name is.
             No top padding either — self-start on the icon above already
             puts its top edge flush with this block's, i.e. with the name's
             first line. A pt would reintroduce exactly the few-pixel gap
             that made the icon and the name look unaligned in the first
             place. */}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold leading-tight text-slate-900">
             <Link href={listingPath} className="hover:underline">
               {item.name}
@@ -141,7 +142,11 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             there's no separate Share button in the footer below any more,
             and PlaceDetailBody's own address row has no SetLocationButton
             either. */}
-        <ListingActionsMenu item={item} category={category} path={listingPath} />
+        {/* align="end" — this sheet is edge-to-edge on mobile, so the
+            default rightward-opening menu would run straight off-screen
+            from a kebab already flush against the edge. See
+            ListingActionsMenu's own doc on `align`. */}
+        <ListingActionsMenu item={item} category={category} path={listingPath} align="end" />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way

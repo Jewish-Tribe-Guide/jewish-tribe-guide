@@ -31,10 +31,10 @@ vi.mock('@/lib/locationContext', async () => {
   return { ...actual, useOptionalLocation: vi.fn() }
 })
 
-function renderMenu(overrides: Partial<Parameters<typeof makeListing>[0]> = {}) {
+function renderMenu(overrides: Partial<Parameters<typeof makeListing>[0]> = {}, align?: 'start' | 'end') {
   const item = makeListing({ id: 'listing-1', name: 'Goldi Market', ...overrides })
   const category = makeCategory()
-  renderWithProviders(<ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" />)
+  renderWithProviders(<ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" align={align} />)
   return { item, category }
 }
 
@@ -90,6 +90,21 @@ describe('ListingActionsMenu', () => {
     const menu = screen.getByRole('menu')
     expect(menu).toHaveClass('left-0')
     expect(menu).not.toHaveClass('right-0')
+  })
+
+  // MapPlaceDetail's kebab sits flush against the edge of an edge-to-edge
+  // mobile sheet — align="end" is what keeps a 160px-wide menu from running
+  // off the right side of the screen there (see this component's own doc on
+  // `align`).
+  it('opens extending left of the kebab (right-anchored) when align="end"', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu({}, 'end')
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    const menu = screen.getByRole('menu')
+    expect(menu).toHaveClass('right-0')
+    expect(menu).not.toHaveClass('left-0')
   })
 
   it('closes the menu on an outside click', async () => {

@@ -26,10 +26,21 @@ export default function ListingActionsMenu({
   item,
   category,
   path,
+  align = 'start',
 }: {
   item: DirectoryResource
   category: CategoryConfig
   path: string
+  /** Which edge of the kebab the dropdown's own edge lines up with —
+   *  'start' (the default) anchors the menu's left edge to the kebab's
+   *  left, extending rightward toward open space; 'end' anchors the menu's
+   *  right edge instead, extending leftward. Callers with room to their
+   *  right (GenericListingCard's card, ListingDetailModal's dialog) use the
+   *  default; MapPlaceDetail's kebab sits flush against the edge of a
+   *  narrow, edge-to-edge mobile sheet, where 'start' would push a 160px
+   *  menu straight off the right side of the screen — 'end' keeps it over
+   *  the open space between the name and the kebab instead. */
+  align?: 'start' | 'end'
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -89,11 +100,10 @@ export default function ListingActionsMenu({
         <div
           role="menu"
           onClick={(e) => e.stopPropagation()}
-          // left-0, not right-0: the kebab sits at the card's own right
-          // edge, so anchoring the menu's right edge to it (the original
-          // build) made it extend back over the name/address/chevron. Left-
-          // anchored, it extends toward the card's outer edge instead.
-          className="absolute left-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+          // See `align`'s own doc above for why this isn't hardcoded to one
+          // direction — it depends on which side of the kebab actually has
+          // room.
+          className={`absolute top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg ${align === 'end' ? 'right-0' : 'left-0'}`}
         >
           {/* ui.map.pins is the same flag the map's own pin filter chip and
               (formerly) PinButton respected — the original build of this
