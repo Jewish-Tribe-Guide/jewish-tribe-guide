@@ -12,6 +12,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
+import PinnedBadge from '@/components/PinnedBadge'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
@@ -22,6 +23,7 @@ import { PencilIcon, FlagIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { usePinned } from '@/lib/pinnedContext'
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
 
@@ -195,6 +197,8 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const isMobile = useIsMobile()
   // The Share path ListingActionsMenu's kebab needs.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
+  const { isPinned } = usePinned()
+  const pinned = isPinned(item.id)
 
   const fields = category.detailFields
   // Per-category capabilities layered under the global `ui.contributions` switches.
@@ -534,13 +538,20 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               couple pixels: the name's own line-height leaves a little
               leading above the visible text, so even with matching box tops
               the glyph itself starts lower than the icon. */}
-          <CategoryIcon
-            icon={category.icon}
-            categoryId={category.id}
-            iconImageUrl={iconImageUrl}
-            color={color}
-            className="h-10 w-10 text-xl self-start mt-0.5"
-          />
+          {/* self-start/mt-0.5 moved to this wrapper (was on CategoryIcon
+              itself) so the badge below can anchor to the same box without
+              disturbing the icon's own position in the row — see the
+              comment above for what those two classes are actually doing. */}
+          <span className="relative shrink-0 self-start mt-0.5">
+            <CategoryIcon
+              icon={category.icon}
+              categoryId={category.id}
+              iconImageUrl={iconImageUrl}
+              color={color}
+              className="h-10 w-10 text-xl"
+            />
+            {pinned && <PinnedBadge />}
+          </span>
 
           {/* Name + subtitle + an optional one-line "what this place is" note
               — badges get their own full-width row below (see badge row

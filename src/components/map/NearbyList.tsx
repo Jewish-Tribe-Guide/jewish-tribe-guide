@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
+import PinnedBadge from '@/components/PinnedBadge'
 import { ExternalIcon, PinIcon } from '@/components/icons'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint } from '@/lib/categoryColor'
@@ -405,18 +406,25 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           disabled={!canViewListing}
           className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
         >
-          <CategoryIcon
-            icon={p.glyph ?? '📍'}
-            categoryId={p.filterId}
-            iconImageUrl={
-              (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
-                ? (p.raw[PHOTO_FIELD_KEY] as string)
-                : p.glyphSrc) ?? undefined
-            }
-            color={p.color}
-            className="h-9 w-9 text-lg"
-            sizePx={36}
-          />
+          {/* Same PinnedBadge the category page's card puts on its own
+              avatar (see GenericListingCard) — the right-side category
+              badge further down keeps its own separate, smaller pin overlay
+              untouched; this is purely additive on the left icon. */}
+          <span className="relative shrink-0">
+            <CategoryIcon
+              icon={p.glyph ?? '📍'}
+              categoryId={p.filterId}
+              iconImageUrl={
+                (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
+                  ? (p.raw[PHOTO_FIELD_KEY] as string)
+                  : p.glyphSrc) ?? undefined
+              }
+              color={p.color}
+              className="h-9 w-9 text-lg"
+              sizePx={36}
+            />
+            {p.pinned && <PinnedBadge />}
+          </span>
           <span className="min-w-0 flex-1">
             <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
               {p.name}

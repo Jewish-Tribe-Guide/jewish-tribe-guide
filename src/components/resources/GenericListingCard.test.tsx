@@ -217,6 +217,30 @@ describe('GenericListingCard — collapsed', () => {
     // alone shouldn't also toggle the row.
     expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
   })
+
+  // PinnedBadge on the avatar — same treatment NearbyList's own left icon
+  // gets (see that file's identical test).
+  it('shows a pin badge on the avatar only once the listing is pinned', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'listing-1', categoryId: 'grocery' }]))
+    const category = makeCategory({ id: 'grocery' })
+    const item = makeListing({ id: 'listing-1', name: 'Acme Grocery' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('📌')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it('shows no pin badge for an unpinned listing', () => {
+    const category = makeCategory()
+    const item = makeListing({ name: 'Acme Grocery' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+  })
 })
 
 describe('GenericListingCard — showInHeader text/textarea fields', () => {
