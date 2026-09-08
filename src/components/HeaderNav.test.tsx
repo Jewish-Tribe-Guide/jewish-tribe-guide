@@ -160,6 +160,35 @@ describe('HeaderNav — More', () => {
     expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.feedbackHeading })).toBeInTheDocument()
   })
 
+  it('renders an admin-configured nav — a renamed top-level link, and a custom label on a More sub-item', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<HeaderNav />, {
+      content: {
+        categories: [grocery, mapCategory],
+        settings: {
+          ...SITE_SETTINGS_DEFAULTS,
+          desktopNavItems: [
+            { id: 'map', label: 'Find on map', kind: 'link', target: 'map' },
+            {
+              id: 'more',
+              label: 'More',
+              kind: 'more-menu',
+              items: [{ id: 'about', label: 'Who we are', kind: 'link', target: 'about' }],
+            },
+          ],
+        },
+      },
+    })
+
+    // The Categories item was left out of this admin config entirely — it
+    // shouldn't render just because categories exist.
+    expect(screen.queryByRole('button', { name: /Categories/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Find on map' })).toHaveAttribute('href', '/test-community/map')
+
+    await user.click(screen.getByRole('button', { name: /More/ }))
+    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/about')
+  })
+
   it('hides the feedback item when an admin has turned feedback off', async () => {
     const user = userEvent.setup()
     renderWithProviders(<HeaderNav />, {

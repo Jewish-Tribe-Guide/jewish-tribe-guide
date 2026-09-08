@@ -13,14 +13,24 @@ import { useActiveCommunity } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import HomeSectionManager, { useCardOptions } from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
+import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
-import { DEFAULT_MOBILE_TABS, FEATURED_CARD_COUNT } from '@/lib/siteSettings'
+import {
+  DEFAULT_MOBILE_TABS,
+  DEFAULT_DESKTOP_NAV_ITEMS,
+  DESKTOP_ACCENT_PRESETS,
+  FEATURED_CARD_COUNT,
+} from '@/lib/siteSettings'
 
-// ── The Home page tab: the header/hero/footer branding text (name, tagline,
-// heading, mission, logo), the home-screen section grouping, and the footer's
-// feedback form — laid out in the same top-to-bottom order they appear on the
-// actual home page. Everything here is a draft, batched into the one shared
-// Save changes button — nothing goes live until you save. Mounted on /admin.
+// ── One component, three tabs — Site (shared), Desktop, Mobile — sharing a
+// single draft and Save button so switching tabs never silently drops a
+// half-finished edit (see SiteSettingsLayout, which mounts this once and
+// passes `section`). Site carries the branding shared by both devices (name,
+// mission, logo, search placeholder), the home-screen section grouping, and
+// the feedback form. Desktop carries the top nav, the home screen's cards
+// and their order, the Browse card's own eyebrow/heading, the hero band, and
+// the accent color. Mobile carries the home screen heading, the tagline, and
+// the bottom tab bar. Nothing goes live until you save.
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
@@ -35,17 +45,14 @@ export default function SiteSettingsEditor({
   section,
 }: {
   token: string
-  /** Which admin tab is rendering this. Both tabs share one component instance
-   *  (see AdminTabs) so the draft and the single Save button survive switching
-   *  between them — a half-finished home screen edit isn't silently dropped
-   *  because you stepped over to fix the tagline. */
-  section: 'site' | 'home'
+  /** Which admin tab is rendering this. All three tabs share one component
+   *  instance (see AdminTabs) so the draft and the single Save button
+   *  survive switching between them — a half-finished edit on one tab isn't
+   *  silently dropped because you stepped over to another. */
+  section: 'site' | 'desktop' | 'mobile'
 }) {
-  // Which device's home screen is being edited. Not persisted — it's a lens on
-  // the same draft, not a setting.
   // Which community the preview should open — the one the console is editing.
   const { community } = useActiveCommunity()
-  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [draft, setDraft] = useState<SiteSettings | null>(null)
   const [sections, setSections] = useState<HomeSection[] | null>(null)
@@ -56,6 +63,8 @@ export default function SiteSettingsEditor({
   const [previewing, setPreviewing] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
+  const [uploadingHeroImage, setUploadingHeroImage] = useState(false)
+  const [heroImageError, setHeroImageError] = useState<string | null>(null)
 
   // The preview iframe is genuinely navigable (real `src` mode — see
   // DevicePreviewFrame), so its own link clicks add entries to the tab's
@@ -152,6 +161,31 @@ export default function SiteSettingsEditor({
     }
   }
 
+  // Same shape as uploadLogo above — uploads to storage and drops the
+  // resulting public URL onto the draft's desktopHeroImage, batched into the
+  // normal Save changes flow rather than taking effect immediately. Alt text
+  // isn't touched here — it's a separate field the admin fills in themselves,
+  // since a filename can't describe what's in the photo.
+  async function uploadHeroImage(file: File) {
+    setHeroImageError(null)
+    setUploadingHeroImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const json = await fetchJson<{ url: string }>(
+        '/api/admin/site-settings/hero-image',
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData },
+        'Upload failed.',
+      )
+      setDraft((d) => (d ? { ...d, desktopHeroImage: { url: json.url, alt: d.desktopHeroImage?.alt ?? '' } } : d))
+      setSavedNotice(false)
+    } catch (err) {
+      setHeroImageError(err instanceof Error ? err.message : 'Upload failed.')
+    } finally {
+      setUploadingHeroImage(false)
+    }
+  }
+
   function setSectionsAndClearNotice(next: DraftHomeSection[]) {
     setSectionsDraft(next)
     setSavedNotice(false)
@@ -213,7 +247,7 @@ export default function SiteSettingsEditor({
         onClose={closePreview}
         // Open on whichever device is being edited, so Preview answers the
         // question actually being asked. Still switchable inside the preview.
-        initialDevice={section === 'home' ? device : 'desktop'}
+        initialDevice={section === 'mobile' ? 'mobile' : 'desktop'}
       />
     )
   }
@@ -222,41 +256,37 @@ export default function SiteSettingsEditor({
     !settings || JSON.stringify(settings) !== JSON.stringify(draft) || !sections || !sectionsEqual(sections, sectionsDraft)
 
   const isSite = section === 'site'
+  const isDesktop = section === 'desktop'
+  const isMobile = section === 'mobile'
 
   return (
     <div>
-      {isSite ? (
+      {isSite && (
         <p className="text-sm text-muted mb-4">
-          Everything that feeds both desktop and mobile — the branding, the home screen heading and
-          mission, the section groups, and the feedback form. The pieces that exist on only one of
-          the two are on the Desktop &amp; mobile tab. Nothing goes live until you click Save
-          changes below.
+          Everything that feeds both desktop and mobile — the branding, the mission, the section
+          groups, the search placeholder, and the feedback form. The pieces that exist on only one
+          device are on the Desktop or Mobile tab. Nothing goes live until you click Save changes
+          below.
         </p>
-      ) : (
+      )}
+      {isDesktop && (
         <p className="text-sm text-muted mb-4">
-          The parts that exist on only one device. Everything shared by both — headings, sections,
-          branding — is on the Site tab. Nothing goes live until you click Save changes below.
+          Everything that exists on desktop only — the top nav, the home screen&rsquo;s cards and
+          their order, the hero band, and the accent color. Everything shared by both devices —
+          branding, sections, search placeholder — is on the Site tab. Nothing goes live until you
+          click Save changes below.
+        </p>
+      )}
+      {isMobile && (
+        <p className="text-sm text-muted mb-4">
+          Everything that exists on mobile only — the home screen heading, the tagline, and the
+          bottom tab bar. Everything shared by both devices is on the Site tab. Nothing goes live
+          until you click Save changes below.
         </p>
       )}
 
       {error && (
         <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>
-      )}
-
-      {!isSite && (
-        <div className="mb-5 inline-flex gap-0.5 rounded-md border border-slate-300 p-0.5">
-          {(['desktop', 'mobile'] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDevice(d)}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer ${
-                device === d ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {d === 'desktop' ? '🖥️ Desktop' : '📱 Mobile'}
-            </button>
-          ))}
-        </div>
       )}
 
       {isSite && (
@@ -267,22 +297,24 @@ export default function SiteSettingsEditor({
           <span className="block text-[11px] text-muted mt-1">Shown in the header and footer.</span>
         </label>
         <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
-          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">Shown under the site name in the header.</span>
-        </label>
-        <label className="block">
-          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
-          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
-          <span className="block text-[11px] text-muted mt-1">
-            The big heading on mobile; labels the search box on desktop, where the site name leads instead.
-          </span>
-        </label>
-        <label className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Mission</span>
           <textarea rows={2} value={draft.mission} onChange={(e) => set('mission', e.target.value)} className={inputClass} />
           <span className="block text-[11px] text-muted mt-1">
-            Shown under the home screen heading, and reused as the footer blurb.
+            Shown under the home screen heading on mobile, and reused as the footer blurb and
+            &lt;meta description&gt;. Desktop has its own separate headline/subhead — see the Desktop
+            tab&rsquo;s Hero card.
+          </span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Search placeholder</span>
+          <input
+            value={draft.searchPlaceholder}
+            onChange={(e) => set('searchPlaceholder', e.target.value)}
+            className={inputClass}
+          />
+          <span className="block text-[11px] text-muted mt-1">
+            The example text inside the search box, on both devices — e.g. &ldquo;Search — kosher
+            food, mikvah, shuls, schools…&rdquo;. Worth updating when the category list changes.
           </span>
         </label>
         <div className="block">
@@ -353,26 +385,49 @@ export default function SiteSettingsEditor({
         <div className="mt-6 max-w-2xl">
           <h3 className="text-sm font-semibold text-slate-800 mb-1">Home page sections</h3>
           <p className="text-[11px] text-muted mb-2">
-            One set of groups, shown differently per device: on desktop they’re the nav tabs across
-            the top and the All categories page they open; on mobile they’re the labelled card grid
-            running down the home screen. Renaming or regrouping changes both.
+            One set of groups, shown differently per device: on desktop they’re the categories
+            mega-menu (see the Desktop tab&rsquo;s Top Nav bar); on mobile they’re the labelled card
+            grid running down the home screen. Renaming or regrouping changes both.
           </p>
           <HomeSectionManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
         </div>
       )}
 
-      {!isSite && device === 'desktop' && (
+      {isDesktop && (
         <div className="mt-6 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">Desktop topics</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Top nav bar</h3>
           <p className="text-[11px] text-muted mb-2">
-            Popular right now, Explore the map, and Zmanim &amp; Shabbos — the desktop home screen&rsquo;s
-            three topic blocks. Rename, reorder, or remove any of them.
+            The header&rsquo;s top-level items, desktop only — Categories, Map, and More by default.
           </p>
-          <DesktopTopicsManager sections={sectionsDraft} onChange={setSectionsAndClearNotice} />
+          <DesktopNavEditor
+            items={draft.desktopNavItems.length > 0 ? draft.desktopNavItems : DEFAULT_DESKTOP_NAV_ITEMS}
+            onChange={(items) => set('desktopNavItems', items)}
+          />
         </div>
       )}
 
-      {!isSite && device === 'desktop' && (
+      {isDesktop && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Home screen cards</h3>
+          <p className="text-[11px] text-muted mb-2">
+            Browse &amp; search, Popular right now, Explore the map, Davening Times, and Shabbat
+            Times — the desktop home screen&rsquo;s cards, in order. Rename, reorder, or remove any
+            of them.
+          </p>
+          <DesktopTopicsManager
+            sections={sectionsDraft}
+            onChange={setSectionsAndClearNotice}
+            browseCopy={{
+              eyebrow: draft.desktopBrowseEyebrow,
+              heading: draft.desktopBrowseHeading,
+              onEyebrowChange: (value) => set('desktopBrowseEyebrow', value),
+              onHeadingChange: (value) => set('desktopBrowseHeading', value),
+            }}
+          />
+        </div>
+      )}
+
+      {isDesktop && (
         <div className="mt-6 max-w-2xl">
           <h3 className="text-sm font-semibold text-slate-800 mb-1">Featured cards</h3>
           <p className="text-[11px] text-muted mb-2">
@@ -386,12 +441,172 @@ export default function SiteSettingsEditor({
         </div>
       )}
 
-      {!isSite && device === 'mobile' && (
+      {isDesktop && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Hero</h3>
+          <p className="text-[11px] text-muted mb-2">
+            The warm band at the top of the desktop home screen — its own headline/subhead, separate
+            from mobile&rsquo;s heading (Mobile tab), plus the photo beside it.
+          </p>
+          <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Headline</span>
+              <input
+                value={draft.desktopHeroHeadline}
+                onChange={(e) => set('desktopHeroHeadline', e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Subhead</span>
+              <textarea
+                rows={2}
+                value={draft.desktopHeroSubhead}
+                onChange={(e) => set('desktopHeroSubhead', e.target.value)}
+                className={inputClass}
+              />
+              <span className="block text-[11px] text-muted mt-1">Optional — leave blank to show the headline alone.</span>
+            </label>
+            <div className="block">
+              <span className="block text-xs font-medium text-slate-700 mb-1">Photo</span>
+              <div className="flex items-center gap-3">
+                {draft.desktopHeroImage?.url && (
+                  <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded-md">
+                    <Image
+                      src={draft.desktopHeroImage.url}
+                      alt={draft.desktopHeroImage.alt || 'Hero photo preview'}
+                      fill
+                      sizes="64px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <label className="shrink-0 text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer">
+                  {uploadingHeroImage ? 'Uploading…' : 'Upload image'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) uploadHeroImage(file)
+                    }}
+                    disabled={uploadingHeroImage}
+                    className="hidden"
+                  />
+                </label>
+                {draft.desktopHeroImage?.url && (
+                  <button
+                    type="button"
+                    onClick={() => set('desktopHeroImage', null)}
+                    className="shrink-0 text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {heroImageError && <span className="block text-[11px] text-red-600 mt-1">{heroImageError}</span>}
+              <label className="block mt-2">
+                <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
+                <input
+                  value={draft.desktopHeroImage?.url ?? ''}
+                  onChange={(e) => {
+                    const url = e.target.value.trim()
+                    set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
+                  }}
+                  placeholder="https://…"
+                  className={inputClass}
+                />
+              </label>
+              <label className="block mt-2">
+                <span className="block text-[11px] text-muted mb-1">Alt text (describe the photo)</span>
+                <input
+                  value={draft.desktopHeroImage?.alt ?? ''}
+                  onChange={(e) => {
+                    const alt = e.target.value
+                    if (draft.desktopHeroImage) set('desktopHeroImage', { ...draft.desktopHeroImage, alt })
+                  }}
+                  disabled={!draft.desktopHeroImage?.url}
+                  className={inputClass}
+                />
+              </label>
+              <span className="block text-[11px] text-muted mt-1">
+                Leave blank to show a plain gradient instead of a photo.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDesktop && (
+        <div className="mt-6 max-w-2xl">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Colors</h3>
+          <p className="text-[11px] text-muted mb-2">
+            The home screen&rsquo;s accent color — the eyebrows above each card, the hero band, and
+            the Davening/Shabbat cards&rsquo; call-to-action buttons.
+          </p>
+          <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {DESKTOP_ACCENT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  onClick={() => set('desktopAccentColor', hex)}
+                  aria-label={`Use ${hex}`}
+                  aria-pressed={draft.desktopAccentColor.toLowerCase() === hex.toLowerCase()}
+                  className={`h-8 w-8 rounded-full border-2 cursor-pointer ${
+                    draft.desktopAccentColor.toLowerCase() === hex.toLowerCase() ? 'border-slate-900' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: hex }}
+                />
+              ))}
+              <label className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={/^#[0-9a-f]{6}$/i.test(draft.desktopAccentColor) ? draft.desktopAccentColor : '#b45309'}
+                  onChange={(e) => set('desktopAccentColor', e.target.value)}
+                  className="h-8 w-8 cursor-pointer rounded border border-slate-300 p-0"
+                  aria-label="Custom color"
+                />
+                <input
+                  value={draft.desktopAccentColor}
+                  onChange={(e) => set('desktopAccentColor', e.target.value)}
+                  placeholder="#b45309"
+                  className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMobile && (
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 max-w-2xl">
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Home screen heading</span>
+          <input value={draft.heroTitle} onChange={(e) => set('heroTitle', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">
+            The big heading at the top of the mobile home screen. Desktop has its own separate hero
+            headline — see the Desktop tab&rsquo;s Hero card.
+          </span>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-slate-700 mb-1">Tagline</span>
+          <input value={draft.tagline} onChange={(e) => set('tagline', e.target.value)} className={inputClass} />
+          <span className="block text-[11px] text-muted mt-1">
+            Not currently shown anywhere on the site — kept here in case that changes.
+          </span>
+        </label>
+      </div>
+      )}
+
+      {isMobile && (
         <div className="mt-6 max-w-2xl">
           <h3 className="text-sm font-semibold text-slate-800 mb-1">Mobile tab bar</h3>
           <p className="text-[11px] text-muted mb-2">
             Rename, reorder, add, or remove the tabs along the bottom of the screen. Desktop has no
-            tab bar — it navigates by the section tabs above instead.
+            tab bar — it navigates by the top nav instead (Desktop tab).
           </p>
           <MobileTabsEditor
             tabs={draft.mobileTabs ?? DEFAULT_MOBILE_TABS}

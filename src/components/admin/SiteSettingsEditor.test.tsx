@@ -52,7 +52,11 @@ function mockLoad(settings: typeof SITE_SETTINGS_DEFAULTS, sections: HomeSection
   })
 }
 
-async function renderEditor(section: 'site' | 'home', settings = SITE_SETTINGS_DEFAULTS, sections: HomeSection[] = []) {
+async function renderEditor(
+  section: 'site' | 'desktop' | 'mobile',
+  settings = SITE_SETTINGS_DEFAULTS,
+  sections: HomeSection[] = [],
+) {
   mockLoad(settings, sections)
   const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
   renderWithProviders(<SiteSettingsEditor token="tok" section={section} />, {
@@ -61,7 +65,7 @@ async function renderEditor(section: 'site' | 'home', settings = SITE_SETTINGS_D
   })
   // "Save changes" always renders once the draft has loaded, regardless of
   // which tab — the Site tab's own name field (used as the loaded-signal
-  // everywhere else) doesn't exist on the "home" tab.
+  // everywhere else) doesn't exist on the other two tabs.
   await screen.findByRole('button', { name: 'Save changes' })
 }
 
@@ -77,10 +81,14 @@ afterEach(() => {
 
 describe('SiteSettingsEditor — the Site tab', () => {
   it('loads and shows the current branding fields', async () => {
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' })
+    await renderEditor('site', {
+      ...SITE_SETTINGS_DEFAULTS,
+      name: 'Test Directory',
+      searchPlaceholder: 'Search — find what you need',
+    })
 
     expect(screen.getByDisplayValue('Test Directory')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Find what you need')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Search — find what you need')).toBeInTheDocument()
   })
 
   it('Save/Cancel start disabled, and editing a field enables them', async () => {
@@ -89,7 +97,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
     expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeDisabled()
 
     const user = userEvent.setup()
-    await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.tagline), '!')
+    await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.searchPlaceholder), '!')
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   })
@@ -175,20 +183,33 @@ describe('SiteSettingsEditor — the Site tab', () => {
   })
 })
 
-describe('SiteSettingsEditor — the Desktop & mobile tab', () => {
-  it('shows the featured-cards picker on desktop by default', async () => {
-    await renderEditor('home')
+describe('SiteSettingsEditor — the Desktop tab', () => {
+  it('shows the featured-cards picker, the top nav editor, and the hero/colors cards', async () => {
+    await renderEditor('desktop')
     expect(screen.getByText('Featured cards')).toBeInTheDocument()
     expect(screen.getByText('Slot 1')).toBeInTheDocument()
+    expect(screen.getByText('Top nav bar')).toBeInTheDocument()
+    expect(screen.getByText('Hero')).toBeInTheDocument()
+    expect(screen.getByText('Colors')).toBeInTheDocument()
+    // Mobile-only fields don't leak onto this tab.
+    expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
   })
 
-  it('switches to the mobile tab bar editor when Mobile is selected', async () => {
-    const user = userEvent.setup()
-    await renderEditor('home')
+  it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {
+    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
+      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [] },
+    ])
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
+  })
+})
 
-    await user.click(screen.getByRole('button', { name: /Mobile/ }))
-
+describe('SiteSettingsEditor — the Mobile tab', () => {
+  it('shows the mobile tab bar editor and the home screen heading, not desktop-only fields', async () => {
+    await renderEditor('mobile')
     expect(screen.getByText('Mobile tab bar')).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.heroTitle)).toBeInTheDocument()
     expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
+    expect(screen.queryByText('Top nav bar')).not.toBeInTheDocument()
   })
 })

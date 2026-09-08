@@ -46,7 +46,84 @@ export type SiteSettings = {
    *  DEFAULT_MOBILE_TABS, so this never has to be configured. Desktop has no
    *  tab bar and ignores this entirely. */
   mobileTabs: MobileTabConfig[]
+  /** The search box's placeholder text, on both devices — e.g. "Search —
+   *  kosher food, mikvah, shuls, schools…". Shared rather than split per
+   *  device: it's describing the same search to the same content. */
+  searchPlaceholder: string
+  /** Desktop only — the header's top-level nav items (Categories / Map /
+   *  More, by default), in order. Empty falls back to
+   *  DEFAULT_DESKTOP_NAV_ITEMS. Mobile has no top nav and ignores this. */
+  desktopNavItems: DesktopNavItem[]
+  /** Desktop only — the small amber-ish eyebrow above the Browse/Search
+   *  card's heading (e.g. "Get started"). */
+  desktopBrowseEyebrow: string
+  /** Desktop only — the Browse/Search card's own heading. Was the same
+   *  field as `heroTitle` (mobile's big heading); now separate so the two
+   *  can read differently even though they're describing the same search. */
+  desktopBrowseHeading: string
+  /** Desktop only — the warm hero band's bold headline. */
+  desktopHeroHeadline: string
+  /** Desktop only — the smaller supporting line under the headline. Empty
+   *  renders the headline alone. */
+  desktopHeroSubhead: string
+  /** Desktop only — the hero band's photo. Null shows the CSS gradient
+   *  placeholder instead. */
+  desktopHeroImage: { url: string; alt: string } | null
+  /** Desktop only — the home screen's accent color (eyebrows, the hero
+   *  band, HomeBreak/Subscribe's CTAs), as a 6-digit hex. Lighter/darker
+   *  shades used alongside it are derived from this one value. */
+  desktopAccentColor: string
 }
+
+/** One entry in the desktop header's top nav, or in the "More" panel it can
+ *  nest one level of. */
+export type DesktopNavItem = {
+  /** Stable key — kept across renames/reorders so a rename can't read as
+   *  "removed then added". */
+  id: string
+  label: string
+  /** 'categories-menu' is the one fixed built-in — the mega-menu driven by
+   *  Home page sections, always the same panel, can't point anywhere else.
+   *  'more-menu' opens a small nested list of its own 'link' items (`items`
+   *  below). Anything else is a plain 'link'. */
+  kind: 'categories-menu' | 'more-menu' | 'link'
+  /** Only for kind 'link': a built-in destination (see
+   *  BUILT_IN_DESKTOP_LINK_TARGETS) or a CardDef id (category slug / form
+   *  id), same targets a mobile tab or featured-card slot can point at. */
+  target?: string
+  /** Only for kind 'more-menu': its own ordered sub-items, each kind
+   *  'link' (never nested further). */
+  items?: DesktopNavItem[]
+}
+
+/** The desktop nav's built-in link destinations — whole app screens/actions
+ *  rather than one category. 'map' is hidden when the community has no Map
+ *  pseudo-category, same gating the mobile tab bar and the old hardcoded nav
+ *  already applied. 'feedback' opens the feedback modal instead of
+ *  navigating. */
+export const BUILT_IN_DESKTOP_LINK_TARGETS = ['map', 'about', 'privacy', 'feedback'] as const
+export type BuiltInDesktopLinkTarget = (typeof BUILT_IN_DESKTOP_LINK_TARGETS)[number]
+
+export function isBuiltInDesktopLinkTarget(target: string): target is BuiltInDesktopLinkTarget {
+  return (BUILT_IN_DESKTOP_LINK_TARGETS as readonly string[]).includes(target)
+}
+
+/** What the desktop top nav has always been, as data — the fallback whenever
+ *  nothing has been configured. Exactly today's hardcoded structure. */
+export const DEFAULT_DESKTOP_NAV_ITEMS: DesktopNavItem[] = [
+  { id: 'categories', label: 'Categories', kind: 'categories-menu' },
+  { id: 'map', label: 'Map', kind: 'link', target: 'map' },
+  {
+    id: 'more',
+    label: 'More',
+    kind: 'more-menu',
+    items: [
+      { id: 'about', label: 'About', kind: 'link', target: 'about' },
+      { id: 'feedback', label: 'Feedback', kind: 'link', target: 'feedback' },
+      { id: 'privacy', label: 'Privacy', kind: 'link', target: 'privacy' },
+    ],
+  },
+]
 
 /** One entry in the mobile bottom tab bar. */
 export type MobileTabConfig = {
@@ -95,6 +172,36 @@ export const DEFAULT_FEEDBACK_BUTTON_LABEL = 'Have general feedback about the si
 export const DEFAULT_FEEDBACK_HEADING = 'Send feedback'
 export const DEFAULT_FEEDBACK_SUCCESS_MESSAGE = 'We appreciate your feedback and will take it into account.'
 
+export const DEFAULT_SEARCH_PLACEHOLDER = 'Search — kosher food, mikvah, shuls, schools…'
+export const DEFAULT_DESKTOP_BROWSE_EYEBROW = 'Get started'
+export const DEFAULT_DESKTOP_ACCENT_COLOR = '#b45309'
+
+/** A small curated set — same idea as CategoryEditor's PIN_COLORS — so the
+ *  admin picker offers a one-click palette instead of demanding a hex value
+ *  from someone who's never used one. Still just a starting point: the input
+ *  beside it takes any 6-digit hex. */
+export const DESKTOP_ACCENT_PRESETS = [
+  '#b45309', // amber-700 — today's default
+  '#0f766e', // teal-700
+  '#7c3aed', // violet-600
+  '#be123c', // rose-700
+  '#1d4ed8', // blue-700
+  '#166534', // green-800
+] as const
+
+// Same split HeroHeading.tsx's own splitMission() does, duplicated rather
+// than imported: that's a 'use client' component and this defaults object is
+// also read server-side (getSiteSettingsUncached's fallback). Only used here
+// to seed a sensible one-time default — HeroHeading keeps doing the real
+// split on `mission` for any settings row saved before this field existed.
+export function defaultHeroSplit(mission: string): { headline: string; subhead: string } {
+  const trimmed = mission.trim()
+  const i = trimmed.indexOf(' — ')
+  if (i === -1) return { headline: trimmed, subhead: '' }
+  return { headline: trimmed.slice(0, i).trim(), subhead: trimmed.slice(i + 3).trim() }
+}
+const heroSplit = defaultHeroSplit(community.mission)
+
 /** The code-configured defaults — used as the client fallback (if the API is
  *  unreachable) and whenever no row exists yet in `site_settings`. */
 export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
@@ -109,6 +216,14 @@ export const SITE_SETTINGS_DEFAULTS: SiteSettings = {
   feedbackSuccessMessage: DEFAULT_FEEDBACK_SUCCESS_MESSAGE,
   featuredCardIds: [],
   mobileTabs: DEFAULT_MOBILE_TABS,
+  searchPlaceholder: DEFAULT_SEARCH_PLACEHOLDER,
+  desktopNavItems: DEFAULT_DESKTOP_NAV_ITEMS,
+  desktopBrowseEyebrow: DEFAULT_DESKTOP_BROWSE_EYEBROW,
+  desktopBrowseHeading: DEFAULT_HERO_TITLE,
+  desktopHeroHeadline: heroSplit.headline,
+  desktopHeroSubhead: heroSplit.subhead,
+  desktopHeroImage: community.heroImage,
+  desktopAccentColor: DEFAULT_DESKTOP_ACCENT_COLOR,
 }
 
 /** Bump when the icon RENDERING changes — the inset, the trim, the padding

@@ -3,9 +3,12 @@ import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { resolveCommunity } from './communityStore'
 import {
+  DEFAULT_DESKTOP_NAV_ITEMS,
   DEFAULT_MOBILE_TABS,
   MAX_MOBILE_TABS,
   SITE_SETTINGS_DEFAULTS,
+  defaultHeroSplit,
+  type DesktopNavItem,
   type MobileTabConfig,
   type SiteSettings,
 } from './siteSettings'
@@ -25,6 +28,14 @@ type Row = {
   feedback_success_message: string
   featured_card_ids: string[] | null
   mobile_tabs: unknown
+  search_placeholder: string | null
+  desktop_nav_items: unknown
+  desktop_browse_eyebrow: string | null
+  desktop_browse_heading: string | null
+  desktop_hero_headline: string | null
+  desktop_hero_subhead: string | null
+  desktop_hero_image: unknown
+  desktop_accent_color: string | null
 }
 
 // jsonb comes back as whatever was written, and this column predates nothing —
@@ -43,13 +54,45 @@ function toMobileTabs(raw: unknown): MobileTabConfig[] {
   return tabs.length ? tabs.slice(0, MAX_MOBILE_TABS) : DEFAULT_MOBILE_TABS
 }
 
+// Same shape as toMobileTabs above: jsonb comes back as whatever was
+// written (or null pre-migration/pre-first-save), so anything that isn't a
+// usable nav item list falls back to the fixed Categories/Map/More
+// structure rather than rendering an empty header nav.
+function toDesktopNavItem(entry: unknown): DesktopNavItem | null {
+  if (!entry || typeof entry !== 'object') return null
+  const { id, label, kind, target, items } = entry as Record<string, unknown>
+  if (typeof id !== 'string' || !id.trim() || typeof label !== 'string' || !label.trim()) return null
+  if (kind !== 'categories-menu' && kind !== 'more-menu' && kind !== 'link') return null
+  if (kind === 'link' && (typeof target !== 'string' || !target.trim())) return null
+  if (kind === 'more-menu') {
+    const subItems = Array.isArray(items) ? items.flatMap((i) => toDesktopNavItem(i) ?? []) : []
+    return { id, label, kind, items: subItems }
+  }
+  return kind === 'link' ? { id, label, kind, target: target as string } : { id, label, kind }
+}
+
+function toDesktopNavItems(raw: unknown): DesktopNavItem[] {
+  if (!Array.isArray(raw)) return DEFAULT_DESKTOP_NAV_ITEMS
+  const items = raw.flatMap((entry) => toDesktopNavItem(entry) ?? [])
+  return items.length ? items : DEFAULT_DESKTOP_NAV_ITEMS
+}
+
+function toHeroImage(raw: unknown): { url: string; alt: string } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { url, alt } = raw as Record<string, unknown>
+  if (typeof url !== 'string' || !url.trim()) return null
+  return { url, alt: typeof alt === 'string' ? alt : '' }
+}
+
 function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFAULTS): SiteSettings {
   if (!row) return fallback
+  const mission = row.mission
+  const heroSplit = defaultHeroSplit(mission)
   return {
     name: row.name,
     tagline: row.tagline,
     heroTitle: row.hero_title,
-    mission: row.mission,
+    mission,
     logoUrl: row.logo_url,
     feedbackEnabled: row.feedback_enabled,
     feedbackButtonLabel: row.feedback_button_label,
@@ -59,6 +102,18 @@ function toSettings(row: Row | null, fallback: SiteSettings = SITE_SETTINGS_DEFA
     // save) — normalized to [] so callers never have to null-check it.
     featuredCardIds: row.featured_card_ids ?? [],
     mobileTabs: toMobileTabs(row.mobile_tabs),
+    searchPlaceholder: row.search_placeholder || fallback.searchPlaceholder,
+    desktopNavItems: toDesktopNavItems(row.desktop_nav_items),
+    desktopBrowseEyebrow: row.desktop_browse_eyebrow || fallback.desktopBrowseEyebrow,
+    desktopBrowseHeading: row.desktop_browse_heading || row.hero_title,
+    // Pre-migration/pre-first-save rows have no desktop hero fields of their
+    // own yet — fall back to splitting this row's real mission, same as the
+    // defaults object does at seed time, so an existing community's hero
+    // doesn't blank out until someone opens the new Desktop tab.
+    desktopHeroHeadline: row.desktop_hero_headline || heroSplit.headline,
+    desktopHeroSubhead: row.desktop_hero_subhead ?? heroSplit.subhead,
+    desktopHeroImage: toHeroImage(row.desktop_hero_image) ?? fallback.desktopHeroImage,
+    desktopAccentColor: row.desktop_accent_color || fallback.desktopAccentColor,
   }
 }
 
@@ -89,7 +144,15 @@ export async function getSiteSettingsUncached(community: string): Promise<SiteSe
   if (data) return toSettings(data as Row)
 
   const c = await resolveCommunity(community)
-  return { ...SITE_SETTINGS_DEFAULTS, name: c.name, tagline: c.tagline, mission: c.mission }
+  const heroSplit = defaultHeroSplit(c.mission)
+  return {
+    ...SITE_SETTINGS_DEFAULTS,
+    name: c.name,
+    tagline: c.tagline,
+    mission: c.mission,
+    desktopHeroHeadline: heroSplit.headline,
+    desktopHeroSubhead: heroSplit.subhead,
+  }
 }
 
 // Same as getSiteSettingsUncached, but cached for the public site.
@@ -126,6 +189,14 @@ export async function updateSiteSettings(
         feedback_success_message: merged.feedbackSuccessMessage,
         featured_card_ids: merged.featuredCardIds,
         mobile_tabs: merged.mobileTabs,
+        search_placeholder: merged.searchPlaceholder,
+        desktop_nav_items: merged.desktopNavItems,
+        desktop_browse_eyebrow: merged.desktopBrowseEyebrow,
+        desktop_browse_heading: merged.desktopBrowseHeading,
+        desktop_hero_headline: merged.desktopHeroHeadline,
+        desktop_hero_subhead: merged.desktopHeroSubhead,
+        desktop_hero_image: merged.desktopHeroImage,
+        desktop_accent_color: merged.desktopAccentColor,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'community_id' },

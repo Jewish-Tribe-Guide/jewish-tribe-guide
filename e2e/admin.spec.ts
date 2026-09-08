@@ -87,28 +87,40 @@ test.describe('admin console', () => {
     await expect(page).toHaveURL(/\/philly\/admin\/categories$/)
   })
 
-  test('the Site tab shows the real saved site name and tagline', async ({ page, request }) => {
+  test('the Site tab shows the real saved site name and search placeholder', async ({ page, request }) => {
     const res = await request.get('/api/site-settings')
     const body = await res.json()
-    const settings = body.settings as { name: string; tagline: string }
+    const settings = body.settings as { name: string; searchPlaceholder: string }
 
     await page.goto('/philly/admin/site')
 
     // Not getByLabel, and not a plain hasText filter: each <label> also
     // wraps its own trailing helper text, which folds into the computed
-    // accessible name — and Tagline's own helper text is "Shown under the
-    // site name in the header", a case-insensitive substring match for
-    // "Site name" too. `{ exact: true }` pins it to the heading span alone.
+    // accessible name — `{ exact: true }` pins it to the heading span alone.
     const siteNameLabel = page.locator('label').filter({ has: page.getByText('Site name', { exact: true }) })
-    const taglineLabel = page.locator('label').filter({ has: page.getByText('Tagline', { exact: true }) })
+    const placeholderLabel = page.locator('label').filter({ has: page.getByText('Search placeholder', { exact: true }) })
     await expect(siteNameLabel.locator('input')).toHaveValue(settings.name)
-    await expect(taglineLabel.locator('input')).toHaveValue(settings.tagline)
+    await expect(placeholderLabel.locator('input')).toHaveValue(settings.searchPlaceholder)
   })
 
-  test('the Desktop & mobile tab loads without error', async ({ page }) => {
-    await page.goto('/philly/admin/home')
+  test('the Desktop tab loads without error', async ({ page }) => {
+    await page.goto('/philly/admin/desktop')
 
     await expect(page.getByText('Featured cards')).toBeVisible()
+    await expect(page.getByText('Top nav bar')).toBeVisible()
+    await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
+  })
+
+  test('the Mobile tab loads without error', async ({ page, request }) => {
+    const res = await request.get('/api/site-settings')
+    const body = await res.json()
+    const settings = body.settings as { heroTitle: string }
+
+    await page.goto('/philly/admin/mobile')
+
+    await expect(page.getByText('Mobile tab bar')).toBeVisible()
+    const headingLabel = page.locator('label').filter({ has: page.getByText('Home screen heading', { exact: true }) })
+    await expect(headingLabel.locator('input')).toHaveValue(settings.heroTitle)
     await expect(page.locator('text=/^(Error|Something went wrong)/')).not.toBeVisible()
   })
 

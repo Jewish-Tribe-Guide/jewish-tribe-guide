@@ -36,6 +36,7 @@ import SearchBox from './SearchBox'
 // where the grid already has its own permanent home further down the page.
 export default function SearchSection({
   heroTitle,
+  searchPlaceholder,
   query,
   onQueryChange,
   interactive = true,
@@ -46,6 +47,8 @@ export default function SearchSection({
   hideHeading = false,
 }: {
   heroTitle: string
+  /** settings.searchPlaceholder — admin-editable (Site tab). */
+  searchPlaceholder: string
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the search box inert (nothing to filter in
@@ -90,7 +93,7 @@ export default function SearchSection({
           small thing floating in its corner. */}
       {!hideHeading && <h2 className="mb-4 text-center text-lg font-semibold text-slate-900">{heroTitle}</h2>}
       <div className="mx-auto max-w-[480px]">
-        <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={false} />
+        <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={searchPlaceholder} />
       </div>
       {mapIcon != null && (
         <div className="mt-4 flex justify-center">

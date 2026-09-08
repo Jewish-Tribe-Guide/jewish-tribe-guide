@@ -9,15 +9,17 @@ export default function SearchBox({
   query,
   onQueryChange,
   interactive = true,
-  isMobile,
+  placeholder,
 }: {
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
-  /** Shorter placeholder examples on a narrow screen. */
-  isMobile: boolean
+  /** settings.searchPlaceholder — admin-editable (Site tab), shared by both
+   *  devices rather than split into separate mobile/desktop copies (it's
+   *  describing the same search either way). */
+  placeholder: string
 }) {
   return (
     <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
@@ -34,14 +36,12 @@ export default function SearchBox({
         // filtering — typing reveals results. "Filter" describes the
         // implementation; "Search" describes what the visitor is doing.
         //
-        // The examples name categories this community actually has.
-        // They used to read "rides, housing", which the guide no longer
-        // offers — a placeholder promising things that aren't there is
-        // worse than a generic one. "shuls" is deliberate: it isn't a
-        // category label, it's one of the hidden keywords that resolves
-        // to Synagogues, so the example doubles as a hint that everyday
-        // words work.
-        placeholder={isMobile ? 'Search — food, mikvah, shuls…' : 'Search — kosher food, mikvah, shuls, schools…'}
+        // Admin-editable (Site tab, "Search placeholder") rather than
+        // hardcoded — it used to read "rides, housing", which the guide no
+        // longer offers, and fixing that meant a code change each time the
+        // category list did. Whoever runs this community's admin console
+        // now owns keeping the examples current.
+        placeholder={placeholder}
         aria-label="Search resources"
         className="min-w-0 flex-1 bg-transparent px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none"
       />

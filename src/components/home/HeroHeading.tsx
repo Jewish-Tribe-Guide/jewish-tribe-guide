@@ -4,31 +4,14 @@ import Image from 'next/image'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
-import { community } from '@/community.config'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import SearchBox from './SearchBox'
 
-/** Splits a mission string on its first " — " into a bold headline clause
- *  and a smaller supporting one, for desktop's promoted-headline treatment
- *  below. `subhead` is `null` when there's no dash to split on, so a
- *  mission written as one plain sentence renders as a headline alone
- *  rather than guessing where to break it.
- *
- *  Not invented copy: this community's actual mission ("Your guide to
- *  Jewish Philadelphia — kept current by you, and by the community that
- *  uses it") is already written as a headline clause plus a supporting
- *  one, joined by a dash — splitting on it is mechanical, not editorial. A
- *  community whose mission is one plain sentence with no dash gets the
- *  no-split fallback instead of a headline missing its second half. */
-export function splitMission(mission: string): { headline: string; subhead: string | null } {
-  const trimmed = mission.trim()
-  const i = trimmed.indexOf(' — ')
-  if (i === -1) return { headline: trimmed, subhead: null }
-  return { headline: trimmed.slice(0, i).trim(), subhead: trimmed.slice(i + 3).trim() }
-}
-
 type Props = {
-  settings: Pick<SiteSettings, 'heroTitle' | 'mission'>
+  settings: Pick<
+    SiteSettings,
+    'heroTitle' | 'mission' | 'desktopHeroHeadline' | 'desktopHeroSubhead' | 'desktopHeroImage' | 'searchPlaceholder'
+  >
   query: string
   onQueryChange: (query: string) => void
   /** Admin-preview only: renders the search box inert (nothing to filter in a
@@ -64,10 +47,11 @@ type Props = {
 // being true once the header's own tagline line was dropped (see
 // SiteHeader's own doc) — SiteHeader already names the site, right above
 // this section, so this band's job became saying what it's FOR instead:
-// `settings.mission` is the headline now, split (see splitMission below)
-// into a bold clause and a smaller supporting one rather than set as one
-// giant run-on sentence — `settings.name` still isn't dead, it's the
-// header, the footer, and the browser tab, just never repeated here.
+// `settings.desktopHeroHeadline`/`desktopHeroSubhead` — admin-editable,
+// separate from mobile's `heroTitle`/`mission` (see the Desktop tab's Hero
+// card) since the two read differently even though they're describing the
+// same site — `settings.name` still isn't dead, it's the header, the
+// footer, and the browser tab, just never repeated here.
 //
 // Search doesn't belong folded into this band either: it's a real third
 // thing this app offers, on par with the category grid and the map below
@@ -81,13 +65,13 @@ type Props = {
 // (SSR-safe), so branching here would flash the desktop layout on a phone
 // for one frame — the same reasoning as Landing's own inlineGridClass.
 //
-// The photo panel shows community.heroImage when a deployment has set one
-// (see that field's own doc — code-level branding, not admin-editable), and
-// falls back to the original CSS gradient + watermark star otherwise, so a
-// fresh community with no photo yet never renders broken.
+// The photo panel shows settings.desktopHeroImage when the admin has set one
+// (Desktop tab's Hero card), and falls back to the original CSS gradient +
+// watermark star otherwise, so a fresh community with no photo yet never
+// renders broken.
 export default function HeroHeading({ settings, query, onQueryChange, interactive = true, mapIcon, onViewMap }: Props) {
   const isMobile = useIsMobile()
-  const { headline, subhead } = splitMission(settings.mission)
+  const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
   const viewMapButton = mapIcon != null && (
     <button
@@ -111,17 +95,16 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
         </p>
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">
-            <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} isMobile={isMobile} />
+            <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
           </div>
         )}
         {viewMapButton}
       </section>
 
-      {/* Desktop — a warm two-column band. Mission is the headline now
-          (split into a bold clause and a smaller supporting one — see
-          splitMission's own doc), not the site name — see the component
-          doc for why (the header beside it already names the site, and
-          search moved out into its own section). */}
+      {/* Desktop — a warm two-column band. desktopHeroHeadline/Subhead are
+          the headline now, not the site name — see the component doc for
+          why (the header beside it already names the site, and search
+          moved out into its own section). */}
       <section className="mt-7 hidden overflow-hidden rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-amber-100/60 desktop:grid desktop:grid-cols-[1.15fr_1fr] desktop:items-stretch">
         <div className="flex flex-col justify-center px-12 py-14">
           <h1 className="text-4xl font-semibold leading-[1.15] text-slate-900 text-balance">
@@ -133,20 +116,20 @@ export default function HeroHeading({ settings, query, onQueryChange, interactiv
             </p>
           )}
         </div>
-        {community.heroImage ? (
+        {heroImage ? (
           // A real photo: it has content to describe, so it's a genuine
           // `alt`, not aria-hidden — the opposite of the placeholder below.
           <div className="relative min-h-[280px]">
             <Image
-              src={community.heroImage.url}
-              alt={community.heroImage.alt}
+              src={heroImage.url}
+              alt={heroImage.alt}
               fill
               sizes="(min-width: 640px) 40vw, 0px"
               className="object-cover"
               // Above the fold on every desktop load — worth the priority
               // fetch the same way a hero image normally is.
               priority
-              unoptimized={!isOptimizableImage(community.heroImage.url)}
+              unoptimized={!isOptimizableImage(heroImage.url)}
             />
           </div>
         ) : (

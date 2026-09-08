@@ -13,7 +13,7 @@ afterEach(() => cleanup())
 // state Landing's grid filters on.
 describe('SearchSection', () => {
   it('heads the section with heroTitle', () => {
-    render(<SearchSection heroTitle="What are you looking for?" query="" onQueryChange={vi.fn()} />)
+    render(<SearchSection heroTitle="What are you looking for?" searchPlaceholder="Search…" query="" onQueryChange={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'What are you looking for?' })).toBeInTheDocument()
   })
@@ -21,7 +21,7 @@ describe('SearchSection', () => {
   it('typing into the box calls onQueryChange, same as the box used to inside the hero', async () => {
     const user = userEvent.setup()
     const onQueryChange = vi.fn()
-    render(<SearchSection heroTitle="What are you looking for?" query="" onQueryChange={onQueryChange} />)
+    render(<SearchSection heroTitle="What are you looking for?" searchPlaceholder="Search…" query="" onQueryChange={onQueryChange} />)
 
     await user.type(screen.getByLabelText('Search resources'), 'g')
 
@@ -36,7 +36,7 @@ describe('SearchSection', () => {
   // instead of the eyebrow+title every other section uses.
   it('omits its own heading when hideHeading is set, without losing the box itself', () => {
     render(
-      <SearchSection heroTitle="What are you looking for?" query="" onQueryChange={vi.fn()} hideHeading />,
+      <SearchSection heroTitle="What are you looking for?" searchPlaceholder="Search…" query="" onQueryChange={vi.fn()} hideHeading />,
     )
 
     expect(screen.queryByRole('heading', { name: 'What are you looking for?' })).not.toBeInTheDocument()

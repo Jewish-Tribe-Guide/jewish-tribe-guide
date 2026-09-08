@@ -105,6 +105,33 @@ describe('DesktopTopicsManager', () => {
     expect(onChange).toHaveBeenCalledWith([map, featured])
   })
 
+  it('describes the zmanim block as Davening Times + community, not the old zmanim grid it used to render', () => {
+    const zmanim: DraftHomeSection = { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', cardIds: [] }
+    renderManager([zmanim])
+
+    expect(screen.getByText(/Upcoming Davening Times, and the "Kept by the Community" card beside it\./)).toBeInTheDocument()
+    expect(screen.queryByText(/daily zmanim grid/)).not.toBeInTheDocument()
+  })
+
+  // Browse and Shabbat don't have a single admin-set heading to rename (see
+  // UNRENAMEABLE_KINDS's own doc) — their row shows the fixed title as plain
+  // text instead of an input a rename would silently do nothing (or have
+  // nowhere to render) for.
+  it('renders Browse and Shabbat rows without a rename input', () => {
+    const browse: DraftHomeSection = { id: 'browse', kind: 'browse', title: 'Browse & search', cardIds: [] }
+    const shabbat: DraftHomeSection = {
+      id: 'shabbat',
+      kind: 'shabbat',
+      title: 'Shabbat Times & Stay in the Loop',
+      cardIds: [],
+    }
+    renderManager([browse, shabbat])
+
+    expect(screen.getByText('Browse & search')).toBeInTheDocument()
+    expect(screen.getByText('Shabbat Times & Stay in the Loop')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
   // The same shared draft array also carries plain category sections (see
   // HomeSectionManager) — this component must never touch or reorder them.
   it('leaves a plain section entry riding along in the draft completely untouched', async () => {

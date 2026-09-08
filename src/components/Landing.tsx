@@ -186,12 +186,28 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // curated subset of exactly what the "Browse everything" grid above
   // already shows in full, so on a fresh community it would just repeat
   // three of those same cards a second time. Still fully supported: an admin
-  // can add it back from the "+ Add" built-in-block button in the Desktop &
-  // mobile tab for a community that wants a curated highlight anyway.
+  // can add it back from the "+ Add" built-in-block button in the Desktop
+  // tab for a community that wants a curated highlight anyway.
+  const hasBrowseRow = configuredBuiltIns.some((b) => b.kind === 'browse')
+  const hasShabbatRow = configuredBuiltIns.some((b) => b.kind === 'shabbat')
+  const otherKindsConfigured = configuredBuiltIns.some((b) => b.kind !== 'browse' && b.kind !== 'shabbat')
+  // 'browse' (the Browse/Search card) and 'shabbat' (Shabbat Times + Stay in
+  // the Loop) used to be hardcoded fixed-first/fixed-last, before either was
+  // part of this reorderable set — see homeSections.ts's own doc. So unlike
+  // 'featured'/'map'/'zmanim' (which fall back together, as a set, to the
+  // default order below), each of these two is patched in independently
+  // ONLY when this community genuinely has no row for that specific kind —
+  // an existing community that already configured zmanim+map keeps their
+  // real order untouched, it just also gets a Browse card up front and a
+  // Shabbat row at the end, exactly where both always rendered before.
   const builtInOrder =
-    configuredBuiltIns.length > 0
-      ? configuredBuiltIns
-      : (['zmanim', 'map'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
+    hasBrowseRow || hasShabbatRow || otherKindsConfigured
+      ? [
+          ...(hasBrowseRow ? [] : [{ kind: 'browse' as const, title: BUILT_IN_BLOCKS.browse.title }]),
+          ...configuredBuiltIns,
+          ...(hasShabbatRow ? [] : [{ kind: 'shabbat' as const, title: BUILT_IN_BLOCKS.shabbat.title }]),
+        ]
+      : (['browse', 'zmanim', 'map', 'shabbat'] as const).map((kind) => ({ kind, title: BUILT_IN_BLOCKS[kind].title }))
 
   // Shared between mobile's permanent grid and desktop's search results —
   // see below for why the two don't share one JSX node any more.
@@ -355,47 +371,80 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 same card language (border, rounded-2xl) as this section —
                 see its own doc on why a 2×2 grid of smaller cards there
                 still reads as a break, not a third full-width peer section. */}
-        <section className="mt-8 hidden desktop:block">
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-            {/* Same amber eyebrow every other home-screen card now carries
-                ("Today", "Community run", "Discover nearby") — this was the
-                one section still missing it. The heading itself is
-                `settings.heroTitle` ("What are you looking for?" by default)
-                rather than a separate hardcoded "Browse Everything" — this
-                card used to stack an eyebrow, that hardcoded title, AND
-                SearchSection's own heroTitle heading, three lines where
-                every other section on this screen has two. `hideHeading`
-                below keeps SearchSection from rendering that same string a
-                second time, right underneath. */}
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Get started</p>
-            <h2 className="mb-6 text-lg font-semibold text-slate-900">{settings.heroTitle}</h2>
-            <SearchSection
-              bare
-              hideHeading
-              heroTitle={settings.heroTitle}
-              query={query}
-              onQueryChange={setQuery}
-              results={!isMobile ? desktopResultsNode : undefined}
-            />
-            {!isMobile && !q && (
-              <div className={ui.search.landing ? 'mt-6' : ''}>
-                <CompactCardGrid
-                  cards={loading ? entryCards : (filtered ?? [])}
-                  categories={categories}
-                  onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-                />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ── The desktop gateway's three singleton blocks — featured cards,
-                the embedded map, HomeBreak — in the admin-configured
-                order (builtInOrder above). Each keeps its own existing gating
+        {/* ── The desktop gateway's five singleton blocks — Browse/search,
+                featured cards, the embedded map, HomeBreak, Shabbat
+                Times/Stay in the Loop — in the admin-configured order
+                (builtInOrder above). Each keeps its own existing gating
                 (hidden while searching, desktop-only, hasMap/zmanimCategory);
-                only the SEQUENCE they render in is now data-driven instead of
+                only the SEQUENCE they render in is data-driven instead of
                 hardcoded. ─────────────────────────────────────────────────── */}
         {builtInOrder.map(({ kind, title }) => {
+          if (kind === 'browse') {
+            // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
+            // the WHOLE card, not just the grid below — search sits right
+            // under that heading as the first thing in the section.
+            // `SearchSection` renders `bare` here (no card/section shell,
+            // and no heading of its own — `hideHeading`, since this card's
+            // own heading right above it already says the same thing) so it
+            // mounts once, as a stable sibling of the grid below, and never
+            // gets swapped out as a whole subtree when `q` changes — that
+            // would unmount the input mid-keystroke and drop focus.
+            //
+            // The grid itself is a flat, always-visible index of every
+            // card. CompactCardGrid, not CardGrid — see that component's
+            // own doc for why a small icon-avatar row instead of a full
+            // photo tile is the fix for a list this long.
+            return (
+              <section key="browse" className="mt-8 hidden desktop:block">
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                    {settings.desktopBrowseEyebrow}
+                  </p>
+                  <h2 className="mb-6 text-lg font-semibold text-slate-900">{settings.desktopBrowseHeading}</h2>
+                  <SearchSection
+                    bare
+                    hideHeading
+                    heroTitle={settings.desktopBrowseHeading}
+                    searchPlaceholder={settings.searchPlaceholder}
+                    query={query}
+                    onQueryChange={setQuery}
+                    results={!isMobile ? desktopResultsNode : undefined}
+                  />
+                  {!isMobile && !q && (
+                    <div className={ui.search.landing ? 'mt-6' : ''}>
+                      <CompactCardGrid
+                        cards={loading ? entryCards : (filtered ?? [])}
+                        categories={categories}
+                        onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+                      />
+                    </div>
+                  )}
+                </div>
+              </section>
+            )
+          }
+          if (kind === 'shabbat') {
+            // Same two-card, rounded-2xl treatment as HomeBreak — the two
+            // breaks read as one visual language even though they're not
+            // one component (see ShabbatTimesCard's own doc for why they
+            // split). Still a JS branch on zmanimCategory for the same
+            // reason HomeBreak's own Zmanim card always was: useZmanim
+            // fetches /api/zmanim uncached, straight through to Hebcal, and
+            // hiding it with `sm:` would cost every phone visitor a
+            // round-trip for a section they never see (mobile has no
+            // equivalent of this row at all).
+            return (
+              !isMobile &&
+              zmanimCategory && (
+                <div key="shabbat" className="my-12 grid grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <SubscribeSection bare />
+                  </div>
+                  <ShabbatTimesCard coords={coords ?? community.mapCenter} locationLabel={zmanimLocationLabel} />
+                </div>
+              )
+            )
+          }
           if (kind === 'featured') {
             // Hidden while searching, when the grid below takes over as the
             // answer to what was typed.
@@ -479,31 +528,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             !isMobile && zmanimCategory && <HomeBreak key="zmanim" coords={coords} />
           )
         })}
-
-        {/* ── Stay in the loop + Shabbat Times — desktop only, right after
-                the map (which is why this sits outside the reorderable
-                builtInOrder walk above, unconditionally last: Stay in the
-                loop used to live here alone before HomeBreak briefly grew to
-                a 2×2 grid holding all four cards between Browse everything
-                and the map; both moved back to their own row below the map).
-                Same two-card, rounded-2xl treatment as HomeBreak above, so
-                the two breaks read as one visual language even though
-                they're no longer one component — see ShabbatTimesCard's own
-                doc for why they split. Still a JS branch on zmanimCategory
-                for the same reason HomeBreak's own Zmanim card always was:
-                useZmanim fetches /api/zmanim uncached, straight through to
-                Hebcal, and hiding it with `sm:` would cost every phone
-                visitor a round-trip for a section they never see (mobile
-                has no equivalent of this row at all). ─────────────────── */}
-        {!isMobile && zmanimCategory && (
-          <div className="my-12 grid grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <SubscribeSection bare />
-            </div>
-            <ShabbatTimesCard coords={coords ?? community.mapCenter} locationLabel={zmanimLocationLabel} />
-          </div>
-        )}
-
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search
                 narrows each section's cards and hides any section left

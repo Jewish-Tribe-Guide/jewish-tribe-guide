@@ -10,16 +10,27 @@
 // and the Zmanim & Shabbos band. Reordering/toggling any of them is just
 // reordering/removing a row in this same list — see HomeSectionManager.tsx
 // and Landing.tsx's ordered block walk.
-export type HomeBlockKind = 'section' | 'featured' | 'map' | 'zmanim'
+export type HomeBlockKind = 'section' | 'featured' | 'map' | 'zmanim' | 'browse' | 'shabbat'
 
-/** The three singleton built-ins' fixed identity — id doubles as `kind` (there
+/** The five singleton built-ins' fixed identity — id doubles as `kind` (there
  *  can only ever be one of each), and the title is fixed/not admin-editable
  *  (unlike a plain section's title). Order here is just documentation; actual
- *  display order always comes from sortOrder. */
+ *  display order always comes from sortOrder.
+ *
+ *  'browse' (the Browse/Search card) and 'shabbat' (Shabbat Times + Stay in
+ *  the Loop) used to be hardcoded fixed-first/fixed-last in Landing.tsx
+ *  rather than part of this reorderable set — see Landing.tsx's own doc on
+ *  why they're each given an independent fallback position (unshift/push)
+ *  instead of joining the all-or-nothing configuredBuiltIns fallback the
+ *  original three use, so an existing community with, say, zmanim+map
+ *  already configured doesn't lose its Browse card and Shabbat row the
+ *  moment this shipped. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {
+  browse: { id: 'browse', title: 'Browse & search' },
   featured: { id: 'featured', title: 'Popular right now' },
   map: { id: 'map', title: 'Explore the Map' },
   zmanim: { id: 'zmanim', title: 'Zmanim & Shabbos' },
+  shabbat: { id: 'shabbat', title: 'Shabbat Times & Stay in the Loop' },
 }
 
 export type HomeSection = {
