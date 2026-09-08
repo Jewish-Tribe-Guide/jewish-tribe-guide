@@ -6,8 +6,7 @@ import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
-import ShareButton from '@/components/resources/ShareButton'
-import PinButton from '@/components/resources/PinButton'
+import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import CategoryIcon from '@/components/CategoryIcon'
@@ -144,20 +143,15 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           </h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {/* self-start + a measured nudge — centered on just the NAME line,
-            not the shorter category label under it. self-center would
-            center against the whole name+category block instead, pulling
-            Pin down further than the name alone calls for.
-            The nudge itself needs to be -2.75px, not the +3.25px the name/
-            icon math alone suggests: PinButton's own -m-1.5/p-1.5 (its tap-
-            target trick — see that component) cancel out to a net-zero
-            visual offset, and a plain mt-* utility here overrides the
-            shorthand's margin-top outright rather than adding to it, which
-            breaks that cancellation. -2.75 is the value that, combined with
-            the trick's fixed 6px padding-top, nets out to the actual
-            +3.25px of visual movement wanted: (22.5-14)/2, name line-height
-            vs. icon height. */}
-        {ui.map.pins && <PinButton id={item.id} categoryId={category.id} name={item.name} className="self-start mt-[-2.75px]" />}
+        {/* self-start — centered on just the NAME line, not the shorter
+            category label under it. self-center would center against the
+            whole name+category block instead, pulling the kebab down
+            further than the name alone calls for. Pin/Share/"Set location"
+            all live behind this one menu now — see ListingActionsMenu — so
+            there's no separate Share button in the footer below any more,
+            and PlaceDetailBody's own address row has no SetLocationButton
+            either. */}
+        <ListingActionsMenu item={item} category={category} path={listingPath} />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way
@@ -169,7 +163,6 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
         <div className="flex gap-3">
-          <ShareButton path={listingPath} title={item.name} />
           {canEdit && (
             <button
               onClick={() => openAction('edit')}

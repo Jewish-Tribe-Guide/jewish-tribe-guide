@@ -16,7 +16,6 @@ import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
-import ShareButton from './ShareButton'
 import ListingActionsMenu from './ListingActionsMenu'
 import Chip from './Chip'
 import { PencilIcon, FlagIcon } from '@/components/icons'
@@ -194,9 +193,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // one tick before settling into the inline panel — accepted the same way
   // the other isMobile-gated layout branches in this app already are.
   const isMobile = useIsMobile()
-  // Shared by ListingActionsMenu's kebab and the expanded footer's own
-  // ShareButton — computed once here rather than each of those two
-  // recomputing the same expression separately.
+  // The Share path ListingActionsMenu's kebab needs.
   const listingPath = routes.listing(community, category.id, listingSlug(item))
 
   const fields = category.detailFields
@@ -676,6 +673,23 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           </div>
         </div>
 
+        {/* Mobile-only twin of the headerTextFields loop above — see the
+            comment there. Indented to align under the name/address (same
+            52px = icon + gap as above). Rendered before the upvote/distance
+            row below, matching desktop's own order (its version of this
+            text sits inside the name column, above where that row starts) —
+            this used to come after on mobile, which read as popularity/
+            distance outranking the description instead of following it. */}
+        {headerTextFields.map(({ f, text }) =>
+          f.type === 'textarea' ? (
+            <p key={f.key} className="desktop:hidden text-sm text-slate-600 mt-2 pl-[52px]">
+              <span style={headerTextClampStyle}>{text}</span>
+            </p>
+          ) : (
+            <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
+          ),
+        )}
+
         {/* Upvote count + distance/travel — its own row left-aligned under
             the icon (pl-[52px] = the 40px icon + 12px gap it sits next to
             above), rather than a column squeezed in beside the name. A
@@ -710,19 +724,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               </div>
             </div>
           </>
-        )}
-
-        {/* Mobile-only twin of the headerTextFields loop above — see the
-            comment there. Indented to align under the name/address (same
-            52px = icon + gap as above). */}
-        {headerTextFields.map(({ f, text }) =>
-          f.type === 'textarea' ? (
-            <p key={f.key} className="desktop:hidden text-sm text-slate-600 mt-2 pl-[52px]">
-              <span style={headerTextClampStyle}>{text}</span>
-            </p>
-          ) : (
-            <p key={f.key} className="desktop:hidden truncate text-sm text-slate-600 mt-2 pl-[52px]">{text}</p>
-          ),
         )}
 
         {/* Badge row — the only chips that survive collapsed: Open and any
@@ -779,8 +780,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+            {/* Share used to sit here too — now only in the collapsed row's
+                own kebab (ListingActionsMenu), same place Pin/Set location
+                live, rather than duplicated in both spots. */}
             <div className="flex gap-3">
-              <ShareButton path={listingPath} title={item.name} />
               {canEdit && (
                 <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
               )}

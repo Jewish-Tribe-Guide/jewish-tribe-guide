@@ -5,7 +5,13 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import * as locationContext from '@/lib/locationContext'
+import { ui } from '@/lib/uiConfig'
 import ListingActionsMenu from './ListingActionsMenu'
+
+// A plain mutable object (not vi.fn()-backed) — ListingActionsMenu reads
+// ui.map.pins directly on every render, so flipping this property between
+// tests is enough; no need to re-mock per test.
+vi.mock('@/lib/uiConfig', () => ({ ui: { map: { pins: true } } }))
 
 // useShareLink already has its own dedicated unit test (useShareLink.test.tsx)
 // covering the native-share-vs-clipboard-copy logic — mocked here so this
@@ -39,6 +45,7 @@ afterEach(() => {
   // test here uses the same listing id, so a pin left set by one test would
   // otherwise leak into the next.
   localStorage.clear()
+  ui.map.pins = true
 })
 
 describe('ListingActionsMenu', () => {
@@ -57,6 +64,34 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  // The original build showed Pin unconditionally, missing the same
+  // ui.map.pins gate PinButton and the map's own pin filter chip respected —
+  // a community with pinning turned off still saw a working Pin action here.
+  it('hides Pin when ui.map.pins is off, but still shows Share', async () => {
+    ui.map.pins = false
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu()
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    expect(screen.queryByRole('menuitem', { name: /^pin$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
+  })
+
+  // The kebab sits at the card's own right edge — anchoring the menu's
+  // right edge to it (extending left) put the menu back over the name/
+  // address/chevron it's meant to stay clear of.
+  it('opens the dropdown extending right of the kebab (left-anchored), not left', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu()
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    const menu = screen.getByRole('menu')
+    expect(menu).toHaveClass('left-0')
+    expect(menu).not.toHaveClass('right-0')
+  })
+
   it('closes the menu on an outside click', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
@@ -69,16 +104,16 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('does not render "I\'m here" when there is no location context (e.g. the admin preview)', async () => {
+  it('does not render "Set location" when there is no location context (e.g. the admin preview)', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
     renderMenu()
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    expect(screen.queryByRole('menuitem', { name: /i'm here/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
   })
 
-  it('does not render "I\'m here" when the listing has no geo coordinates', async () => {
+  it('does not render "Set location" when the listing has no geo coordinates', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
       setListingAnchor: vi.fn(),
@@ -88,10 +123,10 @@ describe('ListingActionsMenu', () => {
     renderMenu({ geo: undefined })
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    expect(screen.queryByRole('menuitem', { name: /i'm here/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
   })
 
-  it('shows "I\'m here", calls setListingAnchor, and closes the menu', async () => {
+  it('shows "Set location", calls setListingAnchor, and closes the menu', async () => {
     const setListingAnchor = vi.fn()
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
@@ -102,13 +137,13 @@ describe('ListingActionsMenu', () => {
     renderMenu({ geo: { lat: 39.95, lng: -75.16 } })
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^i'm here$/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^set location$/i }))
 
     expect(setListingAnchor).toHaveBeenCalledWith({ id: 'listing-1', name: 'Goldi Market', coords: { lat: 39.95, lng: -75.16 } })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('shows "You\'re here" and calls unsetListingAnchor when this listing is already the anchor', async () => {
+  it('shows "Location set" and calls unsetListingAnchor when this listing is already the anchor', async () => {
     const unsetListingAnchor = vi.fn()
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: 'listing-1',
@@ -119,7 +154,7 @@ describe('ListingActionsMenu', () => {
     renderMenu({ geo: { lat: 39.95, lng: -75.16 } })
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.click(screen.getByRole('menuitem', { name: /you're here/i }))
+    await user.click(screen.getByRole('menuitem', { name: /location set/i }))
 
     expect(unsetListingAnchor).toHaveBeenCalledTimes(1)
   })

@@ -261,6 +261,29 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
       expect(description).not.toHaveClass('truncate')
     }
   })
+
+  // Regression: mobile used to render this description AFTER the upvote/
+  // distance row instead of before it, unlike desktop (whose own copy of
+  // this field sits inside the name column, ahead of that row entirely) —
+  // so mobile visitors saw popularity/distance outrank the description.
+  it('renders the mobile-only description before the upvote/distance row, matching desktop\'s own order', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }],
+      upvotesEnabled: true,
+    })
+    const item = makeListing({ note: 'Sit-down glatt kosher steakhouse' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // Not `[class*="pl-[52px]"]` alone — the mobile description paragraph
+    // itself also carries that class (it's indented to match), so that
+    // selector matches it first regardless of order. mt-1.5 + justify-start
+    // together are unique to the upvote/distance row.
+    const mobileDescription = document.querySelector('p.desktop\\:hidden.truncate')!
+    const upvoteRow = document.querySelector('div[class*="mt-1.5"][class*="justify-start"]')!
+    expect(mobileDescription.compareDocumentPosition(upvoteRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })
 
 // The row-alignment handle GenericDirectory uses to measure each card's

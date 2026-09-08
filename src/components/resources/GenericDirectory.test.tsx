@@ -470,3 +470,24 @@ describe('GenericDirectory — distance slot wiring', () => {
     expect(screen.queryByText('distance-slot Alpha')).not.toBeInTheDocument()
   })
 })
+
+describe('GenericDirectory — pinned listings sort first', () => {
+  afterEach(() => localStorage.clear())
+
+  // Seeded directly via the real pinned.ts storage shape rather than driven
+  // through a kebab click — GenericListingCard is stubbed in this file (see
+  // the mock at the top), so there's no real Pin control to click here; this
+  // is the same thing PinnedProvider itself reads on mount.
+  it('renders a pinned listing first, ahead of popularity/alphabetical order', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'b', categoryId: 'grocery' }]))
+    const category = makeCategory({ id: 'grocery', upvotesEnabled: true })
+    const items = [
+      makeListing({ id: 'a', name: 'Alpha', upvotes: 10 }),
+      makeListing({ id: 'b', name: 'Beta', upvotes: 0 }),
+    ]
+    renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
+
+    const names = screen.getAllByText(/^(Alpha|Beta)$/).map((el) => el.textContent)
+    expect(names).toEqual(['Beta', 'Alpha'])
+  })
+})

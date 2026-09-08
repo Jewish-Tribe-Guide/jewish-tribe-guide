@@ -6,20 +6,22 @@ import type { CategoryConfig } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { ui } from '@/lib/uiConfig'
 import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon } from '@/components/icons'
 
-// ── The kebab menu on a listing's collapsed card — Pin, Share, and "I'm
-// here" (SetLocationButton's own action) all reachable without expanding the
-// card first, on both mobile and desktop. Rendered by GenericListingCard in
-// the same top-right corner slot as its own expand chevron.
+// ── The kebab menu on a listing — Pin, Share, and "Set location" all
+// reachable without expanding the card first. Rendered by GenericListingCard
+// (the directory card's collapsed corner, both mobile and desktop) and
+// MapPlaceDetail (the map's own place-detail panel, next to the name) — the
+// only two places a listing is shown in full; every other inline Pin/Share/
+// SetLocationButton usage was removed once this covered them all.
 //
-// Not a reuse of PinButton/ShareButton/SetLocationButton — those three are
-// styled as inline pills for PlaceDetailBody/MapPlaceDetail, not menu rows —
-// but their underlying hooks (usePinned/useShareLink/useOptionalLocation)
-// are exactly what this needs, so this calls them directly and builds its
-// own menu-row markup. Dropdown pattern (open state, outside-click +
-// Escape dismissal, role="menu") mirrors CommunitySwitcher.tsx's own
-// desktop dropdown.
+// Not a reuse of the old PinButton/ShareButton/SetLocationButton components
+// (deleted) — those were styled as inline pills, not menu rows — but their
+// underlying hooks (usePinned/useShareLink/useOptionalLocation) are exactly
+// what this needs, so this calls them directly and builds its own menu-row
+// markup. Dropdown pattern (open state, outside-click + Escape dismissal,
+// role="menu") mirrors CommunitySwitcher.tsx's own desktop dropdown.
 export default function ListingActionsMenu({
   item,
   category,
@@ -55,9 +57,9 @@ export default function ListingActionsMenu({
   }, [open])
 
   const pinned = isPinned(item.id)
-  // Same gate as SetLocationButton's own — a listing whose address failed to
-  // geocode has no geo key, and a category with no physical place (e.g. a
-  // WhatsApp group) has hasAddress === false.
+  // Same gate the old SetLocationButton used — a listing whose address
+  // failed to geocode has no geo key, and a category with no physical place
+  // (e.g. a WhatsApp group) has hasAddress === false.
   const canSetLocation = !!location && category.hasAddress !== false && !!item.geo
   const active = canSetLocation && location!.anchorListingId === item.id
 
@@ -87,22 +89,32 @@ export default function ListingActionsMenu({
         <div
           role="menu"
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+          // left-0, not right-0: the kebab sits at the card's own right
+          // edge, so anchoring the menu's right edge to it (the original
+          // build) made it extend back over the name/address/chevron. Left-
+          // anchored, it extends toward the card's outer edge instead.
+          className="absolute left-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle({ id: item.id, categoryId: category.id })
-              setOpen(false)
-            }}
-            aria-pressed={pinned}
-            className={menuItemClass}
-          >
-            <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
-            {pinned ? 'Pinned' : 'Pin'}
-          </button>
+          {/* ui.map.pins is the same flag the map's own pin filter chip and
+              (formerly) PinButton respected — the original build of this
+              menu missed it and showed Pin unconditionally even with
+              pinning turned off community-wide. */}
+          {ui.map.pins && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggle({ id: item.id, categoryId: category.id })
+                setOpen(false)
+              }}
+              aria-pressed={pinned}
+              className={menuItemClass}
+            >
+              <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
+              {pinned ? 'Pinned' : 'Pin'}
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -126,7 +138,7 @@ export default function ListingActionsMenu({
               className={menuItemClass}
             >
               {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
-              {active ? "You're here" : "I'm here"}
+              {active ? 'Location set' : 'Set location'}
             </button>
           )}
         </div>

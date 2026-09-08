@@ -19,6 +19,7 @@ import { travelCompare } from '@/lib/listingTravel'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { usePinned } from '@/lib/pinnedContext'
 
 type Props = {
   category: CategoryConfig
@@ -75,6 +76,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // visitor drilled into, never the home grid itself.
   useSetScreenHeader(true, category.pluralLabel, onUp)
 
+  const { isPinned } = usePinned()
   const [search, setSearch] = useState(initialSearch ?? '')
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
@@ -357,6 +359,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         Number(!!businessClosure(a as unknown as Record<string, unknown>)) -
         Number(!!businessClosure(b as unknown as Record<string, unknown>))
       if (closedDiff !== 0) return closedDiff
+      // Pinned listings float to the top next, ahead of popularity/distance —
+      // same tier NearbyList.tsx's own sort gives them on the map, "that's
+      // the whole point of pinning something." Still below the closed check
+      // above: a pinned-but-closed listing outranks other closed listings,
+      // not every open one.
+      const pinnedDiff = Number(isPinned(b.id)) - Number(isPinned(a.id))
+      if (pinnedDiff !== 0) return pinnedDiff
       return upvotes && sortByPopular
         ? liveCount(b) - liveCount(a) || travelCompare(a, b)
         : travelCompare(a, b)

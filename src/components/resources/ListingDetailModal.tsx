@@ -10,7 +10,7 @@ import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
-import ShareButton from './ShareButton'
+import ListingActionsMenu from './ListingActionsMenu'
 import { PencilIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
@@ -93,6 +93,7 @@ export default function ListingDetailModal({
   hasNext,
 }: Props) {
   const community = useCommunitySlug()
+  const listingPath = routes.listing(community, category.id, listingSlug(item))
 
   // Reference-counted, not a plain `document.body.style.overflow = isOpen ?
   // 'hidden' : ''` — GenericDirectory can mount dozens of these (one per
@@ -229,15 +230,23 @@ export default function ListingDetailModal({
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {/* The card behind this dialog is dimmed under its own backdrop
+              while the dialog is open, so its kebab isn't reachable from in
+              here — this is that same menu (Pin/Share/Set location),
+              restated in the dialog's own header next to Close, same spot
+              MapPlaceDetail gives it next to the name. */}
+          <div className="flex shrink-0 items-center gap-1">
+            <ListingActionsMenu item={item} category={category} path={listingPath} />
+            <button
+              onClick={onClose}
+              className="shrink-0 text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -258,8 +267,9 @@ export default function ListingDetailModal({
 
           <div className="pt-3 border-t border-slate-200 space-y-2.5">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+            {/* Share used to sit here — now only in the header's own kebab
+                (ListingActionsMenu), next to Close. */}
             <div className="flex gap-3">
-              <ShareButton path={routes.listing(community, category.id, listingSlug(item))} title={item.name} />
               {canEdit && (
                 <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
               )}
