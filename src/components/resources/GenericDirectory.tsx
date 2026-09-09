@@ -38,6 +38,15 @@ type Props = {
   initialSearch?: string
   /** Seed the "Open now" filter — `?openNow=1`, see onParamsChange below. */
   initialOpenNow?: boolean
+  /** Seed the boolean/select field filters — the category's OWN raw query
+   *  params (`?f_<fieldKey>=1` for a boolean, `?sel_<fieldKey>=a,b` for a
+   *  select), keyed generically rather than as named props like
+   *  searchQuery/searchOpenNow above: which fields exist (and are
+   *  filterable) is per-category, decided by `category.detailFields`, not
+   *  fixed ahead of time the way "search text" and "open now" are for every
+   *  category. Extra/unrecognized keys (params for a DIFFERENT category,
+   *  or `q`/`openNow` themselves) are simply ignored when read. */
+  initialFilters?: Record<string, string> | null
   /** Mount with the "All davening times" modal already open — the home
    *  screen's DaveningTimesCard links here with `?davening=1` (see
    *  routes.ts's own daveningTimes helper) so "See all" actually lands on
@@ -82,7 +91,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -102,6 +111,58 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm.
   const now = new Date(useNow())
+
+  // ── Apply a shared link's search/openNow/filters once they actually arrive ──
+  // The lazy initializers above already cover the common case (this component
+  // mounts with the real query string already known), but SlugScreen's
+  // Suspense fallback can mount THIS SAME instance first with none of it read
+  // yet (see FindResources' own doc on searchQuery etc.) — too late for a
+  // lazy initializer to catch. Each of these applies its prop's arrival
+  // exactly once, guarded by its own ref, rather than forcing a remount of
+  // this whole component the way `openDaveningModal` below still does: once
+  // this component started writing search-as-you-type / toggles / filter
+  // picks BACK into these same props (see the sync effects further down), a
+  // remount-on-prop-change would keep firing on every one of those self
+  // writes and wipe out whatever the visitor had just set mid-session.
+  const appliedInitialSearchRef = useRef(false)
+  useEffect(() => {
+    if (appliedInitialSearchRef.current || !initialSearch) return
+    appliedInitialSearchRef.current = true
+    setSearch(initialSearch)
+  }, [initialSearch])
+  const appliedInitialOpenNowRef = useRef(false)
+  useEffect(() => {
+    if (appliedInitialOpenNowRef.current || !initialOpenNow) return
+    appliedInitialOpenNowRef.current = true
+    setOpenNow(true)
+  }, [initialOpenNow])
+  // `initialFilters` is `null` until FindResourcesConnected hydrates, then a
+  // real (possibly empty) object from then on — see FindResources' own doc —
+  // so that transition alone, not any specific key inside it, is the signal
+  // to read it once. Reads `category.detailFields` directly rather than the
+  // `filterableBooleans`/`filterableSelects` computed further down (this runs
+  // before those are in scope, and duplicating the two-line filter here is
+  // cheaper than reordering the whole component around it).
+  const appliedInitialFiltersRef = useRef(false)
+  useEffect(() => {
+    if (appliedInitialFiltersRef.current || !initialFilters) return
+    appliedInitialFiltersRef.current = true
+    const bools: Record<string, boolean> = {}
+    const sels: Record<string, string[]> = {}
+    for (const f of category.detailFields) {
+      if (f.filterable && f.type === 'boolean' && initialFilters[`f_${f.key}`] === '1') bools[f.key] = true
+      if (f.filterable && f.type === 'select') {
+        const raw = initialFilters[`sel_${f.key}`]
+        if (raw) sels[f.key] = raw.split(',').filter(Boolean)
+      }
+    }
+    // One-time application of an external value on arrival, guarded above by
+    // appliedInitialFiltersRef — not the "derive state from props on every
+    // render" pattern this lint rule is otherwise right to flag.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
+    if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
+  }, [initialFilters, category])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
   // Skips the very first render on purpose: `search`/`openNow` there is just
@@ -187,6 +248,45 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   const hasFilterableHours = hoursFields.some((f) => f.filterable)
   const filterableBooleans = fields.filter((f) => f.filterable && f.type === 'boolean')
   const filterableSelects = fields.filter((f) => f.filterable && f.type === 'select')
+
+  // Sync boolFilters/selectFilters into the URL — same `?f_<key>=`/
+  // `?sel_<key>=` shape initialFilters reads above, and the same
+  // skip-the-first-render + replace (not push) reasoning as the search/
+  // openNow sync effects. Recomputes the FULL set of this category's
+  // filterable-field params from current state every time (not a diff
+  // against the previous set) — cheap (a handful of fields per category)
+  // and it means a field toggled off is still explicitly nulled out rather
+  // than requiring separate bookkeeping of what was previously set.
+  const boolFiltersSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!boolFiltersSyncedOnce.current) {
+      boolFiltersSyncedOnce.current = true
+      return
+    }
+    const changes: Record<string, string | null> = {}
+    for (const f of filterableBooleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
+    onParamsChange?.(changes, { replace: true })
+    // filterableBooleans is a fresh array every render (derived from the
+    // stable `category` prop) — including it here would refire this on
+    // every unrelated render instead of only when the filter state itself
+    // changes; `category` doesn't change without remounting this component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boolFilters, onParamsChange])
+
+  const selectFiltersSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!selectFiltersSyncedOnce.current) {
+      selectFiltersSyncedOnce.current = true
+      return
+    }
+    const changes: Record<string, string | null> = {}
+    for (const f of filterableSelects) {
+      const chosen = selectFilters[f.key] ?? []
+      changes[`sel_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
+    }
+    onParamsChange?.(changes, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectFilters, onParamsChange])
 
   // "All davening times" — only for categories with a `minyanim`-type field
   // (today, just Synagogues) and at least one listing with structured data.

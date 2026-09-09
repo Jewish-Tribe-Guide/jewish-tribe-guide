@@ -24,6 +24,9 @@ type Props = {
   initialSearch?: string
   /** Pre-set the "Open now" filter — see GenericDirectory's own doc. */
   initialOpenNow?: boolean
+  /** Pre-set the category's own boolean/select field filters — see
+   *  GenericDirectory's own doc. */
+  initialFilters?: Record<string, string> | null
   /** Mount with "All davening times" already open — see GenericDirectory's
    *  own doc on this prop. */
   openDaveningModal?: boolean
@@ -44,7 +47,7 @@ type Props = {
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, initialOpenNow, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -104,6 +107,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialOpenNow={initialOpenNow} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onParamsChange={onParamsChange} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onParamsChange={onParamsChange} />
   )
 }

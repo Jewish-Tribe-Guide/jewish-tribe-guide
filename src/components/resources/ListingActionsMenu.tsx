@@ -178,13 +178,19 @@ export default function ListingActionsMenu({
     'flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer'
 
   return (
-    // isolate: gives this its own stacking context so the open menu's z-20
-    // is guaranteed above sibling content regardless of DOM order — without
-    // it, a later-DOM `position: relative` sibling (e.g. the kosher-cert
-    // badge's tooltip wrapper in GenericListingCard) can paint over the menu
-    // even though it has no z-index of its own. Same fix already used for
-    // this exact reason in ResourceMapView.tsx.
-    <div ref={wrapRef} className={`relative isolate ${className ?? ''}`}>
+    // isolate alone only got this half right: it gives the menu's own z-20
+    // priority over an unpositioned sibling within the SAME card (e.g. the
+    // kosher-cert badge's tooltip wrapper) by turning this box into a real
+    // stacking context instead of a transparent one — but nothing in this
+    // card (or its grid wrapper) is itself positioned/isolated, so that
+    // context bubbles all the way up to compete against GenericDirectory's
+    // OWN sticky filter bar (`lg:z-30`), and isolate with no z-index of its
+    // own there is an implicit 0 — comfortably losing to that 30. z-40
+    // (matching the "beats a z-30 sidebar" number already established in
+    // ResourceMapView.tsx, for the identical reason) puts this box's own
+    // priority at that outer level above the sticky bar too, not just above
+    // this card's own siblings.
+    <div ref={wrapRef} className={`relative isolate z-40 ${className ?? ''}`}>
       <button
         type="button"
         onClick={(e) => {

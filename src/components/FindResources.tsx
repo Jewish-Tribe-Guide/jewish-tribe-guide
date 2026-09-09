@@ -70,6 +70,12 @@ export type FindResourcesProps = {
   searchQuery?: string | null
   /** `?openNow=1` */
   searchOpenNow?: string | null
+  /** Every raw query param, for the category's own `?f_<key>=`/`?sel_<key>=`
+   *  boolean/select field filters — see GenericDirectory's own doc on
+   *  `initialFilters`, which this becomes. A plain object (not the
+   *  `URLSearchParams` FindResourcesConnected itself reads) so this file
+   *  doesn't need `next/navigation` just to describe its own props. */
+  searchFilters?: Record<string, string> | null
   /** `?hospital=` */
   searchHospital?: string | null
   /** `?form=` */
@@ -103,6 +109,7 @@ export default function FindResources({
   searchItem = null,
   searchQuery = null,
   searchOpenNow = null,
+  searchFilters = null,
   searchHospital = null,
   searchForm = null,
   searchDavening = null,
@@ -146,20 +153,6 @@ export default function FindResources({
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
   const initialOpenNow = searchOpenNow === '1'
-
-  // Frozen versions of the two above, used only for the ResourceLoader `key`
-  // below. The key exists to force a one-time remount for the fallback →
-  // hydrated timing gap (GenericDirectory's lazy useState already ran with
-  // no query string by the time the real `?q=`/`?openNow=` arrives). Once
-  // GenericDirectory's own onParamsChange started writing search-as-you-type
-  // and the Open Now toggle BACK into these same props, using the live value
-  // here would re-trigger that same remount on every keystroke/toggle,
-  // wiping local state the visitor just set mid-session. Freezing at the
-  // first non-empty value keeps the key doing its original one-time job.
-  const hydratedSearchRef = useRef<string | null>(null)
-  if (hydratedSearchRef.current === null && searchQuery) hydratedSearchRef.current = searchQuery
-  const hydratedOpenNowRef = useRef(false)
-  if (!hydratedOpenNowRef.current && initialOpenNow) hydratedOpenNowRef.current = true
   const openDaveningModal = searchDavening === '1'
   const initialDaveningDay = searchDaveningDay ?? undefined
   const hospitalDetailId = searchHospital
@@ -303,13 +296,14 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (hydratedSearchRef.current ?? '') + (hydratedOpenNowRef.current ? '-openNow' : '') + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
+          key={category.id + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
           category={category}
           items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}
+          initialFilters={searchFilters}
           openDaveningModal={openDaveningModal}
           initialDaveningDay={initialDaveningDay}
           onUp={onUp}
