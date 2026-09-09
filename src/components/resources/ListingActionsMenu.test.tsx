@@ -97,7 +97,11 @@ describe('ListingActionsMenu', () => {
 
   // With room to the right (the common case — a directory card, a dialog
   // header), the menu opens rightward so it stays clear of the name/
-  // address/chevron to the kebab's own left.
+  // address/chevron to the kebab's own left. The popup is portaled and
+  // positioned with inline fixed-position styles (see openMenu's own doc),
+  // not Tailwind position classes any more — asserting on transform-origin
+  // is what's left to check "which corner did this actually anchor to"
+  // without hardcoding a specific pixel value.
   it('opens the dropdown extending right of the kebab when there is room', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
@@ -105,8 +109,8 @@ describe('ListingActionsMenu', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     const menu = screen.getByRole('menu')
-    expect(menu).toHaveClass('left-0')
-    expect(menu).not.toHaveClass('right-0')
+    expect(menu.style.transformOrigin).toContain('left')
+    expect(menu.style.transformOrigin).not.toContain('right')
   })
 
   // MapPlaceDetail's kebab sits flush against the edge of an edge-to-edge
@@ -121,8 +125,8 @@ describe('ListingActionsMenu', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     const menu = screen.getByRole('menu')
-    expect(menu).toHaveClass('right-0')
-    expect(menu).not.toHaveClass('left-0')
+    expect(menu.style.transformOrigin).toContain('right')
+    expect(menu.style.transformOrigin).not.toContain('left')
   })
 
   it('closes the menu on an outside click', async () => {

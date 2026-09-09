@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
@@ -22,6 +23,20 @@ import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon } from '@/com
 // what this needs, so this calls them directly and builds its own menu-row
 // markup. Dropdown pattern (open state, outside-click + Escape dismissal,
 // role="menu") mirrors CommunitySwitcher.tsx's own desktop dropdown.
+//
+// The popup itself is portaled to document.body (position: fixed, computed
+// from the kebab button's own getBoundingClientRect — see openMenu), same
+// pattern as CheckboxDropdown right next to this in the same toolbar. An
+// in-place `absolute` popup (what this used to be) only ever wins a z-index
+// fight against whatever ELSE happens to share its nearest real ancestor
+// stacking context — a directory card sits inside a grid, inside this
+// screen's own sticky filter bar's sibling tree, and nothing in that chain
+// is isolated, so raising this popup's own z-index (tried: isolate, then
+// isolate+z-40) kept meeting a new sibling it still lost to instead of
+// actually fixing it (the sticky sort toggle, then a neighboring card's own
+// upvote icon). A portaled, viewport-fixed popup has no such ancestor to
+// lose to at all — it paints in the root stacking context, same as any
+// browser-native menu would.
 
 // w-40 below, in px — needed as a number to compare against actual measured
 // space at open time.
@@ -87,29 +102,58 @@ export default function ListingActionsMenu({
   onOpenChange?: (open: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
-  // Which side the menu actually opens toward — measured fresh every time
-  // it opens (not a fixed per-caller prop) so it's right regardless of
+  // Fixed-position coordinates for the portaled popup — measured fresh every
+  // time it opens (not a fixed per-caller prop) so it's right regardless of
   // where this particular card happens to sit: a kebab flush against the
   // edge of a narrow mobile sheet (MapPlaceDetail) needs the opposite
   // direction from one with open space to its right (a desktop grid card),
   // and a hardcoded per-component choice can't account for a phone vs. a
   // wide monitor, or a card that ends up in the last column of a grid.
-  // Defaults to 'start' (opens rightward) so the very first paint — before
-  // any measurement has run — matches the common case.
-  const [align, setAlign] = useState<'start' | 'end'>('start')
+  // `top`/`bottom` mirror CheckboxDropdown's own "only one is ever set" —
+  // opens downward from the kebab unless there isn't room below it.
+  const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left: number; anchorRight: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // The popup itself is portaled to document.body (see below), so it's no
+  // longer a DOM descendant of `wrapRef` — needs its own ref for the
+  // outside-click check, or clicking a menu item would read as "outside"
+  // and close it before the item's own onClick even runs.
+  const popupRef = useRef<HTMLDivElement>(null)
   const { isPinned, toggle } = usePinned()
   const { share, copied } = useShareLink(path, item.name)
   // Optional, not useLocation() — this renders inside the admin's category
   // preview too, which has no LocationProvider on purpose (see
   // SetLocationButton's own note).
   const location = useOptionalLocation()
+  // Computed here (not down by `active`, which also needs it) so openMenu's
+  // own row-count estimate below can use it without forward-referencing a
+  // `const` declared later in the function. Same gate the old
+  // SetLocationButton used — a listing whose address failed to geocode has
+  // no geo key, and a category with no physical place (e.g. a WhatsApp
+  // group) has hasAddress === false.
+  const canSetLocation = !!location && category.hasAddress !== false && !!item.geo
 
   function openMenu() {
     const rect = wrapRef.current?.getBoundingClientRect()
     if (rect) {
-      const spaceRight = window.innerWidth - rect.left
-      setAlign(spaceRight < MENU_WIDTH + EDGE_MARGIN ? 'end' : 'start')
+      // A rough estimate of the popup's height — good enough to decide
+      // whether it fits below the button without waiting a render to
+      // measure the real thing (same reasoning as CheckboxDropdown's own
+      // ESTIMATED_ROW_PX). ~36px per row, +8px for the popup's own vertical
+      // padding/border.
+      const itemCount = (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0)
+      const estimatedHeight = itemCount * 36 + 8
+      const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
+      // Clamped inward from the kebab's own left edge means the popup is
+      // effectively right-aligned against the viewport edge — used below to
+      // pick a matching transform-origin, without re-reading wrapRef during
+      // render (see the popup's own style comment).
+      const anchorRight = left < rect.left
+      const fitsBelow = rect.bottom + 4 + estimatedHeight <= window.innerHeight
+      setPopupPos(
+        fitsBelow
+          ? { top: rect.bottom + 4, left, anchorRight }
+          : { bottom: window.innerHeight - rect.top + 4, left, anchorRight },
+      )
     }
     setOpen(true)
   }
@@ -131,7 +175,10 @@ export default function ListingActionsMenu({
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) {
+      const target = e.target as Node
+      // Both refs: the popup itself is portaled to document.body (see
+      // openMenu's own doc), so it's no longer a descendant of wrapRef.
+      if (!wrapRef.current?.contains(target) && !popupRef.current?.contains(target)) {
         setOpen(false)
         // See onOutsideDismiss's own doc — this is the one thing that
         // tells whatever's underneath this tap (almost always the card
@@ -168,29 +215,13 @@ export default function ListingActionsMenu({
   }, [open, onOutsideDismiss])
 
   const pinned = isPinned(item.id)
-  // Same gate the old SetLocationButton used — a listing whose address
-  // failed to geocode has no geo key, and a category with no physical place
-  // (e.g. a WhatsApp group) has hasAddress === false.
-  const canSetLocation = !!location && category.hasAddress !== false && !!item.geo
   const active = canSetLocation && location!.anchorListingId === item.id
 
   const menuItemClass =
     'flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer'
 
   return (
-    // isolate alone only got this half right: it gives the menu's own z-20
-    // priority over an unpositioned sibling within the SAME card (e.g. the
-    // kosher-cert badge's tooltip wrapper) by turning this box into a real
-    // stacking context instead of a transparent one — but nothing in this
-    // card (or its grid wrapper) is itself positioned/isolated, so that
-    // context bubbles all the way up to compete against GenericDirectory's
-    // OWN sticky filter bar (`lg:z-30`), and isolate with no z-index of its
-    // own there is an implicit 0 — comfortably losing to that 30. z-40
-    // (matching the "beats a z-30 sidebar" number already established in
-    // ResourceMapView.tsx, for the identical reason) puts this box's own
-    // priority at that outer level above the sticky bar too, not just above
-    // this card's own siblings.
-    <div ref={wrapRef} className={`relative isolate z-40 ${className ?? ''}`}>
+    <div ref={wrapRef} className={`relative ${className ?? ''}`}>
       <button
         type="button"
         onClick={(e) => {
@@ -209,17 +240,23 @@ export default function ListingActionsMenu({
         <DotsIcon className="h-4 w-4" />
       </button>
 
-      {open && (
+      {open && popupPos && createPortal(
         <div
+          ref={popupRef}
           role="menu"
           onClick={(e) => e.stopPropagation()}
-          // align is measured fresh on every open — see openMenu's own doc
-          // on why this isn't a fixed per-caller choice. transform-origin
-          // (for the animation below) matches whichever corner the menu is
-          // actually anchored to, so it eases open from the kebab itself
-          // rather than from a fixed corner that's sometimes wrong.
-          style={{ transformOrigin: align === 'end' ? 'top right' : 'top left' }}
-          className={`absolute top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out] ${align === 'end' ? 'right-0' : 'left-0'}`}
+          // Which corner popupPos actually anchored to (computed once in
+          // openMenu, not re-derived here) is what transform-origin should
+          // match, so the popup eases open from the kebab itself rather than
+          // from a fixed corner that's sometimes wrong.
+          style={{
+            position: 'fixed',
+            top: popupPos.top,
+            bottom: popupPos.bottom,
+            left: popupPos.left,
+            transformOrigin: `${popupPos.top !== undefined ? 'top' : 'bottom'} ${popupPos.anchorRight ? 'right' : 'left'}`,
+          }}
+          className="z-50 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
         >
           {/* ui.map.pins is the same flag the map's own pin filter chip and
               (formerly) PinButton respected — the original build of this
@@ -267,7 +304,8 @@ export default function ListingActionsMenu({
               {active ? 'Location set' : 'Set location'}
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
