@@ -255,12 +255,20 @@ export default function ListingActionsMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`More actions for ${item.name}`}
-        // -m-2.5 p-2.5: same tap-target-growing trick as the chevron button
+        // -m-2 p-2: same tap-target-growing trick as the chevron button
         // right next to this — the icon is well under the 24px
-        // WCAG-recommended tap target.
-        className="-m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 text-slate-400 hover:text-slate-600"
+        // WCAG-recommended tap target (shrunk from -m-2.5/p-2.5 to match
+        // the icon's own bump from h-4 to h-5 below, keeping the same ~36px
+        // effective tap target rather than growing it further). text-slate-900
+        // matches the card's own name (see GenericListingCard's name `<p>`)
+        // rather than the quieter slate-400/600 this used to be — a kebab
+        // that opens a real action menu (Pin/Share/Set location) reads as
+        // more than a decoration, and disappearing at a glance next to bold
+        // black text undersold that. hover:text-primary matches every other
+        // interactive icon-button on this card (UpvoteButton, Edit).
+        className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-slate-900 hover:text-primary"
       >
-        <DotsIcon className="h-4 w-4" />
+        <DotsIcon className="h-5 w-5" />
       </button>
 
       {open && popupPos && createPortal(
