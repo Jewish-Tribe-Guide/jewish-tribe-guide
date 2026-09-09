@@ -108,7 +108,7 @@ describe('GenericListingCard — collapsed', () => {
     const kebab = screen.getByRole('button', { name: /more actions for/i })
     const positioned = kebab.closest('div[class*="absolute"]')
     expect(positioned).not.toBeNull()
-    expect(positioned).toHaveClass('absolute', 'right-0', 'top-1/2', '-translate-y-1/2')
+    expect(positioned).toHaveClass('absolute', 'right-1', 'top-1/2', '-translate-y-1/2')
 
     // Its positioning context (the nearest `relative` ancestor an absolute
     // child measures against) is the wrapper spanning the icon/name row AND

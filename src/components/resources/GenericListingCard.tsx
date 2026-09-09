@@ -714,20 +714,25 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             answers look the same, which is what hid this: a longer card (a
             header text field, an upvote/distance row) revealed the kebab
             sitting near the TOP of a much taller block instead of its
-            middle. right-0 anchors it to that wrapper's own right edge
-            (this row's own trailing edge, same as before); top-1/2
-            -translate-y-1/2 is the actual centering. The wrapper's own pr-8
-            reserves this group's width so the name/description text never
-            wraps under it — a fixed reserve is safe here because this
-            group's own width is small and fixed (an icon-only kebab + an
-            invisible toggle), not content-driven like the URL chips above,
-            which stay in normal flex flow instead specifically because
-            they aren't.
+            middle. right-1 (4px) pulls it in from that wrapper's own right
+            edge rather than sitting flush against it — a bare right-0
+            inherited the card's own 16px edge padding as its only
+            breathing room, which reads as pinned to the corner with
+            nothing else there to anchor it; a small deliberate gap beyond
+            that (Spotify's own overflow-menu spacing, not Material's wider
+            8px — that read as adrift from the corner rather than anchored
+            to it) is what makes it read as placed on purpose. top-1/2
+            -translate-y-1/2 is the actual vertical centering. The
+            wrapper's own pr-8 reserves this group's width (plus the 4px
+            inset) so the name/description text never wraps under it — a
+            fixed reserve is safe here because this group's own width is
+            small and fixed (an icon-only kebab + an invisible toggle), not
+            content-driven like the URL chips above, which stay in normal
+            flex flow instead specifically because they aren't.
             Same negative-margin tap-target-growing trick and gap-5 spacing
             both controls already used inline here — see each one's own
             className for why. */}
-        <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-5">
-          <ListingActionsMenu item={item} category={category} path={listingPath} />
+        <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-5">
           {/* The row's actual accessible toggle — see the row div's own
               comment above. No onClick: relies on the native click a button
               dispatches on mouse activation or Enter/Space bubbling up to
@@ -738,7 +743,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               with no way to open the dialog at all (the row can't be a
               button — see that same comment on why), and
               GenericListingCard.test.tsx queries this exact button by
-              role. */}
+              role.
+              Rendered BEFORE the kebab (not after, as it was when this
+              carried a visible chevron meant to be the rightmost,
+              corner-anchored element) — invisible now, so nothing about it
+              needs to sit at the true trailing edge any more. With it
+              first, the kebab (the one thing here actually meant to be
+              seen) is the rightmost child, right-1 measures distance to
+              IT rather than to an invisible spacer past it, and gap-5 lands
+              between the two exactly where it did before. Confirmed live:
+              swapping this order alone closed a ~36px gap between where the
+              group's own edge sat and where the visible dots actually
+              were — the earlier bug this comment is here to prevent
+              reintroducing. */}
           <button
             type="button"
             aria-expanded={expanded}
@@ -772,6 +789,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
+          <ListingActionsMenu item={item} category={category} path={listingPath} />
         </div>
 
         {/* Mobile-only twin of the headerTextFields loop above — see the
