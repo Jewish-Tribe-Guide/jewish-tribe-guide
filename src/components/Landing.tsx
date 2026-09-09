@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, ViewTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -18,6 +18,7 @@ import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
+import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
 import { community } from '@/community.config'
@@ -304,6 +305,47 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
     return () => document.removeEventListener('jpc:go-home', onGoHome)
   }, [])
 
+  // The mobile back arrow's own directional reveal — SUPPOSED to come from
+  // the ViewTransition below, but never does, because Next keeps this exact
+  // component instance alive across that navigation instead of remounting
+  // it, and ::view-transition-new only ever gets created opposite a real
+  // unmount/mount pair (confirmed live via document.getAnimations() during
+  // an actual nav-back — see `.reveal-slide-back`'s own doc in globals.css).
+  // A plain CSS class stands in for it here instead.
+  //
+  // Watched via IntersectionObserver, not a React effect re-running or the
+  // jpc:go-home listener above — confirmed live (an instrumented counter in
+  // this exact effect) that NEITHER fires again on this reveal: Next hides
+  // this whole screen behind the category page by some means invisible to
+  // React (no re-render, no effect teardown/rerun, same effect instance the
+  // entire time), so there's no React lifecycle hook for "just became
+  // visible again" to attach to at all. IntersectionObserver reports real
+  // layout/paint visibility straight from the browser, independent of
+  // whether React ever re-renders — reliable exactly where the effect-based
+  // attempts weren't. Still gated on consumeHomeReveal() so an ordinary
+  // scroll-driven intersection change (this element merely leaving and
+  // re-entering the viewport) doesn't also trigger it — only a real
+  // back-navigation ever sets that flag. The observer's own first callback
+  // (reporting whatever the current state already is, before anything
+  // could plausibly have changed) is skipped so a true first mount doesn't
+  // race a same-tick reveal.
+  const [backReveal, setBackReveal] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = mainRef.current
+    if (!el || !isMobile) return
+    let first = true
+    const io = new IntersectionObserver(([entry]) => {
+      if (first) {
+        first = false
+        return
+      }
+      if (entry!.isIntersecting && consumeHomeReveal()) setBackReveal(true)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [isMobile])
+
   return (
     <>
       {/* pb-24 clears mobile's fixed bottom tab bar so the last card isn't
@@ -316,7 +358,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           other way of landing here (tab bar, logo, a fresh visit). See
           useNavTransitionProps' own doc. */}
       <ViewTransition {...navTransition}>
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 animate-[fadeIn_180ms_ease-out]">
+      <main
+        ref={mainRef}
+        className={`max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
+        // Only the slide's own animation (the longer of the two — see
+        // reveal-slide-back's own timing) should clear the one-shot flag;
+        // an animationend from something else in this subtree bubbling up
+        // here would clear it prematurely.
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget && e.animationName === 'slide') setBackReveal(false)
+        }}
+      >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 

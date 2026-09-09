@@ -10,8 +10,9 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
 import { ListingsProvider } from '@/lib/listingsContext'
 import type { DirectoryResource } from '@/types'
-import { resetMockIntersectionObserver, triggerAllIntersections } from '@/test/intersectionObserverMock'
+import { resetMockIntersectionObserver, setAllIntersecting, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { markHomeReveal } from '@/lib/homeRevealSignal'
 import Landing from './Landing'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
@@ -72,6 +73,21 @@ const handlers = {
 // see zmanimLocationLabel), which throws outside a LocationProvider. Wraps
 // renderWithProviders' own element instead of duplicating its provider
 // stack/options handling.
+// useIsMobile() reads this — see the "back-navigation reveal" tests below,
+// which only apply on mobile (see navTransitions.ts's own doc).
+function mockViewport(isMobile: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: isMobile,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia
+}
+
 function renderLanding(
   props: Partial<ComponentProps<typeof Landing>> = {},
   options?: Parameters<typeof renderWithProviders>[1],
@@ -428,6 +444,68 @@ describe('Landing', () => {
       await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })
+    })
+  })
+
+  // Landing never remounts when a category's back arrow returns here — Next
+  // keeps this exact instance alive instead of tearing it down (confirmed
+  // live; see globals.css's `.reveal-slide-back` doc) — so nothing in
+  // React's own lifecycle (a render, an effect re-running) ever fires again
+  // on this reveal. An IntersectionObserver is what actually catches it
+  // (real layout visibility, independent of React), gated on
+  // markHomeReveal()/consumeHomeReveal() so an ordinary scroll-driven
+  // intersection change doesn't also trigger it.
+  describe('the mobile back-arrow reveal (reveal-slide-back)', () => {
+    afterEach(() => mockViewport(false))
+
+    it('applies reveal-slide-back once a pending reveal actually intersects', () => {
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+      expect(main.className).toContain('animate-[fadeIn_180ms_ease-out]')
+
+      markHomeReveal()
+      // The observer's own first callback reports current state and is
+      // ignored (see Landing's own doc) — this simulates it, and should be
+      // a no-op even with a reveal already pending.
+      act(() => setAllIntersecting(false))
+      expect(main.className).not.toContain('reveal-slide-back')
+
+      act(() => triggerAllIntersections())
+      expect(main.className).toContain('reveal-slide-back')
+      expect(main.className).not.toContain('animate-[fadeIn_180ms_ease-out]')
+
+      // Not covered here: the one-shot flag clearing back to fadeIn once the
+      // slide's own CSS animation actually ends. jsdom has no
+      // AnimationEvent/animation-timeline support at all, and confirmed
+      // directly (a debug listener that never fired) that React doesn't
+      // even register onAnimationEnd delegation in this environment as a
+      // result — a genuine automation gap, not a skipped assertion.
+    })
+
+    it('ignores an ordinary reveal with no pending back-navigation', () => {
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      // No markHomeReveal() this time — an ordinary scroll-driven
+      // intersection change (or the observer's own first callback) must
+      // never apply the slide.
+      act(() => triggerAllIntersections())
+      expect(main.className).not.toContain('reveal-slide-back')
+    })
+
+    it('does nothing on desktop even with a reveal pending', () => {
+      mockViewport(false)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      markHomeReveal()
+      act(() => triggerAllIntersections())
+      expect(main.className).not.toContain('reveal-slide-back')
     })
   })
 

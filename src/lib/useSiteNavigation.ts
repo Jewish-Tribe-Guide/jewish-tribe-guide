@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { AppMode, MapFilters, NavigateFn } from '@/types'
 import { useCommunitySlug } from './communityContext'
 import { mapQueryString, routes } from './routes'
+import { markHomeReveal } from './homeRevealSignal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The navigation functions every screen already takes as props, reimplemented
@@ -107,17 +108,23 @@ export function useSiteNavigation(): SiteNavigation {
       })
       // Tapping the mobile tab bar's Home button, or the header logo, while
       // already on home pushes the exact URL that's already loaded — Next
-      // treats that as a no-op and never remounts Landing, so a typed search
-      // (local state, not a URL param — see Landing) and scroll position
-      // would otherwise just sit there, which isn't what "go home" means when
-      // you're tapping it as a reset. Landing listens for this and clears
-      // both by hand for that no-op case; a real cross-page navigation resets
-      // them for free by remounting, so this is only load-bearing there.
-      // Skipped for the `at: 'map'` case: that's always a real navigation
-      // (only ever called from the full-map screen, a different pathname),
-      // so it already resets on remount, and firing here too would race the
+      // treats that as a no-op, and (as it turns out) so does a REAL
+      // cross-page nav back to home: Next keeps the previously-rendered
+      // Landing instance alive rather than tearing it down, so nothing
+      // here ever remounts on its own. Landing listens for this event to
+      // reset a stale search/scroll position by hand (the tab-bar/logo
+      // "already home" case). Skipped for the `at: 'map'` case: that's
+      // always a real navigation (only ever called from the full-map
+      // screen, a different pathname), so firing here too would race the
       // scroll-to-map-band effect that same navigation triggers.
       if (!opts?.at) document.dispatchEvent(new CustomEvent('jpc:go-home'))
+      // The mobile back arrow's own directional reveal (see Landing's own
+      // `backReveal` doc) can't ride the event above — see
+      // homeRevealSignal.ts's own doc for why an event dispatched here
+      // isn't reliably caught. transitionTypes is only ever set for that
+      // exact case (the category directory's own back arrow — mobile
+      // only, see SlugScreen's onUp), so its presence IS the signal.
+      if (opts?.transitionTypes) markHomeReveal()
     },
     [router, community],
   )

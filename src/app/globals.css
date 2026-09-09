@@ -242,6 +242,31 @@ body {
     210ms ease-out 150ms both fade,
     400ms ease-in-out both slide;
 }
+/* Landing's own stand-in for ::view-transition-new(.nav-back) above — see
+   Landing.tsx's own `backReveal` state for why a real element needs this at
+   all: Next keeps a previously-rendered Landing instance alive across a
+   category-back-to-home nav rather than tearing it down and remounting it,
+   so `::view-transition-new` never gets created for it (that pseudo-element
+   only exists opposite a real unmount/mount pair) — confirmed live via
+   document.getAnimations() during an actual nav-back, which showed
+   SlugScreen's own exit correctly running `fade`+`slide` while Landing's
+   side ran nothing but its plain mount-triggered `fadeIn` (opacity only,
+   no slide — see the plain `animate-[fadeIn_180ms_ease-out]` a few lines
+   below this file's own view-transition rules). The browser still restarts
+   a CSS animation on this element when it's revealed again even without a
+   real remount (same live capture caught `fadeIn` genuinely restarting on
+   it), so applying the exact same fade+slide recipe directly, as a normal
+   class instead of a view-transition pseudo-selector, produces the same
+   visual result without needing a real mount to hook into. Same keyframes,
+   same offset and timing as `::view-transition-new(.nav-back)` above —
+   kept in sync by hand since one drives a real element and the other a
+   view-transition pseudo-element, and can't share a single selector. */
+.reveal-slide-back {
+  --slide-offset: -60px;
+  animation:
+    210ms ease-out 150ms both fade,
+    400ms ease-in-out both slide;
+}
 @keyframes slide {
   from { translate: var(--slide-offset); }
   to   { translate: 0; }
