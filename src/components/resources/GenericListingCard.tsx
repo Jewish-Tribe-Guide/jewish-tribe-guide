@@ -24,6 +24,7 @@ import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
+import { consumeSuppressedRowClick } from '@/lib/suppressRowClick'
 
 // How long mobile's inline accordion panel takes to open/close — the height
 // (grid-template-rows) and opacity transition below, and the delay before
@@ -206,13 +207,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       cancelAnimationFrame(raf2)
     }
   }, [expanded])
-  // Set (by ListingActionsMenu's own onOutsideDismiss) the instant an
-  // outside tap closes the kebab menu — see that prop's own doc for the
-  // full story. Checked, then cleared, at the very top of the row's own
-  // onClick below: without it, the same tap that dismissed the menu (which
-  // almost always lands on this row — it's most of the visible card) also
-  // silently toggled this card open/closed in the same motion.
-  const suppressNextRowClickRef = useRef(false)
   // Two independent alignment segments — see GenericListingCardHandle's own
   // doc for why this is two spacers, not one. cardRootRef anchors segment
   // 1 (icon/name/address/header text, ending at the upvote row); the
@@ -561,13 +555,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       <div
         ref={cardRootRef}
         onClick={() => {
-          // See suppressNextRowClickRef's own doc — this is the one tap
-          // this row must NOT act on: the same tap that just dismissed the
-          // kebab menu.
-          if (suppressNextRowClickRef.current) {
-            suppressNextRowClickRef.current = false
-            return
-          }
+          // See suppressRowClick's own module doc — this is the one tap
+          // this row must NOT act on: the same tap that just dismissed a
+          // kebab menu, THIS card's own or a different card's (the popup is
+          // portaled — see ListingActionsMenu's own doc — so "outside" can
+          // land on any row on the page, not just this one). Always
+          // consumed, even when it turns out false, so a stray `true` never
+          // leaks into a later, unrelated click on this same row.
+          if (consumeSuppressedRowClick()) return
           setExpanded((p) => {
             if (!p) track('listing_opened', { listing: item.name, category: category.id })
             return !p
@@ -805,11 +800,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
+          {/* No onOutsideDismiss here — see suppressRowClick's own module
+              doc. ListingActionsMenu marks that shared flag itself on every
+              outside dismiss, which covers this row (and every sibling
+              row) without this card needing its own per-instance callback. */}
           <ListingActionsMenu
             item={item}
             category={category}
             path={listingPath}
-            onOutsideDismiss={() => { suppressNextRowClickRef.current = true }}
           />
         </div>
 

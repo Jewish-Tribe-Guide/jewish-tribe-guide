@@ -150,6 +150,41 @@ describe('GenericListingCard — collapsed', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 
+  // Same failure mode as the test above, but across two different cards —
+  // the popup is portaled (see ListingActionsMenu's own doc), so "outside"
+  // now genuinely means "anywhere on the page," including a different
+  // card's own row. Each card's suppressNextRowClickRef only guards ITS OWN
+  // row, so dismissing card A's menu by tapping card B used to leave B free
+  // to expand in the same motion — see suppressRowClick's own module doc.
+  it("does not expand a different card on the tap that dismisses another card's kebab menu", async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const itemA = makeListing({ id: 'listing-a', name: 'Card A' })
+    const itemB = makeListing({ id: 'listing-b', name: 'Card B' })
+    renderWithProviders(
+      <>
+        <GenericListingCard item={itemA} category={category} upvotes={false} count={0} {...requiredHandlers} />
+        <GenericListingCard item={itemB} category={category} upvotes={false} count={0} {...requiredHandlers} />
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for card a/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    // Dismiss card A's menu by tapping card B's row — a different card
+    // entirely, not "elsewhere on the same card" the test above covers.
+    const toggleB = screen.getByRole('button', { name: /show details for card b/i })
+    const rowB = toggleB.closest('div[class*="cursor-pointer"]')!
+    await user.click(rowB)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(toggleB).toHaveAttribute('aria-expanded', 'false')
+
+    // A later, genuinely separate tap on card B must still work.
+    await user.click(rowB)
+    expect(toggleB).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
     const item = makeListing()

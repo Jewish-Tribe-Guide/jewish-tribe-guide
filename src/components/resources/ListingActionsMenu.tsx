@@ -7,6 +7,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { markRowClickSuppressed } from '@/lib/suppressRowClick'
 import { ui } from '@/lib/uiConfig'
 import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon } from '@/components/icons'
 
@@ -69,9 +70,22 @@ export default function ListingActionsMenu({
    *  to tell that handler "this exact tap was already spent dismissing the
    *  menu," it would also silently act on it in the same motion.
    *
-   *  Callers own the actual suppression themselves (see GenericListingCard's
-   *  own use of this) rather than this component trying to stop the click
-   *  from reaching them via DOM propagation tricks — an earlier version did
+   *  This only reaches THIS instance's own caller — fine for the map sheet
+   *  (one place detail panel on screen at a time), but a directory grid has
+   *  one ListingActionsMenu per card, and the tap dismissing one can land on
+   *  a completely different card's row (the popup is portaled to
+   *  document.body — see openMenu's own doc — so "outside" really can mean
+   *  anywhere on the page now). GenericListingCard doesn't wire this prop at
+   *  all any more; see suppressRowClick's own module doc for the shared,
+   *  cross-card mechanism this component drives directly instead, on every
+   *  outside dismiss regardless of whether a caller passed this prop.
+   *
+   *  Kept only for MapPlaceDetail's own use (a distinct concern — dismissing
+   *  the whole sheet's own background-tap-to-collapse, not a listing row),
+   *  which owns its OWN suppression the same way GenericListingCard's used
+   *  to (see MobileNearbySheet's suppressNextCollapseRef) rather than this
+   *  component trying to stop the click from reaching it via DOM
+   *  propagation tricks — an earlier version did
    *  that (mousedown flags a ref, a capture-phase click listener stops
    *  propagation) and it worked in this codebase's own synthetic-event
    *  tests, but failed consistently on real iPhones in both Safari and
@@ -184,6 +198,15 @@ export default function ListingActionsMenu({
         // tells whatever's underneath this tap (almost always the card
         // itself) not to also act on the very same tap.
         onOutsideDismiss?.()
+        // onOutsideDismiss only reaches THIS instance's own caller — fine
+        // when there's only one listing on screen (the map sheet), but a
+        // directory grid has one ListingActionsMenu per card, and the tap
+        // that dismisses THIS one can land on a completely different card's
+        // row (the popup is portaled — see openMenu's own doc — so "outside"
+        // now really can mean "anywhere on the page"). Without this, that
+        // tap would ALSO toggle the OTHER card open/closed in the same
+        // motion: dismiss one thing, and something unrelated reacts too.
+        markRowClickSuppressed()
       }
     }
     const onKey = (e: KeyboardEvent) => {
