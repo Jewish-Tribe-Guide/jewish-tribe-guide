@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
@@ -17,6 +17,7 @@ import { useHomeSections } from '@/lib/useHomeSections'
 import { BUILT_IN_BLOCKS, type HomeBlockKind } from '@/lib/homeSections'
 import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useNavTransitionProps } from '@/lib/navTransitions'
 import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
 import { community } from '@/community.config'
@@ -88,6 +89,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
+  const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
   // The Map pseudo-category still gates whether the map shows at all.
   const hasMap = !!categories?.some((c) => c.kind === 'map')
@@ -308,6 +310,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           hidden behind it — desktop has no such bar, so that padding just
           stacked on top of the footer's own mt-16/border-t below, leaving a
           much bigger gap after the last section than the footer intended. */}
+      {/* ViewTransition: reacts only to a real navigation carrying a tagged
+          transitionType ('nav-back', from a category's own back arrow — see
+          SlugScreen/useSiteNavigation) — a no-op on desktop and on every
+          other way of landing here (tab bar, logo, a fresh visit). See
+          useNavTransitionProps' own doc. */}
+      <ViewTransition {...navTransition}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 animate-[fadeIn_180ms_ease-out]">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
@@ -591,6 +599,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 until after hydration) can guarantee. ─────────────────────── */}
         <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>
       </main>
+      </ViewTransition>
     </>
   )
 }

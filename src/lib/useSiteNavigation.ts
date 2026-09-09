@@ -60,7 +60,7 @@ export type SiteNavigation = {
   navigate: NavigateFn
   /** Opens a guided form — a category-or-form slug under the community. */
   openFlow: (kind: string, preselect?: string[]) => void
-  goHome: (opts?: { at?: 'map' }) => void
+  goHome: (opts?: { at?: 'map'; transitionTypes?: string[] }) => void
   viewListing: (categoryId: string, listingId: string) => void
   viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
@@ -90,12 +90,21 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const goHome = useCallback(
-    (opts?: { at?: 'map' }) => {
+    (opts?: { at?: 'map'; transitionTypes?: string[] }) => {
       // `?at=map` lands the visitor on the home screen's embedded map band
       // rather than at the hero — used when collapsing the fullscreen map, so
       // the collapse reads as zooming out. Mobile's home screen has no map
       // band, so the param is simply ignored there.
-      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`)
+      //
+      // transitionTypes: only the category directory's own back arrow passes
+      // this ('nav-back' — see GenericDirectory's onUp) — not the tab bar's
+      // Home button, the header logo, or the map-exit case above, none of
+      // which have a matching ViewTransition-wrapped exit on their own
+      // screen. Tagging those too would trigger the browser's default
+      // whole-page crossfade with nothing to actually pair it against.
+      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`, {
+        transitionTypes: opts?.transitionTypes,
+      })
       // Tapping the mobile tab bar's Home button, or the header logo, while
       // already on home pushes the exact URL that's already loaded — Next
       // treats that as a no-op and never remounts Landing, so a typed search

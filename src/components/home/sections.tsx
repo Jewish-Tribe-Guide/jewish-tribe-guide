@@ -96,6 +96,13 @@ export function Card({
       href={card.href}
       className="group block w-full cursor-pointer"
       onClick={onCardClick ? () => onCardClick(card) : undefined}
+      // Every card here is one level deeper than the home screen it's on —
+      // a real category, a form, a pseudo-category (Map/Zmanim/Eruv) — so
+      // this is always a "forward" drill-down. Tagging it costs nothing on
+      // its own: whether it actually produces a slide is decided entirely
+      // by the destination's own ViewTransition wrapper (SlugScreen),
+      // which only maps this type to a real animation on mobile.
+      transitionTypes={['nav-forward']}
     >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
@@ -228,6 +235,8 @@ function CompactCard({
       href={card.href}
       className="group flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-colors hover:bg-slate-50"
       onClick={onCardClick ? () => onCardClick(card) : undefined}
+      // See Card's own comment on the same prop above.
+      transitionTypes={['nav-forward']}
     >
       {card.icon ? (
         <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />

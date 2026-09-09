@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { LocationProvider } from '@/lib/locationContext'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
@@ -18,9 +19,19 @@ vi.mock('next/navigation', () => ({
 // The content FindResourcesConnected/FindResources would render (listings,
 // filters, ResourceLoader, ...) isn't this test's concern — only whether
 // SlugScreen's own <main> remounts per slug is. Stubbed to keep this test
-// from also having to satisfy their own dependencies.
+// from also having to satisfy their own dependencies. The stub does call the
+// real onUp prop it's handed, though — that's how the "back arrow" test below
+// exercises SlugScreen's own wiring of it without needing GenericDirectory's
+// real header-back-button machinery (useSetScreenHeader/SiteHeader) in
+// scope, matching FindResourcesConnected.test.tsx's own reasoning for
+// keeping this narrowly about what SlugScreen itself does with its props.
 vi.mock('@/components/FindResourcesConnected', () => ({
-  default: () => <div>FindResourcesConnected stub</div>,
+  default: ({ onUp }: { onUp: () => void }) => (
+    <div>
+      FindResourcesConnected stub
+      <button onClick={onUp}>Up</button>
+    </div>
+  ),
 }))
 vi.mock('@/components/FindResources', () => ({
   default: () => <div>FindResources stub</div>,
@@ -69,5 +80,20 @@ describe('SlugScreen', () => {
       </LocationProvider>,
     )
     expect(document.querySelector('main')).not.toBe(firstMain)
+  })
+
+  // The category directory's own back arrow (GenericDirectory's onUp,
+  // ultimately this) requests the mobile directional slide specifically —
+  // see goHome's own comment on why that's NOT the default for every way of
+  // reaching home. This would silently regress to a plain goHome() (no
+  // slide ever, on any device) if someone simplified this call site without
+  // noticing why the option is there.
+  it('tags its back arrow with nav-back when going home', async () => {
+    const user = userEvent.setup()
+    renderSlug('grocery')
+
+    await user.click(screen.getByRole('button', { name: 'Up' }))
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: ['nav-back'] })
   })
 })

@@ -95,6 +95,14 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   return (
     <header
       className={className}
+      // Named so the browser's View Transition (SlugScreen/Landing's
+      // directional slide, see navTransitions.ts) treats this header as its
+      // own stable layer instead of sweeping it into the sliding content —
+      // see globals.css's own `::view-transition-group(site-header)` rule,
+      // which suppresses any animation on it. Without this, the header
+      // would visibly slide/flash along with the content, breaking the one
+      // fixed reference point a directional transition depends on.
+      style={{ viewTransitionName: 'site-header' }}
     >
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-10">
         {showScreenHeader && screenHeader ? (

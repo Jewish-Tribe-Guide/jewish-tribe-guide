@@ -182,6 +182,86 @@ body {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* Directional slide for mobile's home <-> category navigation (see
+   navTransitions.ts / SlugScreen.tsx / Landing.tsx / sections.tsx) — the
+   native "one level deeper" / "back" convention: forward slides new content
+   in from the right while the old content slides/fades left; back reverses
+   it. Recipe follows Next's own documented pattern for this
+   (node_modules/next/dist/docs/01-app/02-guides/view-transitions.md) —
+   asymmetric timing (old content leaves fast so it doesn't compete for
+   attention; new content arrives a touch slower so there's time to
+   register it) rather than a value invented from scratch.
+
+   Desktop never sees these: useNavTransitionProps only maps 'nav-forward'/
+   'nav-back' to these class names on mobile — desktop's <ViewTransition>
+   gets `default: 'none'` for every type, so it plays no view-transition
+   animation at all and keeps its own plain fadeIn (above) untouched. */
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation:
+    150ms ease-in both fade reverse,
+    400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation:
+    210ms ease-out 150ms both fade,
+    400ms ease-in-out both slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation:
+    150ms ease-in both fade reverse,
+    400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation:
+    210ms ease-out 150ms both fade,
+    400ms ease-in-out both slide;
+}
+@keyframes slide {
+  from { translate: var(--slide-offset); }
+  to   { translate: 0; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* SiteHeader carries `viewTransitionName: 'site-header'` so it's captured as
+   its own layer instead of being swept into the root snapshot the slide
+   above runs on — without this the header visibly double-flashes (old and
+   new snapshots briefly overlapping) every time the slide plays. It's the
+   one fixed point a directional transition needs to actually read as
+   directional, rather than the whole viewport moving. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+/* The transition overlay otherwise captures pointer events for its
+   duration, so a tap during the ~400ms slide is lost rather than reaching
+   the page underneath. */
+::view-transition {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 /* Admin-authored page copy (About, Privacy) — see lib/richText.ts. Tailwind's
  * preflight resets headings and lists to look like body text, which is right
  * everywhere the app builds its own markup with utility classes and wrong for

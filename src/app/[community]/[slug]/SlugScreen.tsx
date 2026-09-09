@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, ViewTransition } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { DirectoryResource } from '@/types'
 import FindResources from '@/components/FindResources'
@@ -10,6 +10,7 @@ import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
+import { useNavTransitionProps } from '@/lib/navTransitions'
 
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only
@@ -37,6 +38,7 @@ export default function SlugScreen({
 }) {
   const { anchor } = useLocation()
   const { goHome, viewMapForCategory } = useSiteNavigation()
+  const navTransition = useNavTransitionProps()
 
   if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} />
 
@@ -50,7 +52,11 @@ export default function SlugScreen({
     listings,
     anchor,
     initialItemId,
-    onUp: goHome,
+    // 'nav-back': this is specifically "return to the home grid," the exact
+    // reverse of a category card's own 'nav-forward' (see sections.tsx) —
+    // not the tab bar's Home button or the header logo, which stay
+    // untagged (see goHome's own doc for why).
+    onUp: () => goHome({ transitionTypes: ['nav-back'] }),
     onViewMap: viewMapForCategory,
   }
 
@@ -61,26 +67,36 @@ export default function SlugScreen({
     // GenericDirectory) was being squeezed into that narrower box along
     // with everything else.
     //
-    // key={slug}: this same component instance serves every category/form —
-    // switching from one to another is a prop change, not a fresh mount, so
-    // without a key the fadeIn animation below (mount-triggered) would only
-    // ever fire once, on this screen's very first visit. Keying on the one
-    // thing that actually changes between "different pages" here forces a
-    // remount (and re-fade) on every switch, the same way visiting a
-    // genuinely different route already does elsewhere.
-    <main key={slug} className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]">
-      {/* The fallback IS FindResources — a full, real render of this category
-          with no query-string state, which is exactly what a plain
-          /community/slug visit (no ?item=/?q=/etc.) looks like. That's what
-          lets this prerender for real: nothing in this fallback's own tree
-          calls useSearchParams, so it isn't deferred behind the boundary the
-          way the whole thing used to be — only FindResourcesConnected,
-          which supplies the query-string-driven refinements (an expanded
-          card, an open form, …) once the page has hydrated, is. */}
-      <Suspense fallback={<FindResources {...findResourcesProps} />}>
-        <FindResourcesConnected {...findResourcesProps} />
-      </Suspense>
-    </main>
+    // ViewTransition, outside the keyed <main>: it only reacts to a real
+    // route change (Home <-> this screen) carrying a tagged transitionType —
+    // see useNavTransitionProps' own doc for why that's mobile-only and why
+    // it's a no-op everywhere else. It does NOT react to <main>'s own
+    // key={slug} changing underneath it (a lateral category-to-category
+    // move, still this same SlugScreen instance) — that keeps using the
+    // plain fadeIn below, untouched, exactly as before.
+    <ViewTransition {...navTransition}>
+      {/* key={slug}: this same component instance serves every category/
+          form — switching from one to another is a prop change, not a
+          fresh mount, so without a key the fadeIn animation below
+          (mount-triggered) would only ever fire once, on this screen's
+          very first visit. Keying on the one thing that actually changes
+          between "different pages" here forces a remount (and re-fade) on
+          every switch, the same way visiting a genuinely different route
+          already does elsewhere. */}
+      <main key={slug} className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]">
+        {/* The fallback IS FindResources — a full, real render of this category
+            with no query-string state, which is exactly what a plain
+            /community/slug visit (no ?item=/?q=/etc.) looks like. That's what
+            lets this prerender for real: nothing in this fallback's own tree
+            calls useSearchParams, so it isn't deferred behind the boundary the
+            way the whole thing used to be — only FindResourcesConnected,
+            which supplies the query-string-driven refinements (an expanded
+            card, an open form, …) once the page has hydrated, is. */}
+        <Suspense fallback={<FindResources {...findResourcesProps} />}>
+          <FindResourcesConnected {...findResourcesProps} />
+        </Suspense>
+      </main>
+    </ViewTransition>
   )
 }
 
