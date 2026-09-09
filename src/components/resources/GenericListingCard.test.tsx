@@ -87,6 +87,25 @@ describe('GenericListingCard — collapsed', () => {
     expect(row).toHaveClass('h-full')
   })
 
+  // The row's own desktop:items-start top-anchors the category icon avatar
+  // next to the name's own line (see that span's own comment), which the
+  // trailing kebab/URL-chip column doesn't need or want — a kebab pinned to
+  // the top of a taller (3-line) row instead of centered against it is the
+  // regression this guards. self-center on the trailing column overrides
+  // the row's alignment for just that column, matching Material Design's
+  // own guidance that a list row's leading/trailing elements center
+  // regardless of how many lines the row's text wraps to.
+  it('centers the trailing kebab column instead of top-anchoring it with the avatar', () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    const kebab = screen.getByRole('button', { name: /more actions for/i })
+    const trailingColumn = kebab.closest('div[class*="shrink-0"]')
+    expect(trailingColumn).not.toBeNull()
+    expect(trailingColumn).toHaveClass('self-center')
+  })
+
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
     const item = makeListing()

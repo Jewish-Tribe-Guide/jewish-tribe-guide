@@ -668,7 +668,17 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          {/* self-center overrides the row's own desktop:items-start above —
+              that top-anchors the AVATAR next to the name's own line so it
+              doesn't drift toward the middle of a taller (3-line) block, but
+              a trailing action column (URL chips, the kebab) is a different
+              element with a different convention: Material Design's own
+              list-item spec centers leading/trailing elements regardless of
+              how many lines the row's text wraps to — Gmail's row-level
+              kebab, a Settings row's trailing chevron, etc. all follow this.
+              The avatar and this column can disagree on alignment; they're
+              just siblings in the same flex row, not tied to one rule. */}
+          <div className="flex items-center gap-3 shrink-0 self-center">
             <div className="flex items-center gap-2">
               {headerUrlFields.map(({ f, href }) => (
                 <a
