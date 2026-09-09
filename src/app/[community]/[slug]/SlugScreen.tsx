@@ -60,7 +60,15 @@ export default function SlugScreen({
     // reason tied to its own content, and the desktop card grid (see
     // GenericDirectory) was being squeezed into that narrower box along
     // with everything else.
-    <main className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8">
+    //
+    // key={slug}: this same component instance serves every category/form —
+    // switching from one to another is a prop change, not a fresh mount, so
+    // without a key the fadeIn animation below (mount-triggered) would only
+    // ever fire once, on this screen's very first visit. Keying on the one
+    // thing that actually changes between "different pages" here forces a
+    // remount (and re-fade) on every switch, the same way visiting a
+    // genuinely different route already does elsewhere.
+    <main key={slug} className="flex flex-1 flex-col w-full max-w-6xl mx-auto px-4 pt-8 pb-24 sm:pt-8 sm:pb-8 animate-[fadeIn_180ms_ease-out]">
       {/* The fallback IS FindResources — a full, real render of this category
           with no query-string state, which is exactly what a plain
           /community/slug visit (no ?item=/?q=/etc.) looks like. That's what

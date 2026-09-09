@@ -308,7 +308,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           hidden behind it — desktop has no such bar, so that padding just
           stacked on top of the footer's own mt-16/border-t below, leaving a
           much bigger gap after the last section than the footer intended. */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 animate-[fadeIn_180ms_ease-out]">
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
 

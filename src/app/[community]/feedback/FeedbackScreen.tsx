@@ -24,7 +24,7 @@ export default function FeedbackScreen() {
     // there and let the footer's own modal open. Rendering a bare feedback
     // page at desktop width would be a screen the site otherwise never shows.
     return (
-      <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-8">
+      <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-8 animate-[fadeIn_180ms_ease-out]">
         <FeedbackForm
           heading={settings.feedbackHeading}
           successMessage={settings.feedbackSuccessMessage}
@@ -35,7 +35,7 @@ export default function FeedbackScreen() {
   }
 
   return (
-    <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24">
+    <main className="flex flex-1 flex-col w-full max-w-4xl mx-auto px-4 pt-8 pb-24 animate-[fadeIn_180ms_ease-out]">
       <FeedbackForm
         variant="inline"
         heading={settings.feedbackHeading}
