@@ -1430,7 +1430,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
           ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
-          : `desktop:relative desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
+          // desktop:isolate: boxed mode (e.g. the home-screen map band) has no
+          // z-index of its own on this wrapper, so without a stacking context
+          // here the search box's z-40 below (ResourceMapView's own overlay,
+          // meant only to sit above the map/sidebar inside this box) leaked
+          // straight into the root stacking context and tied with
+          // SiteHeader's own z-40 — DOM order then let it paint over the
+          // header, including the Categories dropdown nested inside it.
+          // `isolate` contains that z-40 to this box without renumbering it
+          // (fullscreen mode needs no such fix: its z-50 fixed layer already
+          // establishes its own stacking context, and covering the header
+          // there is a separate, intentional tradeoff — see the `controls`
+          // prop's own doc above).
+          : `desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
               borderless ? '' : ' desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
             }`
       }`}
