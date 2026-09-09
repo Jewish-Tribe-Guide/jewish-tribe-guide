@@ -42,11 +42,32 @@ export default function FindResourcesConnected(props: Props) {
     }
     const qs = next.toString()
     const url = qs ? `${pathname}?${qs}` : pathname
-    // replace (not push) for the directory's own search/"Open now" sync —
-    // see FindResources' own onParamsChange doc — so typing or toggling
-    // doesn't spam browser history the way the item/form navigations below
-    // deliberately do.
-    if (opts?.replace) router.replace(url)
+    // The directory's own search/"Open now"/filter sync (see FindResources'
+    // own onParamsChange doc) goes straight through the History API, NOT
+    // router.replace. Even with the URLSearchParams themselves debounced
+    // and now built off window.location.search directly (see above),
+    // router.replace still routes through Next's OWN navigation machinery —
+    // which, on a searchParams-only change to an ALREADY-mounted route,
+    // still triggers a fresh render pass through this component and
+    // everything below it (FindResources → ResourceLoader →
+    // GenericDirectory → the whole listing grid), because this component
+    // reads those very params via useSearchParams(). That's a real
+    // re-render cascade landing on every debounced sync, not a rendering
+    // bug in any one component — confirmed live as the reported "pointer
+    // glitching" (dropped frames from the re-render) and, separately, the
+    // header's own flash reappearing once a listing dialog's scroll-lock
+    // reflow (see globals.css's scrollbar-gutter fix) landed on top of an
+    // already-busy main thread.
+    //
+    // A plain history.replaceState changes the address bar with NO React
+    // re-render at all: nothing here subscribes to raw window.location, and
+    // GenericDirectory already holds search/openNow/filter state locally
+    // (this call exists purely so the URL is shareable and survives a
+    // reload — see GenericDirectory's own hydration effects for the other
+    // half of that). router.push stays for the item/form/hospital
+    // navigations below — those DO need Next's own history/back-button
+    // integration, which this sync deliberately opts out of.
+    if (opts?.replace) window.history.replaceState(window.history.state, '', url)
     else router.push(url)
   }
 
