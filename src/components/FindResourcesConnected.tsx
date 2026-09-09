@@ -23,7 +23,19 @@ export default function FindResourcesConnected(props: Props) {
   const router = useRouter()
 
   const setParams = (changes: Record<string, string | null>, opts?: { replace?: boolean }) => {
-    const next = new URLSearchParams(params)
+    // window.location.search, not the closure-captured `params` above:
+    // `params` is only as fresh as this component's LAST completed render,
+    // and a `router.replace` navigation doesn't resolve synchronously — it's
+    // still in flight by the time a SECOND, fast-following call can arrive
+    // (e.g. clicking three checkbox filters in quick succession, each one
+    // calling this via GenericDirectory's own sync effect). Building off the
+    // stale `params` there meant the second call's `next` never saw the
+    // first call's change, so whichever replace actually committed last
+    // silently dropped it — filters that visibly checked in the UI would
+    // vanish from the URL a moment later. window.location.search is always
+    // the CURRENT address bar, synchronously, regardless of where this
+    // component's own re-render happens to be.
+    const next = new URLSearchParams(window.location.search)
     for (const [key, value] of Object.entries(changes)) {
       if (value === null) next.delete(key)
       else next.set(key, value)

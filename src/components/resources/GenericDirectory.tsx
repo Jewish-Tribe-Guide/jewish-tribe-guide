@@ -257,15 +257,29 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // against the previous set) — cheap (a handful of fields per category)
   // and it means a field toggled off is still explicitly nulled out rather
   // than requiring separate bookkeeping of what was previously set.
+  //
+  // Debounced (like search) rather than firing on every click: a
+  // multi-select filter is exactly the case where a visitor picks several
+  // values in quick succession (e.g. three "Type" checkboxes in a row), and
+  // an immediate `router.replace` per click meant each of those clicks
+  // forced its own live navigation — a full re-render of this whole
+  // directory's listing grid, back to back, only microseconds apart. That
+  // read as actual jank (a lagging/"glitching" cursor while the main thread
+  // was busy re-rendering) purely from clicking a checkbox list a few times,
+  // not from anything wrong with the click handling itself. One replace
+  // after the visitor pauses is both cheaper and closer to "done choosing."
   const boolFiltersSyncedOnce = useRef(false)
   useEffect(() => {
     if (!boolFiltersSyncedOnce.current) {
       boolFiltersSyncedOnce.current = true
       return
     }
-    const changes: Record<string, string | null> = {}
-    for (const f of filterableBooleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
-    onParamsChange?.(changes, { replace: true })
+    const timer = setTimeout(() => {
+      const changes: Record<string, string | null> = {}
+      for (const f of filterableBooleans) changes[`f_${f.key}`] = boolFilters[f.key] ? '1' : null
+      onParamsChange?.(changes, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
     // filterableBooleans is a fresh array every render (derived from the
     // stable `category` prop) — including it here would refire this on
     // every unrelated render instead of only when the filter state itself
@@ -279,12 +293,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
       selectFiltersSyncedOnce.current = true
       return
     }
-    const changes: Record<string, string | null> = {}
-    for (const f of filterableSelects) {
-      const chosen = selectFilters[f.key] ?? []
-      changes[`sel_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
-    }
-    onParamsChange?.(changes, { replace: true })
+    const timer = setTimeout(() => {
+      const changes: Record<string, string | null> = {}
+      for (const f of filterableSelects) {
+        const chosen = selectFilters[f.key] ?? []
+        changes[`sel_${f.key}`] = chosen.length > 0 ? chosen.join(',') : null
+      }
+      onParamsChange?.(changes, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectFilters, onParamsChange])
 
