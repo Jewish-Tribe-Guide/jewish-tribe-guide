@@ -32,6 +32,10 @@ type Props = {
    *  (MobileNearbySheet) is what actually owns the suppression; this just
    *  passes the signal up to it. */
   onOutsideDismiss?: () => void
+  /** Forwarded straight to ListingActionsMenu — see that prop's own doc on
+   *  why onOutsideDismiss alone isn't enough for the map background's own
+   *  tap-to-collapse specifically. */
+  onOpenChange?: (open: boolean) => void
 }
 
 /**
@@ -48,7 +52,7 @@ type Props = {
  * results against each other), which doesn't mean anything for a single
  * place already selected on the map.
  */
-export default function MapPlaceDetail({ item, category, color, onBack, onOutsideDismiss }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, onOutsideDismiss, onOpenChange }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -168,6 +172,7 @@ export default function MapPlaceDetail({ item, category, color, onBack, onOutsid
           path={listingPath}
           className="mr-1 self-center"
           onOutsideDismiss={onOutsideDismiss}
+          onOpenChange={onOpenChange}
         />
       </div>
 

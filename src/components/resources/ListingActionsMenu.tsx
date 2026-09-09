@@ -36,6 +36,7 @@ export default function ListingActionsMenu({
   path,
   className,
   onOutsideDismiss,
+  onOpenChange,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -67,8 +68,23 @@ export default function ListingActionsMenu({
    *  plain ref first depends on nothing but mousedown-before-click
    *  ordering, which every browser guarantees — not on capture-phase
    *  interception behaving the same way this codebase's own tests suggested
-   *  it would. */
+   *  it would.
+   *
+   *  onOutsideDismiss alone turned out not to be enough for the map sheet
+   *  specifically (see MobileNearbySheet's own use of both together): the
+   *  map's own "tap the background to collapse" isn't a real DOM click at
+   *  all — it's Google Maps' own internal 'click' event (ResourceMap.tsx),
+   *  which may recognize a tap through its own touch handling on its own
+   *  schedule, not necessarily downstream of the same native
+   *  mousedown-then-click pair onOutsideDismiss depends on. If Maps' own
+   *  handler runs BEFORE this component's outside-mousedown-detection does,
+   *  onOutsideDismiss fires too late to help. onOpenChange sidesteps the
+   *  ordering question entirely: instead of a one-shot "did this specific
+   *  tap already close it" flag, a caller can just check "is it open RIGHT
+   *  NOW" at the moment its own handler runs, which is true regardless of
+   *  which side's event happened to fire first. */
   onOutsideDismiss?: () => void
+  onOpenChange?: (open: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   // Which side the menu actually opens toward — measured fresh every time
@@ -97,6 +113,20 @@ export default function ListingActionsMenu({
     }
     setOpen(true)
   }
+
+  // Ref-mirrored, same pattern MobileNearbySheet's own onSelectionChangeRef
+  // uses — onOpenChange is usually a fresh inline arrow function every
+  // render; putting it directly in the effect below's dependency array
+  // would re-fire this on every unrelated re-render, not just when `open`
+  // itself actually changes.
+  const onOpenChangeRef = useRef(onOpenChange)
+  useEffect(() => { onOpenChangeRef.current = onOpenChange }, [onOpenChange])
+  // See onOpenChange's own doc — a plain, always-current mirror of `open`
+  // for callers that need to check it synchronously from their OWN handler,
+  // not react to it via a render.
+  useEffect(() => {
+    onOpenChangeRef.current?.(open)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
