@@ -5,7 +5,7 @@ import FindResources, { type FindResourcesProps } from './FindResources'
 
 type Props = Omit<
   FindResourcesProps,
-  'searchItem' | 'searchQuery' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
+  'searchItem' | 'searchQuery' | 'searchOpenNow' | 'searchHospital' | 'searchForm' | 'searchDavening' | 'searchDaveningDay' | 'onParamsChange'
 >
 
 // The query-string-aware half of FindResources, split out so the plain-URL
@@ -22,14 +22,20 @@ export default function FindResourcesConnected(props: Props) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const setParams = (changes: Record<string, string | null>) => {
+  const setParams = (changes: Record<string, string | null>, opts?: { replace?: boolean }) => {
     const next = new URLSearchParams(params)
     for (const [key, value] of Object.entries(changes)) {
       if (value === null) next.delete(key)
       else next.set(key, value)
     }
     const qs = next.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    const url = qs ? `${pathname}?${qs}` : pathname
+    // replace (not push) for the directory's own search/"Open now" sync —
+    // see FindResources' own onParamsChange doc — so typing or toggling
+    // doesn't spam browser history the way the item/form navigations below
+    // deliberately do.
+    if (opts?.replace) router.replace(url)
+    else router.push(url)
   }
 
   return (
@@ -37,6 +43,7 @@ export default function FindResourcesConnected(props: Props) {
       {...props}
       searchItem={params.get('item')}
       searchQuery={params.get('q')}
+      searchOpenNow={params.get('openNow')}
       searchHospital={params.get('hospital')}
       searchForm={params.get('form')}
       searchDavening={params.get('davening')}

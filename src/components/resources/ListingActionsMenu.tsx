@@ -178,7 +178,13 @@ export default function ListingActionsMenu({
     'flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer'
 
   return (
-    <div ref={wrapRef} className={`relative ${className ?? ''}`}>
+    // isolate: gives this its own stacking context so the open menu's z-20
+    // is guaranteed above sibling content regardless of DOM order — without
+    // it, a later-DOM `position: relative` sibling (e.g. the kosher-cert
+    // badge's tooltip wrapper in GenericListingCard) can paint over the menu
+    // even though it has no z-index of its own. Same fix already used for
+    // this exact reason in ResourceMapView.tsx.
+    <div ref={wrapRef} className={`relative isolate ${className ?? ''}`}>
       <button
         type="button"
         onClick={(e) => {

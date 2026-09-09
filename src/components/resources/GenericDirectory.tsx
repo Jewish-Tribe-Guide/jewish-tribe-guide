@@ -36,6 +36,8 @@ type Props = {
   reopenItemId?: string | null
   /** Seed the search box (e.g. "cheese" from a landing "Places" result). */
   initialSearch?: string
+  /** Seed the "Open now" filter — `?openNow=1`, see onParamsChange below. */
+  initialOpenNow?: boolean
   /** Mount with the "All davening times" modal already open — the home
    *  screen's DaveningTimesCard links here with `?davening=1` (see
    *  routes.ts's own daveningTimes helper) so "See all" actually lands on
@@ -66,11 +68,21 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
+  /** Pushes the search text / "Open now" toggle into the URL (`?q=`,
+   *  `?openNow=`) as they change, so a search + filter combination is a
+   *  shareable link — e.g. sending someone `?q=bagel&openNow=1` opens the
+   *  category with "bagel" already typed and Open Now already on. `replace`
+   *  (not push) for both: every keystroke or toggle flip becoming its own
+   *  history entry would make browser-back a nightmare, unlike the
+   *  item/form navigations elsewhere in this tree that deliberately push.
+   *  Optional and a no-op by default, same reasoning as FindResources' own
+   *  onParamsChange — nothing here is interactive before hydration anyway. */
+  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -85,11 +97,37 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const [openNow, setOpenNow] = useState(false)
+  const [openNow, setOpenNow] = useState(initialOpenNow ?? false)
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm.
   const now = new Date(useNow())
+
+  // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
+  // Skips the very first render on purpose: `search`/`openNow` there is just
+  // `initialSearch`/`initialOpenNow` echoed back, and writing it out again
+  // would be a pointless replace on every mount. Debounced for `search` so
+  // typing doesn't fire a history replace per keystroke; `openNow` is a
+  // single toggle, so it goes out immediately.
+  const searchSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!searchSyncedOnce.current) {
+      searchSyncedOnce.current = true
+      return
+    }
+    const timer = setTimeout(() => {
+      onParamsChange?.({ q: search.trim() || null }, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search, onParamsChange])
+  const openNowSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!openNowSyncedOnce.current) {
+      openNowSyncedOnce.current = true
+      return
+    }
+    onParamsChange?.({ openNow: openNow ? '1' : null }, { replace: true })
+  }, [openNow, onParamsChange])
   // Distance is meaningless with nothing to measure from, so this tracks the
   // anchor automatically — Popular while there's none, Distance the instant
   // one exists — until the visitor makes an explicit choice below, which

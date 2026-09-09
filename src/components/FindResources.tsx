@@ -68,6 +68,8 @@ export type FindResourcesProps = {
   searchItem?: string | null
   /** `?q=` */
   searchQuery?: string | null
+  /** `?openNow=1` */
+  searchOpenNow?: string | null
   /** `?hospital=` */
   searchHospital?: string | null
   /** `?form=` */
@@ -81,8 +83,11 @@ export type FindResourcesProps = {
   /** Pushes a change to these query params, keeping the path — a no-op
    *  default is safe: nothing in the fallback render (no query string yet)
    *  can be interacted with before hydration swaps in the real, connected
-   *  version that supplies a real one. */
-  onParamsChange?: (changes: Record<string, string | null>) => void
+   *  version that supplies a real one. `opts.replace` swaps `router.push`
+   *  for `router.replace` — used by the directory's own search/"Open now"
+   *  sync so every keystroke or toggle flip doesn't become its own history
+   *  entry, unlike the item/form navigations below that deliberately push. */
+  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
@@ -97,6 +102,7 @@ export default function FindResources({
   onViewMap,
   searchItem = null,
   searchQuery = null,
+  searchOpenNow = null,
   searchHospital = null,
   searchForm = null,
   searchDavening = null,
@@ -139,6 +145,21 @@ export default function FindResources({
   //   ?day=<key>      that modal is filtered to one day
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
+  const initialOpenNow = searchOpenNow === '1'
+
+  // Frozen versions of the two above, used only for the ResourceLoader `key`
+  // below. The key exists to force a one-time remount for the fallback →
+  // hydrated timing gap (GenericDirectory's lazy useState already ran with
+  // no query string by the time the real `?q=`/`?openNow=` arrives). Once
+  // GenericDirectory's own onParamsChange started writing search-as-you-type
+  // and the Open Now toggle BACK into these same props, using the live value
+  // here would re-trigger that same remount on every keystroke/toggle,
+  // wiping local state the visitor just set mid-session. Freezing at the
+  // first non-empty value keeps the key doing its original one-time job.
+  const hydratedSearchRef = useRef<string | null>(null)
+  if (hydratedSearchRef.current === null && searchQuery) hydratedSearchRef.current = searchQuery
+  const hydratedOpenNowRef = useRef(false)
+  if (!hydratedOpenNowRef.current && initialOpenNow) hydratedOpenNowRef.current = true
   const openDaveningModal = searchDavening === '1'
   const initialDaveningDay = searchDaveningDay ?? undefined
   const hospitalDetailId = searchHospital
@@ -282,12 +303,13 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (initialSearch ?? '') + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
+          key={category.id + (hydratedSearchRef.current ?? '') + (hydratedOpenNowRef.current ? '-openNow' : '') + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
           category={category}
           items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
+          initialOpenNow={initialOpenNow}
           openDaveningModal={openDaveningModal}
           initialDaveningDay={initialDaveningDay}
           onUp={onUp}
@@ -295,6 +317,7 @@ export default function FindResources({
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}
+          onParamsChange={setParams}
         />
       </>
     )
