@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from 'react'
 import type { DirectoryResource } from '@/types'
 import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
@@ -11,6 +11,7 @@ import DirectoryHeader from './DirectoryHeader'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
+import CategoryIcon from '@/components/CategoryIcon'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
@@ -20,6 +21,8 @@ import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
+import { useCategories } from '@/lib/useCategories'
+import { getCategoryColor } from '@/lib/categoryColor'
 
 type Props = {
   category: CategoryConfig
@@ -121,6 +124,10 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // again with the real value.
   const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
   const isMobile = useIsMobile()
+  // For getCategoryColor below — same call CompactCard makes for this same
+  // category's home-screen badge, so the morph target's color matches
+  // exactly (see categoryBadge's own doc).
+  const categories = useCategories()
   // Whether the sticky controls bar below is actually capable of being stuck
   // right now — matches its own `lg:sticky` breakpoint (1024px), not
   // useIsMobile's default (640px, the `desktop:` custom variant elsewhere in
@@ -565,6 +572,38 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     setOpenNow(false)
   }
 
+  // Desktop-only shared-element morph target for the same icon badge
+  // CompactCard shows next to this category on the home screen — that's
+  // the actual home-screen representation on desktop (a small colored
+  // circle, not a photo tile; CardGrid's full photo tiles are mobile-only,
+  // see home/sections.tsx's own doc on why). The matching `name` below is
+  // what lets React's real <ViewTransition> grow that small badge into this
+  // bigger one instead of a flat crossfade — it must exactly match the name
+  // CompactCard gives its own copy (`category-badge-${category.id}`, both
+  // keyed on the same CategoryConfig id) or no pair forms and this just
+  // plays its own plain enter animation. `getCategoryColor` is called the
+  // same way CompactCard calls it (same categories array, same id) so both
+  // ends render the identical color — a mismatch here would make the morph
+  // visibly change hue mid-flight instead of just growing.
+  //
+  // Not rendered at all (not just hidden) when there's no icon to morph —
+  // a badge paired with nothing is pointless — or on mobile, where the
+  // home->category move already has its own directional slide (see
+  // navTransitions.ts) communicating the same "one level deeper" hierarchy;
+  // morphing a badge AND sliding the whole screen at once would compete for
+  // attention rather than reinforcing each other.
+  const categoryBadge = !isMobile && category.icon ? (
+    <ViewTransition name={`category-badge-${category.id}`}>
+      <CategoryIcon
+        icon={category.icon}
+        categoryId={category.id}
+        color={getCategoryColor(categories, category.id)}
+        className="h-16 w-16 text-3xl mb-3"
+        sizePx={64}
+      />
+    </ViewTransition>
+  ) : null
+
   return (
     <div>
       {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
@@ -583,6 +622,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         upLabel={upLabel}
         onUp={onUp}
         titleInHeader
+        banner={categoryBadge}
         actions={
           <>
             {canAdd && (

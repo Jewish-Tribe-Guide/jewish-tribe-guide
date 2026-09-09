@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, ViewTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
@@ -239,7 +239,21 @@ function CompactCard({
       transitionTypes={['nav-forward']}
     >
       {card.icon ? (
-        <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+        // Named (desktop only — this component never mounts on mobile, see
+        // its own doc) so React's real <ViewTransition> grows this small
+        // icon badge into the bigger one GenericDirectory shows at the top
+        // of the category page, instead of a flat crossfade — the "shared
+        // element morph" pattern, matched on `name` alone (see that
+        // component's own comment for the other half). Only when `card.id`
+        // exists to key it on: the couple of hand-built cards with no id
+        // just skip the wrap and render plainly.
+        card.id ? (
+          <ViewTransition name={`category-badge-${card.id}`}>
+            <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+          </ViewTransition>
+        ) : (
+          <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+        )
       ) : (
         <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
       )}

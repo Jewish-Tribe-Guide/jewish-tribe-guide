@@ -491,3 +491,63 @@ describe('GenericDirectory — pinned listings sort first', () => {
     expect(names).toEqual(['Beta', 'Alpha'])
   })
 })
+
+// The desktop shared-element morph target (see GenericDirectory's own
+// `categoryBadge` doc) — a bigger copy of the same icon badge CompactCard
+// shows for this category on the home screen, present only so React's real
+// <ViewTransition> has something on this page to grow the clicked badge
+// into. vitest.setup.ts's own matchMedia stub always reports desktop
+// (`matches: false`), which is what most of these need; mockMobile below
+// overrides it for the one that doesn't.
+function mockMobile() {
+  window.matchMedia = ((query: string) => ({
+    matches: true,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia
+}
+
+describe('GenericDirectory — desktop category badge (morph target)', () => {
+  afterEach(() => {
+    // Restores vitest.setup.ts's own desktop-default stub — see its own
+    // comment on why every other test in this file relies on that default.
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia
+  })
+
+  it('shows a 64px icon badge above the title on desktop', () => {
+    const category = makeCategory({ id: 'grocery', icon: '🛒' })
+    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
+
+    const badge = document.querySelector('[class*="h-16"][class*="w-16"]')
+    expect(badge).toBeInTheDocument()
+  })
+
+  it('renders no badge on mobile — that navigation has its own directional slide instead', () => {
+    mockMobile()
+    const category = makeCategory({ id: 'grocery', icon: '🛒' })
+    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
+
+    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
+  })
+
+  it('renders no badge for a category with no icon — nothing to morph', () => {
+    const category = makeCategory({ id: 'networking', icon: undefined })
+    renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} />)
+
+    expect(document.querySelector('[class*="h-16"][class*="w-16"]')).not.toBeInTheDocument()
+  })
+})
