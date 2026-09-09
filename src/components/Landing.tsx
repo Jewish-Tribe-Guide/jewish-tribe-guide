@@ -369,14 +369,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       <ViewTransition {...navTransition}>
       <main
         ref={mainRef}
+        // Sticks at reveal-slide-back permanently once a real back-nav
+        // triggers it — deliberately never reset back to
+        // animate-[fadeIn_180ms_ease-out] afterward. Swapping the class
+        // back would change the animation-name property, which restarts
+        // WHATEVER animation is newly named regardless of which one it
+        // is — confirmed live (a real device) as the cause of a visible
+        // flash/reload-looking stutter right after the slide finished:
+        // fadeIn's own "from" state is opacity 0, so reapplying it on
+        // already-fully-visible content briefly faded it back out and in
+        // again. Leaving the class alone avoids that class-change
+        // entirely. A later reveal (another back-navigation) still
+        // replays the slide correctly with no JS involved: Next hides
+        // this screen via display:none (see this effect's own doc), and
+        // toggling display:none → visible restarts CSS animations on an
+        // element on its own, same mechanism that made the plain fadeIn
+        // replay before any of this existed — the className never has to
+        // change for that part to keep working.
         className={`max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
-        // Only the slide's own animation (the longer of the two — see
-        // reveal-slide-back's own timing) should clear the one-shot flag;
-        // an animationend from something else in this subtree bubbling up
-        // here would clear it prematurely.
-        onAnimationEnd={(e) => {
-          if (e.target === e.currentTarget && e.animationName === 'slide') setBackReveal(false)
-        }}
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />

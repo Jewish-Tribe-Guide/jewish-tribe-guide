@@ -477,12 +477,21 @@ describe('Landing', () => {
       expect(main.className).toContain('reveal-slide-back')
       expect(main.className).not.toContain('animate-[fadeIn_180ms_ease-out]')
 
-      // Not covered here: the one-shot flag clearing back to fadeIn once the
-      // slide's own CSS animation actually ends. jsdom has no
-      // AnimationEvent/animation-timeline support at all, and confirmed
-      // directly (a debug listener that never fired) that React doesn't
-      // even register onAnimationEnd delegation in this environment as a
-      // result — a genuine automation gap, not a skipped assertion.
+      // Deliberately never reverts to animate-[fadeIn_180ms_ease-out] —
+      // see this className's own doc on why swapping it back caused a
+      // visible flash on a real device (a fresh animation-name value
+      // restarts whatever's newly named, including a fade-from-transparent
+      // on already-visible content). This assertion is a weak guard, not
+      // real regression coverage: it passes against the OLD buggy code
+      // too (confirmed directly), since the bug lived in an
+      // onAnimationEnd handler that only ever fired from a real
+      // 'animationend' event — jsdom has no AnimationEvent/
+      // animation-timeline support at all, so nothing here can actually
+      // trigger it either way. Kept anyway as a sanity check that a plain
+      // intersection update alone (no real animation involved) doesn't
+      // touch the class.
+      act(() => setAllIntersecting(false))
+      expect(main.className).toContain('reveal-slide-back')
     })
 
     it('ignores an ordinary reveal with no pending back-navigation', () => {
