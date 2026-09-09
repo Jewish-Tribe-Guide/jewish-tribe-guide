@@ -23,6 +23,15 @@ type Props = {
   category: CategoryConfig
   color: string
   onBack: () => void
+  /** Forwarded straight to ListingActionsMenu — see that prop's own doc.
+   *  Tapping the map to dismiss this kebab would otherwise also collapse
+   *  the whole bottom sheet in the same motion, the map equivalent of
+   *  GenericListingCard's own row silently re-expanding — the map's
+   *  background tap is MobileNearbySheet's `collapse()`, not a plain
+   *  onClick on anything in this component's own tree, so the caller
+   *  (MobileNearbySheet) is what actually owns the suppression; this just
+   *  passes the signal up to it. */
+  onOutsideDismiss?: () => void
 }
 
 /**
@@ -39,7 +48,7 @@ type Props = {
  * results against each other), which doesn't mean anything for a single
  * place already selected on the map.
  */
-export default function MapPlaceDetail({ item, category, color, onBack }: Props) {
+export default function MapPlaceDetail({ item, category, color, onBack, onOutsideDismiss }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
   const { isPinned } = usePinned()
@@ -153,7 +162,13 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             Spotify's own overflow-menu spacing rather than butting right up
             against it. (Which way the dropdown itself opens is measured
             automatically — see ListingActionsMenu's own doc.) */}
-        <ListingActionsMenu item={item} category={category} path={listingPath} className="mr-1 self-center" />
+        <ListingActionsMenu
+          item={item}
+          category={category}
+          path={listingPath}
+          className="mr-1 self-center"
+          onOutsideDismiss={onOutsideDismiss}
+        />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way

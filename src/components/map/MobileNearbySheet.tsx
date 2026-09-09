@@ -136,6 +136,12 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // Read via a ref, like ResourceMap's own callback props, so this effect
   // only re-fires when the selection itself changes, not on every parent
   // render that happens to pass a new inline function identity.
+  // Set by MapPlaceDetail's own onOutsideDismiss (see that prop's own doc)
+  // the instant an outside tap closes its kebab menu — checked, then
+  // cleared, at the top of collapse() below. Without it, the same tap that
+  // dismissed the kebab (landing on the map background, since that's most
+  // of the screen) also collapsed the whole sheet in the same motion.
+  const suppressNextCollapseRef = useRef(false)
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange }, [onSelectionChange])
   // Set synchronously by selectPlace, just before setSelected — by the time
@@ -216,6 +222,14 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   function collapse() {
+    // See suppressNextCollapseRef's own doc — the one call this must not
+    // make: the collapse paired with a tap that just dismissed
+    // MapPlaceDetail's own kebab menu, not a genuine "tap the map away"
+    // gesture.
+    if (suppressNextCollapseRef.current) {
+      suppressNextCollapseRef.current = false
+      return
+    }
     clearSelection()
     setSnap('peek')
   }
@@ -552,6 +566,7 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
             category={selectedCategory}
             color={selected.color}
             onBack={clearSelection}
+            onOutsideDismiss={() => { suppressNextCollapseRef.current = true }}
           />
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />

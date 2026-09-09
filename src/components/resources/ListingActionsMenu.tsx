@@ -35,6 +35,7 @@ export default function ListingActionsMenu({
   category,
   path,
   className,
+  onOutsideDismiss,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -44,6 +45,30 @@ export default function ListingActionsMenu({
    *  true edge (see MapPlaceDetail, matching Spotify's own overflow-menu
    *  spacing rather than butting right up against the edge). */
   className?: string
+  /** Fired when the menu closes specifically because of an outside click
+   *  (not Escape, not picking a menu item — those already know they closed
+   *  it). An outside click almost always lands on the CARD itself (it's
+   *  most of the visible surface, or in the map sheet, its background),
+   *  which has its own onClick/tap-to-collapse of its own — without a way
+   *  to tell that handler "this exact tap was already spent dismissing the
+   *  menu," it would also silently act on it in the same motion.
+   *
+   *  Callers own the actual suppression themselves (see GenericListingCard's
+   *  own use of this) rather than this component trying to stop the click
+   *  from reaching them via DOM propagation tricks — an earlier version did
+   *  that (mousedown flags a ref, a capture-phase click listener stops
+   *  propagation) and it worked in this codebase's own synthetic-event
+   *  tests, but failed consistently on real iPhones in both Safari and
+   *  Chrome — genuinely blocked from confirming exactly why (this repo's
+   *  browser tooling can't deliver real clicks on this route, and script-
+   *  dispatched touch/mouse events don't reproduce WebKit's own touch-to-
+   *  mouse synthesis closely enough to trust). Letting the click fire
+   *  completely normally and having each caller's OWN handler self-check a
+   *  plain ref first depends on nothing but mousedown-before-click
+   *  ordering, which every browser guarantees — not on capture-phase
+   *  interception behaving the same way this codebase's own tests suggested
+   *  it would. */
+  onOutsideDismiss?: () => void
 }) {
   const [open, setOpen] = useState(false)
   // Which side the menu actually opens toward — measured fresh every time
@@ -57,9 +82,6 @@ export default function ListingActionsMenu({
   // any measurement has run — matches the common case.
   const [align, setAlign] = useState<'start' | 'end'>('start')
   const wrapRef = useRef<HTMLDivElement>(null)
-  // Set for exactly one tick after an outside click closes the menu — see
-  // the capture-phase click listener below for what it's actually for.
-  const justClosedRef = useRef(false)
   const { isPinned, toggle } = usePinned()
   const { share, copied } = useShareLink(path, item.name)
   // Optional, not useLocation() — this renders inside the admin's category
@@ -81,54 +103,39 @@ export default function ListingActionsMenu({
     const onDown = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) {
         setOpen(false)
-        // The mousedown that just closed this doesn't stop its own click
-        // from still reaching whatever it landed on — they're separate
-        // events, and closing the menu here doesn't touch the second one.
-        // Tapping "away" almost always means tapping the listing CARD
-        // itself (it's most of the screen), which has its own onClick to
-        // expand/collapse — so without this, the same tap that dismissed
-        // the menu also silently expanded the card underneath it. Flagged
-        // here, consumed by the always-on capture-phase listener below —
-        // NOT one declared in this same effect. `setOpen(false)` here
-        // flips `open`, which re-runs THIS effect on the next render and
-        // tears down whatever it registered before the paired click has
-        // even fired; a listener declared in this block would already be
-        // gone by the time that click arrives. The one that actually
-        // consumes it has to outlive this open/closed transition, so it's
-        // mounted once for the component's whole lifetime instead.
-        justClosedRef.current = true
+        // See onOutsideDismiss's own doc — this is the one thing that
+        // tells whatever's underneath this tap (almost always the card
+        // itself) not to also act on the very same tap.
+        onOutsideDismiss?.()
       }
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
+    // Standard behavior for any floating menu (native iOS action sheets,
+    // Material menus, Twitter's own) — a scroll means the visitor has
+    // moved on, the same as a tap elsewhere; leaving the menu open while
+    // the page moves under it reads as stuck rather than dismissed.
+    // `{ capture: true }`: 'scroll' doesn't bubble, so a listener here
+    // only sees it for something that scrolls document/window directly —
+    // capture still fires on the way down to whatever ACTUALLY scrolled
+    // (a category page's own list, the map sheet's own scroll region),
+    // which is what most scrolling in this app actually is. `{ passive:
+    // true }`: this never calls preventDefault, so the browser doesn't
+    // need to wait for it before it can start scrolling.
+    const onScroll = () => {
+      setOpen(false)
+      onOutsideDismiss?.()
+    }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
+      document.removeEventListener('scroll', onScroll, true)
     }
-  }, [open])
-
-  // Mounted once, independent of `open` — see justClosedRef's own setter
-  // above for why this can't live in the effect that sets the flag: this
-  // needs to survive the exact render where `open` flips to false, which
-  // tears down that effect's own listeners as part of the same update.
-  // Capture phase specifically: stopping propagation here is what keeps
-  // the click from ever reaching the card's own bubble-phase onClick at
-  // all, not just from reaching further ancestors past it. One-shot —
-  // clears itself immediately, so only the click paired with the
-  // dismissing mousedown is swallowed; every tap after that behaves
-  // normally.
-  useEffect(() => {
-    const onClickCapture = (e: MouseEvent) => {
-      if (!justClosedRef.current) return
-      justClosedRef.current = false
-      e.stopPropagation()
-    }
-    document.addEventListener('click', onClickCapture, true)
-    return () => document.removeEventListener('click', onClickCapture, true)
-  }, [])
+  }, [open, onOutsideDismiss])
 
   const pinned = isPinned(item.id)
   // Same gate the old SetLocationButton used — a listing whose address

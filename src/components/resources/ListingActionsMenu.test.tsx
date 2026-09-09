@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
@@ -137,39 +137,72 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  // The dismissing outside click and the card's own onClick are two
-  // separate concerns — GenericListingCard's whole row is what "outside"
-  // usually means in practice (it's most of the visible card), and that row
-  // has its own onClick to expand/collapse. Without this, a single tap
-  // meant only to dismiss the menu also silently expanded whatever card it
-  // landed on, in the same motion — confirmed live (getBoundingClientRect
-  // + aria-expanded before/after) before this fix landed, not just assumed.
-  // A later, unrelated tap on that same element must still work normally —
-  // this isn't "swallow every click near the menu", just the one paired
-  // with the dismiss.
-  it('does not let the outside click that dismisses the menu also fire a click handler on what it landed on', async () => {
+  // Standard behavior for any floating menu — a scroll means the visitor
+  // has moved on, same as a tap elsewhere. Dispatched on an arbitrary
+  // nested element, not document itself: 'scroll' doesn't bubble, so this
+  // only proves anything if the listener is genuinely catching it via
+  // capture (matching how a real scroll — a category page's own list, the
+  // map sheet's own scroll region — actually happens in this app, never on
+  // document directly).
+  it('closes the menu when the page (or a scrollable ancestor) scrolls', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
-    const onOutsideClick = vi.fn()
     const user = userEvent.setup()
-    renderWithProviders(
-      <>
-        <ListingActionsMenu item={makeListing({ id: 'listing-1', name: 'Goldi Market' })} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" />
-        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-        <div data-testid="card-row" onClick={onOutsideClick}>Goldi Market card row</div>
-      </>,
-    )
+    renderMenu()
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('card-row'))
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(onOutsideClick).not.toHaveBeenCalled()
+    const scrollable = document.createElement('div')
+    document.body.appendChild(scrollable)
+    // fireEvent, not a raw dispatchEvent — this wraps the dispatch in
+    // act(), so the setOpen(false) it triggers is actually flushed to the
+    // DOM before the assertion below runs. A plain dispatchEvent call
+    // looked like a real failure here at first (menu still open) purely
+    // because of that missing flush, not because the listener didn't fire —
+    // confirmed by checking registration directly before landing on this.
+    fireEvent.scroll(scrollable)
 
-    // A second, unrelated tap on the same element (no menu open this time)
-    // must behave normally.
-    await user.click(screen.getByTestId('card-row'))
-    expect(onOutsideClick).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    scrollable.remove()
+  })
+
+  // onOutsideDismiss is the signal callers use to stop that same tap from
+  // ALSO acting on whatever it landed on (see GenericListingCard's own use
+  // of it, and its own regression test) — this component doesn't try to
+  // suppress anything itself any more (an earlier version did, via a
+  // capture-phase stopPropagation; it worked in this codebase's own
+  // synthetic-event tests but failed consistently on real iPhones in both
+  // Safari and Chrome, so it's gone). All this component owns is firing the
+  // callback at the right moment: on an outside click specifically, not on
+  // Escape or on picking a menu item — both of those already know the menu
+  // closed, so re-notifying would be redundant (and for Escape, actively
+  // wrong: a keyboard dismissal has no "click landed somewhere" to guard
+  // against).
+  it('calls onOutsideDismiss only when an outside click closes the menu, not Escape or a menu item', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const onOutsideDismiss = vi.fn()
+    const user = userEvent.setup()
+    const item = makeListing({ id: 'listing-1', name: 'Goldi Market' })
+    const category = makeCategory()
+    renderWithProviders(
+      <ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" onOutsideDismiss={onOutsideDismiss} />,
+    )
+
+    // Escape.
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    await user.keyboard('{Escape}')
+    expect(onOutsideDismiss).not.toHaveBeenCalled()
+
+    // Picking a menu item (Share, which leaves the menu open — use Pin,
+    // which closes it).
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^pin$/i }))
+    expect(onOutsideDismiss).not.toHaveBeenCalled()
+
+    // An actual outside click.
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    await user.click(document.body)
+    expect(onOutsideDismiss).toHaveBeenCalledTimes(1)
   })
 
   it('does not render "Set location" when there is no location context (e.g. the admin preview)', async () => {

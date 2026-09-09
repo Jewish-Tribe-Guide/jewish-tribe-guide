@@ -117,6 +117,39 @@ describe('GenericListingCard — collapsed', () => {
     expect(positioned!.parentElement).toHaveClass('relative', 'pr-8')
   })
 
+  // The outside click that dismisses the kebab almost always lands ON this
+  // row (it's most of the visible card) — without suppressNextRowClickRef
+  // (set via ListingActionsMenu's onOutsideDismiss), that same tap also
+  // silently expanded the card in the same motion. Confirmed live before
+  // this landed (getBoundingClientRect + aria-expanded before/after showed
+  // it flipping to true on the dismiss tap itself), and again after an
+  // earlier fix attempt (a capture-phase stopPropagation inside
+  // ListingActionsMenu) turned out not to hold up on real iPhones despite
+  // passing here — this version moves the suppression into the row's own
+  // handler instead, which depends on nothing but mousedown firing before
+  // click, not on propagation/interception behaving a particular way.
+  it('does not expand the card on the same tap that dismisses its kebab menu', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    // Dismiss by clicking the row itself — the realistic case; the row is
+    // most of the card, so "click away" usually means this.
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    const row = toggle.closest('div[class*="cursor-pointer"]')!
+    await user.click(row)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    // A later, genuinely separate tap on the same row must still work.
+    await user.click(row)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('does not render an upvote count when upvotes is false', () => {
     const category = makeCategory()
     const item = makeListing()

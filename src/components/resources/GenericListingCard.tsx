@@ -206,6 +206,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       cancelAnimationFrame(raf2)
     }
   }, [expanded])
+  // Set (by ListingActionsMenu's own onOutsideDismiss) the instant an
+  // outside tap closes the kebab menu — see that prop's own doc for the
+  // full story. Checked, then cleared, at the very top of the row's own
+  // onClick below: without it, the same tap that dismissed the menu (which
+  // almost always lands on this row — it's most of the visible card) also
+  // silently toggled this card open/closed in the same motion.
+  const suppressNextRowClickRef = useRef(false)
   // Two independent alignment segments — see GenericListingCardHandle's own
   // doc for why this is two spacers, not one. cardRootRef anchors segment
   // 1 (icon/name/address/header text, ending at the upvote row); the
@@ -553,10 +560,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           toggle logic lives, not two copies to keep in sync. */}
       <div
         ref={cardRootRef}
-        onClick={() => setExpanded((p) => {
-          if (!p) track('listing_opened', { listing: item.name, category: category.id })
-          return !p
-        })}
+        onClick={() => {
+          // See suppressNextRowClickRef's own doc — this is the one tap
+          // this row must NOT act on: the same tap that just dismissed the
+          // kebab menu.
+          if (suppressNextRowClickRef.current) {
+            suppressNextRowClickRef.current = false
+            return
+          }
+          setExpanded((p) => {
+            if (!p) track('listing_opened', { listing: item.name, category: category.id })
+            return !p
+          })
+        }}
         // h-full: on desktop this row is the ENTIRE visible card (the outer
         // wrapper's own h-full — see its comment — only stretches the
         // invisible container to match the grid row; this inner div is what
@@ -789,7 +805,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                 visual purpose. */}
             <span className="block h-4 w-4" aria-hidden="true" />
           </button>
-          <ListingActionsMenu item={item} category={category} path={listingPath} />
+          <ListingActionsMenu
+            item={item}
+            category={category}
+            path={listingPath}
+            onOutsideDismiss={() => { suppressNextRowClickRef.current = true }}
+          />
         </div>
 
         {/* Mobile-only twin of the headerTextFields loop above — see the
