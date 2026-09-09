@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ForcedViewport } from '@/lib/useIsMobile'
-import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
+import { GenericListingCard, MOBILE_PANEL_TRANSITION_MS, type GenericListingCardHandle } from './GenericListingCard'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -824,5 +824,51 @@ describe('GenericListingCard — actions menu corner', () => {
       </ForcedViewport>,
     )
     expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
+  })
+})
+
+// The chevron used to be the only visible signal that this row expands at
+// all on mobile (no hover state exists there to hint at it another way).
+// Removing it (see the toggle button's own comment) meant the mobile panel
+// itself had to take over that job by animating open instead of popping in
+// silently — these two things ship together, not independently.
+describe('GenericListingCard — mobile accordion animation', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('renders no visible chevron svg any more, on either breakpoint', () => {
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    expect(toggle.querySelector('svg')).not.toBeInTheDocument()
+  })
+
+  it('keeps the panel mounted through its close transition, then removes it', () => {
+    vi.useFakeTimers()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    act(() => fireEvent.click(toggle))
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+
+    const collapseToggle = screen.getByRole('button', { name: /hide details for/i })
+    act(() => fireEvent.click(collapseToggle))
+    // Still in the DOM immediately after collapsing starts — an instant
+    // unmount here is exactly the silent pop this animation replaced.
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+
+    act(() => void vi.advanceTimersByTime(MOBILE_PANEL_TRANSITION_MS))
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
   })
 })

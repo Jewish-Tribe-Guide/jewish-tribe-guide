@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { track } from '@vercel/analytics'
 import type { DirectoryResource } from '@/types'
 import { PHOTO_FIELD_KEY, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
@@ -24,6 +24,14 @@ import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { usePinned } from '@/lib/pinnedContext'
+
+// How long mobile's inline accordion panel takes to open/close — the height
+// (grid-template-rows) and opacity transition below, and the delay before
+// actually unmounting it on close (see the panelMounted effect), share this
+// one value so the unmount can't fire mid-animation and cut it off. Exported
+// so GenericListingCard.test.tsx can advance fake timers by exactly this
+// much rather than a guessed duration that drifts if this one changes.
+export const MOBILE_PANEL_TRANSITION_MS = 240
 
 // ── Card field helpers ──────────────────────────────────────────────────────────
 
@@ -150,6 +158,54 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   hasNext,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  // Mobile's inline panel (see the isMobile branch far below) animates open
+  // and closed instead of popping in/out silently — replacing the chevron
+  // that used to be the only signal this row was expandable at all (see
+  // that button's own comment).
+  //
+  // Two pieces of state, not one, because "in the DOM" and "in its open CSS
+  // state" can't be the same flag:
+  //
+  // panelMounted — whether the panel exists in the DOM at all. A closing
+  // panel still needs to be there WHILE it animates away, so this can't
+  // just flip false the instant `expanded` does (the old plain
+  // `isMobile && expanded &&` render did exactly that) — it stays mounted
+  // through the close transition and only unmounts once that's actually
+  // finished (MOBILE_PANEL_TRANSITION_MS later).
+  //
+  // panelOpen — the flag the actual grid-rows/opacity classes read. This is
+  // the one that needs the double-rAF below: if the panel mounted with
+  // panelOpen already true in the SAME commit (i.e. just used `expanded`
+  // directly), the browser never gets a frame where the closed classes are
+  // actually painted, so there's nothing for the transition to animate
+  // FROM — it would just snap straight to fully open, which is exactly the
+  // silent pop this was built to replace. Closing has no such gap:
+  // panelOpen can drop to false immediately, since the panel is already
+  // mounted and showing its open classes at that point.
+  const [panelMounted, setPanelMounted] = useState(!!defaultExpanded)
+  const [panelOpen, setPanelOpen] = useState(!!defaultExpanded)
+  useEffect(() => {
+    if (!expanded) {
+      setPanelOpen(false)
+      const timer = setTimeout(() => setPanelMounted(false), MOBILE_PANEL_TRANSITION_MS)
+      return () => clearTimeout(timer)
+    }
+    setPanelMounted(true)
+    // Double rAF: the first callback runs before the NEXT paint (still too
+    // early — same frame the mount itself lands in), the second runs after
+    // that paint has happened, i.e. once the closed state has genuinely hit
+    // the screen. A single rAF is a common enough source of flaky "it
+    // sometimes doesn't animate" bugs elsewhere that it's worth spelling
+    // out rather than risking it here.
+    let raf2 = 0
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setPanelOpen(true))
+    })
+    return () => {
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
+    }
+  }, [expanded])
   // Two independent alignment segments — see GenericListingCardHandle's own
   // doc for why this is two spacers, not one. cardRootRef anchors segment
   // 1 (icon/name/address/header text, ending at the upvote row); the
@@ -659,25 +715,36 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
                   type="button"
                   aria-expanded={expanded}
                   aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
-                  // -m-2.5 p-2.5: the icon itself is 16px, well under the
-                  // 24px WCAG-recommended tap target — padding grows the
-                  // real hit area to ~36px without the negative margin's
-                  // opposite effect shifting anything in the row around it.
+                  // -m-2.5 p-2.5: kept at the same footprint the visible
+                  // chevron used to occupy (16px content + padding = ~36px
+                  // tap target), even though nothing renders inside any
+                  // more — see the invisible spacer below for why, and why
+                  // this button stays in the DOM at all despite having no
+                  // icon on either breakpoint now.
                   className="-m-2.5 cursor-pointer p-2.5"
                 >
-                  {/* Mobile only — a chevron that rotates open/closed reads
-                      right for the inline accordion (see the isMobile branch
-                      further down). Desktop opens a dialog instead, which a
-                      rotating "this expands right here" arrow no longer
-                      describes, and the whole card is already clickable with
-                      its own hover state, so there's nothing left for it to
-                      point at. */}
-                  <svg
-                    className={`desktop:hidden w-4 h-4 text-muted transition-transform duration-200 ${expanded && isMobile ? 'rotate-180' : ''}`}
-                    fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  {/* No visible chevron on either breakpoint any more — this
+                      row is already the tap target (the row div's own
+                      onClick above), so a rotating arrow was always a
+                      redundant echo of state the reveal itself already
+                      shows. Desktop already worked this way (opens a modal,
+                      which needs no icon pointing at it, plus a hover state
+                      this button never had anyway).
+                      Mobile is different — no hover to hint at it, and
+                      removing the chevron there needed a real substitute,
+                      not just deleting the affordance: the panel below now
+                      animates open/closed (height+opacity) instead of
+                      popping in silently, so the motion itself teaches
+                      "tapping this row does something" the moment it
+                      happens, tied directly to the tap. See the panel's own
+                      comment on that transition.
+                      The button itself stays — <button> is the actual
+                      accessible toggle a keyboard/screen-reader visitor
+                      needs (aria-expanded/aria-label above), it just no
+                      longer draws anything. The empty spacer below only
+                      keeps its footprint (and this row's layout) identical
+                      to before, not for any visual purpose. */}
+                  <span className="block h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -764,9 +831,23 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       </div>
 
       {/* Mobile: inline accordion, pushing the rest of the list down — see
-          the isMobile note above the state declaration. */}
-      {isMobile && expanded && (
-        <div className="border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
+          the isMobile note above the state declaration. Animated (height via
+          grid-template-rows, the standard trick for transitioning to/from an
+          unknown "auto" height with no JS measurement — plus opacity) rather
+          than popping in/out silently, since this is the only thing left
+          signaling "tapping this row does something" now that the chevron
+          is gone (see that button's own comment) — no hover state exists on
+          mobile to hint at it beforehand, so the motion itself has to carry
+          that job on the way in. min-h-0 on the inner div is load-bearing:
+          a grid track's default min-height is auto (its content's natural
+          size), which overrides `0fr` and defeats the whole animation
+          without it. */}
+      {isMobile && panelMounted && (
+        <div
+          className={`grid overflow-hidden transition-[grid-template-rows,opacity] ease-out ${panelOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+          style={{ transitionDuration: `${MOBILE_PANEL_TRANSITION_MS}ms` }}
+        >
+        <div className="min-h-0 border-t border-slate-100 px-4 py-4 space-y-3 bg-slate-50 rounded-b-lg">
           <PlaceDetailBody
             item={item}
             category={category}
@@ -803,6 +884,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
               )}
             </div>
           </div>
+        </div>
         </div>
       )}
 
