@@ -136,22 +136,6 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   // Read via a ref, like ResourceMap's own callback props, so this effect
   // only re-fires when the selection itself changes, not on every parent
   // render that happens to pass a new inline function identity.
-  // Set by MapPlaceDetail's own onOutsideDismiss (see that prop's own doc)
-  // the instant an outside tap closes its kebab menu — checked, then
-  // cleared, at the top of collapse() below. Without it, the same tap that
-  // dismissed the kebab (landing on the map background, since that's most
-  // of the screen) also collapsed the whole sheet in the same motion.
-  const suppressNextCollapseRef = useRef(false)
-  // Set by MapPlaceDetail's own onOpenChange, kept always current — a
-  // second, timing-independent guard alongside suppressNextCollapseRef
-  // above (see ListingActionsMenu's own onOpenChange doc for why
-  // onOutsideDismiss alone wasn't enough here specifically): the map's
-  // background tap is Google Maps' own 'click' event, not a plain DOM
-  // click, and there's no guarantee it fires after this component's own
-  // outside-mousedown-detection rather than before or instead of it. This
-  // one just asks "is the kebab open RIGHT NOW", which is true no matter
-  // which side's event happened to run first.
-  const kebabOpenRef = useRef(false)
   const onSelectionChangeRef = useRef(onSelectionChange)
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange }, [onSelectionChange])
   // Set synchronously by selectPlace, just before setSelected — by the time
@@ -232,17 +216,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   function collapse() {
-    // See suppressNextCollapseRef's and kebabOpenRef's own docs — the one
-    // call this must not make: the collapse paired with a tap that just
-    // dismissed MapPlaceDetail's own kebab menu, not a genuine "tap the map
-    // away" gesture. Two checks, not one, because the map's background tap
-    // is Google Maps' own event, not a plain DOM click — kebabOpenRef
-    // covers the case where that fires before this component's own
-    // mousedown-based detection ever gets the chance to.
-    if (suppressNextCollapseRef.current || kebabOpenRef.current) {
-      suppressNextCollapseRef.current = false
-      return
-    }
+    // Used to need to check whether the tap it's reacting to actually just
+    // dismissed MapPlaceDetail's own kebab menu instead of genuinely tapping
+    // the map away — the map's background tap is Google Maps' own event,
+    // not a plain DOM click, so it could fire before, after, or instead of
+    // this component's own outside-click detection. Moot now: the kebab's
+    // own invisible backdrop (see ListingActionsMenu's own doc) sits on top
+    // of the ENTIRE screen while it's open, so a tap dismissing it never
+    // reaches Google Maps' canvas at all — this collapse() simply never
+    // gets called for that tap in the first place.
     clearSelection()
     setSnap('peek')
   }
@@ -579,8 +561,6 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
             category={selectedCategory}
             color={selected.color}
             onBack={clearSelection}
-            onOutsideDismiss={() => { suppressNextCollapseRef.current = true }}
-            onOpenChange={(open) => { kebabOpenRef.current = open }}
           />
         ) : (
           <NearbyList points={points} userLocation={userLocation} onViewListing={onViewListing} onSelectPlace={selectPlace} />

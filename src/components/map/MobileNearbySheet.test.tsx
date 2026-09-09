@@ -28,26 +28,10 @@ vi.mock('./NearbyList', () => ({
   ),
 }))
 vi.mock('./MapPlaceDetail', () => ({
-  default: ({
-    item,
-    onBack,
-    onOutsideDismiss,
-    onOpenChange,
-  }: {
-    item: Point
-    onBack: () => void
-    onOutsideDismiss?: () => void
-    onOpenChange?: (open: boolean) => void
-  }) => (
+  default: ({ item, onBack }: { item: Point; onBack: () => void }) => (
     <div>
       <p>detail for {item.name}</p>
       <button onClick={onBack}>Back to list</button>
-      {/* Stand-ins for ListingActionsMenu's own two dismissal signals (see
-          its own doc on why there are two) — MobileNearbySheet.collapse()'s
-          own guard is what these two tests below exercise. */}
-      <button onClick={() => onOutsideDismiss?.()}>stub outside-dismiss</button>
-      <button onClick={() => onOpenChange?.(true)}>stub kebab open</button>
-      <button onClick={() => onOpenChange?.(false)}>stub kebab closed</button>
     </div>
   ),
 }))
@@ -114,56 +98,18 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByText('detail for Second Place')).toBeInTheDocument()
   })
 
-  // Two independent guards on collapse() — see kebabOpenRef's own doc for
-  // why onOutsideDismiss alone (the mechanism that works for
-  // GenericListingCard's own row, confirmed on a real device) wasn't
-  // enough here: the map's background tap is Google Maps' own 'click'
-  // event, with no guaranteed ordering against this component's own
-  // outside-mousedown detection.
-  // clearSelection() (called by collapse() when not suppressed) undoes the
-  // history entry via history.back() rather than clearing state directly —
-  // see the swipe-back test below. jsdom's history.back()/forward() don't
-  // actually dispatch a popstate the way a real browser does (that test has
-  // to raise one manually), so these two guard tests assert on whether
-  // collapse() reached history.back() at all, not on a DOM update jsdom
-  // can't deliver.
-  it('does not collapse when the kebab is currently open, and does once it reports closed', async () => {
-    const user = userEvent.setup()
-    const ref = createRef<MobileNearbySheetHandle>()
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    render(
-      <MobileNearbySheet ref={ref} points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
-    )
-    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
-    expect(screen.getByText('detail for Goldi Market')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'stub kebab open' }))
-    act(() => ref.current!.collapse())
-    expect(backSpy).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'stub kebab closed' }))
-    act(() => ref.current!.collapse())
-    expect(backSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not collapse on the one call paired with onOutsideDismiss, but does on the next', async () => {
-    const user = userEvent.setup()
-    const ref = createRef<MobileNearbySheetHandle>()
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    render(
-      <MobileNearbySheet ref={ref} points={[point]} userLocation={null} categories={[category]} containerHeight={600} />,
-    )
-    await user.click(screen.getByRole('button', { name: /select Goldi Market/ }))
-
-    await user.click(screen.getByRole('button', { name: 'stub outside-dismiss' }))
-    act(() => ref.current!.collapse())
-    expect(backSpy).not.toHaveBeenCalled()
-
-    // One-shot: a later, genuinely separate collapse() must still work.
-    act(() => ref.current!.collapse())
-    expect(backSpy).toHaveBeenCalledTimes(1)
-  })
-
+  // collapse() used to carry two independent guards here, needed because a
+  // tap dismissing MapPlaceDetail's own kebab menu could otherwise ALSO
+  // collapse this whole sheet in the same motion (the map's background tap
+  // is Google Maps' own 'click' event, not a plain DOM click this
+  // component's own outside-click detection could reliably order itself
+  // against). Removed along with the callback props that drove them
+  // (onOutsideDismiss/onOpenChange) once ListingActionsMenu started
+  // covering this itself: an invisible backdrop sits over the ENTIRE
+  // screen while its menu is open (see that component's own doc), so a
+  // dismissing tap never reaches Google Maps' canvas at all — collapse()
+  // simply never gets called for that tap in the first place, and there's
+  // nothing left here to guard against or test.
   it('returns to the list (not the home screen) when a swipe-back fires while a place is selected', async () => {
     const user = userEvent.setup()
 

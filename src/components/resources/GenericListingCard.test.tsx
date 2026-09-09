@@ -118,16 +118,22 @@ describe('GenericListingCard — collapsed', () => {
   })
 
   // The outside click that dismisses the kebab almost always lands ON this
-  // row (it's most of the visible card) — without suppressNextRowClickRef
-  // (set via ListingActionsMenu's onOutsideDismiss), that same tap also
-  // silently expanded the card in the same motion. Confirmed live before
-  // this landed (getBoundingClientRect + aria-expanded before/after showed
-  // it flipping to true on the dismiss tap itself), and again after an
-  // earlier fix attempt (a capture-phase stopPropagation inside
-  // ListingActionsMenu) turned out not to hold up on real iPhones despite
-  // passing here — this version moves the suppression into the row's own
-  // handler instead, which depends on nothing but mousedown firing before
-  // click, not on propagation/interception behaving a particular way.
+  // row (it's most of the visible card) — without something to stop it,
+  // that same tap also silently expanded the card in the same motion.
+  // Confirmed live before this landed (getBoundingClientRect + aria-expanded
+  // before/after showed it flipping to true on the dismiss tap itself).
+  // Two fix attempts came before the one this now tests: a capture-phase
+  // stopPropagation inside ListingActionsMenu (worked here, not on real
+  // iPhones), then a per-card suppression ref/shared module keyed off
+  // ListingActionsMenu's own onOutsideDismiss callback (worked, but every
+  // new caller — the map's background tap, a directory's Add button — needed
+  // its own bespoke wiring, and some never got it). ListingActionsMenu now
+  // owns this itself with a real, invisible backdrop covering the whole
+  // viewport while the menu is open (see its own top-of-file doc) — this
+  // test clicks that backdrop directly (by test id, not the row), since in
+  // jsdom (no real hit-testing from screen position) that's what actually
+  // receives an outside tap now; a real browser routes the same tap there
+  // by ordinary z-order, whatever it looks like it landed on.
   it('does not expand the card on the same tap that dismisses its kebab menu', async () => {
     const user = userEvent.setup()
     renderWithProviders(
@@ -137,25 +143,26 @@ describe('GenericListingCard — collapsed', () => {
     await user.click(screen.getByRole('button', { name: /more actions for/i }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
 
-    // Dismiss by clicking the row itself — the realistic case; the row is
-    // most of the card, so "click away" usually means this.
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
     const toggle = screen.getByRole('button', { name: /show details for/i })
-    const row = toggle.closest('div[class*="cursor-pointer"]')!
-    await user.click(row)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
 
-    // A later, genuinely separate tap on the same row must still work.
+    // A later, genuinely separate tap on the row must still work.
+    const row = toggle.closest('div[class*="cursor-pointer"]')!
     await user.click(row)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
   })
 
   // Same failure mode as the test above, but across two different cards —
-  // the popup is portaled (see ListingActionsMenu's own doc), so "outside"
-  // now genuinely means "anywhere on the page," including a different
-  // card's own row. Each card's suppressNextRowClickRef only guards ITS OWN
-  // row, so dismissing card A's menu by tapping card B used to leave B free
-  // to expand in the same motion — see suppressRowClick's own module doc.
+  // the popup is portaled (see ListingActionsMenu's own doc), so an outside
+  // tap dismissing card A's menu could land anywhere on the page, including
+  // card B's own row. The backdrop fixes this the same way as the same-card
+  // case: card B is never involved in the click at all (the backdrop
+  // belongs to card A's own React tree and stops its own propagation — see
+  // ListingActionsMenu's own doc), so this is really confirming there's
+  // nothing card-specific left to keep in sync between the two cases any
+  // more, not a separate mechanism.
   it("does not expand a different card on the tap that dismisses another card's kebab menu", async () => {
     const user = userEvent.setup()
     const category = makeCategory()
@@ -171,16 +178,13 @@ describe('GenericListingCard — collapsed', () => {
     await user.click(screen.getByRole('button', { name: /more actions for card a/i }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
 
-    // Dismiss card A's menu by tapping card B's row — a different card
-    // entirely, not "elsewhere on the same card" the test above covers.
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
     const toggleB = screen.getByRole('button', { name: /show details for card b/i })
-    const rowB = toggleB.closest('div[class*="cursor-pointer"]')!
-    await user.click(rowB)
-
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(toggleB).toHaveAttribute('aria-expanded', 'false')
 
     // A later, genuinely separate tap on card B must still work.
+    const rowB = toggleB.closest('div[class*="cursor-pointer"]')!
     await user.click(rowB)
     expect(toggleB).toHaveAttribute('aria-expanded', 'true')
   })

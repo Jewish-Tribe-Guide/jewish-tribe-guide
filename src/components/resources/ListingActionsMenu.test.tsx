@@ -129,7 +129,17 @@ describe('ListingActionsMenu', () => {
     expect(menu.style.transformOrigin).not.toContain('left')
   })
 
-  it('closes the menu on an outside click', async () => {
+  // The invisible backdrop (see ListingActionsMenu's own top-of-file doc) is
+  // what an outside click actually lands on now — a real, full-viewport DOM
+  // element sitting in front of everything else while the menu is open, not
+  // a document-level listener inferring "outside" from where a click
+  // bubbled from. Clicking it directly (via its test id — in a real browser
+  // a tap anywhere outside the popup hits this same element by ordinary hit-
+  // testing, which jsdom doesn't simulate from screen coordinates) is what
+  // that real-world tap looks like here; a raw `document.body` click, by
+  // contrast, targets body ITSELF, which a click bubbling INTO the backdrop
+  // (a descendant) never does.
+  it('closes the menu on an outside click, via the invisible backdrop', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
     renderMenu()
@@ -137,8 +147,38 @@ describe('ListingActionsMenu', () => {
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
 
-    await user.click(document.body)
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  // The backdrop is a REAL DOM element covering the whole viewport while the
+  // menu is open, so an outside click never reaches whatever's visually
+  // underneath it at all — not a suppression convention the thing
+  // underneath has to opt into (see this component's own top-of-file doc on
+  // why the old per-caller onOutsideDismiss/onOpenChange props are gone).
+  // Confirms the other half of that: the tap that closes the menu doesn't
+  // reach a click handler sitting behind the backdrop.
+  it('does not let the dismissing click reach whatever is behind the backdrop', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const onBackgroundClick = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <div onClick={onBackgroundClick}>
+        <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" />
+      </div>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    // The backdrop is portaled to document.body, so this parent isn't its
+    // DOM ancestor — but React bubbles a portaled element's events through
+    // its LOGICAL component tree regardless (this `<div>` IS that tree's
+    // ancestor), which is exactly the gap this test guards: without the
+    // backdrop's own stopPropagation, this click would still reach it.
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(onBackgroundClick).not.toHaveBeenCalled()
   })
 
   // Standard behavior for any floating menu — a scroll means the visitor
@@ -168,45 +208,6 @@ describe('ListingActionsMenu', () => {
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     scrollable.remove()
-  })
-
-  // onOutsideDismiss is the signal callers use to stop that same tap from
-  // ALSO acting on whatever it landed on (see GenericListingCard's own use
-  // of it, and its own regression test) — this component doesn't try to
-  // suppress anything itself any more (an earlier version did, via a
-  // capture-phase stopPropagation; it worked in this codebase's own
-  // synthetic-event tests but failed consistently on real iPhones in both
-  // Safari and Chrome, so it's gone). All this component owns is firing the
-  // callback at the right moment: on an outside click specifically, not on
-  // Escape or on picking a menu item — both of those already know the menu
-  // closed, so re-notifying would be redundant (and for Escape, actively
-  // wrong: a keyboard dismissal has no "click landed somewhere" to guard
-  // against).
-  it('calls onOutsideDismiss only when an outside click closes the menu, not Escape or a menu item', async () => {
-    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
-    const onOutsideDismiss = vi.fn()
-    const user = userEvent.setup()
-    const item = makeListing({ id: 'listing-1', name: 'Goldi Market' })
-    const category = makeCategory()
-    renderWithProviders(
-      <ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" onOutsideDismiss={onOutsideDismiss} />,
-    )
-
-    // Escape.
-    await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.keyboard('{Escape}')
-    expect(onOutsideDismiss).not.toHaveBeenCalled()
-
-    // Picking a menu item (Share, which leaves the menu open — use Pin,
-    // which closes it).
-    await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^pin$/i }))
-    expect(onOutsideDismiss).not.toHaveBeenCalled()
-
-    // An actual outside click.
-    await user.click(screen.getByRole('button', { name: /more actions/i }))
-    await user.click(document.body)
-    expect(onOutsideDismiss).toHaveBeenCalledTimes(1)
   })
 
   it('does not render "Set location" when there is no location context (e.g. the admin preview)', async () => {

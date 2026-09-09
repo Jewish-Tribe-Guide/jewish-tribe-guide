@@ -7,7 +7,6 @@ import type { CategoryConfig } from '@/lib/categories'
 import { usePinned } from '@/lib/pinnedContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { useOptionalLocation } from '@/lib/locationContext'
-import { markRowClickSuppressed } from '@/lib/suppressRowClick'
 import { ui } from '@/lib/uiConfig'
 import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon } from '@/components/icons'
 
@@ -38,6 +37,30 @@ import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon } from '@/com
 // upvote icon). A portaled, viewport-fixed popup has no such ancestor to
 // lose to at all — it paints in the root stacking context, same as any
 // browser-native menu would.
+//
+// Dismissing it also used to need each CALLER's own cooperation: an outside
+// tap that closes the menu almost always lands on something with its own
+// click behavior underneath — the SAME card's row (re-expanding it), a
+// DIFFERENT card's row now that the popup is portaled (toggling THAT one
+// instead), the map's own background-tap-to-collapse, the directory's Add
+// button. Every one of those needed its own bespoke suppression flag
+// (GenericListingCard's suppressNextRowClickRef, a shared cross-card module,
+// MobileNearbySheet's suppressNextCollapseRef + kebabOpenRef for the map),
+// and new ones kept surfacing (desktop's own map click had no flag at all).
+//
+// Replaced all of it with one full-viewport, invisible backdrop rendered
+// alongside the popup (below). It isn't a suppression CONVENTION other code
+// has to opt into — it's a real DOM element sitting on top of the entire
+// page while the menu is open, so an "outside" tap hits IT, by the browser's
+// own hit-testing, and never reaches whatever is visually underneath at
+// all. Nothing left to suppress, anywhere, including callers that don't
+// exist yet. A capture-phase `stopPropagation` was tried for this once
+// before (see git history) and abandoned — it worked in this codebase's own
+// synthetic-event tests but failed consistently on real iPhones in both
+// Safari and Chrome, genuinely unclear why. This isn't that: the backdrop
+// wins by being the actual topmost element at that screen position, a
+// property of normal DOM stacking every browser agrees on, not by racing an
+// event through JS-level interception.
 
 // w-40 below, in px — needed as a number to compare against actual measured
 // space at open time.
@@ -51,8 +74,6 @@ export default function ListingActionsMenu({
   category,
   path,
   className,
-  onOutsideDismiss,
-  onOpenChange,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -62,58 +83,6 @@ export default function ListingActionsMenu({
    *  true edge (see MapPlaceDetail, matching Spotify's own overflow-menu
    *  spacing rather than butting right up against the edge). */
   className?: string
-  /** Fired when the menu closes specifically because of an outside click
-   *  (not Escape, not picking a menu item — those already know they closed
-   *  it). An outside click almost always lands on the CARD itself (it's
-   *  most of the visible surface, or in the map sheet, its background),
-   *  which has its own onClick/tap-to-collapse of its own — without a way
-   *  to tell that handler "this exact tap was already spent dismissing the
-   *  menu," it would also silently act on it in the same motion.
-   *
-   *  This only reaches THIS instance's own caller — fine for the map sheet
-   *  (one place detail panel on screen at a time), but a directory grid has
-   *  one ListingActionsMenu per card, and the tap dismissing one can land on
-   *  a completely different card's row (the popup is portaled to
-   *  document.body — see openMenu's own doc — so "outside" really can mean
-   *  anywhere on the page now). GenericListingCard doesn't wire this prop at
-   *  all any more; see suppressRowClick's own module doc for the shared,
-   *  cross-card mechanism this component drives directly instead, on every
-   *  outside dismiss regardless of whether a caller passed this prop.
-   *
-   *  Kept only for MapPlaceDetail's own use (a distinct concern — dismissing
-   *  the whole sheet's own background-tap-to-collapse, not a listing row),
-   *  which owns its OWN suppression the same way GenericListingCard's used
-   *  to (see MobileNearbySheet's suppressNextCollapseRef) rather than this
-   *  component trying to stop the click from reaching it via DOM
-   *  propagation tricks — an earlier version did
-   *  that (mousedown flags a ref, a capture-phase click listener stops
-   *  propagation) and it worked in this codebase's own synthetic-event
-   *  tests, but failed consistently on real iPhones in both Safari and
-   *  Chrome — genuinely blocked from confirming exactly why (this repo's
-   *  browser tooling can't deliver real clicks on this route, and script-
-   *  dispatched touch/mouse events don't reproduce WebKit's own touch-to-
-   *  mouse synthesis closely enough to trust). Letting the click fire
-   *  completely normally and having each caller's OWN handler self-check a
-   *  plain ref first depends on nothing but mousedown-before-click
-   *  ordering, which every browser guarantees — not on capture-phase
-   *  interception behaving the same way this codebase's own tests suggested
-   *  it would.
-   *
-   *  onOutsideDismiss alone turned out not to be enough for the map sheet
-   *  specifically (see MobileNearbySheet's own use of both together): the
-   *  map's own "tap the background to collapse" isn't a real DOM click at
-   *  all — it's Google Maps' own internal 'click' event (ResourceMap.tsx),
-   *  which may recognize a tap through its own touch handling on its own
-   *  schedule, not necessarily downstream of the same native
-   *  mousedown-then-click pair onOutsideDismiss depends on. If Maps' own
-   *  handler runs BEFORE this component's outside-mousedown-detection does,
-   *  onOutsideDismiss fires too late to help. onOpenChange sidesteps the
-   *  ordering question entirely: instead of a one-shot "did this specific
-   *  tap already close it" flag, a caller can just check "is it open RIGHT
-   *  NOW" at the moment its own handler runs, which is true regardless of
-   *  which side's event happened to fire first. */
-  onOutsideDismiss?: () => void
-  onOpenChange?: (open: boolean) => void
 }) {
   const [open, setOpen] = useState(false)
   // Fixed-position coordinates for the portaled popup — measured fresh every
@@ -127,11 +96,6 @@ export default function ListingActionsMenu({
   // opens downward from the kebab unless there isn't room below it.
   const [popupPos, setPopupPos] = useState<{ top?: number; bottom?: number; left: number; anchorRight: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  // The popup itself is portaled to document.body (see below), so it's no
-  // longer a DOM descendant of `wrapRef` — needs its own ref for the
-  // outside-click check, or clicking a menu item would read as "outside"
-  // and close it before the item's own onClick even runs.
-  const popupRef = useRef<HTMLDivElement>(null)
   const { isPinned, toggle } = usePinned()
   const { share, copied } = useShareLink(path, item.name)
   // Optional, not useLocation() — this renders inside the admin's category
@@ -172,43 +136,14 @@ export default function ListingActionsMenu({
     setOpen(true)
   }
 
-  // Ref-mirrored, same pattern MobileNearbySheet's own onSelectionChangeRef
-  // uses — onOpenChange is usually a fresh inline arrow function every
-  // render; putting it directly in the effect below's dependency array
-  // would re-fire this on every unrelated re-render, not just when `open`
-  // itself actually changes.
-  const onOpenChangeRef = useRef(onOpenChange)
-  useEffect(() => { onOpenChangeRef.current = onOpenChange }, [onOpenChange])
-  // See onOpenChange's own doc — a plain, always-current mirror of `open`
-  // for callers that need to check it synchronously from their OWN handler,
-  // not react to it via a render.
-  useEffect(() => {
-    onOpenChangeRef.current?.(open)
-  }, [open])
-
+  // Escape and scroll-dismiss stay document-level listeners — neither is a
+  // "where did this click land" question the backdrop below can answer for
+  // us, since neither one IS a click. The backdrop (see the popup's own
+  // JSX) is what handles every pointer-based outside dismissal now, so
+  // there's no mousedown listener here any more, and nothing left to notify
+  // a caller about — see this component's own top-of-file doc.
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node
-      // Both refs: the popup itself is portaled to document.body (see
-      // openMenu's own doc), so it's no longer a descendant of wrapRef.
-      if (!wrapRef.current?.contains(target) && !popupRef.current?.contains(target)) {
-        setOpen(false)
-        // See onOutsideDismiss's own doc — this is the one thing that
-        // tells whatever's underneath this tap (almost always the card
-        // itself) not to also act on the very same tap.
-        onOutsideDismiss?.()
-        // onOutsideDismiss only reaches THIS instance's own caller — fine
-        // when there's only one listing on screen (the map sheet), but a
-        // directory grid has one ListingActionsMenu per card, and the tap
-        // that dismisses THIS one can land on a completely different card's
-        // row (the popup is portaled — see openMenu's own doc — so "outside"
-        // now really can mean "anywhere on the page"). Without this, that
-        // tap would ALSO toggle the OTHER card open/closed in the same
-        // motion: dismiss one thing, and something unrelated reacts too.
-        markRowClickSuppressed()
-      }
-    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
@@ -223,19 +158,14 @@ export default function ListingActionsMenu({
     // which is what most scrolling in this app actually is. `{ passive:
     // true }`: this never calls preventDefault, so the browser doesn't
     // need to wait for it before it can start scrolling.
-    const onScroll = () => {
-      setOpen(false)
-      onOutsideDismiss?.()
-    }
-    document.addEventListener('mousedown', onDown)
+    const onScroll = () => setOpen(false)
     document.addEventListener('keydown', onKey)
     document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
-      document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('scroll', onScroll, true)
     }
-  }, [open, onOutsideDismiss])
+  }, [open])
 
   const pinned = isPinned(item.id)
   const active = canSetLocation && location!.anchorListingId === item.id
@@ -272,70 +202,109 @@ export default function ListingActionsMenu({
       </button>
 
       {open && popupPos && createPortal(
-        <div
-          ref={popupRef}
-          role="menu"
-          onClick={(e) => e.stopPropagation()}
-          // Which corner popupPos actually anchored to (computed once in
-          // openMenu, not re-derived here) is what transform-origin should
-          // match, so the popup eases open from the kebab itself rather than
-          // from a fixed corner that's sometimes wrong.
-          style={{
-            position: 'fixed',
-            top: popupPos.top,
-            bottom: popupPos.bottom,
-            left: popupPos.left,
-            transformOrigin: `${popupPos.top !== undefined ? 'top' : 'bottom'} ${popupPos.anchorRight ? 'right' : 'left'}`,
-          }}
-          className="z-50 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
-        >
-          {/* ui.map.pins is the same flag the map's own pin filter chip and
-              (formerly) PinButton respected — the original build of this
-              menu missed it and showed Pin unconditionally even with
-              pinning turned off community-wide. */}
-          {ui.map.pins && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                toggle({ id: item.id, categoryId: category.id })
-                setOpen(false)
-              }}
-              aria-pressed={pinned}
-              className={menuItemClass}
-            >
-              <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
-              {pinned ? 'Pinned' : 'Pin'}
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={share}
-            className={menuItemClass}
+        <>
+          {/* The dismiss mechanism — see this file's own top-of-file doc.
+              Covers the entire viewport (not just "everywhere but the
+              popup" — the popup itself sits in front of this in z-order, so
+              clicks on it still reach it first) and sits BELOW the popup
+              (z-[55] vs the popup's z-[56]) so the popup keeps receiving its
+              own clicks normally. Nothing renders here — it's purely a
+              hit-test target — so `aria-hidden` and no visible styling at
+              all.
+              z-[55], not z-40/z-50: the map screen's own top-level container
+              is `position: fixed` at z-50 (confirmed live — a backdrop at
+              z-40 lost to it outright, and the popup itself, ALSO z-50 back
+              then, only appeared to win by DOM-order luck in a same-value
+              tie, which is exactly the kind of thing that stops being true
+              the next time something reorders). Comfortably below the
+              app's actual blocking modals (LiveLocationPrompt,
+              DroppedPinEditor — z-[70]), which this doesn't need to, and
+              shouldn't, outrank. */}
+          <div
+            data-testid="listing-actions-backdrop"
+            className="fixed inset-0 z-[55]"
+            aria-hidden="true"
+            // stopPropagation matters here even though this is portaled to
+            // document.body: React bubbles a portaled element's events
+            // through its LOGICAL component tree, not the DOM tree it's
+            // actually mounted in — so without this, clicking the backdrop
+            // would still reach the card's own row onClick (GenericListingCard
+            // renders this menu inside that row), the exact same-card
+            // re-expand this whole mechanism exists to prevent. This is a
+            // plain React synthetic-event stopPropagation on an element this
+            // component owns, not the capture-phase document-level
+            // interception that was tried and abandoned before (see this
+            // file's own top-of-file doc) — those are different things, and
+            // this one doesn't share that history of failing on real iPhones.
+            onClick={(e) => {
+              e.stopPropagation()
+              setOpen(false)
+            }}
+          />
+          <div
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            // Which corner popupPos actually anchored to (computed once in
+            // openMenu, not re-derived here) is what transform-origin should
+            // match, so the popup eases open from the kebab itself rather
+            // than from a fixed corner that's sometimes wrong.
+            style={{
+              position: 'fixed',
+              top: popupPos.top,
+              bottom: popupPos.bottom,
+              left: popupPos.left,
+              transformOrigin: `${popupPos.top !== undefined ? 'top' : 'bottom'} ${popupPos.anchorRight ? 'right' : 'left'}`,
+            }}
+            className="z-[56] w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
           >
-            <ExternalIcon className="h-3.5 w-3.5 shrink-0" />
-            {copied ? 'Copied!' : 'Share'}
-          </button>
-          {canSetLocation && (
+            {/* ui.map.pins is the same flag the map's own pin filter chip
+                and (formerly) PinButton respected — the original build of
+                this menu missed it and showed Pin unconditionally even with
+                pinning turned off community-wide. */}
+            {ui.map.pins && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggle({ id: item.id, categoryId: category.id })
+                  setOpen(false)
+                }}
+                aria-pressed={pinned}
+                className={menuItemClass}
+              >
+                <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
+                {pinned ? 'Pinned' : 'Pin'}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (active) location!.unsetListingAnchor()
-                else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
-                setOpen(false)
-              }}
-              aria-pressed={active}
+              onClick={share}
               className={menuItemClass}
             >
-              {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
-              {active ? 'Location set' : 'Set location'}
+              <ExternalIcon className="h-3.5 w-3.5 shrink-0" />
+              {copied ? 'Copied!' : 'Share'}
             </button>
-          )}
-        </div>,
+            {canSetLocation && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (active) location!.unsetListingAnchor()
+                  else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
+                  setOpen(false)
+                }}
+                aria-pressed={active}
+                className={menuItemClass}
+              >
+                {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
+                {active ? 'Location set' : 'Set location'}
+              </button>
+            )}
+          </div>
+        </>,
         document.body,
       )}
     </div>
