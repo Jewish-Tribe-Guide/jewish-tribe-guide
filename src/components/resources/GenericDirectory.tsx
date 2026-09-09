@@ -22,6 +22,7 @@ import { ui } from '@/lib/uiConfig'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { usePinned } from '@/lib/pinnedContext'
 import { useCategories } from '@/lib/useCategories'
+import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
 
 type Props = {
@@ -101,12 +102,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useSetScreenHeader(true, category.pluralLabel, onUp)
 
   const { isPinned } = usePinned()
-  const [search, setSearch] = useState(initialSearch ?? '')
+  // Captured once, on this component's very first render — see
+  // backForwardNavigation's own module doc. A visitor who presses back/
+  // forward should land on a blank slate here even though the URL they're
+  // arriving on still carries whatever was filtered before (browser history
+  // doesn't forget a replaceState'd URL just because you navigated away and
+  // back — see the fuller reasoning in the effects below); a real
+  // navigation — a clicked link, a shared URL, typing an address — is
+  // exactly the case that SHOULD still hydrate from it, since that's what
+  // makes a filtered link shareable in the first place.
+  const [arrivedViaBackForward] = useState(() => didArriveViaBackForward())
+  const [search, setSearch] = useState(arrivedViaBackForward ? '' : (initialSearch ?? ''))
   const [boolFilters, setBoolFilters] = useState<Record<string, boolean>>({})
   // Multi-select: each key maps to the set of chosen values (empty = no filter).
   const [selectFilters, setSelectFilters] = useState<Record<string, string[]>>({})
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const [openNow, setOpenNow] = useState(initialOpenNow ?? false)
+  const [openNow, setOpenNow] = useState(arrivedViaBackForward ? false : (initialOpenNow ?? false))
   // Drives the "Open now" filter below. Without it the filter answers for the
   // moment the page rendered, so a list narrowed to what's open at 4pm still
   // shows those places at 10pm.
@@ -128,14 +139,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useEffect(() => {
     if (appliedInitialSearchRef.current || !initialSearch) return
     appliedInitialSearchRef.current = true
+    if (arrivedViaBackForward) return
+    // One-time application of an external value on arrival, guarded above —
+    // not the "derive state from props on every render" pattern this lint
+    // rule is otherwise right to flag.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearch(initialSearch)
-  }, [initialSearch])
+  }, [initialSearch, arrivedViaBackForward])
   const appliedInitialOpenNowRef = useRef(false)
   useEffect(() => {
     if (appliedInitialOpenNowRef.current || !initialOpenNow) return
     appliedInitialOpenNowRef.current = true
+    if (arrivedViaBackForward) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenNow(true)
-  }, [initialOpenNow])
+  }, [initialOpenNow, arrivedViaBackForward])
   // `initialFilters` is `null` until FindResourcesConnected hydrates, then a
   // real (possibly empty) object from then on — see FindResources' own doc —
   // so that transition alone, not any specific key inside it, is the signal
@@ -147,6 +165,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   useEffect(() => {
     if (appliedInitialFiltersRef.current || !initialFilters) return
     appliedInitialFiltersRef.current = true
+    if (arrivedViaBackForward) return
     const bools: Record<string, boolean> = {}
     const sels: Record<string, string[]> = {}
     for (const f of category.detailFields) {
@@ -162,7 +181,29 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
     if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
-  }, [initialFilters, category])
+  }, [initialFilters, category, arrivedViaBackForward])
+  // The visible page already renders blank on a back/forward arrival —
+  // nothing above applied the URL's own search/openNow/filter values to
+  // local state — so this just catches the address bar up to match what's
+  // already on screen, once, right after mount. See
+  // backForwardNavigation's own module doc for why "the URL still has them"
+  // and "the page should show them" are different questions: browser
+  // history keeps whatever a replaceState last set an entry's URL to
+  // forever, regardless of how a visitor later arrives back at it.
+  useEffect(() => {
+    if (!arrivedViaBackForward) return
+    const changes: Record<string, string | null> = { q: null, openNow: null }
+    for (const f of category.detailFields) {
+      if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
+      if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
+    }
+    onParamsChange?.(changes, { replace: true })
+    // Deliberately once per mount only, not re-run for every later prop
+    // change (onParamsChange especially is often a fresh closure every
+    // parent render) — arrivedViaBackForward itself never changes after
+    // mount, so there's nothing meaningful for this to react to twice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
   // Skips the very first render on purpose: `search`/`openNow` there is just
