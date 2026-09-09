@@ -253,11 +253,36 @@ body {
   pointer-events: none;
 }
 
+/* prefers-reduced-motion: reduce — was only wired for the View Transition
+   pseudo-elements above (the mobile slide, the desktop badge morph), which
+   left every other animation in the app — fadeIn (page content, the wizard),
+   menuIn (the kebab dropdown), and the mobile listing card's accordion
+   reveal (a plain CSS `transition`, not `animation`, so the old rule's
+   animation-duration override wouldn't have touched it even if it had been
+   written broadly enough to try) — running at full speed regardless of this
+   OS-level accessibility setting. The `*` rule below is the standard
+   broad-spectrum fix (same pattern CSS-Tricks' widely-cited snippet and
+   Tailwind's own reduced-motion plugin use): near-zero rather than literally
+   0s so `transitionend`/`animationend` still fire for anything that depends
+   on them (some browsers skip firing those events for an exactly-zero
+   duration), and !important specifically because an author stylesheet rule
+   with !important is the one thing that outranks a plain inline style in
+   the cascade — which matters here, since the accordion panel's own
+   duration is set via an inline `style` prop (GenericListingCard.tsx), not
+   a class. Keeps the view-transition-specific rule alongside it rather than
+   assuming the universal selector reaches into that pseudo-element tree the
+   same way normal DOM elements do. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   ::view-transition-old(*),
   ::view-transition-new(*),
   ::view-transition-group(*) {
-    animation-duration: 0s !important;
+    animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
   }
 }
