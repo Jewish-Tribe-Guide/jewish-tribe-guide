@@ -195,7 +195,29 @@ body {
    Desktop never sees these: useNavTransitionProps only maps 'nav-forward'/
    'nav-back' to these class names on mobile — desktop's <ViewTransition>
    gets `default: 'none'` for every type, so it plays no view-transition
-   animation at all and keeps its own plain fadeIn (above) untouched. */
+   animation at all and keeps its own plain fadeIn (above) untouched.
+
+   The browser always creates an implicit `root` snapshot group alongside
+   whatever named/classed groups a page actually declares, and gives it its
+   own default crossfade UNLESS something turns that off — easy to miss
+   entirely since nothing above asks for it. Confirmed live via
+   document.getAnimations() during an actual nav-back: React's own boundary
+   (an auto-named group, not literally "root") correctly ran the fade+slide
+   below, while `::view-transition-old(root)` was, at the same time, running
+   the browser's own built-in `-ua-view-transition-fade-out` — a second,
+   unrelated whole-page crossfade (covering everything outside <main> and
+   outside the header's own carve-out below, i.e. mainly the mobile tab bar)
+   layered on top of the slide, which is what read as a "weird fade" rather
+   than a clean directional move. Same double animation on nav-forward too,
+   just less noticeable against a simpler destination. Disabling it here
+   doesn't change anything else outside <main> visually, since that content
+   doesn't actually differ between the old and new page — root only ever had
+   pixels to crossfade because of its own default animation existing at all,
+   not because anything really changed under it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
 ::view-transition-old(.nav-forward) {
   --slide-offset: -60px;
   animation:
