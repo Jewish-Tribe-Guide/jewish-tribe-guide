@@ -200,11 +200,17 @@ body {
    navTransitions.ts / SlugScreen.tsx / Landing.tsx / sections.tsx) — the
    native "one level deeper" / "back" convention: forward slides new content
    in from the right while the old content slides/fades left; back reverses
-   it. Recipe follows Next's own documented pattern for this
-   (node_modules/next/dist/docs/01-app/02-guides/view-transitions.md) —
-   asymmetric timing (old content leaves fast so it doesn't compete for
-   attention; new content arrives a touch slower so there's time to
-   register it) rather than a value invented from scratch.
+   it. Originally followed Next's own documented recipe for this
+   (node_modules/next/dist/docs/01-app/02-guides/view-transitions.md)
+   verbatim, including its asymmetric fade timing — old content faded out
+   over 150ms while new content's fade-in was delayed 150ms before running
+   its own 210ms — but that produced a real, confirmed-live bug: at the
+   exact instant the old fade finished, the new fade hadn't started yet
+   (still sitting at its pre-delay opacity: 0), so both layers were
+   transparent at once and the background showed through as a blank flash
+   between screens. Fixed by giving old and new the same 210ms duration and
+   starting them together (no delay) so they cross-fade instead of handing
+   off — opacity always sums to ~1 across the transition, never both 0.
 
    Desktop never sees these: useNavTransitionProps only maps 'nav-forward'/
    'nav-back' to these class names on mobile — desktop's <ViewTransition>
@@ -235,25 +241,25 @@ body {
 ::view-transition-old(.nav-forward) {
   --slide-offset: -60px;
   animation:
-    150ms ease-in both fade reverse,
+    210ms ease-in both fade reverse,
     400ms ease-in-out both slide reverse;
 }
 ::view-transition-new(.nav-forward) {
   --slide-offset: 60px;
   animation:
-    210ms ease-out 150ms both fade,
+    210ms ease-out both fade,
     400ms ease-in-out both slide;
 }
 ::view-transition-old(.nav-back) {
   --slide-offset: 60px;
   animation:
-    150ms ease-in both fade reverse,
+    210ms ease-in both fade reverse,
     400ms ease-in-out both slide reverse;
 }
 ::view-transition-new(.nav-back) {
   --slide-offset: -60px;
   animation:
-    210ms ease-out 150ms both fade,
+    210ms ease-out both fade,
     400ms ease-in-out both slide;
 }
 /* Landing's own stand-in for ::view-transition-new(.nav-back) above — see
@@ -278,7 +284,7 @@ body {
 .reveal-slide-back {
   --slide-offset: -60px;
   animation:
-    210ms ease-out 150ms both fade,
+    210ms ease-out both fade,
     400ms ease-in-out both slide;
 }
 @keyframes slide {
