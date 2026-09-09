@@ -87,23 +87,34 @@ describe('GenericListingCard — collapsed', () => {
     expect(row).toHaveClass('h-full')
   })
 
-  // The row's own desktop:items-start top-anchors the category icon avatar
-  // next to the name's own line (see that span's own comment), which the
-  // trailing kebab/URL-chip column doesn't need or want — a kebab pinned to
-  // the top of a taller (3-line) row instead of centered against it is the
-  // regression this guards. self-center on the trailing column overrides
-  // the row's alignment for just that column, matching Material Design's
-  // own guidance that a list row's leading/trailing elements center
-  // regardless of how many lines the row's text wraps to.
-  it('centers the trailing kebab column instead of top-anchoring it with the avatar', () => {
+  // The kebab/toggle group is absolutely positioned (right-0, top-1/2
+  // -translate-y-1/2) against the relative wrapper spanning the whole
+  // pre-badge-divider block, not just the icon/name/address row it used to
+  // share a flex row with — self-centering WITHIN that row (an earlier,
+  // narrower fix) only matched the row's own short height, and still
+  // pinned the kebab near the top of a taller card once a header text
+  // field or an upvote/distance row added real height below it. Centering
+  // against the CARD's real header height needed pulling it out of normal
+  // flex flow entirely, not just changing its align-self — see that
+  // group's own comment for the fuller reasoning, and this component's
+  // Storybook-free live-verification notes in the commit that introduced
+  // this for the getBoundingClientRect check that actually caught the gap
+  // a self-center-only fix left behind.
+  it('positions the kebab absolutely, centered against the full pre-badge block', () => {
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
     const kebab = screen.getByRole('button', { name: /more actions for/i })
-    const trailingColumn = kebab.closest('div[class*="shrink-0"]')
-    expect(trailingColumn).not.toBeNull()
-    expect(trailingColumn).toHaveClass('self-center')
+    const positioned = kebab.closest('div[class*="absolute"]')
+    expect(positioned).not.toBeNull()
+    expect(positioned).toHaveClass('absolute', 'right-0', 'top-1/2', '-translate-y-1/2')
+
+    // Its positioning context (the nearest `relative` ancestor an absolute
+    // child measures against) is the wrapper spanning the icon/name row AND
+    // the rows below it, not the narrow icon/name row alone — that's the
+    // actual "the whole card" the kebab centers against now.
+    expect(positioned!.parentElement).toHaveClass('relative', 'pr-8')
   })
 
   it('does not render an upvote count when upvotes is false', () => {

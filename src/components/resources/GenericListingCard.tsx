@@ -583,6 +583,16 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             without items-start the icon (and the trailing column) drift
             toward the middle of that taller block instead of staying
             anchored near the name's own line. */}
+        {/* relative + pr-8: the positioning context for the absolutely-
+            placed kebab/toggle group further down, and the reserved space
+            that keeps this row's name text (and the description/upvote
+            rows below, though neither actually gets close to the edge in
+            practice) from running underneath it. Wraps this row through
+            the upvote/distance row — everything above the badge divider —
+            which is the actual "centered against the whole card" the
+            kebab is centered against; see that group's own comment for why
+            this wrapper's exact extent is what it is. */}
+        <div className="relative pr-8">
         <div className="flex items-center desktop:items-start gap-3">
           {/* Icon avatar — same glyph/image + tinted color as this category's
               map pin (see getCategoryColor), so a place reads as the same
@@ -668,97 +678,100 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             )}
           </div>
 
-          {/* self-center overrides the row's own desktop:items-start above —
-              that top-anchors the AVATAR next to the name's own line so it
-              doesn't drift toward the middle of a taller (3-line) block, but
-              a trailing action column (URL chips, the kebab) is a different
-              element with a different convention: Material Design's own
-              list-item spec centers leading/trailing elements regardless of
-              how many lines the row's text wraps to — Gmail's row-level
-              kebab, a Settings row's trailing chevron, etc. all follow this.
-              The avatar and this column can disagree on alignment; they're
-              just siblings in the same flex row, not tied to one rule. */}
-          <div className="flex items-center gap-3 shrink-0 self-center">
-            <div className="flex items-center gap-2">
-              {headerUrlFields.map(({ f, href }) => (
-                <a
-                  key={f.key}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                >
-                  {f.linkLabel ?? f.label}
-                </a>
-              ))}
-              {/* Pin / Share / "I'm here" and the chevron both grow their own
-                  tap target with a negative margin (-m-2.5, 10px of
-                  invisible overflow on every side — see each button's own
-                  className below) — a real hit-testing browser (not jsdom,
-                  which never caught this) resolves overlapping invisible
-                  regions to whichever element sits on top, so with only
-                  gap-2 (8px) between two 10px overflows the kebab's own hit
-                  area swallowed clicks meant for the chevron next to it.
-                  gap-5 (20px) is the minimum that fully clears both. */}
-              <div className="flex items-center gap-5">
-                {/* Pin / Share / "I'm here" — reachable without expanding
-                    the card, on both mobile and desktop. Same corner slot
-                    as the chevron right next to it, which is exactly why
-                    the upvote/distance stat above no longer lives here on
-                    mobile (see renderUpvoteDistanceContent's own comment) —
-                    there's no room left in this corner for both. */}
-                <ListingActionsMenu item={item} category={category} path={listingPath} />
-                {/* The row's actual accessible toggle — see the row div's
-                    own comment above. No onClick: relies on the native
-                    click a button dispatches on mouse activation or Enter/
-                    Space bubbling up to the row's handler, which does the
-                    real work. Still present and still carries aria-expanded/
-                    aria-label on desktop even though its chevron doesn't
-                    render there — removing the button itself, not just its
-                    icon, would leave keyboard/screen-reader visitors with
-                    no way to open the dialog at all (the row can't be a
-                    button — see that same comment on why), and
-                    GenericListingCard.test.tsx queries this exact button by
-                    role. */}
-                <button
-                  type="button"
-                  aria-expanded={expanded}
-                  aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
-                  // -m-2.5 p-2.5: kept at the same footprint the visible
-                  // chevron used to occupy (16px content + padding = ~36px
-                  // tap target), even though nothing renders inside any
-                  // more — see the invisible spacer below for why, and why
-                  // this button stays in the DOM at all despite having no
-                  // icon on either breakpoint now.
-                  className="-m-2.5 cursor-pointer p-2.5"
-                >
-                  {/* No visible chevron on either breakpoint any more — this
-                      row is already the tap target (the row div's own
-                      onClick above), so a rotating arrow was always a
-                      redundant echo of state the reveal itself already
-                      shows. Desktop already worked this way (opens a modal,
-                      which needs no icon pointing at it, plus a hover state
-                      this button never had anyway).
-                      Mobile is different — no hover to hint at it, and
-                      removing the chevron there needed a real substitute,
-                      not just deleting the affordance: the panel below now
-                      animates open/closed (height+opacity) instead of
-                      popping in silently, so the motion itself teaches
-                      "tapping this row does something" the moment it
-                      happens, tied directly to the tap. See the panel's own
-                      comment on that transition.
-                      The button itself stays — <button> is the actual
-                      accessible toggle a keyboard/screen-reader visitor
-                      needs (aria-expanded/aria-label above), it just no
-                      longer draws anything. The empty spacer below only
-                      keeps its footprint (and this row's layout) identical
-                      to before, not for any visual purpose. */}
-                  <span className="block h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+          {/* URL chips only now — the kebab/toggle used to live here too,
+              but centering THEM against just this row wasn't actually what
+              "centered" meant: this row is only the icon/name/address block,
+              a fraction of the card's real height once the description twin
+              and upvote/distance row below are counted too. They've moved
+              to the absolutely-positioned group after this row instead,
+              centered against the FULL pre-badge-divider block — see that
+              group's own comment. self-center here still applies (still a
+              trailing element, same Material Design reasoning), independent
+              of the avatar's own top-anchoring above. */}
+          <div className="flex items-center gap-2 shrink-0 self-center">
+            {headerUrlFields.map(({ f, href }) => (
+              <a
+                key={f.key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+              >
+                {f.linkLabel ?? f.label}
+              </a>
+            ))}
           </div>
+        </div>
+
+        {/* Pin / Share / "I'm here" and the toggle — absolutely positioned
+            against the relative pr-8 wrapper above (which spans this row
+            through the upvote/distance row below, stopping short of the
+            badge divider) rather than sitting inline in the row above,
+            specifically so "centered" means centered against the CARD'S
+            real header height, not just this one row's — a short card
+            (name + address, no description, no upvote stat) made the two
+            answers look the same, which is what hid this: a longer card (a
+            header text field, an upvote/distance row) revealed the kebab
+            sitting near the TOP of a much taller block instead of its
+            middle. right-0 anchors it to that wrapper's own right edge
+            (this row's own trailing edge, same as before); top-1/2
+            -translate-y-1/2 is the actual centering. The wrapper's own pr-8
+            reserves this group's width so the name/description text never
+            wraps under it — a fixed reserve is safe here because this
+            group's own width is small and fixed (an icon-only kebab + an
+            invisible toggle), not content-driven like the URL chips above,
+            which stay in normal flex flow instead specifically because
+            they aren't.
+            Same negative-margin tap-target-growing trick and gap-5 spacing
+            both controls already used inline here — see each one's own
+            className for why. */}
+        <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-5">
+          <ListingActionsMenu item={item} category={category} path={listingPath} />
+          {/* The row's actual accessible toggle — see the row div's own
+              comment above. No onClick: relies on the native click a button
+              dispatches on mouse activation or Enter/Space bubbling up to
+              the row's handler, which does the real work. Still present and
+              still carries aria-expanded/aria-label on desktop even though
+              its chevron doesn't render there — removing the button itself,
+              not just its icon, would leave keyboard/screen-reader visitors
+              with no way to open the dialog at all (the row can't be a
+              button — see that same comment on why), and
+              GenericListingCard.test.tsx queries this exact button by
+              role. */}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Hide' : 'Show'} details for ${item.name}`}
+            // -m-2.5 p-2.5: kept at the same footprint the visible chevron
+            // used to occupy (16px content + padding = ~36px tap target),
+            // even though nothing renders inside any more — see the
+            // invisible spacer below for why, and why this button stays in
+            // the DOM at all despite having no icon on either breakpoint
+            // now.
+            className="-m-2.5 cursor-pointer p-2.5"
+          >
+            {/* No visible chevron on either breakpoint any more — this row
+                is already the tap target (the row div's own onClick above),
+                so a rotating arrow was always a redundant echo of state the
+                reveal itself already shows. Desktop already worked this way
+                (opens a modal, which needs no icon pointing at it, plus a
+                hover state this button never had anyway).
+                Mobile is different — no hover to hint at it, and removing
+                the chevron there needed a real substitute, not just
+                deleting the affordance: the panel below now animates
+                open/closed (height+opacity) instead of popping in silently,
+                so the motion itself teaches "tapping this row does
+                something" the moment it happens, tied directly to the tap.
+                See the panel's own comment on that transition.
+                The button itself stays — <button> is the actual accessible
+                toggle a keyboard/screen-reader visitor needs
+                (aria-expanded/aria-label above), it just no longer draws
+                anything. The empty spacer below only keeps its footprint
+                (and this row's layout) identical to before, not for any
+                visual purpose. */}
+            <span className="block h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
         {/* Mobile-only twin of the headerTextFields loop above — see the
@@ -813,6 +826,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             </div>
           </>
         )}
+        </div>
 
         {/* Badge row — the only chips that survive collapsed: Open and any
             badge tied to an actual filter control. Below the name row
