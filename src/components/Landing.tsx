@@ -322,24 +322,33 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // visible again" to attach to at all. IntersectionObserver reports real
   // layout/paint visibility straight from the browser, independent of
   // whether React ever re-renders — reliable exactly where the effect-based
-  // attempts weren't. Still gated on consumeHomeReveal() so an ordinary
+  // attempts weren't. Gated on consumeHomeReveal() so an ordinary
   // scroll-driven intersection change (this element merely leaving and
   // re-entering the viewport) doesn't also trigger it — only a real
-  // back-navigation ever sets that flag. The observer's own first callback
-  // (reporting whatever the current state already is, before anything
-  // could plausibly have changed) is skipped so a true first mount doesn't
-  // race a same-tick reveal.
+  // back-navigation ever sets that flag.
+  //
+  // An earlier version also skipped the observer's very first-ever
+  // callback, on the theory that it always just reports pre-existing state
+  // rather than a real transition. Confirmed live (an instrumented
+  // callback wrapper against a real deployment) that this assumption is
+  // false: this effect's own observer gets created around the FORWARD
+  // navigation into a category (this element is already hidden by then,
+  // not at true first mount as local testing had suggested), and the
+  // browser coalesced the hide-then-reveal into a single callback — the
+  // observer's first-ever invocation WAS the real "became visible again"
+  // event, with no earlier "became hidden" callback to have been the
+  // "harmless baseline" the skip was written for. Skipping it ate the
+  // only signal that ever arrived. consumeHomeReveal() is already the
+  // correct, sufficient gate on its own — a stray true baseline callback
+  // only produces a false positive here if a real back-navigation also
+  // happened to be pending at that exact instant, which is what the flag
+  // means in the first place.
   const [backReveal, setBackReveal] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const el = mainRef.current
     if (!el || !isMobile) return
-    let first = true
     const io = new IntersectionObserver(([entry]) => {
-      if (first) {
-        first = false
-        return
-      }
       if (entry!.isIntersecting && consumeHomeReveal()) setBackReveal(true)
     })
     io.observe(el)

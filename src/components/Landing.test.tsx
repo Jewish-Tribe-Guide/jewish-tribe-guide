@@ -466,9 +466,10 @@ describe('Landing', () => {
       expect(main.className).toContain('animate-[fadeIn_180ms_ease-out]')
 
       markHomeReveal()
-      // The observer's own first callback reports current state and is
-      // ignored (see Landing's own doc) — this simulates it, and should be
-      // a no-op even with a reveal already pending.
+      // An intersection callback reporting NOT intersecting must be a
+      // no-op regardless of a pending reveal — only isIntersecting: true
+      // ever applies the slide (see Landing's own doc on why there's no
+      // separate "ignore the first callback" special case any more).
       act(() => setAllIntersecting(false))
       expect(main.className).not.toContain('reveal-slide-back')
 
@@ -491,10 +492,30 @@ describe('Landing', () => {
       const main = document.querySelector('main')!
 
       // No markHomeReveal() this time — an ordinary scroll-driven
-      // intersection change (or the observer's own first callback) must
-      // never apply the slide.
+      // intersection change becoming true must never apply the slide on
+      // its own.
       act(() => triggerAllIntersections())
       expect(main.className).not.toContain('reveal-slide-back')
+    })
+
+    it('applies the slide even when the FIRST-EVER intersection callback is the one reporting true', () => {
+      // Regression guard for the actual production bug: a live capture
+      // against a real deployment showed the observer's first-ever
+      // callback can itself be the "became visible again" event, with no
+      // earlier "became hidden" callback ever arriving to be skipped
+      // first — the browser can coalesce a fast hide-then-reveal into one
+      // notification. An earlier version of this effect specifically
+      // ignored the observer's first-ever callback on the assumption it
+      // always reports harmless pre-existing state, which silently ate
+      // this exact case.
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      markHomeReveal()
+      act(() => triggerAllIntersections())
+      expect(main.className).toContain('reveal-slide-back')
     })
 
     it('does nothing on desktop even with a reveal pending', () => {
