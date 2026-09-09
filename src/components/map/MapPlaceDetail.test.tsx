@@ -261,4 +261,26 @@ describe('MapPlaceDetail', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Back to list' }))
     expect(onBack).toHaveBeenCalled()
   })
+
+  // Was self-start (the header row's own default) until this centered
+  // against just the name line instead of the whole name+category block —
+  // reversed to match GenericListingCard's own kebab, which centers
+  // against its full header for the same reason (Material Design: a row's
+  // trailing element centers against the row as a whole, not just its
+  // first line). Mocked up both options before this landed.
+  it('centers the kebab against the whole name+category block, not just the name', () => {
+    const category = makeCategory()
+    const item = makeListing()
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    const kebab = screen.getByRole('button', { name: /more actions for/i })
+    const positioned = kebab.closest('div[class*="mr-1"]')
+    expect(positioned).not.toBeNull()
+    expect(positioned).toHaveClass('self-center')
+  })
 })

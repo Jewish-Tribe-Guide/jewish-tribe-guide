@@ -134,20 +134,26 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
           </h2>
           <p className="text-sm text-muted">{category.label}</p>
         </div>
-        {/* self-start — centered on just the NAME line, not the shorter
-            category label under it. self-center would center against the
-            whole name+category block instead, pulling the kebab down
-            further than the name alone calls for. Pin/Share/"Set location"
-            all live behind this one menu now — see ListingActionsMenu — so
-            there's no separate Share button in the footer below any more,
-            and PlaceDetailBody's own address row has no SetLocationButton
-            either. */}
+        {/* self-center — was self-start (the flex row's own default,
+            un-overridden) until this centered against just the name line
+            instead of the whole name+category block. Reversed to match the
+            category directory's own kebab (GenericListingCard), which
+            centers against its full header block for the same reason:
+            Material Design's own guidance is that a row's leading/trailing
+            elements center against the row as a whole, not just its first
+            line — a rule this component used to make a deliberate exception
+            to, before that same rule got applied elsewhere in the app.
+            Mocked up first (both options, side by side) before this landed.
+            Pin/Share/"Set location" all live behind this one menu now — see
+            ListingActionsMenu — so there's no separate Share button in the
+            footer below any more, and PlaceDetailBody's own address row has
+            no SetLocationButton either. */}
         {/* mr-1 — a small trailing gap so the kebab doesn't sit flush
             against this edge-to-edge mobile sheet's own true edge, matching
             Spotify's own overflow-menu spacing rather than butting right up
             against it. (Which way the dropdown itself opens is measured
             automatically — see ListingActionsMenu's own doc.) */}
-        <ListingActionsMenu item={item} category={category} path={listingPath} className="mr-1" />
+        <ListingActionsMenu item={item} category={category} path={listingPath} className="mr-1 self-center" />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way
