@@ -303,6 +303,45 @@ describe('GenericDirectory', () => {
       expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
       expect(screen.queryByText('Regular Mart')).not.toBeInTheDocument()
     })
+
+    // A category screen isn't torn down and remounted when a visitor
+    // navigates away and back to it (confirmed live — see GenericDirectory's
+    // own comment above the popstate listener this exercises), so the two
+    // tests above — which only cover what happens at this component's own
+    // true first mount — can't tell apart "the fix works" from "the fix only
+    // ever ran once and got lucky." This is the second, later arrival: the
+    // component is never remounted (didArriveViaBackForward stays false
+    // throughout, exactly as it would for an already-mounted instance) and a
+    // real popstate fires on window instead — the actual browser back/
+    // forward gesture, once this screen is already sitting there filtered.
+    it('clears an already-typed search when a real back/forward gesture happens, even without a remount', async () => {
+      const user = userEvent.setup()
+      const onParamsChange = vi.fn()
+      const category = makeCategory({
+        detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+      })
+      const items = [
+        { ...makeListing({ id: 'a', name: 'Kosher Mart' }), isKosher: true },
+        { ...makeListing({ id: 'b', name: 'Regular Mart' }), isKosher: false },
+      ] as unknown as DirectoryResource[]
+      renderWithProviders(
+        <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />,
+      )
+
+      await user.type(screen.getByPlaceholderText('Search…'), 'kosher')
+      expect(screen.getByPlaceholderText('Search…')).toHaveValue('kosher')
+      onParamsChange.mockClear()
+
+      act(() => window.dispatchEvent(new PopStateEvent('popstate')))
+
+      expect(screen.getByPlaceholderText('Search…')).toHaveValue('')
+      expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
+      expect(screen.getByText('Regular Mart')).toBeInTheDocument()
+      expect(onParamsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ q: null, f_isKosher: null }),
+        { replace: true },
+      )
+    })
   })
 
   describe('the Popularity/Distance sort toggle', () => {

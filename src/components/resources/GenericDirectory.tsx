@@ -182,27 +182,68 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     if (Object.keys(bools).length > 0) setBoolFilters((prev) => ({ ...prev, ...bools }))
     if (Object.keys(sels).length > 0) setSelectFilters((prev) => ({ ...prev, ...sels }))
   }, [initialFilters, category, arrivedViaBackForward])
-  // The visible page already renders blank on a back/forward arrival —
-  // nothing above applied the URL's own search/openNow/filter values to
-  // local state — so this just catches the address bar up to match what's
-  // already on screen, once, right after mount. See
-  // backForwardNavigation's own module doc for why "the URL still has them"
-  // and "the page should show them" are different questions: browser
-  // history keeps whatever a replaceState last set an entry's URL to
-  // forever, regardless of how a visitor later arrives back at it.
-  useEffect(() => {
-    if (!arrivedViaBackForward) return
+  // Resets this screen's own search/openNow/filters to blank, both in local
+  // state and (via onParamsChange) back out to the address bar — what a
+  // back/forward arrival should show, since the URL alone can't be trusted
+  // to reflect "abandoned" vs. "still wanted" (see backForwardNavigation's
+  // own module doc). A ref, read through by both effects below, rather than
+  // a plain function: it closes over onParamsChange, which is often a fresh
+  // closure every parent render, and neither effect should re-run just
+  // because of that.
+  const clearFiltersRef = useRef<() => void>(undefined)
+  clearFiltersRef.current = () => {
+    setSearch('')
+    setOpenNow(false)
+    setBoolFilters({})
+    setSelectFilters({})
     const changes: Record<string, string | null> = { q: null, openNow: null }
     for (const f of category.detailFields) {
       if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
       if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
     }
     onParamsChange?.(changes, { replace: true })
-    // Deliberately once per mount only, not re-run for every later prop
-    // change (onParamsChange especially is often a fresh closure every
-    // parent render) — arrivedViaBackForward itself never changes after
-    // mount, so there's nothing meaningful for this to react to twice.
+  }
+  // Covers the genuine-document-reload case: arrivedViaBackForward was
+  // already true at THIS component's very first mount, so the URL needs
+  // catching up to the blank state already rendered above. Deliberately
+  // does NOT cover a subsequent same-document back/forward into an
+  // already-visited category — see the popstate listener just below for
+  // why that needs an entirely different mechanism, not a wider dependency
+  // array here.
+  useEffect(() => {
+    if (!arrivedViaBackForward) return
+    clearFiltersRef.current!()
+    // Deliberately once per mount only — arrivedViaBackForward itself never
+    // changes after mount, so there's nothing meaningful for this to react
+    // to twice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // A category screen is NOT torn down and remounted when a visitor
+  // navigates away and back to it — confirmed live (an instrumented DOM
+  // reference survived a real history.back()+forward() round trip
+  // unchanged), the same kept-alive mechanism already documented on
+  // Landing/Home. That breaks the mount-only effect just above for every
+  // arrival after the first: a visitor filters this category, presses
+  // back, then forward, and lands back on the exact same already-mounted
+  // instance — whose lazy `arrivedViaBackForward` was captured as `false`
+  // at its one and only true mount, long before any of this happened, and
+  // never gets re-evaluated since there's no second mount to recompute it.
+  //
+  // Unlike that effect, this one doesn't need to detect "did I, personally,
+  // just get mounted via back/forward" — it just needs to react to a real
+  // popstate happening at all, at any point after this component came into
+  // existence, whether or not it happens to be the visible screen at that
+  // exact moment. That's also true when this fires while a DIFFERENT
+  // screen is on top: harmless, since it only clears this instance's own
+  // local state, which is exactly what should have already happened by the
+  // time a visitor navigates back into it again.
+  useEffect(() => {
+    function onPopState() {
+      clearFiltersRef.current!()
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──
