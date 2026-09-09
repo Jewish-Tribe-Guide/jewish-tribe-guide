@@ -171,6 +171,17 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* A small dropdown easing open from its own anchor corner (see
+   ListingActionsMenu) — same family as fadeIn above, just a shorter, subtler
+   scale+opacity move sized for a compact popover rather than a full screen,
+   closer to how Gmail's own overflow menus ease in instead of popping in
+   instantly. transform-origin is set inline per instance (it depends on
+   which corner the menu is actually anchored to). */
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* Admin-authored page copy (About, Privacy) — see lib/richText.ts. Tailwind's
  * preflight resets headings and lists to look like body text, which is right
  * everywhere the app builds its own markup with utility classes and wrong for

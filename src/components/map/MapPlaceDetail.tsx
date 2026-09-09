@@ -142,11 +142,12 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             there's no separate Share button in the footer below any more,
             and PlaceDetailBody's own address row has no SetLocationButton
             either. */}
-        {/* align="end" — this sheet is edge-to-edge on mobile, so the
-            default rightward-opening menu would run straight off-screen
-            from a kebab already flush against the edge. See
-            ListingActionsMenu's own doc on `align`. */}
-        <ListingActionsMenu item={item} category={category} path={listingPath} align="end" />
+        {/* mr-1 — a small trailing gap so the kebab doesn't sit flush
+            against this edge-to-edge mobile sheet's own true edge, matching
+            Spotify's own overflow-menu spacing rather than butting right up
+            against it. (Which way the dropdown itself opens is measured
+            automatically — see ListingActionsMenu's own doc.) */}
+        <ListingActionsMenu item={item} category={category} path={listingPath} className="mr-1" />
       </div>
 
       {/* This has never had a persistent collapsed-row header the way

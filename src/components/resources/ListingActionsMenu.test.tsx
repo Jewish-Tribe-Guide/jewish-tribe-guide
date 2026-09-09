@@ -31,16 +31,33 @@ vi.mock('@/lib/locationContext', async () => {
   return { ...actual, useOptionalLocation: vi.fn() }
 })
 
-function renderMenu(overrides: Partial<Parameters<typeof makeListing>[0]> = {}, align?: 'start' | 'end') {
+function renderMenu(overrides: Partial<Parameters<typeof makeListing>[0]> = {}) {
   const item = makeListing({ id: 'listing-1', name: 'Goldi Market', ...overrides })
   const category = makeCategory()
-  renderWithProviders(<ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" align={align} />)
+  renderWithProviders(<ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" />)
   return { item, category }
+}
+
+// Simulates the kebab's own position for the open-direction measurement in
+// openMenu() — jsdom's default getBoundingClientRect() is all zeros, which
+// (against jsdom's real, large default innerWidth) already reads as "plenty
+// of room to the right", i.e. the common case. Only the near-the-edge case
+// needs this.
+function mockKebabNearRightEdge() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: window.innerWidth - 20,
+    top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => {},
+  })
 }
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  // Restores Element.prototype.getBoundingClientRect after
+  // mockKebabNearRightEdge — clearAllMocks alone resets call history but not
+  // a spy's overridden implementation, which would otherwise leak into
+  // every test after it.
+  vi.restoreAllMocks()
   // usePinned is backed by real localStorage (see pinnedContext.tsx) — every
   // test here uses the same listing id, so a pin left set by one test would
   // otherwise leak into the next.
@@ -78,10 +95,10 @@ describe('ListingActionsMenu', () => {
     expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
   })
 
-  // The kebab sits at the card's own right edge — anchoring the menu's
-  // right edge to it (extending left) put the menu back over the name/
-  // address/chevron it's meant to stay clear of.
-  it('opens the dropdown extending right of the kebab (left-anchored), not left', async () => {
+  // With room to the right (the common case — a directory card, a dialog
+  // header), the menu opens rightward so it stays clear of the name/
+  // address/chevron to the kebab's own left.
+  it('opens the dropdown extending right of the kebab when there is room', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
     renderMenu()
@@ -93,13 +110,14 @@ describe('ListingActionsMenu', () => {
   })
 
   // MapPlaceDetail's kebab sits flush against the edge of an edge-to-edge
-  // mobile sheet — align="end" is what keeps a 160px-wide menu from running
-  // off the right side of the screen there (see this component's own doc on
-  // `align`).
-  it('opens extending left of the kebab (right-anchored) when align="end"', async () => {
+  // mobile sheet — measured, not a fixed per-caller choice (see openMenu's
+  // own doc), so a 160px-wide menu doesn't run off the right side of the
+  // screen there.
+  it('opens the dropdown extending left of the kebab when there is no room to the right', async () => {
+    mockKebabNearRightEdge()
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
-    renderMenu({}, 'end')
+    renderMenu()
 
     await user.click(screen.getByRole('button', { name: /more actions/i }))
     const menu = screen.getByRole('menu')
