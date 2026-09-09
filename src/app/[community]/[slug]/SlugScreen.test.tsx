@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -37,9 +37,30 @@ vi.mock('@/components/FindResources', () => ({
   default: () => <div>FindResources stub</div>,
 }))
 
+// useIsMobile() reads this to decide whether the back arrow's nav-back tag
+// is worth sending — see navTransitions.ts's own doc. Defaults to "mobile"
+// here since that's the case most of this file's tests care about; the one
+// test that needs the opposite overrides it for just that test.
+function mockViewport(isMobile: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: isMobile,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia
+}
+
 afterEach(() => {
   cleanup()
   resetMockRouter()
+})
+
+beforeEach(() => {
+  mockViewport(true)
 })
 
 function renderSlug(slug: string) {
@@ -95,5 +116,22 @@ describe('SlugScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Up' }))
 
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: ['nav-back'] })
+  })
+
+  // The regression this guards: nav-back used to be decided by
+  // useNavTransitionProps() reading useIsMobile() at the DESTINATION
+  // (Landing)'s own mount, which starts false and only corrects after an
+  // effect — wrong at the exact moment a fresh mount needs it. Moved to be
+  // checked here instead (SlugScreen is already mounted and stable by the
+  // time "Up" is clicked), so this asserts the desktop half directly: no
+  // tag at all, not just one that happens not to animate.
+  it('does not tag its back arrow on desktop', async () => {
+    mockViewport(false)
+    const user = userEvent.setup()
+    renderSlug('grocery')
+
+    await user.click(screen.getByRole('button', { name: 'Up' }))
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: undefined })
   })
 })

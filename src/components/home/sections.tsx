@@ -18,6 +18,7 @@ import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import CategoryIcon from '@/components/CategoryIcon'
 import { getCategoryColor } from '@/lib/categoryColor'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 export type CardDef = {
   title: string
@@ -85,6 +86,10 @@ export function Card({
 }) {
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
+  // See navTransitions.ts's own doc on why this check has to happen HERE,
+  // at the already-mounted source of the click, rather than at the
+  // destination's ViewTransition wrapper the way it used to.
+  const isMobile = useIsMobile()
   return (
     // A real <Link>, not a <button onClick={card.go}> — go still exists on
     // CardDef for the one place a tile opens programmatically instead of by
@@ -98,11 +103,10 @@ export function Card({
       onClick={onCardClick ? () => onCardClick(card) : undefined}
       // Every card here is one level deeper than the home screen it's on —
       // a real category, a form, a pseudo-category (Map/Zmanim/Eruv) — so
-      // this is always a "forward" drill-down. Tagging it costs nothing on
-      // its own: whether it actually produces a slide is decided entirely
-      // by the destination's own ViewTransition wrapper (SlugScreen),
-      // which only maps this type to a real animation on mobile.
-      transitionTypes={['nav-forward']}
+      // this is always a "forward" drill-down, but only worth tagging on
+      // mobile — desktop's screens are plain fades with no edge the
+      // content is conceptually anchored to (see navTransitions.ts).
+      transitionTypes={isMobile ? ['nav-forward'] : undefined}
     >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
@@ -235,8 +239,10 @@ function CompactCard({
       href={card.href}
       className="group flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-colors hover:bg-slate-50"
       onClick={onCardClick ? () => onCardClick(card) : undefined}
-      // See Card's own comment on the same prop above.
-      transitionTypes={['nav-forward']}
+      // No transitionTypes tag here, unlike Card above — this row never
+      // mounts on mobile (see this component's own doc), and desktop never
+      // wants the slide (see navTransitions.ts), so there's no case where
+      // tagging it would do anything but risk a stray whole-page crossfade.
     >
       {card.icon ? (
         // Named (desktop only — this component never mounts on mobile, see

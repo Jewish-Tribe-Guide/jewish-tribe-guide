@@ -11,6 +11,7 @@ import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useNavTransitionProps } from '@/lib/navTransitions'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // The client half of the [slug] route. The server has already decided whether
 // this slug is a category or a form (and 404'd if it was neither), so this only
@@ -39,6 +40,11 @@ export default function SlugScreen({
   const { anchor } = useLocation()
   const { goHome, viewMapForCategory } = useSiteNavigation()
   const navTransition = useNavTransitionProps()
+  // See navTransitions.ts's own doc — this has to be checked here, at the
+  // already-mounted source of the "up" click, not baked into the
+  // ViewTransition config above (which is read at this same screen's own,
+  // possibly-still-correcting, mount).
+  const isMobile = useIsMobile()
 
   if (kind === 'form') return <FormScreen slug={slug} goHome={goHome} />
 
@@ -55,8 +61,9 @@ export default function SlugScreen({
     // 'nav-back': this is specifically "return to the home grid," the exact
     // reverse of a category card's own 'nav-forward' (see sections.tsx) —
     // not the tab bar's Home button or the header logo, which stay
-    // untagged (see goHome's own doc for why).
-    onUp: () => goHome({ transitionTypes: ['nav-back'] }),
+    // untagged (see goHome's own doc for why). Mobile-only, same reasoning
+    // as Card's own tag — see navTransitions.ts.
+    onUp: () => goHome({ transitionTypes: isMobile ? ['nav-back'] : undefined }),
     onViewMap: viewMapForCategory,
   }
 
