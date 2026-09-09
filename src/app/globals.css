@@ -56,6 +56,20 @@ html {
    * root only — is the configuration trackpad-back was verified working
    * against. */
   overflow-x: hidden;
+  /* Reserves the vertical scrollbar's own width permanently, whether or not
+   * a scrollbar is actually showing right now. Without it, useBodyScrollLock
+   * (any listing/davening/report dialog — see its own doc) toggling this
+   * element's overflow to `hidden` while a dialog is open removes the
+   * scrollbar entirely, widening the viewport by however many pixels the
+   * scrollbar used to take. That's a real layout change, not just a visual
+   * one: everything sized against the viewport — including the sticky,
+   * backdrop-blurred SiteHeader — reflows and repaints to the new width the
+   * instant a dialog opens, and again back the instant it closes, which is
+   * what actually reads as "the header flashes" right after tapping a
+   * listing. Support: all evergreen browsers except Safari before 18.2,
+   * where this is simply a no-op (the flash this fixes elsewhere still
+   * happens there, not a regression from adding this). */
+  scrollbar-gutter: stable;
 }
 
 @theme {
