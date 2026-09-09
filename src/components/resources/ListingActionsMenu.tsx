@@ -57,6 +57,9 @@ export default function ListingActionsMenu({
   // any measurement has run — matches the common case.
   const [align, setAlign] = useState<'start' | 'end'>('start')
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Set for exactly one tick after an outside click closes the menu — see
+  // the capture-phase click listener below for what it's actually for.
+  const justClosedRef = useRef(false)
   const { isPinned, toggle } = usePinned()
   const { share, copied } = useShareLink(path, item.name)
   // Optional, not useLocation() — this renders inside the admin's category
@@ -76,7 +79,25 @@ export default function ListingActionsMenu({
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      if (!wrapRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+        // The mousedown that just closed this doesn't stop its own click
+        // from still reaching whatever it landed on — they're separate
+        // events, and closing the menu here doesn't touch the second one.
+        // Tapping "away" almost always means tapping the listing CARD
+        // itself (it's most of the screen), which has its own onClick to
+        // expand/collapse — so without this, the same tap that dismissed
+        // the menu also silently expanded the card underneath it. Flagged
+        // here, consumed by the always-on capture-phase listener below —
+        // NOT one declared in this same effect. `setOpen(false)` here
+        // flips `open`, which re-runs THIS effect on the next render and
+        // tears down whatever it registered before the paired click has
+        // even fired; a listener declared in this block would already be
+        // gone by the time that click arrives. The one that actually
+        // consumes it has to outlive this open/closed transition, so it's
+        // mounted once for the component's whole lifetime instead.
+        justClosedRef.current = true
+      }
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -88,6 +109,26 @@ export default function ListingActionsMenu({
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  // Mounted once, independent of `open` — see justClosedRef's own setter
+  // above for why this can't live in the effect that sets the flag: this
+  // needs to survive the exact render where `open` flips to false, which
+  // tears down that effect's own listeners as part of the same update.
+  // Capture phase specifically: stopping propagation here is what keeps
+  // the click from ever reaching the card's own bubble-phase onClick at
+  // all, not just from reaching further ancestors past it. One-shot —
+  // clears itself immediately, so only the click paired with the
+  // dismissing mousedown is swallowed; every tap after that behaves
+  // normally.
+  useEffect(() => {
+    const onClickCapture = (e: MouseEvent) => {
+      if (!justClosedRef.current) return
+      justClosedRef.current = false
+      e.stopPropagation()
+    }
+    document.addEventListener('click', onClickCapture, true)
+    return () => document.removeEventListener('click', onClickCapture, true)
+  }, [])
 
   const pinned = isPinned(item.id)
   // Same gate the old SetLocationButton used — a listing whose address

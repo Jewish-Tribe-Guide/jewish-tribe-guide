@@ -137,6 +137,41 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  // The dismissing outside click and the card's own onClick are two
+  // separate concerns — GenericListingCard's whole row is what "outside"
+  // usually means in practice (it's most of the visible card), and that row
+  // has its own onClick to expand/collapse. Without this, a single tap
+  // meant only to dismiss the menu also silently expanded whatever card it
+  // landed on, in the same motion — confirmed live (getBoundingClientRect
+  // + aria-expanded before/after) before this fix landed, not just assumed.
+  // A later, unrelated tap on that same element must still work normally —
+  // this isn't "swallow every click near the menu", just the one paired
+  // with the dismiss.
+  it('does not let the outside click that dismisses the menu also fire a click handler on what it landed on', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const onOutsideClick = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <ListingActionsMenu item={makeListing({ id: 'listing-1', name: 'Goldi Market' })} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" />
+        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+        <div data-testid="card-row" onClick={onOutsideClick}>Goldi Market card row</div>
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('card-row'))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(onOutsideClick).not.toHaveBeenCalled()
+
+    // A second, unrelated tap on the same element (no menu open this time)
+    // must behave normally.
+    await user.click(screen.getByTestId('card-row'))
+    expect(onOutsideClick).toHaveBeenCalledTimes(1)
+  })
+
   it('does not render "Set location" when there is no location context (e.g. the admin preview)', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
     const user = userEvent.setup()
