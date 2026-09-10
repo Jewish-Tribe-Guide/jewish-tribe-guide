@@ -226,9 +226,19 @@ export default function SubscribeSection({
                         to it is what actually communicates which, the same
                         way the other two checkboxes' own labels do the
                         explaining. */}
+                    {/* bg-primary, not a neutral slate — the two REAL
+                        checkboxes beside it (New listings/Closures) are
+                        plain unstyled <input type="checkbox">s, and an
+                        unstyled checked checkbox renders with the browser's
+                        own default accent color, which reads as blue in
+                        every evergreen browser — this app's own
+                        --color-primary is that same blue, so this is the
+                        closer visual match to what a native checked
+                        checkbox actually looks like, not an arbitrary
+                        choice. */}
                     <span
                       aria-hidden="true"
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] bg-slate-700 text-white"
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] bg-primary text-white"
                     >
                       <CheckIcon className="h-3 w-3" />
                     </span>
