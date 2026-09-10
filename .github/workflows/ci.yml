@@ -79,7 +79,7 @@ jobs:
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -115,7 +115,7 @@ jobs:
   form-roundtrip:
     name: Form submission (wizard reaches the database)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -143,7 +143,7 @@ jobs:
   admin-write:
     name: Admin console write behavior (approve/reject via the real UI)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     # needs cache-roundtrip too (not just unit): both suites' auth.setup.ts
     # mint a session by calling generateLink + verifyOtp against the SAME
     # resolved admin email (see cacheE2eAdmin.mjs's resolveDefaultCommunityAdminEmail —
@@ -185,7 +185,7 @@ jobs:
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
