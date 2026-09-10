@@ -233,31 +233,46 @@ body {
    doesn't change anything else outside <main> visually, since that content
    doesn't actually differ between the old and new page — root only ever had
    pixels to crossfade because of its own default animation existing at all,
-   not because anything really changed under it. */
+   not because anything really changed under it.
+
+   --slide-offset used to be a fixed ±60px, not the ±100% below — reported
+   live (a screenshot mid-transition) as home's hero/search and a category's
+   filter bar/listing cards visibly overlapping rather than one clearing the
+   frame before the other reads. On a ~375-430px phone, 60px is only about
+   15% of the screen: with old and new cross-fading via opacity at the same
+   time (the fix directly above), both were still sitting almost fully on
+   top of each other for most of the 400ms slide, and unlike home<->category
+   real OS drill-downs pair, these two screens share no structure a viewer
+   could read as "the same content, just nudged" — the overlap just looked
+   like a glitch. ±100% (of the snapshot's own width, same box the old fixed
+   px value was relative to) pushes each screen fully off/on frame, the way
+   an actual push transition does, so the two never occupy the same space at
+   once — only their fade continues to overlap, which is what avoids the
+   blank-flash bug two sections above. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
 }
 ::view-transition-old(.nav-forward) {
-  --slide-offset: -60px;
+  --slide-offset: -100%;
   animation:
     210ms ease-in both fade reverse,
     400ms ease-in-out both slide reverse;
 }
 ::view-transition-new(.nav-forward) {
-  --slide-offset: 60px;
+  --slide-offset: 100%;
   animation:
     210ms ease-out both fade,
     400ms ease-in-out both slide;
 }
 ::view-transition-old(.nav-back) {
-  --slide-offset: 60px;
+  --slide-offset: 100%;
   animation:
     210ms ease-in both fade reverse,
     400ms ease-in-out both slide reverse;
 }
 ::view-transition-new(.nav-back) {
-  --slide-offset: -60px;
+  --slide-offset: -100%;
   animation:
     210ms ease-out both fade,
     400ms ease-in-out both slide;
@@ -282,7 +297,7 @@ body {
    kept in sync by hand since one drives a real element and the other a
    view-transition pseudo-element, and can't share a single selector. */
 .reveal-slide-back {
-  --slide-offset: -60px;
+  --slide-offset: -100%;
   animation:
     210ms ease-out both fade,
     400ms ease-in-out both slide;
