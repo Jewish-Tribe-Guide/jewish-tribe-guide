@@ -15,6 +15,7 @@ import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
 import { resolveCapabilities } from '@/lib/categories'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 
 // A pending add/edit/report action on a listing within the current category.
@@ -243,7 +244,17 @@ export default function FindResources({
   }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
-    return <EruvInfo eruvim={eruvim} onUp={onUp} upLabel="Home" title={eruv?.pluralLabel} />
+    return (
+      <EruvInfo
+        eruvim={eruvim}
+        onUp={onUp}
+        upLabel="Home"
+        title={eruv?.pluralLabel}
+        icon={eruv?.icon}
+        color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
+        cardImageUrl={eruv?.cardImageUrl}
+      />
+    )
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
@@ -257,6 +268,9 @@ export default function FindResources({
         onUp={onUp}
         upLabel="Home"
         title={zmanim?.pluralLabel}
+        icon={zmanim?.icon}
+        color={zmanim ? getCategoryColor(categories, zmanim.id) : undefined}
+        cardImageUrl={zmanim?.cardImageUrl}
       />
     )
   }

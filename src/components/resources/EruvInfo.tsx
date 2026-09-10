@@ -1,8 +1,11 @@
 import type { EruvRecord } from '@/types'
-import Breadcrumb from '@/components/Breadcrumb'
+import DirectoryHeader from './DirectoryHeader'
+import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import { ExternalIcon } from '@/components/icons'
 import { community } from '@/community.config'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 type Props = {
   eruvim: EruvRecord[]
@@ -14,6 +17,12 @@ type Props = {
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
   title?: string
+  /** This pseudo-category's own icon/color/photo — see CategoryConfig. Falls
+   *  back to a neutral slate (matching getCategoryColor's own fallback) and
+   *  no icon while categories are still loading, same as `title` above. */
+  icon?: string
+  color?: string
+  cardImageUrl?: string | null
 }
 
 function EruvCard({ eruv }: { eruv: EruvRecord }) {
@@ -36,19 +45,25 @@ function EruvCard({ eruv }: { eruv: EruvRecord }) {
   )
 }
 
-export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information' }: Props) {
+export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information', icon, color = '#64748b', cardImageUrl }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
   useSetScreenHeader(true, title, onUp)
+  const isMobile = useIsMobile()
+
+  const banner = !isMobile && icon ? (
+    <CategoryBandBadge color={color}>
+      <CategoryGlyph categoryId={undefined} icon={icon} className="h-[55%] w-[55%]" />
+    </CategoryBandBadge>
+  ) : null
 
   return (
-    <div>
-      {/* Breadcrumb (desktop only) names the same destination the header's
-          "‹ {title}" now covers on mobile — see Breadcrumb's own doc for why
-          only one of the two ever shows at a time. */}
-      <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />
-      <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">{title}</h2>
+    <CategoryBandFrame color={color} imageUrl={cardImageUrl}>
+      {/* Mobile used to have its own "‹ {upLabel}" row here — see
+          GenericDirectory's identical comment on why it doesn't need one now
+          that useSetScreenHeader puts the same "‹ {title}" in SiteHeader. */}
+      <DirectoryHeader title={title} upLabel={upLabel} onUp={onUp} titleInHeader banner={banner} />
       <p className="mb-4 text-sm text-muted">
         Check the current status of the {community.region}-area eruvim before Shabbos.
       </p>
@@ -58,6 +73,6 @@ export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', titl
           <EruvCard key={eruv.id} eruv={eruv} />
         ))}
       </div>
-    </div>
+    </CategoryBandFrame>
   )
 }
