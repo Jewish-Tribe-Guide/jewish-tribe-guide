@@ -41,12 +41,31 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
   // ImageCropModal) before it ever reaches `upload` — nothing is sent to the
   // server until the admin/submitter confirms how it's framed. Also doubles
   // as "re-editing an already-uploaded photo" — clicking the preview when a
-  // photo is already set (see the dropzone's onClick below) sets this to
-  // `value` (a URL, not a File) to reopen the same modal sourced from what's
-  // already there, instead of requiring the original file again.
+  // photo is already set (see the dropzone's onClick below) reopens the same
+  // modal, sourced from `originalFileRef` below when one's known rather than
+  // `value` itself.
   const [cropSource, setCropSource] = useState<File | string | null>(null)
+  // The actual picked file behind the CURRENT `value`, kept around
+  // separately from `cropSource` (which clears back to null once the crop
+  // modal closes) — without this, clicking "reposition" a second time in
+  // the same session reopens the modal sourced from `value`, which by then
+  // is last time's CROPPED output, not the original photo. Confirmed live:
+  // repeatedly narrowing the same already-narrowed square/rect that way
+  // makes it impossible to ever see the parts of the photo the first crop
+  // left out, the exact opposite of what "reposition" is supposed to let
+  // you do. Only reset when the visitor picks/drops/pastes an actual NEW
+  // file — an already-uploaded `value` from a previous page load (no local
+  // File behind it at all) still falls back to re-cropping the URL itself,
+  // the same limitation any avatar editor that doesn't keep every original
+  // around forever has.
+  const originalFileRef = useRef<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  function pickNewFile(file: File) {
+    originalFileRef.current = file
+    setCropSource(file)
+  }
 
   async function upload(file: Blob) {
     setError(null)
@@ -84,7 +103,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
     if (!item) return
     e.preventDefault()
     const file = item.getAsFile()
-    if (file) setCropSource(file)
+    if (file) pickNewFile(file)
   }
 
   return (
@@ -98,16 +117,18 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
           role="button"
           aria-label={value.trim() ? 'Adjust photo' : 'Image preview — click then paste an image, or drag one here'}
           // Clicking an already-set photo reopens the crop step on it (see
-          // cropSource's own comment) — no separate "Adjust" button needed;
-          // the preview itself IS the affordance, the same way clicking your
-          // own avatar to change it works everywhere else (Slack, GitHub, …).
-          // An empty preview has nothing to reopen, so a click there is a
-          // no-op — it still focuses for paste, and drag/drop still works.
-          onClick={() => { if (value.trim()) setCropSource(value) }}
+          // originalFileRef's own comment for why that's the ORIGINAL file
+          // when one's known, not `value`) — no separate "Adjust" button
+          // needed; the preview itself IS the affordance, the same way
+          // clicking your own avatar to change it works everywhere else
+          // (Slack, GitHub, …). An empty preview has nothing to reopen, so a
+          // click there is a no-op — it still focuses for paste, and
+          // drag/drop still works.
+          onClick={() => { if (value.trim()) setCropSource(originalFileRef.current ?? value) }}
           onKeyDown={(e) => {
             if ((e.key === 'Enter' || e.key === ' ') && value.trim()) {
               e.preventDefault()
-              setCropSource(value)
+              setCropSource(originalFileRef.current ?? value)
             }
           }}
           onPaste={handlePaste}
@@ -117,7 +138,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
             e.preventDefault()
             setDragOver(false)
             const file = e.dataTransfer.files?.[0]
-            if (file) setCropSource(file)
+            if (file) pickNewFile(file)
           }}
           className={`relative flex h-14 shrink-0 items-center justify-center overflow-hidden border-2 border-dashed bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary ${shapeClass} ${
             dragOver ? 'border-primary bg-primary/5' : 'border-slate-200'
@@ -170,7 +191,10 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
             {value.trim() && (
               <button
                 type="button"
-                onClick={() => onChange('')}
+                onClick={() => {
+                  originalFileRef.current = null
+                  onChange('')
+                }}
                 className="text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
               >
                 Remove
@@ -191,7 +215,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
           onChange={(e) => {
             const file = e.target.files?.[0]
             e.target.value = ''
-            if (file) setCropSource(file)
+            if (file) pickNewFile(file)
           }}
           disabled={uploading}
           className="hidden"
@@ -204,7 +228,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
           onChange={(e) => {
             const file = e.target.files?.[0]
             e.target.value = ''
-            if (file) setCropSource(file)
+            if (file) pickNewFile(file)
           }}
           disabled={uploading}
           className="hidden"
@@ -217,7 +241,13 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
         <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
         <input
           value={value}
-          onChange={(e) => onChange(e.target.value.trim())}
+          onChange={(e) => {
+            // A manually-typed/pasted URL has no local File behind it —
+            // clear any remembered original so a later "reposition" click
+            // re-crops THIS url, not whatever was picked before it.
+            originalFileRef.current = null
+            onChange(e.target.value.trim())
+          }}
           placeholder="https://…"
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
         />

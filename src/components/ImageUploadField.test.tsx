@@ -1,0 +1,123 @@
+// @vitest-environment jsdom
+import { useState } from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import ImageUploadField from './ImageUploadField'
+
+// ImageCropModal itself needs a real image load + canvas (see its own lack
+// of unit tests) — out of scope here. What this file cares about is WHICH
+// `source` ImageUploadField hands it on each open, so the mock just surfaces
+// that plus a couple of buttons standing in for "Use photo"/"Cancel".
+vi.mock('./ImageCropModal', () => ({
+  default: ({
+    source,
+    onConfirm,
+    onCancel,
+  }: {
+    source: File | string
+    onConfirm: (blob: Blob) => void
+    onCancel: () => void
+  }) => (
+    <div>
+      <p>Crop modal open</p>
+      <p>Source: {typeof source === 'string' ? source : `file:${source.name}`}</p>
+      <button onClick={() => onConfirm(new Blob(['cropped'], { type: 'image/jpeg' }))}>Confirm crop</button>
+      <button onClick={onCancel}>Cancel crop</button>
+    </div>
+  ),
+}))
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+function fakeFile(name: string) {
+  return new File(['fake image bytes'], name, { type: 'image/jpeg' })
+}
+
+// A real caller always feeds the resulting URL straight back in as the next
+// `value` (see SiteSettingsEditor, CategoryFormFields, ListingForm) — this
+// wrapper does the same, which is what lets a SECOND reposition see the
+// first crop's uploaded URL as `value` at all.
+function ControlledField() {
+  const [value, setValue] = useState('')
+  return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" />
+}
+
+describe('ImageUploadField', () => {
+  // Regression test: reported live — after "Use photo", reopening the crop
+  // step to readjust re-cropped the ALREADY-CROPPED upload instead of the
+  // original picked file, so repositioning could only ever narrow further,
+  // never recover whatever the first crop left out.
+  it('re-crops the original picked file on a second reposition, not the previously uploaded URL', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, url: 'https://example.com/cropped-1.jpg' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, url: 'https://example.com/cropped-2.jpg' }),
+        }),
+    )
+
+    render(<ControlledField />)
+
+    // "Upload image"'s hidden file input has no `capture` attribute; "Take
+    // photo"'s does — this is how the test tells the two apart.
+    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    const original = fakeFile('vacation.jpg')
+    await user.upload(fileInput, original)
+
+    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+    await user.click(screen.getByText('Confirm crop'))
+
+    await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-1.jpg'))
+    expect(screen.queryByText('Crop modal open')).not.toBeInTheDocument()
+
+    // Reposition the now-uploaded photo — this is the exact scenario that
+    // broke: it used to reopen sourced from cropped-1.jpg (last time's
+    // OUTPUT), not vacation.jpg (the real original).
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+
+    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Confirm crop'))
+    await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-2.jpg'))
+  })
+
+  it('falls back to re-cropping the URL itself when no local file is known (an already-uploaded photo from a previous session)', async () => {
+    const user = userEvent.setup()
+    function PreloadedField() {
+      const [value, setValue] = useState('https://example.com/from-last-session.jpg')
+      return <ImageUploadField value={value} onChange={setValue} uploadUrl="/api/upload" />
+    }
+    render(<PreloadedField />)
+
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+
+    expect(screen.getByText('Source: https://example.com/from-last-session.jpg')).toBeInTheDocument()
+  })
+
+  it('forgets the remembered original once a URL is pasted in directly', async () => {
+    const user = userEvent.setup()
+    render(<ControlledField />)
+
+    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    await user.upload(fileInput, fakeFile('vacation.jpg'))
+    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+    await user.click(screen.getByText('Cancel crop'))
+
+    await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/pasted.jpg')
+
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+
+    expect(screen.getByText('Source: https://example.com/pasted.jpg')).toBeInTheDocument()
+  })
+})
