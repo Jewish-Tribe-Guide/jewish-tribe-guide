@@ -159,8 +159,8 @@ test.describe('listing detail — desktop', () => {
     await page.goto(`/${community}/${category.id}`)
     await dismissLocationPrompt(page)
 
-    const first = page.getByRole('button', { name: /^Show details for / }).first()
-    await first.click()
+    const triggers = page.getByRole('button', { name: /^Show details for / })
+    await triggers.first().click()
     // Several clicks, not one — the first "next" from item 1 is often still
     // in the SAME grid row (no scroll needed at all), which wouldn't have
     // exposed this bug either. Enough clicks to guarantee at least one
@@ -170,10 +170,17 @@ test.describe('listing detail — desktop', () => {
     }
 
     const dialog = page.getByRole('dialog')
-    const name = (await dialog.getAttribute('aria-label'))!
+    await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
 
-    const nextTrigger = page.getByRole('button', { name: `Show details for ${name}` })
+    // Tracked by position (5 "Next" clicks from the first item lands on the
+    // 6th, index 5), not by re-matching the dialog's own aria-label against
+    // the trigger buttons' names — two real listings sharing an exact name
+    // (a legitimate case: two branches of the same business) made that a
+    // strict-mode violation, reported live in CI against real test-project
+    // data. The list itself doesn't reorder between these clicks, so the
+    // index is stable.
+    const nextTrigger = triggers.nth(5)
     await expect(nextTrigger).toBeVisible()
 
     // The site header is ALSO `position: sticky` (see SiteHeader's own

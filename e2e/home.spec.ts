@@ -73,43 +73,74 @@ test.describe('home — Browse everything grid', () => {
 // cramped this particular card actually was. jsdom can't compute real
 // container queries, so the actual swap only has coverage here.
 //
-// The card used to be squeezed to roughly half the content column's width
-// (a 2-up grid it shared with DaveningTimesCard, inside HomeBreak) — narrow
-// enough that a real desktop window (700px) could still push its content
-// box under the ~470px breakpoint. It's a full-width standalone card now
-// (see homeSections.ts's own doc on why the pair split), so its content box
-// at the `desktop:` gate's own floor (640px viewport) measures ~536px —
-// still above the breakpoint. Measured directly against a real running
-// server: the short-label state is unreachable at any viewport where this
-// card is visible at all any more. The mechanism itself is untouched (still
-// correct if the layout ever narrows this card again) — only the "and
-// sometimes it's the short one" half of this test is gone, since there's
-// nothing left to reach it with.
+// Whether this card is full-width or paired half-width with a neighbor
+// (DaveningTimesCard) in a 2-up grid is an admin's own per-community choice
+// (see homeSections.ts's own `width` doc) — this used to assume "always
+// full-width now" and hardcode "always the long label," which broke the
+// moment a real community was (legitimately) configured half-width: at
+// that width its content box sits well under the ~470px breakpoint, so the
+// short label is the CORRECT rendered state there, not a bug. Derives the
+// expectation from the card's own actual measured content box instead
+// (border box minus its own `p-7`, 56px total — see ContributeButton's own
+// doc on why border-box alone is the wrong measurement here), so this holds
+// regardless of whatever width the running community happens to be
+// configured at.
 test.describe('home — Update Listings button labels', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop-only card')
 
-  test('shows the long label at every viewport where the card is visible', async ({ page }) => {
+  test('whichever label the container query picks, it renders fully — not clipped, not overlapping its neighbor', async ({ page }) => {
     const community = await defaultCommunity(page)
 
     await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
     await ready(page)
 
-    // Both labels are always in the DOM (see ContributeButton's own doc) —
-    // one hidden by CSS, not conditionally rendered — so the assertion has
-    // to check which one is actually VISIBLE, not just present in
-    // textContent (Playwright's text matchers don't filter on CSS
-    // visibility, so `toContainText` would pass either way here).
-    const wideAdd = page.getByRole('button', { name: 'Add' })
-    await expect(wideAdd).toBeVisible()
-    await expect(wideAdd.getByText('Add a place')).toBeVisible()
+    // NOT "assert the long label is always visible" (what this used to do)
+    // and NOT "recompute the same ~470px breakpoint ContributeButton itself
+    // hardcodes, then assert visibility matches that" (what a first attempt
+    // at fixing this did instead) — a fair objection to that version: it
+    // mostly just re-derives the implementation's own constant and checks
+    // it against itself, not an independent requirement. Whether this card
+    // renders full-width or paired half-width with a neighbor is a
+    // legitimate per-community admin choice (homeSections.ts's own `width`
+    // doc), not something this test should assume OR re-predict from a
+    // magic number. What actually has to hold regardless of that choice:
+    // whichever of the two labels the browser's own container query picks,
+    // it has to render as a complete, non-overlapping button — not clipped
+    // by the card edge, not overlapping the next button over. That's
+    // independent of which width the admin picked and independent of the
+    // exact breakpoint value.
+    for (const width of [640, 900, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      const addBtn = page.getByRole('button', { name: 'Add' })
+      const editBtn = page.getByRole('button', { name: 'Edit' })
+      await expect(addBtn).toBeVisible()
 
-    // The `desktop:` gate's own floor — the narrowest viewport this card
-    // shows at all. Still the long label here.
-    await page.setViewportSize({ width: 640, height: 640 })
-    const narrowAdd = page.getByRole('button', { name: 'Add' })
-    await expect(narrowAdd).toBeVisible()
-    await expect(narrowAdd.getByText('Add a place')).toBeVisible()
+      // Both labels are always in the DOM (see ContributeButton's own doc)
+      // — one hidden by CSS, not conditionally rendered — so this has to
+      // check which one is actually VISIBLE, not just present in
+      // textContent (Playwright's text matchers don't filter on CSS
+      // visibility, so `toContainText` would pass either way here). Exactly
+      // one of the two should be showing; the toggle being stuck with both
+      // (or neither) visible is its own bug the rest of this test can't
+      // catch, since it looks at whichever ONE label it finds visible.
+      const long = addBtn.getByText('Add a place')
+      const short = addBtn.getByText('Add', { exact: true })
+      const [longVisible, shortVisible] = await Promise.all([long.isVisible(), short.isVisible()])
+      expect(longVisible !== shortVisible, `at ${width}px, expected exactly one of the long/short labels visible, got long=${longVisible} short=${shortVisible}`).toBe(true)
+      const visibleLabel = longVisible ? long : short
+
+      const [labelBox, addBox, editBox] = await Promise.all([visibleLabel.boundingBox(), addBtn.boundingBox(), editBtn.boundingBox()])
+      expect(labelBox && addBox && editBox, `a box was missing at ${width}px`).toBeTruthy()
+      // Not clipped: the label's own box has to fit entirely inside its
+      // button's box, not spill past its right edge (the tell-tale sign of
+      // a container query firing before there's actually room — the exact
+      // bug the OTHER test below this one guards, at a wider range of
+      // widths this one doesn't sweep).
+      expect(labelBox!.x + labelBox!.width, `label clipped by its own button's right edge at ${width}px`).toBeLessThanOrEqual(addBox!.x + addBox!.width + 1)
+      // Not overlapping: Add's button box ends before Edit's begins.
+      expect(addBox!.x + addBox!.width, `Add's button overlaps Edit's at ${width}px`).toBeLessThanOrEqual(editBox!.x + 1)
+    }
   })
 
   // The bug a screenshot caught: the container query that swaps to the long
@@ -133,11 +164,15 @@ test.describe('home — Update Listings button labels', () => {
     const reportButton = page.getByRole('button', { name: 'Report' })
 
     // Starts at 800, not narrower: below the `desktop:` 640px gate this
-    // card isn't visible at all, and the card is full-width now (see
-    // homeSections.ts's own doc) rather than squeezed into a 2-up grid, so
-    // there's more room at any given viewport than there used to be — 800
-    // is comfortably past the gate with margin to spare, not a boundary
-    // this test is trying to sit right on.
+    // card isn't visible at all. Whether it renders full-width or paired
+    // half-width with a neighbor is a per-community admin choice
+    // (homeSections.ts's own `width` doc) this test doesn't assume either
+    // way — these are the SHORT labels (aria-label, always present
+    // regardless of which span is CSS-visible — see ContributeButton's own
+    // doc), so what's being swept here is purely "do three short words ever
+    // wrap," which a half-width card has just as much room for as a
+    // full-width one; 800 is comfortably past the `desktop:` gate either
+    // way, not a boundary this test is trying to sit right on.
     for (const width of [800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await expect(addButton).toBeVisible()
