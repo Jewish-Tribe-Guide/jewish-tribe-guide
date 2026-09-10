@@ -105,19 +105,62 @@ describe('ImageUploadField', () => {
     expect(screen.getByText('Source: https://example.com/from-last-session.jpg')).toBeInTheDocument()
   })
 
-  it('forgets the remembered original once a URL is pasted in directly', async () => {
+  it('a freshly picked file replaces whatever URL was remembered before it', async () => {
     const user = userEvent.setup()
     render(<ControlledField />)
 
-    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
-    await user.upload(fileInput, fakeFile('vacation.jpg'))
-    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+    // Typing a URL only sets `value` directly — it doesn't open the crop
+    // modal on its own, same as a real caller feeding in an existing value.
+    await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/pasted.jpg')
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+    expect(screen.getByText('Source: https://example.com/pasted.jpg')).toBeInTheDocument()
     await user.click(screen.getByText('Cancel crop'))
 
-    await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/pasted.jpg')
+    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    await user.upload(fileInput, fakeFile('vacation.jpg'))
 
     await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
 
-    expect(screen.getByText('Source: https://example.com/pasted.jpg')).toBeInTheDocument()
+    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
+  })
+
+  // Regression test: reported live — setting the photo by pasting a URL
+  // directly (a real admin flow: a stock-photo link, not a downloaded file)
+  // rather than uploading a file, then cropping and reopening to readjust,
+  // reopened sourced from the CROPPED OUTPUT instead of the pasted URL —
+  // the exact same bug as the File case above, just for the other of the
+  // two ways an "original" can arrive. The pasted URL is real: 900×1293
+  // portrait; a naive re-crop of the already-4:3 output has nowhere left to
+  // reposition to.
+  it('re-crops the originally PASTED URL on a second reposition, not the previously uploaded (cropped) URL', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, url: 'https://example.com/cropped-1.jpg' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, url: 'https://example.com/cropped-2.jpg' }),
+        }),
+    )
+    render(<ControlledField />)
+
+    await user.type(screen.getByPlaceholderText('https://…'), 'https://example.com/city-hall-original.jpg')
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+    expect(screen.getByText('Source: https://example.com/city-hall-original.jpg')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Confirm crop'))
+    await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-1.jpg'))
+
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+
+    expect(screen.getByText('Source: https://example.com/city-hall-original.jpg')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Confirm crop'))
+    await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-2.jpg'))
   })
 })

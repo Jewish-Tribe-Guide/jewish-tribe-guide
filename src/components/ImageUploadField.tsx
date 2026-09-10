@@ -45,25 +45,33 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
   // modal, sourced from `originalFileRef` below when one's known rather than
   // `value` itself.
   const [cropSource, setCropSource] = useState<File | string | null>(null)
-  // The actual picked file behind the CURRENT `value`, kept around
-  // separately from `cropSource` (which clears back to null once the crop
-  // modal closes) — without this, clicking "reposition" a second time in
-  // the same session reopens the modal sourced from `value`, which by then
-  // is last time's CROPPED output, not the original photo. Confirmed live:
-  // repeatedly narrowing the same already-narrowed square/rect that way
-  // makes it impossible to ever see the parts of the photo the first crop
-  // left out, the exact opposite of what "reposition" is supposed to let
-  // you do. Only reset when the visitor picks/drops/pastes an actual NEW
-  // file — an already-uploaded `value` from a previous page load (no local
-  // File behind it at all) still falls back to re-cropping the URL itself,
-  // the same limitation any avatar editor that doesn't keep every original
-  // around forever has.
-  const originalFileRef = useRef<File | null>(null)
+  // The actual source behind the CURRENT `value` — a File when one was
+  // picked/dropped/pasted-as-image, or a URL when one was typed/pasted into
+  // the URL field below — kept around separately from `cropSource` (which
+  // clears back to null once the crop modal closes). Without this, clicking
+  // "reposition" a second time in the same session reopens the modal
+  // sourced from `value`, which by then is last time's CROPPED output, not
+  // the original photo. Confirmed live TWO ways: repeatedly narrowing an
+  // already-cropped File makes it impossible to see the parts the first
+  // crop left out, and — the one this ref used to get wrong — pasting a URL
+  // directly (a real admin's actual flow: a stock-photo link, not a
+  // downloaded file) had this cleared to null on the theory that "no local
+  // File behind it" meant nothing could be remembered, when the pasted URL
+  // ITSELF is exactly as good an original as a File is: reopening after a
+  // crop fell back to `value` (the cropped, frame-shaped output) instead of
+  // the pasted URL (the real, differently-shaped original), reproducing the
+  // exact bug this ref exists to prevent. Only reset when the visitor
+  // provides an actual NEW source (a new file, drop, paste-as-image, typed
+  // URL, or Remove) — an already-uploaded `value` from a PREVIOUS page load
+  // (no local original of any kind ever seen this session) still falls back
+  // to re-cropping the URL itself, the one limitation no amount of local
+  // bookkeeping can fix without uploading every original forever.
+  const originalSourceRef = useRef<File | string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   function pickNewFile(file: File) {
-    originalFileRef.current = file
+    originalSourceRef.current = file
     setCropSource(file)
   }
 
@@ -117,18 +125,18 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
           role="button"
           aria-label={value.trim() ? 'Adjust photo' : 'Image preview — click then paste an image, or drag one here'}
           // Clicking an already-set photo reopens the crop step on it (see
-          // originalFileRef's own comment for why that's the ORIGINAL file
-          // when one's known, not `value`) — no separate "Adjust" button
-          // needed; the preview itself IS the affordance, the same way
-          // clicking your own avatar to change it works everywhere else
+          // originalSourceRef's own comment for why that's the ORIGINAL
+          // source when one's known, not `value`) — no separate "Adjust"
+          // button needed; the preview itself IS the affordance, the same
+          // way clicking your own avatar to change it works everywhere else
           // (Slack, GitHub, …). An empty preview has nothing to reopen, so a
           // click there is a no-op — it still focuses for paste, and
           // drag/drop still works.
-          onClick={() => { if (value.trim()) setCropSource(originalFileRef.current ?? value) }}
+          onClick={() => { if (value.trim()) setCropSource(originalSourceRef.current ?? value) }}
           onKeyDown={(e) => {
             if ((e.key === 'Enter' || e.key === ' ') && value.trim()) {
               e.preventDefault()
-              setCropSource(originalFileRef.current ?? value)
+              setCropSource(originalSourceRef.current ?? value)
             }
           }}
           onPaste={handlePaste}
@@ -192,7 +200,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
               <button
                 type="button"
                 onClick={() => {
-                  originalFileRef.current = null
+                  originalSourceRef.current = null
                   onChange('')
                 }}
                 className="text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
@@ -242,11 +250,16 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
         <input
           value={value}
           onChange={(e) => {
-            // A manually-typed/pasted URL has no local File behind it —
-            // clear any remembered original so a later "reposition" click
-            // re-crops THIS url, not whatever was picked before it.
-            originalFileRef.current = null
-            onChange(e.target.value.trim())
+            // A manually-typed/pasted URL IS an original, every bit as much
+            // as a picked File is — see originalSourceRef's own comment for
+            // why this used to clear it instead, which was the bug. Setting
+            // it here (not just calling onChange) means a later crop's own
+            // onChange — the resulting upload URL — won't overwrite it, so
+            // "reposition" after that crop still targets THIS url, not the
+            // frame-shaped output.
+            const url = e.target.value.trim()
+            originalSourceRef.current = url
+            onChange(url)
           }}
           placeholder="https://…"
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
