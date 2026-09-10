@@ -42,8 +42,11 @@ const HOSPITALS_ID = '__hospitals__'
 // has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
 // stays as-is: there is only ever a handful of those, they're the visitor's
 // own transient marks, and standing out is the entire point of one.
-const HOSPITAL_COLOR = '#b6302b'
-const HOSPITAL_ICON = '🏥'
+// Exported so HospitalsDirectory's own header band uses the identical color
+// and glyph — a hospital should read as the same "thing" on the map and on
+// its own directory page, not two independently-chosen reds.
+export const HOSPITAL_COLOR = '#b6302b'
+export const HOSPITAL_ICON = '🏥'
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.

@@ -8,10 +8,10 @@ import { useNow } from '@/lib/useNow'
 import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
 import type { Minyan } from '@/lib/davening'
 import DirectoryHeader from './DirectoryHeader'
+import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
 import CheckboxDropdown from './CheckboxDropdown'
 import { GenericListingCard, type GenericListingCardHandle } from './GenericListingCard'
 import DaveningTimesModal from '@/components/synagogues/DaveningTimesModal'
-import CategoryIcon from '@/components/CategoryIcon'
 import { PlusIcon, ClockIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useScrollShowHide, useSetScreenHeader } from '@/lib/headerVisibility'
@@ -24,6 +24,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import { useCategories } from '@/lib/useCategories'
 import { didArriveViaBackForward } from '@/lib/backForwardNavigation'
 import { getCategoryColor } from '@/lib/categoryColor'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 
 type Props = {
   category: CategoryConfig
@@ -830,50 +831,56 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // navTransitions.ts) communicating the same "one level deeper" hierarchy;
   // morphing a badge AND sliding the whole screen at once would compete for
   // attention rather than reinforcing each other.
+  const bandColor = getCategoryColor(categories, category.id)
+  const bandImage = category.cardImageUrl?.trim() || null
+
+  // Not rendered at all (not just hidden) when there's no icon to morph — a
+  // badge paired with nothing is pointless — or on mobile, where the
+  // home->category move already has its own directional slide (see
+  // navTransitions.ts) communicating the same "one level deeper" hierarchy;
+  // morphing a badge AND sliding the whole screen at once would compete for
+  // attention rather than reinforcing each other.
   const categoryBadge = !isMobile && category.icon ? (
     <ViewTransition name={`category-badge-${category.id}`}>
-      <CategoryIcon
-        icon={category.icon}
-        categoryId={category.id}
-        color={getCategoryColor(categories, category.id)}
-        className="h-16 w-16 text-3xl mb-3"
-        sizePx={64}
-      />
+      <CategoryBandBadge color={bandColor}>
+        <CategoryGlyph categoryId={category.id} icon={category.icon} className="h-[55%] w-[55%]" />
+      </CategoryBandBadge>
     </ViewTransition>
   ) : null
 
   return (
     <div>
-      {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
-          desktop:hidden) alongside DirectoryHeader's desktop-only Breadcrumb.
-          It's gone now that useSetScreenHeader (above) puts the same "‹
-          {title}" control directly in SiteHeader on mobile — this component
-          no longer needs to render its own copy of it. Desktop is
-          unaffected: Breadcrumb still renders exactly as before. */}
+      <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
+          {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
+              desktop:hidden) alongside DirectoryHeader's desktop-only Breadcrumb.
+              It's gone now that useSetScreenHeader (above) puts the same "‹
+              {title}" control directly in SiteHeader on mobile — this component
+              no longer needs to render its own copy of it. Desktop is
+              unaffected: Breadcrumb still renders exactly as before. */}
 
-      <DirectoryHeader
-        title={category.pluralLabel}
-        count={filtered.length}
-        hasAddress={category.hasAddress}
-        anchorLabel={anchorLabel}
-        addressPrompt={addressPrompt}
-        upLabel={upLabel}
-        onUp={onUp}
-        titleInHeader
-        banner={categoryBadge}
-        actions={
-          <>
-            {canAdd && (
-              <button
-                onClick={onAdd}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
-              >
-                <PlusIcon className="h-4 w-4" /> Add
-              </button>
-            )}
-          </>
-        }
-      />
+          <DirectoryHeader
+            title={category.pluralLabel}
+            count={filtered.length}
+            hasAddress={category.hasAddress}
+            anchorLabel={anchorLabel}
+            addressPrompt={addressPrompt}
+            upLabel={upLabel}
+            onUp={onUp}
+            titleInHeader
+            banner={categoryBadge}
+            actions={
+              <>
+                {canAdd && (
+                  <button
+                    onClick={onAdd}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <PlusIcon className="h-4 w-4" /> Add
+                  </button>
+                )}
+              </>
+            }
+          />
 
       {/* Controls — sticky from lg up so search/filters/sort stay reachable
           on a long list instead of scrolling away above the fold. `top-14`
@@ -1287,6 +1294,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           ))}
         </div>
       )}
+      </CategoryBandFrame>
 
       {hasMinyanim && (
         <DaveningTimesModal
