@@ -29,6 +29,31 @@ const NAV_TRANSITION_MAP = {
   default: 'none',
 } as const
 
+// iOS (Safari AND Chrome — Apple requires every iOS browser to run WebKit's
+// engine, regardless of branding; reported live as stuck/frozen nav on both)
+// hits a real, open, unfixed upstream bug — facebook/react#35336 — matching
+// this exact shape: a <ViewTransition> with BOTH `enter` and `exit` set,
+// wrapping a <Suspense> with a real fallback, which is exactly what
+// SlugScreen's own <main> does. Not something this app's CSS or React
+// version can work around from here; the ViewTransition API itself is still
+// a React canary-only feature (see package.json's react/react-dom pin)
+// specifically because it isn't stable yet. Omitting BOTH `enter` and `exit`
+// entirely on iOS (not just mapping their values to 'none') is what actually
+// avoids the trigger, per the linked issue — it's the PROPS being present at
+// all that matters, not which animation the map resolves to. This disables
+// the slide entirely on iOS, in both directions, falling back to the plain
+// mount-triggered fadeIn every screen already has — no directional slide
+// there, but a working nav.
+function isIOSWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  // iPadOS 13+ reports as "Macintosh" in the UA string, indistinguishable
+  // from a real Mac by string alone — maxTouchPoints is what actually tells
+  // them apart (a real Mac has none).
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 export function useNavTransitionProps() {
+  if (isIOSWebKit()) return { default: 'none' as const }
   return { enter: NAV_TRANSITION_MAP, exit: NAV_TRANSITION_MAP, default: 'none' as const }
 }
