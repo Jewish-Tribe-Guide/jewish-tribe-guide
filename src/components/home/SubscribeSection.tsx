@@ -198,69 +198,64 @@ export default function SubscribeSection({
                     filter chip in a real filter UI would ("All categories"
                     vs "3 checked") — closing it never has to mean "and
                     reset to all" the way it used to. */}
-                <div ref={pickerRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setPickerOpen((o) => !o)}
-                    aria-expanded={pickerOpen}
-                    className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 transition-colors hover:text-slate-900"
-                  >
-                    {/* A decorative stand-in for the New listings/Closures
-                        checkboxes beside it, not a real <input
-                        type="checkbox"> — that was tried first, with
-                        readOnly + tabIndex={-1} + aria-hidden to keep it
-                        inert, but axe's no-focusable-content rule still
-                        flagged it: a native form control nested inside a
-                        <button> is flagged by assistive tech regardless of
-                        those attributes (ARIA's own nested-interactive rule
-                        prohibits it outright), not just a false positive to
-                        suppress. A plain span with the same check-icon
-                        contract everything else in this app already uses
-                        for "on" states sidesteps the rule entirely — there
-                        is no real form control here for anything to
-                        (correctly or not) think it can focus. Always
-                        checked, regardless of `allCategories`: this row is
-                        always "on" (there's always some category selection
-                        driving the subscription, whether that's literally
-                        all of them or a specific few) — the label text next
-                        to it is what actually communicates which, the same
-                        way the other two checkboxes' own labels do the
-                        explaining. */}
-                    {/* bg-primary, not a neutral slate — the two REAL
-                        checkboxes beside it (New listings/Closures) are
-                        plain unstyled <input type="checkbox">s, and an
-                        unstyled checked checkbox renders with the browser's
-                        own default accent color, which reads as blue in
-                        every evergreen browser — this app's own
-                        --color-primary is that same blue, so this is the
-                        closer visual match to what a native checked
-                        checkbox actually looks like, not an arbitrary
-                        choice. */}
-                    {/* border-primary-dark: a plain checked checkbox in
-                        every evergreen browser has a defined edge (a
-                        slightly darker ring around the filled square, not a
-                        flat fill) — reported live as visibly missing here
-                        next to the two real checkboxes beside it. Sized to
-                        13px, not the Tailwind-default 16px (h-4 w-4) this
-                        started as — measured live against the real
-                        checkboxes beside it (getComputedStyle), an unstyled
-                        <input type="checkbox"> renders at 13x13px in
-                        Chrome, and the 16px version visibly read as larger
-                        than its real neighbors. */}
-                    <span
+                <div ref={pickerRef} className="group relative">
+                  {/* Checkbox, label and chevron are all plain decorative
+                      content now, not the <button>'s own children — the
+                      button below is an invisible full-row overlay instead
+                      (absolute inset-0 on this `relative` parent), labelled
+                      via aria-label rather than visible children. A real
+                      <input type="checkbox"> was tried nested INSIDE the
+                      button first, then a decorative span standing in for
+                      it — both hit the same wall: axe's no-focusable-content
+                      rule (and ARIA's own prohibited-descendants rule
+                      behind it) forbids a focusable-capable element inside
+                      a button role, and a span made to LOOK like a checkbox
+                      never actually rendered identically to the two real
+                      ones beside it in every browser (color, size, border —
+                      all had to be hand-matched and still didn't match).
+                      Moving the button out from around the checkbox instead
+                      of the checkbox out of the button sidesteps both
+                      problems at once: this is the same real, native,
+                      unstyled <input type="checkbox"> as New listings/
+                      Closures — pixel-identical forever, nothing to
+                      maintain — and it's a sibling of the button, not a
+                      descendant, so the ARIA rule no longer applies. */}
+                  <div className="flex items-center gap-2 text-sm text-slate-700 transition-colors group-hover:text-slate-900">
+                    {/* Always checked, regardless of `allCategories`: this
+                        row is always "on" (there's always some category
+                        selection driving the subscription, whether that's
+                        literally all of them or a specific few) — the label
+                        text next to it is what actually communicates
+                        which, the same way the other two checkboxes' own
+                        labels do the explaining. readOnly + pointer-events-
+                        none: decorative, not a second way to toggle
+                        anything — the overlay button below is what opens
+                        the real picker. */}
+                    <input
+                      type="checkbox"
+                      checked
+                      readOnly
+                      tabIndex={-1}
                       aria-hidden="true"
-                      className="flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border border-primary-dark bg-primary text-white"
-                    >
-                      <CheckIcon className="h-2.5 w-2.5" />
+                      className="pointer-events-none"
+                    />
+                    <span aria-hidden="true">
+                      {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     </span>
-                    {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     {/* text-[10px]: this is just "opens a menu," not a
                         heading — at the default text-sm size it read as
                         bigger than the affordance needed. */}
                     <span aria-hidden="true" className="text-[10px] text-slate-400">
                       {pickerOpen ? '▲' : '▼'}
                     </span>
-                  </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen((o) => !o)}
+                    aria-expanded={pickerOpen}
+                    aria-label={allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
+                    className="absolute inset-0 cursor-pointer"
+                  />
 
                   {pickerOpen && (
                     <div
