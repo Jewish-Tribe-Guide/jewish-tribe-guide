@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -162,5 +162,66 @@ describe('ImageUploadField', () => {
 
     await user.click(screen.getByText('Confirm crop'))
     await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-2.jpg'))
+  })
+
+  // Regression test: reported live — SiteSettingsEditor's "Preview" button
+  // swaps its ENTIRE rendered form for an iframe and back, which unmounts
+  // ImageUploadField itself (it isn't rendered at all while previewing) even
+  // though SiteSettingsEditor's own component instance never unmounts. That
+  // wipes an internal ref exactly like a real remount would, bringing back
+  // the "reposition re-crops the cropped output" bug for a third reason
+  // (after: a second reposition on the same instance; a URL pasted instead
+  // of a file) — the fix for those two didn't survive an actual unmount at
+  // all. `originalSource`/`onOriginalSourceChange` let a caller keep this
+  // memory on ITS OWN instance instead, which is what this simulates: a
+  // parent-owned ref, handed down as the controlled props, surviving an
+  // unmount/remount of ImageUploadField the same way it needs to survive
+  // SiteSettingsEditor's Preview toggle.
+  it('survives ImageUploadField itself unmounting and remounting, when the caller owns the original via controlled props', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, url: 'https://example.com/cropped-1.jpg' }),
+      }),
+    )
+
+    function CallerOwnedField() {
+      const [value, setValue] = useState('')
+      const [mounted, setMounted] = useState(true)
+      const originalRef = useRef<File | string | null>(null)
+      return (
+        <div>
+          {/* Stands in for SiteSettingsEditor's `if (previewing) return <DevicePreviewFrame />` — a real unmount of this field, not a hide/show. */}
+          <button onClick={() => setMounted((m) => !m)}>Toggle preview</button>
+          {mounted && (
+            <ImageUploadField
+              value={value}
+              onChange={setValue}
+              uploadUrl="/api/upload"
+              originalSource={originalRef.current}
+              onOriginalSourceChange={(source) => { originalRef.current = source }}
+            />
+          )}
+        </div>
+      )
+    }
+    render(<CallerOwnedField />)
+
+    const fileInput = document.querySelector('input[type="file"]:not([capture])') as HTMLInputElement
+    await user.upload(fileInput, fakeFile('vacation.jpg'))
+    await user.click(screen.getByText('Confirm crop'))
+    await waitFor(() => expect(document.querySelector('img')).toHaveAttribute('src', 'https://example.com/cropped-1.jpg'))
+
+    // Toggle "Preview" on, then back off — a real unmount and fresh mount of
+    // ImageUploadField, same as the app's own DevicePreviewFrame swap.
+    await user.click(screen.getByText('Toggle preview'))
+    expect(screen.queryByRole('button', { name: 'Adjust photo' })).not.toBeInTheDocument()
+    await user.click(screen.getByText('Toggle preview'))
+
+    await user.click(screen.getByRole('button', { name: 'Adjust photo' }))
+
+    expect(screen.getByText('Source: file:vacation.jpg')).toBeInTheDocument()
   })
 })
