@@ -220,30 +220,31 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }, [])
 
   // A category screen is NOT torn down and remounted when a visitor
-  // navigates away and back to it — confirmed live (an instrumented DOM
-  // reference survived a real history.back()+forward() round trip
-  // unchanged), the same kept-alive mechanism already documented on
-  // Landing/Home. That breaks the mount-only effect just above for every
-  // arrival after the first: a visitor filters this category, presses
-  // back, then forward, and lands back on the exact same already-mounted
-  // instance — whose lazy `arrivedViaBackForward` was captured as `false`
-  // at its one and only true mount, long before any of this happened, and
-  // never gets re-evaluated since there's no second mount to recompute it.
+  // navigates away and back to it — it's kept alive under React's own
+  // <Activity> instead (see ResourceMap.tsx's and homeRevealSignal.ts's own
+  // comments on the same mechanism for Home). Activity's actual contract,
+  // confirmed live here (an instrumented effect logged a fresh "activated"
+  // entry on every return visit, plain click or back/forward alike, while
+  // the DOM node and this component's own state both survived unchanged):
+  // effects tear down while hidden and RE-RUN when Activity reactivates the
+  // subtree — the same "on a true first mount, and again whenever Activity
+  // reactivates it" behavior homeRevealSignal.ts documents for Landing.
   //
-  // Unlike that effect, this one doesn't need to detect "did I, personally,
-  // just get mounted via back/forward" — it just needs to react to a real
-  // popstate happening at all, at any point after this component came into
-  // existence, whether or not it happens to be the visible screen at that
-  // exact moment. That's also true when this fires while a DIFFERENT
-  // screen is on top: harmless, since it only clears this instance's own
-  // local state, which is exactly what should have already happened by the
-  // time a visitor navigates back into it again.
+  // That re-run is exactly the hook this needs, and unlike trying to catch
+  // the navigation event itself (confirmed live, and the wrong shape of fix
+  // regardless — this effect's own reactivation always happens one tick
+  // after the navigation that caused it, so it can never observe that same
+  // navigation firing), it needs no external signal at all: a ref survives
+  // Activity's hide/reveal the same way state does, so "have I activated
+  // before" is answerable from entirely inside this component. `initialXxx`
+  // props are of no help on a reactivation regardless — confirmed live,
+  // they're already-undefined by the time Activity reveals this screen
+  // again, hydrated-once refs and all — so any later activation blanking
+  // unconditionally is the right call, not just the achievable one.
+  const hasActivatedBeforeRef = useRef(false)
   useEffect(() => {
-    function onPopState() {
-      clearFiltersRef.current!()
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
+    if (hasActivatedBeforeRef.current) clearFiltersRef.current!()
+    hasActivatedBeforeRef.current = true
   }, [])
 
   // ── Sync search + "Open now" into the URL (see onParamsChange's own doc) ──

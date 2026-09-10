@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { Activity } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -305,16 +306,19 @@ describe('GenericDirectory', () => {
     })
 
     // A category screen isn't torn down and remounted when a visitor
-    // navigates away and back to it (confirmed live — see GenericDirectory's
-    // own comment above the popstate listener this exercises), so the two
-    // tests above — which only cover what happens at this component's own
-    // true first mount — can't tell apart "the fix works" from "the fix only
-    // ever ran once and got lucky." This is the second, later arrival: the
-    // component is never remounted (didArriveViaBackForward stays false
-    // throughout, exactly as it would for an already-mounted instance) and a
-    // real popstate fires on window instead — the actual browser back/
-    // forward gesture, once this screen is already sitting there filtered.
-    it('clears an already-typed search when a real back/forward gesture happens, even without a remount', async () => {
+    // navigates away and back to it — it's kept alive under React's own
+    // <Activity> instead (see GenericDirectory's own comment above the
+    // hasActivatedBeforeRef effect this exercises, and homeRevealSignal.ts
+    // for the same mechanism documented on Home/Landing). So the two tests
+    // above — which only cover what happens at this component's own true
+    // first mount — can't tell apart "the fix works" from "the fix only ever
+    // ran once and got lucky." This wraps the SAME instance in a real
+    // <Activity> boundary and toggles it hidden-then-visible, the same way
+    // the real app's screen stack does for a category left and returned to
+    // (whether by pressing back then forward, or just clicking the same
+    // category card again — confirmed live, Activity doesn't distinguish
+    // between the two; both go through the identical hide/reveal cycle).
+    it('clears an already-typed search when Activity hides and reveals this screen again, even without a remount', async () => {
       const user = userEvent.setup()
       const onParamsChange = vi.fn()
       const category = makeCategory({
@@ -324,15 +328,28 @@ describe('GenericDirectory', () => {
         { ...makeListing({ id: 'a', name: 'Kosher Mart' }), isKosher: true },
         { ...makeListing({ id: 'b', name: 'Regular Mart' }), isKosher: false },
       ] as unknown as DirectoryResource[]
-      renderWithProviders(
-        <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />,
+      const { rerenderWithProviders } = renderWithProviders(
+        <Activity mode="visible">
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>,
       )
 
       await user.type(screen.getByPlaceholderText('Search…'), 'kosher')
       expect(screen.getByPlaceholderText('Search…')).toHaveValue('kosher')
       onParamsChange.mockClear()
 
-      act(() => window.dispatchEvent(new PopStateEvent('popstate')))
+      // Away (hidden — the visitor is looking at Home) and back (visible
+      // again — they returned to this same category), same component tree.
+      rerenderWithProviders(
+        <Activity mode="hidden">
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>,
+      )
+      rerenderWithProviders(
+        <Activity mode="visible">
+          <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />
+        </Activity>,
+      )
 
       expect(screen.getByPlaceholderText('Search…')).toHaveValue('')
       expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
