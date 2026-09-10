@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { CategoryConfig } from '@/lib/categories'
+import { bandImageFor, type CategoryConfig } from '@/lib/categories'
+import { getCategoryColor } from '@/lib/categoryColor'
 import type { DirectoryResource, MapFilters } from '@/types'
 import type { Coords } from '@/lib/useStoredLocation'
 import { withMilesFromAddress } from '@/lib/listingTravel'
+import { community } from '@/community.config'
+import { eruvim } from '@/data/resources'
 import GenericDirectory from '@/components/resources/GenericDirectory'
+import EruvInfo from '@/components/resources/EruvInfo'
+import ZmanimCard from '@/components/ZmanimCard'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import ResourceMapView from '@/components/map/ResourceMapView'
@@ -110,7 +115,38 @@ export default function CategoryPreview({
   }
 
   let content: React.ReactNode
-  if (action?.mode === 'create') {
+  if (category.kind === 'eruv') {
+    // No Add/Edit/Report action state applies here — it's a single info
+    // page, not a directory of listings — so this bypasses the action
+    // switch below entirely, same as 'zmanim' just after it.
+    content = (
+      <EruvInfo
+        eruvim={eruvim}
+        onUp={onClose}
+        upLabel="Home"
+        title={category.pluralLabel}
+        icon={category.icon}
+        color={getCategoryColor([category], category.id)}
+        bandImageUrl={bandImageFor(category)}
+      />
+    )
+  } else if (category.kind === 'zmanim') {
+    // Same fallback the real screen uses when no address is set
+    // (FindResources' own zmanimCoords/locationLabel) — so the preview
+    // shows real, meaningful times immediately rather than an empty state.
+    content = (
+      <ZmanimCard
+        coords={coords ?? community.mapCenter}
+        locationLabel={(coords && address) || community.region}
+        onUp={onClose}
+        upLabel="Home"
+        title={category.pluralLabel}
+        icon={category.icon}
+        color={getCategoryColor([category], category.id)}
+        bandImageUrl={bandImageFor(category)}
+      />
+    )
+  } else if (action?.mode === 'create') {
     content = (
       <ListingForm
         category={category}
