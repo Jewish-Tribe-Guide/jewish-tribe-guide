@@ -91,6 +91,22 @@ afterEach(() => {
 })
 
 describe('SiteSettingsEditor — the Site tab', () => {
+  // Regression test: the logo used to upload through a bare file input with
+  // no way to reposition/re-zoom it afterward, unlike every other image
+  // upload in the admin (category icons, listing photos), which already go
+  // through ImageUploadField/ImageCropModal. This just checks the field
+  // renders through that same shared component now — actually exercising
+  // the crop modal itself needs a real image load, out of scope here (see
+  // ImageCropModal's own lack of unit tests, canvas/Image geometry isn't
+  // practical to simulate in jsdom).
+  it('shows the reposition affordance once a logo is set, the same as a category icon or listing photo', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, logoUrl: 'https://example.com/logo.png' })
+    await openAllSections(user)
+
+    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+  })
+
   it('loads and shows the current branding fields once its section is opened', async () => {
     const user = userEvent.setup()
     await renderEditor('site', {
@@ -210,6 +226,20 @@ describe('SiteSettingsEditor — the Site tab', () => {
 })
 
 describe('SiteSettingsEditor — the Desktop tab', () => {
+  // Same regression as the logo above, for the hero band's photo — same
+  // ImageUploadField, just a wider aspect ratio (see the field's own
+  // `aspect={4 / 3}`) since this one is a banner, not an avatar-shaped icon.
+  it('shows the reposition affordance once the hero photo is set', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop', {
+      ...SITE_SETTINGS_DEFAULTS,
+      desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: '' },
+    })
+    await openAllSections(user)
+
+    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+  })
+
   it('shows the top nav editor, hero, colors, and home screen cards sections — not Featured cards, which was removed', async () => {
     await renderEditor('desktop')
     expect(screen.getByText('Top nav bar')).toBeInTheDocument()

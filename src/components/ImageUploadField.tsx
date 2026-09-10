@@ -20,6 +20,11 @@ type Props = {
   /** Small circular preview (an icon) vs. a larger square one — purely
    *  visual; both upload the same way. */
   shape?: 'circle' | 'square'
+  /** Width ÷ height of the crop stage/output and this field's own preview
+   *  box — 1 (the default) for an icon/avatar-style photo, something wider
+   *  for a banner-shaped image (the site's desktop hero photo is the first
+   *  caller that needs this). See ImageCropModal's own doc. */
+  aspect?: number
   helpText?: string
 }
 
@@ -28,7 +33,7 @@ type Props = {
  *  take a photo directly. Built generic (not category-icon-specific) so the
  *  next image field this app needs (the site logo is the obvious first
  *  candidate) can reuse it instead of re-implementing the same four paths. */
-export default function ImageUploadField({ value, onChange, uploadUrl, token, shape = 'circle', helpText }: Props) {
+export default function ImageUploadField({ value, onChange, uploadUrl, token, shape = 'circle', aspect = 1, helpText }: Props) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -114,9 +119,16 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
             const file = e.dataTransfer.files?.[0]
             if (file) setCropSource(file)
           }}
-          className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border-2 border-dashed bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary ${shapeClass} ${
+          className={`relative flex h-14 shrink-0 items-center justify-center overflow-hidden border-2 border-dashed bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary ${shapeClass} ${
             dragOver ? 'border-primary bg-primary/5' : 'border-slate-200'
           }`}
+          // A fixed height (h-14 above) with the width derived from `aspect`
+          // — a plain `w-14` Tailwind class can't flex to match a caller-
+          // supplied ratio, and this is the one dimension that actually
+          // needs to vary: a square icon preview stays 56×56, a wide hero
+          // preview becomes a correspondingly wide 56-tall strip instead of
+          // a misleadingly square box.
+          style={{ width: 56 * aspect }}
         >
           {value.trim() ? (
             // Plain <img>, not next/image: this previews a file that may have
@@ -216,6 +228,7 @@ export default function ImageUploadField({ value, onChange, uploadUrl, token, sh
         <ImageCropModal
           source={cropSource}
           shape={shape}
+          aspect={aspect}
           onCancel={() => setCropSource(null)}
           onConfirm={(blob) => {
             setCropSource(null)

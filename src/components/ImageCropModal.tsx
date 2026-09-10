@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// The on-screen crop stage is a fixed square (in CSS px) regardless of the
+// The on-screen crop stage's LONGER side (in CSS px), regardless of the
 // source photo's own dimensions or the eventual output size — same idea as
 // WhatsApp/Twitter/every other avatar cropper: what you see while dragging
 // IS the frame, at a size that comfortably fits a modal on a phone screen.
-const STAGE_PX = 280
-// The actual file that gets uploaded — a fixed square well above typical
-// display size (CategoryIcon never renders larger than a few dozen px) but
-// not so large it bloats the upload for what's ultimately a small avatar.
-const OUTPUT_PX = 640
+// The shorter side is derived from `aspect` below, so a square crop (the
+// original, and still the default) gets a square stage, and a wide crop
+// (the site's hero banner) gets a stage shaped the same way.
+const STAGE_MAX_PX = 280
+// The actual file that gets uploaded — well above typical display size
+// (CategoryIcon never renders larger than a few dozen px; the hero band is
+// the largest consumer, comfortably covered by a max side of 1200) but not
+// so large it bloats the upload for what's ultimately a decorative photo.
+const OUTPUT_MAX_PX = 1200
 
 type Props = {
   /** A freshly picked/dropped/pasted file, OR the URL of a photo that's
@@ -22,24 +26,37 @@ type Props = {
    *  avatar editor that doesn't keep the pre-crop original around has. */
   source: File | string
   /** Matches ImageUploadField's own shape — only changes the crop guide's
-   *  outline (circle vs. rounded square); the exported file is always a
-   *  plain square either way; CSS (`rounded-full` on CategoryIcon, etc.)
-   *  does the actual circular clipping wherever a circle-shaped photo is
-   *  displayed, the same as it already does for an uncropped image. */
+   *  outline (circle vs. rounded rectangle); CSS (`rounded-full` on
+   *  CategoryIcon, etc.) does the actual circular clipping wherever a
+   *  circle-shaped photo is displayed, the same as it already does for an
+   *  uncropped image. Meaningless (ignored) once `aspect` isn't 1 — a
+   *  circle guide only ever makes sense on a square crop. */
   shape: 'circle' | 'square'
+  /** Width ÷ height of both the crop stage and the exported file — 1 (the
+   *  default) for the original square avatar/photo crop; something wider
+   *  for a banner-shaped image like the site's desktop hero photo. */
+  aspect?: number
   onCancel: () => void
-  /** A square JPEG blob, already cropped/zoomed/positioned exactly as shown
-   *  in the stage — the caller uploads it as-is. */
+  /** A JPEG blob at this same aspect ratio, already cropped/zoomed/
+   *  positioned exactly as shown in the stage — the caller uploads it as-is. */
   onConfirm: (blob: Blob) => void
 }
 
 /** A WhatsApp-style "drag to reposition, slide to zoom" step between picking
  *  a photo and actually uploading it — without it, a photo whose subject
- *  isn't already dead-center and roughly square gets awkwardly cropped by
- *  CategoryIcon's `object-cover` with no way to see or fix that ahead of
- *  time. Renders a fixed-size square stage; the image is drawn oversized and
- *  panned/scaled within it, and only the visible square is ever exported. */
-export default function ImageCropModal({ source, shape, onCancel, onConfirm }: Props) {
+ *  isn't already dead-center gets awkwardly cropped by `object-cover` with
+ *  no way to see or fix that ahead of time. Renders a fixed-size stage at
+ *  `aspect`'s shape; the image is drawn oversized and panned/scaled within
+ *  it, and only the visible frame is ever exported. */
+export default function ImageCropModal({ source, shape, aspect = 1, onCancel, onConfirm }: Props) {
+  // The stage's own box, in CSS px — the longer side is pinned to
+  // STAGE_MAX_PX and the other derived from `aspect`, so a square crop gets
+  // the same stage size this always had and a wide crop gets a stage that's
+  // proportionally just as wide, not a fixed box regardless of shape.
+  const stageW = aspect >= 1 ? STAGE_MAX_PX : STAGE_MAX_PX * aspect
+  const stageH = aspect >= 1 ? STAGE_MAX_PX / aspect : STAGE_MAX_PX
+  const outputW = aspect >= 1 ? OUTPUT_MAX_PX : OUTPUT_MAX_PX * aspect
+  const outputH = aspect >= 1 ? OUTPUT_MAX_PX / aspect : OUTPUT_MAX_PX
   const isFile = typeof source !== 'string'
 
   // A File needs an object URL created and revoked inside the SAME effect
@@ -74,13 +91,16 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
   // The scale at which the image's SHORT side exactly fills the stage (the
   // "cover" fit) — this is `zoom`'s baseline of 1; the slider only ever
   // zooms IN from here, so the stage can never show empty space around the
-  // image (same floor WhatsApp/Twitter's own croppers use).
-  const baseScale = natural ? Math.max(STAGE_PX / natural.w, STAGE_PX / natural.h) : 1
+  // image (same floor WhatsApp/Twitter's own croppers use). Both stage
+  // dimensions matter now that the stage isn't always square — matching just
+  // the short natural side against the short stage side would still leave
+  // gaps on the long axis for a source photo shaped differently from `aspect`.
+  const baseScale = natural ? Math.max(stageW / natural.w, stageH / natural.h) : 1
   const effectiveScale = baseScale * zoom
   const displayedW = natural ? natural.w * effectiveScale : 0
   const displayedH = natural ? natural.h * effectiveScale : 0
-  const maxOffsetX = Math.max(0, (displayedW - STAGE_PX) / 2)
-  const maxOffsetY = Math.max(0, (displayedH - STAGE_PX) / 2)
+  const maxOffsetX = Math.max(0, (displayedW - stageW) / 2)
+  const maxOffsetY = Math.max(0, (displayedH - stageH) / 2)
 
   function clamp(x: number, y: number) {
     return {
@@ -98,8 +118,8 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
     const scale = baseScale * z
     const w = natural ? natural.w * scale : 0
     const h = natural ? natural.h * scale : 0
-    const maxX = Math.max(0, (w - STAGE_PX) / 2)
-    const maxY = Math.max(0, (h - STAGE_PX) / 2)
+    const maxX = Math.max(0, (w - stageW) / 2)
+    const maxY = Math.max(0, (h - stageH) / 2)
     setOffset((o) => ({ x: Math.min(maxX, Math.max(-maxX, o.x)), y: Math.min(maxY, Math.max(-maxY, o.y)) }))
   }
 
@@ -120,8 +140,8 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
     if (!imgRef.current || !natural) return
     setExporting(true)
     const canvas = document.createElement('canvas')
-    canvas.width = OUTPUT_PX
-    canvas.height = OUTPUT_PX
+    canvas.width = outputW
+    canvas.height = outputH
     const ctx = canvas.getContext('2d')
     if (!ctx) {
       setExporting(false)
@@ -129,14 +149,15 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
     }
     // Same geometry the stage renders with — the image sits centered in the
     // stage, then shifted by `offset`; working out its top-left from that
-    // lets the visible STAGE_PX×STAGE_PX window be mapped back to a region
-    // of the original, full-resolution image to actually draw from.
-    const imgTopLeftX = STAGE_PX / 2 + offset.x - displayedW / 2
-    const imgTopLeftY = STAGE_PX / 2 + offset.y - displayedH / 2
+    // lets the visible stageW×stageH window be mapped back to a region of
+    // the original, full-resolution image to actually draw from.
+    const imgTopLeftX = stageW / 2 + offset.x - displayedW / 2
+    const imgTopLeftY = stageH / 2 + offset.y - displayedH / 2
     const sourceX = -imgTopLeftX / effectiveScale
     const sourceY = -imgTopLeftY / effectiveScale
-    const sourceSize = STAGE_PX / effectiveScale
-    ctx.drawImage(imgRef.current, sourceX, sourceY, sourceSize, sourceSize, 0, 0, OUTPUT_PX, OUTPUT_PX)
+    const sourceWidth = stageW / effectiveScale
+    const sourceHeight = stageH / effectiveScale
+    ctx.drawImage(imgRef.current, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, outputW, outputH)
     canvas.toBlob(
       (blob) => {
         setExporting(false)
@@ -159,7 +180,7 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           className="relative mx-auto overflow-hidden rounded-lg bg-slate-800 touch-none select-none"
-          style={{ width: STAGE_PX, height: STAGE_PX, cursor: 'grab' }}
+          style={{ width: stageW, height: stageH, cursor: 'grab' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- a local
               object URL for the in-progress crop, not a real hosted image */}
@@ -181,15 +202,15 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
               height: displayedH || undefined,
               // Tailwind's preflight resets EVERY <img> to `max-width: 100%`
               // — harmless almost everywhere (that's the point of it), but
-              // here it silently caps this image at the stage's own 280px
-              // width the moment zoom pushes displayedW past that, while
-              // this component's own export math (which reads `displayedW`
+              // here it silently caps this image at the stage's own width
+              // the moment zoom pushes displayedW past that, while this
+              // component's own export math (which reads `displayedW`
               // straight from state, not the DOM) has no idea the on-screen
               // picture just got clamped smaller than what was asked for.
               // The visible crop and the exported crop quietly stop
               // matching — WYSIWYG breaks with no error anywhere. Explicit
               // `none` here is what actually lets `width` above take effect
-              // past 280px.
+              // past the stage's own size.
               maxWidth: 'none',
               maxHeight: 'none',
               transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
@@ -205,7 +226,7 @@ export default function ImageCropModal({ source, shape, onCancel, onConfirm }: P
               would darken (and imply hidden) a ring of content that the real
               icon shows anyway, and — worse — hide from view a ring that
               genuinely does get clipped. What's exported is always exactly
-              the stage's own square bounds regardless of this guide. */}
+              the stage's own bounds regardless of this guide. */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{

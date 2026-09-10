@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { useCallback, useEffect, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
@@ -16,6 +15,7 @@ import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
 import CollapsibleSection from './CollapsibleSection'
+import ImageUploadField from '@/components/ImageUploadField'
 import {
   DEFAULT_MOBILE_TABS,
   DEFAULT_DESKTOP_NAV_ITEMS,
@@ -66,10 +66,6 @@ export default function SiteSettingsEditor({
   const [error, setError] = useState<string | null>(null)
   const [savedNotice, setSavedNotice] = useState(false)
   const [previewing, setPreviewing] = useState(false)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [logoError, setLogoError] = useState<string | null>(null)
-  const [uploadingHeroImage, setUploadingHeroImage] = useState(false)
-  const [heroImageError, setHeroImageError] = useState<string | null>(null)
 
   // The preview iframe is genuinely navigable (real `src` mode — see
   // DevicePreviewFrame), so its own link clicks add entries to the tab's
@@ -144,52 +140,10 @@ export default function SiteSettingsEditor({
     setSavedNotice(false)
   }
 
-  // Uploads the picked file to storage and drops the resulting public URL
-  // onto the draft — same as pasting a URL, so it's still batched into the
-  // normal Save changes flow rather than taking effect immediately.
-  async function uploadLogo(file: File) {
-    setLogoError(null)
-    setUploadingLogo(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const json = await fetchJson<{ url: string }>(
-        '/api/admin/site-settings/logo',
-        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData },
-        'Upload failed.',
-      )
-      set('logoUrl', json.url)
-    } catch (err) {
-      setLogoError(err instanceof Error ? err.message : 'Upload failed.')
-    } finally {
-      setUploadingLogo(false)
-    }
-  }
-
-  // Same shape as uploadLogo above — uploads to storage and drops the
-  // resulting public URL onto the draft's desktopHeroImage, batched into the
-  // normal Save changes flow rather than taking effect immediately. Alt text
-  // isn't touched here — it's a separate field the admin fills in themselves,
-  // since a filename can't describe what's in the photo.
-  async function uploadHeroImage(file: File) {
-    setHeroImageError(null)
-    setUploadingHeroImage(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const json = await fetchJson<{ url: string }>(
-        '/api/admin/site-settings/hero-image',
-        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData },
-        'Upload failed.',
-      )
-      setDraft((d) => (d ? { ...d, desktopHeroImage: { url: json.url, alt: d.desktopHeroImage?.alt ?? '' } } : d))
-      setSavedNotice(false)
-    } catch (err) {
-      setHeroImageError(err instanceof Error ? err.message : 'Upload failed.')
-    } finally {
-      setUploadingHeroImage(false)
-    }
-  }
+  // Both the logo and the hero photo upload through ImageUploadField now
+  // (see its own render below) — it does the fetch, the reposition/re-zoom
+  // step (ImageCropModal), and its own loading/error state internally, so
+  // there's nothing bespoke left to do here beyond handing it `onChange`.
 
   function setSectionsAndClearNotice(next: DraftHomeSection[]) {
     setSectionsDraft(next)
@@ -323,62 +277,14 @@ export default function SiteSettingsEditor({
         </label>
         <div className="block">
           <span className="block text-xs font-medium text-slate-700 mb-1">Logo</span>
-          <div className="flex items-center gap-3">
-            {draft.logoUrl?.trim() && (
-              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl">
-                {/* Same reasoning as the header's mark: an attribute rather
-                    than a URL interpolated into a style string. `unoptimized`
-                    because this one previews a logo the admin may have
-                    uploaded seconds ago — going through the image optimizer
-                    would risk showing them a cached copy of the old file while
-                    they're checking whether the new one took. */}
-                <Image
-                  src={draft.logoUrl}
-                  alt="Site logo preview"
-                  fill
-                  sizes="36px"
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            )}
-            <label className="shrink-0 text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer">
-              {uploadingLogo ? 'Uploading…' : 'Upload image'}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  e.target.value = ''
-                  if (file) uploadLogo(file)
-                }}
-                disabled={uploadingLogo}
-                className="hidden"
-              />
-            </label>
-            {draft.logoUrl?.trim() && (
-              <button
-                type="button"
-                onClick={() => set('logoUrl', null)}
-                className="shrink-0 text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-          {logoError && <span className="block text-[11px] text-red-600 mt-1">{logoError}</span>}
-          <label className="block mt-2">
-            <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
-            <input
-              value={draft.logoUrl ?? ''}
-              onChange={(e) => set('logoUrl', e.target.value.trim() || null)}
-              placeholder="https://…"
-              className={inputClass}
-            />
-          </label>
-          <span className="block text-[11px] text-muted mt-1">
-            Shown in the header instead of the default mark. Leave blank to keep the default.
-          </span>
+          <ImageUploadField
+            value={draft.logoUrl ?? ''}
+            onChange={(url) => set('logoUrl', url || null)}
+            uploadUrl="/api/admin/site-settings/logo"
+            token={token}
+            shape="square"
+            helpText="Shown in the header instead of the default mark. Leave blank to keep the default."
+          />
         </div>
       </CollapsibleSection>
       </div>
@@ -440,56 +346,22 @@ export default function SiteSettingsEditor({
             </label>
             <div className="block">
               <span className="block text-xs font-medium text-slate-700 mb-1">Photo</span>
-              <div className="flex items-center gap-3">
-                {draft.desktopHeroImage?.url && (
-                  <div className="relative h-9 w-16 shrink-0 overflow-hidden rounded-md">
-                    <Image
-                      src={draft.desktopHeroImage.url}
-                      alt={draft.desktopHeroImage.alt || 'Hero photo preview'}
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                )}
-                <label className="shrink-0 text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-3 py-2 hover:bg-slate-50 transition-colors cursor-pointer">
-                  {uploadingHeroImage ? 'Uploading…' : 'Upload image'}
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      e.target.value = ''
-                      if (file) uploadHeroImage(file)
-                    }}
-                    disabled={uploadingHeroImage}
-                    className="hidden"
-                  />
-                </label>
-                {draft.desktopHeroImage?.url && (
-                  <button
-                    type="button"
-                    onClick={() => set('desktopHeroImage', null)}
-                    className="shrink-0 text-sm text-muted hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {heroImageError && <span className="block text-[11px] text-red-600 mt-1">{heroImageError}</span>}
-              <label className="block mt-2">
-                <span className="block text-[11px] text-muted mb-1">…or paste an image URL directly</span>
-                <input
-                  value={draft.desktopHeroImage?.url ?? ''}
-                  onChange={(e) => {
-                    const url = e.target.value.trim()
-                    set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
-                  }}
-                  placeholder="https://…"
-                  className={inputClass}
-                />
-              </label>
+              <ImageUploadField
+                value={draft.desktopHeroImage?.url ?? ''}
+                onChange={(url) =>
+                  set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
+                }
+                uploadUrl="/api/admin/site-settings/hero-image"
+                token={token}
+                shape="square"
+                // Wider than the icon/avatar default (1) — an approximation
+                // of the actual band's shape (see HeroHeading.tsx's own
+                // `min-h-[280px]` two-column grid, which has no single fixed
+                // ratio since its height tracks the headline/subhead beside
+                // it) close enough that what the admin frames here is what
+                // `object-cover` actually shows, not a wild mismatch.
+                aspect={4 / 3}
+              />
               <label className="block mt-2">
                 <span className="block text-[11px] text-muted mb-1">Alt text (describe the photo)</span>
                 <input
