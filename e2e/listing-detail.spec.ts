@@ -100,6 +100,37 @@ test.describe('listing detail — desktop', () => {
     expect(await columnsAt(600)).toBe(1)
   })
 
+  // CategoryBandFrame wraps this whole screen (header, filters, grid) in a
+  // full-bleed photo band, and used to break out to the viewport width with
+  // `left-1/2 -translate-x-1/2` — a CSS transform. A transform on an
+  // ancestor creates a new containing block for any `position: fixed`
+  // descendant, and this dialog is `fixed inset-0`, so it ended up
+  // positioned relative to that ancestor's own box instead of the viewport
+  // — which moves as the page scrolls. Scrolling down first is essential:
+  // at scrollY 0 the two containing blocks coincide and the bug is
+  // invisible. Fixed by swapping the transform for the calc(50% - 50vw)
+  // margin trick, which achieves the same full-bleed layout without ever
+  // setting a transform.
+  test('the dialog stays centered in the viewport when opened after scrolling down', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const { category } = await largestCategory(request, community)
+
+    await page.goto(`/${community}/${category.id}`)
+    await dismissLocationPrompt(page)
+
+    await page.mouse.wheel(0, 600)
+    await page.getByRole('button', { name: /^Show details for / }).first().click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const box = (await dialog.boundingBox())!
+    const viewport = page.viewportSize()!
+    const dialogCenterX = box.x + box.width / 2
+    const dialogCenterY = box.y + box.height / 2
+    expect(Math.abs(dialogCenterX - viewport.width / 2), 'dialog should be horizontally centered in the viewport').toBeLessThan(5)
+    expect(Math.abs(dialogCenterY - viewport.height / 2), 'dialog should be vertically centered in the viewport').toBeLessThan(5)
+  })
+
   // Arrow navigation scrolls the next/previous card into view. That scroll
   // used to only clear the site header's own height — not the SEPARATE
   // sticky search/filter/sort bar directly under it (GenericDirectory's

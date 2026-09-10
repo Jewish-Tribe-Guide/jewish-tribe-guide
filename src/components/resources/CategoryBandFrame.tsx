@@ -44,7 +44,21 @@ export function CategoryBandFrame({ color, imageUrl, children }: FrameProps) {
   const bandImage = imageUrl?.trim() || null
 
   return (
-    <div className="relative left-1/2 -mt-12 w-screen -translate-x-1/2 border-x border-t border-slate-200">
+    // Full-bleed breakout via the calc(50% - 50vw) margin trick, not
+    // left-1/2 + -translate-x-1/2 (what this used to do, and what
+    // ResourceMapView's mobile band still does): a `translate` is a CSS
+    // transform, and a transform on an ancestor creates a new containing
+    // block for any `position: fixed` descendant instead of the viewport.
+    // `children` here is the whole category screen, listing grid included,
+    // and GenericListingCard's desktop dialog (ListingDetailModal) is
+    // `fixed inset-0` — so with the transform in place that dialog was
+    // positioned relative to THIS div's own box, which moves as the page
+    // scrolls, instead of staying centered in the viewport. Confirmed live:
+    // the dialog's on-screen position tracked scroll offset exactly.
+    // Margins achieve the identical full-bleed layout without ever setting
+    // a transform, so nothing downstream loses the viewport as its
+    // containing block.
+    <div className="relative -mt-12 mx-[calc(50%-50vw)] border-x border-t border-slate-200">
       <div
         className="relative h-48 overflow-hidden sm:h-56"
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
