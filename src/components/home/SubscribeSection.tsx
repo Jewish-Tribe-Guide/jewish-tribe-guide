@@ -6,6 +6,7 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
+import { CheckIcon } from '@/components/icons'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
 // The home screen ends at the map with nothing after it but the footer; this
@@ -204,29 +205,33 @@ export default function SubscribeSection({
                     aria-expanded={pickerOpen}
                     className="flex cursor-pointer items-center gap-2 text-sm text-slate-700 transition-colors hover:text-slate-900"
                   >
-                    {/* A real checkbox, styled exactly like the New
-                        listings/Closures ones beside it — not a fake
-                        decorative glyph — so the three read as the same
-                        kind of control. Always checked, regardless of
-                        `allCategories`: this row is always "on" (there's
-                        always some category selection driving the
-                        subscription, whether that's literally all of them
-                        or a specific few) — the label text next to it is
-                        what actually communicates which, the same way the
-                        other two checkboxes' own labels do the explaining.
-                        readOnly + pointer-events-none: it's decorative, not
-                        a second way to toggle anything (an <input> can't be
-                        a <button>'s own interactive child per ARIA's
-                        nested-interactive rule); the button's own onClick
-                        above is what opens the real picker. */}
-                    <input
-                      type="checkbox"
-                      checked
-                      readOnly
-                      tabIndex={-1}
+                    {/* A decorative stand-in for the New listings/Closures
+                        checkboxes beside it, not a real <input
+                        type="checkbox"> — that was tried first, with
+                        readOnly + tabIndex={-1} + aria-hidden to keep it
+                        inert, but axe's no-focusable-content rule still
+                        flagged it: a native form control nested inside a
+                        <button> is flagged by assistive tech regardless of
+                        those attributes (ARIA's own nested-interactive rule
+                        prohibits it outright), not just a false positive to
+                        suppress. A plain span with the same check-icon
+                        contract everything else in this app already uses
+                        for "on" states sidesteps the rule entirely — there
+                        is no real form control here for anything to
+                        (correctly or not) think it can focus. Always
+                        checked, regardless of `allCategories`: this row is
+                        always "on" (there's always some category selection
+                        driving the subscription, whether that's literally
+                        all of them or a specific few) — the label text next
+                        to it is what actually communicates which, the same
+                        way the other two checkboxes' own labels do the
+                        explaining. */}
+                    <span
                       aria-hidden="true"
-                      className="pointer-events-none"
-                    />
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] bg-slate-700 text-white"
+                    >
+                      <CheckIcon className="h-3 w-3" />
+                    </span>
                     {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     {/* text-[10px]: this is just "opens a menu," not a
                         heading — at the default text-sm size it read as
