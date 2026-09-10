@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -174,9 +174,11 @@ describe('ImageUploadField', () => {
   // of a file) — the fix for those two didn't survive an actual unmount at
   // all. `originalSource`/`onOriginalSourceChange` let a caller keep this
   // memory on ITS OWN instance instead, which is what this simulates: a
-  // parent-owned ref, handed down as the controlled props, surviving an
+  // parent-owned value, handed down as the controlled props, surviving an
   // unmount/remount of ImageUploadField the same way it needs to survive
-  // SiteSettingsEditor's Preview toggle.
+  // SiteSettingsEditor's Preview toggle. State, not a ref, matching that
+  // real caller — both are read during render to pass through as a
+  // controlled prop (react-hooks/refs disallows a ref there).
   it('survives ImageUploadField itself unmounting and remounting, when the caller owns the original via controlled props', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(
@@ -190,7 +192,7 @@ describe('ImageUploadField', () => {
     function CallerOwnedField() {
       const [value, setValue] = useState('')
       const [mounted, setMounted] = useState(true)
-      const originalRef = useRef<File | string | null>(null)
+      const [original, setOriginal] = useState<File | string | null>(null)
       return (
         <div>
           {/* Stands in for SiteSettingsEditor's `if (previewing) return <DevicePreviewFrame />` — a real unmount of this field, not a hide/show. */}
@@ -200,8 +202,8 @@ describe('ImageUploadField', () => {
               value={value}
               onChange={setValue}
               uploadUrl="/api/upload"
-              originalSource={originalRef.current}
-              onOriginalSourceChange={(source) => { originalRef.current = source }}
+              originalSource={original}
+              onOriginalSourceChange={setOriginal}
             />
           )}
         </div>

@@ -124,7 +124,15 @@ export function useScreenHeader(): ScreenHeaderState {
 export function useSetScreenHeader(active: boolean, title: string, onBack: () => void): void {
   const { setScreenHeader } = useContext(ScreenHeaderContext)
   const onBackRef = useRef(onBack)
-  onBackRef.current = onBack
+  // Keeps the ref current without writing to it during render (React's
+  // react-hooks/refs rule — a render is allowed to run more than once, or be
+  // thrown away, before it commits, so a write here has to happen in an
+  // effect instead). No dependency array: this needs to run after EVERY
+  // render, not just when `onBack` changes, since `current` has to reflect
+  // whatever the LATEST render's closure was by the time anything reads it.
+  useLayoutEffect(() => {
+    onBackRef.current = onBack
+  })
 
   useLayoutEffect(() => {
     if (!active) return

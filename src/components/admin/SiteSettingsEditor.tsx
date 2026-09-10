@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -76,9 +76,15 @@ export default function SiteSettingsEditor({
   // plain internal ref exactly the way the fields' own doc warns about.
   // Kept here instead, on the one component instance that's actually alive
   // the whole time, and handed down via ImageUploadField's own
-  // originalSource/onOriginalSourceChange controlled-mode props.
-  const logoOriginalRef = useRef<File | string | null>(null)
-  const heroOriginalRef = useRef<File | string | null>(null)
+  // originalSource/onOriginalSourceChange controlled-mode props. State, not
+  // a ref: both are read during render (`originalSource={...}` below) to
+  // pass through as a controlled prop, and a ref's mutations aren't
+  // guaranteed to be reflected in the next render the way this needs (React's
+  // own react-hooks/refs rule) — a File/string swap here is a real, if
+  // infrequent, admin action, so the extra re-render this costs over a ref
+  // is not a real concern the way it would be on a hot render path.
+  const [logoOriginal, setLogoOriginal] = useState<File | string | null>(null)
+  const [heroOriginal, setHeroOriginal] = useState<File | string | null>(null)
 
   // The preview iframe is genuinely navigable (real `src` mode — see
   // DevicePreviewFrame), so its own link clicks add entries to the tab's
@@ -296,8 +302,8 @@ export default function SiteSettingsEditor({
             uploadUrl="/api/admin/site-settings/logo"
             token={token}
             shape="square"
-            originalSource={logoOriginalRef.current}
-            onOriginalSourceChange={(source) => { logoOriginalRef.current = source }}
+            originalSource={logoOriginal}
+            onOriginalSourceChange={setLogoOriginal}
             helpText="Shown in the header instead of the default mark. Leave blank to keep the default."
           />
         </div>
@@ -384,8 +390,8 @@ export default function SiteSettingsEditor({
                 // exactly right at every width — this is the one that's
                 // right most often, not a compromise nobody actually sees.
                 aspect={11 / 6}
-                originalSource={heroOriginalRef.current}
-                onOriginalSourceChange={(source) => { heroOriginalRef.current = source }}
+                originalSource={heroOriginal}
+                onOriginalSourceChange={setHeroOriginal}
               />
               <label className="block mt-2">
                 <span className="block text-[11px] text-muted mb-1">Alt text (describe the photo)</span>

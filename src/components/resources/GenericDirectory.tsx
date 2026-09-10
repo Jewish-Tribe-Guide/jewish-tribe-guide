@@ -192,18 +192,28 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // closure every parent render, and neither effect should re-run just
   // because of that.
   const clearFiltersRef = useRef<() => void>(undefined)
-  clearFiltersRef.current = () => {
-    setSearch('')
-    setOpenNow(false)
-    setBoolFilters({})
-    setSelectFilters({})
-    const changes: Record<string, string | null> = { q: null, openNow: null }
-    for (const f of category.detailFields) {
-      if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
-      if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
+  // Written in an effect, not during render (react-hooks/refs) — a render
+  // can run more than once, or be thrown away, before it commits, so writing
+  // to a ref here has to wait until it's actually committed. No dependency
+  // array: this needs to stay current after EVERY render, the same reason
+  // this is a ref instead of a plain function in the first place (see this
+  // block's own doc above) — category/onParamsChange can be a fresh value
+  // each render, and the two effects below only ever call this well after
+  // it, never in the same commit, so ordinary (not layout) timing is fine.
+  useEffect(() => {
+    clearFiltersRef.current = () => {
+      setSearch('')
+      setOpenNow(false)
+      setBoolFilters({})
+      setSelectFilters({})
+      const changes: Record<string, string | null> = { q: null, openNow: null }
+      for (const f of category.detailFields) {
+        if (f.filterable && f.type === 'boolean') changes[`f_${f.key}`] = null
+        if (f.filterable && f.type === 'select') changes[`sel_${f.key}`] = null
+      }
+      onParamsChange?.(changes, { replace: true })
     }
-    onParamsChange?.(changes, { replace: true })
-  }
+  })
   // Covers the genuine-document-reload case: arrivedViaBackForward was
   // already true at THIS component's very first mount, so the URL needs
   // catching up to the blank state already rendered above. Deliberately
