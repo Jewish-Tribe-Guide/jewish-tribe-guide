@@ -650,7 +650,7 @@ export function resourceCards(
   const zmanim = categories.find((c) => c.kind === 'zmanim')
   const eruv = categories.find((c) => c.kind === 'eruv')
 
-  return [
+  const cards = [
     ...(medical
       ? [{
           title: medical.pluralLabel,
@@ -712,6 +712,21 @@ export function resourceCards(
         }]
       : []),
   ]
+
+  // Hospitals/Zmanim/Eruv are built above as one-off cards (they're pseudo-
+  // categories, not `kind === 'listing'`), so without this they always land
+  // in the fixed positions they were spliced in at — Hospitals first, Zmanim
+  // and Eruv last — rather than wherever their own title actually falls.
+  // `categories` itself is already alphabetical by pluralLabel (see
+  // listCategoriesUncached's own comment), so sorting only the pseudo-
+  // category cards into that same order would work too, but sorting
+  // everything is simpler and produces the same result. groupCardsIntoSections
+  // (HeaderNav's "Categories" menu) re-derives each section's order from its
+  // own admin-configured `cardIds` regardless of this array's order, so this
+  // only affects "Browse everything"'s flat grid, which is exactly the one
+  // that's meant to be alphabetical.
+  cards.sort((a, b) => a.title.localeCompare(b.title))
+  return cards
 }
 
 /** The hand-built cards at the front of the grid — Patient & Family Support,

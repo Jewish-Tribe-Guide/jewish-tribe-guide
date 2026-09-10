@@ -66,14 +66,11 @@ function ReadyState({ data }: { data: ZmanimData }) {
   return (
     <div className="space-y-4">
       {/* Hebrew date */}
-      <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-        <span className="text-3xl" aria-hidden="true">🕯️</span>
-        <div>
-          <p className="text-base font-semibold text-slate-900">{hebrewDate}</p>
-          {todayHolidays.length > 0 && (
-            <p className="text-sm font-medium text-primary">{todayHolidays.join(' · ')}</p>
-          )}
-        </div>
+      <div className="pb-3 border-b border-slate-100">
+        <p className="text-base font-semibold text-slate-900">{hebrewDate}</p>
+        {todayHolidays.length > 0 && (
+          <p className="text-sm font-medium text-primary">{todayHolidays.join(' · ')}</p>
+        )}
       </div>
 
       {/* Daily zmanim */}
