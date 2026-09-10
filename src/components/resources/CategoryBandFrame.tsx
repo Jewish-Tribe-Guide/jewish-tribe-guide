@@ -44,7 +44,7 @@ export function CategoryBandFrame({ color, imageUrl, children }: FrameProps) {
   const bandImage = imageUrl?.trim() || null
 
   return (
-    <div className="relative left-1/2 -mt-12 w-screen -translate-x-1/2 border border-slate-200">
+    <div className="relative left-1/2 -mt-12 w-screen -translate-x-1/2 border-x border-t border-slate-200">
       <div
         className="relative h-48 overflow-hidden sm:h-56"
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
