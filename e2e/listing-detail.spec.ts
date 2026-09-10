@@ -123,26 +123,40 @@ test.describe('listing detail — desktop', () => {
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
+
+    // Two independent checks instead of one combined "is the dialog
+    // centered on some independently-computed viewport width" — the
+    // earlier version of this test tried exactly that against both
+    // page.viewportSize() and document.documentElement.clientWidth, and
+    // got an identical "off by 7.5px" result from both in CI (never
+    // reproduced locally), which means neither was actually the source of
+    // truth for whatever CI's real rendering area is — chasing the right
+    // "true viewport width" number was the wrong axis entirely.
+    //
+    // What this test actually needs to prove is narrower: the dialog's own
+    // flex wrapper (`fixed inset-0 ...` — see ListingDetailModal.tsx) is
+    // positioned relative to the real viewport, not some transformed
+    // ancestor's box that drifts with scroll (the original bug — see the
+    // comment above). `inset-0` guarantees that wrapper's top-left corner
+    // sits at the viewport's own (0, 0) — a scrollbar only ever narrows the
+    // RIGHT edge's available space, never moves the origin — so checking
+    // the wrapper's own position needs no viewport-width measurement at
+    // all. Once that holds, the dialog being centered WITHIN that wrapper
+    // is the browser's own flexbox (items-center/justify-center) doing its
+    // job, not something this test needs to re-verify against an
+    // independently-computed width.
+    const wrapper = page.locator('.fixed.inset-0.z-50').filter({ has: dialog })
+    const wrapperBox = (await wrapper.boundingBox())!
+    expect(Math.abs(wrapperBox.x), 'the dialog\'s fixed wrapper should sit at the viewport\'s own left edge').toBeLessThan(2)
+    expect(Math.abs(wrapperBox.y), 'the dialog\'s fixed wrapper should sit at the viewport\'s own top edge').toBeLessThan(2)
+
     const box = (await dialog.boundingBox())!
-    // NOT page.viewportSize() (the nominal configured size, e.g. 1280) and
-    // NOT window.innerWidth/innerHeight either — both stay constant
-    // regardless of whether a scrollbar is actually showing. CI runs Linux/
-    // headless Chromium with a real, space-reserving scrollbar (this app's
-    // `scrollbar-gutter: stable` on <html> always leaves room for one); a
-    // classic scrollbar narrows the actual rendered content area — the area
-    // a `fixed inset-0` element centers within — by its own width, and only
-    // document.documentElement.clientWidth/clientHeight reflect that
-    // narrowed area. Local dev (macOS, overlay scrollbars, no reserved
-    // space) passed either way, which is exactly why this only broke in CI:
-    // off by ~7.5px, almost exactly half a ~15px scrollbar's width.
-    const viewport = await page.evaluate(() => ({
-      width: document.documentElement.clientWidth,
-      height: document.documentElement.clientHeight,
-    }))
     const dialogCenterX = box.x + box.width / 2
     const dialogCenterY = box.y + box.height / 2
-    expect(Math.abs(dialogCenterX - viewport.width / 2), 'dialog should be horizontally centered in the viewport').toBeLessThan(5)
-    expect(Math.abs(dialogCenterY - viewport.height / 2), 'dialog should be vertically centered in the viewport').toBeLessThan(5)
+    const wrapperCenterX = wrapperBox.x + wrapperBox.width / 2
+    const wrapperCenterY = wrapperBox.y + wrapperBox.height / 2
+    expect(Math.abs(dialogCenterX - wrapperCenterX), 'dialog should be horizontally centered within its own fixed wrapper').toBeLessThan(5)
+    expect(Math.abs(dialogCenterY - wrapperCenterY), 'dialog should be vertically centered within its own fixed wrapper').toBeLessThan(5)
   })
 
   // Arrow navigation scrolls the next/previous card into view. That scroll
