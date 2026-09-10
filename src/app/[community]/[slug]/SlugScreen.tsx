@@ -10,7 +10,7 @@ import VolunteerWizard from '@/components/wizard/VolunteerWizard'
 import GenericFormWizard from '@/components/wizard/GenericFormWizard'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
-import { useNavTransitionProps } from '@/lib/navTransitions'
+import { isIOSWebKit, useNavTransitionProps } from '@/lib/navTransitions'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 // The client half of the [slug] route. The server has already decided whether
@@ -62,8 +62,16 @@ export default function SlugScreen({
     // reverse of a category card's own 'nav-forward' (see sections.tsx) —
     // not the tab bar's Home button or the header logo, which stay
     // untagged (see goHome's own doc for why). Mobile-only, same reasoning
-    // as Card's own tag — see navTransitions.ts.
-    onUp: () => goHome({ transitionTypes: isMobile ? ['nav-back'] : undefined }),
+    // as Card's own tag — see navTransitions.ts. Also excludes iOS: unlike
+    // forward (whose only animation hook is the <ViewTransition> above,
+    // already iOS-safe), this transitionTypes value ALSO drives Landing's
+    // own hand-rolled .reveal-slide-back class via markHomeReveal() — a
+    // second, separate mechanism that isn't gated by useNavTransitionProps
+    // at all. Passing 'nav-back' here on iOS doesn't risk the crash (that
+    // needs the <ViewTransition>'s own enter+exit props, already stripped),
+    // but it did produce a visible inconsistency: forward correctly fading
+    // like everything else, back still sliding. See isIOSWebKit's own doc.
+    onUp: () => goHome({ transitionTypes: isMobile && !isIOSWebKit() ? ['nav-back'] : undefined }),
     onViewMap: viewMapForCategory,
   }
 

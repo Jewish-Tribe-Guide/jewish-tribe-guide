@@ -44,7 +44,19 @@ const NAV_TRANSITION_MAP = {
 // the slide entirely on iOS, in both directions, falling back to the plain
 // mount-triggered fadeIn every screen already has — no directional slide
 // there, but a working nav.
-function isIOSWebKit(): boolean {
+// Exported (not just used internally below) because it also has to gate
+// Landing's OWN hand-rolled back-slide — SlugScreen's onUp passes
+// transitionTypes to goHome() to drive two independent things: React's
+// <ViewTransition> here (which reading isIOSWebKit inside this hook alone
+// already protects), and — entirely separately — markHomeReveal(), which
+// flips Landing's own .reveal-slide-back class (see that file's own
+// `backReveal` doc). That second path is plain CSS, not the
+// <ViewTransition>'s enter/exit props, so it was never touched by gating
+// only this hook: reported live as still sliding on iOS after that fix,
+// while forward correctly fell back to a plain fade — an inconsistency, not
+// the crash risk itself, but real enough that SlugScreen's own onUp needs
+// this same check before it ever calls goHome({ transitionTypes }).
+export function isIOSWebKit(): boolean {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent
   // iPadOS 13+ reports as "Macintosh" in the UA string, indistinguishable

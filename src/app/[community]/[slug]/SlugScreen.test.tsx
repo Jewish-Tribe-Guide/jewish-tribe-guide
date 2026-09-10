@@ -134,4 +134,28 @@ describe('SlugScreen', () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: undefined })
   })
+
+  // Mobile, but iOS: this used to still tag 'nav-back' here (isMobile alone
+  // decided it), even though useNavTransitionProps() had already been
+  // changed to drop the <ViewTransition>'s own enter/exit props on iOS —
+  // see that file's own doc on facebook/react#35336. Reported live: forward
+  // correctly fell back to a plain fade on iOS, but back still slid, because
+  // this transitionTypes value ALSO drives Landing's separate
+  // .reveal-slide-back class via markHomeReveal(), a mechanism this file's
+  // useNavTransitionProps fix never touched.
+  it('does not tag its back arrow on iOS, even though it is mobile', async () => {
+    mockViewport(true)
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      platform: '',
+      maxTouchPoints: 5,
+    })
+    const user = userEvent.setup()
+    renderSlug('grocery')
+
+    await user.click(screen.getByRole('button', { name: 'Up' }))
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/test-community', { transitionTypes: undefined })
+    vi.unstubAllGlobals()
+  })
 })
