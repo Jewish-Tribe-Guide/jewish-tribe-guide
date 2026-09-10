@@ -5,7 +5,7 @@ import { CATEGORY_CAPABILITY_KEYS, DEFAULT_CATEGORY_ICON, type CategoryConfig } 
 import { CATEGORY_TEMPLATES } from '@/lib/categoryTemplates'
 import { getCategoryColor } from '@/lib/categoryColor'
 import CategoryPreview from './CategoryPreview'
-import { CardBackgroundField, IconField, PinColorField, inputClass } from './CategoryFormFields'
+import { CardBackgroundField, CardBandImageField, IconField, PinColorField, inputClass } from './CategoryFormFields'
 import { FieldEditor } from './CategoryFieldEditor'
 import { CleanupConfirm, RenameConfirm, IdRenameConfirm } from './CategorySaveConfirmations'
 import { CAPABILITY_LABELS, mergeFieldsWithHidden, normalizeField } from './categoryEditorLogic'
@@ -123,6 +123,7 @@ export function CategoryEditor({
           : null,
       cardImageUrl: draft.cardImageUrl.trim() || null,
       cardTextColor: draft.cardImageUrl.trim() ? draft.cardTextColor : null,
+      cardBandImageUrl: draft.cardBandImageUrl.trim() || null,
       pinColor: draft.pinColor || null,
     }
     return <CategoryPreview category={previewCategory} onClose={closePreview} />
@@ -218,6 +219,14 @@ export function CategoryEditor({
             onCardTextColor={(v) => set('cardTextColor', v)}
             previewIcon={draft.icon}
             previewTitle={draft.pluralLabel || 'Category'}
+          />
+          <CardBandImageField
+            cardBandImageUrl={draft.cardBandImageUrl}
+            onCardBandImageUrl={(v) => set('cardBandImageUrl', v)}
+            fallbackImageUrl={draft.cardImageUrl}
+            previewIcon={draft.icon}
+            previewColor={draft.pinColor || fallbackPinColor}
+            token={token}
           />
         </section>
 

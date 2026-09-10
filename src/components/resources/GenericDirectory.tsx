@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from 'react'
 import type { DirectoryResource } from '@/types'
-import { resolveCapabilities, selectValues, type CategoryConfig } from '@/lib/categories'
+import { resolveCapabilities, selectValues, bandImageFor, type CategoryConfig } from '@/lib/categories'
 import { hoursOpenNow, businessClosure } from '@/lib/hours'
 import { useNow } from '@/lib/useNow'
 import { ALL_MINYAN_DAYS, isMinyanim, type MinyanDayKey } from '@/lib/davening'
@@ -832,7 +832,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // morphing a badge AND sliding the whole screen at once would compete for
   // attention rather than reinforcing each other.
   const bandColor = getCategoryColor(categories, category.id)
-  const bandImage = category.cardImageUrl?.trim() || null
+  const bandImage = bandImageFor(category)
 
   // Not rendered at all (not just hidden) when there's no icon to morph — a
   // badge paired with nothing is pointless — or on mobile, where the

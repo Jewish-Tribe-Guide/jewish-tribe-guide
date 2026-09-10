@@ -9,7 +9,8 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
-import { CardBackgroundField, IconField } from './CategoryFormFields'
+import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
 
 // ── The categories manager: one list mixing the two kinds of thing a
@@ -637,6 +638,7 @@ export function SingletonEditor({
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
+  const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
   // Map only — kept as a string (not number|null) so the field can sit blank
   // mid-edit rather than snapping to 0. Parsed back to number|null on save.
   const [mapZoomRadius, setMapZoomRadius] = useState(
@@ -665,6 +667,7 @@ export function SingletonEditor({
             iconImageUrl: iconImageUrl.trim() || null,
             cardImageUrl: cardImageUrl.trim() || null,
             cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+            cardBandImageUrl: cardBandImageUrl.trim() || null,
             ...(category.kind === 'map'
               ? { mapZoomRadiusMiles: mapZoomRadius.trim() === '' ? null : Number(mapZoomRadius) }
               : {}),
@@ -715,6 +718,14 @@ export function SingletonEditor({
           onCardTextColor={setCardTextColor}
           previewIcon={icon}
           previewTitle={name || category.pluralLabel}
+        />
+        <CardBandImageField
+          cardBandImageUrl={cardBandImageUrl}
+          onCardBandImageUrl={setCardBandImageUrl}
+          fallbackImageUrl={cardImageUrl}
+          previewIcon={icon}
+          previewColor={getCategoryColor([category], category.id)}
+          token={token}
         />
         {category.kind === 'map' && (
           <label className="block pt-3 border-t border-slate-100">

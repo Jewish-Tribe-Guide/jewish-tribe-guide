@@ -14,7 +14,7 @@ import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWid
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
-import { resolveCapabilities } from '@/lib/categories'
+import { resolveCapabilities, bandImageFor } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 
@@ -252,7 +252,7 @@ export default function FindResources({
         title={eruv?.pluralLabel}
         icon={eruv?.icon}
         color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
-        cardImageUrl={eruv?.cardImageUrl}
+        bandImageUrl={eruv ? bandImageFor(eruv) : undefined}
       />
     )
   }
@@ -270,7 +270,7 @@ export default function FindResources({
         title={zmanim?.pluralLabel}
         icon={zmanim?.icon}
         color={zmanim ? getCategoryColor(categories, zmanim.id) : undefined}
-        cardImageUrl={zmanim?.cardImageUrl}
+        bandImageUrl={zmanim ? bandImageFor(zmanim) : undefined}
       />
     )
   }

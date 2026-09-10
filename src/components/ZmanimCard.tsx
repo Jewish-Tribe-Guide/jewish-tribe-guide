@@ -27,10 +27,10 @@ type Props = {
    *  no icon while categories are still loading, same as `title` above. */
   icon?: string
   color?: string
-  cardImageUrl?: string | null
+  bandImageUrl?: string | null
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos', icon, color = '#64748b', cardImageUrl }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl }: Props) {
   const { data, status } = useZmanim(coords)
 
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
@@ -46,7 +46,7 @@ export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All
   ) : null
 
   return (
-    <CategoryBandFrame color={color} imageUrl={cardImageUrl}>
+    <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
       {/* Mobile used to have its own "‹ {upLabel}" row here — see
           GenericDirectory's identical comment on why it doesn't need one now
           that useSetScreenHeader puts the same "‹ {title}" in SiteHeader. */}

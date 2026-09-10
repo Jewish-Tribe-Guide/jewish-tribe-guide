@@ -312,6 +312,16 @@ export type CategoryConfig = {
    *  image so the title/icon stay legible regardless of the photo. Ignored
    *  when there's no image. */
   cardTextColor?: string | null
+  /** A second photo, specifically for the desktop directory header's wide,
+   *  short banner (CategoryBandFrame) — as distinct from `cardImageUrl`,
+   *  the home-screen card's roughly-4:3 tile. The two need different crops
+   *  of what's often the same photo (a 4:3-tight crop usually cuts off too
+   *  much of a wide banner, and vice versa), so this has its own upload +
+   *  crop step in the category editor rather than reusing `cardImageUrl`.
+   *  Admin-uploaded (see /api/admin/categories/band), unlike `cardImageUrl`
+   *  which is a pasted URL with no crop. Null/unset falls back to
+   *  `cardImageUrl` for the banner too — see `bandImageFor` below. */
+  cardBandImageUrl?: string | null
   /** The colour of this category's map pin and listing avatar (a hex string).
    *  Null/unset falls back to a colour derived from the category's position in
    *  the list — see getCategoryColor. That fallback used to be the only
@@ -373,6 +383,14 @@ export function slugifyFieldKey(label: string): string {
  *  is needed. */
 export function isCategorySyncEligible(category: { hasAddress?: boolean }): boolean {
   return category.hasAddress !== false
+}
+
+/** Which photo a category's desktop directory banner (CategoryBandFrame)
+ *  should show: the dedicated, already-cropped-for-this-shape band photo if
+ *  one's set, else the home card's photo (better than nothing even
+ *  uncropped for the banner), else null — the plain color wash. */
+export function bandImageFor(category: { cardBandImageUrl?: string | null; cardImageUrl?: string | null }): string | null {
+  return category.cardBandImageUrl?.trim() || category.cardImageUrl?.trim() || null
 }
 
 // Evaluates a field's `showIf` against the current detail values.
