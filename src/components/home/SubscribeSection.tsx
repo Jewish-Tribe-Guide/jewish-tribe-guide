@@ -236,11 +236,22 @@ export default function SubscribeSection({
                         closer visual match to what a native checked
                         checkbox actually looks like, not an arbitrary
                         choice. */}
+                    {/* border-primary-dark: a plain checked checkbox in
+                        every evergreen browser has a defined edge (a
+                        slightly darker ring around the filled square, not a
+                        flat fill) — reported live as visibly missing here
+                        next to the two real checkboxes beside it. Sized to
+                        13px, not the Tailwind-default 16px (h-4 w-4) this
+                        started as — measured live against the real
+                        checkboxes beside it (getComputedStyle), an unstyled
+                        <input type="checkbox"> renders at 13x13px in
+                        Chrome, and the 16px version visibly read as larger
+                        than its real neighbors. */}
                     <span
                       aria-hidden="true"
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] bg-primary text-white"
+                      className="flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border border-primary-dark bg-primary text-white"
                     >
-                      <CheckIcon className="h-3 w-3" />
+                      <CheckIcon className="h-2.5 w-2.5" />
                     </span>
                     {allCategories ? 'All categories' : `${selected.length} ${selected.length === 1 ? 'category' : 'categories'}`}
                     {/* text-[10px]: this is just "opens a menu," not a
