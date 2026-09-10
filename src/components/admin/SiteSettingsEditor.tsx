@@ -369,13 +369,21 @@ export default function SiteSettingsEditor({
                 uploadUrl="/api/admin/site-settings/hero-image"
                 token={token}
                 shape="square"
-                // Wider than the icon/avatar default (1) — an approximation
-                // of the actual band's shape (see HeroHeading.tsx's own
-                // `min-h-[280px]` two-column grid, which has no single fixed
-                // ratio since its height tracks the headline/subhead beside
-                // it) close enough that what the admin frames here is what
-                // `object-cover` actually shows, not a wild mismatch.
-                aspect={4 / 3}
+                // Measured live against the real page (HeroHeading.tsx's
+                // `min-h-[280px]` right-hand grid column), not guessed —
+                // an earlier 4/3 here was a genuine guess and came out
+                // visibly wrong. The column's own width tracks the fluid
+                // 1.15fr/1fr grid until the page's max-w-6xl container caps
+                // out, which happens by ~1280px viewport width — comfortably
+                // below ordinary laptop/desktop width, so the vast majority
+                // of real visitors land on the SAME shape: 512.5×280 at
+                // 1280px, 1440px, and 1920px alike (confirmed identical at
+                // all three). Narrower desktop widths (~900px) do shrink
+                // toward a squarer ~1.4, and the "desktop:" breakpoint floor
+                // (640px) toward ~1:1, but there's no single ratio that's
+                // exactly right at every width — this is the one that's
+                // right most often, not a compromise nobody actually sees.
+                aspect={11 / 6}
                 originalSource={heroOriginalRef.current}
                 onOriginalSourceChange={(source) => { heroOriginalRef.current = source }}
               />
