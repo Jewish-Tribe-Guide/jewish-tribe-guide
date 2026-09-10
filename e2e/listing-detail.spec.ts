@@ -124,7 +124,21 @@ test.describe('listing detail — desktop', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     const box = (await dialog.boundingBox())!
-    const viewport = page.viewportSize()!
+    // NOT page.viewportSize() (the nominal configured size, e.g. 1280) and
+    // NOT window.innerWidth/innerHeight either — both stay constant
+    // regardless of whether a scrollbar is actually showing. CI runs Linux/
+    // headless Chromium with a real, space-reserving scrollbar (this app's
+    // `scrollbar-gutter: stable` on <html> always leaves room for one); a
+    // classic scrollbar narrows the actual rendered content area — the area
+    // a `fixed inset-0` element centers within — by its own width, and only
+    // document.documentElement.clientWidth/clientHeight reflect that
+    // narrowed area. Local dev (macOS, overlay scrollbars, no reserved
+    // space) passed either way, which is exactly why this only broke in CI:
+    // off by ~7.5px, almost exactly half a ~15px scrollbar's width.
+    const viewport = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
+    }))
     const dialogCenterX = box.x + box.width / 2
     const dialogCenterY = box.y + box.height / 2
     expect(Math.abs(dialogCenterX - viewport.width / 2), 'dialog should be horizontally centered in the viewport').toBeLessThan(5)
