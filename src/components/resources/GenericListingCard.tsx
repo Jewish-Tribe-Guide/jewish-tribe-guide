@@ -297,15 +297,17 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           ))}
         </div>
       ) : showDistanceSlot ? (
-        // Blue text, not a filled pill — a gray pill here read as just
+        // Muted text, not a filled pill — a gray pill here read as just
         // another tag in the badge row below (Bakery, IKC), which is a
-        // filter/fact about the place, not a "tap this" action. Blue text
-        // already carries "clickable" on its own, no background needed, and
-        // it can't be confused with a badge one row down. Same PinIcon the
-        // header's own "Set location" control uses (icons.tsx), so this
-        // reads as the same concept rather than a different symbol for the
-        // same idea, and still repeated down the list — that repetition is
-        // what teaches "every row has this", not this element's own styling.
+        // filter/fact about the place, not a "tap this" action. Colored blue
+        // like a real action instead drew the eye too much for how minor
+        // this is on a first-glance scan of the list — muted at rest,
+        // primary on hover, same restrained treatment as this card's own
+        // Edit/Report actions just below. Same PinIcon the header's own "Set
+        // location" control uses (icons.tsx), so this reads as the same
+        // concept rather than a different symbol for the same idea, and
+        // still repeated down the list — that repetition is what teaches
+        // "every row has this", not this element's own styling.
         //
         // -my-2 py-2: the label itself is under the 24px WCAG-recommended
         // tap target now that there's no pill padding doing that job.
@@ -320,7 +322,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             e.stopPropagation()
             document.dispatchEvent(new CustomEvent('jpc:open-location'))
           }}
-          className="-my-2 flex shrink-0 items-center gap-1 whitespace-nowrap py-2 text-xs font-medium text-primary transition-colors hover:underline cursor-pointer"
+          className="-my-2 flex shrink-0 items-center gap-1 whitespace-nowrap py-2 text-xs font-medium text-muted transition-colors hover:text-primary cursor-pointer"
         >
           <PinIcon className="h-3 w-3" />
           Distance
