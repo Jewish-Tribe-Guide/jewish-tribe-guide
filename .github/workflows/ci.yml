@@ -205,16 +205,26 @@ jobs:
     name: End-to-end tests (test project)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    # Needs the three write suites too, not just unit: they all share this
-    # same TEST_SUPABASE_* project now that e2e points at it, and e2e's own
-    # helpers (defaultCommunity, categoryWithListings) pick "some real
-    # category with listings" — which can land on a temporary row one of
-    # them creates and deletes mid-test (e.g. cache-roundtrip's "Cache
-    # Round-trip Seed" fixture), failing when it vanishes underneath the
+    # Needs cache-roundtrip and admin-write too, not just unit: both share
+    # this same TEST_SUPABASE_* project now that e2e points at it and both
+    # create/rename/delete categories and home-section rows — content e2e's
+    # own helpers (defaultCommunity, categoryWithListings) read via "pick
+    # some real category with listings", which can land on a temporary row
+    # one of them is mid-edit on (e.g. cache-roundtrip's "Cache Round-trip
+    # Seed" fixture), failing when it changes or vanishes underneath the
     # assertion. Same underlying class of bug as 03c2e99 and the admin-write/
-    # cache-roundtrip race above; running after all three removes it the
-    # same way.
-    needs: [unit, cache-roundtrip, form-roundtrip, admin-write]
+    # cache-roundtrip race above; running after both removes it the same way.
+    #
+    # NOT form-roundtrip: it only creates/deletes form and submission rows
+    # (a seeded test form, its response), which nothing in e2e/ reads —
+    # api.spec.ts's own /api/admin/forms calls are unauthenticated requests
+    # against an id that can't exist, asserting they're refused before
+    # reaching the database, and offline.spec.ts's /api/requests probe just
+    # checks a GET to a write endpoint isn't cached, independent of what (if
+    # anything) it returns. Excluding it lets e2e start as soon as
+    # cache-roundtrip/admin-write finish rather than also waiting on however
+    # long form-roundtrip's own run takes.
+    needs: [unit, cache-roundtrip, admin-write]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
