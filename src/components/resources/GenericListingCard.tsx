@@ -13,6 +13,7 @@ import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
+import { PinIcon } from '@/components/icons'
 import UpvoteButton from './UpvoteButton'
 import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
@@ -291,17 +292,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           {travel.map((t) => <span key={t}>{t}</span>)}
         </div>
       ) : showDistanceSlot ? (
-        // Deliberately quiet — muted, not the amber of the header's prompt.
-        // This is the column not yet filled in, repeated down the list; it
-        // should read as a gap the visitor can close, never as the site
-        // asking again.
-        //
-        // No underline. It first carried a dotted rule meaning "a blank to
-        // fill in", and that failed the only test that mattered: the person
-        // who designed this app looked at it and asked what the stray line
-        // was. An affordance nobody recognises is just an artifact, and an
-        // artifact is something people learn to ignore. The repetition down
-        // the rows is what does the work here, not the decoration.
+        // A filled pill, not a bare dash — the dash read as a broken/missing
+        // value rather than an empty one to fill in. Same PinIcon the
+        // header's own "Set location" control uses (icons.tsx), so this
+        // reads as the same concept rather than a different symbol for the
+        // same idea. Still deliberately quiet (slate, not the header
+        // prompt's amber) and still repeated down the list — that repetition
+        // is what teaches "every row has this", not the pill's own styling.
         <button
           type="button"
           aria-label="Set your location to see distances"
@@ -311,15 +308,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             e.stopPropagation()
             document.dispatchEvent(new CustomEvent('jpc:open-location'))
           }}
-          // -my-2 py-2: the label itself is 17px tall, under the 24px
-          // WCAG-recommended tap target. Padding grows the real hit area to
-          // ~33px; the negative margin cancels it out of the layout so the
-          // row's height doesn't shift. Same technique, and same reason, as
-          // the chevron above.
-          className="-my-2 flex items-center gap-1 whitespace-nowrap py-2 text-xs text-muted transition-colors hover:text-slate-600 cursor-pointer"
+          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-200 cursor-pointer"
         >
-          <span aria-hidden="true">📍</span>
-          <span aria-hidden="true">—</span>
+          <PinIcon className="h-3 w-3" />
+          Distance
         </button>
       ) : null}
     </>
