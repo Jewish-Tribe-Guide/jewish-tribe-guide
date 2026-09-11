@@ -26,6 +26,9 @@ import { usePinned } from '@/lib/pinnedContext'
 import { CURRENT_LOCATION_LABEL } from '@/lib/useLiveLocation'
 import { useDroppedPins } from '@/lib/droppedPinsContext'
 import DroppedPinEditor from './DroppedPinEditor'
+import { useCampaignBanners } from '@/lib/contentContext'
+import { activeCampaignBanner } from '@/lib/campaignBanner'
+import { community } from '@/community.config'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -1358,6 +1361,33 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     </div>
   )
 
+  // A live seasonal campaign's category (see CampaignBannerManager), given
+  // its own distinctly-styled chip rather than just sorting into `options`
+  // by count like every other category — the whole point is that a visitor
+  // notices it's not an ordinary category. Absent entirely outside the
+  // campaign's date range (activeCampaignBanner), and also when its
+  // category currently has no points to show (nothing to filter to).
+  const activeCampaign = activeCampaignBanner(useCampaignBanners(), useNow(), community.timezone)
+  const campaignOption = activeCampaign ? options.find((o) => o.id === activeCampaign.categoryId) : undefined
+  const campaignHighlighted = !!campaignOption && effectiveSelected.has(campaignOption.id) && !allChipsOn
+  const campaignChip = campaignOption && (
+    <div
+      className={`relative flex shrink-0 items-stretch rounded-full text-xs font-semibold transition-colors ${
+        campaignHighlighted ? 'text-white' : 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900'
+      }`}
+      style={campaignHighlighted ? { backgroundColor: campaignOption.color } : { boxShadow: 'inset 0 0 0 1.5px rgba(180,130,20,0.35)' }}
+    >
+      <button
+        onClick={() => toggle(campaignOption.id)}
+        aria-pressed={effectiveSelected.has(campaignOption.id)}
+        className={`flex items-center gap-1 py-1 pl-2.5 pr-2.5 rounded-full cursor-pointer ${campaignHighlighted ? '' : 'hover:from-amber-100 hover:to-amber-200'}`}
+      >
+        <span aria-hidden="true">✨</span>
+        <span>{campaignOption.label}</span>
+      </button>
+    </div>
+  )
+
   // A standalone toggle, not one of CategoryFilter's own chips — it narrows
   // ACROSS categories rather than toggling one, so it doesn't belong to
   // that component's select/all/none model. Rendered by CategoryFilter
@@ -1415,6 +1445,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onToggleBool={toggleBoolField}
       selectFilters={selectFilters}
       onToggleSelectValue={toggleSelectValue}
+      campaignChip={campaignChip}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
       scrollArrow

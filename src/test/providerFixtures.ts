@@ -51,6 +51,7 @@ export function makeContent(overrides: Partial<CommunityContent> = {}): Communit
     homeSections: [],
     forms: [],
     hospitals: [],
+    campaignBanners: [],
     failed: [],
     ...overrides,
   }

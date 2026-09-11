@@ -54,6 +54,14 @@ type Props = {
   onToggleBool: (categoryId: string, key: string) => void
   selectFilters: Record<string, string[]>
   onToggleSelectValue: (categoryId: string, key: string, value: string) => void
+  /** A live seasonal campaign's category (see CampaignBannerManager) — same
+   *  reasoning and same slot as `pinnedChip` below (a fully-rendered node,
+   *  not a `FilterOption`, since it needs its own distinct styling rather
+   *  than the plain on/off treatment every regular chip gets), but rendered
+   *  first: a time-limited promotion outranks the visitor's own Pinned
+   *  shortlist while it's live. Absent entirely outside the campaign's date
+   *  range — see activeCampaignBanner. */
+  campaignChip?: React.ReactNode
   /** The "Pinned" shortlist toggle — not one of `options`, so it can't just
    *  be another entry in that array: it narrows ACROSS categories rather
    *  than being one, and it's the single most important chip in the row, so
@@ -112,6 +120,7 @@ export default function CategoryFilter({
   onToggleBool,
   selectFilters,
   onToggleSelectValue,
+  campaignChip,
   pinnedChip,
   pinnedOn,
   resortToken,
@@ -361,6 +370,7 @@ export default function CategoryFilter({
       >
         All
       </button>
+      {campaignChip}
       {pinnedChip}
       {visible.map((o) => {
         const selectedState = selected.has(o.id)

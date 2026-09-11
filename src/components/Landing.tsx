@@ -11,6 +11,7 @@ import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
+import CampaignBannerCard from '@/components/home/CampaignBannerCard'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
 import { useCategories } from '@/lib/useCategories'
 import { useHomeSections } from '@/lib/useHomeSections'
@@ -390,6 +391,19 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+
+        {/* ── Seasonal campaign banner ─────────────────────────────────────────
+                Renders nothing outside its own admin-set date range (see the
+                component's own doc). Common to both layouts — sits above the
+                desktop card stack below AND the mobile `desktop:hidden` grid
+                further down — so one element here, no isMobile branch, is a
+                banner "near the top" on both. Not part of builtInOrder/
+                cardKindContent: it isn't admin-orderable among those cards,
+                just a plain "is one active" check, same shape as
+                hasMap/zmanimCategory above. ─────────────────────────────── */}
+        <div className="mt-8">
+          <CampaignBannerCard />
+        </div>
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the

@@ -10,12 +10,14 @@ vi.mock('./siteSettingsStore', () => ({ getSiteSettings: vi.fn() }))
 vi.mock('./homeSectionStore', () => ({ listHomeSections: vi.fn() }))
 vi.mock('./formStore', () => ({ listPublishedForms: vi.fn() }))
 vi.mock('./hospitalStore', () => ({ listHospitals: vi.fn() }))
+vi.mock('./campaignBannerStore', () => ({ listCampaignBanners: vi.fn() }))
 
 const { listCategories } = await import('./categoryStore')
 const { getSiteSettings } = await import('./siteSettingsStore')
 const { listHomeSections } = await import('./homeSectionStore')
 const { listPublishedForms } = await import('./formStore')
 const { listHospitals } = await import('./hospitalStore')
+const { listCampaignBanners } = await import('./campaignBannerStore')
 const { loadCommunityContent } = await import('./loadCommunityContent')
 const { FALLBACK_CATEGORIES } = await import('./categoryFallback')
 const { SITE_SETTINGS_DEFAULTS } = await import('./siteSettings')
@@ -29,6 +31,7 @@ function allSucceed() {
   vi.mocked(listHomeSections).mockResolvedValue([])
   vi.mocked(listPublishedForms).mockResolvedValue([])
   vi.mocked(listHospitals).mockResolvedValue([])
+  vi.mocked(listCampaignBanners).mockResolvedValue([])
 }
 
 afterEach(() => {
@@ -100,10 +103,11 @@ describe('loadCommunityContent', () => {
     vi.mocked(listHomeSections).mockRejectedValue(new Error('c'))
     vi.mocked(listPublishedForms).mockRejectedValue(new Error('d'))
     vi.mocked(listHospitals).mockRejectedValue(new Error('e'))
+    vi.mocked(listCampaignBanners).mockRejectedValue(new Error('f'))
 
     const content = await loadCommunityContent('philly')
 
-    expect(content.failed).toHaveLength(5)
+    expect(content.failed).toHaveLength(6)
     expect(content.categories.length).toBeGreaterThan(0)
   })
 })

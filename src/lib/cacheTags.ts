@@ -22,6 +22,7 @@ export const TAGS = {
   homeSections: (community: string) => `home-sections:${community}`,
   forms: (community: string) => `forms:${community}`,
   hospitals: (community: string) => `hospitals:${community}`,
+  campaignBanners: (community: string) => `campaign-banners:${community}`,
 } as const
 
 /** Every tag whose content the admin can change for one community. A write
@@ -37,5 +38,6 @@ export function allCommunityTags(community: string): string[] {
     TAGS.homeSections(community),
     TAGS.forms(community),
     TAGS.hospitals(community),
+    TAGS.campaignBanners(community),
   ]
 }

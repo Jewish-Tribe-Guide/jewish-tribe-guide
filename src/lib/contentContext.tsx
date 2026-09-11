@@ -117,6 +117,10 @@ export function useHospitals() {
   return useContent().hospitals
 }
 
+export function useCampaignBanners() {
+  return useContent().campaignBanners
+}
+
 /** The admin category editor's unsaved draft, spliced into the category list
  *  the wrapped subtree reads.
  *
