@@ -147,15 +147,51 @@ describe('listCategoriesUncached', () => {
 })
 
 describe('listCategories', () => {
-  it('excludes inactive categories, unlike listCategoriesUncached', async () => {
-    mockFrom.mockReturnValue(
-      chainable({
-        data: [rawRow, { ...rawRow, id: 'hidden-cat', active: false }],
-        error: null,
-      }),
+  // listCategories now also reads campaign_banner (to let a live campaign's
+  // category through despite active: false — see this function's own doc),
+  // so every test here has to answer for both tables, not just `category`.
+  function mockTables(categoryRows: unknown[], bannerRows: unknown[] = []) {
+    mockFrom.mockImplementation((table: string) =>
+      chainable({ data: table === 'campaign_banner' ? bannerRows : categoryRows, error: null }),
     )
+  }
+
+  it('excludes inactive categories, unlike listCategoriesUncached', async () => {
+    mockTables([rawRow, { ...rawRow, id: 'hidden-cat', active: false }])
     const categories = await listCategories('philly')
     expect(categories.map((c) => c.id)).toEqual(['synagogue'])
+  })
+
+  it('shows an inactive category anyway when a live campaign links to it', async () => {
+    mockTables([{ ...rawRow, id: 'sukkahs', active: false }], [
+      {
+        id: 'sukkah-map',
+        category_id: 'sukkahs',
+        title: 'Sukkah Map',
+        subtitle: '',
+        start_date: '2020-01-01',
+        end_date: '2999-01-01', // always live, regardless of when this test runs
+        destination: 'map',
+      },
+    ])
+    const categories = await listCategories('philly')
+    expect(categories.map((c) => c.id)).toEqual(['sukkahs'])
+  })
+
+  it('keeps an inactive category hidden when its campaign has not started or already ended', async () => {
+    mockTables([{ ...rawRow, id: 'sukkahs', active: false }], [
+      {
+        id: 'sukkah-map',
+        category_id: 'sukkahs',
+        title: 'Sukkah Map',
+        subtitle: '',
+        start_date: '2000-01-01',
+        end_date: '2000-01-02', // long over
+        destination: 'map',
+      },
+    ])
+    const categories = await listCategories('philly')
+    expect(categories).toEqual([])
   })
 })
 

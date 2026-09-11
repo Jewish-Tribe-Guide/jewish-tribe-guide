@@ -10,12 +10,17 @@ import type { CampaignBanner } from '@/lib/campaignBanner'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
 // or whatever the next one-off is) — a title/subtitle, a link to an existing
-// category, and a start/end date. Visibility is purely that date range (see
-// campaignBanner.ts's activeCampaignBanner) — no separate on/off flag, so
-// there's nothing here to toggle besides the dates themselves. While a
-// banner's window is open, the home screen shows it (CampaignBannerCard) and
-// the map gives its category a distinctly-styled chip right after "All"
-// (ResourceMapView) — both read the same rows this tab writes.
+// category, a start/end date, and where the banner's own CTA sends a
+// visitor (the category's page, or the map pre-filtered to it). Visibility
+// is purely that date range (see campaignBanner.ts's activeCampaignBanner)
+// — no separate on/off flag, so there's nothing here to toggle besides the
+// dates themselves. While a banner's window is open: the home screen shows
+// it (CampaignBannerCard), the map gives its category a distinctly-styled
+// chip right after "All" (ResourceMapView) regardless of destination, AND
+// the linked category itself becomes visible in the normal grid/nav even if
+// it's set inactive (categoryStore.ts's listCategories) — so a category
+// meant to exist ONLY for this campaign (Sukkahs, say) can stay hidden the
+// rest of the year with nothing else to remember.
 //
 // Immediate save per action (create/edit/delete each its own request), not
 // the batched-draft style HomeSectionManager uses — this is its own
@@ -24,9 +29,23 @@ import type { CampaignBanner } from '@/lib/campaignBanner'
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary'
 
-type FormState = { categoryId: string; title: string; subtitle: string; startDate: string; endDate: string }
+type FormState = {
+  categoryId: string
+  title: string
+  subtitle: string
+  startDate: string
+  endDate: string
+  destination: 'list' | 'map'
+}
 
-const EMPTY_FORM: FormState = { categoryId: '', title: '', subtitle: '', startDate: '', endDate: '' }
+const EMPTY_FORM: FormState = {
+  categoryId: '',
+  title: '',
+  subtitle: '',
+  startDate: '',
+  endDate: '',
+  destination: 'map',
+}
 
 export default function CampaignBannerManager({ token }: { token: string }) {
   const community = useCommunitySlug()
@@ -72,6 +91,7 @@ export default function CampaignBannerManager({ token }: { token: string }) {
       subtitle: banner.subtitle,
       startDate: banner.startDate,
       endDate: banner.endDate,
+      destination: banner.destination,
     })
     setFormError(null)
   }
@@ -147,8 +167,10 @@ export default function CampaignBannerManager({ token }: { token: string }) {
       <p className="text-sm text-muted mb-4">
         A seasonal banner — a title, a link to an existing category, and a start/end date. It shows
         up on the home screen and gets a highlighted chip on the map for exactly that date range,
-        then disappears completely once the range ends. Reuse this for the next one-off promotion
-        rather than building a new one.
+        then disappears completely once the range ends — and if the linked category is set
+        inactive, it becomes visible in the normal grid and nav for that same window too, so a
+        category that only exists for this campaign can stay hidden the rest of the year. Reuse
+        this for the next one-off promotion rather than building a new one.
       </p>
 
       {error && <p className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">{error}</p>}
@@ -178,7 +200,8 @@ export default function CampaignBannerManager({ token }: { token: string }) {
                 <div>
                   <p className="text-sm font-medium text-slate-900">{banner.title}</p>
                   <p className="text-xs text-muted">
-                    {categoryLabel(banner.categoryId)} · {banner.startDate} – {banner.endDate}
+                    {categoryLabel(banner.categoryId)} · {banner.startDate} – {banner.endDate} ·{' '}
+                    {banner.destination === 'list' ? 'links to list' : 'links to map'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -266,7 +289,7 @@ function CampaignBannerForm({
         />
       </label>
       <label className="block">
-        <span className="block text-[11px] font-medium text-slate-600 mb-1">Links to</span>
+        <span className="block text-[11px] font-medium text-slate-600 mb-1">Category</span>
         <select
           value={form.categoryId}
           onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
@@ -277,6 +300,19 @@ function CampaignBannerForm({
               {c.pluralLabel}
             </option>
           ))}
+        </select>
+      </label>
+      <label className="block">
+        <span className="block text-[11px] font-medium text-slate-600 mb-1">
+          Banner sends visitors to
+        </span>
+        <select
+          value={form.destination}
+          onChange={(e) => setForm({ ...form, destination: e.target.value === 'list' ? 'list' : 'map' })}
+          className={inputClass}
+        >
+          <option value="map">The map, pre-filtered to this category</option>
+          <option value="list">The category&rsquo;s own page (list view)</option>
         </select>
       </label>
       <div className="flex gap-3">

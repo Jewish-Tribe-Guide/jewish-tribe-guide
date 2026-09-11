@@ -14,6 +14,11 @@ export type CampaignBanner = {
    *  activeCampaignBanner), not raw UTC. */
   startDate: string
   endDate: string
+  /** Where the banner's own CTA (and nothing else — the map's own chip
+   *  always stays a map chip) sends a visitor: the category's own directory
+   *  page, or the map pre-filtered to it. Admin's own call per campaign —
+   *  "people mostly care about the map" doesn't hold for every promotion. */
+  destination: 'list' | 'map'
 }
 
 /** `now` (epoch ms) as the community's own local calendar date, 'YYYY-MM-DD'
@@ -44,4 +49,28 @@ export function activeCampaignBanner(
   const live = banners.filter((b) => b.startDate <= today && today <= b.endDate)
   if (live.length === 0) return null
   return live.reduce((latest, b) => (b.startDate > latest.startDate ? b : latest))
+}
+
+/** Every category id with a currently-live campaign — unlike
+ *  activeCampaignBanner (which picks the single ONE banner to actually
+ *  show), a category's own visibility should follow ALL of them: two
+ *  unrelated live campaigns linking to two different categories should
+ *  promote both, not just whichever one activeCampaignBanner would have
+ *  picked to display.
+ *
+ *  Used server-side (categoryStore.ts's listCategories) to let an otherwise
+ *  admin-hidden category (active: false) become visible for exactly a
+ *  campaign's own window, without a separate flag to keep in sync — see
+ *  that migration's own doc. Deliberately plain UTC (no per-community
+ *  timezone lookup): this feeds a `'use cache'`/`cacheLife('days')` read
+ *  that already only refreshes roughly daily (this repo's existing
+ *  sync-hours cron revalidates everything each morning), so a few hours of
+ *  timezone imprecision on top of that day-scale staleness is not worth a
+ *  second query just to resolve the community's own timezone here. The
+ *  banner and map chip a visitor actually sees are still exact — they're
+ *  computed client-side against the community's real timezone (see
+ *  CampaignBannerCard, ResourceMapView). */
+export function activeCampaignCategoryIds(banners: CampaignBanner[], now: number): Set<string> {
+  const today = localDateString('UTC', now)
+  return new Set(banners.filter((b) => b.startDate <= today && today <= b.endDate).map((b) => b.categoryId))
 }

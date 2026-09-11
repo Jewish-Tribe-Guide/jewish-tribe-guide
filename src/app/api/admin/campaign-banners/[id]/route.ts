@@ -10,6 +10,7 @@ type PatchBody = {
   subtitle?: string
   startDate?: string
   endDate?: string
+  destination?: 'list' | 'map'
 }
 
 // PATCH /api/admin/campaign-banners/:id — only the provided keys change.
@@ -33,6 +34,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
   if (body.startDate !== undefined && body.endDate !== undefined && body.startDate > body.endDate) {
     return Response.json({ ok: false, errors: ['Start date must be on or before the end date.'] }, { status: 400 })
+  }
+  if (body.destination !== undefined && body.destination !== 'list' && body.destination !== 'map') {
+    return Response.json({ ok: false, errors: ['Invalid destination.'] }, { status: 400 })
   }
 
   try {

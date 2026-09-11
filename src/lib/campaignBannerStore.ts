@@ -1,7 +1,11 @@
 import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
-import { slugify } from './categoryStore'
+// Straight from routes.ts (categoryStore.ts's own source for this), not
+// re-exported via categoryStore.ts — that file now imports from this one
+// (to fold active campaigns into which categories are visible), so
+// importing back from it here would be a circular dependency.
+import { slugify } from './routes'
 import type { CampaignBanner } from './campaignBanner'
 
 type CampaignBannerRow = {
@@ -11,6 +15,7 @@ type CampaignBannerRow = {
   subtitle: string
   start_date: string
   end_date: string
+  destination: string | null
 }
 
 function toBanner(row: CampaignBannerRow): CampaignBanner {
@@ -21,6 +26,11 @@ function toBanner(row: CampaignBannerRow): CampaignBanner {
     subtitle: row.subtitle ?? '',
     startDate: row.start_date,
     endDate: row.end_date,
+    // Same "read before this migration ran" fallback every other widened
+    // column in this codebase uses (see homeSectionStore.ts's toSection) —
+    // a row selected via `select('*')` before the column existed simply
+    // won't have the key.
+    destination: row.destination === 'list' ? 'list' : 'map',
   }
 }
 
@@ -48,7 +58,14 @@ export async function listCampaignBanners(community: string): Promise<CampaignBa
 
 export async function createCampaignBanner(
   community: string,
-  input: { categoryId: string; title: string; subtitle?: string; startDate: string; endDate: string },
+  input: {
+    categoryId: string
+    title: string
+    subtitle?: string
+    startDate: string
+    endDate: string
+    destination?: 'list' | 'map'
+  },
 ): Promise<CampaignBanner> {
   const supabase = getAdminClient()
   const base = slugify(input.title) || 'campaign'
@@ -75,6 +92,7 @@ export async function createCampaignBanner(
     subtitle: input.subtitle?.trim() ?? '',
     start_date: input.startDate,
     end_date: input.endDate,
+    destination: input.destination === 'list' ? 'list' : 'map',
   }
 
   const { data, error } = await supabase.from('campaign_banner').insert(row).select('*').single()
@@ -87,7 +105,14 @@ export async function createCampaignBanner(
 export async function updateCampaignBanner(
   community: string,
   id: string,
-  patch: Partial<{ categoryId: string; title: string; subtitle: string; startDate: string; endDate: string }>,
+  patch: Partial<{
+    categoryId: string
+    title: string
+    subtitle: string
+    startDate: string
+    endDate: string
+    destination: 'list' | 'map'
+  }>,
 ): Promise<CampaignBanner | null> {
   const supabase = getAdminClient()
 
@@ -97,6 +122,7 @@ export async function updateCampaignBanner(
   if (patch.subtitle !== undefined) row.subtitle = patch.subtitle.trim()
   if (patch.startDate !== undefined) row.start_date = patch.startDate
   if (patch.endDate !== undefined) row.end_date = patch.endDate
+  if (patch.destination !== undefined) row.destination = patch.destination
 
   if (Object.keys(row).length === 0) {
     const { data } = await supabase

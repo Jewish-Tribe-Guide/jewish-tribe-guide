@@ -26,6 +26,7 @@ type CreateBody = {
   subtitle?: string
   startDate?: string
   endDate?: string
+  destination?: string
 }
 
 // POST /api/admin/campaign-banners — create a new campaign banner.
@@ -53,6 +54,9 @@ export async function POST(request: Request) {
   if (body.startDate > body.endDate) {
     return Response.json({ ok: false, errors: ['Start date must be on or before the end date.'] }, { status: 400 })
   }
+  if (body.destination !== undefined && body.destination !== 'list' && body.destination !== 'map') {
+    return Response.json({ ok: false, errors: ['Invalid destination.'] }, { status: 400 })
+  }
 
   try {
     const banner = await createCampaignBanner(community.slug, {
@@ -61,6 +65,7 @@ export async function POST(request: Request) {
       subtitle: body.subtitle,
       startDate: body.startDate,
       endDate: body.endDate,
+      destination: body.destination === 'list' ? 'list' : 'map',
     })
     // The public site caches this content; drop it so the edit shows up.
     await revalidatePublicContent()

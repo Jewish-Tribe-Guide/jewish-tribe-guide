@@ -2,6 +2,8 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { TAGS } from './cacheTags'
 import { getAdminClient } from './supabase/admin'
 import { assertUsableSlug, slugify } from './routes'
+import { listCampaignBanners } from './campaignBannerStore'
+import { activeCampaignCategoryIds } from './campaignBanner'
 
 export { slugify }
 import {
@@ -92,12 +94,28 @@ export async function listCategoriesUncached(community: string): Promise<Categor
 // function: the directory grid, search, sitemap, and direct-URL
 // resolution), but still returned by listCategoriesUncached for the admin
 // manager to edit and re-activate.
+//
+// EXCEPT a category with a currently-live campaign banner (see
+// campaignBanner.ts's activeCampaignCategoryIds) — that reads as visible
+// here too, regardless of its own `active` flag. This is what lets a
+// dedicated seasonal category (Sukkahs, say) stay hidden the other eleven
+// months without a second admin action: set it inactive once, link a
+// campaign banner to it, and its own start/end dates are the only thing
+// that ever needs updating again. Also tags this read with
+// TAGS.campaignBanners so saving a campaign (not just a category)
+// invalidates it — otherwise a brand-new campaign's category would stay
+// invisible until this cache expired on its own.
 export async function listCategories(community: string): Promise<CategoryConfig[]> {
   'use cache'
   cacheTag(TAGS.categories(community))
+  cacheTag(TAGS.campaignBanners(community))
   cacheLife('days')
-  const categories = await listCategoriesUncached(community)
-  return categories.filter((c) => c.active !== false)
+  const [categories, banners] = await Promise.all([
+    listCategoriesUncached(community),
+    listCampaignBanners(community),
+  ])
+  const promoted = activeCampaignCategoryIds(banners, Date.now())
+  return categories.filter((c) => c.active !== false || promoted.has(c.id))
 }
 
 export async function getCategoryById(community: string, id: string): Promise<CategoryConfig | null> {

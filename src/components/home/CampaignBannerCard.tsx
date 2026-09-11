@@ -16,12 +16,15 @@ import { community } from '@/community.config'
 // this isn't admin-orderable among them, it's a plain "is one active right
 // now" check, same shape as hasMap/zmanimCategory further down that file.
 //
-// Links straight to the map, pre-filtered to the linked category
-// (mapQueryString's own `cat` param) — that filtered map IS the landing
-// page; nothing else needed. Card, not a bare link, so it earns a spot this
-// prominent (right under the hero, above every other card) without looking
-// like an afterthought — same rounded-2xl bordered shell every other
-// home-screen card uses (see DaveningTimesCard).
+// Links to the map (pre-filtered to the linked category, via
+// mapQueryString's own `cat` param) or the category's own directory page —
+// the admin's own call per campaign (see CampaignBannerManager's
+// destination field), since "people mostly care about the map" isn't true
+// for every promotion. Either way that page IS the landing page; nothing
+// else needed. Card, not a bare link, so it earns a spot this prominent
+// (right under the hero, above every other card) without looking like an
+// afterthought — same rounded-2xl bordered shell every other home-screen
+// card uses (see DaveningTimesCard).
 export default function CampaignBannerCard() {
   const banners = useCampaignBanners()
   const categories = useCategories()
@@ -37,7 +40,11 @@ export default function CampaignBannerCard() {
   // empty filter.
   if (!category) return null
 
-  const href = `${routes.map(communitySlug)}${mapQueryString({ categories: [banner.categoryId] })}`
+  const href =
+    banner.destination === 'list'
+      ? routes.slug(communitySlug, banner.categoryId)
+      : `${routes.map(communitySlug)}${mapQueryString({ categories: [banner.categoryId] })}`
+  const ctaLabel = banner.destination === 'list' ? `See ${category.pluralLabel.toLowerCase()} →` : 'View on the map →'
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -48,7 +55,7 @@ export default function CampaignBannerCard() {
         href={href}
         className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
       >
-        View on the map →
+        {ctaLabel}
       </Link>
     </div>
   )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeCampaignBanner, type CampaignBanner } from './campaignBanner'
+import { activeCampaignBanner, activeCampaignCategoryIds, type CampaignBanner } from './campaignBanner'
 
 const NY = 'America/New_York'
 
@@ -11,6 +11,7 @@ function banner(overrides: Partial<CampaignBanner> = {}): CampaignBanner {
     subtitle: '',
     startDate: '2026-09-25',
     endDate: '2026-10-05',
+    destination: 'map',
     ...overrides,
   }
 }
@@ -53,5 +54,35 @@ describe('activeCampaignBanner', () => {
     const later = banner({ id: 'b', startDate: '2026-09-28', endDate: '2026-10-02' })
     const result = activeCampaignBanner([earlier, later], new Date('2026-09-30T12:00:00Z').getTime(), NY)
     expect(result?.id).toBe('b')
+  })
+})
+
+describe('activeCampaignCategoryIds', () => {
+  it('includes a category with a currently-live campaign', () => {
+    const b = banner({ categoryId: 'sukkahs' })
+    const ids = activeCampaignCategoryIds([b], new Date('2026-09-30T12:00:00Z').getTime())
+    expect(ids.has('sukkahs')).toBe(true)
+  })
+
+  it('excludes a category whose campaign has not started or already ended', () => {
+    const b = banner({ categoryId: 'sukkahs', startDate: '2026-09-25', endDate: '2026-10-05' })
+    const before = activeCampaignCategoryIds([b], new Date('2026-09-24T12:00:00Z').getTime())
+    const after = activeCampaignCategoryIds([b], new Date('2026-10-06T12:00:00Z').getTime())
+    expect(before.has('sukkahs')).toBe(false)
+    expect(after.has('sukkahs')).toBe(false)
+  })
+
+  // Unlike activeCampaignBanner (which picks ONE banner to display), this
+  // promotes every category with a live campaign — two unrelated campaigns
+  // for two different categories should both come through.
+  it('includes every category with a live campaign, not just one', () => {
+    const a = banner({ id: 'a', categoryId: 'sukkahs' })
+    const b = banner({ id: 'b', categoryId: 'menorahs' })
+    const ids = activeCampaignCategoryIds([a, b], new Date('2026-09-30T12:00:00Z').getTime())
+    expect(ids).toEqual(new Set(['sukkahs', 'menorahs']))
+  })
+
+  it('is empty with no banners', () => {
+    expect(activeCampaignCategoryIds([], Date.now())).toEqual(new Set())
   })
 })
