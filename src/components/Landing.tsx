@@ -640,7 +640,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               rows.push({
                 key: `${cur.kind}-${next.kind}`,
                 node: (
-                  <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
+                  // NOT `desktop:` (640px) — that breakpoint answers "is this
+                  // a phone", not "is there room for two half cards side by
+                  // side", and reusing it here paired them at widths where
+                  // neither card had enough room. Update Listings' three
+                  // buttons need ~465-470px of content box just on their own
+                  // (see UpdateListingsCard's own doc) — once you subtract
+                  // this grid's gap-4 and each card's own p-7, pairing below
+                  // ~1220px left a column too narrow for that, wrapping
+                  // "Report" onto its own row. Below this, both cards stack
+                  // full-width instead, each getting the whole content
+                  // column — comfortably more room than either needs.
+                  <div className="grid grid-cols-1 gap-4 min-[1220px]:grid-cols-2">
                     {cur.node}
                     {next.node}
                   </div>
