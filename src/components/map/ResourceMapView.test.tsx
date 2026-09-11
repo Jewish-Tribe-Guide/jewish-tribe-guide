@@ -13,6 +13,7 @@ import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import type { LocationControls } from '@/components/home/LocationControl'
+import type { CampaignBanner } from '@/lib/campaignBanner'
 import type { DirectoryResource } from '@/types'
 import { track } from '@vercel/analytics'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -70,14 +71,19 @@ afterEach(() => cleanup())
 // listings === null || categories === null`) — so every test needs all
 // three, unlike the CommunityProvider/ContentProvider-only components tested
 // so far.
-function renderMap(ui: ReactElement, listings: DirectoryResource[] = [], categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })]) {
+function renderMap(
+  ui: ReactElement,
+  listings: DirectoryResource[] = [],
+  categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+  campaignBanners: CampaignBanner[] = [],
+) {
   return renderWithProviders(
     <PinnedProvider>
       <DroppedPinsProvider>
         <ListingsProvider listings={listings}>{ui}</ListingsProvider>
       </DroppedPinsProvider>
     </PinnedProvider>,
-    { content: { categories } },
+    { content: { categories, campaignBanners } },
   )
 }
 
@@ -86,7 +92,12 @@ function renderMap(ui: ReactElement, listings: DirectoryResource[] = [], categor
 // which jsdom's global polyfill always reports as desktop — ForcedViewport
 // (the same mechanism the admin device preview uses) short-circuits that
 // instead of fighting the polyfill.
-function renderMobileMap(ui: ReactElement, listings: DirectoryResource[] = [], categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })]) {
+function renderMobileMap(
+  ui: ReactElement,
+  listings: DirectoryResource[] = [],
+  categories = [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+  campaignBanners: CampaignBanner[] = [],
+) {
   return renderWithProviders(
     <PinnedProvider>
       <DroppedPinsProvider>
@@ -95,7 +106,7 @@ function renderMobileMap(ui: ReactElement, listings: DirectoryResource[] = [], c
         </ListingsProvider>
       </DroppedPinsProvider>
     </PinnedProvider>,
-    { content: { categories } },
+    { content: { categories, campaignBanners } },
   )
 }
 
@@ -440,6 +451,64 @@ describe('ResourceMapView — pinning', () => {
     await user.click(screen.getByRole('button', { name: 'Long-press Acme Grocery' }))
 
     expect(await screen.findByRole('button', { name: /^Pinned/ })).toBeInTheDocument()
+  })
+})
+
+describe('ResourceMapView — campaign chip', () => {
+  // A wide, fixed date range rather than dates relative to "today" — this
+  // only needs to always be currently active, not exercise
+  // activeCampaignBanner's own boundary logic (that's campaignBanner.test.ts's
+  // job).
+  const liveBanner: CampaignBanner = {
+    id: 'sukkah-map',
+    categoryId: 'grocery',
+    title: 'Sukkah Map',
+    subtitle: '',
+    startDate: '2000-01-01',
+    endDate: '2999-12-31',
+    destination: 'map',
+  }
+
+  it('shows the live campaign category as its own chip on desktop', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+      [liveBanner],
+    )
+
+    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
+    // sparkle from the button's accessible name, and the campaign category
+    // also still appears as its own ordinary chip elsewhere in the row (this
+    // is an additional distinctly-styled affordance, not a replacement) — so
+    // "Grocery Stores" alone would match two buttons.
+    const sparkle = screen.getByText('✨')
+    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
+  })
+
+  // Real bug: ResourceMapView renders TWO separate <CategoryFilter> instances
+  // — one for the desktop chip row (only mounted when !isMobile), and a
+  // second, shared one under the search bar that's what actually renders on
+  // mobile. Only the desktop instance was ever passed `campaignChip`, so a
+  // live campaign's chip appeared on desktop but silently never on mobile,
+  // even with the exact same active campaign and category.
+  it('shows the live campaign category as its own chip on mobile too', () => {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderMobileMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+      [liveBanner],
+    )
+
+    // Queried by the ✨ marker, not accessible name: aria-hidden excludes the
+    // sparkle from the button's accessible name, and the campaign category
+    // also still appears as its own ordinary chip elsewhere in the row (this
+    // is an additional distinctly-styled affordance, not a replacement) — so
+    // "Grocery Stores" alone would match two buttons.
+    const sparkle = screen.getByText('✨')
+    expect(within(sparkle.closest('button')!).getByText('Grocery Stores')).toBeInTheDocument()
   })
 })
 

@@ -1863,6 +1863,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                         onToggleBool={toggleBoolField}
                         selectFilters={selectFilters}
                         onToggleSelectValue={toggleSelectValue}
+                        campaignChip={campaignChip}
                         pinnedChip={pinnedChip}
                         pinnedOn={pinnedSelected}
                       />
