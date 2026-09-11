@@ -640,7 +640,22 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               rows.push({
                 key: `${cur.kind}-${next.kind}`,
                 node: (
-                  <div className="grid grid-cols-1 gap-4 desktop:grid-cols-2">
+                  // NOT `desktop:` (640px) — that breakpoint answers "is this
+                  // a phone", not "is there room for two half cards side by
+                  // side", and reusing it here paired them at widths where
+                  // neither card had enough room. Update Listings' three
+                  // buttons measure 465px exactly (Add's left edge to
+                  // Report's right edge, at whatever width forces the long
+                  // labels — see UpdateListingsCard's own doc). Working
+                  // backward through this grid's own gap-4 (16px) and each
+                  // card's own p-7 (56px), a column needs to be >= 537px,
+                  // which — given this page's own px-4 sm:px-6 padding and
+                  // max-w-6xl cap — means a viewport of at least ~1106px.
+                  // 1120 gives that a little breathing room without giving
+                  // up real width where two cards would actually fit; below
+                  // it both cards stack full-width instead, each getting the
+                  // whole content column.
+                  <div className="grid grid-cols-1 gap-4 min-[1120px]:grid-cols-2">
                     {cur.node}
                     {next.node}
                   </div>
