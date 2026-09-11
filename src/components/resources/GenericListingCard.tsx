@@ -291,7 +291,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
           {travel.map((t) => (
             <span key={t.text} className="inline-flex items-center gap-1">
-              {t.kind === 'distance' && <PinIcon className="h-3 w-3" />}
+              {t.kind === 'distance' && <PinIcon className="h-3 w-3 text-primary" />}
               {t.text}
             </span>
           ))}
@@ -315,7 +315,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           }}
           className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-200 cursor-pointer"
         >
-          <PinIcon className="h-3 w-3" />
+          <PinIcon className="h-3 w-3 text-primary" />
           Distance
         </button>
       ) : null}
