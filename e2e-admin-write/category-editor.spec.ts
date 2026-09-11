@@ -79,3 +79,68 @@ test('creating a category through the real editor makes it live, and deleting it
     .maybeSingle()
   expect(afterDelete, 'the category should be gone after confirming delete').toBeNull()
 })
+
+test('a category created hidden stays hidden, and "+ Add listing" publishes a listing to it directly with no moderation queue', async ({ page }) => {
+  const categoryName = `E2E Hidden Cat ${randomUUID().slice(0, 8)}`
+  const listingName = `E2E Direct Listing ${randomUUID().slice(0, 8)}`
+  pendingCategoryNames.push(categoryName)
+
+  const visible = (l: Locator) => l.and(page.locator(':visible'))
+
+  await page.goto('/philly/admin/categories')
+  await visible(page.getByRole('button', { name: '+ New category' })).click()
+
+  await page.getByPlaceholder('e.g. Schools').and(page.locator(':visible')).fill(categoryName)
+  // No address on this category — sidesteps the real Google Places
+  // autocomplete AddressInput uses, which this suite doesn't drive anywhere
+  // else; a plain name-only listing is enough to prove the direct-add path.
+  await visible(page.getByLabel('An address')).uncheck()
+  // The create-time visibility toggle this test exists to cover — see
+  // AGENTS.md's testing conventions: this failed against the pre-fix
+  // CategoryEditor (no such checkbox existed; every category was created
+  // active) before the checkbox and its wiring were added.
+  await visible(page.getByLabel('Visible on the site immediately')).uncheck()
+  await visible(page.getByRole('button', { name: 'Create category' })).click()
+
+  const row = page.locator('div.rounded-lg.shadow-sm:visible', { hasText: categoryName })
+  await expect(row).toBeVisible({ timeout: 10_000 })
+  await expect(row.getByRole('button', { name: 'Hidden' })).toBeVisible()
+
+  const supabase = getAdminClient()
+  const { data: created } = await supabase
+    .from('category')
+    .select('id, active')
+    .eq('plural_label', categoryName)
+    .maybeSingle()
+  expect(created, 'the category should exist in the database after Create').not.toBeNull()
+  expect(created!.active, 'a category created with the box unchecked should never touch active:true').toBe(false)
+
+  // "+ Add listing" — publishes directly, live, with no review queue, even
+  // though the category itself is hidden. This is the path a hidden
+  // seasonal category (e.g. Sukkahs, ahead of its campaign banner's reveal
+  // date) is meant to be seeded through.
+  await row.getByRole('button', { name: '+ Add listing' }).click()
+  await visible(page.getByLabel('Name *')).fill(listingName)
+  const addButton = visible(page.getByRole('button', { name: 'Add listing' }))
+  await expect(addButton).toBeEnabled()
+  await addButton.click()
+
+  // Closing the form navigates back to the category list.
+  await expect(row).toBeVisible({ timeout: 10_000 })
+
+  const { data: listing } = await supabase
+    .from('resource')
+    .select('id, status, category')
+    .eq('name', listingName)
+    .maybeSingle()
+  expect(listing, 'the listing should exist in the database immediately').not.toBeNull()
+  expect(listing!.category).toBe(created!.id)
+  expect(listing!.status, 'a direct admin add must publish immediately, not queue for moderation').toBe('approved')
+
+  const { data: submission } = await supabase
+    .from('submission')
+    .select('status')
+    .eq('target_id', listing!.id)
+    .maybeSingle()
+  expect(submission?.status ?? 'approved', 'nothing should be left pending in the moderation queue').not.toBe('pending')
+})

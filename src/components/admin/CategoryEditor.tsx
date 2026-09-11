@@ -203,6 +203,23 @@ export function CategoryEditor({
                 : 'Changing this moves every listing here to the new URL — old links stop working.'}
             </span>
           </label>
+          {isNew && (
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.active}
+                onChange={(e) => set('active', e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Visible on the site immediately
+            </label>
+          )}
+          {isNew && !draft.active && (
+            <span className="block text-[11px] text-muted -mt-1">
+              Created hidden — nobody sees it until you switch it to Visible from the category list.
+              Use “+ Add listing” on that row to add listings to it in the meantime.
+            </span>
+          )}
           <PinColorField
             value={draft.pinColor}
             onChange={(v) => set('pinColor', v)}

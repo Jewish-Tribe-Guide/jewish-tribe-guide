@@ -166,6 +166,7 @@ export async function createCategory(community: string, input: {
   cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
+  active?: boolean
 }): Promise<CategoryConfig> {
   const supabase = getAdminClient()
   const kind = input.kind ?? 'listing'
@@ -225,6 +226,7 @@ export async function createCategory(community: string, input: {
     card_band_image_url: input.cardBandImageUrl?.trim() || null,
     pin_color: input.pinColor?.trim() || null,
     icon_image_url: input.iconImageUrl?.trim() || null,
+    active: input.active ?? true,
   }
 
   const { data, error } = await supabase.from('category').insert(row).select('*').single()

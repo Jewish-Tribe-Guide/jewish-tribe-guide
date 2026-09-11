@@ -331,8 +331,30 @@ describe('createCategory', () => {
         upvotes_enabled: false,
         icon: '📋',
         sort_order: 100,
+        active: true,
       }),
     )
+  })
+
+  // The create-time visibility toggle (CategoryEditor's isNew-only checkbox)
+  // depends on this: without it, a category can only be created active and
+  // hidden as a second, separate request — a real window where it's briefly
+  // public. See AGENTS.md's testing conventions: this failed against the
+  // pre-fix createCategory (no `active` in its input type at all, so the
+  // insert always fell through to the DB's `default true`) before the field
+  // was added to the input type and the inserted row.
+  it('passes active: false through to the inserted row when explicitly set', async () => {
+    let call = 0
+    const insertBuilder = chainable({ data: { ...rawRow, active: false }, error: null })
+    mockFrom.mockImplementation(() => {
+      call += 1
+      return call === 1 ? chainable({ data: null, error: null }) : insertBuilder
+    })
+
+    const result = await createCategory('philly', { label: 'Sukkahs', active: false })
+
+    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ active: false }))
+    expect(result.active).toBe(false)
   })
 })
 

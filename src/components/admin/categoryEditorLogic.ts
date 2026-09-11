@@ -60,6 +60,11 @@ export type Draft = {
   cardBandImageUrl: string
   /** '' means "no colour chosen" — see getCategoryColor's positional fallback. */
   pinColor: string
+  /** Only settable at creation (see CategoryEditor's isNew-only checkbox) — an
+   *  existing category's visibility is changed from CategoryManager's own
+   *  per-row toggle instead, so this is read here but never re-shown/re-sent
+   *  on an edit save (see useCategorySaveWorkflow). */
+  active: boolean
 }
 
 export const CAPABILITY_LABELS: Record<keyof CategoryCapabilities, string> = {
@@ -133,6 +138,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     cardTextColor: c?.cardTextColor || '#ffffff',
     cardBandImageUrl: c?.cardBandImageUrl ?? '',
     pinColor: c?.pinColor || '',
+    active: c?.active ?? true,
   }
 }
 

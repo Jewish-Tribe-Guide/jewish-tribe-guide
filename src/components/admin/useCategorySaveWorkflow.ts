@@ -181,7 +181,7 @@ export function useCategorySaveWorkflow({
     setSaving(true)
     try {
       const payload = {
-        ...(isNew && { id: draft.id }),
+        ...(isNew && { id: draft.id, active: draft.active }),
         label: draft.label,
         pluralLabel: draft.pluralLabel || draft.label,
         icon: draft.icon,

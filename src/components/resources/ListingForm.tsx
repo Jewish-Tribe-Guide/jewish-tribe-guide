@@ -46,12 +46,19 @@ type Props = {
    *  "Verifying…" right when they open the form. Falls back to rendering its
    *  own widget (the old behavior) when omitted, e.g. in the admin preview. */
   sharedTurnstile?: { token: string; reset: () => void }
+  /** Admin console only: adds the listing directly and live via
+   *  /api/admin/listings, skipping the public form's anti-abuse layer
+   *  (Turnstile, honeypot), the submitter name/email fields, and the
+   *  moderation queue entirely — this path is already behind real admin
+   *  auth. Only meaningful with mode="create"; see CategoryManager's
+   *  "+ Add listing" action. */
+  adminSubmit?: { token: string }
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit }: Props) {
   const community = useCommunitySlug()
   const config = category
   const hasAddress = category.hasAddress !== false
@@ -258,19 +265,25 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
     setSubmitting(true)
     try {
-      const res = await fetch(withCommunity('/api/submissions', community), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operation: mode === 'edit' ? 'update' : 'create',
-          targetType: 'listing',
-          targetId: mode === 'edit' ? existing?.id : undefined,
-          payload,
-          submittedBy,
-          company: honeypot,
-          turnstileToken,
-        }),
-      })
+      const res = adminSubmit
+        ? await fetch(withCommunity('/api/admin/listings', community), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminSubmit.token}` },
+            body: JSON.stringify({ payload }),
+          })
+        : await fetch(withCommunity('/api/submissions', community), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              operation: mode === 'edit' ? 'update' : 'create',
+              targetType: 'listing',
+              targetId: mode === 'edit' ? existing?.id : undefined,
+              payload,
+              submittedBy,
+              company: honeypot,
+              turnstileToken,
+            }),
+          })
       const body = await res.json()
       if (!res.ok || !body.ok) {
         // Turnstile tokens are single-use and expire after ~5 min — on a form
@@ -285,7 +298,9 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         // a category with edits turned off — and treating those as an expired
         // challenge produced an endless "we've refreshed it, tap Submit again"
         // that no amount of tapping could clear, while hiding the real reason
-        // the server gave.
+        // the server gave. Not reachable in admin mode — there's no Turnstile
+        // challenge to expire — but the check is harmless either way since
+        // /api/admin/listings never returns this code.
         if (body.code === 'turnstile') {
           // And only offer the retry once. If a fresh token fails too, the
           // problem isn't staleness, and repeating the same hopeful message is
@@ -309,7 +324,10 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         return
       }
       setRetriedVerification(false)
-      setDone(true)
+      // Admin mode: the listing is already live — nothing to review, so skip
+      // the "Thank you!" pending screen and just close back out.
+      if (adminSubmit) onSubmitted()
+      else setDone(true)
     } catch {
       setRetriedVerification(false)
       setErrors(['Network error. Please check your connection and try again.'])
@@ -367,16 +385,25 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           "here's what happens next" tone in the intake wizards. */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-3.5 py-2.5 mb-5">
         <p className="text-sm text-blue-800">
-          <span className="font-semibold">Reviewed before it goes live.</span>{' '}
-          {mode === 'edit'
-            ? 'This won’t change the listing — a moderator reviews it first.'
-            : 'A moderator checks new listings before they appear on the site.'}
+          {adminSubmit ? (
+            <>
+              <span className="font-semibold">Publishes immediately.</span> Adding this yourself skips
+              the review queue — it goes live as soon as you submit.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">Reviewed before it goes live.</span>{' '}
+              {mode === 'edit'
+                ? 'This won’t change the listing — a moderator reviews it first.'
+                : 'A moderator checks new listings before they appear on the site.'}
+            </>
+          )}
         </p>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Honeypot value={honeypot} onChange={setHoneypot} />
+        {!adminSubmit && <Honeypot value={honeypot} onChange={setHoneypot} />}
         {hasAddress && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
@@ -509,16 +536,18 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-          <div>
-            <label htmlFor="listing-submitter-name" className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
-            <input id="listing-submitter-name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+        {!adminSubmit && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+            <div>
+              <label htmlFor="listing-submitter-name" className="block text-sm font-medium text-slate-700 mb-1">Your name (optional)</label>
+              <input id="listing-submitter-name" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
+              <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
+            </div>
           </div>
-          <div>
-            <label htmlFor="listing-submitter-email" className="block text-sm font-medium text-slate-700 mb-1">Your email (optional)</label>
-            <input id="listing-submitter-email" type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} className={inputClass} />
-          </div>
-        </div>
+        )}
 
         {errors.length > 0 && (
           <ul className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 list-disc list-inside space-y-0.5">
@@ -528,24 +557,27 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
           </ul>
         )}
 
-        {!sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
+        {!adminSubmit && !sharedTurnstile && <TurnstileWidget ref={ownTurnstileRef} onVerify={setOwnTurnstileToken} />}
 
         {/* Disabled until a token is actually in hand (when Turnstile is
             configured) — otherwise a visitor who fills the form faster than
             the background challenge completes could submit with an empty
-            token and get rejected for no visible reason. */}
+            token and get rejected for no visible reason. An admin submission
+            has no Turnstile challenge at all, so it's never gated on one. */}
         <button
           type="submit"
-          disabled={submitting || (TURNSTILE_ACTIVE && !turnstileToken)}
+          disabled={submitting || (!adminSubmit && TURNSTILE_ACTIVE && !turnstileToken)}
           className="w-full sm:w-auto bg-primary text-white font-medium px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
         >
           {submitting
             ? 'Submitting…'
-            : TURNSTILE_ACTIVE && !turnstileToken
-              ? 'Verifying…'
-              : mode === 'edit'
-                ? 'Submit edit for review'
-                : 'Submit for review'}
+            : adminSubmit
+              ? 'Add listing'
+              : TURNSTILE_ACTIVE && !turnstileToken
+                ? 'Verifying…'
+                : mode === 'edit'
+                  ? 'Submit edit for review'
+                  : 'Submit for review'}
         </button>
 
         <PrivacyNote />
