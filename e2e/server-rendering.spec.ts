@@ -129,6 +129,13 @@ test.describe('content is server-rendered', () => {
     const { category, count } = await categoryWithListings(request, community)
 
     await page.goto(`/${community}/${category.id}`)
+    // Every sibling test in this file waits for the page to settle before
+    // asserting anything — this one didn't, on the desktop path below, and
+    // it caught the page mid-transition: a strict-mode violation from two
+    // copies of DirectoryHeader's count text (the fallback shell's and the
+    // real content's) both momentarily in the DOM. Same class of thing
+    // `ready()` exists to wait out everywhere else in this suite.
+    await ready(page)
 
     if (isMobile) {
       // The "N listings" label is `hidden sm:inline`, so there's nothing to
@@ -140,7 +147,6 @@ test.describe('content is server-rendered', () => {
       // response — which meant it passed on names found only in the RSC
       // payload, a completely unrelated reason from what this test claims to
       // check.
-      await ready(page)
       await dismissLocationPrompt(page)
       const names: string[] = (await (
         await request.get(`/api/resources?category=${category.id}&community=${community}`)
