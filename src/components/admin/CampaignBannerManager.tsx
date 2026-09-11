@@ -5,7 +5,7 @@ import { useLoadOnMount } from '@/lib/useLoadOnMount'
 import { fetchJson, parseOkJson } from '@/lib/fetchJson'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useCommunitySlug } from '@/lib/communityContext'
-import { useCategories } from '@/lib/useCategories'
+import type { CategoryConfig } from '@/lib/categories'
 import type { CampaignBanner } from '@/lib/campaignBanner'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
@@ -49,7 +49,15 @@ const EMPTY_FORM: FormState = {
 
 export default function CampaignBannerManager({ token }: { token: string }) {
   const community = useCommunitySlug()
-  const categories = useCategories()
+  // Deliberately NOT useCategories()/ContentProvider — that reads the
+  // public, filtered listCategories(), which hides an inactive category
+  // unless a currently-LIVE campaign already promotes it (see
+  // categoryStore.ts's own listCategories). A brand-new hidden category has
+  // no campaign yet, so it would never appear here to link one in the first
+  // place — the exact chicken-and-egg this admin-only fetch avoids. Same
+  // /api/admin/categories route (listCategoriesUncached, everything
+  // regardless of active) CategoryManager.tsx uses for its own list.
+  const [categories, setCategories] = useState<CategoryConfig[] | null>(null)
   const listingCategories = (categories ?? []).filter((c) => c.kind === 'listing')
 
   const [banners, setBanners] = useState<CampaignBanner[] | null>(null)
@@ -63,13 +71,22 @@ export default function CampaignBannerManager({ token }: { token: string }) {
   const load = useCallback(async () => {
     setError(null)
     try {
-      const body = await parseOkJson<{ banners: CampaignBanner[] }>(
-        await fetch(withCommunity('/api/admin/campaign-banners', community), {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        'Failed to load campaign banners.',
-      )
-      setBanners(body.banners)
+      const [bannersBody, categoriesBody] = await Promise.all([
+        parseOkJson<{ banners: CampaignBanner[] }>(
+          await fetch(withCommunity('/api/admin/campaign-banners', community), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          'Failed to load campaign banners.',
+        ),
+        parseOkJson<{ categories: CategoryConfig[] }>(
+          await fetch(withCommunity('/api/admin/categories', community), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          'Failed to load categories.',
+        ),
+      ])
+      setBanners(bannersBody.banners)
+      setCategories(categoriesBody.categories)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
     }
@@ -159,7 +176,9 @@ export default function CampaignBannerManager({ token }: { token: string }) {
   }
 
   function categoryLabel(id: string): string {
-    return listingCategories.find((c) => c.id === id)?.pluralLabel ?? id
+    const c = listingCategories.find((c) => c.id === id)
+    if (!c) return id
+    return c.active === false ? `${c.pluralLabel} (hidden)` : c.pluralLabel
   }
 
   return (
@@ -261,14 +280,14 @@ function CampaignBannerForm({
 }: {
   form: FormState
   setForm: (f: FormState) => void
-  listingCategories: { id: string; pluralLabel: string }[]
+  listingCategories: { id: string; pluralLabel: string; active?: boolean }[]
   error: string | null
   saving: boolean
   onSave: () => void
   onCancel: () => void
 }) {
   return (
-    <div className="space-y-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
+    <div data-testid="campaign-banner-form" className="space-y-3 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
       {error && <p className="text-sm text-red-700">{error}</p>}
       <label className="block">
         <span className="block text-[11px] font-medium text-slate-600 mb-1">Title</span>
@@ -297,10 +316,14 @@ function CampaignBannerForm({
         >
           {listingCategories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.pluralLabel}
+              {c.active === false ? `${c.pluralLabel} (hidden)` : c.pluralLabel}
             </option>
           ))}
         </select>
+        <span className="block text-[11px] text-muted mt-1">
+          A hidden category can be linked here ahead of time — it stays hidden until this
+          campaign&rsquo;s start date arrives, then shows up on its own. Nothing else to remember.
+        </span>
       </label>
       <label className="block">
         <span className="block text-[11px] font-medium text-slate-600 mb-1">
