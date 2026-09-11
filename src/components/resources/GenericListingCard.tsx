@@ -297,13 +297,20 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           ))}
         </div>
       ) : showDistanceSlot ? (
-        // A filled pill, not a bare dash — the dash read as a broken/missing
-        // value rather than an empty one to fill in. Same PinIcon the
+        // Blue text, not a filled pill — a gray pill here read as just
+        // another tag in the badge row below (Bakery, IKC), which is a
+        // filter/fact about the place, not a "tap this" action. Blue text
+        // already carries "clickable" on its own, no background needed, and
+        // it can't be confused with a badge one row down. Same PinIcon the
         // header's own "Set location" control uses (icons.tsx), so this
         // reads as the same concept rather than a different symbol for the
-        // same idea. Still deliberately quiet (slate, not the header
-        // prompt's amber) and still repeated down the list — that repetition
-        // is what teaches "every row has this", not the pill's own styling.
+        // same idea, and still repeated down the list — that repetition is
+        // what teaches "every row has this", not this element's own styling.
+        //
+        // -my-2 py-2: the label itself is under the 24px WCAG-recommended
+        // tap target now that there's no pill padding doing that job.
+        // Padding grows the real hit area; the negative margin cancels it
+        // back out of the layout so the row's height doesn't shift.
         <button
           type="button"
           aria-label="Set your location to see distances"
@@ -313,9 +320,9 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             e.stopPropagation()
             document.dispatchEvent(new CustomEvent('jpc:open-location'))
           }}
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-200 cursor-pointer"
+          className="-my-2 flex shrink-0 items-center gap-1 whitespace-nowrap py-2 text-xs font-medium text-primary transition-colors hover:underline cursor-pointer"
         >
-          <PinIcon className="h-3 w-3 text-primary" />
+          <PinIcon className="h-3 w-3" />
           Distance
         </button>
       ) : null}
