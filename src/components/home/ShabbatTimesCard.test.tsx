@@ -1,9 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import { renderWithProviders as render } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import type { ZmanimData } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
 import ShabbatTimesCard from './ShabbatTimesCard'
+
+// Needed by useCommunitySlug() (communityContext.tsx), which this card now
+// calls to link out to the full Zmanim page — see nextNavigationMock's own doc.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // Candle lighting and havdalah, nothing else — this used to be the full
 // daily Zmanim (sunrise, latest Shema, latest Shacharis, sunset, nightfall)
@@ -75,6 +85,14 @@ describe('ShabbatTimesCard', () => {
 
     const link = screen.getByRole('link', { name: 'Hebcal.com' })
     expect(link).toHaveAttribute('href', 'https://www.hebcal.com')
+  })
+
+  it('links out to the full Zmanim & Shabbos page, next to the Hebcal credit', () => {
+    mockUseZmanim.mockReturnValue({ data: readyData, status: 'ready' })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    const link = screen.getByRole('link', { name: 'See full zmanim →' })
+    expect(link).toHaveAttribute('href', '/test-community/zmanim')
   })
 
   it('shows a loading state while zmanim are in flight', () => {
