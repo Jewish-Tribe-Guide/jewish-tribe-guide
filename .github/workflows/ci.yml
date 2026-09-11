@@ -205,7 +205,16 @@ jobs:
     name: End-to-end tests (test project)
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.63.0-noble
-    needs: unit
+    # Needs the three write suites too, not just unit: they all share this
+    # same TEST_SUPABASE_* project now that e2e points at it, and e2e's own
+    # helpers (defaultCommunity, categoryWithListings) pick "some real
+    # category with listings" — which can land on a temporary row one of
+    # them creates and deletes mid-test (e.g. cache-roundtrip's "Cache
+    # Round-trip Seed" fixture), failing when it vanishes underneath the
+    # assertion. Same underlying class of bug as 03c2e99 and the admin-write/
+    # cache-roundtrip race above; running after all three removes it the
+    # same way.
+    needs: [unit, cache-roundtrip, form-roundtrip, admin-write]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
