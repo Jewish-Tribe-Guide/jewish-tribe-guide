@@ -17,21 +17,32 @@ type ContributeAction = 'create' | 'edit' | 'report'
 // at plenty of real window sizes. Now that this is a standalone full-width
 // card, its content box is close to the full column width — the container
 // query stays regardless, since the actual measured requirement (see the
-// 470px note below) doesn't depend on which layout got it there. `aria-label`
+// 540px note below) doesn't depend on which layout got it there. `aria-label`
 // still carries the plain word (`short`) independent of the visible phrase,
 // since a screen reader doesn't need "Add a place" when "Add" already says
 // what the control does. Module-scope, not defined inside this component,
 // so it isn't a new component type — and doesn't remount its buttons — on
 // every render.
 //
-// 470px, not a rounder-looking number: a `@container` query is evaluated
+// 540px, not a rounder-looking number: a `@container` query is evaluated
 // against the container's own CONTENT box (this card's width minus its own
 // `p-7` padding, 56px), not the border box `getBoundingClientRect` reports —
 // so at a real 420px-wide content box, the three buttons' actual rendered
-// width (icons + long labels + gaps, ~465px measured) still didn't fit on
-// one row. 470 is that ~465px measured requirement plus a few px of slack,
-// so the swap to long labels never happens before there's actually room for
-// all three.
+// width (icons + long labels + gaps) still didn't fit on one row.
+//
+// This used to be 470 (a ~465px measurement plus a few px of slack) —
+// measured on macOS. That's the wrong platform: CI runs Linux
+// (mcr.microsoft.com/playwright), and font rasterization genuinely differs
+// between FreeType and CoreText even for the identical Figtree file — the
+// same three buttons measured 486px there, not 465px, confirmed by actually
+// running the real CI Docker image locally (`docker run
+// mcr.microsoft.com/playwright:v1.63.0-noble`, not guessed) after this exact
+// gap caused Landing.tsx's grid-pairing width to cross 470px — triggering
+// the long labels — before it was actually wide enough to fit them,
+// wrapping "Report" onto its own line at a narrow band of real widths
+// (1140-1160px) that a Mac-only measurement had no way to catch. 540 is
+// 486 plus a real margin, not shaved to the edge of one platform's
+// measurement again.
 function ContributeButton({ onClick, icon, short, long, primary }: {
   onClick: () => void
   icon: React.ReactNode
@@ -58,8 +69,8 @@ function ContributeButton({ onClick, icon, short, long, primary }: {
           render — so there's nothing here for a container-query-blind
           crawler/test to miss and no layout jump as the container resizes
           past the breakpoint. */}
-      <span className="hidden @min-[470px]:inline">{long}</span>
-      <span className="@min-[470px]:hidden">{short}</span>
+      <span className="hidden @min-[540px]:inline">{long}</span>
+      <span className="@min-[540px]:hidden">{short}</span>
     </button>
   )
 }

@@ -176,17 +176,33 @@ test.describe('home — Update Listings button labels', () => {
     for (const width of [800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       await expect(addButton).toBeVisible()
-      const [addBox, editBox, reportBox] = await Promise.all([
-        addButton.boundingBox(),
-        editButton.boundingBox(),
-        reportButton.boundingBox(),
-      ])
-      expect(addBox && editBox && reportBox, `buttons not all visible at ${width}px`).toBeTruthy()
-      // Same row means the same `y` — a fixed row height (~44px for these
-      // buttons) means an actually-wrapped button lands well below, not
-      // within a rounding error of, the others' y.
-      expect(Math.abs(addBox!.y - editBox!.y), `Edit wrapped at ${width}px`).toBeLessThan(5)
-      expect(Math.abs(addBox!.y - reportBox!.y), `Report wrapped at ${width}px`).toBeLessThan(5)
+
+      // Polled, not a single read. The actual 1150px wrap this test caught
+      // was NOT a timing race — reproduced deterministically in the real CI
+      // Docker image (mcr.microsoft.com/playwright), it stayed wrapped no
+      // matter how long the read was retried, because the three buttons
+      // genuinely needed more room on Linux (486px, measured) than on macOS
+      // (465px) — see UpdateListingsCard's own doc on the 540px threshold
+      // that actually fixes it. The poll is kept anyway as a real defensive
+      // improvement per this file's own convention (auto-retrying beats a
+      // one-shot snapshot) — same row means the same `y` (a fixed ~44px row
+      // height means an actually-wrapped button lands well below, not
+      // within a rounding error of, the others'), and it still fails fast
+      // (3s) on a genuine, permanent wrap rather than masking one.
+      await expect
+        .poll(
+          async () => {
+            const [addBox, editBox, reportBox] = await Promise.all([
+              addButton.boundingBox(),
+              editButton.boundingBox(),
+              reportButton.boundingBox(),
+            ])
+            if (!addBox || !editBox || !reportBox) return null
+            return Math.max(Math.abs(addBox.y - editBox.y), Math.abs(addBox.y - reportBox.y))
+          },
+          { message: `Edit/Report wrapped at ${width}px`, timeout: 3_000 },
+        )
+        .toBeLessThan(5)
     }
   })
 })
