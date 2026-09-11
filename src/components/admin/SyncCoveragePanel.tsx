@@ -7,6 +7,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import type { SyncCoverage, SyncCheckField, ClosureReport, PendingFirstSyncReport } from '@/lib/syncCoverage'
 import type { BusinessStatus } from '@/lib/hours'
+import Section from './CollapsibleSection'
 
 // The Metrics tab's Google Places sync coverage report — three questions an
 // admin can't answer today without reading raw `details` JSON:
@@ -18,37 +19,6 @@ import type { BusinessStatus } from '@/lib/hours'
 // hand-edited field actually drifted from what Google shows, if anything?)
 // is on-demand per listing — the only part of this report that spends a
 // live Google Places API call, so it's never run in bulk.
-
-function Section({
-  title,
-  description,
-  count,
-  children,
-}: {
-  title: string
-  description: string
-  count: number
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-3 p-4 text-left cursor-pointer"
-      >
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">
-            {title} <span className="font-normal text-muted">({count})</span>
-          </p>
-          <p className="text-xs text-muted mt-0.5">{description}</p>
-        </div>
-        <span className="text-xs text-muted shrink-0">{open ? 'Hide' : 'Show'}</span>
-      </button>
-      {open && count > 0 && <div className="border-t border-slate-100 divide-y divide-slate-100">{children}</div>}
-    </div>
-  )
-}
 
 // One field's "Resume syncing" action — only ever shown once a check has
 // already reported a match, but resumeSyncField re-verifies live anyway

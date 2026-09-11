@@ -1,4 +1,5 @@
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { siteUrl } from '@/lib/siteUrl'
@@ -33,6 +34,7 @@ export const metadata: Metadata = {
 // text does, defeating the point of making this admin-editable at all.
 export default async function PrivacyPage() {
   const page = await getPage('privacy')
+  const title = page?.title ?? 'Privacy Policy'
   const lastUpdated = page
     ? new Date(page.updatedAt).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -47,15 +49,19 @@ export default async function PrivacyPage() {
       {/* The same control every other second-level screen uses, saying the
           same word. This used to be a bespoke underlined "← Back to
           {community.name}" link, which named its destination differently from
-          the rest of the app for no reason anyone could point at. */}
-      <UpButton href="/" label="Home" className="mb-0" />
+          the rest of the app for no reason anyone could point at.
+          UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton href="/" label="Home" className="mb-0 desktop:hidden" />
+      <Breadcrumb href="/" upLabel="Home" title={title} className="mb-0" />
 
       {/* One card holding the whole document — title included. See the same
           note on /about for why the h1 sits inside rather than above it, and
           why the back link doesn't. */}
       <div className="mt-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         <h1 className="text-[30px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
-          {page?.title ?? 'Privacy Policy'}
+          {title}
         </h1>
         {lastUpdated && <p className="mt-1.5 text-sm text-muted">Last updated: {lastUpdated}</p>}
 

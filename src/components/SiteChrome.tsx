@@ -11,7 +11,7 @@ import ContentFailureNotice from '@/components/ContentFailureNotice'
 import { LocationProvider, useLocation } from '@/lib/locationContext'
 import { PinnedProvider } from '@/lib/pinnedContext'
 import { DroppedPinsProvider } from '@/lib/droppedPinsContext'
-import { HeaderCollapseProvider } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider } from '@/lib/headerVisibility'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
 import { useCategories } from '@/lib/useCategories'
 import { useSiteSettings } from '@/lib/useSiteSettings'
@@ -37,7 +37,6 @@ function screenFromPath(pathname: string): { mode: AppMode; cardId: string | nul
   if (!first) return { mode: 'home', cardId: null }
   if (first === 'map') return { mode: 'map', cardId: null }
   if (first === 'feedback') return { mode: 'feedback', cardId: null }
-  if (first === 'all') return { mode: 'all-categories', cardId: null }
   // Anything else is a category or form slug.
   return { mode: 'find', cardId: first }
 }
@@ -150,7 +149,9 @@ export default function SiteChrome({
       <PinnedProvider>
         <DroppedPinsProvider>
           <HeaderCollapseProvider>
-            <Chrome year={year}>{children}</Chrome>
+            <ScreenHeaderProvider>
+              <Chrome year={year}>{children}</Chrome>
+            </ScreenHeaderProvider>
           </HeaderCollapseProvider>
         </DroppedPinsProvider>
       </PinnedProvider>

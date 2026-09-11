@@ -42,8 +42,11 @@ const HOSPITALS_ID = '__hospitals__'
 // has a hundred and fifty pins on it. DROPPED_PIN_COLOR below deliberately
 // stays as-is: there is only ever a handful of those, they're the visitor's
 // own transient marks, and standing out is the entire point of one.
-const HOSPITAL_COLOR = '#b6302b'
-const HOSPITAL_ICON = '🏥'
+// Exported so HospitalsDirectory's own header band uses the identical color
+// and glyph — a hospital should read as the same "thing" on the map and on
+// its own directory page, not two independently-chosen reds.
+export const HOSPITAL_COLOR = '#b6302b'
+export const HOSPITAL_ICON = '🏥'
 // A dropped pin's marker id is prefixed with this so a click handler can
 // tell it apart from a real listing/hospital point without a separate prop
 // threaded through every consumer — see droppedMapPoints below.
@@ -149,11 +152,20 @@ type Props = {
    *  address anyway (the admin category-preview map), which just means no
    *  control renders. */
   controls?: LocationControls
+  /** Embedded home-screen map only — drops this component's own boxed
+   *  border (rounded-2xl/ring) in the non-fullscreen state, because the
+   *  caller (Landing.tsx) draws a single outer card around a heading plus
+   *  this map instead, matching Browse everything's own card — see that
+   *  render site's own comment. No effect once fullscreen: that state
+   *  always manages its own chrome (`rounded-none`/`ring-0`, breaking out
+   *  to `fixed inset-0`), same as before this prop existed. Never set by
+   *  `standalone` callers, which have no outer card to defer to. */
+  borderless?: boolean
 }
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls, borderless }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
@@ -1405,6 +1417,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       onToggleSelectValue={toggleSelectValue}
       pinnedChip={pinnedChip}
       pinnedOn={pinnedSelected}
+      scrollArrow
     />
   )
 
@@ -1420,7 +1433,21 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
           ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
-          : 'desktop:relative desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
+          // desktop:isolate: boxed mode (e.g. the home-screen map band) has no
+          // z-index of its own on this wrapper, so without a stacking context
+          // here the search box's z-40 below (ResourceMapView's own overlay,
+          // meant only to sit above the map/sidebar inside this box) leaked
+          // straight into the root stacking context and tied with
+          // SiteHeader's own z-40 — DOM order then let it paint over the
+          // header, including the Categories dropdown nested inside it.
+          // `isolate` contains that z-40 to this box without renumbering it
+          // (fullscreen mode needs no such fix: its z-50 fixed layer already
+          // establishes its own stacking context, and covering the header
+          // there is a separate, intentional tradeoff — see the `controls`
+          // prop's own doc above).
+          : `desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
+              borderless ? '' : ' desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
+            }`
       }`}
     >
       {loading ? (
@@ -1964,7 +1991,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </button>
           </div>
           {draftNoneSelected && (
-            <p className="shrink-0 px-4 pb-2 text-xs text-amber-600">
+            <p className="shrink-0 px-4 pb-2 text-xs text-caution">
               Select at least one category to see results.
             </p>
           )}

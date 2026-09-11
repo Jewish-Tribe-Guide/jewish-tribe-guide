@@ -123,6 +123,27 @@ test.describe('URLs', () => {
     expect(response?.status()).toBe(404)
   })
 
+  test('a 404 under a known community offers a way back into it, not just "/"', async ({ page }) => {
+    // Before this, the 404 page's only link was "Go home" → "/", which for a
+    // non-default community lands somewhere else entirely. This resolves the
+    // attempted slug client-side against /api/communities (not-found.tsx gets
+    // no params to do it server-side) and, when it matches, offers a link
+    // back into that same community instead of a generic escape hatch.
+    const community = await defaultCommunity(page)
+
+    await page.goto(`/${community}/not-a-real-category`)
+
+    await expect(page.locator(`a[href="/${community}"]`)).toBeVisible()
+    await expect(page.locator(`a[href="/${community}/map"]`)).toBeVisible()
+  })
+
+  test('a 404 for an unknown community only offers the generic home link', async ({ page }) => {
+    await page.goto('/not-a-real-community')
+
+    await expect(page.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '/')
+    await expect(page.locator('a[href="/not-a-real-community"]')).toHaveCount(0)
+  })
+
   test('the map carries its filters in the URL', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     // Needs a category that actually plots pins (categoryWithListings would
@@ -161,7 +182,7 @@ test.describe('URLs', () => {
   test('reserved screens are not treated as categories', async ({ page }) => {
     const community = await defaultCommunity(page)
 
-    for (const screen of ['map', 'all', 'feedback']) {
+    for (const screen of ['map', 'feedback']) {
       const response = await page.goto(`/${community}/${screen}`)
       expect(response?.status(), `/${community}/${screen} should be a real screen`).toBe(200)
     }
@@ -207,7 +228,10 @@ test.describe('URLs', () => {
     test.skip(!eruv, `no eruv-kind category configured for ${community}`)
     if (!eruv) return
 
-    await page.goto(`/${community}/all`)
+    // The home screen has the full category index — desktop's "Browse
+    // everything" grid, mobile's own grid inline — so it's where this tile
+    // lives now that there's no separate All Categories page.
+    await page.goto(`/${community}`)
     await dismissLocationPrompt(page)
     // A real <a>, not a <button> — see sections.tsx's CardDef.href, added so
     // cmd/ctrl/middle-click "open in new tab" works on these tiles, which a

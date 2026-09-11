@@ -98,6 +98,18 @@ describe('MobileNearbySheet', () => {
     expect(screen.getByText('detail for Second Place')).toBeInTheDocument()
   })
 
+  // collapse() used to carry two independent guards here, needed because a
+  // tap dismissing MapPlaceDetail's own kebab menu could otherwise ALSO
+  // collapse this whole sheet in the same motion (the map's background tap
+  // is Google Maps' own 'click' event, not a plain DOM click this
+  // component's own outside-click detection could reliably order itself
+  // against). Removed along with the callback props that drove them
+  // (onOutsideDismiss/onOpenChange) once ListingActionsMenu started
+  // covering this itself: an invisible backdrop sits over the ENTIRE
+  // screen while its menu is open (see that component's own doc), so a
+  // dismissing tap never reaches Google Maps' canvas at all — collapse()
+  // simply never gets called for that tap in the first place, and there's
+  // nothing left here to guard against or test.
   it('returns to the list (not the home screen) when a swipe-back fires while a place is selected', async () => {
     const user = userEvent.setup()
 

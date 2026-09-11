@@ -20,15 +20,17 @@ const THANKSGIVING = new Date(2026, 10, 26, 9, 0).getTime()
 
 describe('calendarDaysFor', () => {
   it('always includes the weekday', () => {
-    expect(calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false })).dayKeys).toEqual(['sat'])
+    expect(
+      calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false, isYomTov: false })).dayKeys,
+    ).toEqual(['sat'])
   })
 
   it('adds the holiday key, and names it, only on a real secular holiday', () => {
-    const plain = calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false }))
+    const plain = calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false, isYomTov: false }))
     expect(plain.dayKeys).not.toContain('holiday')
     expect(plain.labels).toEqual([])
 
-    const feast = calendarDaysFor(THANKSGIVING, zmanim({ isRoshChodesh: false }))
+    const feast = calendarDaysFor(THANKSGIVING, zmanim({ isRoshChodesh: false, isYomTov: false }))
     expect(feast.dayKeys).toContain('holiday')
     expect(feast.labels).toContain('Thanksgiving')
   })
@@ -36,14 +38,14 @@ describe('calendarDaysFor', () => {
   it('adds Rosh Chodesh when Hebcal says so, under Hebcal’s own name', () => {
     const rc = calendarDaysFor(
       ORDINARY_SATURDAY,
-      zmanim({ isRoshChodesh: true, holidays: ['Rosh Chodesh Elul'] }),
+      zmanim({ isRoshChodesh: true, isYomTov: false, holidays: ['Rosh Chodesh Elul'] }),
     )
     expect(rc.dayKeys).toContain('rosh_chodesh')
     expect(rc.labels).toContain('Rosh Chodesh Elul')
   })
 
   it('drops Rosh Chodesh when Hebcal says it is not', () => {
-    const result = calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false }))
+    const result = calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false, isYomTov: false }))
     expect(result.dayKeys).not.toContain('rosh_chodesh')
     expect(result.roshChodeshKnown).toBe(true)
   })
@@ -57,6 +59,33 @@ describe('calendarDaysFor', () => {
       expect(result.dayKeys).toContain('rosh_chodesh')
       expect(result.roshChodeshKnown).toBe(false)
       // Nothing is claimed in the UI on a guess.
+      expect(result.labels).toEqual([])
+    }
+  })
+
+  it('adds Yom Tov when Hebcal says so, under Hebcal’s own name', () => {
+    const yt = calendarDaysFor(
+      ORDINARY_SATURDAY,
+      zmanim({ isRoshChodesh: false, isYomTov: true, holidays: ['Sukkot I'] }),
+    )
+    expect(yt.dayKeys).toContain('yom_tov')
+    expect(yt.labels).toContain('Sukkot I')
+  })
+
+  it('drops Yom Tov when Hebcal says it is not', () => {
+    const result = calendarDaysFor(ORDINARY_SATURDAY, zmanim({ isRoshChodesh: false, isYomTov: false }))
+    expect(result.dayKeys).not.toContain('yom_tov')
+    expect(result.yomTovKnown).toBe(true)
+  })
+
+  // Same never-narrow-on-missing-data rule as Rosh Chodesh: a shul's Yom Tov
+  // minyan has to stay visible rather than dropping out while the answer is
+  // still a guess.
+  it('keeps Yom Tov when the answer is unknown, and says so', () => {
+    for (const unknown of [null, undefined, zmanim()]) {
+      const result = calendarDaysFor(ORDINARY_SATURDAY, unknown)
+      expect(result.dayKeys).toContain('yom_tov')
+      expect(result.yomTovKnown).toBe(false)
       expect(result.labels).toEqual([])
     }
   })

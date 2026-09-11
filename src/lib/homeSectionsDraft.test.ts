@@ -3,7 +3,7 @@ import type { DraftHomeSection, HomeSection } from './homeSections'
 import { saveHomeSections } from './homeSectionsDraft'
 
 function section(overrides: Partial<HomeSection> = {}): HomeSection {
-  return { id: 'featured', kind: 'section', title: 'Featured', sortOrder: 100, cardIds: ['a'], ...overrides }
+  return { id: 'featured', kind: 'section', title: 'Featured', sortOrder: 100, cardIds: ['a'], width: 'full', ...overrides }
 }
 
 function jsonResponse(body: unknown, ok = true) {
@@ -16,8 +16,8 @@ afterEach(() => {
 
 describe('saveHomeSections', () => {
   it('deletes sections dropped from the draft, leaving an unchanged survivor untouched', async () => {
-    const original = [section({ id: 'a', kind: 'section', title: 'A', cardIds: ['x'] }), section({ id: 'b' })]
-    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'A', cardIds: ['x'] }]
+    const original = [section({ id: 'a', kind: 'section', title: 'A', cardIds: ['x'], width: 'full' }), section({ id: 'b' })]
+    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'A', cardIds: ['x'], width: 'full' }]
 
     const fetchSpy = vi.fn().mockResolvedValue(jsonResponse({ ok: true }))
     vi.stubGlobal('fetch', fetchSpy)
@@ -33,7 +33,7 @@ describe('saveHomeSections', () => {
 
   it('creates a brand-new section and uses its real id going forward (e.g. for sortOrder reconciliation)', async () => {
     const original: HomeSection[] = []
-    const draft: DraftHomeSection[] = [{ id: 'new:123', kind: 'section', title: 'New Section', cardIds: ['x'] }]
+    const draft: DraftHomeSection[] = [{ id: 'new:123', kind: 'section', title: 'New Section', cardIds: ['x'], width: 'full' }]
 
     const fetchSpy = vi.fn().mockImplementation((url: string, opts: RequestInit) => {
       if (opts.method === 'POST') {
@@ -51,15 +51,17 @@ describe('saveHomeSections', () => {
       '/api/admin/home-sections?community=philly',
       expect.objectContaining({
         method: 'POST',
+        // No `width` for a plain section — see createSection's own doc:
+        // it's only meaningful (and only sent) alongside a built-in `kind`.
         body: JSON.stringify({ title: 'New Section', cardIds: ['x'] }),
       }),
     )
     expect(result[0].id).toBe('new-section')
   })
 
-  it('creates a re-added built-in block by sending just its kind, not title/cardIds', async () => {
+  it('creates a re-added built-in block by sending its kind and width, not title/cardIds', async () => {
     const original: HomeSection[] = []
-    const draft: DraftHomeSection[] = [{ id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }]
+    const draft: DraftHomeSection[] = [{ id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }]
 
     const fetchSpy = vi.fn().mockResolvedValue(
       jsonResponse({ ok: true, section: section({ id: 'map', kind: 'map', title: 'Explore the map', sortOrder: 100 }) }),
@@ -70,13 +72,13 @@ describe('saveHomeSections', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/admin/home-sections?community=philly',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'map' }) }),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'map', width: 'full' }) }),
     )
   })
 
   it('patches a section whose title or cardIds changed', async () => {
-    const original = [section({ id: 'a', kind: 'section', title: 'Old Title', cardIds: ['x'] })]
-    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'New Title', cardIds: ['x'] }]
+    const original = [section({ id: 'a', kind: 'section', title: 'Old Title', cardIds: ['x'], width: 'full' })]
+    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'New Title', cardIds: ['x'], width: 'full' }]
 
     const fetchSpy = vi.fn().mockResolvedValue(
       jsonResponse({ ok: true, section: section({ id: 'a', kind: 'section', title: 'New Title', sortOrder: 100 }) }),
@@ -89,14 +91,14 @@ describe('saveHomeSections', () => {
       '/api/admin/home-sections/a?community=philly',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ title: 'New Title', cardIds: ['x'] }),
+        body: JSON.stringify({ title: 'New Title', cardIds: ['x'], width: 'full' }),
       }),
     )
   })
 
   it('leaves an unchanged section alone (no PATCH for title/cardIds) when order is also unchanged', async () => {
     const original = [section({ id: 'a', kind: 'section', title: 'Same', cardIds: ['x'], sortOrder: 100 })]
-    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Same', cardIds: ['x'] }]
+    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Same', cardIds: ['x'], width: 'full' }]
 
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
@@ -111,8 +113,8 @@ describe('saveHomeSections', () => {
     // Reordered: b now comes first, so a needs sortOrder 200, b needs 100 (was 200).
     const original = [section({ id: 'a', sortOrder: 100 }), section({ id: 'b', sortOrder: 200 })]
     const draft: DraftHomeSection[] = [
-      { id: 'b', kind: 'section', title: 'Featured', cardIds: ['a'] },
-      { id: 'a', kind: 'section', title: 'Featured', cardIds: ['a'] },
+      { id: 'b', kind: 'section', title: 'Featured', cardIds: ['a'], width: 'full' },
+      { id: 'a', kind: 'section', title: 'Featured', cardIds: ['a'], width: 'full' },
     ]
 
     const patchCalls: string[] = []
@@ -138,7 +140,7 @@ describe('saveHomeSections', () => {
 
   it('throws the server-provided error message when a save fails', async () => {
     const original = [section({ id: 'a' })]
-    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Renamed', cardIds: ['a'] }]
+    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Renamed', cardIds: ['a'], width: 'full' }]
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false, errors: ['Not authorized.'] }, false)))
 
@@ -147,7 +149,7 @@ describe('saveHomeSections', () => {
 
   it('falls back to a generic message when the server gives no errors array', async () => {
     const original = [section({ id: 'a' })]
-    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Renamed', cardIds: ['a'] }]
+    const draft: DraftHomeSection[] = [{ id: 'a', kind: 'section', title: 'Renamed', cardIds: ['a'], width: 'full' }]
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ ok: false }, false)))
 

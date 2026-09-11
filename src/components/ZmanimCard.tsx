@@ -1,8 +1,12 @@
 'use client'
 
-import UpButton from '@/components/UpButton'
 import ZmanimBody from '@/components/ZmanimBody'
+import DirectoryHeader from '@/components/resources/DirectoryHeader'
+import { CategoryBandFrame, CategoryBandBadge } from '@/components/resources/CategoryBandFrame'
+import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useZmanim } from '@/lib/useZmanim'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 type Props = {
   /** Coordinates to compute zmanim for — the visitor's typed address, or the
@@ -18,24 +22,39 @@ type Props = {
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
   title?: string
+  /** This pseudo-category's own icon/color/photo — see CategoryConfig. Falls
+   *  back to a neutral slate (matching getCategoryColor's own fallback) and
+   *  no icon while categories are still loading, same as `title` above. */
+  icon?: string
+  color?: string
+  bandImageUrl?: string | null
 }
 
-export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos' }: Props) {
+export default function ZmanimCard({ coords, locationLabel, onUp, upLabel = 'All resources', title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl }: Props) {
   const { data, status } = useZmanim(coords)
 
-  return (
-    <div>
-      <UpButton label={upLabel} onClick={onUp} />
+  // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call, which this mirrors now that this screen has the same gap
+  // it used to (its own mobile UpButton, no header title).
+  useSetScreenHeader(true, title, onUp)
+  const isMobile = useIsMobile()
 
-      {/* Heading */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
-        <p className="text-sm text-muted mt-0.5">{locationLabel}</p>
-      </div>
+  const banner = !isMobile && icon ? (
+    <CategoryBandBadge color={color}>
+      <CategoryGlyph categoryId={undefined} icon={icon} className="h-[55%] w-[55%]" />
+    </CategoryBandBadge>
+  ) : null
+
+  return (
+    <CategoryBandFrame color={color} imageUrl={bandImageUrl}>
+      {/* Mobile used to have its own "‹ {upLabel}" row here — see
+          GenericDirectory's identical comment on why it doesn't need one now
+          that useSetScreenHeader puts the same "‹ {title}" in SiteHeader. */}
+      <DirectoryHeader title={title} anchorLabel={locationLabel} upLabel={upLabel} onUp={onUp} titleInHeader banner={banner} />
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
         <ZmanimBody data={data} status={status} />
       </section>
-    </div>
+    </CategoryBandFrame>
   )
 }

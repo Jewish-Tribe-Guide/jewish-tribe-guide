@@ -1,4 +1,5 @@
 import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
 import { siteUrl } from '@/lib/siteUrl'
@@ -24,8 +25,12 @@ export default async function AboutPage() {
       {/* The same control every other second-level screen uses, saying the
           same word. This used to be a bespoke underlined "← Back to
           {community.name}" link, which named its destination differently from
-          the rest of the app for no reason anyone could point at. */}
-      <UpButton href="/" label="Home" className="mb-0" />
+          the rest of the app for no reason anyone could point at.
+          UpButton (mobile) and Breadcrumb (desktop) name the same
+          destination, so only one ever shows at a time — see Breadcrumb's
+          own doc. */}
+      <UpButton href="/" label="Home" className="mb-0 desktop:hidden" />
+      <Breadcrumb href="/" upLabel="Home" title={title} className="mb-0" />
 
       {/* One card holding the whole document — title included. The h1 sits
           inside rather than above because these two pages are documents, not

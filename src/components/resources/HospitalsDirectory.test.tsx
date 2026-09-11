@@ -27,7 +27,11 @@ describe('HospitalsDirectory', () => {
     const hospitals = [makeHospital({ id: 'a', name: 'Jefferson' }), makeHospital({ id: 'b', name: 'Einstein' })]
     renderWithProviders(<HospitalsDirectory anchor={noAnchor} {...handlers} />, { content: { hospitals } })
 
-    expect(screen.getByText('Which hospital?')).toBeInTheDocument()
+    // By role, not getByText — see GenericDirectory.test.tsx's identical
+    // comment: DirectoryHeader's desktop breadcrumb repeats the title as
+    // plain text above the real h1, which jsdom (no viewport to hide it
+    // against) renders unconditionally alongside it.
+    expect(screen.getByRole('heading', { name: 'Which hospital?' })).toBeInTheDocument()
     expect(screen.getByText('Jefferson')).toBeInTheDocument()
     expect(screen.getByText('Einstein')).toBeInTheDocument()
   })
@@ -140,7 +144,12 @@ describe('HospitalsDirectory', () => {
       content: { hospitals: [makeHospital()] },
     })
 
-    await user.click(screen.getByRole('button', { name: /All resources/ }))
+    // Two such buttons now exist — the mobile UpButton and DirectoryHeader's
+    // desktop breadcrumb (see that component's upLabel/onUp) — CSS-hidden
+    // from each other depending on viewport, which jsdom doesn't have. Both
+    // call the same onUp, so either serves to prove the wiring; the first is
+    // as good as any.
+    await user.click(screen.getAllByRole('button', { name: 'All resources' })[0])
     expect(onUp).toHaveBeenCalledTimes(1)
   })
 })

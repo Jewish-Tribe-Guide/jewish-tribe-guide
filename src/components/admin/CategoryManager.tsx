@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CATEGORY_CAPABILITY_KEYS, resolveCapabilities, type CategoryConfig } from '@/lib/categories'
 import type { FormConfig } from '@/lib/forms'
 import { useLoadOnMount } from '@/lib/useLoadOnMount'
@@ -9,7 +9,9 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import FormEditor from './FormEditor'
 import { CategoryEditor } from './CategoryEditor'
-import { CardBackgroundField, IconField } from './CategoryFormFields'
+import CategoryPreview from './CategoryPreview'
+import { CardBackgroundField, CardBandImageField, IconField } from './CategoryFormFields'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { CAPABILITY_LABELS } from './categoryEditorLogic'
 
 // ── The categories manager: one list mixing the two kinds of thing a
@@ -637,6 +639,7 @@ export function SingletonEditor({
   const [iconImageUrl, setIconImageUrl] = useState(category.iconImageUrl ?? '')
   const [cardImageUrl, setCardImageUrl] = useState(category.cardImageUrl ?? '')
   const [cardTextColor, setCardTextColor] = useState(category.cardTextColor || '#ffffff')
+  const [cardBandImageUrl, setCardBandImageUrl] = useState(category.cardBandImageUrl ?? '')
   // Map only — kept as a string (not number|null) so the field can sit blank
   // mid-edit rather than snapping to 0. Parsed back to number|null on save.
   const [mapZoomRadius, setMapZoomRadius] = useState(
@@ -644,6 +647,50 @@ export function SingletonEditor({
   )
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+
+  // Live preview, same pattern as CategoryEditor's own (history entry so
+  // Back/the preview's own Up button land here instead of skipping past to
+  // the category list) — only for the two kinds CategoryPreview actually
+  // knows how to render standalone content for (see its own kind switch).
+  // Map's preview is the site's real map (a much bigger surface, already
+  // reachable from the live site) and Hospitals is a whole chooser+detail
+  // flow tied to real hospital data, not a single card of content — neither
+  // fits this same "preview the draft" shape without a lot more scaffolding
+  // than a Save/Cancel-only editor like this one has needed until now.
+  const previewSupported = category.kind === 'eruv' || category.kind === 'zmanim'
+  const [previewing, setPreviewing] = useState(false)
+
+  useEffect(() => {
+    if (!previewSupported) return
+    function onPopState(e: PopStateEvent) {
+      setPreviewing(!!(e.state as { editorPreview?: boolean } | null)?.editorPreview)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [previewSupported])
+
+  function openPreview() {
+    setPreviewing(true)
+    history.pushState({ ...(window.history.state ?? {}), editorPreview: true }, '')
+  }
+
+  function closePreview() {
+    history.back()
+  }
+
+  if (previewing) {
+    const previewCategory: CategoryConfig = {
+      ...category,
+      label: name.trim() || category.label,
+      pluralLabel: name.trim() || category.pluralLabel,
+      icon: icon.trim() || category.icon,
+      iconImageUrl: iconImageUrl.trim() || null,
+      cardImageUrl: cardImageUrl.trim() || null,
+      cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+      cardBandImageUrl: cardBandImageUrl.trim() || null,
+    }
+    return <CategoryPreview category={previewCategory} onClose={closePreview} />
+  }
 
   async function save() {
     setErrors([])
@@ -665,6 +712,7 @@ export function SingletonEditor({
             iconImageUrl: iconImageUrl.trim() || null,
             cardImageUrl: cardImageUrl.trim() || null,
             cardTextColor: cardImageUrl.trim() ? cardTextColor : null,
+            cardBandImageUrl: cardBandImageUrl.trim() || null,
             ...(category.kind === 'map'
               ? { mapZoomRadiusMiles: mapZoomRadius.trim() === '' ? null : Number(mapZoomRadius) }
               : {}),
@@ -716,6 +764,14 @@ export function SingletonEditor({
           previewIcon={icon}
           previewTitle={name || category.pluralLabel}
         />
+        <CardBandImageField
+          cardBandImageUrl={cardBandImageUrl}
+          onCardBandImageUrl={setCardBandImageUrl}
+          fallbackImageUrl={cardImageUrl}
+          previewIcon={icon}
+          previewColor={getCategoryColor([category], category.id)}
+          token={token}
+        />
         {category.kind === 'map' && (
           <label className="block pt-3 border-t border-slate-100">
             <span className="block text-xs font-medium text-slate-700 mb-1">Zoom radius</span>
@@ -752,6 +808,14 @@ export function SingletonEditor({
       )}
 
       <div className="mt-4 flex gap-2">
+        {previewSupported && (
+          <button
+            onClick={openPreview}
+            className="text-sm font-medium border border-slate-300 text-slate-600 rounded-md px-4 py-2 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            Preview
+          </button>
+        )}
         <button
           onClick={save}
           disabled={saving}

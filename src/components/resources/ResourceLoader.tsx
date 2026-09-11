@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
+import type { DirectoryResource, DirectoryAnchor } from '@/types'
 import type { CategoryConfig } from '@/lib/categories'
 import { withMilesFromAddress } from '@/lib/listingTravel'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -22,6 +22,17 @@ type Props = {
   reopenItemId?: string | null
   /** Pre-fill the directory's search box (from a landing "Places" result). */
   initialSearch?: string
+  /** Pre-set the "Open now" filter — see GenericDirectory's own doc. */
+  initialOpenNow?: boolean
+  /** Pre-set the category's own boolean/select field filters — see
+   *  GenericDirectory's own doc. */
+  initialFilters?: Record<string, string> | null
+  /** Mount with "All davening times" already open — see GenericDirectory's
+   *  own doc on this prop. */
+  openDaveningModal?: boolean
+  /** Mount that modal already filtered to this one day — see
+   *  GenericDirectory's own doc on this prop. */
+  initialDaveningDay?: string
   onUp: () => void
   /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
    *  index there), "All resources" on desktop (a separate index page). See
@@ -30,14 +41,13 @@ type Props = {
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
-  /** Navigate to the map screen, carrying the directory's active search + field
-   *  filters so the map opens showing the same results. */
-  onViewMap?: (query?: string, filters?: MapFilters) => void
+  /** Pushes search/openNow changes into the URL — see GenericDirectory's own doc. */
+  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
 }
 
 // Every category renders via the generic, hint-driven card renderer (badges,
 // filters, kosher-item tags + search, and upvotes — all from category config).
-export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onViewMap }: Props) {
+export default function ResourceLoader({ category, items, anchor, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
   const title = category.pluralLabel
 
   // Extract a stable dep from the anchor object (anchor itself is re-created
@@ -97,6 +107,6 @@ export default function ResourceLoader({ category, items, anchor, reopenItemId, 
   const addressPrompt = !anchor.label && category.hasAddress !== false
 
   return (
-    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onViewMap={onViewMap} />
+    <GenericDirectory category={category} items={withDistance} anchorLabel={anchorLabel} addressPrompt={addressPrompt} reopenItemId={reopenItemId} initialSearch={initialSearch} initialOpenNow={initialOpenNow} initialFilters={initialFilters} openDaveningModal={openDaveningModal} initialDaveningDay={initialDaveningDay} onUp={onUp} upLabel={upLabel} onAdd={onAdd} onEdit={onEdit} onReport={onReport} onParamsChange={onParamsChange} />
   )
 }

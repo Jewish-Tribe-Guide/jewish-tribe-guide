@@ -105,6 +105,26 @@ export function categoryTint(color: string): string {
   return color + '2e' // ≈18% alpha
 }
 
+/** The hairline ring around a category avatar — the same color as the pin and
+ *  the tint, at a higher alpha, as an inset box-shadow so it costs no layout
+ *  and never fights the circle's own `overflow-hidden`.
+ *
+ *  Why the tint alone wasn't enough: 128 of this community's 135 listings
+ *  carry an uploaded image, and on the directory pages those images are
+ *  mostly brand logos on a WHITE field. A white logo fills the circle edge to
+ *  edge and hides `categoryTint` completely — so the one cue that a Grocery
+ *  row and a Grocery pin are the same thing was present in the markup and
+ *  invisible on screen, for the majority of rows. The ring is drawn on the
+ *  circle's edge, which an `object-cover` image never reaches.
+ *
+ *  0x59 ≈ 35%: the tint's own 18% is a fill read across a whole disc, while
+ *  this is 1.5px of line that has to hold up against white; matched by eye so
+ *  the two read as one object rather than a circle with a darker outline
+ *  stuck on it. */
+export function categoryRing(color: string): string {
+  return `inset 0 0 0 1.5px ${color}59`
+}
+
 /** Whether a value is a colour this app will store for a pin. Deliberately
  *  strict — a six-digit hex and nothing else. The value ends up in an inline
  *  `style` on the map pin and the listing avatar, so anything looser is both a

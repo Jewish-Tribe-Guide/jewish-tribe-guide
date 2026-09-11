@@ -14,8 +14,8 @@ import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWid
 import type { DirectoryResource, DirectoryAnchor, MapFilters } from '@/types'
 import { useCategories } from '@/lib/useCategories'
 import { useHospitals } from '@/lib/useHospitals'
-import { useIsMobile } from '@/lib/useIsMobile'
-import { resolveCapabilities } from '@/lib/categories'
+import { resolveCapabilities, bandImageFor } from '@/lib/categories'
+import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 
 // A pending add/edit/report action on a listing within the current category.
@@ -44,19 +44,11 @@ export type FindResourcesProps = {
    *  since it reflects an in-page navigation (e.g. Edit/Report closing) that
    *  happened after this screen mounted. */
   initialItemId?: string
-  /** Up from any resource view. On mobile this is the only "up" there is —
-   *  the home grid IS the index. On desktop it's the fallback for views that
-   *  aren't a category's own "All resources" (the unknown/loading states
-   *  below, which already say "Home") — see upToAllResources for the one
-   *  that matters more, a category's own listings/hospitals/eruv/zmanim. */
+  /** Up from any resource view — always home. Both mobile and desktop have a
+   *  real, complete category index on the home screen (mobile's own grid;
+   *  desktop's "Browse everything" — see Landing.tsx), so there's no longer
+   *  a separate "All resources" destination to distinguish from home. */
   onUp: () => void
-  /** Desktop only — opens the All Categories page. A category's own
-   *  "All resources" back button goes here instead of `onUp` (home) on
-   *  desktop, since desktop split what used to be one screen (the home grid
-   *  doubling as the index) into two: a short home gateway, and this
-   *  separate full index — see upToAllResources. Mobile has no such split
-   *  (its home screen still IS the full index), so it's simply unused there. */
-  onViewAllCategories?: () => void
   /** Navigate to the map screen pre-filtered to this category, carrying the
    *  directory's active search query and field filters. */
   onViewMap?: (categoryId: string, query?: string, filters?: MapFilters) => void
@@ -77,15 +69,32 @@ export type FindResourcesProps = {
   searchItem?: string | null
   /** `?q=` */
   searchQuery?: string | null
+  /** `?openNow=1` */
+  searchOpenNow?: string | null
+  /** Every raw query param, for the category's own `?f_<key>=`/`?sel_<key>=`
+   *  boolean/select field filters — see GenericDirectory's own doc on
+   *  `initialFilters`, which this becomes. A plain object (not the
+   *  `URLSearchParams` FindResourcesConnected itself reads) so this file
+   *  doesn't need `next/navigation` just to describe its own props. */
+  searchFilters?: Record<string, string> | null
   /** `?hospital=` */
   searchHospital?: string | null
   /** `?form=` */
   searchForm?: string | null
+  /** `?davening=` — "1" opens "All davening times" on arrival. See
+   *  GenericDirectory's own doc on `openDaveningModal`, which this becomes. */
+  searchDavening?: string | null
+  /** `?day=` — filters that modal to one day on arrival. See
+   *  GenericDirectory's own doc on `initialDaveningDay`, which this becomes. */
+  searchDaveningDay?: string | null
   /** Pushes a change to these query params, keeping the path — a no-op
    *  default is safe: nothing in the fallback render (no query string yet)
    *  can be interacted with before hydration swaps in the real, connected
-   *  version that supplies a real one. */
-  onParamsChange?: (changes: Record<string, string | null>) => void
+   *  version that supplies a real one. `opts.replace` swaps `router.push`
+   *  for `router.replace` — used by the directory's own search/"Open now"
+   *  sync so every keystroke or toggle flip doesn't become its own history
+   *  entry, unlike the item/form navigations below that deliberately push. */
+  onParamsChange?: (changes: Record<string, string | null>, opts?: { replace?: boolean }) => void
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
@@ -97,30 +106,17 @@ export default function FindResources({
   anchor,
   initialItemId,
   onUp,
-  onViewAllCategories,
   onViewMap,
   searchItem = null,
   searchQuery = null,
+  searchOpenNow = null,
+  searchFilters = null,
   searchHospital = null,
   searchForm = null,
+  searchDavening = null,
+  searchDaveningDay = null,
   onParamsChange = () => {},
 }: FindResourcesProps) {
-  // Every "All resources" button below means what it says — the actual list
-  // of every resource. On mobile that's still the home grid (onUp). On
-  // desktop, home is now a short gateway with just three featured cards, not
-  // the index, so "All resources" instead means the dedicated All Categories
-  // page (see onViewAllCategories) — going to onUp there would silently
-  // relabel "All resources" onto a screen that isn't one.
-  const isMobile = useIsMobile()
-  const upToAllResources = () => {
-    if (!isMobile && onViewAllCategories) onViewAllCategories()
-    else onUp()
-  }
-  // What upToAllResources above actually goes to, for the Up button's own
-  // label — mobile has no separate "All resources" page to name (see the
-  // comment above), so naming the button after the real destination avoids
-  // promising an index screen mobile doesn't have.
-  const upToAllResourcesLabel = isMobile ? 'Home' : 'All resources'
   // Zmanim is a city-wide resource. It anchors on the visitor's typed address
   // when set, otherwise on the community's configured center + label — so it
   // works for any community, with or without hospitals.
@@ -153,8 +149,13 @@ export default function FindResources({
   //   ?q=<text>       pre-fill the category's search box
   //   ?hospital=<id>  show that hospital's About page
   //   ?form=<mode>    an add/edit/report form is open over the list
+  //   ?davening=1     "All davening times" is open over the list
+  //   ?day=<key>      that modal is filtered to one day
   const reopenItemId = searchItem ?? initialItemId ?? null
   const initialSearch = searchQuery
+  const initialOpenNow = searchOpenNow === '1'
+  const openDaveningModal = searchDavening === '1'
+  const initialDaveningDay = searchDaveningDay ?? undefined
   const hospitalDetailId = searchHospital
 
   const setParams = onParamsChange
@@ -181,7 +182,17 @@ export default function FindResources({
   const action =
     formParam !== null
       ? (actionSubject ??
-        (deepLinkListing ? ({ mode: formParam, listing: deepLinkListing } as ListingAction) : null))
+        // 'create' deep-links straight in with no listing to resolve first —
+        // unlike edit/report, which need `reopenItemId` to look one up. This
+        // is what lets the home screen's Add/Edit/Report picker (UpdateListingsCard)
+        // land directly on the create form via `?form=create`, the same way
+        // a search result's Edit/Report button already deep-links into
+        // those.
+        (formParam === 'create'
+          ? ({ mode: 'create' } as ListingAction)
+          : deepLinkListing
+            ? ({ mode: formParam, listing: deepLinkListing } as ListingAction)
+            : null))
       : null
 
   // Open one hospital's About page (from the Hospitals list).
@@ -214,7 +225,7 @@ export default function FindResources({
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals' && !hospitalDetailId) {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={upToAllResources} upLabel={upToAllResourcesLabel} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} upLabel="Home" onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'hospitals' && hospitalDetailId) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
@@ -233,7 +244,17 @@ export default function FindResources({
   }
   if (view === 'eruv') {
     const eruv = categories?.find((c) => c.kind === 'eruv')
-    return <EruvInfo eruvim={eruvim} onUp={upToAllResources} upLabel={upToAllResourcesLabel} title={eruv?.pluralLabel} />
+    return (
+      <EruvInfo
+        eruvim={eruvim}
+        onUp={onUp}
+        upLabel="Home"
+        title={eruv?.pluralLabel}
+        icon={eruv?.icon}
+        color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
+        bandImageUrl={eruv ? bandImageFor(eruv) : undefined}
+      />
+    )
   }
   if (view === 'zmanim') {
     // Pass raw coords (the visitor's address, or the community's center) so the
@@ -244,9 +265,12 @@ export default function FindResources({
         key={locationLabel}
         coords={zmanimCoords}
         locationLabel={locationLabel}
-        onUp={upToAllResources}
-        upLabel={upToAllResourcesLabel}
+        onUp={onUp}
+        upLabel="Home"
         title={zmanim?.pluralLabel}
+        icon={zmanim?.icon}
+        color={zmanim ? getCategoryColor(categories, zmanim.id) : undefined}
+        bandImageUrl={zmanim ? bandImageFor(zmanim) : undefined}
       />
     )
   }
@@ -286,18 +310,22 @@ export default function FindResources({
       <>
         {sharedTurnstileWidget}
         <ResourceLoader
-          key={category.id + (initialSearch ?? '')}
+          key={category.id + (openDaveningModal ? `-davening${initialDaveningDay ?? ''}` : '')}
           category={category}
           items={listings}
           anchor={anchor}
           reopenItemId={reopenItemId}
           initialSearch={initialSearch ?? undefined}
-          onUp={upToAllResources}
-          upLabel={upToAllResourcesLabel}
+          initialOpenNow={initialOpenNow}
+          initialFilters={searchFilters}
+          openDaveningModal={openDaveningModal}
+          initialDaveningDay={initialDaveningDay}
+          onUp={onUp}
+          upLabel="Home"
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
           onReport={(listing) => openAction({ mode: 'report', listing })}
-          onViewMap={onViewMap ? (query, filters) => onViewMap(category.id, query, filters) : undefined}
+          onParamsChange={setParams}
         />
       </>
     )

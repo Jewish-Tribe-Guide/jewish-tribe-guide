@@ -11,7 +11,6 @@ import {
 describe('routes', () => {
   it('builds every screen under its community', () => {
     expect(routes.home('philly')).toBe('/philly')
-    expect(routes.allCategories('philly')).toBe('/philly/all')
     expect(routes.map('philly')).toBe('/philly/map')
     expect(routes.feedback('philly')).toBe('/philly/feedback')
     expect(routes.slug('philly', 'grocery')).toBe('/philly/grocery')

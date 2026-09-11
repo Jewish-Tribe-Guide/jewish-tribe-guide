@@ -54,6 +54,10 @@ export type Draft = {
   cardImageUrl: string
   /** Text color over the card image (a hex string). */
   cardTextColor: string
+  /** Photo for the desktop directory banner (CategoryBandFrame) — its own
+   *  upload/crop, separate from cardImageUrl above. Blank falls back to
+   *  cardImageUrl, then to the plain color wash — see bandImageFor. */
+  cardBandImageUrl: string
   /** '' means "no colour chosen" — see getCategoryColor's positional fallback. */
   pinColor: string
 }
@@ -127,6 +131,7 @@ export function toDraft(c: CategoryConfig | null): Draft {
     externalLinkUrl: c?.externalLink?.url ?? '',
     cardImageUrl: c?.cardImageUrl ?? '',
     cardTextColor: c?.cardTextColor || '#ffffff',
+    cardBandImageUrl: c?.cardBandImageUrl ?? '',
     pinColor: c?.pinColor || '',
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { categoryColorUsage, categoryTint, getCategoryColor, isValidPinColor, PIN_COLORS } from './categoryColor'
+import { categoryColorUsage, categoryTint, getCategoryColor, isValidPinColor, PIN_COLORS, categoryRing } from './categoryColor'
 import type { CategoryConfig } from './categories'
 
 // The colour is assigned by position rather than stored, so the map pin and the
@@ -278,5 +278,26 @@ describe('categoryColorUsage', () => {
 
   it('is empty for a null list, so a still-loading editor renders plain swatches', () => {
     expect(categoryColorUsage(null).size).toBe(0)
+  })
+})
+
+describe('categoryRing', () => {
+  // The ring exists because the tint doesn't survive an uploaded logo: most
+  // listings here carry a brand image on a white field, which covers the
+  // tinted disc completely and takes the category's colour off the row with
+  // it. An inset shadow is drawn on the circle's edge, where an object-cover
+  // image never reaches.
+  it('is an inset shadow in the category colour', () => {
+    const ring = categoryRing('#b63167')
+    expect(ring).toContain('inset')
+    expect(ring).toContain('#b63167')
+  })
+
+  it('is stronger than the tint it sits around', () => {
+    // A line has to hold up against white at 1.5px where a full-disc fill
+    // does not; if these two ever converge the ring stops being visible on
+    // exactly the white-logo rows it was added for.
+    const alpha = (s: string) => parseInt(s.slice(-2), 16)
+    expect(alpha(categoryRing('#b63167').trim())).toBeGreaterThan(alpha(categoryTint('#b63167')))
   })
 })

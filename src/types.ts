@@ -54,8 +54,49 @@ export type ZmanimData = {
    *  callers never have to string-match Hebcal's naming — see the note there
    *  about Erev Rosh Chodesh. */
   isRoshChodesh?: boolean
-  // ── Future-friendly slots (not yet populated) ──
-  fastDay?: { label: string; start: string; end: string } | null
+  /** Whether today itself is a full Yom Tov day (Rosh Hashana, Yom Kippur,
+   *  the first/last days of Sukkot and Pesach, Shmini Atzeret, Simchat
+   *  Torah, Shavuot) — Erev Yom Tov and Chol HaMoed are deliberately
+   *  excluded, since a shul's "Yom Tov" minyan tag means the day work is
+   *  forbidden, not the lead-up or the intermediate days. Derived from
+   *  `holidays` in lib/zmanim, same as `isRoshChodesh`. */
+  isYomTov?: boolean
+  /** The next Yom Tov period landing within the lookahead window (see
+   *  lib/zmanim.ts's own `lookaheadDays` doc for how far ahead that is) —
+   *  `null` when there isn't one, which is the common case most weeks. */
+  holidayPeriod?: {
+    /** e.g. "Rosh Hashana" — normalized from Hebcal's own title, which
+     *  carries a year or day-number suffix ("Rosh Hashana 5787",
+     *  "Sukkot II") that isn't meaningful to a visitor glancing at this
+     *  card. See lib/zmanim.ts's own normalizer for exactly what it strips. */
+    name: string
+    /** The first candle lighting only — see `candleLightings` for every
+     *  one a multi-day Yom Tov has. */
+    begins: ZmanEntry
+    /** Every candle-lighting instant in the period, in order — one entry
+     *  for a single-day Yom Tov (Yom Kippur), two for the ordinary 2-day
+     *  case (Rosh Hashana; Sukkot/Pesach/Shavuot's opening and closing;
+     *  each lit from an existing flame the second night, at its own later
+     *  time). `begins` above is always `candleLightings[0]`. */
+    candleLightings: ZmanEntry[]
+    ends: ZmanEntry
+  } | null
+  /** The next minor/major fast day (Tzom Gedaliah, Asara B'Tevet, Ta'anit
+   *  Esther, Shiva Asar B'Tammuz, Tisha B'Av — Ta'anit Bechorot too, when a
+   *  firstborn visitor would want it) landing within the same lookahead
+   *  window as `holidayPeriod`, or `null` when there isn't one. Separate
+   *  from `holidayPeriod`: Yom Kippur is a fast too, but it already has its
+   *  own candle-lighting/havdalah pair and shows up there, not here — see
+   *  lib/zmanim.ts's `findFastPeriod` for why Hebcal never double-reports
+   *  it. `ends` is nullable because Hebcal doesn't publish one for Ta'anit
+   *  Bechorot (traditionally ended early by a siyum, not a zman). */
+  fastPeriod?: {
+    /** e.g. "Tzom Gedaliah" — from Hebcal's own "Fast ends" item, which
+     *  (unlike "Fast begins") is never prefixed "Erev ". */
+    name: string
+    begins: ZmanEntry
+    ends: ZmanEntry | null
+  } | null
 }
 
 export type Resource = {
@@ -330,7 +371,7 @@ export type MapFilters = {
   select?: Record<string, string[]>
 }
 
-export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback' | 'all-categories'
+export type AppMode = 'home' | 'find' | 'map' | 'assist' | 'volunteer' | 'community-home' | 'give' | 'feedback'
 
 /** A guided form opened over the current page: 'support'/'volunteer' for the
  *  two built-in wizards, or any other form's id for an admin-created one.

@@ -56,7 +56,7 @@ describe('ReportListing', () => {
     expect(body.note).toBe('Closed permanently.')
     expect(body.submittedBy).toEqual({ name: 'A Neighbor' })
 
-    expect(await screen.findByText('Thanks for the heads-up')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Thanks for the heads-up' })).toBeInTheDocument()
   })
 
   it('omits note and submittedBy when left blank, rather than sending empty strings', async () => {
@@ -80,7 +80,7 @@ describe('ReportListing', () => {
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
     expect(await screen.findByText('Please slow down and try again.')).toBeInTheDocument()
-    expect(screen.queryByText('Thanks for the heads-up')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Thanks for the heads-up' })).not.toBeInTheDocument()
   })
 
   it('shows a network-error fallback message', async () => {
@@ -100,7 +100,7 @@ describe('ReportListing', () => {
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
-    expect(await screen.findByText('Thanks for the heads-up')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Thanks for the heads-up' })).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -113,9 +113,13 @@ describe('ReportListing', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
-    await screen.findByText('Thanks for the heads-up')
+    await screen.findByRole('heading', { name: 'Thanks for the heads-up' })
 
-    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    // Two "Grocery Stores" controls now render simultaneously (UpButton for
+    // mobile, Breadcrumb for desktop — jsdom doesn't apply the CSS that keeps
+    // only one visible at a time); either calls the same handler, so clicking
+    // the first is enough to prove it.
+    await user.click(screen.getAllByRole('button', { name: /Grocery Stores/ })[0])
     expect(onSubmitted).toHaveBeenCalledTimes(1)
     expect(onUp).not.toHaveBeenCalled()
   })

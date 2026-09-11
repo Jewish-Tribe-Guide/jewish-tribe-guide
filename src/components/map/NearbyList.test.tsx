@@ -110,4 +110,25 @@ describe('NearbyList row swipe (desktop trackpad)', () => {
 
     expect(localStorage.getItem('jpc:pinned-listings')).toContain('listing-1')
   })
+
+  // The left avatar's own PinnedBadge (see GenericListingCard's identical
+  // treatment) — the row's right-side category badge used to draw its own
+  // separate 📌 overlay too, which repeated the same fact twice on one row;
+  // that overlay is gone now, so a pinned row shows the glyph exactly once.
+  it('shows a pin badge on the left avatar only when the point is pinned', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={[makePoint({ pinned: false })]} userLocation={null} onViewListing={vi.fn()} />
+      </PinnedProvider>,
+    )
+    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+
+    cleanup()
+    renderWithProviders(
+      <PinnedProvider>
+        <NearbyList points={[makePoint({ pinned: true })]} userLocation={null} onViewListing={vi.fn()} />
+      </PinnedProvider>,
+    )
+    expect(screen.getByText('📌')).toBeInTheDocument()
+  })
 })

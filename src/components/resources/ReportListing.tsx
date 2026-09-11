@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import UpButton from '@/components/UpButton'
+import Breadcrumb from '@/components/Breadcrumb'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   listing: DirectoryResource
@@ -69,13 +70,18 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
   const inputClass =
     'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
+  // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call. Swaps to the done-state title once submitted, matching
+  // each branch's own Breadcrumb below.
+  useSetScreenHeader(true, done ? 'Thanks for the heads-up' : 'Report a problem', done ? onSubmitted : onUp)
+
   if (done) {
     return (
       <div>
-        <UpButton label={upLabel} onClick={onSubmitted} />
+        <Breadcrumb upLabel={upLabel} onUp={onSubmitted} title="Thanks for the heads-up" />
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
-          <h2 className="text-lg font-semibold text-green-800 mb-1">Thanks for the heads-up</h2>
+          <h2 className="text-lg font-semibold text-green-800 mb-1 sr-only desktop:not-sr-only">Thanks for the heads-up</h2>
           <p className="text-sm text-green-700">We&apos;ll review this and update the listing if needed.</p>
         </div>
       </div>
@@ -84,9 +90,12 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
 
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
+      {/* Breadcrumb (desktop only) names the same destination the header's
+          "‹ Report a problem" now covers on mobile — see Breadcrumb's own
+          doc for why only one of the two ever shows at a time. */}
+      <Breadcrumb upLabel={upLabel} onUp={onUp} title="Report a problem" />
 
-      <h2 className="text-xl font-semibold text-slate-800 mb-1">Report a problem</h2>
+      <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">Report a problem</h2>
       <p className="text-sm text-muted mb-2">
         Use this to report that <span className="font-medium text-slate-700">{listing.name}</span> has{' '}
         <span className="font-medium text-slate-700">permanently closed</span>. A moderator reviews every

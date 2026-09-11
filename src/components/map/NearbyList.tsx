@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { haversineMiles } from '@/lib/geo'
 import CategoryIcon from '@/components/CategoryIcon'
+import PinnedBadge from '@/components/PinnedBadge'
 import { ExternalIcon, PinIcon } from '@/components/icons'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint } from '@/lib/categoryColor'
@@ -405,18 +406,25 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           disabled={!canViewListing}
           className={`flex min-w-0 flex-1 items-center gap-3 text-left ${canViewListing ? 'cursor-pointer group' : 'cursor-default'}`}
         >
-          <CategoryIcon
-            icon={p.glyph ?? '📍'}
-            categoryId={p.filterId}
-            iconImageUrl={
-              (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
-                ? (p.raw[PHOTO_FIELD_KEY] as string)
-                : p.glyphSrc) ?? undefined
-            }
-            color={p.color}
-            className="h-9 w-9 text-lg"
-            sizePx={36}
-          />
+          {/* Same PinnedBadge the category page's card puts on its own
+              avatar (see GenericListingCard) — the right-side category
+              badge further down keeps its own separate, smaller pin overlay
+              untouched; this is purely additive on the left icon. */}
+          <span className="relative shrink-0">
+            <CategoryIcon
+              icon={p.glyph ?? '📍'}
+              categoryId={p.filterId}
+              iconImageUrl={
+                (typeof p.raw?.[PHOTO_FIELD_KEY] === 'string' && (p.raw[PHOTO_FIELD_KEY] as string).trim()
+                  ? (p.raw[PHOTO_FIELD_KEY] as string)
+                  : p.glyphSrc) ?? undefined
+              }
+              color={p.color}
+              className="h-9 w-9 text-lg"
+              sizePx={36}
+            />
+            {p.pinned && <PinnedBadge />}
+          </span>
           <span className="min-w-0 flex-1">
             <p className={`text-sm font-semibold leading-tight ${canViewListing ? 'text-slate-900 group-hover:text-blue-600 transition-colors' : 'text-slate-900'}`}>
               {p.name}
@@ -442,25 +450,16 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
             two (color/shape read faster than digits), same as the pin
             markers on the map themselves sit above their labels. */}
         <div className="flex shrink-0 flex-col items-center justify-center gap-1 ml-1">
+          {/* No pinned sub-badge here any more — the row's own left avatar
+              (see the CategoryIcon/PinnedBadge pairing above) already shows
+              it, and duplicating it on this second, smaller badge too just
+              repeated the same fact twice on one row. */}
           <span
-            className="relative flex h-6 w-6 items-center justify-center rounded-full text-xs"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-xs"
             style={{ backgroundColor: categoryTint(p.color), color: p.color }}
             aria-hidden="true"
           >
             <CategoryGlyph categoryId={p.filterId} icon={p.glyph ?? '📍'} className="h-3.5 w-3.5" />
-            {/* Same small badge, same blue, as the pinned marker gets on
-                the map itself (see ResourceMap's buildPin) — this row's
-                own category badge is the closest equivalent spot to
-                overlay it here, so "pinned" reads the same way in both
-                places. */}
-            {p.pinned && (
-              <span
-                className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white text-[8px] leading-none text-white"
-                style={{ backgroundColor: '#2563eb' }}
-              >
-                📌
-              </span>
-            )}
           </span>
           {p.miles !== null && (
             <span className="text-[11px] font-semibold tabular-nums" style={{ color: p.color }}>

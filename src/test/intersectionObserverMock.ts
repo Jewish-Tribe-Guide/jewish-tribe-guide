@@ -49,15 +49,24 @@ export function resetMockIntersectionObserver(): void {
   observed = []
 }
 
-/** Fires every currently-observed callback as if its element just scrolled
- *  into view. Wrap in `act(...)` (or call after a `user-event` interaction,
- *  which already wraps its own work in `act`) so React processes the
- *  resulting state update before your next assertion. */
-export function triggerAllIntersections(): void {
+/** Fires every currently-observed callback with a given `isIntersecting`
+ *  value — `true` for "just scrolled into view", `false` for "just scrolled
+ *  out of view" (what a sticky-bar sentinel reports once the bar it guards
+ *  engages — see GenericDirectory's `controlsStuck`). Wrap in `act(...)` (or
+ *  call after a `user-event` interaction, which already wraps its own work
+ *  in `act`) so React processes the resulting state update before your next
+ *  assertion. */
+export function setAllIntersecting(isIntersecting: boolean): void {
   for (const { target, callback } of observed) {
     callback(
-      [{ isIntersecting: true, target } as IntersectionObserverEntry],
+      [{ isIntersecting, target } as IntersectionObserverEntry],
       new MockIntersectionObserver(() => {}),
     )
   }
+}
+
+/** Shorthand for `setAllIntersecting(true)` — kept since "now it's visible"
+ *  is by far the more common case among existing callers. */
+export function triggerAllIntersections(): void {
+  setAllIntersecting(true)
 }

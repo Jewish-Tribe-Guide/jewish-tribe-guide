@@ -6,20 +6,39 @@
 // `kind` widens this from "just titled category groups" to the desktop home
 // screen's full block order — a plain named section (kind 'section', the
 // original and by far the most common case) sits in the SAME ordered list as
-// three singleton built-in blocks: the featured-cards row, the embedded map,
-// and the Zmanim & Shabbos band. Reordering/toggling any of them is just
-// reordering/removing a row in this same list — see HomeSectionManager.tsx
-// and Landing.tsx's ordered block walk.
-export type HomeBlockKind = 'section' | 'featured' | 'map' | 'zmanim'
+// six singleton built-in blocks, one per desktop home-screen card. Reordering
+// or removing any of them is just reordering/removing a row in this same
+// list — see HomeSectionManager.tsx and Landing.tsx's ordered block walk.
+//
+// 'zmanim' (Davening Times + the community card, paired side-by-side),
+// 'shabbat' (Shabbat Times + Stay in the Loop, also paired), and 'featured'
+// (the "Popular right now" row) are gone as of this type — each pair split
+// into two fully independent cards ('davening'/'listings',
+// 'subscribe'/'jewishTimes'), and 'featured' was dropped outright (no
+// admin control was ever built for it, and it duplicated what the flat
+// "Browse everything" grid already shows). The DB CHECK constraint keeps
+// allowing the old values too, though (see the migration that added the
+// current set) — DDL here only ever widens, never narrows, so an existing
+// row with one of the old kinds doesn't fail to load; Landing.tsx's ordered
+// walk just no longer has a branch for it, so it silently renders nothing
+// until reseeded (see seed-home-blocks.mjs) or removed by hand.
+export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'map' | 'subscribe' | 'jewishTimes'
 
-/** The three singleton built-ins' fixed identity — id doubles as `kind` (there
- *  can only ever be one of each), and the title is fixed/not admin-editable
- *  (unlike a plain section's title). Order here is just documentation; actual
- *  display order always comes from sortOrder. */
+/** The six singleton built-ins' fixed identity — id doubles as `kind` (there
+ *  can only ever be one of each). `title` is only ever used as this row's
+ *  fallback label in the admin's own "+ Add" button and DB default — every
+ *  one of these six has its own dedicated eyebrow/heading fields in
+ *  SiteSettings now (see DesktopTopicsManager's CARD_META), not a
+ *  live-rendered `title` the way the old 'featured'/'map'/'zmanim' did.
+ *  Order here is just documentation; actual display order always comes from
+ *  sortOrder. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {
-  featured: { id: 'featured', title: 'Popular right now' },
-  map: { id: 'map', title: 'Explore the map' },
-  zmanim: { id: 'zmanim', title: 'Zmanim & Shabbos' },
+  browse: { id: 'browse', title: 'Categories and Search Card' },
+  davening: { id: 'davening', title: 'Davening Times Card' },
+  listings: { id: 'listings', title: 'Update Listings Card' },
+  map: { id: 'map', title: 'Map Card' },
+  subscribe: { id: 'subscribe', title: 'Email Signup Card' },
+  jewishTimes: { id: 'jewishTimes', title: 'Jewish Times Card' },
 }
 
 export type HomeSection = {
@@ -33,13 +52,22 @@ export type HomeSection = {
    *  'medical') — which cards belong here, and in what order. Always empty
    *  for a built-in block; they aren't card groups. */
   cardIds: string[]
+  /** Desktop only, and only meaningful for a built-in card (kind !==
+   *  'section' — plain sections have their own layout, this doesn't apply).
+   *  'full' (the default) is its own row, edge to edge. Two 'half' cards
+   *  that land next to each other in sortOrder pair into one 2-column row —
+   *  see Landing.tsx's own row-pairing walk. A 'half' card with no 'half'
+   *  neighbor (the one before or after it in order is 'full', or it's first/
+   *  last) falls back to rendering full width alone, so a single unpaired
+   *  half-width card never looks like a mistake. */
+  width: 'full' | 'half'
 }
 
 /** The Home page tab's in-progress, unsaved copy of a section — order is
  *  implied by array position (no `sortOrder` yet), and `id` may be a
  *  temporary client-only placeholder (see `NEW_SECTION_PREFIX`) for a
  *  section that doesn't exist on the server yet. */
-export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds'>
+export type DraftHomeSection = Pick<HomeSection, 'id' | 'kind' | 'title' | 'cardIds' | 'width'>
 
 /** Prefix marking a draft section's id as client-only (not yet created on the
  *  server) — see saveHomeSections in homeSectionsDraft.ts, which creates a

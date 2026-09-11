@@ -52,7 +52,11 @@ function mockLoad(settings: typeof SITE_SETTINGS_DEFAULTS, sections: HomeSection
   })
 }
 
-async function renderEditor(section: 'site' | 'home', settings = SITE_SETTINGS_DEFAULTS, sections: HomeSection[] = []) {
+async function renderEditor(
+  section: 'site' | 'desktop' | 'mobile',
+  settings = SITE_SETTINGS_DEFAULTS,
+  sections: HomeSection[] = [],
+) {
   mockLoad(settings, sections)
   const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
   renderWithProviders(<SiteSettingsEditor token="tok" section={section} />, {
@@ -61,8 +65,19 @@ async function renderEditor(section: 'site' | 'home', settings = SITE_SETTINGS_D
   })
   // "Save changes" always renders once the draft has loaded, regardless of
   // which tab — the Site tab's own name field (used as the loaded-signal
-  // everywhere else) doesn't exist on the "home" tab.
+  // everywhere else) doesn't exist on the other two tabs.
   await screen.findByRole('button', { name: 'Save changes' })
+}
+
+// Every settings block is a CollapsibleSection now, collapsed by default
+// (same "Show ▸ / Hide ▾" pattern as the Metrics tab's Sync Coverage report)
+// — a field inside one isn't in the document at all until its own section
+// is opened. Tests that need to read/type into a field open everything
+// first, same as an admin clicking through every "Show" on the page.
+async function openAllSections(user: ReturnType<typeof userEvent.setup>) {
+  for (const button of screen.getAllByRole('button', { name: /^Show / })) {
+    await user.click(button)
+  }
 }
 
 beforeEach(() => {
@@ -76,20 +91,52 @@ afterEach(() => {
 })
 
 describe('SiteSettingsEditor — the Site tab', () => {
-  it('loads and shows the current branding fields', async () => {
-    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' })
+  // Regression test: the logo used to upload through a bare file input with
+  // no way to reposition/re-zoom it afterward, unlike every other image
+  // upload in the admin (category icons, listing photos), which already go
+  // through ImageUploadField/ImageCropModal. This just checks the field
+  // renders through that same shared component now — actually exercising
+  // the crop modal itself needs a real image load, out of scope here (see
+  // ImageCropModal's own lack of unit tests, canvas/Image geometry isn't
+  // practical to simulate in jsdom).
+  it('shows the reposition affordance once a logo is set, the same as a category icon or listing photo', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, logoUrl: 'https://example.com/logo.png' })
+    await openAllSections(user)
+
+    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
+  })
+
+  it('loads and shows the current branding fields once its section is opened', async () => {
+    const user = userEvent.setup()
+    await renderEditor('site', {
+      ...SITE_SETTINGS_DEFAULTS,
+      name: 'Test Directory',
+      searchPlaceholder: 'Search — find what you need',
+    })
+    await openAllSections(user)
 
     expect(screen.getByDisplayValue('Test Directory')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Find what you need')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Search — find what you need')).toBeInTheDocument()
+  })
+
+  // Every settings block starts collapsed — the Branding section title is
+  // the one thing that's always in the document.
+  it('every block starts collapsed, behind a "Show" button', async () => {
+    await renderEditor('site')
+    expect(screen.getByText('Branding')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(SITE_SETTINGS_DEFAULTS.name)).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Show / }).length).toBeGreaterThan(0)
   })
 
   it('Save/Cancel start disabled, and editing a field enables them', async () => {
+    const user = userEvent.setup()
     await renderEditor('site')
+    await openAllSections(user)
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
     expect(screen.getByRole('button', { name: /^Cancel$/ })).toBeDisabled()
 
-    const user = userEvent.setup()
-    await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.tagline), '!')
+    await user.type(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.searchPlaceholder), '!')
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   })
@@ -97,6 +144,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('Cancel reverts an edited field back to the loaded value', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
+    await openAllSections(user)
 
     const nameInput = screen.getByDisplayValue('Original Name')
     await user.clear(nameInput)
@@ -110,6 +158,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('Save sends only the settings PATCH when only settings changed, and shows a saved notice', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, name: 'Original Name' })
+    await openAllSections(user)
 
     const nameInput = screen.getByDisplayValue('Original Name')
     await user.clear(nameInput)
@@ -133,6 +182,7 @@ describe('SiteSettingsEditor — the Site tab', () => {
   it('toggling feedback off hides the feedback sub-fields', async () => {
     const user = userEvent.setup()
     await renderEditor('site', { ...SITE_SETTINGS_DEFAULTS, feedbackEnabled: true })
+    await openAllSections(user)
 
     expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.feedbackButtonLabel)).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Enabled' }))
@@ -175,20 +225,77 @@ describe('SiteSettingsEditor — the Site tab', () => {
   })
 })
 
-describe('SiteSettingsEditor — the Desktop & mobile tab', () => {
-  it('shows the featured-cards picker on desktop by default', async () => {
-    await renderEditor('home')
-    expect(screen.getByText('Featured cards')).toBeInTheDocument()
-    expect(screen.getByText('Slot 1')).toBeInTheDocument()
+describe('SiteSettingsEditor — the Desktop tab', () => {
+  // Same regression as the logo above, for the hero band's photo — same
+  // ImageUploadField, just a wider aspect ratio (see the field's own
+  // `aspect={4 / 3}`) since this one is a banner, not an avatar-shaped icon.
+  it('shows the reposition affordance once the hero photo is set', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop', {
+      ...SITE_SETTINGS_DEFAULTS,
+      desktopHeroImage: { url: 'https://example.com/hero.jpg', alt: '' },
+    })
+    await openAllSections(user)
+
+    expect(screen.getByText('Click the preview to reposition/re-zoom it')).toBeInTheDocument()
   })
 
-  it('switches to the mobile tab bar editor when Mobile is selected', async () => {
-    const user = userEvent.setup()
-    await renderEditor('home')
-
-    await user.click(screen.getByRole('button', { name: /Mobile/ }))
-
-    expect(screen.getByText('Mobile tab bar')).toBeInTheDocument()
+  it('shows the top nav editor, hero, colors, and home screen cards sections — not Featured cards, which was removed', async () => {
+    await renderEditor('desktop')
+    expect(screen.getByText('Top nav bar')).toBeInTheDocument()
+    expect(screen.getByText('Hero')).toBeInTheDocument()
+    expect(screen.getByText('Colors')).toBeInTheDocument()
+    expect(screen.getByText('Home screen cards')).toBeInTheDocument()
     expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
+    // Mobile-only fields don't leak onto this tab.
+    expect(screen.queryByText('Mobile tab bar')).not.toBeInTheDocument()
+  })
+
+  it('orders Top nav bar, then Hero, then Colors, then Home screen cards', async () => {
+    await renderEditor('desktop')
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    const order = ['Top nav bar', 'Hero', 'Colors', 'Home screen cards']
+    const indices = order.map((label) => headings.indexOf(label))
+    expect(indices).toEqual([...indices].sort((a, b) => a - b))
+    expect(indices.every((i) => i !== -1)).toBe(true)
+  })
+
+  it('shows the Browse card\'s eyebrow/heading fields once a Browse row exists', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
+      { id: 'browse', kind: 'browse', title: 'Browse & search', sortOrder: -400, cardIds: [], width: 'full' },
+    ])
+    await openAllSections(user)
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseEyebrow)).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.desktopBrowseHeading)).toBeInTheDocument()
+  })
+
+  // Regression: sectionsEqual's own strip() left `width` out of the fields
+  // it compares, so flipping a card between Full and Half width changed
+  // sectionsDraft but never made `dirty` true — Save stayed disabled and the
+  // toggle silently didn't persist.
+  it('toggling a card between Full and Half width enables Save', async () => {
+    const user = userEvent.setup()
+    await renderEditor('desktop', SITE_SETTINGS_DEFAULTS, [
+      { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 0, cardIds: [], width: 'full' },
+    ])
+    await openAllSections(user)
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Half width' }))
+
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+  })
+})
+
+describe('SiteSettingsEditor — the Mobile tab', () => {
+  it('shows the mobile tab bar editor and the home screen heading, not desktop-only fields', async () => {
+    const user = userEvent.setup()
+    await renderEditor('mobile')
+    expect(screen.getByText('Mobile tab bar')).toBeInTheDocument()
+    await openAllSections(user)
+    expect(screen.getByDisplayValue(SITE_SETTINGS_DEFAULTS.heroTitle)).toBeInTheDocument()
+    expect(screen.queryByText('Featured cards')).not.toBeInTheDocument()
+    expect(screen.queryByText('Top nav bar')).not.toBeInTheDocument()
   })
 })

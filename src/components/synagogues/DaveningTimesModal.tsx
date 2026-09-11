@@ -22,6 +22,7 @@ import { community } from '@/community.config'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { roundMiles } from '@/lib/geo'
 import { useOptionalLocation } from '@/lib/locationContext'
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 import DenominationFilter from './DenominationFilter'
 
 const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
@@ -33,6 +34,7 @@ const DAY_PILL_LABELS: Record<MinyanDayKey, string> = {
   fri: 'Fri',
   sat: 'Sat',
   rosh_chodesh: 'Rosh Chodesh',
+  yom_tov: 'Yom Tov',
   holiday: 'Holiday',
 }
 
@@ -85,6 +87,14 @@ type Props = {
   onClose: () => void
   /** Pre-select a denomination when the modal opens (mirrors the parent's filter). */
   initialDenomination?: string
+  /** Open already filtered to these days instead of the "Today" default —
+   *  GenericDirectory sets this from `?day=` when DaveningTimesCard links
+   *  here showing tomorrow's earliest minyan, so the modal doesn't open to
+   *  "Today" and show nothing left with no visible reason why. Read once, on
+   *  mount (see the lazy initializer below) — this is an arrival value, not
+   *  something that should fight the visitor's own day-filter clicks on a
+   *  modal instance that's already open. */
+  initialDayFilter?: MinyanDayKey[]
 }
 
 function shulsFromItems(items: DirectoryResource[]) {
@@ -250,7 +260,7 @@ const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', '
  *  an explicit list — empty means no day filter, i.e. the full week. */
 type DayFilter = { mode: 'today' } | { mode: 'custom'; days: MinyanDayKey[] }
 
-export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '' }: Props) {
+export default function DaveningTimesModal({ items, isOpen, onClose, initialDenomination = '', initialDayFilter }: Props) {
   const [selectedDenominations, setSelectedDenominations] = useState<string[]>(initialDenomination ? [initialDenomination] : [])
   const [calcDisclaimerDismissed, setCalcDisclaimerDismissed] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -306,7 +316,17 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
   // full view one tap behind. Seeded in the initializer rather than reset on
   // each open, so the deliberate choice documented below — that the day filter
   // persists across opens while denomination doesn't — still holds.
-  const [dayFilter, setDayFilter] = useState<DayFilter>({ mode: 'today' })
+  //
+  // `initialDayFilter` overrides that seed exactly once, for the one caller
+  // that arrives already knowing "today" is the wrong day to show (see this
+  // prop's own doc) — a lazy initializer, not an effect, because the parent
+  // (GenericDirectory) forces a fresh mount of this whole tree whenever the
+  // query string that carries it changes (see FindResources.tsx's own
+  // `key`), so this component's first render is guaranteed to already have
+  // the real value, the same guarantee `openDaveningModal` relies on.
+  const [dayFilter, setDayFilter] = useState<DayFilter>(() =>
+    initialDayFilter && initialDayFilter.length > 0 ? { mode: 'custom', days: initialDayFilter } : { mode: 'today' },
+  )
   // Which row's "how far / directions" panel is open — accordion-style, one
   // at a time. Keyed by day+tefillah+index since the same shul can appear in
   // more than one row across the modal.
@@ -326,10 +346,17 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
     else setOpenRowKey(null)
   }, [isOpen, initialDenomination])
 
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
+  // Not a hand-rolled `document.body.style.overflow` toggle — that was tried
+  // here and doesn't work in this app: the element that actually scrolls is
+  // `<html>`, not `<body>` (see globals.css's own long comment on why, and
+  // useBodyScrollLock's own doc for the same finding written down once
+  // already). Locking body.style.overflow is confirmed live to be a no-op
+  // for real scrolling — a trackpad/wheel gesture over the open modal still
+  // moved window.scrollY, so the page behind it kept scrolling while the
+  // modal was up, and once you'd scrolled it, the modal's own content
+  // stopped tracking your scroll gesture until something (closing and
+  // reopening it) reset the mismatch.
+  useBodyScrollLock(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -556,12 +583,25 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                       .map((t) => ({
                         tefillah: t,
                         label: TEFILLAH_LABELS[t],
+                        // Sorted on the CALCULATED time when there is one,
+                        // not the raw rule text — `row.time` for an
+                        // anchor-based row is prose ("10 min before
+                        // Sunset"), which parseTimeToMinutes can't turn into
+                        // a number at all (it returns Infinity), so two
+                        // different anchor times used to tie on that
+                        // Infinity and fall through to distance instead of
+                        // chronological order — a shul 15 minutes before
+                        // sunset could show below one 10 minutes before it,
+                        // the later time first. calcFor resolves the real
+                        // clock time for anchor rows and returns null for a
+                        // plain clock-time row, so `?? r.time` still sorts
+                        // those correctly exactly as before.
                         // Same time (or both non-clock, e.g. two "call to
                         // confirm" rows) → closer shul first.
                         rows: group.rows
                           .filter((r) => r.tefillah === t)
                           .sort((a, b) =>
-                            parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time) ||
+                            parseTimeToMinutes(calcFor(a) ?? a.time) - parseTimeToMinutes(calcFor(b) ?? b.time) ||
                             distanceScore(a.shul) - distanceScore(b.shul),
                           ),
                       }))
@@ -588,7 +628,7 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
                               const info = shulInfoByName.get(row.shul)
                               const dim = isOutOfSeason(row.season, season)
                               return (
-                              <div key={i} className={`py-1.5 first:pt-0${dim ? ' opacity-45' : ''}`}>
+                              <div key={`${row.shul}|${row.time}`} className={`py-1.5 first:pt-0${dim ? ' opacity-45' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={() => setOpenRowKey((k) => (k === rowKey ? null : rowKey))}

@@ -32,7 +32,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const slug = community.slug
     entries.push(
       { url: `${base}${routes.home(slug)}`, lastModified: now, changeFrequency: 'daily', priority: 1 },
-      { url: `${base}${routes.allCategories(slug)}`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
       { url: `${base}${routes.map(slug)}`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
     )
 

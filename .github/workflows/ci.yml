@@ -6,9 +6,28 @@ name: CI
 # `form-roundtrip`, `admin-write` and `e2e` each need their own Supabase
 # project (see the `env:` block in each job for exactly which repo secrets to
 # add, Settings → Secrets and variables → Actions, before they can pass) —
-# `integration`, `cache-roundtrip`, `form-roundtrip` and `admin-write` all
-# write to and delete from the SAME dedicated, disposable test project (see
-# README "Integration tests"), `e2e` only reads from the real one.
+# `integration`, `cache-roundtrip`, `form-roundtrip`, `admin-write` and `e2e`
+# all write to (or, for `e2e`, only read from) the SAME dedicated, disposable
+# test project (see README "Integration tests").
+#
+# `e2e` used to point at the real production project instead — reasoning
+# being it's read-only, so no harm done. In practice that made every PR's
+# required check depend on production's CURRENT data/config, not just on the
+# PR's own code: a branch that added new admin-configurable content (new
+# home-screen card kinds) failed `e2e` in CI for weeks even though the code
+# was correct, because production's `home_section` rows hadn't been migrated
+# to match yet — and the fix that unblocked it was a manual production
+# database write made specifically to satisfy CI, the reverse of this repo's
+# own "deploy code first, then migrate content" order (see AGENTS.md
+# "Ordering"). A required check's pass/fail should trace back to the PR's
+# own code, not to a shared, mutable, externally-changing thing.
+#
+# `e2e-prod-smoke` is the same suite against the real production project,
+# kept for the genuinely useful part of that idea — catching prod
+# data/config drift — without making it a merge gate: it only runs on push
+# to `main` (i.e. after a merge, not as part of one) and every step is
+# `continue-on-error`, so a failure is visible in the Actions tab without
+# blocking anything.
 #
 # Every job below sets timeout-minutes, well above its normal run time (a
 # few minutes) but far under GitHub's 360-minute default — nothing should
@@ -79,7 +98,7 @@ jobs:
   cache-roundtrip:
     name: Cache round-trip (admin save reaches the cached page)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -115,7 +134,7 @@ jobs:
   form-roundtrip:
     name: Form submission (wizard reaches the database)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     needs: unit
     timeout-minutes: 15
     steps:
@@ -143,7 +162,7 @@ jobs:
   admin-write:
     name: Admin console write behavior (approve/reject via the real UI)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
     # needs cache-roundtrip too (not just unit): both suites' auth.setup.ts
     # mint a session by calling generateLink + verifyOtp against the SAME
     # resolved admin email (see cacheE2eAdmin.mjs's resolveDefaultCommunityAdminEmail —
@@ -183,10 +202,29 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: End-to-end tests
+    name: End-to-end tests (test project)
     runs-on: ubuntu-latest
-    container: mcr.microsoft.com/playwright:v1.62.1-noble
-    needs: unit
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    # Needs cache-roundtrip and admin-write too, not just unit: both share
+    # this same TEST_SUPABASE_* project now that e2e points at it and both
+    # create/rename/delete categories and home-section rows — content e2e's
+    # own helpers (defaultCommunity, categoryWithListings) read via "pick
+    # some real category with listings", which can land on a temporary row
+    # one of them is mid-edit on (e.g. cache-roundtrip's "Cache Round-trip
+    # Seed" fixture), failing when it changes or vanishes underneath the
+    # assertion. Same underlying class of bug as 03c2e99 and the admin-write/
+    # cache-roundtrip race above; running after both removes it the same way.
+    #
+    # NOT form-roundtrip: it only creates/deletes form and submission rows
+    # (a seeded test form, its response), which nothing in e2e/ reads —
+    # api.spec.ts's own /api/admin/forms calls are unauthenticated requests
+    # against an id that can't exist, asserting they're refused before
+    # reaching the database, and offline.spec.ts's /api/requests probe just
+    # checks a GET to a write endpoint isn't cached, independent of what (if
+    # anything) it returns. Excluding it lets e2e start as soon as
+    # cache-roundtrip/admin-write finish rather than also waiting on however
+    # long form-roundtrip's own run takes.
+    needs: [unit, cache-roundtrip, admin-write]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -201,6 +239,35 @@ jobs:
       # only invoke Chromium via test:e2e.
       - run: npm run test:e2e
         env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
+          INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  e2e-prod-smoke:
+    name: End-to-end tests (production, non-blocking)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    needs: unit
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e
+        continue-on-error: true
+        env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -209,6 +276,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-prod-smoke
           path: playwright-report/
           retention-days: 14

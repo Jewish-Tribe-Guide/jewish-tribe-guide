@@ -434,6 +434,20 @@ describe('CommunityManager — the city picker auto-fills the rest of the form',
   })
 })
 
+// The whole card — name/badges/link on top, everything else (Publish/
+// Unpublish, Delete, the preview link, the Admins roster) behind one
+// "Show"/"Hide" toggle. Shared by every describe below that needs to reach
+// past that toggle, since it replaced what used to be two separate
+// disclosures (the row's own always-visible actions, and Admins' own nested
+// one) with a single one at the card level.
+function cardFor(name: RegExp): HTMLElement {
+  return screen.getByRole('link', { name }).parentElement!.parentElement!
+}
+
+async function openCard(user: ReturnType<typeof userEvent.setup>, card: HTMLElement) {
+  await user.click(within(card).getByRole('button', { name: /^show /i }))
+}
+
 describe('CommunityManager — deleting a community', () => {
   const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true })
   // region overridden — makeCommunity defaults it to 'Philadelphia', which
@@ -441,29 +455,28 @@ describe('CommunityManager — deleting a community', () => {
   // match a `/philadelphia/i` query meant for the philly row alone.
   const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false })
 
-  // The delete button is a sibling of the community's own admin-console
-  // link, not nested under it — parentElement is the shared row container
-  // for both, which is what `within` needs to scope to just this row.
-  function rowFor(name: RegExp): HTMLElement {
-    return screen.getByRole('link', { name }).parentElement!
-  }
-
   it('offers no delete option for the default community', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/philadelphia/i))
 
-    // There IS a "Delete" button on the page (Upper East Side's) — just not
-    // attached to the default community's own row.
-    expect(within(rowFor(/philadelphia/i)).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    // There IS a "Delete" button on the page (Upper East Side's, once
+    // opened) — just not on the default community's own card.
+    expect(within(cardFor(/philadelphia/i)).queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
   })
 
   it('offers a delete option for a non-default community', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
-    expect(within(rowFor(/upper east side/i)).getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
+    const card = cardFor(/upper east side/i)
+    await openCard(user, card)
+    expect(within(card).getByRole('button', { name: /^delete$/i })).toBeInTheDocument()
   })
 
   it('requires retyping the exact slug before "Delete forever" is enabled', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
 
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
     expect(
@@ -495,6 +508,7 @@ describe('CommunityManager — deleting a community', () => {
   it('Cancel backs out of the confirmation without deleting', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
 
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
@@ -507,6 +521,7 @@ describe('CommunityManager — deleting a community', () => {
   it('sends the confirmed slug to DELETE /api/admin/communities/:slug and does a full reload on success', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
     vi.mocked(fetchJson).mockResolvedValueOnce({ ok: true })
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
@@ -530,15 +545,19 @@ describe('CommunityManager — deleting a community', () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('The default community cannot be deleted.'))
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
 
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
     await user.type(screen.getByLabelText(/type.*to confirm/i), 'ues')
     await user.click(screen.getByRole('button', { name: /delete forever/i }))
 
     expect(await screen.findByText('The default community cannot be deleted.')).toBeInTheDocument()
-    // Still in the list — scoped past the confirmation panel's own repeat
-    // of the name, which is still open since the delete failed.
-    expect(within(rowFor(/upper east side/i)).getByText('Upper East Side')).toBeInTheDocument()
+    // Still in the list — the card (and its own link to the admin console)
+    // is still there, even though the confirmation panel — which repeats
+    // the name in its own warning text — is still open since the delete
+    // failed. cardFor itself would throw on more than one match, so its
+    // success here already proves there's exactly one link.
+    expect(cardFor(/upper east side/i)).toBeInTheDocument()
   })
 
   // The real production safety net — see /api/admin/communities/[slug]/route.ts's
@@ -547,7 +566,10 @@ describe('CommunityManager — deleting a community', () => {
   // only to fail with a 403 when clicked.
   it('hides every delete button when NEXT_PUBLIC_VERCEL_ENV is production', async () => {
     vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', 'production')
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/philadelphia/i))
+    await openCard(user, cardFor(/upper east side/i))
 
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument()
     expect(screen.getByText(/deleting a community isn.t available in production/i)).toBeInTheDocument()
@@ -570,12 +592,16 @@ describe('CommunityManager — the hidden-community preview link', () => {
   }
 
   it('shows no preview link for a visible community', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, { ...ues, visible: true }])
+    await openCard(user, cardFor(/upper east side/i))
     expect(screen.queryByDisplayValue(/access=/)).not.toBeInTheDocument()
   })
 
   it('shows the ?access= link for a hidden community', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
     const input = screen.getByDisplayValue(/\/ues\?access=super-secret-token$/) as HTMLInputElement
     expect(input).toHaveAttribute('readOnly')
   })
@@ -589,6 +615,7 @@ describe('CommunityManager — the hidden-community preview link', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     stubClipboard(writeText)
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
 
     await user.click(screen.getByRole('button', { name: /copy link/i }))
 
@@ -601,37 +628,40 @@ describe('CommunityManager — publishing a community', () => {
   const philly = makeCommunity({ slug: 'philly', name: 'Philadelphia', isDefault: true, visible: true })
   const ues = makeCommunity({ slug: 'ues', name: 'Upper East Side', region: 'Manhattan', isDefault: false, visible: false })
 
-  function rowFor(name: RegExp): HTMLElement {
-    return screen.getByRole('link', { name }).parentElement!
-  }
-
   it('labels a visible community "Live" and a hidden one "Hidden"', async () => {
     await renderAndWaitForList([philly, ues])
 
-    expect(within(rowFor(/philadelphia/i)).getByText('Live')).toBeInTheDocument()
-    expect(within(rowFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
+    expect(within(cardFor(/philadelphia/i)).getByText('Live')).toBeInTheDocument()
+    expect(within(cardFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
   })
 
   it('shows the still-reachable-by-URL note only for a hidden community', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/philadelphia/i))
+    await openCard(user, cardFor(/upper east side/i))
 
-    expect(within(rowFor(/philadelphia/i)).queryByText(/not on the switcher or sitemap/i)).not.toBeInTheDocument()
-    expect(within(rowFor(/upper east side/i)).getByText(/not on the switcher or sitemap/i)).toBeInTheDocument()
+    expect(within(cardFor(/philadelphia/i)).queryByText(/not on the switcher or sitemap/i)).not.toBeInTheDocument()
+    expect(within(cardFor(/upper east side/i)).getByText(/not on the switcher or sitemap/i)).toBeInTheDocument()
   })
 
   it('offers "Publish" for a hidden community and "Unpublish" for a visible one', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/philadelphia/i))
+    await openCard(user, cardFor(/upper east side/i))
 
-    expect(within(rowFor(/philadelphia/i)).getByRole('button', { name: /^unpublish$/i })).toBeInTheDocument()
-    expect(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
+    expect(within(cardFor(/philadelphia/i)).getByRole('button', { name: /^unpublish$/i })).toBeInTheDocument()
+    expect(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i })).toBeInTheDocument()
   })
 
   it('PATCHes visible:true and flips the row to "Live" on Publish', async () => {
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
     vi.mocked(fetchJson).mockResolvedValueOnce({ community: { ...ues, visible: true, previewToken: null } })
 
-    await user.click(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
+    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
 
     await waitFor(() => expect(fetchJson).toHaveBeenCalledTimes(1))
     const call = vi.mocked(fetchJson).mock.calls[0]!
@@ -641,18 +671,19 @@ describe('CommunityManager — publishing a community', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
     expect(JSON.parse(init.body as string)).toEqual({ visible: true })
 
-    expect(await within(rowFor(/upper east side/i)).findByText('Live')).toBeInTheDocument()
+    expect(await within(cardFor(/upper east side/i)).findByText('Live')).toBeInTheDocument()
   })
 
   it('shows a server-side error inline and leaves the community\'s visibility unchanged', async () => {
     vi.mocked(fetchJson).mockRejectedValue(new Error('Could not update visibility.'))
     const user = userEvent.setup()
     await renderAndWaitForList([philly, ues])
+    await openCard(user, cardFor(/upper east side/i))
 
-    await user.click(within(rowFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
+    await user.click(within(cardFor(/upper east side/i)).getByRole('button', { name: /^publish$/i }))
 
     expect(await screen.findByText('Could not update visibility.')).toBeInTheDocument()
-    expect(within(rowFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
+    expect(within(cardFor(/upper east side/i)).getByText('Hidden')).toBeInTheDocument()
   })
 })
 
@@ -669,16 +700,11 @@ describe('CommunityManager — admin roster', () => {
     notifyReviewEmails: ['jane@example.com'],
   })
 
-  // The roster is a sibling of the row's own link+buttons, one level
-  // further up the card — rowFor (used by the publishing tests above) stops
-  // at the link's immediate parent, which doesn't reach it.
-  function cardFor(name: RegExp): HTMLElement {
-    return screen.getByRole('link', { name }).parentElement!.parentElement!
-  }
-
   it('shows every admin with their own submission and review-action preference', async () => {
+    const user = userEvent.setup()
     await renderAndWaitForList([ues])
     const card = cardFor(/upper east side/i)
+    await openCard(user, card)
 
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     expect(within(janeRow).getByText('Off')).toBeInTheDocument()
@@ -690,8 +716,10 @@ describe('CommunityManager — admin roster', () => {
   })
 
   it('shows the empty state when no admins are configured', async () => {
+    const user = userEvent.setup()
     const empty = makeCommunity({ slug: 'empty', name: 'Empty Community' })
     await renderAndWaitForList([empty])
+    await openCard(user, cardFor(/empty community/i))
     expect(screen.getByText(/no admins set — falls back to the superadmin list/i)).toBeInTheDocument()
   })
 
@@ -703,6 +731,7 @@ describe('CommunityManager — admin roster', () => {
     })
 
     const card = cardFor(/upper east side/i)
+    await openCard(user, card)
     await user.type(within(card).getByPlaceholderText(/new-admin@example.com/i), 'new@example.com')
     await user.click(within(card).getByRole('button', { name: /^add admin$/i }))
 
@@ -721,6 +750,7 @@ describe('CommunityManager — admin roster', () => {
     })
 
     const card = cardFor(/upper east side/i)
+    await openCard(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     // Not sent yet — confirmation is required first.
@@ -740,6 +770,7 @@ describe('CommunityManager — admin roster', () => {
     await renderAndWaitForList([ues])
 
     const card = cardFor(/upper east side/i)
+    await openCard(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     await user.click(within(janeRow).getByRole('button', { name: /^cancel$/i }))
@@ -754,6 +785,7 @@ describe('CommunityManager — admin roster', () => {
     await renderAndWaitForList([ues])
 
     const card = cardFor(/upper east side/i)
+    await openCard(user, card)
     const janeRow = within(card).getByText('jane@example.com').closest('tr')!
     await user.click(within(janeRow).getByRole('button', { name: /^remove$/i }))
     await user.click(within(janeRow).getByRole('button', { name: /^confirm$/i }))

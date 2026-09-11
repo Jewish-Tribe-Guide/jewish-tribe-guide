@@ -216,6 +216,15 @@ const MobileNearbySheet = forwardRef<MobileNearbySheetHandle, Props>(function Mo
   }
 
   function collapse() {
+    // Used to need to check whether the tap it's reacting to actually just
+    // dismissed MapPlaceDetail's own kebab menu instead of genuinely tapping
+    // the map away — the map's background tap is Google Maps' own event,
+    // not a plain DOM click, so it could fire before, after, or instead of
+    // this component's own outside-click detection. Moot now: the kebab's
+    // own invisible backdrop (see ListingActionsMenu's own doc) sits on top
+    // of the ENTIRE screen while it's open, so a tap dismissing it never
+    // reaches Google Maps' canvas at all — this collapse() simply never
+    // gets called for that tap in the first place.
     clearSelection()
     setSnap('peek')
   }

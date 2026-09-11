@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { AppMode, MapFilters, NavigateFn } from '@/types'
 import { useCommunitySlug } from './communityContext'
 import { mapQueryString, routes } from './routes'
+import { markHomeReveal } from './homeRevealSignal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The navigation functions every screen already takes as props, reimplemented
@@ -29,12 +30,10 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
       return routes.map(community)
     case 'feedback':
       return routes.feedback(community)
-    case 'all-categories':
-      return routes.allCategories(community)
     case 'find': {
       // 'find' means "open a category directory"; which one is in `extra`.
       const view = typeof extra?.findView === 'string' ? extra.findView : null
-      if (!view) return routes.allCategories(community)
+      if (!view) return routes.home(community)
       // findQuery/findItemId (set when navigating from a search result) become
       // the same ?q=/?item= params FindResources reads on mount, so the target
       // category opens pre-filtered with the tapped listing already expanded.
@@ -60,12 +59,9 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
 export type SiteNavigation = {
   /** The shared NavigateFn every screen takes. */
   navigate: NavigateFn
-  /** Opens a guided form — a category-or-form slug under the community.
-   *  `from: 'all'` marks it as opened from the All Categories index, so the
-   *  form's own close button returns there instead of defaulting to home. */
-  openFlow: (kind: string, preselect?: string[], from?: 'all') => void
-  goHome: (opts?: { at?: 'map' }) => void
-  viewAllCategories: (section?: string) => void
+  /** Opens a guided form — a category-or-form slug under the community. */
+  openFlow: (kind: string, preselect?: string[]) => void
+  goHome: (opts?: { at?: 'map'; transitionTypes?: string[] }) => void
   viewListing: (categoryId: string, listingId: string) => void
   viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
@@ -82,15 +78,12 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const openFlow = useCallback(
-    (kind: string, preselect?: string[], from?: 'all') => {
+    (kind: string, preselect?: string[]) => {
       // A form's pre-checked needs ride in the query string so the link is
       // shareable and survives a reload — they used to live in history.state,
-      // which neither did. `from` rides alongside for the same reason: the
-      // form's own close button (SlugScreen) reads it to return to the All
-      // Categories index instead of always defaulting to home.
+      // which neither did.
       const params = new URLSearchParams()
       if (preselect?.length) params.set('need', preselect.join(','))
-      if (from) params.set('from', from)
       const qs = params.toString()
       router.push(`${routes.slug(community, kind)}${qs ? `?${qs}` : ''}`)
     },
@@ -98,38 +91,40 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const goHome = useCallback(
-    (opts?: { at?: 'map' }) => {
+    (opts?: { at?: 'map'; transitionTypes?: string[] }) => {
       // `?at=map` lands the visitor on the home screen's embedded map band
       // rather than at the hero — used when collapsing the fullscreen map, so
       // the collapse reads as zooming out. Mobile's home screen has no map
       // band, so the param is simply ignored there.
-      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`)
+      //
+      // transitionTypes: only the category directory's own back arrow passes
+      // this ('nav-back' — see GenericDirectory's onUp) — not the tab bar's
+      // Home button, the header logo, or the map-exit case above, none of
+      // which have a matching ViewTransition-wrapped exit on their own
+      // screen. Tagging those too would trigger the browser's default
+      // whole-page crossfade with nothing to actually pair it against.
+      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`, {
+        transitionTypes: opts?.transitionTypes,
+      })
       // Tapping the mobile tab bar's Home button, or the header logo, while
       // already on home pushes the exact URL that's already loaded — Next
-      // treats that as a no-op and never remounts Landing, so a typed search
-      // (local state, not a URL param — see Landing) and scroll position
-      // would otherwise just sit there, which isn't what "go home" means when
-      // you're tapping it as a reset. Landing listens for this and clears
-      // both by hand for that no-op case; a real cross-page navigation resets
-      // them for free by remounting, so this is only load-bearing there.
-      // Skipped for the `at: 'map'` case: that's always a real navigation
-      // (only ever called from the full-map screen, a different pathname),
-      // so it already resets on remount, and firing here too would race the
+      // treats that as a no-op, and (as it turns out) so does a REAL
+      // cross-page nav back to home: Next keeps the previously-rendered
+      // Landing instance alive rather than tearing it down, so nothing
+      // here ever remounts on its own. Landing listens for this event to
+      // reset a stale search/scroll position by hand (the tab-bar/logo
+      // "already home" case). Skipped for the `at: 'map'` case: that's
+      // always a real navigation (only ever called from the full-map
+      // screen, a different pathname), so firing here too would race the
       // scroll-to-map-band effect that same navigation triggers.
       if (!opts?.at) document.dispatchEvent(new CustomEvent('jpc:go-home'))
-    },
-    [router, community],
-  )
-
-  const viewAllCategories = useCallback(
-    (section?: string) => {
-      // A query param rather than a fragment: the sections load async, so the
-      // browser's native fragment scrolling would fire before the target
-      // exists, and AllCategories has to do the scroll itself once they're
-      // there. A param is also readable with useSearchParams, which a hash
-      // isn't. Either way the link is shareable, which history state was not.
-      const qs = section ? `?section=${encodeURIComponent(section)}` : ''
-      router.push(`${routes.allCategories(community)}${qs}`)
+      // The mobile back arrow's own directional reveal (see Landing's own
+      // `backReveal` doc) can't ride the event above — see
+      // homeRevealSignal.ts's own doc for why an event dispatched here
+      // isn't reliably caught. transitionTypes is only ever set for that
+      // exact case (the category directory's own back arrow — mobile
+      // only, see SlugScreen's onUp), so its presence IS the signal.
+      if (opts?.transitionTypes) markHomeReveal()
     },
     [router, community],
   )
@@ -156,7 +151,7 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   return useMemo(
-    () => ({ navigate, openFlow, goHome, viewAllCategories, viewListing, viewMapForCategory }),
-    [navigate, openFlow, goHome, viewAllCategories, viewListing, viewMapForCategory],
+    () => ({ navigate, openFlow, goHome, viewListing, viewMapForCategory }),
+    [navigate, openFlow, goHome, viewListing, viewMapForCategory],
   )
 }

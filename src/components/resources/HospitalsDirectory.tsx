@@ -4,9 +4,12 @@ import { useState } from 'react'
 import { useHospitals } from '@/lib/useHospitals'
 import type { DirectoryAnchor, HospitalInfo } from '@/types'
 import { haversineMiles, roundMiles } from '@/lib/geo'
-import UpButton from '@/components/UpButton'
 import DirectoryHeader from './DirectoryHeader'
+import { CategoryBandFrame, CategoryBandBadge } from './CategoryBandFrame'
+import { HOSPITAL_COLOR } from '@/components/map/ResourceMapView'
 import { useLogSearchMiss } from '@/lib/useLogSearchMiss'
+import { useSetScreenHeader } from '@/lib/headerVisibility'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 type Props = {
   anchor: DirectoryAnchor
@@ -36,7 +39,15 @@ function features(info?: HospitalInfo | null): string[] {
 // Lists every hospital, sorted by distance from the visitor's address (when set),
 // with a search box. Tapping one opens its Jewish-resources page. Framed as a
 // question so it reads as a clear first step, not a database listing.
+const TITLE = 'Which hospital?'
+
 export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = 'All resources', onViewMap }: Props) {
+  // Puts "‹ {TITLE}" in SiteHeader on mobile — see GenericDirectory's
+  // identical call, which this mirrors now that this screen has the same gap
+  // it used to (its own mobile UpButton, no header title).
+  useSetScreenHeader(true, TITLE, onUp)
+  const isMobile = useIsMobile()
+
   const [search, setSearch] = useState('')
   const hospitals = useHospitals() ?? []
   const coords = anchor.coords
@@ -65,14 +76,29 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
     source: 'Hospitals',
   })
 
+  // Same red as the map's own hospital pins (HOSPITAL_COLOR/HOSPITAL_ICON in
+  // ResourceMapView) — a hospital should read as the same thing here and
+  // there, not two independently-chosen colors. No cardImageUrl: this isn't
+  // a CategoryConfig row, so there's nowhere a photo could be stored — the
+  // band always falls back to the plain color wash, same as most real
+  // categories do today.
+  const banner = !isMobile ? (
+    <CategoryBandBadge color={HOSPITAL_COLOR}>
+      <BuildingIcon className="h-[55%] w-[55%]" />
+    </CategoryBandBadge>
+  ) : null
+
   return (
     <div>
-      <UpButton label={upLabel} onClick={onUp} />
-
+      <CategoryBandFrame color={HOSPITAL_COLOR}>
       <DirectoryHeader
-        title="Which hospital?"
+        title={TITLE}
         anchorLabel={coords && label ? label : undefined}
         addressPrompt
+        upLabel={upLabel}
+        onUp={onUp}
+        titleInHeader
+        banner={banner}
       />
       {/* Description + Map sit on their own row here (not in the header's actions
           slot) because the explanatory copy is unique to this screen. */}
@@ -168,6 +194,7 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
           })}
         </div>
       )}
+      </CategoryBandFrame>
     </div>
   )
 }

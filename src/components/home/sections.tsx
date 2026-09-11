@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, ViewTransition } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
@@ -16,6 +16,9 @@ import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
+import CategoryIcon from '@/components/CategoryIcon'
+import { getCategoryColor } from '@/lib/categoryColor'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 export type CardDef = {
   title: string
@@ -49,14 +52,44 @@ export type CardDef = {
    *  for photos where white doesn't read well). Ignored without an image, and
    *  doesn't affect the icon — that always renders as a white silhouette. */
   cardTextColor?: string | null
+  /** How much is behind this card, already worded — "22 places", "19 groups".
+   *  Shown only by CompactCard (the flat browse index); the full photo tiles
+   *  have a different job.
+   *
+   *  A pre-worded string rather than a number, because the right noun is the
+   *  caller's to know: WhatsApp Groups are not "places", and the counted
+   *  cards sit in the same array as ones that count nothing at all. Leave it
+   *  undefined for those — see CompactCard on why "0 places" is worse than
+   *  saying nothing. */
+  count?: string
 }
 
 // Soft tile tints, cycled per card across the grid.
 export const TINTS = ['bg-sky-50', 'bg-amber-50', 'bg-rose-50', 'bg-emerald-50', 'bg-indigo-50']
 
-export function Card({ card, tint, priority = false }: { card: CardDef; tint: string; priority?: boolean }) {
+export function Card({
+  card,
+  tint,
+  priority = false,
+  onCardClick,
+}: {
+  card: CardDef
+  tint: string
+  priority?: boolean
+  /** Fired on click, alongside the real navigation (not instead of it) —
+   *  callers use this to tag which on-screen surface a card was opened
+   *  from (e.g. the tab nav's mega-menu vs. the always-visible desktop
+   *  grid — see CardGrid's own doc). Optional: most callers of Card don't
+   *  need this, so it defaults to nothing rather than every render site
+   *  having to pass a no-op. */
+  onCardClick?: (card: CardDef) => void
+}) {
   const hasImage = !!card.cardImageUrl
   const textColor = card.cardTextColor || '#ffffff'
+  // See navTransitions.ts's own doc on why this check has to happen HERE,
+  // at the already-mounted source of the click, rather than at the
+  // destination's ViewTransition wrapper the way it used to.
+  const isMobile = useIsMobile()
   return (
     // A real <Link>, not a <button onClick={card.go}> — go still exists on
     // CardDef for the one place a tile opens programmatically instead of by
@@ -64,7 +97,17 @@ export function Card({ card, tint, priority = false }: { card: CardDef; tint: st
     // the tile itself now navigates the normal way: Link already knows to
     // leave a modified click (cmd/ctrl/middle) to the browser and only
     // intercept a plain one, which a click handler can never do on its own.
-    <Link href={card.href} className="group block w-full cursor-pointer">
+    <Link
+      href={card.href}
+      className="group block w-full cursor-pointer"
+      onClick={onCardClick ? () => onCardClick(card) : undefined}
+      // Every card here is one level deeper than the home screen it's on —
+      // a real category, a form, a pseudo-category (Map/Zmanim/Eruv) — so
+      // this is always a "forward" drill-down, but only worth tagging on
+      // mobile — desktop's screens are plain fades with no edge the
+      // content is conceptually anchored to (see navTransitions.ts).
+      transitionTypes={isMobile ? ['nav-forward'] : undefined}
+    >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
       >
@@ -132,9 +175,12 @@ export function CardSkeleton() {
 export function CardGrid({
   cards,
   loadingCount = 0,
+  onCardClick,
 }: {
   cards: CardDef[]
   loadingCount?: number
+  /** See Card's own doc — threaded straight through. */
+  onCardClick?: (card: CardDef) => void
 }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
@@ -146,11 +192,210 @@ export function CardGrid({
           // The first row is above the fold at every breakpoint (4 cards is the
           // widest row the grid ever renders), so those load eagerly.
           priority={i < 4}
+          onCardClick={onCardClick}
         />
       ))}
       {Array.from({ length: loadingCount }, (_, i) => (
         <CardSkeleton key={`skeleton-${i}`} />
       ))}
+    </div>
+  )
+}
+
+/** One row in CompactCardGrid — the tinted, colour-ringed icon glyph, the
+ *  category's name, and how many places are in it.
+ *
+ *  This used to prefer the admin-set home-screen photo, cropped to a 32px
+ *  circle, on the reasoning that an avatar that small costs the same visual
+ *  weight as the glyph it replaces. It does cost the same weight — but it
+ *  does not carry the same information, and that's the part that was wrong.
+ *  Rendered at 32px in a 1440px viewport, this community's twelve category
+ *  photos (Food, Childcare, Hospitals, Schools, Hotels, Grocery…) all resolve
+ *  to the same indistinct brown-grey disc: a photograph needs a subject you
+ *  can make out, and at 32px there is no subject, only average colour. The
+ *  glyph is legible at that size and the category's own `pinColor` makes each
+ *  row distinguishable at a glance, which is what an index is for.
+ *
+ *  The photos are not the problem — their size is. `CardGrid`'s full tile is
+ *  still exactly right for a small curated set, where a photo has room to be
+ *  one. See `count` below for the other half of what a row here should say. */
+function CompactCard({
+  card,
+  color,
+  onCardClick,
+}: {
+  card: CardDef
+  color: string
+  onCardClick?: (card: CardDef) => void
+}) {
+  return (
+    // No border/background at rest — this is navigation, not content; a
+    // border on every one of 15+ rows just moves the "too many different
+    // things crammed in" problem from photos to boxes. Background-only on
+    // hover, same as the tab nav's own mega-menu items and its section
+    // buttons — a click target still reads clearly without a permanent box
+    // around it.
+    <Link
+      href={card.href}
+      className="group flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-colors hover:bg-slate-50"
+      onClick={onCardClick ? () => onCardClick(card) : undefined}
+      // No transitionTypes tag here, unlike Card above — this row never
+      // mounts on mobile (see this component's own doc), and desktop never
+      // wants the slide (see navTransitions.ts), so there's no case where
+      // tagging it would do anything but risk a stray whole-page crossfade.
+    >
+      {card.icon ? (
+        // Named (desktop only — this component never mounts on mobile, see
+        // its own doc) so React's real <ViewTransition> grows this small
+        // icon badge into the bigger one GenericDirectory shows at the top
+        // of the category page, instead of a flat crossfade — the "shared
+        // element morph" pattern, matched on `name` alone (see that
+        // component's own comment for the other half). Only when `card.id`
+        // exists to key it on: the couple of hand-built cards with no id
+        // just skip the wrap and render plainly.
+        card.id ? (
+          <ViewTransition name={`category-badge-${card.id}`}>
+            <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+          </ViewTransition>
+        ) : (
+          <CategoryIcon icon={card.icon} categoryId={card.id} color={color} className="h-9 w-9 text-base shrink-0" sizePx={36} />
+        )
+      ) : (
+        <span className="h-9 w-9 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+      )}
+      {/* min-w-0 on the COLUMN, not just the label: without it the flex item
+          takes its content's intrinsic width and the truncate below never
+          fires, so a long category name pushes the row wider than its grid
+          track instead of ellipsing. */}
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium text-slate-800 group-hover:text-primary transition-colors">
+          {card.title}
+        </span>
+        {/* Absent, not zero-filled, when the caller has no count for this
+            card — the pseudo-categories (Map, Zmanim, Eruv) and the Support/
+            Volunteer entry cards aren't collections of places and have
+            nothing true to say here, and "0 places" on one of those would be
+            a worse answer than silence. Same reason the count is hidden
+            while listings are still loading rather than flashing "0". */}
+        {card.count != null && (
+          <span className="truncate text-xs text-slate-400 tabular-nums">{card.count}</span>
+        )}
+      </span>
+    </Link>
+  )
+}
+
+/** A dense alternative to CardGrid — icon/avatar + name in a small row
+ *  instead of a full photo tile, tiled many-per-line rather than 2-4 wide.
+ *  For a list meant to hold EVERY card at once (see Landing's "Browse
+ *  everything"), not a curated few: a wall of full-size photo tiles reads as
+ *  "trying to fit too many different things in one place" (an admin-uploaded
+ *  photo, a flat tint, a test fixture's placeholder — all at hero-card size,
+ *  side by side) and only gets heavier as more categories are added. This
+ *  stays calm at any count because every row costs the same, small amount of
+ *  space regardless of what's behind it — a 32px circular crop of the
+ *  card's own photo where one's set (see CompactCard's own doc — small
+ *  enough to cost the same weight as the icon glyph it replaces), that
+ *  glyph otherwise. CardGrid's rich full-tile photo treatment is still
+ *  exactly right for a SMALL curated set ("Popular right now") where a
+ *  handful of considered photos are the point, not a liability. */
+// How many rows to show before collapsing.
+const ROWS_WHEN_COLLAPSED = 4
+
+export function CompactCardGrid({
+  cards,
+  categories,
+  onCardClick,
+}: {
+  cards: CardDef[]
+  /** Resolves each card's icon-avatar tint — see getCategoryColor. */
+  categories: CategoryConfig[] | null
+  onCardClick?: (card: CardDef) => void
+}) {
+  // Collapsed by default — a community with a dozen-plus categories turned
+  // this from "an index" into a wall of rows below the fold before a
+  // visitor got to the map or anything else on the page.
+  const [expanded, setExpanded] = useState(false)
+  const gridRef = useRef<HTMLDivElement>(null)
+  // Pixel height that clips the grid to exactly ROWS_WHEN_COLLAPSED rows, or
+  // null when there's nothing to collapse (four rows or fewer already, or
+  // not yet measured). A fixed ITEM count here would be wrong on its own
+  // terms — this grid runs 2/3/4 columns depending on viewport width (see
+  // its own className below), so "16 items" is four rows at the widest
+  // column count and well over four at the narrowest. Measuring the real
+  // rendered row positions instead — same technique GenericDirectory's own
+  // alignRows already uses for "how many cards share a row" — gets the
+  // right cutoff at any width instead of guessing one.
+  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    function measure() {
+      const grid = gridRef.current
+      if (!grid) return
+      const children = Array.from(grid.children) as HTMLElement[]
+      if (children.length === 0) {
+        setCollapsedHeight(null)
+        return
+      }
+      const gridTop = grid.getBoundingClientRect().top
+      const rowTops: number[] = []
+      for (const child of children) {
+        const top = Math.round(child.getBoundingClientRect().top)
+        if (!rowTops.includes(top)) rowTops.push(top)
+      }
+      if (rowTops.length <= ROWS_WHEN_COLLAPSED) {
+        setCollapsedHeight(null)
+        return
+      }
+      // Bottom of the last child whose row is among the first
+      // ROWS_WHEN_COLLAPSED — everything after that gets clipped.
+      const lastVisibleRowTop = rowTops[ROWS_WHEN_COLLAPSED - 1]
+      let bottom = 0
+      for (const child of children) {
+        if (Math.round(child.getBoundingClientRect().top) <= lastVisibleRowTop) {
+          bottom = Math.max(bottom, child.getBoundingClientRect().bottom)
+        }
+      }
+      setCollapsedHeight(bottom - gridTop)
+    }
+    measure()
+    // Column count depends on the grid's actual pixel width, which only a
+    // real resize can change — same reasoning as GenericDirectory's own
+    // alignRows re-pass.
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [cards.length])
+
+  const isCollapsible = collapsedHeight != null
+
+  return (
+    <div>
+      <div
+        ref={gridRef}
+        className="grid grid-cols-2 gap-2 overflow-hidden sm:grid-cols-3 lg:grid-cols-4"
+        style={!expanded && collapsedHeight != null ? { maxHeight: collapsedHeight } : undefined}
+      >
+        {cards.map((card) => (
+          <CompactCard
+            key={card.id ?? card.title}
+            card={card}
+            color={getCategoryColor(categories, card.id ?? '')}
+            onCardClick={onCardClick}
+          />
+        ))}
+      </div>
+      {isCollapsible && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-xl py-2.5 text-sm font-medium text-primary transition-colors hover:bg-slate-50"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+          <span aria-hidden="true" className="text-[10px]">
+            {expanded ? '▴' : '▾'}
+          </span>
+        </button>
+      )}
     </div>
   )
 }
@@ -294,9 +539,18 @@ export function searchListings(
 export function PlacesResults({
   hits,
   onOpen,
+  showDistanceSlot,
 }: {
   hits: ListingHit[]
   onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
+  /** No location set yet — hold each distance-based hit's distance column
+   *  open with a tappable placeholder instead of omitting it, same as
+   *  GenericDirectory's own `addressPrompt` (see GenericListingCard's
+   *  `showDistanceSlot` doc). A mixed-category list can mix distance-based
+   *  hits with ones that have no address at all (e.g. WhatsApp groups), so
+   *  this is combined per-hit with that hit's own `category.hasAddress`
+   *  rather than applied blindly to every card. */
+  showDistanceSlot?: boolean
 }) {
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({})
 
@@ -305,23 +559,29 @@ export function PlacesResults({
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Places
       </h2>
-      <div className="space-y-2">
+      {/* desktop: a grid instead of a single column, same reasoning (and same
+          track-sizing pitfalls, already solved once) as GenericDirectory's
+          own listing grid — see that component's own doc for why
+          auto-fill/minmax/1fr, not a fixed column count or auto-fit. */}
+      <div className="space-y-2 desktop:space-y-0 desktop:grid desktop:gap-3 desktop:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
         {hits.map((hit) => (
-          <GenericListingCard
-            key={hit.item.id}
-            item={hit.item}
-            category={hit.category}
-            upvotes={!!hit.category.upvotesEnabled}
-            count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
-            onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
-            onTagClick={(tag) => onOpen({ ...hit, term: tag })}
-            onNameClick={() => onOpen(hit)}
-            onFilterOpen={() => onOpen(hit)}
-            onFilterBool={() => onOpen(hit)}
-            onFilterSelect={() => onOpen(hit)}
-            onEdit={() => onOpen(hit, 'edit')}
-            onReport={() => onOpen(hit, 'report')}
-          />
+          <div key={hit.item.id} className="desktop:max-w-md">
+            <GenericListingCard
+              item={hit.item}
+              category={hit.category}
+              showDistanceSlot={!!showDistanceSlot && hit.category.hasAddress !== false}
+              upvotes={!!hit.category.upvotesEnabled}
+              count={voteCounts[hit.item.id] ?? hit.item.upvotes ?? 0}
+              onVote={(c) => setVoteCounts((prev) => ({ ...prev, [hit.item.id]: c }))}
+              onTagClick={(tag) => onOpen({ ...hit, term: tag })}
+              onNameClick={() => onOpen(hit)}
+              onFilterOpen={() => onOpen(hit)}
+              onFilterBool={() => onOpen(hit)}
+              onFilterSelect={() => onOpen(hit)}
+              onEdit={() => onOpen(hit, 'edit')}
+              onReport={() => onOpen(hit, 'report')}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -350,6 +610,23 @@ function labelWords(c: CategoryConfig): string[] {
     .filter((w) => w.length >= 3)
 }
 
+/** "22 places" / "19 listings" for a category's browse-index row, or
+ *  undefined when there's nothing honest to say.
+ *
+ *  Two nouns, picked off `hasAddress` rather than off a hardcoded list of
+ *  category ids: a category whose listings have no address isn't a set of
+ *  places you can go to — WhatsApp Groups and Networking are the live cases —
+ *  and calling them places would be wrong in the one word the row exists to
+ *  add. Any future address-less category gets the right noun for free.
+ *
+ *  Undefined (not "0") when counts haven't loaded or the category has none:
+ *  see CompactCard on why silence beats a zero here. */
+export function cardCount(c: CategoryConfig, counts: Record<string, number> | null | undefined): string | undefined {
+  const n = counts?.[c.id]
+  if (!n) return undefined
+  return `${n} ${c.hasAddress === false ? (n === 1 ? 'listing' : 'listings') : (n === 1 ? 'place' : 'places')}`
+}
+
 /** Resource cards: every live category (restaurants, groceries, hotels, …)
  *  plus the hand-curated pages. Returns null while categories are loading
  *  (show skeletons). */
@@ -360,6 +637,12 @@ export function resourceCards(
   // hood — see CardDef.href's own comment for why this is threaded in
   // alongside `nav` rather than derived from it.
   communitySlug: string,
+  // How many approved listings each category holds, keyed by category id —
+  // null while listings are still loading, which is why `cardCount` below
+  // returns undefined rather than "0 places" for a missing entry. Threaded in
+  // rather than fetched here because Landing already holds the full listing
+  // set for its own search.
+  counts?: Record<string, number> | null,
 ): CardDef[] | null {
   if (categories === null) return null
 
@@ -367,7 +650,7 @@ export function resourceCards(
   const zmanim = categories.find((c) => c.kind === 'zmanim')
   const eruv = categories.find((c) => c.kind === 'eruv')
 
-  return [
+  const cards = [
     ...(medical
       ? [{
           title: medical.pluralLabel,
@@ -390,6 +673,7 @@ export function resourceCards(
       title: c.pluralLabel,
       id: c.id,
       icon: c.icon,
+      count: cardCount(c, counts),
       cardImageUrl: c.cardImageUrl,
       cardTextColor: c.cardTextColor,
       keywords: [...new Set([...labelWords(c), ...(CATEGORY_KEYWORDS[c.id] ?? []), c.id.replaceAll('-', ' ')])],
@@ -428,6 +712,21 @@ export function resourceCards(
         }]
       : []),
   ]
+
+  // Hospitals/Zmanim/Eruv are built above as one-off cards (they're pseudo-
+  // categories, not `kind === 'listing'`), so without this they always land
+  // in the fixed positions they were spliced in at — Hospitals first, Zmanim
+  // and Eruv last — rather than wherever their own title actually falls.
+  // `categories` itself is already alphabetical by pluralLabel (see
+  // listCategoriesUncached's own comment), so sorting only the pseudo-
+  // category cards into that same order would work too, but sorting
+  // everything is simpler and produces the same result. groupCardsIntoSections
+  // (HeaderNav's "Categories" menu) re-derives each section's order from its
+  // own admin-configured `cardIds` regardless of this array's order, so this
+  // only affects "Browse everything"'s flat grid, which is exactly the one
+  // that's meant to be alphabetical.
+  cards.sort((a, b) => a.title.localeCompare(b.title))
+  return cards
 }
 
 /** The hand-built cards at the front of the grid — Patient & Family Support,

@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen, type RenderResult } from '@testing-library/react'
+import { act, cleanup, screen, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { track } from '@vercel/analytics'
 import { renderWithProviders } from '@/test/renderWithProviders'
-import { makeCategory } from '@/test/providerFixtures'
+import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
-import { resetMockIntersectionObserver, triggerAllIntersections } from '@/test/intersectionObserverMock'
+import { ListingsProvider } from '@/lib/listingsContext'
+import type { DirectoryResource } from '@/types'
+import { resetMockIntersectionObserver, setAllIntersecting, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import { mockRouter } from '@/test/nextNavigationMock'
+import { markHomeReveal } from '@/lib/homeRevealSignal'
 import Landing from './Landing'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
@@ -22,23 +26,24 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// HomeMap and ZmanimStrip are mocked out — both pull in real network/SDK
-// dependencies of their own (Google Maps, the uncached /api/zmanim fetch)
-// that are their own components' concerns, not Landing's. What's under test
-// here is Landing's own composition/filtering logic: which sections render,
-// whether typing narrows the grid, and whether the map/zmanim bands appear
-// only when the community actually has those pseudo-categories.
+// HomeMap and DaveningTimesCard are mocked out — both pull in real
+// network/SDK dependencies of their own (Google Maps, the community's real
+// listings/categories aggregation) that are their own components'
+// concerns, not Landing's. What's under test here is Landing's own
+// composition/filtering logic: which cards render, whether typing narrows
+// the grid, and whether the map/davening cards appear only when the
+// community actually has the relevant pseudo-category/data.
+//
+// ShabbatTimesCard/SubscribeSection/UpdateListingsCard are NOT mocked —
+// none of them ever were, even before the old zmanim+shabbat pairs split
+// into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('@/components/home/HomeMap', () => ({
   default: () => <div data-testid="home-map-stub" />,
 }))
-vi.mock('@/components/home/ZmanimStrip', () => ({
-  // Renders the real `title` prop (unlike coords/locationLabel, which pull
-  // in the network dependency this mock exists to avoid) — Landing passes
-  // the admin-renamed topic title through here, and a test needs to see it
-  // to prove that wiring, not just that the stub is present.
-  default: ({ title }: { title: string }) => <div data-testid="zmanim-strip-stub">{title}</div>,
+vi.mock('@/components/home/DaveningTimesCard', () => ({
+  default: () => <div data-testid="davening-stub" />,
 }))
 
 afterEach(() => {
@@ -49,7 +54,6 @@ afterEach(() => {
 const handlers = {
   onNavigate: vi.fn(),
   onOpenFlow: vi.fn(),
-  onViewAllCategories: vi.fn(),
   coords: null,
   liveTracking: { tracking: false, error: null, start: vi.fn(), stop: vi.fn() },
   controls: {
@@ -69,13 +73,34 @@ const handlers = {
 // see zmanimLocationLabel), which throws outside a LocationProvider. Wraps
 // renderWithProviders' own element instead of duplicating its provider
 // stack/options handling.
+// useIsMobile() reads this — see the "back-navigation reveal" tests below,
+// which only apply on mobile (see navTransitions.ts's own doc).
+function mockViewport(isMobile: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: isMobile,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia
+}
+
 function renderLanding(
   props: Partial<ComponentProps<typeof Landing>> = {},
   options?: Parameters<typeof renderWithProviders>[1],
+  // Defaults to null (the same as no provider at all — see useAllListings'
+  // own doc) so every existing call site is unaffected; only the map card's
+  // "N places across M categories" line needs real listings supplied.
+  listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
     <LocationProvider>
-      <Landing {...handlers} {...props} />
+      <ListingsProvider listings={listings}>
+        <Landing {...handlers} {...props} />
+      </ListingsProvider>
     </LocationProvider>,
     options,
   )
@@ -91,8 +116,11 @@ describe('Landing', () => {
       },
     })
 
-    expect(screen.getByText('Welcome to the directory')).toBeInTheDocument()
-    expect(screen.getByText('Everything nearby')).toBeInTheDocument()
+    // getAllByText, not getByText: HeroHeading renders both its mobile and
+    // desktop layouts in the DOM at once (toggled by CSS, not JS — see that
+    // component's own doc), so the heading/mission text exists twice.
+    expect(screen.getAllByText('Welcome to the directory').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Everything nearby').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
@@ -102,9 +130,21 @@ describe('Landing', () => {
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    await user.type(screen.getByLabelText('Search resources'), 'grocery')
+    // getAllByLabelText, not getByLabelText: HeroHeading now renders the
+    // search box twice in the DOM (mobile's plain block and desktop's warm
+    // band), toggled with `desktop:hidden`/`hidden desktop:` classes rather
+    // than a JS branch — see that component's own doc on why. jsdom doesn't
+    // apply CSS, so both are genuinely present; either one drives the same
+    // Landing state, so the first is as good as any for a test.
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
-    expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
+    // getAllByText, not getByText: the same result set now renders twice in
+    // the DOM once there's a query — mobile's own permanent grid section,
+    // and desktop's copy inside SearchSection's white box (see Landing's
+    // resultsNode doc on why: a single mount can't live in two different
+    // places in the tree, so this is genuine, deliberate duplication, not a
+    // bug). jsdom doesn't apply CSS, so both are visible to a query here.
+    expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
     expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
   })
 
@@ -112,9 +152,9 @@ describe('Landing', () => {
     const user = userEvent.setup()
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
 
-    await user.type(screen.getByLabelText('Search resources'), 'xyznotreal')
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'xyznotreal')
 
-    expect(screen.getByText(/Nothing matches “xyznotreal”/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
   })
 
   it('renders the map band only when the community has a Map pseudo-category, deferring HomeMap itself until scrolled near', () => {
@@ -135,23 +175,78 @@ describe('Landing', () => {
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
   })
 
-  it('renders the zmanim strip only when the community has a zmanim pseudo-category', () => {
+  describe('the map card\'s "N places across M categories" line', () => {
+    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', kind: 'listing', pluralLabel: 'Synagogues' })
+
+    it('counts real listings across listing-kind categories only, once they’ve loaded', () => {
+      const listings = [
+        makeListing({ id: 'l1', category: 'grocery' }),
+        makeListing({ id: 'l2', category: 'grocery' }),
+        makeListing({ id: 'l3', category: 'synagogue' }),
+        // A stray row filed under the Map pseudo-category itself — shouldn't
+        // happen in real data, but proves the count is driven by the
+        // category's own `kind`, not just whatever `listings` happens to hold.
+        makeListing({ id: 'l4', category: 'map' }),
+      ]
+      renderLanding(undefined, { content: { categories: [withMap, grocery, synagogue] } }, listings)
+
+      expect(
+        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '3 places across 2 categories'),
+      ).toBeInTheDocument()
+    })
+
+    it('pluralizes down to one place, one category', () => {
+      renderLanding(
+        undefined,
+        { content: { categories: [withMap, grocery] } },
+        [makeListing({ id: 'l1', category: 'grocery' })],
+      )
+
+      expect(
+        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '1 place across 1 category'),
+      ).toBeInTheDocument()
+    })
+
+    it('shows nothing yet while listings haven’t loaded, rather than claiming zero', () => {
+      renderLanding(undefined, { content: { categories: [withMap, grocery] } })
+      expect(screen.queryByText(/places across/)).not.toBeInTheDocument()
+    })
+  })
+
+  // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
+  // still gated on a real Zmanim pseudo-category — it needs candle-lighting
+  // data that has nowhere to come from otherwise. Davening Times/Update
+  // Listings/Email Signup dropped that gate entirely when the old paired
+  // blocks split into independent cards (see homeSections.ts's own doc) —
+  // each now has only the gating it actually needs on its own merits.
+  it('renders the Jewish Times card only when the community has a zmanim pseudo-category', () => {
     const withZmanim = makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })
     const { unmount } = renderLanding(undefined, { content: { categories: [withZmanim] } })
-    expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })).toBeInTheDocument()
     unmount()
 
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    expect(screen.queryByTestId('zmanim-strip-stub')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
   })
 
-  describe('the gateway block order (Popular right now / Explore the map / Zmanim & Shabbos)', () => {
+  it('renders Update Listings and (once a minyanim category exists) Davening Times with no zmanim category at all', () => {
+    // Regression: both used to share a component with the Jewish
+    // Times/Shabbat pair and were needlessly gated on zmanimCategory even
+    // though neither reads zmanim data — see homeSections.ts's own doc.
+    renderLanding(undefined, { content: { categories: [makeCategory()] } }) // grocery only, no zmanim category
+    expect(screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).toBeInTheDocument()
+    expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+  })
+
+  describe('the gateway block order (Explore the map / Davening Times)', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
     ]
 
-    it('defaults to map before zmanim when nothing is configured (no built-in rows at all)', () => {
+    it('defaults to davening before map when nothing is configured (no built-in rows at all)', () => {
       const { container } = renderLanding(undefined, {
         content: { categories: withMapAndZmanim, homeSections: [] },
       })
@@ -161,64 +256,287 @@ describe('Landing', () => {
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="zmanim-strip-stub"'))
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
     })
 
-    it('follows the admin-configured order — zmanim before map', () => {
+    it('follows the admin-configured order — map before davening', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] },
-            { id: 'map', kind: 'map', title: 'Explore the map', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
       act(() => triggerAllIntersections())
 
       const html = container.innerHTML
-      expect(html.indexOf('data-testid="zmanim-strip-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="davening-stub"'))
     })
 
-    it('renders an admin-renamed topic’s own title, not the built-in default', () => {
+    it('renders the map’s admin-editable heading, not the built-in default', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
+          settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapHeading: 'See it on the map' },
           homeSections: [
-            { id: 'map', kind: 'map', title: 'See it on the map', sortOrder: 100, cardIds: [] },
-            { id: 'zmanim', kind: 'zmanim', title: 'Shabbos Times', sortOrder: 200, cardIds: [] },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
 
       expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Explore the map' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('zmanim-strip-stub')).toHaveTextContent('Shabbos Times')
+      expect(screen.queryByRole('heading', { name: 'Explore the Map' })).not.toBeInTheDocument()
     })
 
-    it('hides a built-in block that was configured out (removed), even though its category exists', () => {
+    // All-or-nothing: the admin's Home screen cards list is authoritative
+    // the moment it has any row at all — a kind with no row is "not
+    // configured", not "default it in anyway". See Landing.tsx's own doc —
+    // an earlier version tried the independent-fallback approach and it
+    // meant the admin's own list stopped matching what the live site
+    // actually rendered, which is worse than a temporary gap.
+    it('hides a built-in card that has no row of its own, once a sibling kind is configured', () => {
       renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
-          homeSections: [{ id: 'zmanim', kind: 'zmanim', title: 'Zmanim & Shabbos', sortOrder: 100, cardIds: [] }],
+          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
         },
       })
 
-      expect(screen.getByTestId('zmanim-strip-stub')).toBeInTheDocument()
+      expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
+      // Map has no row of its own here, so it doesn't render at all —
+      // configuring one kind doesn't implicitly configure the rest.
       expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
     })
   })
 
-  it('calls onViewAllCategories when "Browse all categories" is clicked', async () => {
-    const user = userEvent.setup()
-    const onViewAllCategories = vi.fn()
-    renderLanding(
-      { onViewAllCategories },
-      { content: { categories: [makeCategory()] } },
-    )
+  describe('side-by-side cards (width: half)', () => {
+    const withMapAndZmanim = [
+      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
+      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+    ]
 
-    await user.click(screen.getByRole('button', { name: /Browse all categories/ }))
+    it('pairs two adjacent half-width cards into one row', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+          ],
+        },
+      })
+      act(() => triggerAllIntersections())
 
-    expect(onViewAllCategories).toHaveBeenCalledTimes(1)
+      // Both stubs share the same grid row — a direct parent with grid
+      // classes containing both testids, not two separate my-12 rows.
+      const daveningStub = screen.getByTestId('davening-stub')
+      const mapStub = screen.getByTestId('home-map-stub')
+      const row = daveningStub.closest('.grid')
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(mapStub)
+      // Only one shared outer spacing wrapper for the pair, not one each.
+      expect(container.querySelectorAll('.my-12').length).toBe(1)
+    })
+
+    it('a half-width card with no half-width neighbor falls back to its own full-width row', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: withMapAndZmanim,
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+      act(() => triggerAllIntersections())
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      // Not inside a grid — its own row, same as a full-width card.
+      expect(daveningStub.closest('.grid')).toBeNull()
+      expect(container.querySelectorAll('.my-12').length).toBe(2)
+    })
+
+    it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
+      // davening/map both 'half', but no zmanim category — davening is
+      // JS-gated on nothing here (it self-gates on minyanim data, mocked to
+      // always render), map self-gates on `hasMap`; drop the map category so
+      // map renders nothing at all, leaving davening the only real card.
+      renderLanding(undefined, {
+        content: {
+          categories: [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })], // no map category
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+          ],
+        },
+      })
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      expect(daveningStub.closest('.grid')).toBeNull()
+      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+    })
   })
+
+  describe('the "Browse everything" flat grid (desktop)', () => {
+    // The tab nav above already lists every category too, grouped under
+    // invented umbrella labels and hidden until hover — this grid exists
+    // specifically so nothing is grouped and nothing needs hovering. Its own
+    // describe block, not folded into the "narrows the grid" test above,
+    // because that test's assertions are about the mobile/search grid one
+    // section down, not this one.
+    it('shows every card flat, not grouped under a section heading', () => {
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+      renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
+
+      // The card's heading is `settings.heroTitle` now ("What are you
+      // looking for?" by default), not a hardcoded "Browse Everything" —
+      // see Landing.tsx's own comment on why that string is gone.
+      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
+      // Both cards render as siblings under the ONE "Browse everything"
+      // heading — not under their own admin-configured section titles
+      // ("Food and Hospitality", etc.), which is what "flat" means here.
+      const grid = heading.parentElement!
+      expect(within(grid).getByText('Grocery Stores')).toBeInTheDocument()
+      expect(within(grid).getByText('Synagogues')).toBeInTheDocument()
+    })
+
+    // A list meant to hold every card at once (13+ real categories, growing)
+    // reads as "too many different things crammed together" the moment each
+    // row gets its own bordered box — that's the exact complaint that moved
+    // this section from CardGrid's photo tiles to CompactCardGrid in the
+    // first place. A border re-added later, even a subtle one, quietly
+    // reintroduces the same crowding at scale.
+    it('rows have no border/background at rest — only on hover, like the tab nav\'s own menu items', () => {
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+
+      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
+      const row = within(heading.parentElement!).getByText('Grocery Stores').closest('a')!
+      expect(row.className).not.toMatch(/\bborder\b/)
+      expect(row.className).not.toMatch(/\bbg-white\b/)
+      expect(row.className).toMatch(/hover:bg-slate-50/)
+    })
+
+    // `settings.heroTitle` now titles the whole merged card — search sits
+    // under it as the first thing in the section, framed as "search within
+    // these categories" — not just this flat grid, so unlike the flat grid
+    // itself (still replaced by the grouped results grid while there's a
+    // query — see "narrows the grid" above), the heading no longer hides.
+    it('keeps its heading as the section title while actively searching', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
+
+      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
+      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+    })
+
+    it('tracks category_opened with source "grid" on a card click', async () => {
+      const user = userEvent.setup()
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+
+      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
+      await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
+
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })
+    })
+  })
+
+  // Landing never remounts when a category's back arrow returns here — Next
+  // keeps this exact instance alive instead of tearing it down (confirmed
+  // live; see globals.css's `.reveal-slide-back` doc) — so nothing in
+  // React's own lifecycle (a render, an effect re-running) ever fires again
+  // on this reveal. An IntersectionObserver is what actually catches it
+  // (real layout visibility, independent of React), gated on
+  // markHomeReveal()/consumeHomeReveal() so an ordinary scroll-driven
+  // intersection change doesn't also trigger it.
+  describe('the mobile back-arrow reveal (reveal-slide-back)', () => {
+    afterEach(() => mockViewport(false))
+
+    it('applies reveal-slide-back once a pending reveal actually intersects', () => {
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+      expect(main.className).toContain('animate-[fadeIn_180ms_ease-out]')
+
+      markHomeReveal()
+      // An intersection callback reporting NOT intersecting must be a
+      // no-op regardless of a pending reveal — only isIntersecting: true
+      // ever applies the slide (see Landing's own doc on why there's no
+      // separate "ignore the first callback" special case any more).
+      act(() => setAllIntersecting(false))
+      expect(main.className).not.toContain('reveal-slide-back')
+
+      act(() => triggerAllIntersections())
+      expect(main.className).toContain('reveal-slide-back')
+      expect(main.className).not.toContain('animate-[fadeIn_180ms_ease-out]')
+
+      // Deliberately never reverts to animate-[fadeIn_180ms_ease-out] —
+      // see this className's own doc on why swapping it back caused a
+      // visible flash on a real device (a fresh animation-name value
+      // restarts whatever's newly named, including a fade-from-transparent
+      // on already-visible content). This assertion is a weak guard, not
+      // real regression coverage: it passes against the OLD buggy code
+      // too (confirmed directly), since the bug lived in an
+      // onAnimationEnd handler that only ever fired from a real
+      // 'animationend' event — jsdom has no AnimationEvent/
+      // animation-timeline support at all, so nothing here can actually
+      // trigger it either way. Kept anyway as a sanity check that a plain
+      // intersection update alone (no real animation involved) doesn't
+      // touch the class.
+      act(() => setAllIntersecting(false))
+      expect(main.className).toContain('reveal-slide-back')
+    })
+
+    it('ignores an ordinary reveal with no pending back-navigation', () => {
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      // No markHomeReveal() this time — an ordinary scroll-driven
+      // intersection change becoming true must never apply the slide on
+      // its own.
+      act(() => triggerAllIntersections())
+      expect(main.className).not.toContain('reveal-slide-back')
+    })
+
+    it('applies the slide even when the FIRST-EVER intersection callback is the one reporting true', () => {
+      // Regression guard for the actual production bug: a live capture
+      // against a real deployment showed the observer's first-ever
+      // callback can itself be the "became visible again" event, with no
+      // earlier "became hidden" callback ever arriving to be skipped
+      // first — the browser can coalesce a fast hide-then-reveal into one
+      // notification. An earlier version of this effect specifically
+      // ignored the observer's first-ever callback on the assumption it
+      // always reports harmless pre-existing state, which silently ate
+      // this exact case.
+      mockViewport(true)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      markHomeReveal()
+      act(() => triggerAllIntersections())
+      expect(main.className).toContain('reveal-slide-back')
+    })
+
+    it('does nothing on desktop even with a reveal pending', () => {
+      mockViewport(false)
+      const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+      renderLanding(undefined, { content: { categories: [grocery] } })
+      const main = document.querySelector('main')!
+
+      markHomeReveal()
+      act(() => triggerAllIntersections())
+      expect(main.className).not.toContain('reveal-slide-back')
+    })
+  })
+
 })

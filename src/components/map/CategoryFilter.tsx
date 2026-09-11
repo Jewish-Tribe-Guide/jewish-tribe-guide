@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
 import type { MapPoint } from './ResourceMap'
 import CategoryFilterControls, { activeFilterEntries, categoryHasFilterableFields } from './CategoryFilterControls'
-import { ChevronRightIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 
@@ -72,6 +72,23 @@ type Props = {
    *  reorders this row. See the `order` state below for why an ordinary tap
    *  on a chip already in the row must NOT do the same. */
   resortToken?: number
+  /** Desktop only: round buttons pinned at the row's left/right edges that
+   *  scroll it — replacing the browser's native (and here invisible, since
+   *  `chip-scroll` hides the scrollbar) horizontal-scroll affordance with
+   *  something a visitor can actually see and click. Each side's button
+   *  only shows once there's actually somewhere left to scroll TO on that
+   *  side — hidden at the very start (nothing to scroll back to) and the
+   *  very end (nothing left to scroll forward to), the same pattern most
+   *  carousel components use. Both are absolutely positioned OVER the row
+   *  rather than flex siblings beside it, so showing/hiding either one can
+   *  never change the row's own layout width — which is what makes toggling
+   *  them safe: an earlier version reserved the right button's space as a
+   *  flex sibling instead, and mounting/unmounting it changed the row's own
+   *  width, which is exactly what decided whether to mount it — a feedback
+   *  loop that visually shook (see CategoryFilter.test.tsx's own note).
+   *  Not meaningful together with `wrap` (the full-screen picker's own
+   *  multi-line layout has no scroll to reveal). */
+  scrollArrow?: boolean
 }
 
 /** The filter bar above the map: a chip per category that doubles as the color
@@ -98,6 +115,7 @@ export default function CategoryFilter({
   pinnedChip,
   pinnedOn,
   resortToken,
+  scrollArrow,
 }: Props) {
   // Mobile keeps the original, simpler chip: a filter segment only shows up
   // once something's already active (spelled out, e.g. "IKC"), and tapping
@@ -208,6 +226,32 @@ export default function CategoryFilter({
   // outside-click check below.
   const popupRef = useRef<HTMLDivElement>(null)
 
+  // `scrollArrow`'s own row ref, plus which of the two edge buttons are
+  // currently worth showing — recomputed on scroll (the row itself moving)
+  // and on resize (the row's own width, or its content, changing). Starts
+  // both false: the true starting state is measured on mount, in the effect
+  // below, before anything has necessarily painted with a wrong guess.
+  const scrollRowRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  useEffect(() => {
+    if (!scrollArrow) return
+    const el = scrollRowRef.current
+    if (!el) return
+    const check = () => {
+      setCanScrollLeft(el.scrollLeft > 1)
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    }
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', check)
+      ro.disconnect()
+    }
+  }, [scrollArrow, optionIds])
+
   useEffect(() => {
     if (!openFilterFor) return
     function handleClick(e: MouseEvent | TouchEvent) {
@@ -279,8 +323,28 @@ export default function CategoryFilter({
 
   const openCategory = openFilterFor ? categories.find((c) => c.id === openFilterFor) : undefined
 
-  return (
-    <div className={wrap ? 'flex flex-wrap items-center gap-1.5' : 'chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1'}>
+  const scrollByDirection = (dir: 1 | -1) => {
+    const el = scrollRowRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  const row = (
+    <div
+      ref={scrollArrow ? scrollRowRef : undefined}
+      className={
+        wrap
+          ? 'flex flex-wrap items-center gap-1.5'
+          // Padding reserved on BOTH sides unconditionally, regardless of
+          // canScrollLeft/canScrollRight — same reasoning as the buttons
+          // themselves being absolutely positioned: if this padding came
+          // and went with the buttons' own visibility, the row's width (and
+          // therefore its own scroll bounds) would change depending on
+          // state, which is exactly the kind of self-referential loop that
+          // caused the shaking bug this file's tests document.
+          : `chip-scroll flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 ${scrollArrow ? 'pl-9 pr-9' : ''}`
+      }
+    >
       {/* Always resets to everything — there's no "hide everything" state
           left to toggle to (unclicking the last chip already resets here,
           see `toggle` in ResourceMapView), so this reads as a single "All"
@@ -486,6 +550,41 @@ export default function CategoryFilter({
           className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
         >
           ⋯ More
+        </button>
+      )}
+    </div>
+  )
+
+  if (!scrollArrow) return row
+
+  // Each button is absolutely positioned OVER the row rather than a flex
+  // sibling beside it (matching Google Maps' own right-edge button exactly —
+  // verified live: `position: absolute; right: 0; width/height: 32px;
+  // border-radius: 16px`) — an overlay can never change the row's own
+  // layout width, which is what makes conditionally showing/hiding either
+  // one safe: an earlier version reserved the right button's space as a
+  // flex sibling instead, and mounting/unmounting it changed the row's own
+  // width, which is exactly what decided whether to mount it — a feedback
+  // loop that visually shook (see CategoryFilter.test.tsx's own note).
+  return (
+    <div className="relative">
+      {row}
+      {canScrollLeft && (
+        <button
+          onClick={() => scrollByDirection(-1)}
+          aria-label="Show earlier categories"
+          className="absolute left-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </button>
+      )}
+      {canScrollRight && (
+        <button
+          onClick={() => scrollByDirection(1)}
+          aria-label="Show more categories"
+          className="absolute right-0 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md hover:bg-slate-50 cursor-pointer"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
         </button>
       )}
     </div>

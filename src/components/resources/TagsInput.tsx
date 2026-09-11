@@ -17,7 +17,7 @@ type Props = {
 
 // Multi-select for a `type: 'tags'` field: pick from the vocabulary or type a new
 // item. Values are stored as labels (e.g. "Kosher Cheese") on the listing.
-// Each selected tag can be toggled between "always" (green) and "sometimes" (amber)
+// Each selected tag can be toggled between "always" (green) and "sometimes" (caution)
 // by clicking the chip itself; × removes it entirely.
 //
 // A field with `fixedVocabulary` is closed — its vocab comes straight from the
@@ -116,7 +116,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
             </span>
           ))}
           {sometimes.map((label) => (
-            <span key={label} className="inline-flex items-center gap-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full pl-2 pr-1 py-0.5">
+            <span key={label} className="inline-flex items-center gap-1 text-xs font-medium bg-caution/10 text-caution border border-caution/30 rounded-full pl-2 pr-1 py-0.5">
               <button
                 type="button"
                 onClick={() => moveToAlways(label)}
@@ -125,7 +125,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
               >
                 ~{label}
               </button>
-              <button type="button" onClick={() => removeSometimes(label)} aria-label={`Remove ${label}`} className="hover:bg-amber-100 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
+              <button type="button" onClick={() => removeSometimes(label)} aria-label={`Remove ${label}`} className="hover:bg-caution/20 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
                 ×
               </button>
             </span>
@@ -135,7 +135,7 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
 
       {showConsistency && (always.length > 0 || sometimes.length > 0) && (
         <p className="text-xs text-muted mb-2">
-          <span className="text-green-700 font-medium">Green</span> = always in stock · Click a tag to toggle to <span className="text-amber-600 font-medium">~sometimes</span>
+          <span className="text-green-700 font-medium">Green</span> = always in stock · Click a tag to toggle to <span className="text-caution font-medium">~sometimes</span>
         </p>
       )}
 

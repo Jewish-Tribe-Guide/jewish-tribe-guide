@@ -42,6 +42,33 @@ export default defineConfig({
   // window for the network, and only in the setup helpers that use it.
   timeout: 60_000,
   fullyParallel: true,
+  // No explicit value used to mean Playwright's own default (half the CPU
+  // count) — 3 on a 6-core dev machine, but GitHub's ubuntu-latest runner
+  // only has 4 vCPUs shared between the Next.js server, every worker's own
+  // Chromium instance, AND the test runner process itself, which is a much
+  // more contended box than 4 raw cores suggests. Reported live: the SAME
+  // handful of content-read tests (home.spec.ts, routing.spec.ts —
+  // "element(s) not found" well inside their own timeouts, not a real
+  // absence) failed in CI across several runs, changing which exact test
+  // failed each time, while the full suite — same code, same fresh
+  // production build, `CI=true` to match reuseExistingServer's behavior —
+  // passed 177/177 locally every time. That rules out the application code
+  // and the tests themselves; what's left is the runner having measurably
+  // less real throughput per worker than this default assumes.
+  //
+  // Set to 1, not some smaller-but-still-parallel number — Playwright's
+  // default already resolves from the runner's own reported CPU count
+  // (which a container typically inherits from the host via cgroups, not
+  // something this file can read in advance), so a guessed intermediate
+  // value risks silently matching the existing default and changing
+  // nothing. 1 is the only value guaranteed to actually remove inter-test
+  // contention as a variable, rather than possibly not moving it at all.
+  // Capped globally rather than tuning individual test timeouts one at a
+  // time, since the failing test was a different one on every run — the
+  // contention is the actual variable, not any single assertion's own
+  // budget. Serial in CI costs real wall-clock time (this job's own
+  // 15-minute timeout has slack for it), not correctness.
+  workers: process.env.CI ? 1 : undefined,
   // Nothing here should be flaky; a retry that passes is hiding something.
   retries: 0,
   // CI keeps console output terse (dot) but also writes an HTML report, so a

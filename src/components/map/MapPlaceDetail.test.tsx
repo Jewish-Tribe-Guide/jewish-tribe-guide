@@ -57,9 +57,47 @@ describe('MapPlaceDetail', () => {
     expect(link).toHaveAttribute('href', '/test-community/grocery/goldi-market-abc123')
   })
 
-  it('shows the same FreshnessFooter/Share/Edit/Report bottom section the category directory\'s expanded card shows', () => {
+  // Regression: the header avatar used to overlay a small category-glyph
+  // badge on its own corner whenever a real photo was showing (see git
+  // history) — removed at the user's request, so a photo avatar here now
+  // renders as a plain circle with nothing else drawn on top of it.
+  it('shows the photo avatar with no category-glyph corner badge on top of it', () => {
+    const category = makeCategory({ id: 'grocery', label: 'Grocery Store' })
+    const item = makeListing({ name: 'Goldi Market', photo: 'https://example.com/goldi.jpg' })
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    // Not getByRole('img') — CategoryIcon's photo has alt="" (decorative),
+    // which drops it from the accessibility tree's img role entirely.
+    expect(document.querySelector('img')).toBeInTheDocument()
+    expect(document.querySelector('[class*="-right-1.5"][class*="-top-1.5"]')).not.toBeInTheDocument()
+  })
+
+  // Same PinnedBadge GenericListingCard/NearbyList put on their own avatars
+  // (see each file's identical test) — shows up here too now.
+  it('shows a pin badge on the header avatar once the listing is pinned', () => {
+    const category = makeCategory({ id: 'grocery', label: 'Grocery Store' })
+    const item = makeListing({ id: 'goldi-1', name: 'Goldi Market' })
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'goldi-1', categoryId: 'grocery' }]))
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    expect(screen.getByText('📌')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it('shows the same FreshnessFooter/Edit/Report bottom section the category directory\'s expanded card shows, plus a Pin/Share/Set location kebab in the header', async () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
+    const user = (await import('@testing-library/user-event')).default.setup()
 
     renderWithProviders(
       <PinnedProvider>
@@ -68,21 +106,27 @@ describe('MapPlaceDetail', () => {
     )
 
     expect(screen.getByText('Is this info current?')).toBeInTheDocument()
-    const shareButton = screen.getByRole('button', { name: /Share/ })
-    expect(shareButton).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+    const editButton = screen.getByRole('button', { name: /Edit/ })
+    expect(editButton).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Report/ })).toBeInTheDocument()
 
-    // The bug this guards: Share used to sit on the same line as "Is this
-    // info current?" (both inline elements with only a margin between them),
-    // instead of its own row below like the category directory's card.
-    // Share/Edit/Report all being direct siblings under one shared parent —
-    // separate from FreshnessFooter's own — is what forces the line break,
-    // same structure GenericListingCard uses.
-    const row = shareButton.parentElement!
-    expect(row).toContainElement(screen.getByRole('button', { name: /Edit/ }))
+    // The bug this used to guard: Share (now in the kebab below, not a
+    // footer sibling any more) used to sit on the same line as "Is this
+    // info current?" instead of its own row below. Edit/Report being direct
+    // siblings under one shared parent — separate from FreshnessFooter's
+    // own — is what still forces that line break, same structure
+    // GenericListingCard uses.
+    const row = editButton.parentElement!
     expect(row).toContainElement(screen.getByRole('button', { name: /Report/ }))
     expect(row).not.toContainElement(screen.getByText('Is this info current?'))
+
+    // Pin/Share/"Set location" — same kebab GenericListingCard's own card
+    // shows, restated here since this panel has no separate collapsed card
+    // of its own to put one on.
+    const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
+    await user.click(kebab)
+    expect(screen.getByRole('menuitem', { name: /^pin$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
   })
 
   it('swaps to the edit form (same one the category directory uses) when Edit is clicked, and back on cancel', async () => {
@@ -133,8 +177,9 @@ describe('MapPlaceDetail', () => {
 
     expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Report/ })).not.toBeInTheDocument()
-    // Share stays available regardless — it isn't a contribution capability.
-    expect(screen.getByRole('button', { name: /Share/ })).toBeInTheDocument()
+    // The kebab (Pin/Share/Set location) stays available regardless — none
+    // of those are contribution capabilities.
+    expect(screen.getByRole('button', { name: /more actions for goldi market/i })).toBeInTheDocument()
   })
 
   it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {
@@ -215,5 +260,27 @@ describe('MapPlaceDetail', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Back to list' }))
     expect(onBack).toHaveBeenCalled()
+  })
+
+  // Was self-start (the header row's own default) until this centered
+  // against just the name line instead of the whole name+category block —
+  // reversed to match GenericListingCard's own kebab, which centers
+  // against its full header for the same reason (Material Design: a row's
+  // trailing element centers against the row as a whole, not just its
+  // first line). Mocked up both options before this landed.
+  it('centers the kebab against the whole name+category block, not just the name', () => {
+    const category = makeCategory()
+    const item = makeListing()
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    const kebab = screen.getByRole('button', { name: /more actions for/i })
+    const positioned = kebab.closest('div[class*="mr-1"]')
+    expect(positioned).not.toBeNull()
+    expect(positioned).toHaveClass('self-center')
   })
 })

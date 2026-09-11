@@ -22,6 +22,7 @@ type PatchBody = {
   externalLink?: { label: string; url: string } | null
   cardImageUrl?: string | null
   cardTextColor?: string | null
+  cardBandImageUrl?: string | null
   pinColor?: string | null
   iconImageUrl?: string | null
   /** Map category only (kind === 'map') — see CategoryConfig's own doc. */
@@ -72,6 +73,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<'/api/admin/
   }
   if (body.cardImageUrl && !isHttpUrl(body.cardImageUrl)) {
     return Response.json({ ok: false, errors: ['The card image must be a valid http(s) URL.'] }, { status: 400 })
+  }
+  if (body.cardBandImageUrl && !isHttpUrl(body.cardBandImageUrl)) {
+    return Response.json({ ok: false, errors: ['The banner image must be a valid http(s) URL.'] }, { status: 400 })
   }
   if (
     body.mapZoomRadiusMiles !== undefined &&

@@ -14,10 +14,10 @@ import { community } from '@/community.config'
 //
 // `sections` (the draft prop) actually holds every home_section row, plain
 // sections AND the three built-in blocks (Popular right now / Explore the
-// map / Zmanim & Shabbos — see homeSections.ts's HomeBlockKind) sharing one
-// table/one save pipeline. Those three are desktop-only concerns edited from
-// their own place (DesktopTopicsManager, under the Desktop & mobile tab's
-// Desktop toggle) — this component only ever renders/reorders the
+// map / Zmanim & Shabbos / Browse / Shabbat — see homeSections.ts's
+// HomeBlockKind) sharing one table/one save pipeline. Those built-ins are
+// desktop-only concerns edited from their own place (DesktopTopicsManager,
+// under the Desktop tab) — this component only ever renders/reorders the
 // kind==='section' subset, carefully leaving any built-in entries in the
 // draft untouched (see sectionEntries/builtInEntries below) rather than
 // assuming the array is homogeneous. ──────────────────────────────────────
@@ -84,7 +84,11 @@ export default function HomeSectionManager({
 
   function addSection() {
     if (!newTitle.trim()) return
-    onChange([...sectionEntries, { id: newDraftSectionId(), kind: 'section', title: newTitle.trim(), cardIds: [] }, ...builtInEntries])
+    onChange([
+      ...sectionEntries,
+      { id: newDraftSectionId(), kind: 'section', title: newTitle.trim(), cardIds: [], width: 'full' },
+      ...builtInEntries,
+    ])
     setNewTitle('')
   }
 

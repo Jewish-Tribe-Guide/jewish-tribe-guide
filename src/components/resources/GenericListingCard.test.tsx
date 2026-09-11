@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
+import { createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
-import { GenericListingCard } from './GenericListingCard'
+import { ForcedViewport } from '@/lib/useIsMobile'
+import { GenericListingCard, MOBILE_PANEL_TRANSITION_MS, type GenericListingCardHandle } from './GenericListingCard'
 
 // The first component test built on the CommunityProvider/ContentProvider
 // harness (renderWithProviders) — this was the specific component the
@@ -59,10 +61,132 @@ describe('GenericListingCard — collapsed', () => {
     // why: it holds other real interactive children, so it can't also be
     // an ARIA button). Clicking it exercises the real accessible path,
     // not just the row's mouse-only onClick convenience.
-    const toggle = screen.getByRole('button', { expanded: false })
+    const toggle = screen.getByRole('button', { name: /show details for/i })
     await user.click(toggle)
 
-    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide details for/i })).toBeInTheDocument()
+  })
+
+  // The outer card wrapper stretches to match its row-mates in the desktop
+  // grid (CSS Grid's default row-stretch — see the wrapper's own h-full
+  // comment), but a plain block child doesn't inherit that automatically.
+  // Without h-full on this inner row too, a card shorter than its tallest
+  // neighbor left a dead strip at the card's own bottom — inside the visible
+  // border, past where this div's content ended — with no onClick and no
+  // hover state, which is what read as "the whole card isn't clickable."
+  it('the clickable row stretches to fill the card (h-full), not just its own content', () => {
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    const row = toggle.closest('div[class*="cursor-pointer"]')
+    expect(row).not.toBeNull()
+    expect(row).toHaveClass('h-full')
+  })
+
+  // The kebab/toggle group is absolutely positioned (right-0, top-1/2
+  // -translate-y-1/2) against the relative wrapper spanning the whole
+  // pre-badge-divider block, not just the icon/name/address row it used to
+  // share a flex row with — self-centering WITHIN that row (an earlier,
+  // narrower fix) only matched the row's own short height, and still
+  // pinned the kebab near the top of a taller card once a header text
+  // field or an upvote/distance row added real height below it. Centering
+  // against the CARD's real header height needed pulling it out of normal
+  // flex flow entirely, not just changing its align-self — see that
+  // group's own comment for the fuller reasoning, and this component's
+  // Storybook-free live-verification notes in the commit that introduced
+  // this for the getBoundingClientRect check that actually caught the gap
+  // a self-center-only fix left behind.
+  it('positions the kebab absolutely, centered against the full pre-badge block', () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    const kebab = screen.getByRole('button', { name: /more actions for/i })
+    const positioned = kebab.closest('div[class*="absolute"]')
+    expect(positioned).not.toBeNull()
+    expect(positioned).toHaveClass('absolute', 'right-1', 'top-1/2', '-translate-y-1/2')
+
+    // Its positioning context (the nearest `relative` ancestor an absolute
+    // child measures against) is the wrapper spanning the icon/name row AND
+    // the rows below it, not the narrow icon/name row alone — that's the
+    // actual "the whole card" the kebab centers against now.
+    expect(positioned!.parentElement).toHaveClass('relative', 'pr-8')
+  })
+
+  // The outside click that dismisses the kebab almost always lands ON this
+  // row (it's most of the visible card) — without something to stop it,
+  // that same tap also silently expanded the card in the same motion.
+  // Confirmed live before this landed (getBoundingClientRect + aria-expanded
+  // before/after showed it flipping to true on the dismiss tap itself).
+  // Two fix attempts came before the one this now tests: a capture-phase
+  // stopPropagation inside ListingActionsMenu (worked here, not on real
+  // iPhones), then a per-card suppression ref/shared module keyed off
+  // ListingActionsMenu's own onOutsideDismiss callback (worked, but every
+  // new caller — the map's background tap, a directory's Add button — needed
+  // its own bespoke wiring, and some never got it). ListingActionsMenu now
+  // owns this itself with a real, invisible backdrop covering the whole
+  // viewport while the menu is open (see its own top-of-file doc) — this
+  // test clicks that backdrop directly (by test id, not the row), since in
+  // jsdom (no real hit-testing from screen position) that's what actually
+  // receives an outside tap now; a real browser routes the same tap there
+  // by ordinary z-order, whatever it looks like it landed on.
+  it('does not expand the card on the same tap that dismisses its kebab menu', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    // A later, genuinely separate tap on the row must still work.
+    const row = toggle.closest('div[class*="cursor-pointer"]')!
+    await user.click(row)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  // Same failure mode as the test above, but across two different cards —
+  // the popup is portaled (see ListingActionsMenu's own doc), so an outside
+  // tap dismissing card A's menu could land anywhere on the page, including
+  // card B's own row. The backdrop fixes this the same way as the same-card
+  // case: card B is never involved in the click at all (the backdrop
+  // belongs to card A's own React tree and stops its own propagation — see
+  // ListingActionsMenu's own doc), so this is really confirming there's
+  // nothing card-specific left to keep in sync between the two cases any
+  // more, not a separate mechanism.
+  it("does not expand a different card on the tap that dismisses another card's kebab menu", async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const itemA = makeListing({ id: 'listing-a', name: 'Card A' })
+    const itemB = makeListing({ id: 'listing-b', name: 'Card B' })
+    renderWithProviders(
+      <>
+        <GenericListingCard item={itemA} category={category} upvotes={false} count={0} {...requiredHandlers} />
+        <GenericListingCard item={itemB} category={category} upvotes={false} count={0} {...requiredHandlers} />
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for card a/i }))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('listing-actions-backdrop'))
+    const toggleB = screen.getByRole('button', { name: /show details for card b/i })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(toggleB).toHaveAttribute('aria-expanded', 'false')
+
+    // A later, genuinely separate tap on card B must still work.
+    const rowB = toggleB.closest('div[class*="cursor-pointer"]')!
+    await user.click(rowB)
+    expect(toggleB).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('does not render an upvote count when upvotes is false', () => {
@@ -193,7 +317,231 @@ describe('GenericListingCard — collapsed', () => {
     expect(onNameClick).toHaveBeenCalledTimes(1)
     // Expanding is a separate, unrelated interaction — clicking the name
     // alone shouldn't also toggle the row.
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
+  })
+
+  // PinnedBadge on the avatar — same treatment NearbyList's own left icon
+  // gets (see that file's identical test).
+  it('shows a pin badge on the avatar only once the listing is pinned', () => {
+    localStorage.setItem('jpc:pinned-listings', JSON.stringify([{ id: 'listing-1', categoryId: 'grocery' }]))
+    const category = makeCategory({ id: 'grocery' })
+    const item = makeListing({ id: 'listing-1', name: 'Acme Grocery' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.getByText('📌')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it('shows no pin badge for an unpinned listing', () => {
+    const category = makeCategory()
+    const item = makeListing({ name: 'Acme Grocery' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(screen.queryByText('📌')).not.toBeInTheDocument()
+  })
+})
+
+describe('GenericListingCard — showInHeader text/textarea fields', () => {
+  // `text` keeps the single-line truncate a header field always had — a
+  // short tagline has a sensible one-line-or-nothing shape.
+  it('truncates a showInHeader "text" field to one line', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }],
+    })
+    const item = makeListing({ note: 'Sit-down glatt kosher steakhouse' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    for (const note of screen.getAllByText('Sit-down glatt kosher steakhouse')) {
+      expect(note).toHaveClass('truncate')
+    }
+  })
+
+  // `textarea` clamps to a few lines instead — a real free-form description
+  // (Networking's listings are just a name and a website otherwise) has no
+  // sensible one-line-or-nothing shape, and truncating it to one line would
+  // cut it off after a handful of words.
+  it('clamps a showInHeader "textarea" field to a few lines instead of truncating', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', showInHeader: true }],
+    })
+    const item = makeListing({ d: 'A network of young leaders and philanthropists giving back as they build connections and community.' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    // Rendered twice (a desktop version and a mobile twin — see
+    // GenericListingCard's own comment on why); both should carry the clamp.
+    // Inline style, not a `line-clamp-3` className — see
+    // headerTextClampStyle's own comment on why className-based line-clamp
+    // silently did nothing here (a `desktop:block`/`desktop:hidden` display
+    // utility on the same element won the cascade over line-clamp's own
+    // required `display: -webkit-box`).
+    for (const description of screen.getAllByText(/A network of young leaders/)) {
+      expect(description).toHaveStyle({ WebkitLineClamp: '3', display: '-webkit-box' })
+      expect(description).not.toHaveClass('truncate')
+    }
+  })
+
+  // Regression: mobile used to render this description AFTER the upvote/
+  // distance row instead of before it, unlike desktop (whose own copy of
+  // this field sits inside the name column, ahead of that row entirely) —
+  // so mobile visitors saw popularity/distance outrank the description.
+  it('renders the mobile-only description before the upvote/distance row, matching desktop\'s own order', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'note', label: 'Note', type: 'text', showInHeader: true }],
+      upvotesEnabled: true,
+    })
+    const item = makeListing({ note: 'Sit-down glatt kosher steakhouse' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // Not `[class*="pl-[52px]"]` alone — the mobile description paragraph
+    // itself also carries that class (it's indented to match), so that
+    // selector matches it first regardless of order. mt-1.5 + justify-start
+    // together are unique to the upvote/distance row.
+    const mobileDescription = document.querySelector('p.desktop\\:hidden.truncate')!
+    const upvoteRow = document.querySelector('div[class*="mt-1.5"][class*="justify-start"]')!
+    expect(mobileDescription.compareDocumentPosition(upvoteRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
+
+// The row-alignment handle GenericDirectory uses to measure each card's
+// content height and set two independent invisible spacers — one above the
+// upvote/distance row, one above the badge row — see GenericListingCardHandle's
+// own doc for why this is two segments rather than one shared spacer: it's
+// what makes the popularity/distance LINE itself land at the same height
+// across a row of cards, not just the badges further down. An earlier
+// heuristic (reserving 2-line name height category-wide) reserved a visible
+// gap between the NAME and ADDRESS on every card in a category, not just the
+// row that actually needed it — that's gone.
+describe('GenericListingCard — row-alignment handle', () => {
+  it('measureUpvoteRowOffset reads the real gap between the card root and the upvote/distance row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: true })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // jsdom lays out everything at 0×0 (no real geometry engine), so the
+    // meaningful assertion here isn't a specific pixel value — it's that
+    // the handle actually returns a number instead of null, i.e. it found
+    // both the card root and a real upvote/distance row to measure between.
+    // A category with nothing there (see the next test) is what null is for.
+    expect(ref.current?.measureUpvoteRowOffset()).not.toBeNull()
+  })
+
+  it('measureUpvoteRowOffset is null when there is no upvote/distance row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: false })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(ref.current?.measureUpvoteRowOffset()).toBeNull()
+  })
+
+  it('measureBadgeGap reads the gap to the badge row, falling back to the card root when there is no upvote row', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({
+      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+      upvotesEnabled: false,
+    })
+    const item = makeListing({ name: 'Acme', isKosher: true })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(ref.current?.measureBadgeGap()).not.toBeNull()
+  })
+
+  it('measureBadgeGap is null when there is no badge row to align', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    // No hours/filterable fields and upvotes off — nothing to put in the
+    // badge row (see badgeRow's own gating further up this file).
+    const category = makeCategory({ detailFields: [], upvotesEnabled: false })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    expect(ref.current?.measureBadgeGap()).toBeNull()
+  })
+
+  it("setUpvoteSpacerHeight sets the spacer directly above the upvote/distance row, clamped at 0", () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({ upvotesEnabled: true })
+    const item = makeListing({ name: 'Acme' })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes count={0} {...requiredHandlers} />,
+    )
+
+    // The spacer is the aria-hidden div immediately before the upvote row's
+    // own container — there's nothing else in the card carrying that exact
+    // pairing to identify it by.
+    const upvoteRow = document.querySelector('[class*="pl-[52px]"]')
+    const spacer = upvoteRow?.previousElementSibling
+
+    act(() => ref.current?.setUpvoteSpacerHeight(24))
+    expect(spacer).toHaveStyle({ height: '24px' })
+
+    act(() => ref.current?.setUpvoteSpacerHeight(-5))
+    expect(spacer).toHaveStyle({ height: '0px' })
+  })
+
+  it("setBadgeSpacerHeight sets the spacer directly above the badge row, clamped at 0", () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const category = makeCategory({
+      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+    })
+    const item = makeListing({ name: 'Acme', isKosher: true })
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    // The spacer is the aria-hidden div immediately before the badge row's
+    // own border-t container — there's nothing else in the card carrying
+    // that exact pairing to identify it by.
+    const badgeContainer = document.querySelector('.border-t.border-slate-100')
+    const spacer = badgeContainer?.previousElementSibling
+
+    act(() => ref.current?.setBadgeSpacerHeight(24))
+    expect(spacer).toHaveStyle({ height: '24px' })
+
+    act(() => ref.current?.setBadgeSpacerHeight(-5))
+    expect(spacer).toHaveStyle({ height: '0px' })
+  })
+})
+
+// The modal replaces GenericListingCard's own collapsed row entirely (the
+// card behind it is hidden under the backdrop), so a showInHeader url field
+// has to be restated somewhere in the dialog too — this is the "somewhere":
+// the same pill, next to the name, the collapsed row already used.
+describe('GenericListingCard — desktop modal header url field', () => {
+  it('shows a showInHeader url field as a pill next to the name in the dialog, not duplicated in the actions row', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory({
+      detailFields: [{ key: 'w', label: 'Website', type: 'url', showInHeader: true }],
+    })
+    const item = makeListing({ w: 'https://example.com' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+
+    const dialog = screen.getByRole('dialog')
+    const websiteLinks = within(dialog).getAllByRole('link', { name: 'Website' })
+    expect(websiteLinks).toHaveLength(1)
+    expect(websiteLinks[0]).toHaveAttribute('href', 'https://example.com')
   })
 })
 
@@ -346,7 +694,7 @@ describe('GenericListingCard — count badge', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.queryByText('Kosher')).not.toBeInTheDocument()
   })
@@ -361,7 +709,7 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { expanded: false }))
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument()
@@ -378,6 +726,94 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: /edit/i }))
 
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+  })
+
+  // Desktop's ListingDetailModal — real here, not mocked, since this is
+  // exactly the wiring under test: an arrow key while the dialog is open
+  // reaches GenericDirectory's onNavigate through it.
+  it('calls onNavigate(1)/onNavigate(-1) on ArrowRight/ArrowLeft while the dialog is open', async () => {
+    const user = userEvent.setup()
+    const onNavigate = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={onNavigate} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+    await user.keyboard('{ArrowRight}')
+    await user.keyboard('{ArrowLeft}')
+
+    expect(onNavigate).toHaveBeenNthCalledWith(1, 1)
+    expect(onNavigate).toHaveBeenNthCalledWith(2, -1)
+  })
+
+  // A visible arrow at either end of the list would look clickable but
+  // silently do nothing — this is what's supposed to stop that, not just
+  // the boundary check inside GenericDirectory's own navigateFromCard.
+  it('disables the Previous/Next buttons per hasPrev/hasNext, and clicking Next calls onNavigate(1)', async () => {
+    const user = userEvent.setup()
+    const onNavigate = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard
+        item={item}
+        category={category}
+        upvotes={false}
+        count={0}
+        onNavigate={onNavigate}
+        hasPrev={false}
+        hasNext={true}
+        {...requiredHandlers}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+
+    expect(screen.getByRole('button', { name: 'Previous listing' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next listing' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Next listing' }))
+    expect(onNavigate).toHaveBeenCalledWith(1)
+  })
+
+  // Was `fixed left-4`/`fixed right-4` — pinned to the viewport's own edges
+  // regardless of how far that left them from the dialog card itself (which
+  // tops out at max-w-md and sits centered, so on a wide screen the arrows
+  // ended up hundreds of pixels away). They're flex siblings of the card
+  // now, inside the same centered row, so they land right next to it at any
+  // viewport width instead.
+  it('sits as a flex sibling of the dialog card, not pinned to the viewport edge', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} onNavigate={vi.fn()} hasPrev hasNext {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+
+    const prevButton = screen.getByRole('button', { name: 'Previous listing' })
+    expect(prevButton).not.toHaveClass('fixed')
+    expect(prevButton.parentElement).toBe(screen.getByRole('dialog').parentElement)
+  })
+
+  // GenericDirectory needs to close THIS card and open a sibling from
+  // outside it — the whole reason GenericListingCard exposes a ref handle.
+  it('opens and closes via an imperative ref handle', async () => {
+    const category = makeCategory()
+    const item = makeListing()
+    const ref = createRef<GenericListingCardHandle>()
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    act(() => ref.current!.open())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    act(() => ref.current!.close())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
@@ -406,6 +842,9 @@ describe('GenericListingCard — distance slot', () => {
         {...requiredHandlers}
       />,
     )
+    // One copy — mobile and desktop now share the same row (see
+    // renderUpvoteDistanceContent's own doc on why the mobile-only stacked
+    // corner version was removed: it needed to make room for the kebab menu).
     expect(screen.getByRole('button', { name: slotLabel })).toBeInTheDocument()
   })
 
@@ -461,8 +900,77 @@ describe('GenericListingCard — distance slot', () => {
     // The row's own click handler expands the card. A tap meant for the slot
     // must not also do that — the visitor asked for the location picker, not
     // for this listing's details.
-    expect(screen.getByRole('button', { expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /show details for/i })).toBeInTheDocument()
 
     document.removeEventListener('jpc:open-location', opened)
+  })
+})
+
+// ── The collapsed row's actions kebab (Pin/Share/I'm here — see
+// ListingActionsMenu.tsx) and the layout change that made room for it: the
+// upvote/distance stat moved from a mobile-only corner column into the same
+// pl-[52px] row desktop already used, freeing the corner for the kebab on
+// both platforms. ──────────────────────────────────────────────────────────
+describe('GenericListingCard — actions menu corner', () => {
+  it('renders the actions kebab on desktop, in the collapsed row', () => {
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
+  })
+
+  it('renders the actions kebab on mobile too, in the same collapsed row', () => {
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
+  })
+})
+
+// The chevron used to be the only visible signal that this row expands at
+// all on mobile (no hover state exists there to hint at it another way).
+// Removing it (see the toggle button's own comment) meant the mobile panel
+// itself had to take over that job by animating open instead of popping in
+// silently — these two things ship together, not independently.
+describe('GenericListingCard — mobile accordion animation', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
+  it('renders no visible chevron svg any more, on either breakpoint', () => {
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    expect(toggle.querySelector('svg')).not.toBeInTheDocument()
+  })
+
+  it('keeps the panel mounted through its close transition, then removes it', () => {
+    vi.useFakeTimers()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+
+    const toggle = screen.getByRole('button', { name: /show details for/i })
+    act(() => fireEvent.click(toggle))
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+
+    const collapseToggle = screen.getByRole('button', { name: /hide details for/i })
+    act(() => fireEvent.click(collapseToggle))
+    // Still in the DOM immediately after collapsing starts — an instant
+    // unmount here is exactly the silent pop this animation replaced.
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+
+    act(() => void vi.advanceTimersByTime(MOBILE_PANEL_TRANSITION_MS))
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
   })
 })

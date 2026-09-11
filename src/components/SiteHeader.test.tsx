@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCommunity } from '@/test/providerFixtures'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
-import { HeaderCollapseProvider } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider, useSetScreenHeader } from '@/lib/headerVisibility'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
 import SiteHeader from './SiteHeader'
@@ -46,7 +47,7 @@ function location(overrides: Partial<LocationControls> = {}): LocationControls {
 }
 
 describe('SiteHeader — a single community', () => {
-  it('renders the site name/tagline as one "go home" button, with no switcher', async () => {
+  it('renders the site name as one "go home" button, with no switcher', async () => {
     const user = userEvent.setup()
     const onGoHome = vi.fn()
     renderWithProviders(
@@ -57,11 +58,26 @@ describe('SiteHeader — a single community', () => {
     )
 
     expect(screen.getByText('Test Directory')).toBeInTheDocument()
-    expect(screen.getByText('Find what you need')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
 
     await user.click(screen.getByText('Test Directory'))
     expect(onGoHome).toHaveBeenCalledTimes(1)
+  })
+
+  // The tagline used to render as a second line under the name — it repeated
+  // roughly what the hero's mission line says a few pixels of scroll later.
+  // Dropped from the header for that reason (see SiteHeader's own comment);
+  // the field itself is untouched (still admin-editable, still set here),
+  // it just has no render site left.
+  it('no longer renders the tagline — that redundant second line is gone', () => {
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory', tagline: 'Find what you need' } } },
+    )
+
+    expect(screen.queryByText('Find what you need')).not.toBeInTheDocument()
   })
 })
 
@@ -130,5 +146,56 @@ describe('SiteHeader — several communities', () => {
 
     expect(screen.getByText('Preview Name')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
+  })
+})
+
+describe('SiteHeader — mobile', () => {
+  // On mobile this block only ever renders on the home screen itself — every
+  // other screen swaps it for the back button (showScreenHeader) or the
+  // header collapses entirely (the map) — so a link back to the page you're
+  // already on has nowhere useful to go. Plain text there instead.
+  it('the site name is plain text, not a link back to the page you’re already on', async () => {
+    const user = userEvent.setup()
+    const onGoHome = vi.fn()
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <ForcedViewport isMobile>
+          <SiteHeader onGoHome={onGoHome} location={location()} />
+        </ForcedViewport>
+      </HeaderCollapseProvider>,
+      { content: { settings: { ...SITE_SETTINGS_DEFAULTS, name: 'Test Directory' } } },
+    )
+
+    expect(screen.getByText('Test Directory')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Test Directory' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Test Directory' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Test Directory'))
+    expect(onGoHome).not.toHaveBeenCalled()
+  })
+
+  // Regression coverage for the `compact` prop LocationControl used to take
+  // (SiteHeader passed `compact={showScreenHeader}`, collapsing the "Set
+  // location" text to just the pin icon on every non-home mobile screen).
+  // That's gone now — the prompt should show in full wherever the pill
+  // renders, on mobile, until a location is actually set.
+  it('still shows the "Set location" prompt in full on a category screen, not just the icon', () => {
+    function DirectoryScreenStandIn() {
+      useSetScreenHeader(true, 'Grocery', vi.fn())
+      return null
+    }
+
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <ScreenHeaderProvider>
+          <ForcedViewport isMobile>
+            <DirectoryScreenStandIn />
+            <SiteHeader onGoHome={vi.fn()} location={location()} />
+          </ForcedViewport>
+        </ScreenHeaderProvider>
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByText('Set location')).not.toHaveClass('hidden')
   })
 })

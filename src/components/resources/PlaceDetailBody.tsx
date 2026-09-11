@@ -9,7 +9,6 @@ import { useNow } from '@/lib/useNow'
 import HoursDisplay from './HoursDisplay'
 import DaveningTimes, { hasDaveningTimes } from './DaveningTimes'
 import Chip from './Chip'
-import SetLocationButton from './SetLocationButton'
 import { directionsUrl, destinationQuery } from '@/lib/googleMapsLinks'
 import { formatPhone } from '@/lib/validation'
 import { useOptionalLocation } from '@/lib/locationContext'
@@ -133,6 +132,17 @@ type Props = {
   /** Signal-badge field keys to skip in the status row for the same reason —
    *  they're the ones already showing in the caller's own header. */
   hiddenBadgeKeys?: string[]
+  /** Include showInHeader url fields (e.g. a "Join group" link) in the
+   *  action-button row below, instead of assuming they're already visible
+   *  elsewhere. GenericListingCard's own collapsed row renders these
+   *  persistently above its inline mobile accordion, so leaving this off
+   *  (the default) is correct there — the link never actually disappears.
+   *  It's wrong for a caller with no such persistent header of its own:
+   *  ListingDetailModal replaces the collapsed row entirely (the card
+   *  behind it is hidden under the backdrop), and MapPlaceDetail never had
+   *  one to begin with — both left a "Website" field configured
+   *  showInHeader simply missing once opened, not shown twice. */
+  includeHeaderUrlFields?: boolean
   /** Skip the "N kosher items" count chip (see GenericListingCard's own
    *  countHeaderField doc) — set by a caller whose own collapsed header
    *  already shows it. The map's place-detail popup has no collapsed state
@@ -150,7 +160,7 @@ type Props = {
  * where it's opened from. Callers add their own header and any
  * caller-specific extras (e.g. the card's Edit/Report footer) around this.
  */
-export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], hideCountBadge }: Props) {
+export default function PlaceDetailBody({ item, category, onTagClick, onFilterOpen, onFilterBool, onFilterSelect, hideOpenStatus, hiddenBadgeKeys = [], includeHeaderUrlFields = false, hideCountBadge }: Props) {
   // null outside a LocationProvider (the admin's category preview) — see
   // useOptionalLocation's own doc comment.
   const location = useOptionalLocation()
@@ -159,8 +169,10 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const tagFields = fields.filter((f) => f.type === 'tags')
   // A url field already shown up top on the collapsed card (showInHeader —
   // see GenericListingCard) doesn't also get an expanded action button here;
-  // one link, one place, not both.
-  const urlFields = fields.filter((f) => f.type === 'url' && !f.showInHeader)
+  // one link, one place, not both. Unless the caller says it has no such
+  // header of its own (includeHeaderUrlFields) — then this is the only
+  // place it can show at all.
+  const urlFields = fields.filter((f) => f.type === 'url' && (includeHeaderUrlFields || !f.showInHeader))
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const minyanimField = fields.find((f) => f.type === 'minyanim')
   // 'image' (the per-listing Photo field — see PHOTO_FIELD_KEY) is excluded
@@ -241,7 +253,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         cls:
           closure === 'permanent'
             ? 'bg-red-50 text-red-700 border-red-200'
-            : 'bg-amber-50 text-amber-700 border-amber-200',
+            : 'bg-caution/10 text-caution border-caution/30',
       }
     : null
   // Gated on placeId, not just the timestamp: a listing whose Google match
@@ -381,20 +393,12 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
       )}
 
       {showAddress && (
-        // min-w-0 but deliberately NOT flex-1: the address sizes to its own
-        // text, so the button sits immediately after it and reads as being
-        // about the address. flex-1 made the address fill the row, which on a
-        // wide desktop card pushed the button to the far right edge — far
-        // enough away that it looked like an unrelated control.
-        //
-        // Mobile is unchanged by that: there the address wants more room than
-        // the row has, so it shrinks (min-w-0 is what permits it) and wraps to
-        // two lines with the button riding the top of them, rather than
-        // truncating or being pushed onto a line of its own.
+        // "Set location" used to live here too, right after the address —
+        // now only in the kebab (ListingActionsMenu) on the collapsed card/
+        // dialog/map panel this renders inside.
         <div className="flex items-start gap-3">
           <PinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
           <p className="min-w-0 text-sm text-slate-800">{item.address}</p>
-          <SetLocationButton item={item} category={category} />
         </div>
       )}
 
@@ -459,7 +463,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
         ]}
       </ClampedChipRow>
       {tagsSometimes.length > 0 && (
-        <p className="text-[11px] text-amber-700 desktop:hidden">~not always in stock — call ahead</p>
+        <p className="text-[11px] text-caution desktop:hidden">~not always in stock — call ahead</p>
       )}
     </div>
   )
@@ -513,7 +517,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   const caveatSection = caveatNotes.length > 0 && (
     <div className="space-y-1">
       {caveatNotes.map(({ f, note }) => (
-        <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-amber-700">
+        <p key={`caveat:${f.key}`} className="text-[12px] leading-snug text-caution">
           {note || 'Not everything here is kosher — please verify.'}
         </p>
       ))}
@@ -524,8 +528,21 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // have content — never before the first or after the last — so a section
   // only ever gets a separating line when there's actually something on
   // both sides of it to separate.
+  //
+  // Filtered on truthiness (`Boolean`), not `s !== false`: most of these are
+  // `condition && (<div>...)`, where a false condition short-circuits to the
+  // boolean `false` — but addressSection's condition is an OR-chain ending
+  // in `syncedNote`, and `a || b || c` returns the LAST operand when every
+  // one is falsy, not necessarily the literal `false`. With nothing to show,
+  // that chain evaluates to `null` (syncedNote's own empty value), not
+  // `false` — `s !== false` let it through as a real section that rendered
+  // nothing, and the section AFTER it still got a divider drawn above it as
+  // if there'd been real content in this empty one to separate it from.
+  // Caught live: Networking's "The Chevra" (no address/phone/hours — an
+  // empty addressSection) showed a stray `<hr>` before its Description
+  // with nothing above it.
   const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, tagsSection, caveatSection]
-    .filter((s): s is Exclude<typeof s, false> => s !== false)
+    .filter((s): s is Exclude<typeof s, false | null | undefined> => !!s)
 
   return (
     <div className="space-y-4">

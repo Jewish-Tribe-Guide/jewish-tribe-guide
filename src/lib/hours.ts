@@ -17,6 +17,47 @@ export type StructuredHours = Partial<Record<DayKey, DayHours>>
 
 export const DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
+/** Which weekday it is, and how many minutes into it, in `timezone` —
+ *  NOT the caller's own device timezone, which `new Date(now).getDay()`/
+ *  `.getHours()` would silently use instead. That distinction is exactly
+ *  what upcomingDavening.ts needs and originally got wrong: it computed
+ *  "today"/"now" straight off the browser's local clock, so a visitor whose
+ *  device timezone doesn't match the community's (a phone that travelled,
+ *  a hospital kiosk set to UTC) could get handed the wrong day's minyanim
+ *  entirely, or a nowMinutes offset by hours — which reads exactly like "the
+ *  card jumped to tomorrow" or "showed an afternoon time for a morning
+ *  minyan" depending on which side of midnight/noon the offset landed on.
+ *  lib/zmanim.ts's own todayInTimezone solves the identical problem for
+ *  Hebcal's day-relative queries but isn't exported; this is the same
+ *  technique (Intl.DateTimeFormat with an explicit `timeZone`), generalized
+ *  for any caller that needs "what weekday, what time of day, over there".
+ *
+ *  NOT a replacement for getOpenStatus/hoursOpenNow above, which read the
+ *  viewer's own local clock ON PURPOSE (see this file's own top-of-file
+ *  doc and hours.test.ts's own note) — a visitor standing outside a store
+ *  correctly cares about their own wall time, not the store's. This
+ *  function is for the opposite case: matching a schedule that's tied to
+ *  the COMMUNITY's own location (a shul's posted minyan times) regardless
+ *  of where the person looking at the page happens to be standing. */
+export function dayAndMinutesInTimezone(now: number, timezone: string): { day: DayKey; minutes: number } {
+  const date = new Date(now)
+  const shortDow = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: timezone }).format(date)
+  const day = DAY_KEYS[['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(shortDow)]
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  // Midnight formats as "24" in some ICU implementations under hour12:false
+  // (correct per the spec's own hour-cycle rules, surprising to a caller
+  // expecting 0-23) — normalized here so minutes-since-midnight never comes
+  // out as 1440 for what is, in fact, minute 0.
+  const hour = get('hour') % 24
+  return { day, minutes: hour * 60 + get('minute') }
+}
+
 const DAY_LABELS: Record<DayKey, string> = {
   sun: 'Sunday',
   mon: 'Monday',

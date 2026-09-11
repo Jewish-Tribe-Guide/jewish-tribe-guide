@@ -5,7 +5,8 @@ import { DEFAULT_CATEGORY_ICON, type CategoryConfig } from '@/lib/categories'
 import { Card as HomeCard, TINTS } from '@/components/home/sections'
 import ImageUploadField from '@/components/ImageUploadField'
 import CategoryIcon from '@/components/CategoryIcon'
-import { categoryColorUsage, PIN_COLORS, type ColorUser } from '@/lib/categoryColor'
+import { CategoryGlyph } from '@/lib/categoryIcons'
+import { categoryColorUsage, categoryTint, categoryRing, PIN_COLORS, type ColorUser } from '@/lib/categoryColor'
 
 // ── Shared form-field building blocks used by CategoryEditor and
 // SingletonEditor (in CategoryManager.tsx), and by FormEditor. ──
@@ -232,6 +233,85 @@ export function CardBackgroundField({
             }}
             tint={TINTS[0]}
           />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// The banner-photo upload + crop + live preview — shared by the full category
+// editor and SingletonEditor. Separate from CardBackgroundField above: the
+// desktop directory header's banner (CategoryBandFrame) is a wide, short
+// strip, and a crop tight enough to read well as the home card's ~4:3 tile
+// usually cuts off too much of a wide banner (and vice versa) — so this is
+// its own photo with its own upload/crop step, not a second use of
+// cardImageUrl. Unlike that field (a pasted URL with no crop), this one IS an
+// upload — same ImageUploadField/ImageCropModal pattern as the icon field
+// above, just a wide `aspect` instead of a square one.
+export function CardBandImageField({
+  cardBandImageUrl,
+  onCardBandImageUrl,
+  fallbackImageUrl,
+  previewIcon,
+  previewColor,
+  token,
+}: {
+  cardBandImageUrl: string
+  onCardBandImageUrl: (value: string) => void
+  /** cardImageUrl, the home-card photo — what the real banner falls back to
+   *  (uncropped for this shape) when this field is blank, per bandImageFor. */
+  fallbackImageUrl: string
+  previewIcon: string
+  previewColor: string
+  token: string
+}) {
+  const previewImage = cardBandImageUrl.trim() || fallbackImageUrl.trim() || null
+  return (
+    <div className="pt-3 border-t border-slate-100">
+      <span className="block text-xs font-medium text-slate-700 mb-1">Desktop directory banner (optional)</span>
+      <div className="flex gap-4 items-start flex-wrap">
+        <div className="flex-1 min-w-[240px]">
+          <ImageUploadField
+            value={cardBandImageUrl}
+            onChange={onCardBandImageUrl}
+            uploadUrl="/api/admin/categories/band"
+            token={token}
+            shape="square"
+            aspect={5}
+            helpText={
+              fallbackImageUrl.trim()
+                ? 'Shown at the top of this category’s page on desktop. Falls back to the home-screen card photo above (uncropped for this wider shape) if left blank, then to a plain color wash.'
+                : 'Shown at the top of this category’s page on desktop. Falls back to a plain color wash if left blank — same as every category without a photo here.'
+            }
+          />
+        </div>
+        {/* A contained stand-in for the real banner, which is full-bleed and
+            desktop-only (CategoryBandFrame) — fixed-width here so it fits the
+            editor panel regardless. The crop/color/badge shown is exactly
+            what a visitor sees; only the "full browser width" part is mocked. */}
+        <div className="w-40 shrink-0">
+          <span className="block text-[10px] font-medium text-slate-500 mb-1">Preview</span>
+          <div
+            className="relative h-14 w-40 overflow-hidden rounded-md border border-slate-200"
+            style={!previewImage ? { backgroundColor: categoryTint(previewColor) } : undefined}
+          >
+            {previewImage && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- see
+                    ImageUploadField's own identical note: previews a photo that
+                    may have been uploaded seconds ago, so no benefit from the
+                    optimizer and a real risk of a stale cached copy. */}
+                <img src={previewImage} alt="" className="h-full w-full object-cover" />
+                <div className="absolute inset-0" style={{ backgroundColor: `${previewColor}73` }} />
+              </>
+            )}
+          </div>
+          <div
+            className="relative -mt-4 ml-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white text-sm"
+            style={{ boxShadow: `0 0 0 2px white, ${categoryRing(previewColor)}`, color: previewColor }}
+          >
+            <CategoryGlyph categoryId={undefined} icon={previewIcon || DEFAULT_CATEGORY_ICON} className="h-[55%] w-[55%]" />
+          </div>
         </div>
       </div>
     </div>

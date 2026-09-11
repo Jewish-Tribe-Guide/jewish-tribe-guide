@@ -186,11 +186,25 @@ export async function largestCategory(
  *  The prompt renders after a data-dependent effect, not on first paint, so
  *  a one-shot `isVisible()` check races it: it can appear moments after the
  *  check passes and intercept whatever the test clicks next. Actively wait a
- *  bit instead — harmless (and fast to resolve) when it never shows up. */
+ *  bit instead — harmless (and fast to resolve) when it never shows up.
+ *
+ *  1000ms used to be that wait. Reported live in CI: multiple unrelated
+ *  tests timing out on `locator.click` with this exact prompt's own
+ *  backdrop (`role="presentation"`, `z-[70]`) "intercepts pointer events",
+ *  retried for the test's full 60s budget — the prompt's data-dependent
+ *  effect finishing just past 1000ms under CI's real resource contention
+ *  (this repo's own file-level notes document the same "suspect a budget,
+ *  not the system under test" shape happening more than once elsewhere),
+ *  so this returned early believing there was nothing to dismiss while the
+ *  prompt was still about to open. 5000ms, matching this suite's own
+ *  default `expect` timeout elsewhere — same reasoning as the doc above:
+ *  still fast when the prompt never shows, since the wait resolves the
+ *  instant `state: 'visible'` is met OR the timeout is reached, not a fixed
+ *  delay either way. */
 export async function dismissLocationPrompt(page: Page): Promise<void> {
   const notNow = page.getByRole('button', { name: 'Not now' })
   try {
-    await notNow.waitFor({ state: 'visible', timeout: 1000 })
+    await notNow.waitFor({ state: 'visible', timeout: 5000 })
   } catch {
     return
   }

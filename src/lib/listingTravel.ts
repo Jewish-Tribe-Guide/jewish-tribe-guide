@@ -52,12 +52,19 @@ export function travelCompare(a: DirectoryResource, b: DirectoryResource): numbe
   return a.name.localeCompare(b.name)
 }
 
-// The travel chips shown on a card, as separate strings so drive/walk can stack
-// vertically instead of being joined on one wide line.
-export function travelParts(item: DirectoryResource): string[] {
-  if (item.milesFromAddress != null) return [`📍 ${roundMiles(item.milesFromAddress)} mi`]
-  const parts: string[] = []
-  if (item.driveMinutes != null) parts.push(`🚗 ${item.driveMinutes} min`)
-  if (item.walkMinutes != null) parts.push(`🚶 ${item.walkMinutes} min`)
+// The travel chips shown on a card, as separate parts so drive/walk can stack
+// vertically instead of being joined on one wide line. `kind` rather than an
+// embedded emoji so the caller (a .tsx component) can render the straight-line
+// distance with the same PinIcon the rest of the app uses for "location" —
+// this file stays plain .ts, with no JSX of its own. Drive/walk keep their
+// emoji since there's no vector icon for those yet and no report of them
+// reading as broken the way the bare pin-and-dash placeholder did.
+export type TravelPart = { kind: 'distance' | 'drive' | 'walk'; text: string }
+
+export function travelParts(item: DirectoryResource): TravelPart[] {
+  if (item.milesFromAddress != null) return [{ kind: 'distance', text: `${roundMiles(item.milesFromAddress)} mi` }]
+  const parts: TravelPart[] = []
+  if (item.driveMinutes != null) parts.push({ kind: 'drive', text: `🚗 ${item.driveMinutes} min` })
+  if (item.walkMinutes != null) parts.push({ kind: 'walk', text: `🚶 ${item.walkMinutes} min` })
   return parts
 }

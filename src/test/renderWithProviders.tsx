@@ -4,6 +4,7 @@ import type { Community } from '@/lib/communityStore'
 import type { CommunityContent } from '@/lib/loadCommunityContent'
 import { CommunityProvider } from '@/lib/communityContext'
 import { ContentProvider } from '@/lib/contentContext'
+import { PinnedProvider } from '@/lib/pinnedContext'
 import { makeCommunity, makeContent } from './providerFixtures'
 
 // ── Renders a component inside the same provider stack the real app wraps it
@@ -39,9 +40,17 @@ export function renderWithProviders(ui: ReactElement, options: Overrides & Omit<
   const resolvedContent = makeContent(content)
   const resolvedCommunities = communities ?? [resolvedCommunity]
 
+  // PinnedProvider — matches SiteChrome's own real nesting (it wraps the
+  // whole app in one), added when GenericListingCard grew a Pin action that
+  // calls usePinned() unconditionally. Not LocationProvider: useOptionalLocation()
+  // already tolerates its absence by returning null, which is what real
+  // production code does on purpose in the admin preview — so tests using
+  // this harness simply don't exercise "I'm here", same as that real screen.
   const wrap = (node: ReactElement) => (
     <CommunityProvider community={resolvedCommunity} communities={resolvedCommunities}>
-      <ContentProvider content={resolvedContent}>{node}</ContentProvider>
+      <ContentProvider content={resolvedContent}>
+        <PinnedProvider>{node}</PinnedProvider>
+      </ContentProvider>
     </CommunityProvider>
   )
 

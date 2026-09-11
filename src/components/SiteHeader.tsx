@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState, type MouseEvent } from 'react'
+import type { MouseEvent } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import LocationControl, { type LocationControls } from '@/components/home/LocationControl'
 import CommunitySwitcher from '@/components/CommunitySwitcher'
+import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { nextHeaderVisible, useHeaderCollapsed } from '@/lib/headerVisibility'
+import { useHeaderCollapsed, useScreenHeader, useScrollShowHide } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
@@ -23,9 +24,17 @@ type Props = {
   /** Admin-preview only: render with these settings instead of the live,
    *  fetched ones — used by the Site tab's Preview button. */
   previewSettings?: SiteSettings
+  /** Admin category preview only (CategoryPreview.tsx) — that tool renders
+   *  this header around one isolated category screen, and always has since
+   *  before HeaderNav existed (SectionTabs, its predecessor, never mounted
+   *  there either — it only ever lived on the home screen). A full
+   *  Categories/Map/More nav navigating out of that isolated preview isn't
+   *  something that tool ever offered, so this keeps it that way rather than
+   *  silently gaining site-wide nav chrome it wasn't designed around. */
+  hideNav?: boolean
 }
 
-export default function SiteHeader({ onGoHome, location, previewSettings }: Props) {
+export default function SiteHeader({ onGoHome, location, previewSettings, hideNav }: Props) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
   const { community, communities, setCommunity } = useActiveCommunity()
@@ -36,71 +45,24 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
 
   const collapsed = useHeaderCollapsed()
   const isMobile = useIsMobile()
-  const [scrollVisible, setScrollVisible] = useState(true)
+
+  // On mobile, a category/hospital/synagogue directory screen (the only
+  // things that ever call useSetScreenHeader — see GenericDirectory) swaps
+  // the static site name for its own "‹ {title}", the same pattern the cRc
+  // Kosher app's own drill-down screens use. Desktop keeps the site name and
+  // relies on Breadcrumb ("{upLabel} / {title}") instead — there's already
+  // room there for both, so this only ever applies at mobile widths.
+  const screenHeader = useScreenHeader()
+  const showScreenHeader = isMobile && !!screenHeader
 
   // Hides the header while scrolling down — more room for what you're
   // reading — and brings it back the moment you scroll up, even slightly,
   // the same pattern most mobile browsers use for their own address bar.
   // Desktop keeps the header pinned; scrolling behaves differently there and
-  // there's no cramped-screen problem to solve.
-  useEffect(() => {
-    // No listener needed on desktop — `visible` below ignores scrollVisible
-    // there, so there's nothing for one to drive.
-    if (!isMobile) return
-
-    // `anchorY` is where the current run of scrolling in one direction began —
-    // NOT the position at the previous event. The threshold in
-    // nextHeaderVisible is meant to be "how far have you scrolled this way",
-    // and a browser fires a scroll event roughly per frame: a finger drag or
-    // a trackpad moves single-digit pixels per event, so comparing against
-    // the previous event's position means the 8px slack is essentially never
-    // cleared and the header only ever reacts to a hard flick. Measuring from
-    // the start of the run is what makes an ordinary, unhurried scroll work.
-    let lastY = window.scrollY
-    let anchorY = lastY
-    let goingDown = true
-
-    // Deliberately no rAF/ticking-flag throttle here. That pattern schedules
-    // the actual work on the next animation frame and guards re-entry with a
-    // boolean that only that frame clears — and a frame can simply never
-    // come (the tab going to the background mid-scroll, which a phone does
-    // constantly: a notification pull-down, switching apps, the screen
-    // locking). Then the flag is stuck true forever and every future scroll
-    // event is silently ignored — the header dies hidden, or dies shown, and
-    // nothing in the UI says why. The work here is a couple of comparisons
-    // and a setState; it doesn't need deferring, and running it inline can't
-    // get stuck.
-    function onScroll() {
-      const y = window.scrollY
-      if (y !== lastY) {
-        const down = y > lastY
-        // Reversing restarts the measurement from where the reversal
-        // happened, so "scroll up a little to get the header back" costs the
-        // same small distance no matter how far down the page you already
-        // are.
-        if (down !== goingDown) {
-          goingDown = down
-          anchorY = lastY
-        }
-        lastY = y
-      }
-      // Read into a const before handing it to the updater. React runs a
-      // functional updater immediately only when nothing else is queued for
-      // this fiber, and otherwise defers it to render — an updater closing
-      // over the mutable `anchorY` would then read whatever it had become by
-      // then, rather than its value at the moment of this event.
-      const anchor = anchorY
-      setScrollVisible((prev) => nextHeaderVisible(y, anchor, prev))
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isMobile])
-
-  // On desktop `scrollVisible` just isn't consulted, rather than an effect
-  // fighting to keep resetting it to true — one less thing that could race
-  // the isMobile flip on a resize across the breakpoint.
-  const scrollHideVisible = !isMobile || scrollVisible
+  // there's no cramped-screen problem to solve. See useScrollShowHide's own
+  // doc for the scroll-anchor mechanism this shares with the category
+  // directory's sticky filter bar (GenericDirectory.tsx).
+  const scrollHideVisible = useScrollShowHide(isMobile)
 
   // `collapsed` (a whole screen, like the mobile map, saying "get out of the
   // way for as long as I'm mounted") is `invisible h-0`, not `hidden`
@@ -133,14 +95,47 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
   return (
     <header
       className={className}
+      // Named so the browser's View Transition (SlugScreen/Landing's
+      // directional slide, see navTransitions.ts) treats this header as its
+      // own stable layer instead of sweeping it into the sliding content —
+      // see globals.css's own `::view-transition-group(site-header)` rule,
+      // which suppresses any animation on it. Without this, the header
+      // would visibly slide/flash along with the content, breaking the one
+      // fixed reference point a directional transition depends on.
+      style={{ viewTransitionName: 'site-header' }}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center">
-        {/* On mobile the logo only hides while no location is set — that's when
-            the wide "Set location" pill competes with the full title + tagline
-            for the row, and dropping the mark frees the ~46px needed to keep
-            the text full. Once a location is set the pill collapses to just its
-            pin, so the logo comes back. Always shown from sm up. */}
-        {(() => {
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-10">
+        {showScreenHeader && screenHeader ? (
+          <button
+            onClick={screenHeader.onBack}
+            className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
+          >
+            {/* Same h-9 w-9 footprint and gap-2.5 as the logo mark below, so
+                the title lands at the exact x-position it does on the home
+                screen — a visitor's eye doesn't have to re-find it after a
+                back-navigation. Circular chip (border + white fill + shadow),
+                not a bare icon: mirrors LocationControl's own pill on the
+                opposite side of this row, so the two ends of the header read
+                as a matched pair rather than one polished control and one
+                plain glyph — the same "circular back button" treatment apps
+                like WhatsApp use. */}
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white shadow-sm">
+              <svg
+                className="h-5 w-5 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900">
+              {screenHeader.title}
+            </span>
+          </button>
+        ) : (() => {
           const mark = settings.logoUrl?.trim() ? (
             // next/image rather than a CSS background. Beyond the resizing and
             // format negotiation, this also closes a small hole: the URL used
@@ -148,7 +143,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
             // logo URL containing a ")" broke the rule, and the value was
             // never escaped. Here it's an attribute, handled by React.
             <span
-              className={`${location.address ? 'block' : 'hidden'} sm:block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl`}
+              className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl"
               aria-hidden="true"
             >
               <Image
@@ -179,18 +174,29 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
               />
             </span>
           ) : (
-            <span className={`${location.address ? 'grid' : 'hidden'} sm:grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white`}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
               <StarOfDavid className="h-5 w-5" />
             </span>
           )
+          // Tagline used to render as a second line here — dropped along
+          // with the header's own extra height (h-16 → h-14 below): it said
+          // roughly the same thing the hero's mission line says a few
+          // pixels of scroll later ("Guide for residents, visitors, and
+          // patients" next to the hero's own mission sentence), so the
+          // header carried the message twice before a visitor had read
+          // either in full.
+          //
+          // This WAS tagline's only render site — its own type doc in
+          // siteSettings.ts says exactly that ("Shown under the site name in
+          // the header"). Left admin-editable rather than removed (still
+          // shows in the Site tab, still round-trips to the database) since
+          // deleting a field is a bigger, separate decision than deciding
+          // not to render it — but as of this change it has no surface
+          // anywhere on the live site. Worth knowing before spending more
+          // time writing good taglines into a field nothing shows.
           const title = (
-            <span className="min-w-0 flex-1 leading-tight">
-              <span className="block truncate text-[15px] font-bold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
-                {settings.name}
-              </span>
-              <span className="block truncate text-[11px] text-slate-500">
-                {settings.tagline}
-              </span>
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+              {settings.name}
             </span>
           )
 
@@ -213,12 +219,27 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
 
           // One community: the header is exactly what it always was — the whole
           // mark-plus-title block is a single "go home" link.
+          //
+          // On mobile, though, this block only ever renders on the home
+          // screen itself — every other screen swaps it for the back button
+          // above (showScreenHeader) or the header collapses entirely (the
+          // map) — so there's nowhere for "go home" to usefully go. Plain,
+          // non-interactive text there instead of a link to the page you're
+          // already on.
           if (!switchable || switchable.length < 2) {
+            if (isMobile) {
+              return (
+                <span className="flex min-w-0 shrink items-center gap-2.5">
+                  {mark}
+                  {title}
+                </span>
+              )
+            }
             return (
               <Link
                 href={routes.home(community.slug)}
                 onClick={goHomeClick}
-                className="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer group text-left"
+                className="flex min-w-0 shrink items-center gap-2.5 cursor-pointer group text-left"
               >
                 {mark}
                 {title}
@@ -231,7 +252,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
           // Split into two controls rather than one because a button can't
           // nest inside a button.
           return (
-            <div className="flex min-w-0 flex-1 items-center gap-2.5 group">
+            <div className="flex min-w-0 shrink items-center gap-2.5 group">
               <Link href={routes.home(community.slug)} onClick={goHomeClick} aria-label="Home" className="contents cursor-pointer">
                 {mark}
               </Link>
@@ -245,6 +266,11 @@ export default function SiteHeader({ onGoHome, location, previewSettings }: Prop
             </div>
           )
         })()}
+
+        {/* Categories/Map/More — see HeaderNav's own doc for why this
+            replaces the old full-width tab row rather than sitting beside
+            it, and `hideNav`'s own doc for the one caller that opts out. */}
+        {!hideNav && <HeaderNav />}
 
         <div className="ml-auto">
           <LocationControl controls={location} />

@@ -56,6 +56,20 @@ html {
    * root only — is the configuration trackpad-back was verified working
    * against. */
   overflow-x: hidden;
+  /* Reserves the vertical scrollbar's own width permanently, whether or not
+   * a scrollbar is actually showing right now. Without it, useBodyScrollLock
+   * (any listing/davening/report dialog — see its own doc) toggling this
+   * element's overflow to `hidden` while a dialog is open removes the
+   * scrollbar entirely, widening the viewport by however many pixels the
+   * scrollbar used to take. That's a real layout change, not just a visual
+   * one: everything sized against the viewport — including the sticky,
+   * backdrop-blurred SiteHeader — reflows and repaints to the new width the
+   * instant a dialog opens, and again back the instant it closes, which is
+   * what actually reads as "the header flashes" right after tapping a
+   * listing. Support: all evergreen browsers except Safari before 18.2,
+   * where this is simply a no-op (the flash this fixes elsewhere still
+   * happens there, not a regression from adding this). */
+  scrollbar-gutter: stable;
 }
 
 @theme {
@@ -64,8 +78,22 @@ html {
      --color-primary-dark derives from whatever primary ends up being. */
   --color-primary: #1d4ed8;
   --color-primary-dark: color-mix(in oklab, var(--color-primary) 82%, #000);
-  --color-accent: #d97706;
-  --color-accent-dark: #b45309;
+  /* The home screen's own warmth — eyebrows, the hero, Update Listings/
+     Subscribe's CTAs. Matches those components' own literal amber-700/800
+     exactly, now named instead of duplicated as raw Tailwind classes at
+     each call site. */
+  --color-accent: #b45309;
+  --color-accent-dark: #92400e;
+  /* A second, distinct warm color for "verify this" — kosher cert caveats,
+     the "sometimes in stock" tags, the "set location" prompt. Deliberately
+     NOT the same value as --color-accent: this app's home screen already
+     uses warm gold decoratively, and reusing that exact color for a
+     safety-relevant caveat (is this actually kosher-certified?) would dilute
+     the one thing that color is supposed to signal there. A deep rust —
+     darker and browner than home's own gold, without leaning as far toward
+     this app's real error/closed red (red-700, #b91c1c) as the oxblood and
+     brick/clay candidates this was picked over. */
+  --color-caution: #9a3412;
   /* Plain slate-50. Tried tinting this with a few percent of the community's
      brand color to make the page feel less neutral; at desktop widths, where
      a lot of the surface shows at once, it read as the whole site having gone
@@ -155,6 +183,190 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* A small dropdown easing open from its own anchor corner (see
+   ListingActionsMenu) — same family as fadeIn above, just a shorter, subtler
+   scale+opacity move sized for a compact popover rather than a full screen,
+   closer to how Gmail's own overflow menus ease in instead of popping in
+   instantly. transform-origin is set inline per instance (it depends on
+   which corner the menu is actually anchored to). */
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Directional slide for mobile's home <-> category navigation (see
+   navTransitions.ts / SlugScreen.tsx / Landing.tsx / sections.tsx) — the
+   native "one level deeper" / "back" convention: forward slides new content
+   in from the right while the old content slides/fades left; back reverses
+   it. Originally followed Next's own documented recipe for this
+   (node_modules/next/dist/docs/01-app/02-guides/view-transitions.md)
+   verbatim, including its asymmetric fade timing — old content faded out
+   over 150ms while new content's fade-in was delayed 150ms before running
+   its own 210ms — but that produced a real, confirmed-live bug: at the
+   exact instant the old fade finished, the new fade hadn't started yet
+   (still sitting at its pre-delay opacity: 0), so both layers were
+   transparent at once and the background showed through as a blank flash
+   between screens. Fixed by giving old and new the same 210ms duration and
+   starting them together (no delay) so they cross-fade instead of handing
+   off — opacity always sums to ~1 across the transition, never both 0.
+
+   Desktop never sees these: useNavTransitionProps only maps 'nav-forward'/
+   'nav-back' to these class names on mobile — desktop's <ViewTransition>
+   gets `default: 'none'` for every type, so it plays no view-transition
+   animation at all and keeps its own plain fadeIn (above) untouched.
+
+   The browser always creates an implicit `root` snapshot group alongside
+   whatever named/classed groups a page actually declares, and gives it its
+   own default crossfade UNLESS something turns that off — easy to miss
+   entirely since nothing above asks for it. Confirmed live via
+   document.getAnimations() during an actual nav-back: React's own boundary
+   (an auto-named group, not literally "root") correctly ran the fade+slide
+   below, while `::view-transition-old(root)` was, at the same time, running
+   the browser's own built-in `-ua-view-transition-fade-out` — a second,
+   unrelated whole-page crossfade (covering everything outside <main> and
+   outside the header's own carve-out below, i.e. mainly the mobile tab bar)
+   layered on top of the slide, which is what read as a "weird fade" rather
+   than a clean directional move. Same double animation on nav-forward too,
+   just less noticeable against a simpler destination. Disabling it here
+   doesn't change anything else outside <main> visually, since that content
+   doesn't actually differ between the old and new page — root only ever had
+   pixels to crossfade because of its own default animation existing at all,
+   not because anything really changed under it.
+
+   --slide-offset used to be a fixed ±60px, not the ±100% below — reported
+   live (a screenshot mid-transition) as home's hero/search and a category's
+   filter bar/listing cards visibly overlapping rather than one clearing the
+   frame before the other reads. On a ~375-430px phone, 60px is only about
+   15% of the screen: with old and new cross-fading via opacity at the same
+   time (the fix directly above), both were still sitting almost fully on
+   top of each other for most of the 400ms slide, and unlike home<->category
+   real OS drill-downs pair, these two screens share no structure a viewer
+   could read as "the same content, just nudged" — the overlap just looked
+   like a glitch. ±100% (of the snapshot's own width, same box the old fixed
+   px value was relative to) pushes each screen fully off/on frame, the way
+   an actual push transition does, so the two never occupy the same space at
+   once — only their fade continues to overlap, which is what avoids the
+   blank-flash bug two sections above. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(.nav-forward) {
+  --slide-offset: -100%;
+  animation:
+    210ms ease-in both fade reverse,
+    400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 100%;
+  animation:
+    210ms ease-out both fade,
+    400ms ease-in-out both slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 100%;
+  animation:
+    210ms ease-in both fade reverse,
+    400ms ease-in-out both slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -100%;
+  animation:
+    210ms ease-out both fade,
+    400ms ease-in-out both slide;
+}
+/* Landing's own stand-in for ::view-transition-new(.nav-back) above — see
+   Landing.tsx's own `backReveal` state for why a real element needs this at
+   all: Next keeps a previously-rendered Landing instance alive across a
+   category-back-to-home nav rather than tearing it down and remounting it,
+   so `::view-transition-new` never gets created for it (that pseudo-element
+   only exists opposite a real unmount/mount pair) — confirmed live via
+   document.getAnimations() during an actual nav-back, which showed
+   SlugScreen's own exit correctly running `fade`+`slide` while Landing's
+   side ran nothing but its plain mount-triggered `fadeIn` (opacity only,
+   no slide — see the plain `animate-[fadeIn_180ms_ease-out]` a few lines
+   below this file's own view-transition rules). The browser still restarts
+   a CSS animation on this element when it's revealed again even without a
+   real remount (same live capture caught `fadeIn` genuinely restarting on
+   it), so applying the exact same fade+slide recipe directly, as a normal
+   class instead of a view-transition pseudo-selector, produces the same
+   visual result without needing a real mount to hook into. Same keyframes,
+   same offset and timing as `::view-transition-new(.nav-back)` above —
+   kept in sync by hand since one drives a real element and the other a
+   view-transition pseudo-element, and can't share a single selector. */
+.reveal-slide-back {
+  --slide-offset: -100%;
+  animation:
+    210ms ease-out both fade,
+    400ms ease-in-out both slide;
+}
+@keyframes slide {
+  from { translate: var(--slide-offset); }
+  to   { translate: 0; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* SiteHeader carries `viewTransitionName: 'site-header'` so it's captured as
+   its own layer instead of being swept into the root snapshot the slide
+   above runs on — without this the header visibly double-flashes (old and
+   new snapshots briefly overlapping) every time the slide plays. It's the
+   one fixed point a directional transition needs to actually read as
+   directional, rather than the whole viewport moving. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+/* The transition overlay otherwise captures pointer events for its
+   duration, so a tap during the ~400ms slide is lost rather than reaching
+   the page underneath. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* prefers-reduced-motion: reduce — was only wired for the View Transition
+   pseudo-elements above (the mobile slide, the desktop badge morph), which
+   left every other animation in the app — fadeIn (page content, the wizard),
+   menuIn (the kebab dropdown), and the mobile listing card's accordion
+   reveal (a plain CSS `transition`, not `animation`, so the old rule's
+   animation-duration override wouldn't have touched it even if it had been
+   written broadly enough to try) — running at full speed regardless of this
+   OS-level accessibility setting. The `*` rule below is the standard
+   broad-spectrum fix (same pattern CSS-Tricks' widely-cited snippet and
+   Tailwind's own reduced-motion plugin use): near-zero rather than literally
+   0s so `transitionend`/`animationend` still fire for anything that depends
+   on them (some browsers skip firing those events for an exactly-zero
+   duration), and !important specifically because an author stylesheet rule
+   with !important is the one thing that outranks a plain inline style in
+   the cascade — which matters here, since the accordion panel's own
+   duration is set via an inline `style` prop (GenericListingCard.tsx), not
+   a class. Keeps the view-transition-specific rule alongside it rather than
+   assuming the universal selector reaches into that pseudo-element tree the
+   same way normal DOM elements do. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
 }
 
 /* Admin-authored page copy (About, Privacy) — see lib/richText.ts. Tailwind's

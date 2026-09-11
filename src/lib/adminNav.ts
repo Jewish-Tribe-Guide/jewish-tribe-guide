@@ -30,7 +30,9 @@ export type AdminTab =
   | 'responses'
   | 'archived'
   | 'site'
-  | 'home'
+  | 'desktop'
+  | 'mobile'
+  | 'subscribers'
   | 'metrics'
   | 'team'
   | 'communities'
@@ -49,11 +51,18 @@ export function adminTabs(community: string, isSuperAdmin: boolean): { tab: Admi
     { tab: 'responses', href: `${base}/responses`, label: 'Responses' },
     { tab: 'archived', href: `${base}/archived`, label: 'Archived' },
     { tab: 'site', href: `${base}/site`, label: 'Site' },
-    // Not "Home page" any more — what's left here is whatever exists on
-    // exactly one of the two devices, and the mobile tab bar shows on every
-    // phone screen, not just the home one.
-    { tab: 'home', href: `${base}/home`, label: 'Desktop & mobile' },
+    // Split from one combined "Desktop & mobile" tab into two — the desktop
+    // redesign grew enough device-only settings (top nav, the hero band,
+    // the Browse card's own copy, the home-screen accent color) that a
+    // device toggle inside one tab stopped scaling; each device now gets
+    // its own tab, same as Site, all three sharing one draft/Save (see
+    // SiteSettingsLayout).
+    { tab: 'desktop', href: `${base}/desktop`, label: 'Desktop' },
+    { tab: 'mobile', href: `${base}/mobile`, label: 'Mobile' },
     { tab: 'categories', href: `${base}/categories`, label: 'Categories' },
+    // Category-subscription signups (SubscribeSection, desktop-only) — view
+    // + remove only, see SubscriberManager's own doc.
+    { tab: 'subscribers', href: `${base}/subscribers`, label: 'Subscribers' },
     // Every one of THIS community's own admins can reach this — see
     // /api/admin/team's own comment — unlike Communities below, which is
     // superadmin-only underneath.

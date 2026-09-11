@@ -76,7 +76,7 @@ describe('HomeSectionManager', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     const [sections] = onChange.mock.calls[0]!
     expect(sections).toHaveLength(1)
-    expect(sections[0]).toMatchObject({ title: 'Essentials', cardIds: [] })
+    expect(sections[0]).toMatchObject({ title: 'Essentials', cardIds: [], width: 'full' })
   })
 
   it('does not add a section with a blank title', async () => {
@@ -91,7 +91,7 @@ describe('HomeSectionManager', () => {
 
   it('renaming a section calls onChange with the updated title', async () => {
     const user = userEvent.setup()
-    render(<ManagerHarness initial={[{ id: 'sec-1', kind: 'section', title: 'Old Title', cardIds: [] }]} />)
+    render(<ManagerHarness initial={[{ id: 'sec-1', kind: 'section', title: 'Old Title', cardIds: [], width: 'full' }]} />)
 
     const titleInput = screen.getByDisplayValue('Old Title')
     await user.clear(titleInput)
@@ -102,7 +102,7 @@ describe('HomeSectionManager', () => {
 
   it('deleting a section asks for confirmation and removes it once confirmed', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [] }
+    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [], width: 'full' }
     const onChange = renderManager([section])
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
@@ -114,7 +114,7 @@ describe('HomeSectionManager', () => {
   it('leaves the section alone when the delete confirmation is declined', async () => {
     vi.stubGlobal('confirm', vi.fn(() => false))
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [] }
+    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [], width: 'full' }
     const onChange = renderManager([section])
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
@@ -124,29 +124,29 @@ describe('HomeSectionManager', () => {
 
   it('assigning a card via the picker moves it out of "unassigned" and into the section', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [] }
+    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: [], width: 'full' }
     const onChange = renderManager([section])
 
     await user.selectOptions(screen.getByRole('combobox'), 'grocery')
 
-    expect(onChange).toHaveBeenCalledWith([{ ...section, cardIds: ['grocery'] }])
+    expect(onChange).toHaveBeenCalledWith([{ ...section, cardIds: ['grocery'], width: 'full' }])
   })
 
   it('removing an assigned card calls onChange without it', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: ['grocery'] }
+    const section: DraftHomeSection = { id: 'sec-1', kind: 'section', title: 'Essentials', cardIds: ['grocery'], width: 'full' }
     const onChange = renderManager([section])
 
     expect(screen.getByText('Grocery Stores')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Remove' }))
 
-    expect(onChange).toHaveBeenCalledWith([{ ...section, cardIds: [] }])
+    expect(onChange).toHaveBeenCalledWith([{ ...section, cardIds: [], width: 'full' }])
   })
 
   it('moving a section swaps its position with its neighbor', async () => {
     const user = userEvent.setup()
-    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [] }
-    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [], width: 'full' }
+    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [], width: 'full' }
     const onChange = renderManager([a, b])
 
     const downButtons = screen.getAllByRole('button', { name: 'Move section down' })
@@ -161,8 +161,8 @@ describe('HomeSectionManager', () => {
   // card from one section to another short of removing it first (making it
   // unassigned again) and re-adding it elsewhere.
   it('still offers the picker, listing other sections’ cards, when nothing is unassigned', () => {
-    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['grocery'] }
-    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['grocery'], width: 'full' }
+    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [], width: 'full' }
     renderManager([a, b])
 
     // Section B's own picker still offers Section A's card, to move it here
@@ -175,14 +175,14 @@ describe('HomeSectionManager', () => {
 
   it('picking another section’s card from the picker moves it here, out of its old section', async () => {
     const user = userEvent.setup()
-    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['grocery'] }
-    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['grocery'], width: 'full' }
+    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [], width: 'full' }
     const onChange = renderManager([a, b])
 
     const pickers = screen.getAllByRole('combobox')
     await user.selectOptions(pickers[1]!, 'grocery')
 
-    expect(onChange).toHaveBeenCalledWith([{ ...a, cardIds: [] }, { ...b, cardIds: ['grocery'] }])
+    expect(onChange).toHaveBeenCalledWith([{ ...a, cardIds: [], width: 'full' }, { ...b, cardIds: ['grocery'], width: 'full' }])
   })
 
   it('a section’s own picker never offers a card already in that same section', () => {
@@ -190,7 +190,7 @@ describe('HomeSectionManager', () => {
     // test category) lives in this single section — nothing left its own
     // picker could offer, so it should render no picker at all rather than
     // one listing its own cards back to it.
-    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['support', 'volunteer', 'grocery'] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: ['support', 'volunteer', 'grocery'], width: 'full' }
     renderManager([a])
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
@@ -204,7 +204,7 @@ describe('HomeSectionManager', () => {
 // or lose one of these entries even though they ride along in `sections`.
 describe('HomeSectionManager — ignores built-in topic entries riding along in the draft', () => {
   it('never renders a built-in entry as a section row', () => {
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }
     renderManager([map])
 
     expect(screen.queryByDisplayValue('Explore the map')).not.toBeInTheDocument()
@@ -213,7 +213,7 @@ describe('HomeSectionManager — ignores built-in topic entries riding along in 
 
   it('adding a section leaves an existing built-in entry untouched, in its original relative position', async () => {
     const user = userEvent.setup()
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }
     const onChange = renderManager([map])
 
     await user.type(screen.getByPlaceholderText('New section title'), 'Essentials')
@@ -225,9 +225,9 @@ describe('HomeSectionManager — ignores built-in topic entries riding along in 
 
   it('reordering sections never moves a built-in entry out of the draft', async () => {
     const user = userEvent.setup()
-    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [] }
-    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
+    const a: DraftHomeSection = { id: 'a', kind: 'section', title: 'A', cardIds: [], width: 'full' }
+    const b: DraftHomeSection = { id: 'b', kind: 'section', title: 'B', cardIds: [], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }
     const onChange = renderManager([a, b, map])
 
     const downButtons = screen.getAllByRole('button', { name: 'Move section down' })
@@ -238,8 +238,8 @@ describe('HomeSectionManager — ignores built-in topic entries riding along in 
 
   it('deleting a section leaves a built-in entry elsewhere in the draft untouched', async () => {
     const user = userEvent.setup()
-    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Essentials', cardIds: [] }
-    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [] }
+    const section: DraftHomeSection = { id: 'a', kind: 'section', title: 'Essentials', cardIds: [], width: 'full' }
+    const map: DraftHomeSection = { id: 'map', kind: 'map', title: 'Explore the map', cardIds: [], width: 'full' }
     const onChange = renderManager([section, map])
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))

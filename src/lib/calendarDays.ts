@@ -33,6 +33,9 @@ export type CalendarToday = {
   labels: string[]
   /** False while the Rosh Chodesh answer is a fallback rather than a fact. */
   roshChodeshKnown: boolean
+  /** False while the Yom Tov answer is a fallback rather than a fact — same
+   *  reasoning as roshChodeshKnown. */
+  yomTovKnown: boolean
 }
 
 export function calendarDaysFor(now: number, zmanim: ZmanimData | null | undefined): CalendarToday {
@@ -55,5 +58,15 @@ export function calendarDaysFor(now: number, zmanim: ZmanimData | null | undefin
     labels.push(zmanim.holidays?.find((e) => e.startsWith('Rosh Chodesh')) ?? 'Rosh Chodesh')
   }
 
-  return { dayKeys, labels, roshChodeshKnown }
+  // Same never-narrow-on-missing-data rule as Rosh Chodesh above, and the
+  // same reason: a shul's Yom Tov minyan (a different, often later,
+  // schedule) has to stay visible in the Today filter rather than silently
+  // dropping out because the Jewish-calendar answer hasn't arrived yet.
+  const yomTovKnown = typeof zmanim?.isYomTov === 'boolean'
+  if (!yomTovKnown || zmanim?.isYomTov) dayKeys.push('yom_tov')
+  if (yomTovKnown && zmanim?.isYomTov) {
+    labels.push(zmanim.holidays?.find((e) => !e.startsWith('Erev ') && !e.startsWith('Rosh Chodesh')) ?? 'Yom Tov')
+  }
+
+  return { dayKeys, labels, roshChodeshKnown, yomTovKnown }
 }

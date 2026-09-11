@@ -247,8 +247,16 @@ test('deleting a community through the real UI removes it and everything in it',
     await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000, 3_000] })
 
-  const row = page.getByRole('link', { name }).locator('..')
-  await visible(page, row.getByRole('button', { name: 'Delete' })).click()
+  // Publish/Unpublish, Delete and the Admins roster all live behind one
+  // "Show"/"Hide" toggle on the card now (see CommunityManager.tsx's own
+  // comment on why) — collapsed by default, so Delete isn't in the DOM
+  // until this is clicked.
+  const card = page.getByRole('link', { name }).locator('..').locator('..')
+  await visible(page, card.getByRole('button', { name: new RegExp(`^Show ${name}$`) })).click()
+  // exact: true — otherwise this also matches the toggle button, whose own
+  // accessible name is now "Hide E2E Delete …" once expanded (a plain
+  // substring match on 'Delete' catches that too).
+  await visible(page, card.getByRole('button', { name: 'Delete', exact: true })).click()
   await page.getByLabel(`Type ${slug} to confirm`).fill(slug)
   // Waited for explicitly rather than inferred from the UI settling — this
   // is the one action in this whole file whose success can't be re-derived

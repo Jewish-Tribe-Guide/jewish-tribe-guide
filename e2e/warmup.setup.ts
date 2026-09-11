@@ -30,11 +30,24 @@ setup('warm the content caches', async ({ page, request }) => {
   // Also warms the server-rendered page path (and the "/" redirect) for free.
   const community = await defaultCommunity(page)
 
+  // categories/resources/site-settings/communities were the original set;
+  // home-sections/forms/hospitals were missing — loadCommunityContent (the
+  // community layout's own server-side read, backing every page including
+  // the home screen) calls all seven of these underlying stores, so leaving
+  // the last three cold left them exposed to the exact race this file's own
+  // comment describes. Reported live: home.spec.ts assertions on content
+  // that should already be on the page ("What are you looking for?", the
+  // Update Listings card's Add button) failing with "element(s) not found"
+  // — not a rendering bug, a dozen parallel tests all racing the same
+  // in-flight miss on one of these three.
   const responses = await Promise.all([
     request.get(`/api/categories?community=${community}`),
     request.get(`/api/resources?community=${community}`),
     request.get(`/api/site-settings?community=${community}`),
     request.get('/api/communities'),
+    request.get(`/api/home-sections?community=${community}`),
+    request.get(`/api/forms?community=${community}`),
+    request.get(`/api/hospitals?community=${community}`),
   ])
 
   // A content read that's outright broken should say so here, once, rather

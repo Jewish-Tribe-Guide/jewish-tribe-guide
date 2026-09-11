@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Honeypot from './Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from './TurnstileWidget'
 import { submitRequest } from '@/lib/submitRequest'
@@ -28,6 +29,21 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [error, setError] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
+
+  // FeedbackScreen's desktop branch renders the modal variant unconditionally
+  // on page load — not behind a click the way FeedbackButton/HeaderNav's
+  // "More" always are — so, unlike CommunitySwitcher's own portal (which
+  // only ever runs after a click, never during a server render),
+  // `createPortal(..., document.body)` below CAN be reached during SSR,
+  // where `document` doesn't exist. `mounted` delays the portal to after
+  // this component is actually running in the browser; the server (and the
+  // client's first paint, before hydration) render nothing for the modal
+  // variant instead of crashing on it.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,22 +80,42 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
     turnstileRef.current?.reset()
   }
 
-  const wrap = (children: React.ReactNode) =>
-    variant === 'modal' ? (
-      // onClick on the backdrop itself (not bubbled up from the card) closes
-      // it, same as the ✕ — checking e.target === e.currentTarget rather than
-      // stopPropagation on the card below, so a click anywhere inside the
-      // card (including future children that don't know to stop it) can
-      // never accidentally fall through and close the whole thing.
+  const wrap = (children: React.ReactNode) => {
+    if (variant !== 'modal') {
+      return <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>
+    }
+    // FeedbackScreen's desktop branch renders this variant unconditionally
+    // on page load, so the portal below can be reached during SSR, where
+    // there's no `document` to portal into (see `mounted`'s own comment) —
+    // render nothing until this is actually running in the browser.
+    if (!mounted) return null
+
+    // Portaled to <body> — opened from HeaderNav's "More" menu, which
+    // lives inside SiteHeader, and that header carries `backdrop-blur`.
+    // A backdrop-filter (like a transform) establishes a containing
+    // block for `position: fixed` descendants, so `fixed inset-0` here
+    // was sizing itself to the ~65px header instead of the viewport: the
+    // backdrop dimmed only a strip at the top of the screen, and the
+    // card rendered inside that strip, cut off, with the rest of the
+    // page untouched below it. CommunitySwitcher hit the identical bug
+    // for the identical reason (see its own doc) — same fix here.
+    //
+    // overflow-y-auto on this element, not a max-h + its own scroll on
+    // the card below (tried first) — the form (message, email,
+    // Turnstile widget, submit, privacy note) can be taller than a
+    // short browser window, and a `vh`-based cap on a nested scrollable
+    // card doesn't reliably track the real visible viewport the way
+    // this element's own box (now correctly sized once portaled) does.
+    return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
         onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
       >
         <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
-      </div>
-    ) : (
-      <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>
+      </div>,
+      document.body,
     )
+  }
 
   if (status === 'success') {
     return wrap(

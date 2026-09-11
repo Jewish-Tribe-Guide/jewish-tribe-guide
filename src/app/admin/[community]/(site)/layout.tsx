@@ -7,22 +7,27 @@ import SiteSettingsEditor from '@/components/admin/SiteSettingsEditor'
 import { adminBase } from '@/lib/adminNav'
 import { useCommunitySlug } from '@/lib/communityContext'
 
-// /admin/site and /admin/home deliberately render the SAME mounted
-// SiteSettingsEditor instance — one draft, one Save button — so switching
-// between them doesn't silently drop a half-finished edit. A route file per
-// tab would break that (Next mounts/unmounts per route by default); this
-// route-group layout is the fix: it persists across exactly those two
+// /admin/site, /admin/desktop, and /admin/mobile deliberately render the SAME
+// mounted SiteSettingsEditor instance — one draft, one Save button — so
+// switching between them doesn't silently drop a half-finished edit. A route
+// file per tab would break that (Next mounts/unmounts per route by default);
+// this route-group layout is the fix: it persists across exactly those three
 // sibling routes (the same way admin/layout.tsx persists across every
 // /admin/* route) and owns the one SiteSettingsEditor mount point itself,
 // deriving which section to show from the URL rather than from a prop a
-// per-route page file would have to pass down. site/page.tsx and
-// home/page.tsx are empty on purpose — this layout renders the real content
-// for both, ignoring `children`.
+// per-route page file would have to pass down. site/page.tsx, desktop/page.tsx,
+// and mobile/page.tsx are empty on purpose — this layout renders the real
+// content for all three, ignoring `children`.
 export default function SiteSettingsLayout() {
   const session = useAdminSession()
   const community = useCommunitySlug()
   const pathname = usePathname()
-  const section = pathname.startsWith(`${adminBase(community)}/home`) ? 'home' : 'site'
+  const base = adminBase(community)
+  const section = pathname.startsWith(`${base}/desktop`)
+    ? 'desktop'
+    : pathname.startsWith(`${base}/mobile`)
+      ? 'mobile'
+      : 'site'
 
   return (
     <div>

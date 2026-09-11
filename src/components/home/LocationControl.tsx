@@ -264,6 +264,15 @@ export default function LocationControl({ controls }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        // The label span below is `hidden` (display: none, not just visually
+        // hidden) once an address is set or `compact` is on, which drops it
+        // from the accessibility tree along with the screen — so the button's
+        // accessible name has to come from here, not from that text, or a
+        // screen reader announces this control as unlabeled. Axe's
+        // button-name rule caught exactly this once `compact` made the
+        // hidden-label state reachable on every category screen, not only
+        // after a visitor had set an address.
+        aria-label={label}
         className="flex max-w-[220px] items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2.5 text-xs sm:pl-2.5 sm:pr-3 sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
       >
         {/* Filled once an address is set — on mobile the label text collapses
@@ -279,9 +288,10 @@ export default function LocationControl({ controls }: Props) {
         ) : (
           <PinIcon filled={!!resolvedAddress} className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
         )}
-        {/* Show the "Set location" prompt on every size so first-time mobile
-            visitors discover it; once an address is set, collapse to just the
-            pin on mobile to save header space. */}
+        {/* Show the "Set location" (or "Live") prompt on every size and every
+            screen so a mobile visitor always has a way to discover and reach
+            this control; once an address is actually set, collapse to just
+            the pin on mobile to save header space. */}
         <span className={`truncate ${resolvedAddress ? 'hidden md:block' : 'block'}`}>{label}</span>
       </button>
 
