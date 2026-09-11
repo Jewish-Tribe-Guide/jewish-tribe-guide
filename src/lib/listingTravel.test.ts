@@ -133,11 +133,18 @@ describe('withMilesFromAddress', () => {
 
 describe('travelParts', () => {
   it('shows miles alone when the visitor typed an address', () => {
-    expect(travelParts(at('x', { milesFromAddress: 0.4, driveMinutes: 5 }))).toEqual(['📍 0.4 mi'])
+    // No embedded emoji on `text` for distance — the caller renders PinIcon
+    // itself based on `kind`, see GenericListingCard.
+    expect(travelParts(at('x', { milesFromAddress: 0.4, driveMinutes: 5 }))).toEqual([
+      { kind: 'distance', text: '0.4 mi' },
+    ])
   })
 
   it('stacks drive and walk as separate chips so they can wrap', () => {
-    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual(['🚗 5 min', '🚶 18 min'])
+    expect(travelParts(at('x', { driveMinutes: 5, walkMinutes: 18 }))).toEqual([
+      { kind: 'drive', text: '🚗 5 min' },
+      { kind: 'walk', text: '🚶 18 min' },
+    ])
   })
 
   it('shows nothing at all when there is nothing to show', () => {
@@ -145,7 +152,7 @@ describe('travelParts', () => {
   })
 
   it('omits the half it does not have', () => {
-    expect(travelParts(at('x', { driveMinutes: 5 }))).toEqual(['🚗 5 min'])
-    expect(travelParts(at('x', { walkMinutes: 18 }))).toEqual(['🚶 18 min'])
+    expect(travelParts(at('x', { driveMinutes: 5 }))).toEqual([{ kind: 'drive', text: '🚗 5 min' }])
+    expect(travelParts(at('x', { walkMinutes: 18 }))).toEqual([{ kind: 'walk', text: '🚶 18 min' }])
   })
 })

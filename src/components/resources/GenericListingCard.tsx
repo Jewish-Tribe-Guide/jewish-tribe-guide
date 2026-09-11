@@ -289,7 +289,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       )}
       {travel.length > 0 ? (
         <div className="flex flex-col items-start gap-0.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-          {travel.map((t) => <span key={t}>{t}</span>)}
+          {travel.map((t) => (
+            <span key={t.text} className="inline-flex items-center gap-1">
+              {t.kind === 'distance' && <PinIcon className="h-3 w-3" />}
+              {t.text}
+            </span>
+          ))}
         </div>
       ) : showDistanceSlot ? (
         // A filled pill, not a bare dash — the dash read as a broken/missing
