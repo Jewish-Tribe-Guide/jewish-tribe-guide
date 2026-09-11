@@ -217,10 +217,23 @@ export async function dismissLocationPrompt(page: Page): Promise<void> {
  *  Deliberately not `networkidle`: the map, the zmanim strip and geolocation
  *  keep connections open, so it never settles on some screens and the test
  *  times out having proved nothing. Playwright discourages it for this reason.
- *  Waiting for the app's own chrome is both faster and a real signal. */
+ *  Waiting for the app's own chrome is both faster and a real signal.
+ *
+ *  Also waits for `document.fonts.ready` — the custom Figtree webfont is
+ *  requested via CSS, not blocking DOMContentLoaded, so a test that measures
+ *  text-dependent layout (button widths, wrap points) right after this
+ *  resolved could still be measuring the browser's fallback font on a slow
+ *  or resource-constrained runner. Confirmed via a CI trace: a home.spec.ts
+ *  wrap-detection test failed only in CI, and the page snapshot at the
+ *  moment of failure showed the long button labels rendering in a column
+ *  narrow enough that only the short labels should have fit — the font swap
+ *  from fallback to Figtree hadn't happened yet. The font request itself
+ *  succeeded (200, `font/woff2`); the race was between that swap and the
+ *  measurement, not a missing or broken font. */
 export async function ready(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
   await page.locator('header').first().waitFor({ state: 'visible' })
+  await page.evaluate(() => document.fonts.ready)
 }
 
 /** The server's HTML with `<script>` contents removed — i.e. the markup a
