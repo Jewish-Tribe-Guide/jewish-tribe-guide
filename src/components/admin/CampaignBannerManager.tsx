@@ -10,9 +10,10 @@ import type { CampaignBanner } from '@/lib/campaignBanner'
 
 // ── The 'campaigns' tab: seasonal promotions (a "Sukkah Map" every Sukkot,
 // or whatever the next one-off is) — a title/subtitle, a link to an existing
-// category, a start/end date, and where the banner's own CTA sends a
-// visitor (the category's page, or the map pre-filtered to it). Visibility
-// is purely that date range (see campaignBanner.ts's activeCampaignBanner)
+// category, a start/end date, and which of the banner's two CTAs (Map View,
+// Browse Listings — CampaignBannerCard shows both, always) leads as the
+// solid/primary button. Visibility is purely that date range (see
+// campaignBanner.ts's activeCampaignBanner)
 // — no separate on/off flag, so there's nothing here to toggle besides the
 // dates themselves. While a banner's window is open: the home screen shows
 // it (CampaignBannerCard), the map gives its category a distinctly-styled
@@ -220,7 +221,7 @@ export default function CampaignBannerManager({ token }: { token: string }) {
                   <p className="text-sm font-medium text-slate-900">{banner.title}</p>
                   <p className="text-xs text-muted">
                     {categoryLabel(banner.categoryId)} · {banner.startDate} – {banner.endDate} ·{' '}
-                    {banner.destination === 'list' ? 'links to list' : 'links to map'}
+                    {banner.destination === 'list' ? 'Browse Listings leads' : 'Map View leads'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -327,16 +328,20 @@ function CampaignBannerForm({
       </label>
       <label className="block">
         <span className="block text-[11px] font-medium text-slate-600 mb-1">
-          Banner sends visitors to
+          Which button leads?
         </span>
         <select
           value={form.destination}
           onChange={(e) => setForm({ ...form, destination: e.target.value === 'list' ? 'list' : 'map' })}
           className={inputClass}
         >
-          <option value="map">The map, pre-filtered to this category</option>
-          <option value="list">The category&rsquo;s own page (list view)</option>
+          <option value="map">Map View</option>
+          <option value="list">Browse Listings</option>
         </select>
+        <span className="block text-[11px] text-muted mt-1">
+          Both always show on the banner &mdash; this just decides which one comes first and
+          stands out.
+        </span>
       </label>
       <div className="flex gap-3">
         <label className="block flex-1">
