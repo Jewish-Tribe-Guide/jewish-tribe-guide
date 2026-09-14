@@ -267,7 +267,7 @@ export default function HeaderNav() {
               <button
                 key={item.id}
                 onClick={() => setFeedbackOpen(true)}
-                className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-slate-900 cursor-pointer"
+                className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary cursor-pointer"
               >
                 {item.label}
               </button>
@@ -278,7 +278,7 @@ export default function HeaderNav() {
             <Link
               key={item.id}
               href={href}
-              className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-slate-900"
+              className="whitespace-nowrap text-sm font-semibold text-slate-700 transition-colors hover:text-primary"
             >
               {item.label}
             </Link>
