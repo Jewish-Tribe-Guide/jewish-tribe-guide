@@ -4,7 +4,6 @@ import Image from 'next/image'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { community } from '@/community.config'
 import { GridIcon, MapFoldIcon, SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 
@@ -77,14 +76,13 @@ type Props = {
 // renders broken.
 //
 // Desktop mockup match (docs/desktop-mockup-plan.md, Phase 3): serif
-// headline, a "People · Places · Community" tagline under the buttons, a
-// faint skyline silhouette low in the band, and — at `lg` and up, where
-// there's room beside the headline without colliding — a short serif quote
-// over the photo's right side naming the community by its own
-// `community.config` region (never hardcoded, since this app hosts more
-// than one community). The Browse Categories button now carries a small
-// grid icon and View Map an outline folded-map glyph, replacing the raw
-// admin-set emoji this used to render directly next to the label.
+// headline and a faint skyline silhouette low in the band. The mockup's own
+// "People · Places · Community" tagline and the short quote over the
+// photo's right side (naming the community by its own `community.config`
+// region) were both cut after review — the user's own call, not a mockup
+// deviation. The Browse Categories button carries a small grid icon and
+// View Map an outline folded-map glyph, replacing the raw admin-set emoji
+// this used to render directly next to the label.
 export default function HeroHeading({
   settings,
   query,
@@ -196,10 +194,17 @@ export default function HeroHeading({
             heavier/wider wash than an earlier pass here, which faded out
             gradually starting right at the left edge and left even the
             headline sitting on partially-faded photo instead of a solid
-            band. */}
+            band.
+            Fades to `--color-cream`, not pure white: the page ground right
+            below this section (body's own `desktop:bg-cream`) is that same
+            cream, not white, so a pure-white wash left a visible seam where
+            the hero's washed area met the page underneath it — two
+            different "light" colors sitting flush against each other.
+            Fading to the same cream makes the two read as one continuous
+            surface, matching the mockup. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,white_0%,white_30%,transparent_58%)]"
+          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--color-cream)_0%,var(--color-cream)_30%,transparent_58%)]"
         />
         {/* Faint skyline, low and behind the text column — purely
             decorative (aria-hidden), `-z-10` inside this section's own
@@ -243,19 +248,6 @@ export default function HeroHeading({
                 View Map
               </button>
             )}
-          </div>
-          <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.35em] text-slate-500">
-            People · Places · Community
-          </p>
-        </div>
-        {/* Short quote over the photo's right side — hidden below `lg` so it
-            can't collide with the headline at narrower desktop widths. */}
-        <div className="pointer-events-none absolute inset-0 mx-auto hidden max-w-6xl px-4 sm:px-6 lg:block">
-          <div className="absolute right-6 top-[96px] max-w-[190px]">
-            <p className="font-serif text-xl leading-snug text-ink">
-              A stronger Jewish {community.region} together.
-            </p>
-            <div className="mt-3 h-0.5 w-7 bg-gold" />
           </div>
         </div>
       </section>

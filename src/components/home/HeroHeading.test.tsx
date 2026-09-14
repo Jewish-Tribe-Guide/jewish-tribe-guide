@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { community } from '@/community.config'
 import HeroHeading from './HeroHeading'
 
 afterEach(() => cleanup())
@@ -75,10 +74,11 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
   })
 })
 
-// Desktop mockup match (Phase 3, docs/desktop-mockup-plan.md): a
-// "People · Places · Community" tagline, a short quote naming the
-// community's own region (never hardcoded — this app hosts more than one
-// community), and View Map rendering a real icon instead of the raw
+// Desktop mockup match (Phase 3, docs/desktop-mockup-plan.md), later
+// trimmed: the mockup's own "People · Places · Community" tagline and its
+// short quote naming the community's region were both cut after review —
+// the user's own call — so this now asserts they're gone rather than
+// present. View Map still renders a real icon instead of the raw
 // admin-set emoji string it used to show next to the label.
 describe('HeroHeading — Phase 3 desktop details', () => {
   const settings = {
@@ -91,14 +91,14 @@ describe('HeroHeading — Phase 3 desktop details', () => {
     desktopHeroImage: null,
   }
 
-  it('renders the People · Places · Community tagline on desktop', () => {
+  it('no longer renders the People · Places · Community tagline', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
-    expect(screen.getByText('People · Places · Community')).toBeInTheDocument()
+    expect(screen.queryByText('People · Places · Community')).not.toBeInTheDocument()
   })
 
-  it('renders the quote using community.region, not a hardcoded city name', () => {
+  it('no longer renders the "stronger Jewish [region] together" quote', () => {
     render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
-    expect(screen.getByText(`A stronger Jewish ${community.region} together.`)).toBeInTheDocument()
+    expect(screen.queryByText(/stronger Jewish/)).not.toBeInTheDocument()
   })
 
   it('the desktop View Map button renders an icon, not the raw admin-set emoji string, next to the label', () => {
