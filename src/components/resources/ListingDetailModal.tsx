@@ -259,6 +259,7 @@ export default function ListingDetailModal({
             onFilterSelect={onFilterSelect}
             hideOpenStatus
             hiddenBadgeKeys={headerBadgeKeys}
+            hideCountBadge
             // Not includeHeaderUrlFields here — that field now has a home in
             // this dialog's own header, next to the name (see above), the
             // same reason PlaceDetailBody's default excludes it from this

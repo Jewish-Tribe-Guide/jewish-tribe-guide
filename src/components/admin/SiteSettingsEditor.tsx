@@ -14,6 +14,7 @@ import HomeSectionManager from './HomeSectionManager'
 import DesktopTopicsManager from './DesktopTopicsManager'
 import DesktopNavEditor from './DesktopNavEditor'
 import MobileTabsEditor from './MobileTabsEditor'
+import SubscriberManager from './SubscriberManager'
 import CollapsibleSection from './CollapsibleSection'
 import ImageUploadField from '@/components/ImageUploadField'
 import {
@@ -467,6 +468,14 @@ export default function SiteSettingsEditor({
               settings={draft}
               onSettingChange={set}
             />
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {isDesktop && (
+        <div className="mt-6 max-w-2xl">
+          <CollapsibleSection title="Subscribers" contentClassName="p-4">
+            <SubscriberManager token={token} />
           </CollapsibleSection>
         </div>
       )}
