@@ -122,6 +122,19 @@ html {
      go lighter/darker on the neutral scale, not back toward a brand tint. */
   --color-surface: #f1f5f9;
   --color-muted: #64748b;
+  /* Desktop mockup match (docs/desktop-mockup-plan.md) — cream page ground,
+     deep-navy heading ink, brand teal (Browse Categories, link hovers) and
+     a gold accent rule under the hero quote / closing strip. Desktop only;
+     mobile keeps --color-surface/slate-900 as before. */
+  --color-cream: #f7f5ef;
+  --color-ink: #13243a;
+  --color-brand-teal: #1f5b5a;
+  --color-brand-teal-dark: #184a49;
+  --color-gold: #c9a45c;
+  /* Desktop-only heading font (hero, card titles) — see layout.tsx's
+     Source_Serif_4 import, which supplies --font-source-serif. Georgia is
+     the fallback if the webfont fails to load. */
+  --font-serif: var(--font-source-serif), Georgia, serif;
 }
 
 /* Empty date inputs render their "mm/dd/yyyy" format text in the full text

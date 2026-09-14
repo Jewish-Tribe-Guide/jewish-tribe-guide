@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Figtree } from 'next/font/google'
+import { Figtree, Source_Serif_4 } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ServiceWorker from '@/components/ServiceWorker'
@@ -10,6 +10,10 @@ import './globals.css'
 import { getDefaultCommunity } from '@/lib/communityStore'
 
 const figtree = Figtree({ subsets: ['latin'] })
+// Desktop-only headings (hero, card titles) — see globals.css's `font-serif`
+// utility, which layers this over Georgia/serif as a fallback. Figtree stays
+// the default body font everywhere, mobile included.
+const sourceSerif = Source_Serif_4({ subsets: ['latin'], weight: ['400', '600', '700'], variable: '--font-source-serif' })
 
 // Reads the admin-edited site name/mission for the tab title and meta
 // description. Falls back to the community.config defaults on any failure
@@ -68,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={figtree.className}
+      className={`${figtree.className} ${sourceSerif.variable}`}
       // Brand color is single-sourced from community.config: override the
       // Tailwind `primary` utilities' variable at runtime so it always matches
       // `themeColor` (browser chrome / manifest). globals.css holds only a
@@ -82,7 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           actually-visible area pushed its bottom edge (the sheet) just past
           the fold, needing a small scroll to reveal it. 100dvh tracks the
           real visible viewport as the browser chrome shows/hides. */}
-      <body className="bg-surface text-slate-900 antialiased min-h-dvh flex flex-col">
+      <body className="bg-surface desktop:bg-cream text-slate-900 antialiased min-h-dvh flex flex-col">
         {children}
         <Analytics />
         <SpeedInsights />
