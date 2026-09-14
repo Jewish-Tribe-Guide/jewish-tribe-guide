@@ -10,6 +10,12 @@ export default function SearchBox({
   onQueryChange,
   interactive = true,
   placeholder,
+  // Spacing only, not the border/background/shadow — those stay fixed so
+  // every caller gets the same pill styling, but the desktop hero (Phase 3
+  // of the mockup rework) wants a taller ~48px box than mobile/SearchSection's
+  // default, and forking the whole component for that one difference would
+  // duplicate everything else here.
+  className = 'pl-5 pr-2 py-2',
 }: {
   query: string
   onQueryChange: (query: string) => void
@@ -20,9 +26,11 @@ export default function SearchBox({
    *  devices rather than split into separate mobile/desktop copies (it's
    *  describing the same search either way). */
   placeholder: string
+  /** Padding only — see the prop's own doc above. */
+  className?: string
 }) {
   return (
-    <div className="flex items-center rounded-full border border-slate-200 bg-white pl-5 pr-2 py-2 shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)]">
+    <div className={`flex items-center rounded-full border border-slate-200 bg-white shadow-[0_6px_20px_rgb(0,0,0,0.06)] transition-shadow focus-within:shadow-[0_6px_24px_rgb(0,0,0,0.12)] ${className}`}>
       <svg className="h-5 w-5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
       </svg>

@@ -410,7 +410,17 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           query={query}
           onQueryChange={setQuery}
           mapIcon={hasMap ? mapIcon : null}
-          onViewMap={() => mapBandRef.current?.scrollIntoView({ block: 'start' })}
+          onViewMap={() => {
+            // The map card only renders when the admin's Home screen cards
+            // list still includes it (see the mockup plan — the user removes
+            // it there, in the admin, not here); once it's gone,
+            // mapBandRef.current silently stays null and this fell through
+            // to doing nothing at all. Falling back to the full map page
+            // keeps "View Map" working either way, same call SiteChrome's
+            // own tab bar uses for its Map tab.
+            if (mapBandRef.current) mapBandRef.current.scrollIntoView({ block: 'start' })
+            else onNavigate(null, 'map')
+          }}
           onBrowseCategories={() => browseCardRef.current?.scrollIntoView({ block: 'start' })}
         />
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { community } from '@/community.config'
 import HeroHeading from './HeroHeading'
 
 afterEach(() => cleanup())
@@ -71,6 +72,50 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
     // separate hero fields are a desktop-only headline treatment, not a
     // change to what mobile has always shown.
     expect(screen.getByText(settings.mission).tagName).toBe('P')
+  })
+})
+
+// Desktop mockup match (Phase 3, docs/desktop-mockup-plan.md): a
+// "People · Places · Community" tagline, a short quote naming the
+// community's own region (never hardcoded — this app hosts more than one
+// community), and View Map rendering a real icon instead of the raw
+// admin-set emoji string it used to show next to the label.
+describe('HeroHeading — Phase 3 desktop details', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Search — kosher food, mikvah, shuls, schools…',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+
+  it('renders the People · Places · Community tagline on desktop', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.getByText('People · Places · Community')).toBeInTheDocument()
+  })
+
+  it('renders the quote using community.region, not a hardcoded city name', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    expect(screen.getByText(`A stronger Jewish ${community.region} together.`)).toBeInTheDocument()
+  })
+
+  it('the desktop View Map button renders an icon, not the raw admin-set emoji string, next to the label', () => {
+    const { container } = render(
+      <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />,
+    )
+
+    // Two "View Map" buttons exist in the DOM at once (CSS-only mobile/
+    // desktop split — see the component's own doc); only the desktop one is
+    // in scope for this phase, so this is scoped to the `desktop:block`
+    // section rather than asserting on every button in the document.
+    const desktopSection = container.querySelector('.desktop\\:block')
+    expect(desktopSection).not.toBeNull()
+    const desktopViewMap = Array.from(desktopSection!.querySelectorAll('button')).find((b) => b.textContent?.includes('View Map'))
+    expect(desktopViewMap).toBeTruthy()
+    expect(desktopViewMap!.textContent).not.toContain('🗺️')
+    expect(desktopViewMap!.querySelector('svg')).toBeTruthy()
   })
 })
 

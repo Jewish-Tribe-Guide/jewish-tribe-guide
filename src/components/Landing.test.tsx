@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
@@ -181,6 +181,56 @@ describe('Landing', () => {
     renderLanding(undefined, { content: { categories: [makeCategory()] } })
     act(() => triggerAllIntersections())
     expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+  })
+
+  // Phase 3 of the desktop mockup rework: the hero's "View Map" button used
+  // to unconditionally scroll to the embedded map band — which silently did
+  // nothing once the admin's Home screen cards list stopped including a map
+  // row (the map band and the Map pseudo-category that gates this button's
+  // very existence are two independent settings; see Landing's own doc on
+  // "all-or-nothing" homeSections). Now it falls back to navigating to the
+  // full map page, the same call SiteChrome's own Map tab uses.
+  describe('the hero\'s "View Map" button', () => {
+    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
+
+    beforeEach(() => {
+      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
+      Element.prototype.scrollIntoView = vi.fn()
+      vi.mocked(handlers.onNavigate).mockClear()
+    })
+
+    it('scrolls to the embedded map band when it renders', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, {
+        content: {
+          categories: [withMap],
+          homeSections: [{ id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' }],
+        },
+      })
+
+      await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
+
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
+      expect(handlers.onNavigate).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the full map page once the admin has removed the map band from Home', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, {
+        content: {
+          categories: [withMap],
+          // All-or-nothing homeSections: a davening-only row means the map
+          // band doesn't render at all, even though the Map pseudo-category
+          // (and therefore the View Map button itself) still exists.
+          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
+        },
+      })
+
+      await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
+
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
+      expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
+    })
   })
 
   describe('the map card\'s "N places across M categories" line', () => {

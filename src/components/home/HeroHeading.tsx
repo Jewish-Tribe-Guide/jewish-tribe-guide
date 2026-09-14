@@ -1,10 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { useIsMobile } from '@/lib/useIsMobile'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import { isOptimizableImage } from '@/lib/imageHosts'
+import { community } from '@/community.config'
+import { GridIcon, MapFoldIcon, SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 
 type Props = {
@@ -74,6 +75,16 @@ type Props = {
 // (Desktop tab's Hero card), and falls back to the original CSS gradient +
 // watermark star otherwise, so a fresh community with no photo yet never
 // renders broken.
+//
+// Desktop mockup match (docs/desktop-mockup-plan.md, Phase 3): serif
+// headline, a "People · Places · Community" tagline under the buttons, a
+// faint skyline silhouette low in the band, and — at `lg` and up, where
+// there's room beside the headline without colliding — a short serif quote
+// over the photo's right side naming the community by its own
+// `community.config` region (never hardcoded, since this app hosts more
+// than one community). The Browse Categories button now carries a small
+// grid icon and View Map an outline folded-map glyph, replacing the raw
+// admin-set emoji this used to render directly next to the label.
 export default function HeroHeading({
   settings,
   query,
@@ -83,7 +94,6 @@ export default function HeroHeading({
   onViewMap,
   onBrowseCategories,
 }: Props) {
-  const isMobile = useIsMobile()
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
   const viewMapButton = mapIcon != null && (
@@ -131,7 +141,7 @@ export default function HeroHeading({
           the site). Search + the two buttons sit over the photo's left
           side, on a light wash gradient that keeps dark text legible while
           leaving the photo's right side uncovered. */}
-      <section className="hidden desktop:block relative left-1/2 isolate min-h-[520px] w-screen -translate-x-1/2 overflow-hidden desktop:-mt-[60px]">
+      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-hidden desktop:-mt-[60px]">
         {heroImage ? (
           // A real photo: it has content to describe, so it's a genuine
           // `alt`, not aria-hidden — the opposite of the placeholder below.
@@ -189,42 +199,63 @@ export default function HeroHeading({
             band. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,white_0%,white_45%,transparent_68%)]"
+          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,white_0%,white_30%,transparent_58%)]"
         />
-        <div className="mx-auto flex min-h-[520px] max-w-6xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
-          <h1 className="max-w-2xl text-6xl font-bold leading-[1.05] text-slate-900 text-balance">
+        {/* Faint skyline, low and behind the text column — purely
+            decorative (aria-hidden), `-z-10` inside this section's own
+            `isolate` so it never competes with the wash/photo layers
+            above. */}
+        <SkylineIcon className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[360px] text-slate-400 opacity-15" />
+        <div className="mx-auto flex min-h-[435px] max-w-6xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
+          <h1 className="max-w-2xl font-serif text-[64px] font-bold leading-[1.02] tracking-tight text-ink text-balance">
             {headline}
           </h1>
           {subhead && (
-            <p className="mt-5 max-w-[46ch] text-lg leading-relaxed text-slate-600">
+            <p className="mt-3 max-w-[46ch] text-lg text-slate-600">
               {subhead}
             </p>
           )}
           {ui.search.landing && (
-            <div className="mt-8 max-w-md">
-              <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
+            <div className="mt-8 max-w-[585px]">
+              <SearchBox
+                query={query}
+                onQueryChange={onQueryChange}
+                interactive={interactive}
+                placeholder={settings.searchPlaceholder}
+                className="pl-6 pr-2.5 py-3"
+              />
             </div>
           )}
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={onBrowseCategories}
-              // sage, not the site's usual amber accent — matches the
-              // Sukkah banner's own desktop "Map View" button (see
-              // CampaignBannerCard), the one place this palette already
-              // exists in the app, rather than introducing a second green.
-              className="inline-flex items-center gap-2 rounded-full bg-sage-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-sage-700 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-teal-dark cursor-pointer"
             >
+              <GridIcon className="h-[18px] w-[18px]" />
               Browse Categories
             </button>
             {mapIcon != null && (
               <button
                 onClick={onViewMap}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-[15px] font-medium text-ink shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
               >
-                <span aria-hidden="true">{mapIcon}</span>
+                <MapFoldIcon className="h-[18px] w-[18px]" />
                 View Map
               </button>
             )}
+          </div>
+          <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.35em] text-slate-500">
+            People · Places · Community
+          </p>
+        </div>
+        {/* Short quote over the photo's right side — hidden below `lg` so it
+            can't collide with the headline at narrower desktop widths. */}
+        <div className="pointer-events-none absolute inset-0 mx-auto hidden max-w-6xl px-4 sm:px-6 lg:block">
+          <div className="absolute right-6 top-[96px] max-w-[190px]">
+            <p className="font-serif text-xl leading-snug text-ink">
+              A stronger Jewish {community.region} together.
+            </p>
+            <div className="mt-3 h-0.5 w-7 bg-gold" />
           </div>
         </div>
       </section>

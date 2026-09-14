@@ -240,3 +240,28 @@ export function DotsIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// A simple city-skyline silhouette — filled shapes, not stroked lines like
+// every icon above, since a skyline reads as solid rooftops against sky
+// rather than an outlined pictogram. A row of plain rectangle "rooftops"
+// flanking one taller, stepped tower loosely standing in for Philadelphia
+// City Hall's own silhouette, without depicting the real building closely
+// enough to need a licensed asset. Purely decorative wherever it's used
+// (HeroHeading, ClosingStrip) — callers render it aria-hidden.
+export function SkylineIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 -14 200 104" fill="currentColor" aria-hidden="true" className={className}>
+      <rect x="0" y="46" width="22" height="44" />
+      <rect x="26" y="30" width="18" height="60" />
+      <rect x="48" y="54" width="16" height="36" />
+      {/* The stepped tower, with a slim spire on top. */}
+      <rect x="86" y="10" width="28" height="80" />
+      <rect x="92" y="0" width="16" height="14" />
+      <rect x="97" y="-14" width="6" height="16" />
+      <rect x="118" y="38" width="20" height="52" />
+      <rect x="142" y="24" width="18" height="66" />
+      <rect x="164" y="50" width="16" height="40" />
+      <rect x="184" y="36" width="16" height="54" />
+    </svg>
+  )
+}
