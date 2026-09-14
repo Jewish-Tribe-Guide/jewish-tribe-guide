@@ -1259,9 +1259,27 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // JSX below), so there's always a way to pull the panel out, even on a
   // freshly-loaded map with nothing narrowed yet.
   const sidebarVisible = (desktopNarrowed || !!desktopSelected || sidebarOpenedManually) && !sidebarCollapsed
+  // Keyed off sidebarVisible itself, not off desktopNarrowed/desktopSelected
+  // (which the old version branched on) — those can go stale independently
+  // of sidebarCollapsed. Concretely: select a place (sidebarCollapsed reset
+  // to false at selection time), close via this same toggle while still
+  // selected (branches into setSidebarCollapsed, so it's now true), then
+  // click the map background to deselect (desktopSelected -> null, but
+  // nothing there touches sidebarCollapsed — it's still true). Toggling
+  // again now falls into the OTHER branch (desktopNarrowed/desktopSelected
+  // are both falsy), which only ever flipped sidebarOpenedManually — never
+  // sidebarCollapsed, which was the one thing actually keeping it hidden.
+  // sidebarVisible stayed false no matter how many times you clicked
+  // "Show sidebar" after that. Always writing both flags to an explicit
+  // target state (not toggling either blind) means there's no combination
+  // of prior state this can get stuck in.
   function toggleSidebar() {
-    if (desktopNarrowed || desktopSelected) setSidebarCollapsed((c) => !c)
-    else setSidebarOpenedManually((o) => !o)
+    if (sidebarVisible) {
+      setSidebarCollapsed(true)
+    } else {
+      setSidebarCollapsed(false)
+      setSidebarOpenedManually(true)
+    }
   }
 
   // Auto-collapse the sidebar once whatever it was showing disappears —

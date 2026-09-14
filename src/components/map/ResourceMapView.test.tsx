@@ -43,11 +43,13 @@ vi.mock('./ResourceMap', () => ({
     points,
     onSelectPoint,
     onLongPressPoint,
+    onBackgroundClick,
     frameToken,
   }: {
     points: MapPoint[]
     onSelectPoint?: (p: MapPoint) => void
     onLongPressPoint?: (p: MapPoint) => void
+    onBackgroundClick?: () => void
     frameToken?: number
   }) => (
     <div data-testid="resource-map">
@@ -59,6 +61,7 @@ vi.mock('./ResourceMap', () => ({
           <button onClick={() => onLongPressPoint?.(p)}>Long-press {p.name}</button>
         </div>
       ))}
+      <button onClick={() => onBackgroundClick?.()}>Click map background</button>
     </div>
   ),
 }))
@@ -396,6 +399,39 @@ describe('ResourceMapView — selecting a place', () => {
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
 
     expect(await screen.findByText('1 Main St')).toBeInTheDocument()
+  })
+
+  // Regression: select a place (opens the sidebar), close it with the edge
+  // toggle WHILE still selected (not the detail panel's own "back" button —
+  // that clears the selection outright, this doesn't), then click the map
+  // background to deselect, then try to reopen. The toggle used to branch
+  // on desktopNarrowed/desktopSelected to decide which of two flags to
+  // flip — closing while selected set sidebarCollapsed, but deselecting via
+  // the map background never reset it, so the later reopen attempt (now
+  // routed to the other flag, sidebarOpenedManually) could never overcome
+  // it. sidebarVisible stayed false no matter how many times "Show sidebar"
+  // was clicked.
+  it('reopening the sidebar still works after closing it while a place was selected, then deselecting', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ category: 'grocery', name: 'Acme Grocery', address: '1 Main St' })],
+      [grocery],
+    )
+    const asideWidth = () => container.querySelector('aside')?.className.match(/desktop:w-\[?(\d+)(?:px\])?/)?.[1]
+
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+    expect(await screen.findByText('1 Main St')).toBeInTheDocument()
+    expect(asideWidth()).toBe('380')
+
+    await user.click(screen.getByRole('button', { name: 'Hide sidebar' }))
+    expect(asideWidth()).toBe('0')
+
+    await user.click(screen.getByRole('button', { name: 'Click map background' }))
+
+    await user.click(screen.getByRole('button', { name: 'Show sidebar' }))
+    expect(asideWidth()).toBe('380')
   })
 
   // A pin tapped directly on the map is already visible right where it is —
