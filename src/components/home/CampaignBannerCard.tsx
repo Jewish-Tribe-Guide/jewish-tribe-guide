@@ -9,6 +9,7 @@ import { useDismissedCampaignBanners } from '@/lib/dismissedCampaignBanners'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { routes, mapQueryString } from '@/lib/routes'
 import { community } from '@/community.config'
+import { LeafIcon, PinIcon } from '@/components/icons'
 
 // ── A seasonal promotion (see CampaignBannerManager's own doc) — renders
 // nothing outside its admin-set date range, so there is no separate on/off
@@ -50,6 +51,15 @@ import { community } from '@/community.config'
 // choice between. The admin's `destination` field still does something: it
 // decides which button is solid (primary) vs outlined (secondary), not
 // which one exists.
+//
+// Desktop mockup match (Phase 4, docs/desktop-mockup-plan.md): a completely
+// separate horizontal layout (`hidden desktop:flex`), not the mobile card's
+// vertical one reused with a few overrides — the two read too differently
+// (a left-edge photo placeholder, buttons pinned to the right, no colour
+// rail) to share markup cleanly. Mobile's own JSX is untouched apart from
+// gaining `desktop:hidden`; both blocks are computed from the same
+// `banner`/`primary`/`secondary` values above so the actual content/logic
+// only lives in one place.
 export default function CampaignBannerCard() {
   const banners = useCampaignBanners()
   const categories = useCategories()
@@ -80,53 +90,116 @@ export default function CampaignBannerCard() {
     : { href: mapHref, label: 'Map View' }
 
   return (
-    <div
-      className="relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 pr-9 shadow-sm desktop:border-sage-200 desktop:from-sage-50"
-    >
-      <div
-        aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-700 to-blue-900 desktop:from-sage-600 desktop:to-sage-900"
-      />
-      <button
-        type="button"
-        onClick={() => dismiss(banner.id)}
-        aria-label="Dismiss"
-        className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 desktop:hover:bg-sage-900/10 desktop:hover:text-sage-900"
-      >
-        ✕
-      </button>
-
-      {/* Same eyebrow treatment as the Browse card's `desktopBrowseEyebrow`
-          ("Get started") — text-xs/uppercase/tracking-wide — colored to
-          match this banner's own per-breakpoint accent rather than that
-          card's amber, so it reads as this banner's label, not a borrowed
-          one. Static, not admin-editable: every banner is "happening now"
-          by definition (activeCampaignBanner already filters to live ones),
-          so there's nothing per-campaign for an admin to set here. */}
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700 desktop:text-sage-700">
-        Happening now
-      </p>
-      <h3 className="max-w-[28ch] text-lg font-extrabold text-slate-900 desktop:max-w-[32ch] desktop:text-[19px]">
-        {banner.title}
-      </h3>
-      {banner.subtitle && (
-        <p className="mb-4 mt-1 text-sm leading-relaxed text-stone-600 desktop:max-w-[44ch]">{banner.subtitle}</p>
-      )}
-
-      <div className="mt-4 flex gap-2.5">
-        <Link
-          href={primary.href}
-          className="flex-1 cursor-pointer rounded-lg bg-gradient-to-br from-blue-700 to-blue-800 px-4 py-2.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:from-blue-800 hover:to-blue-900 desktop:flex-none desktop:from-sage-600 desktop:to-sage-700 desktop:hover:from-sage-700 desktop:hover:to-sage-800"
+    <>
+      {/* Mobile — unchanged, apart from `desktop:hidden` (the old desktop:
+          color overrides are gone from here too, now that desktop has its
+          own separate block below rather than this one wearing both). */}
+      <div className="relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 pr-9 shadow-sm desktop:hidden">
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-700 to-blue-900"
+        />
+        <button
+          type="button"
+          onClick={() => dismiss(banner.id)}
+          aria-label="Dismiss"
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900"
         >
-          {primary.label}
-        </Link>
-        <Link
-          href={secondary.href}
-          className="flex-1 cursor-pointer rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-center text-sm font-bold text-blue-800 transition-colors hover:bg-blue-50 desktop:flex-none desktop:border-sage-200 desktop:text-sage-700 desktop:hover:bg-sage-50"
-        >
-          {secondary.label}
-        </Link>
+          ✕
+        </button>
+
+        {/* Same eyebrow treatment as the Browse card's `desktopBrowseEyebrow`
+            ("Get started") — text-xs/uppercase/tracking-wide. Static, not
+            admin-editable: every banner is "happening now" by definition
+            (activeCampaignBanner already filters to live ones), so there's
+            nothing per-campaign for an admin to set here. */}
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+          Happening now
+        </p>
+        <h3 className="max-w-[28ch] text-lg font-extrabold text-slate-900">
+          {banner.title}
+        </h3>
+        {banner.subtitle && (
+          <p className="mb-4 mt-1 text-sm leading-relaxed text-stone-600">{banner.subtitle}</p>
+        )}
+
+        <div className="mt-4 flex gap-2.5">
+          <Link
+            href={primary.href}
+            className="flex-1 cursor-pointer rounded-lg bg-gradient-to-br from-blue-700 to-blue-800 px-4 py-2.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:from-blue-800 hover:to-blue-900"
+          >
+            {primary.label}
+          </Link>
+          <Link
+            href={secondary.href}
+            className="flex-1 cursor-pointer rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-center text-sm font-bold text-blue-800 transition-colors hover:bg-blue-50"
+          >
+            {secondary.label}
+          </Link>
+        </div>
       </div>
-    </div>
+
+      {/* Desktop — horizontal: a photo placeholder on the left fading into
+          the banner, text in the middle, buttons pinned to the right. No
+          left colour rail here (that's a mobile-only accent). */}
+      <div className="relative hidden items-center overflow-hidden rounded-2xl border border-sage-200 bg-sage-50 desktop:flex min-h-[120px]">
+        <div
+          aria-hidden="true"
+          // `self-stretch` alone (not also `h-full`, which is height:100% —
+          // an explicit height, so it resolves against this row's own
+          // height, which is auto/content-driven, not a definite value, and
+          // computes to a 0px-tall sliver instead of stretching) is what
+          // makes this fill the row's actual height, whatever that ends up
+          // being.
+          className="relative w-[24%] self-stretch bg-gradient-to-br from-amber-200 via-sage-200 to-sage-50 [mask-image:linear-gradient(to_right,black_60%,transparent)]"
+        >
+          <LeafIcon className="absolute inset-0 m-auto h-16 w-16 text-white/70" />
+        </div>
+
+        <div className="flex-1 px-6">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sage-700">
+            Happening now
+          </p>
+          <h3 className="max-w-[32ch] font-serif text-[24px] font-semibold text-ink">
+            {banner.title}
+          </h3>
+          {banner.subtitle && (
+            <p className="mt-1 max-w-[44ch] text-[15px] text-stone-600">{banner.subtitle}</p>
+          )}
+        </div>
+
+        {/* Faint leaf decoration behind the buttons, at the banner's own
+            right edge — purely decorative, aria-hidden, -z-10 to stay
+            behind the buttons rather than competing with them for clicks
+            (the wrapper's own overflow-hidden also keeps it from spilling
+            past the rounded corner). */}
+        <LeafIcon className="pointer-events-none absolute -right-4 bottom-0 -z-10 h-28 w-28 text-sage-900/10" />
+
+        <div className="flex shrink-0 items-center gap-3 pr-16">
+          <Link
+            href={primary.href}
+            className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-sage-700"
+          >
+            {mapIsPrimary && <PinIcon className="h-4 w-4 shrink-0" />}
+            {primary.label}
+          </Link>
+          <Link
+            href={secondary.href}
+            className="cursor-pointer rounded-lg border border-sage-200 bg-white px-4 py-2.5 text-sm font-bold text-sage-700 transition-colors hover:bg-sage-50"
+          >
+            {secondary.label}
+          </Link>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => dismiss(banner.id)}
+          aria-label="Dismiss"
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-sage-900/10 hover:text-sage-900"
+        >
+          ✕
+        </button>
+      </div>
+    </>
   )
 }

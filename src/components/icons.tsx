@@ -265,3 +265,16 @@ export function SkylineIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// A single stylized leaf — stands in for the Sukkot/schach greenery this
+// banner is themed around without depicting a real sukkah. Used both as the
+// photo placeholder's faint watermark glyph and the banner's own decorative
+// corner accent (see CampaignBannerCard's desktop block).
+export function LeafIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M11 20c8 0 11-6 11-13-7 0-13 3-13 11 0-8-6-11-13-11 0 7 3 13 15 13Z" />
+      <path d="M11 20V7" />
+    </svg>
+  )
+}
