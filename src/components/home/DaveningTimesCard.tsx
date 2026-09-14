@@ -8,13 +8,14 @@ import { useNow } from '@/lib/useNow'
 import { currentSeason } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
 import { isMinyanim, type Minyan } from '@/lib/davening'
-import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
+import { nextUpcomingDavening, formatStartsIn, type ShulMinyanim } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useZmanim } from '@/lib/useZmanim'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
-import { distanceMiles, type LatLng } from '@/lib/geo'
+import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 import { community } from '@/community.config'
+import { SunIcon } from '@/components/icons'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
@@ -36,17 +37,21 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // the point of this card is that there is nothing to read, only one fact
 // to glance at, with "All davening times" as the answer to "and the rest?".
 //
-// The one fact used to sit in a plain blue-tinted row — a treatment that
-// made sense when this was one row picked out of a list, and stopped
-// making sense once the list was cut down to exactly one row: there was
-// nothing left to pick it out FROM. It's a bordered "plaque" now instead —
-// its own left accent, the time given real size and weight, the tefillah
-// name promoted to a small label above it rather than sitting inline — so
-// it reads as a stated fact rather than a list row. Amber, not a category
-// colour: this card can show a minyan from any category with a minyanim
-// field, so it isn't "Synagogues' own" the way a single-category card's
-// icon tint would be, and amber is what the rest of this row (the
-// community card beside it, "Today" above) already uses.
+// Desktop mockup match (Phase 6, docs/desktop-mockup-plan.md): the one fact
+// is a single compact amber-tinted row now — a sun icon, the tefillah name
+// and shul (or "at N nearby shuls") on the left, the time and a plain-
+// language countdown (formatStartsIn) on the right — rather than the larger
+// bordered "plaque" this used to be. The card lost its own distance chip
+// ("N mi") in the same pass: it no longer has the header-row space that
+// used to hold it, and the card is now a peer of Update Listings/Suggest a
+// Listing in a 3-up row (see Landing.tsx's own community-row doc) rather
+// than pairing with Update Listings alone. "View all times" replaces the
+// old amber pill button with a plain text link in the header row, matching
+// the mockup's other "See more" links (DaveningTimesCard, UpdateListingsCard
+// used to each have their own distinct CTA treatment; this card's own is
+// now consistent with them). Amber, not a category colour: this card can
+// show a minyan from any category with a minyanim field, so it isn't
+// "Synagogues' own" the way a single-category card's icon tint would be.
 export default function DaveningTimesCard({
   coords,
   eyebrow,
@@ -127,13 +132,6 @@ export default function DaveningTimesCard({
   // doesn't appear rather than showing a permanently-empty shell.
   if (!linkCategoryId) return null
 
-  const nearestMiles = (() => {
-    if (!coords || !result) return null
-    const known = result.shulGeos.filter((g): g is LatLng => !!g)
-    if (known.length === 0) return null
-    return Math.min(...known.map((g) => distanceMiles(coords, g)))
-  })()
-
   // `?davening=1` opens "All davening times" as soon as the category page
   // mounts (see GenericDirectory's own `openDaveningModal` doc) — without it
   // this landed on a bare category page and made the visitor find the same
@@ -155,42 +153,38 @@ export default function DaveningTimesCard({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{eyebrow}</p>
-      <div className="mb-4 flex items-baseline gap-2">
-        <h3 className="text-lg font-semibold text-slate-900">{heading}</h3>
-        {/* Top-right, off the plaque's own line entirely — see the
-            component doc for why this only shows for a single named shul
-            (nearestMiles is already null for a "nearby shuls" tie). */}
-        {nearestMiles != null && (
-          <span className="ml-auto whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
-            {nearestMiles} mi
-          </span>
-        )}
+      <div className="mb-4 flex items-end justify-between gap-2">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{eyebrow}</p>
+          <h3 className="font-serif text-lg font-semibold text-ink">{heading}</h3>
+        </div>
+        <Link href={seeAllHref} className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink transition-colors hover:text-brand-teal">
+          View all times →
+        </Link>
       </div>
 
       {result ? (
-        <div className="rounded-xl border border-amber-100 border-l-4 border-l-amber-700 bg-gradient-to-b from-amber-50/40 to-white px-4 py-3.5">
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-amber-800">{result.label}</p>
-          <p className="mt-0.5 text-[32px] font-extrabold leading-none tracking-tight tabular-nums text-slate-900">
-            {result.time}
-            {result.isTomorrow && <span className="ml-1.5 text-base font-bold text-muted">tmrw</span>}
-          </p>
-          <p className="mt-2 text-[13px] font-semibold text-slate-600">
-            {result.shul ? result.shul.name : `at ${result.shulCount} nearby shuls`}
-          </p>
+        <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3">
+          <SunIcon className="h-6 w-6 shrink-0 text-amber-500" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{result.label}</p>
+            <p className="truncate text-xs text-slate-500">
+              {result.shul ? result.shul.name : `at ${result.shulCount} nearby shuls`}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm font-semibold tabular-nums text-ink">{result.time}</p>
+            <p className="text-xs text-slate-500">
+              {formatStartsIn(nowMinutes, result.minutes, result.isTomorrow)}
+              {result.isTomorrow && ' tmrw'}
+            </p>
+          </div>
         </div>
       ) : (
         <p className="rounded-lg bg-slate-50 px-3.5 py-3 text-[13px] text-muted">
           No davening times posted yet.
         </p>
       )}
-
-      <Link
-        href={seeAllHref}
-        className="mt-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800"
-      >
-        All davening times →
-      </Link>
     </div>
   )
 }

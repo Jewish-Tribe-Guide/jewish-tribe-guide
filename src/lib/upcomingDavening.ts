@@ -19,6 +19,13 @@ export type UpcomingDavening = {
   /** Formatted clock time, e.g. "7:14 PM" — already resolved for anchor-based
    *  rows (sunset/candle-lighting/havdalah), not the rule text. */
   time: string
+  /** `time`, as minutes since local midnight of the day it falls on (today
+   *  or tomorrow, per `isTomorrow`) — not minutes-from-now. Filled from the
+   *  same resolved candidate `time` comes from, so the two never disagree.
+   *  Feeds formatStartsIn's own "In N min"/"In N hr M min" countdown, which
+   *  needs a plain number to do arithmetic on rather than re-parsing the
+   *  formatted clock string. */
+  minutes: number
   /** True once every shul's minyanim for today have passed and this is
    *  tomorrow's earliest instead. Real weekdays only — see the module doc. */
   isTomorrow: boolean
@@ -147,9 +154,33 @@ function buildResult(candidates: Candidate[], isTomorrow: boolean): UpcomingDave
   return {
     label,
     time: group[0].time,
+    minutes: minMinutes,
     isTomorrow,
     shul: shulNames.length === 1 ? { name: shulNames[0], geo: group[0].shulGeo } : null,
     shulCount: shulNames.length,
     shulGeos: group.map((c) => c.shulGeo),
   }
+}
+
+/** "In 12 min" / "In 1 hr 12 min" / "In 2 hr" / "Now" — a plain-language
+ *  countdown to `target` (minutes since local midnight of the day it falls
+ *  on), from `nowMinutes` (minutes since local midnight of TODAY). When
+ *  `isTomorrow`, `target` is added to 1440 first so the subtraction still
+ *  lands on a positive count regardless of how far past midnight `nowMinutes`
+ *  is — this is never called with a `target` that's actually further than 24h
+ *  out (nextUpcomingDavening never looks past tomorrow), so there's no
+ *  ">24h" case to format.
+ *
+ *  Exactly 0 minutes away reads as "Now", not "In 0 min" — the card is
+ *  naming something happening at this instant, and "In 0 min" reads as a
+ *  bug, not a countdown. */
+export function formatStartsIn(nowMinutes: number, target: number, isTomorrow: boolean): string {
+  const targetFromNow = isTomorrow ? target + 24 * 60 : target
+  const delta = Math.max(0, targetFromNow - nowMinutes)
+  if (delta === 0) return 'Now'
+  const hours = Math.floor(delta / 60)
+  const minutes = delta % 60
+  if (hours === 0) return `In ${minutes} min`
+  if (minutes === 0) return `In ${hours} hr`
+  return `In ${hours} hr ${minutes} min`
 }

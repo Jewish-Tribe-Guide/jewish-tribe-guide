@@ -266,6 +266,37 @@ export function SkylineIcon({ className }: IconProps) {
   )
 }
 
+// Sun — DaveningTimesCard's compact row (Phase 6, desktop mockup rework).
+export function SunIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2v3" />
+      <path d="M12 19v3" />
+      <path d="M4.2 4.2l2.1 2.1" />
+      <path d="M17.7 17.7l2.1 2.1" />
+      <path d="M2 12h3" />
+      <path d="M19 12h3" />
+      <path d="M4.2 19.8l2.1-2.1" />
+      <path d="M17.7 6.3l2.1-2.1" />
+    </svg>
+  )
+}
+
+// People — UpdateListingsCard's header icon (Phase 6, desktop mockup
+// rework). Two overlapping figures, not one — "kept by the community" is
+// about the group, not an individual.
+export function PeopleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3" />
+    </svg>
+  )
+}
+
 // A single stylized leaf — stands in for the Sukkot/schach greenery this
 // banner is themed around without depicting a real sukkah. Used both as the
 // photo placeholder's faint watermark glyph and the banner's own decorative

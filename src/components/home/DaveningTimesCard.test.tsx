@@ -5,7 +5,6 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { ListingsProvider } from '@/lib/listingsContext'
-import { distanceMiles } from '@/lib/geo'
 import DaveningTimesCard from './DaveningTimesCard'
 
 vi.mock('next/navigation', () => ({
@@ -122,7 +121,13 @@ describe('DaveningTimesCard', () => {
     }
   })
 
-  it('shows distance to the shul once a location is set, and omits it when none is', () => {
+  // The distance chip ("N mi") this used to show is gone — see the
+  // component's own doc: the compact single-row design (Phase 6, desktop
+  // mockup rework) has no header-row space left for it now that the card
+  // sits in a 3-up row with Update Listings/Suggest a Listing instead of
+  // pairing with Update Listings alone. Not replaced with anything; this
+  // is a deliberate feature removal, not coverage that moved elsewhere.
+  it('never shows a distance chip, with or without a location set', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-09-08T13:00:00'))
@@ -142,21 +147,47 @@ describe('DaveningTimesCard', () => {
         </ListingsProvider>,
         { content: { categories: [synagogue] } },
       )
-      expect(screen.queryByText(/mi$/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/\d+(\.\d+)? mi$/)).not.toBeInTheDocument()
 
-      const expectedMiles = distanceMiles(coords, shulGeo)
       rerenderWithProviders(
         <ListingsProvider listings={[shul]}>
           <DaveningTimesCard coords={coords} eyebrow="Today" heading="Upcoming Davening" />
         </ListingsProvider>,
       )
-      expect(screen.getByText(new RegExp(`${expectedMiles} mi$`))).toBeInTheDocument()
+      expect(screen.queryByText(/\d+(\.\d+)? mi$/)).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('links "All davening times" to the category page with the minyanim field, opening the modal on arrival', () => {
+  // Countdown (formatStartsIn) — see upcomingDavening.test.ts for the pure
+  // formatting logic itself; this is the component actually wiring the
+  // clock and the resolved minyan minutes into it.
+  it('shows a plain-language countdown to the next minyan', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-08T13:00:00')) // Tuesday 1:00 PM
+      const shul = makeListing({
+        id: 'shul-1',
+        category: 'synagogue',
+        name: 'Kahal Kadosh Mikveh Israel',
+        minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:12pm' }],
+      })
+
+      renderWithProviders(
+        <ListingsProvider listings={[shul]}>
+          <DaveningTimesCard coords={null} eyebrow="Today" heading="Upcoming Davening" />
+        </ListingsProvider>,
+        { content: { categories: [synagogue] } },
+      )
+
+      expect(screen.getByText('In 1 hr 12 min')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('links "View all times" to the category page with the minyanim field, opening the modal on arrival', () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date('2026-09-08T13:00:00'))
@@ -178,7 +209,7 @@ describe('DaveningTimesCard', () => {
       // link names, rather than a bare category page the visitor then has
       // to find the same button on again — see GenericDirectory's own
       // `openDaveningModal` doc.
-      const link = screen.getByRole('link', { name: /All davening times/ })
+      const link = screen.getByRole('link', { name: /View all times/ })
       expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1')
     } finally {
       vi.useRealTimers()
@@ -210,8 +241,8 @@ describe('DaveningTimesCard', () => {
         { content: { categories: [synagogue] } },
       )
 
-      expect(screen.getByText('tmrw')).toBeInTheDocument()
-      const link = screen.getByRole('link', { name: /All davening times/ })
+      expect(screen.getByText(/tmrw/)).toBeInTheDocument()
+      const link = screen.getByRole('link', { name: /View all times/ })
       expect(link).toHaveAttribute('href', '/test-community/synagogue?davening=1&day=wed')
     } finally {
       vi.useRealTimers()

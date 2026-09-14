@@ -15,12 +15,13 @@ vi.mock('next/navigation', () => ({
 
 afterEach(() => cleanup())
 
-// UpdateListingsCard's Add step (Edit/Report moved to EditReportPicker — a listing
-// search, not a category picker; see that component's own tests). What
-// matters here: only categories where Add is actually enabled show up (the
-// same gate the real Add button already respects), the search field
-// filters that list live, and picking a category hands off to the real
-// Add form that already exists.
+// SuggestListingCard's "Submit a Listing" step (Edit/Report used to be a
+// separate listing-search picker, EditReportPicker — deleted along with the
+// Add/Edit/Report buttons this used to pair with; see UpdateListingsCard's
+// own doc). What matters here: only categories where Add is actually
+// enabled show up (the same gate the real Add button already respects), the
+// search field filters that list live, and picking a category hands off to
+// the real Add form that already exists.
 
 describe('ContributePicker', () => {
   it('only lists categories where Add is actually enabled', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextUpcomingDavening, type ShulMinyanim } from './upcomingDavening'
+import { formatStartsIn, nextUpcomingDavening, type ShulMinyanim } from './upcomingDavening'
 import type { Minyan } from './davening'
 import { geoKey } from './useZmanAnchors'
 
@@ -101,6 +101,7 @@ describe('nextUpcomingDavening', () => {
     expect(result).toEqual({
       label: 'Mincha',
       time: '2:00pm',
+      minutes: 14 * 60, // 2:00pm
       isTomorrow: false,
       shul: { name: 'Kahal Kadosh Mikveh Israel', geo: kahalKadosh.geo },
       shulCount: 1,
@@ -223,5 +224,32 @@ describe('nextUpcomingDavening', () => {
     })
     expect(result?.label).toBe('Shacharis & Mincha')
     expect(result?.shulCount).toBe(2)
+  })
+})
+
+describe('formatStartsIn', () => {
+  it('exactly at the target reads as "Now", not "In 0 min"', () => {
+    expect(formatStartsIn(13 * 60, 13 * 60, false)).toBe('Now')
+  })
+
+  it('under an hour away', () => {
+    expect(formatStartsIn(13 * 60, 13 * 60 + 12, false)).toBe('In 12 min')
+  })
+
+  it('exactly one hour away — no dangling "0 min"', () => {
+    expect(formatStartsIn(13 * 60, 14 * 60, false)).toBe('In 1 hr')
+  })
+
+  it('over an hour away, with minutes left over', () => {
+    expect(formatStartsIn(13 * 60, 14 * 60 + 12, false)).toBe('In 1 hr 12 min')
+  })
+
+  it('several hours away', () => {
+    expect(formatStartsIn(6 * 60, 8 * 60, false)).toBe('In 2 hr')
+  })
+
+  it('tomorrow — target is measured from the NEXT day\'s midnight, 24h ahead of today\'s', () => {
+    // 11pm tonight, tomorrow's minyan at 7am: 8 hours away.
+    expect(formatStartsIn(23 * 60, 7 * 60, true)).toBe('In 8 hr')
   })
 })

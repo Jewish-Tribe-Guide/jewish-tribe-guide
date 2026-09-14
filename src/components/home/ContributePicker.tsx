@@ -11,11 +11,15 @@ import { routes } from '@/lib/routes'
 import { ui } from '@/lib/uiConfig'
 import CategoryIcon from '@/components/CategoryIcon'
 
-/** Add step of UpdateListingsCard's Add/Edit/Report picker — Edit/Report skip this
- *  entirely now (see EditReportPicker: those search for the listing itself,
- *  category shown only as a disambiguator) since a category-first step made
- *  someone translate "which business" into "which bucket" for no reason.
- *  Add still needs one, though — there's no existing listing to search for,
+/** The Add flow's category picker — opened by SuggestListingCard's "Submit a
+ *  Listing" button (UpdateListingsCard used to open this too, before the
+ *  desktop mockup rework split Add/Edit/Report off into its own dedicated
+ *  card — see that component's own doc). Edit/Report used to skip a step
+ *  like this entirely (see the deleted EditReportPicker: those searched for
+ *  the listing itself, category shown only as a disambiguator) since a
+ *  category-first step made someone translate "which business" into "which
+ *  bucket" for no reason. Add still needs one, though — there's no existing
+ *  listing to search for,
  *  so "which category" is the real first question. A search field instead
  *  of a plain grid: filtering scales better than a grid that just gets
  *  taller as more categories are added, while keeping each result's icon

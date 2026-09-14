@@ -9,6 +9,7 @@ import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
+import SuggestListingCard from '@/components/home/SuggestListingCard'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
@@ -487,13 +488,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 Listings, Email Signup, Jewish Times) uses the same card
                 language (border, rounded-2xl) as this section, so the whole
                 stack reads as one family. */}
-        {/* ── The desktop gateway's six singleton cards — Categories &
-                Search, Davening Times, Update Listings, Map, Email Signup,
-                Jewish Times — in the admin-configured order (builtInOrder
-                above), and now optionally paired side by side (see
-                homeSections.ts's own `width` doc). Each card keeps only the
-                gating it actually needs on its own merits — Davening Times
-                self-gates on having a minyanim-bearing category at all
+        {/* ── The desktop gateway's cards — Categories & Search, Davening
+                Times, Update Listings, Map, Email Signup, Jewish Times, plus
+                the new Suggest a Listing — in the admin-configured order
+                (builtInOrder above), and now optionally paired side by side
+                (see homeSections.ts's own `width` doc). Each card keeps only
+                the gating it actually needs on its own merits — Davening
+                Times self-gates on having a minyanim-bearing category at all
                 (inside DaveningTimesCard), Jewish Times gates on a real
                 Zmanim pseudo-category existing (candle-lighting data has
                 nowhere to come from otherwise), and Update Listings/Email
@@ -507,7 +508,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 something (cardKindContent didn't return null) — a 'half'
                 card whose would-be partner is gated off that render (or is
                 itself the last card) falls back to a full-width row of its
-                own, so a lone half-width card never looks like a mistake. */}
+                own, so a lone half-width card never looks like a mistake.
+
+                Davening Times and Update Listings are the one exception to
+                that generic per-kind path: the desktop mockup (Phase 6,
+                docs/desktop-mockup-plan.md) puts them in one 3-up
+                "community" row together with Suggest a Listing (a card with
+                no `width`/kind of its own in the database — card widths
+                there are only 'full' | 'half', and kinds are fixed by a DB
+                constraint, so there's nowhere to hang a generic pairing rule
+                for a third card). See the renderedCards walk below, which
+                intercepts those two kinds specifically instead of routing
+                them through cardKindContent. */}
         {(() => {
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
@@ -590,33 +602,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               </div>
             )
           }
-          if (kind === 'davening') {
-            // No outer zmanimCategory gate any more — that was this card's
-            // old shared-component sibling's requirement (ShabbatTimesCard's
-            // useZmanim), not this card's own. DaveningTimesCard already
-            // self-gates on having any minyanim-bearing category at all
-            // (returns null otherwise), which is the real requirement here.
-            return (
-              !isMobile && (
-                <DaveningTimesCard
-                  coords={coords}
-                  eyebrow={settings.desktopDaveningEyebrow}
-                  heading={settings.desktopDaveningHeading}
-                />
-              )
-            )
-          }
-          if (kind === 'listings') {
-            // Unconditional (no zmanimCategory gate) — this card has never
-            // depended on zmanim data; it was only ever gated because it
-            // used to share a component (HomeBreak) with Davening Times.
-            return !isMobile && (
-              <UpdateListingsCard
-                eyebrow={settings.desktopListingsEyebrow}
-                heading={settings.desktopListingsHeading}
-              />
-            )
-          }
+          // 'davening'/'listings' are NOT handled here any more — see the
+          // community-row special case in the renderedCards walk below,
+          // which merges them with Suggest a Listing into one row instead
+          // of each getting its own.
           if (kind === 'subscribe') {
             // Also unconditional — SubscribeSection doesn't read zmanim
             // data either; it only used to pair visually with
@@ -719,9 +708,71 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           // Pairing happens AFTER gating (see the comment above) — build the
           // rendered, non-empty cards first, THEN walk them looking for two
           // adjacent 'half' cards to combine into one row.
-          const renderedCards = builtInOrder
-            .map(({ kind, width }) => ({ kind, width, node: cardKindContent(kind) }))
-            .filter((c): c is typeof c & { node: React.ReactElement } => Boolean(c.node))
+          //
+          // 'davening'/'listings' get a special case here rather than going
+          // through cardKindContent like every other kind: the desktop
+          // mockup (Phase 6, docs/desktop-mockup-plan.md) puts Davening
+          // Times, Update Listings and the new Suggest a Listing card in one
+          // 3-up "community" row instead of each kind getting its own row —
+          // Suggest a Listing has no `width`/kind of its own in the database
+          // (card widths there are only ever 'full' | 'half', and kinds are
+          // fixed by a DB constraint) to hang a generic pairing rule off of,
+          // so the row is built by hand at whichever of the two configured
+          // kinds the walk reaches FIRST, and the other is skipped when the
+          // walk reaches it. Their own `width` values are ignored for this
+          // row — same reasoning CardKindContent's half-pairing below has no
+          // say here either. Every other kind (Subscribe + Jewish Times
+          // still pair) goes through the normal path untouched.
+          const renderedCards: { kind: string; width: 'full' | 'half'; node: React.ReactElement }[] = []
+          let communityRowRendered = false
+          for (const { kind, width } of builtInOrder) {
+            if (kind === 'davening' || kind === 'listings') {
+              if (communityRowRendered) continue
+              communityRowRendered = true
+              const hasDavening = builtInOrder.some((b) => b.kind === 'davening')
+              const hasListings = builtInOrder.some((b) => b.kind === 'listings')
+              const communityCards: React.ReactElement[] = []
+              if (hasDavening && !isMobile) {
+                communityCards.push(
+                  <DaveningTimesCard
+                    key="davening"
+                    coords={coords}
+                    eyebrow={settings.desktopDaveningEyebrow}
+                    heading={settings.desktopDaveningHeading}
+                  />,
+                )
+              }
+              if (hasListings && !isMobile) {
+                communityCards.push(
+                  <UpdateListingsCard key="listings" eyebrow={settings.desktopListingsEyebrow} heading={settings.desktopListingsHeading} />,
+                )
+              }
+              // Suggest a Listing — always present, when the row renders at
+              // all (i.e. desktop, and at least one of the other two kinds
+              // is configured).
+              if (!isMobile) communityCards.push(<SuggestListingCard key="suggest" />)
+              if (communityCards.length === 0) continue
+
+              const communityRowClass =
+                communityCards.length === 3
+                  ? 'grid gap-5 min-[900px]:grid-cols-3'
+                  : communityCards.length === 2
+                    ? 'grid gap-5 min-[740px]:grid-cols-2'
+                    : 'grid gap-5'
+              renderedCards.push({
+                kind: 'community',
+                width: 'full',
+                node: <div className={communityRowClass}>{communityCards}</div>,
+              })
+              continue
+            }
+            const node = cardKindContent(kind)
+            // Truthy-narrowed, same as the old `.filter` predicate this
+            // replaced: cardKindContent's return type is the broader
+            // React.ReactNode (it can return `false` from an `isMobile &&`
+            // gate), but a truthy value here is always the real element.
+            if (node) renderedCards.push({ kind, width, node: node as React.ReactElement })
+          }
 
           const rows: { key: string; node: React.ReactNode }[] = []
           for (let i = 0; i < renderedCards.length; i++) {

@@ -298,6 +298,78 @@ describe('Landing', () => {
     expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
   })
 
+  // Phase 6a of the desktop mockup rework: Davening Times, Update Listings
+  // and the new Suggest a Listing card share ONE row (the "community row")
+  // instead of each getting its own — see Landing.tsx's own community-row
+  // doc for why this is a special case rather than the generic half-width
+  // pairing every other kind goes through.
+  describe('the community row (Davening / Update Listings / Suggest a Listing)', () => {
+    it('renders all three, in order, when both Davening and Update Listings are configured', () => {
+      const { container } = renderLanding(undefined, {
+        content: {
+          categories: [makeCategory()],
+          homeSections: [
+            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 200, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+
+      const daveningStub = screen.getByTestId('davening-stub')
+      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
+      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
+
+      const row = daveningStub.closest('.grid')!
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(listingsHeading)
+      expect(row).toContainElement(suggestHeading)
+      expect(row).toHaveClass('min-[900px]:grid-cols-3')
+
+      // Only one shared row wrapper for all three, not one per card.
+      expect(container.querySelectorAll('.my-12').length).toBe(1)
+
+      // Document order: Davening, then Update Listings, then Suggest.
+      const html = container.innerHTML
+      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading))
+      expect(html.indexOf(SITE_SETTINGS_DEFAULTS.desktopListingsHeading)).toBeLessThan(html.indexOf('Suggest a Listing'))
+    })
+
+    it('renders Update Listings + Suggest (no Davening slot) once Davening is not configured', () => {
+      renderLanding(undefined, {
+        content: {
+          categories: [makeCategory()],
+          homeSections: [
+            { id: 'listings', kind: 'listings', title: 'Update Listings Card', sortOrder: 100, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
+      const listingsHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })
+      const suggestHeading = screen.getByRole('heading', { name: 'Suggest a Listing' })
+
+      const row = listingsHeading.closest('.grid')!
+      expect(row).not.toBeNull()
+      expect(row).toContainElement(suggestHeading)
+      expect(row).toHaveClass('min-[740px]:grid-cols-2')
+    })
+
+    it('renders nothing for the community row when neither kind is configured', () => {
+      renderLanding(undefined, {
+        content: {
+          categories: [makeCategory()],
+          homeSections: [
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'full' },
+          ],
+        },
+      })
+
+      expect(screen.queryByTestId('davening-stub')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopListingsHeading })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Suggest a Listing' })).not.toBeInTheDocument()
+    })
+  })
+
   describe('the gateway block order (Explore the map / Davening Times)', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
@@ -374,27 +446,36 @@ describe('Landing', () => {
     const withMapAndZmanim = [
       makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
       makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
+      // SubscribeSection self-gates on having at least one real (kind:
+      // 'listing') category to offer in its picker — without one it
+      // renders null, same as this suite's own jewishTimes/zmanim gate.
+      makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
     ]
 
+    // davening/map used to be this suite's own example pair — davening no
+    // longer generically pairs with anything (it's always pulled into the
+    // community row alongside Update Listings/Suggest a Listing instead,
+    // see Landing.tsx's own community-row doc), so these are rewritten
+    // against subscribe/jewishTimes, the pair the plan explicitly keeps
+    // pairing generically.
     it('pairs two adjacent half-width cards into one row', () => {
       const { container } = renderLanding(undefined, {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
           ],
         },
       })
-      act(() => triggerAllIntersections())
 
-      // Both stubs share the same grid row — a direct parent with grid
-      // classes containing both testids, not two separate my-12 rows.
-      const daveningStub = screen.getByTestId('davening-stub')
-      const mapStub = screen.getByTestId('home-map-stub')
-      const row = daveningStub.closest('.grid')
+      // Both cards share the same grid row — a direct parent with grid
+      // classes containing both, not two separate my-12 rows.
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
+      const jewishTimesHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
+      const row = subscribeHeading.closest('.grid')
       expect(row).not.toBeNull()
-      expect(row).toContainElement(mapStub)
+      expect(row).toContainElement(jewishTimesHeading)
       // Only one shared outer spacing wrapper for the pair, not one each.
       expect(container.querySelectorAll('.my-12').length).toBe(1)
     })
@@ -404,37 +485,39 @@ describe('Landing', () => {
         content: {
           categories: withMapAndZmanim,
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'full' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
-      act(() => triggerAllIntersections())
 
-      const daveningStub = screen.getByTestId('davening-stub')
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
       // Not inside a grid — its own row, same as a full-width card.
-      expect(daveningStub.closest('.grid')).toBeNull()
+      expect(subscribeHeading.closest('.grid')).toBeNull()
       expect(container.querySelectorAll('.my-12').length).toBe(2)
     })
 
     it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
-      // davening/map both 'half', but no zmanim category — davening is
-      // JS-gated on nothing here (it self-gates on minyanim data, mocked to
-      // always render), map self-gates on `hasMap`; drop the map category so
-      // map renders nothing at all, leaving davening the only real card.
+      // subscribe/jewishTimes both 'half', but no zmanim category — subscribe
+      // is unconditional (mocked to always render), jewishTimes self-gates
+      // on zmanimCategory; drop the zmanim category so jewishTimes renders
+      // nothing at all, leaving subscribe the only real card.
       renderLanding(undefined, {
         content: {
-          categories: [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })], // no map category
+          categories: [
+            makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
+            makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' }),
+          ], // no zmanim category
           homeSections: [
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'half' },
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 200, cardIds: [], width: 'half' },
+            { id: 'subscribe', kind: 'subscribe', title: 'Subscribe Card', sortOrder: 100, cardIds: [], width: 'half' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 200, cardIds: [], width: 'half' },
           ],
         },
       })
 
-      const daveningStub = screen.getByTestId('davening-stub')
-      expect(daveningStub.closest('.grid')).toBeNull()
-      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+      const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
+      expect(subscribeHeading.closest('.grid')).toBeNull()
+      expect(screen.queryByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })).not.toBeInTheDocument()
     })
   })
 
