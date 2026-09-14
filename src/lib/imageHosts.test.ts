@@ -102,4 +102,31 @@ describe('isOptimizableImage', () => {
     vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '0')
     expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(true)
   })
+
+  // The targeted switch: Supabase Storage (admin/community-uploaded listing
+  // photos — the actual volume driver) goes unoptimized, but Unsplash
+  // category-tile photos, the much smaller and more visible set, don't.
+  it('rejects only Supabase Storage once NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED is set, leaving Unsplash optimized', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED', '1')
+    expect(
+      isOptimizableImage('https://abcdefg.supabase.co/storage/v1/object/public/logos/logo.png'),
+    ).toBe(false)
+    expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(true)
+  })
+
+  it('is unaffected by any other value of NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED', '0')
+    expect(
+      isOptimizableImage('https://abcdefg.supabase.co/storage/v1/object/public/logos/logo.png'),
+    ).toBe(true)
+  })
+
+  it('the total kill switch still wins over the targeted one', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', SUPABASE)
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    vi.stubEnv('NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED', '0')
+    expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(false)
+  })
 })

@@ -51,22 +51,40 @@ export function optimizedImagePatterns(supabaseUrl: string | undefined) {
 /** True when `src` is on a host the optimizer is configured for. Anything else
  *  has to render with `unoptimized`, or next/image throws.
  *
- *  Also the single kill switch for Vercel's Image Optimization usage: set
- *  NEXT_PUBLIC_IMAGES_UNOPTIMIZED=1 (Vercel env vars → redeploy to apply,
- *  since NEXT_PUBLIC_ vars are inlined at build time) to make every call site
- *  in the app fall back to serving photos as-is instead of through the paid
- *  optimizer — same fallback already used for untrusted hosts, just forced
- *  on for all of them. Meant as an emergency lever if usage is about to run
- *  out for the month (Vercel has no built-in "auto-downgrade near the cap"
- *  feature — this is the manual substitute, flipped in response to Vercel's
- *  own usage-threshold emails), not a permanent setting; flip it back off
- *  once the billing period resets. */
+ *  Two kill switches for Vercel's Image Optimization usage, both meant as an
+ *  emergency lever if usage is about to run out for the month (Vercel has no
+ *  built-in "auto-downgrade near the cap" feature — these are the manual
+ *  substitute, flipped in response to Vercel's own usage-threshold emails),
+ *  not a permanent setting; flip back off once the billing period resets.
+ *  Both are env vars → Vercel env vars → redeploy to apply, since
+ *  NEXT_PUBLIC_ vars are inlined at build time:
+ *
+ *  - NEXT_PUBLIC_IMAGES_UNOPTIMIZED=1 — everything, every host. The blunt,
+ *    total kill switch.
+ *  - NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED=1 — Supabase Storage only
+ *    (admin/community-uploaded listing photos), leaving Unsplash category-
+ *    tile photos optimized. Supabase Storage is the dominant volume driver
+ *    (138 of 154 approved listings have an uploaded photo, each rendered at
+ *    several fixed sizes across the map list/card/detail/chip — see
+ *    CategoryIcon.tsx) against Unsplash's much smaller ~11 category tiles,
+ *    which are also the ones most visible on every single home-screen visit
+ *    — worth keeping crisp if only one has to give. Prefer this one first;
+ *    reach for the total switch above only if it isn't enough on its own. */
 export function isOptimizableImage(src: string): boolean {
   if (process.env.NEXT_PUBLIC_IMAGES_UNOPTIMIZED === '1') return false
-  const patterns = optimizedImagePatterns(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   try {
     const url = new URL(src)
     if (url.protocol !== 'https:') return false
+    if (process.env.NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED === '1' && supabaseUrl) {
+      try {
+        if (url.hostname === new URL(supabaseUrl).hostname) return false
+      } catch {
+        // A malformed SUPABASE_URL shouldn't take this check down — fall
+        // through to the normal patterns match below.
+      }
+    }
+    const patterns = optimizedImagePatterns(supabaseUrl)
     return patterns.some((p) => {
       if (p.hostname !== url.hostname) return false
       // Only the two shapes actually used: an exact prefix, or "/**".
