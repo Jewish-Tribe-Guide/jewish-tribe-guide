@@ -31,8 +31,16 @@ import { community } from '@/community.config'
 // localStorage-backed UI in this app already makes.
 //
 // The accent color itself is deliberately NOT the same on both breakpoints.
-// Desktop uses amber because that's already this app's "live campaign"
-// color there (the map's own campaign chip, DaveningTimesCard's rail).
+// Desktop used to be amber — the theory was that it's already this app's
+// "live campaign" color (the map's own chip, DaveningTimesCard's rail) —
+// but that reasoning didn't hold up: amber is actually the desktop home
+// screen's whole ambient "today / next up" tint (also the hero, Shabbat
+// Times' Friday highlight), not something specific to a campaign. A
+// stronger amber banner just matched five other things instead of
+// standing apart from one. It's `--color-sage` now (globals.css) — warm
+// enough for a Sukkot-season banner, but a genuinely different hue from
+// everything else on the page, including this app's actual "always in
+// stock" green (see that token's own comment on why it isn't reused here).
 // Mobile has no existing amber precedent, so it uses the app's own primary
 // blue instead — the color every other mobile button/link already is —
 // rather than teaching a brand-new "special" color with no learned meaning.
@@ -73,17 +81,17 @@ export default function CampaignBannerCard() {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 pr-9 shadow-sm desktop:border-amber-200 desktop:from-amber-50"
+      className="relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 pr-9 shadow-sm desktop:border-sage-200 desktop:from-sage-50"
     >
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-700 to-blue-900 desktop:from-amber-700 desktop:to-amber-900"
+        className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-700 to-blue-900 desktop:from-sage-600 desktop:to-sage-900"
       />
       <button
         type="button"
         onClick={() => dismiss(banner.id)}
         aria-label="Dismiss"
-        className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 desktop:hover:bg-amber-900/10 desktop:hover:text-amber-900"
+        className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 desktop:hover:bg-sage-900/10 desktop:hover:text-sage-900"
       >
         ✕
       </button>
@@ -98,13 +106,13 @@ export default function CampaignBannerCard() {
       <div className="mt-4 flex gap-2.5">
         <Link
           href={primary.href}
-          className="flex-1 cursor-pointer rounded-lg bg-gradient-to-br from-blue-700 to-blue-800 px-4 py-2.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:from-blue-800 hover:to-blue-900 desktop:flex-none desktop:from-amber-700 desktop:to-amber-800 desktop:hover:from-amber-800 desktop:hover:to-amber-900"
+          className="flex-1 cursor-pointer rounded-lg bg-gradient-to-br from-blue-700 to-blue-800 px-4 py-2.5 text-center text-sm font-bold text-white shadow-sm transition-colors hover:from-blue-800 hover:to-blue-900 desktop:flex-none desktop:from-sage-600 desktop:to-sage-700 desktop:hover:from-sage-700 desktop:hover:to-sage-800"
         >
           {primary.label}
         </Link>
         <Link
           href={secondary.href}
-          className="flex-1 cursor-pointer rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-center text-sm font-bold text-blue-800 transition-colors hover:bg-blue-50 desktop:flex-none desktop:border-amber-200 desktop:text-amber-800 desktop:hover:bg-amber-50"
+          className="flex-1 cursor-pointer rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-center text-sm font-bold text-blue-800 transition-colors hover:bg-blue-50 desktop:flex-none desktop:border-sage-200 desktop:text-sage-700 desktop:hover:bg-sage-50"
         >
           {secondary.label}
         </Link>

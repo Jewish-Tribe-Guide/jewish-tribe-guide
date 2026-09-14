@@ -94,6 +94,21 @@ html {
      this app's real error/closed red (red-700, #b91c1c) as the oxblood and
      brick/clay candidates this was picked over. */
   --color-caution: #9a3412;
+  /* CampaignBannerCard's desktop accent — a lighter, more spring-like olive
+     than the home screen's own gold (--color-accent above), and deliberately
+     NOT Tailwind's stock green-*: that's already this app's "always in
+     stock" color on kosher tags (TagsInput.tsx), and reusing it here would
+     make the banner read as an availability signal instead of an
+     invitation. One full scale (not a single value like caution above)
+     since the banner needs a wash, a border, a rail gradient, and a button
+     with its own hover state — see that component's own comment. */
+  --color-sage-50: #f5f8ee;
+  --color-sage-100: #e8eedb;
+  --color-sage-200: #cddbb0;
+  --color-sage-600: #628141;
+  --color-sage-700: #4f6a34;
+  --color-sage-800: #435a2a;
+  --color-sage-900: #35481f;
   /* Plain slate-50. Tried tinting this with a few percent of the community's
      brand color to make the page feel less neutral; at desktop widths, where
      a lot of the surface shows at once, it read as the whole site having gone
