@@ -1,6 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useZmanim } from '@/lib/useZmanim'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 
 // ── Shabbat & Holiday Times — candle lighting and havdalah, plus the next
 // Yom Tov when there is one. ────────────────────────────────────────────────
@@ -53,6 +56,7 @@ export default function ShabbatTimesCard({
   heading?: string
 }) {
   const { data, status } = useZmanim(coords)
+  const communitySlug = useCommunitySlug()
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -152,15 +156,29 @@ export default function ShabbatTimesCard({
               )}
             </div>
           )}
-          {/* Same attribution/link as the real Zmanim & Shabbos page
-              (ZmanimBody) — this card shows the same Hebcal-sourced data, so
-              it carries the same credit. */}
-          <p className="pt-3 text-[11px] text-muted">
-            Zmanim from{' '}
-            <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
-              Hebcal.com
-            </a>
-          </p>
+          <div className="flex items-baseline justify-between gap-3 pt-3">
+            {/* Same attribution/link as the real Zmanim & Shabbos page
+                (ZmanimBody) — this card shows the same Hebcal-sourced data, so
+                it carries the same credit. */}
+            <p className="text-[11px] text-muted">
+              Zmanim from{' '}
+              <a href="https://www.hebcal.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">
+                Hebcal.com
+              </a>
+            </p>
+            {/* Quiet, not a pill like DaveningTimesCard's own CTA — this card
+                already shows today's times; this is a secondary path to the
+                fuller ZmanimBody page (sunrise, latest Shema/Shacharis,
+                nightfall), not the point of the card. Shares this trailing
+                row with the Hebcal credit rather than sitting up by the
+                title, which is where an actual "do this" action belongs. */}
+            <Link
+              href={routes.slug(communitySlug, 'zmanim')}
+              className="shrink-0 text-[11px] font-semibold text-amber-700 transition-colors hover:text-amber-800 hover:underline"
+            >
+              See full zmanim →
+            </Link>
+          </div>
         </>
       ) : (
         <p className="text-[13px] text-muted">Zmanim are unavailable right now. Please try again in a moment.</p>
