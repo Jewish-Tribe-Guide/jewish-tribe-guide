@@ -34,6 +34,32 @@ const nextConfig: NextConfig = {
     // the "can this be optimized?" check can't drift apart — see
     // src/lib/imageHosts.ts for why the list is narrow rather than a wildcard.
     remotePatterns: optimizedImagePatterns(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    // Next's own default is 8 deviceSizes (640-3840) + 8 imageSizes (16-384)
+    // — every distinct (photo, width) pair the optimizer is ever asked for
+    // counts as its own Image Optimization Transformation, so a wide,
+    // mostly-unused ladder is pure waste against a metered quota. Narrowed to
+    // what this app actually requests, not a generic guess:
+    //
+    //   imageSizes — every fixed-px `sizes` prop in the app (CategoryIcon,
+    //   the header logo) asks for 32/36/40/44/48px, never the default's
+    //   16/128/256/384. [32, 48, 64, 96] covers those at both 1x and 2x
+    //   density (36/40/44/48 all round up to 48; their 2x doubles round up
+    //   to 64 or 96) with nothing left over.
+    //
+    //   deviceSizes — every viewport-relative `sizes` prop (the hero photo,
+    //   category tile cards) sits inside a max-w-6xl (1152px) container;
+    //   nothing here is a true edge-to-edge layout except the category
+    //   band photo, kept in mind with the 1920 tier. Content-uploaded photos
+    //   are themselves capped at 1200px on upload anyway (ImageCropModal's
+    //   OUTPUT_MAX_PX), so anything above that produces the same source
+    //   image again under a different label, not a sharper one.
+    //
+    // Same visual result at every size that's actually used — this doesn't
+    // trade quality for quota, it just stops generating variants nobody
+    // requests. Not a monthly lever like imageHosts.ts's kill switches;
+    // this is a permanent fix, safe to leave in place regardless of usage.
+    imageSizes: [32, 48, 64, 96],
+    deviceSizes: [640, 828, 1080, 1280, 1920],
   },
   // Cache Components. Two things this buys:
   //
