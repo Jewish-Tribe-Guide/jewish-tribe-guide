@@ -453,30 +453,28 @@ describe('Landing', () => {
       // The card's heading is `settings.heroTitle` now ("What are you
       // looking for?" by default), not a hardcoded "Browse Everything" —
       // see Landing.tsx's own comment on why that string is gone.
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
+      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
       // Both cards render as siblings under the ONE "Browse everything"
-      // heading — not under their own admin-configured section titles
-      // ("Food and Hospitality", etc.), which is what "flat" means here.
-      const grid = heading.parentElement!
-      expect(within(grid).getByText('Grocery Stores')).toBeInTheDocument()
-      expect(within(grid).getByText('Synagogues')).toBeInTheDocument()
+      // card — not under their own admin-configured section titles ("Food
+      // and Hospitality", etc.), which is what "flat" means here.
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getByText('Grocery Stores')).toBeInTheDocument()
+      expect(within(card).getByText('Synagogues')).toBeInTheDocument()
     })
 
-    // A list meant to hold every card at once (13+ real categories, growing)
-    // reads as "too many different things crammed together" the moment each
-    // row gets its own bordered box — that's the exact complaint that moved
-    // this section from CardGrid's photo tiles to CompactCardGrid in the
-    // first place. A border re-added later, even a subtle one, quietly
-    // reintroduces the same crowding at scale.
-    it('rows have no border/background at rest — only on hover, like the tab nav\'s own menu items', () => {
+    // Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) gave this
+    // card real tiles — a bordered box per category, not CompactCardGrid's
+    // borderless hover-only rows. That's a deliberate reversal of the
+    // earlier design (this test used to assert the opposite); see
+    // CategoryTileRow's own doc for why.
+    it('tiles are real bordered boxes, not borderless hover-only rows', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
-      const row = within(heading.parentElement!).getByText('Grocery Stores').closest('a')!
-      expect(row.className).not.toMatch(/\bborder\b/)
-      expect(row.className).not.toMatch(/\bbg-white\b/)
-      expect(row.className).toMatch(/hover:bg-slate-50/)
+      const card = screen.getByTestId('browse-everything-card')
+      const tile = within(card).getByText('Grocery Stores').closest('a')!
+      expect(tile.className).toMatch(/\bborder\b/)
+      expect(tile.className).toMatch(/hover:border-slate-300/)
     })
 
     // `settings.heroTitle` now titles the whole merged card — search sits
@@ -498,10 +496,63 @@ describe('Landing', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
-      const heading = screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })
-      await user.click(within(heading.parentElement!).getByText('Grocery Stores'))
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByText('Grocery Stores'))
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'grocery', source: 'grid' })
+    })
+  })
+
+  // Phase 5 of the desktop mockup rework: the flat grid collapses to 8
+  // tiles by default, with a "Browse all categories" toggle in the card's
+  // own header row (beside the search box, not directly under the grid —
+  // see CategoryTileRow's own doc on why the expand state lives in Landing
+  // rather than inside that component).
+  describe('"Browse all categories" (8-tile collapse)', () => {
+    function nineCategories() {
+      return Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+    }
+
+    it('shows exactly 8 tiles collapsed, all of them once expanded', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, { content: { categories: nineCategories() } })
+
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(8)
+
+      await user.click(screen.getByRole('button', { name: 'Browse all categories →' }))
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
+      expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('collapses back to 8 on a second click', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, { content: { categories: nineCategories() } })
+
+      await user.click(screen.getByRole('button', { name: 'Browse all categories →' }))
+      await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
+
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(8)
+      expect(screen.getByRole('button', { name: 'Browse all categories →' })).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('hides the toggle entirely with 8 or fewer cards', () => {
+      const eight = Array.from({ length: 8 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: eight } })
+
+      expect(screen.queryByRole('button', { name: /Browse all categories|Show fewer categories/ })).not.toBeInTheDocument()
+    })
+
+    it('tile clicks still track category_opened with source "grid" once expanded', async () => {
+      const user = userEvent.setup()
+      renderLanding(undefined, { content: { categories: nineCategories() } })
+
+      await user.click(screen.getByRole('button', { name: 'Browse all categories →' }))
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByText('Category 8'))
+
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat8', source: 'grid' })
     })
   })
 

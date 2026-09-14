@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CardGrid, CategoryTileRow, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import SearchSection from '@/components/home/SearchSection'
 import HomeMap from '@/components/home/HomeMap'
@@ -78,6 +78,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
+  // "Browse all categories" (desktop "What are you looking for?" card) —
+  // collapsed to the first 8 tiles by default, expanded to every card on
+  // click. Lives here, not inside CategoryTileRow itself: the toggle button
+  // that drives it sits in this card's own header row, beside the search
+  // box, not directly under the grid — so the state has to be shared between
+  // two siblings rather than owned by the grid alone.
+  const [browseExpanded, setBrowseExpanded] = useState(false)
   // Deferred, not just observed: the embedded map costs a few hundred KB of
   // Google Maps JS (places/main/util/common/controls/map — see
   // loadGoogleMaps.ts), loaded the instant HomeMap mounts. Gating the mount
@@ -505,44 +512,77 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
-            // the WHOLE card, not just the grid below — search sits right
-            // under that heading as the first thing in the section.
+            // the WHOLE card — left half of the header row, with the search
+            // box (compact, not the old full-width-centered treatment) and
+            // the "Browse all categories" toggle sharing the right half.
             // `SearchSection` renders `bare` here (no card/section shell,
             // and no heading of its own — `hideHeading`, since this card's
-            // own heading right above it already says the same thing) so it
-            // mounts once, as a stable sibling of the grid below, and never
-            // gets swapped out as a whole subtree when `q` changes — that
-            // would unmount the input mid-keystroke and drop focus.
+            // own heading already says the same thing) so it mounts once, as
+            // a stable sibling of the grid below, and never gets swapped out
+            // as a whole subtree when `q` changes — that would unmount the
+            // input mid-keystroke and drop focus. Its own `results` slot is
+            // left unset here on purpose: those results need to span the
+            // FULL card width once there's a query, not the search box's own
+            // ~440px column, so they're rendered as this card's own sibling
+            // block below the header row instead of nested inside it.
             //
             // The grid itself is a flat, always-visible index of every
-            // card. CompactCardGrid, not CardGrid — see that component's
-            // own doc for why a small icon-avatar row instead of a full
-            // photo tile is the fix for a list this long.
+            // card, collapsed to CategoryTileRow's first 8 tiles until
+            // "Browse all categories" expands it. CompactCardGrid, kept for
+            // desktop search results (`desktopResultsNode` below) — dense
+            // icon/name rows still fit a filtered result list better than
+            // this card's bigger tile treatment.
+            const browseCards = loading ? entryCards : (filtered ?? [])
             return (
               // scroll-mt-24, not the map band's own scroll-mt-20 — same
               // sticky-header offset requirement, but a distinct value so
               // e2e/header.spec.ts's `div.scroll-mt-20.desktop:block`
               // selector (written when that combination was unique to the
               // map band) still resolves to exactly one element.
-              <div ref={browseCardRef} className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                    {settings.desktopBrowseEyebrow}
-                  </p>
-                  <h2 className="mb-6 text-lg font-semibold text-slate-900">{settings.desktopBrowseHeading}</h2>
-                  <SearchSection
-                    bare
-                    hideHeading
-                    heroTitle={settings.desktopBrowseHeading}
-                    searchPlaceholder={settings.searchPlaceholder}
-                    query={query}
-                    onQueryChange={setQuery}
-                    results={!isMobile ? desktopResultsNode : undefined}
-                  />
+              <div
+                ref={browseCardRef}
+                data-testid="browse-everything-card"
+                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5"
+              >
+                  <div className="flex flex-wrap items-end justify-between gap-6">
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                        {settings.desktopBrowseEyebrow}
+                      </p>
+                      <h2 className="font-serif text-lg font-semibold text-ink">{settings.desktopBrowseHeading}</h2>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="w-[440px] max-w-full">
+                        <SearchSection
+                          bare
+                          hideHeading
+                          heroTitle={settings.desktopBrowseHeading}
+                          searchPlaceholder={settings.searchPlaceholder}
+                          query={query}
+                          onQueryChange={setQuery}
+                        />
+                      </div>
+                      {/* Hidden once there are 8 or fewer cards — nothing to
+                          expand, so the toggle would do nothing. */}
+                      {browseCards.length > 8 && (
+                        <button
+                          type="button"
+                          onClick={() => setBrowseExpanded((e) => !e)}
+                          aria-expanded={browseExpanded}
+                          className="shrink-0 cursor-pointer text-[13px] font-semibold text-ink transition-colors hover:text-brand-teal"
+                        >
+                          {browseExpanded ? 'Show fewer categories' : 'Browse all categories →'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {!isMobile && q && <div className="mt-6">{desktopResultsNode}</div>}
                   {!isMobile && !q && (
                     <div className={ui.search.landing ? 'mt-6' : ''}>
-                      <CompactCardGrid
-                        cards={loading ? entryCards : (filtered ?? [])}
+                      <CategoryTileRow
+                        cards={browseCards}
                         categories={categories}
+                        expanded={browseExpanded}
                         onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
                       />
                     </div>

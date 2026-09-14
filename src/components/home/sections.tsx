@@ -400,6 +400,80 @@ export function CompactCardGrid({
   )
 }
 
+/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) — the "What
+ *  are you looking for?" card's tile grid: a bigger, friendlier icon per
+ *  category (56px, tinted per getCategoryColor, same as CompactCard's own
+ *  smaller version) laid out `grid-cols-4 lg:grid-cols-8` instead of
+ *  CompactCardGrid's dense many-per-line rows. Expansion is fully
+ *  controlled by the caller (`expanded`) rather than owned here, because the
+ *  toggle button that drives it ("Browse all categories →") lives in
+ *  Landing's own header row above this grid, not beside it — CompactCardGrid
+ *  can own its own "Show more" because that button sits directly under its
+ *  grid; this one can't. CompactCardGrid itself is untouched and still
+ *  used for desktop search results (SearchSection's own `results` slot). */
+export function CategoryTileRow({
+  cards,
+  categories,
+  expanded,
+  onCardClick,
+}: {
+  cards: CardDef[]
+  /** Resolves each card's icon-avatar tint — see getCategoryColor. */
+  categories: CategoryConfig[] | null
+  /** false shows the first 8 cards only; true shows all of them. */
+  expanded: boolean
+  onCardClick?: (card: CardDef) => void
+}) {
+  const visible = expanded ? cards : cards.slice(0, 8)
+
+  return (
+    <div className="grid grid-cols-4 gap-3 lg:grid-cols-8">
+      {visible.map((card) => (
+        <Link
+          key={card.id ?? card.title}
+          href={card.href}
+          className="flex flex-col items-center rounded-xl border border-slate-200/80 bg-white px-2 py-5 text-center transition-colors hover:border-slate-300 hover:shadow-sm"
+          onClick={onCardClick ? () => onCardClick(card) : undefined}
+        >
+          {card.icon ? (
+            // Named the same way CompactCard's own badge is (desktop only,
+            // matched on `category-badge-${card.id}`) so a real
+            // <ViewTransition> grows this tile's icon into the bigger one
+            // GenericDirectory shows at the top of the category page —
+            // whichever of the two (this grid or CompactCardGrid's search
+            // results) the visitor actually clicked through.
+            card.id ? (
+              <ViewTransition name={`category-badge-${card.id}`}>
+                <CategoryIcon
+                  icon={card.icon}
+                  categoryId={card.id}
+                  color={getCategoryColor(categories, card.id)}
+                  className="h-14 w-14 text-2xl"
+                  sizePx={56}
+                />
+              </ViewTransition>
+            ) : (
+              <CategoryIcon
+                icon={card.icon}
+                categoryId={card.id}
+                color={getCategoryColor(categories, card.id ?? '')}
+                className="h-14 w-14 text-2xl"
+                sizePx={56}
+              />
+            )
+          ) : (
+            <span className="h-14 w-14 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+          )}
+          <span className="mt-3 w-full truncate text-sm font-medium text-ink">{card.title}</span>
+          {card.count != null && (
+            <span className="w-full truncate text-[13px] text-slate-500">{card.count}</span>
+          )}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 /** Does a card match the typed query? Every word must appear in the title or a
  *  hidden keyword (AND across words). */
 export function cardMatches(card: CardDef, query: string): boolean {
