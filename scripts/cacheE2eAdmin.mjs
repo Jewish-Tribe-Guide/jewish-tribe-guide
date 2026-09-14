@@ -1,22 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
-// A fixed admin identity shared by every write-suite that runs against the
-// disposable test Supabase project (cache-roundtrip, admin-write) — not a
-// real person, not shared with the app's real SUPERADMIN_EMAILS. Exists only
+// Fixed admin identities for the write-suites that run against the
+// disposable test Supabase project (cache-roundtrip, admin-write) — not real
+// people, not shared with the app's real SUPERADMIN_EMAILS. Exist only
 // inside that test project (see run-test-project-server.mjs, which boots
 // every one of these suites' server, and each suite's own auth.setup.ts).
-// Each runs as its own process/port, so sharing this identity is safe for
-// ordinary reads/writes — but NOT for minting the session itself: cache-
-// roundtrip's and admin-write's auth.setup.ts both call generateLink +
-// verifyOtp for whatever resolveDefaultCommunityAdminEmail resolves to
-// (often this same address), and a fresh magic-link token invalidates
-// whichever one was already outstanding for that user. The two jobs used to
-// run in CI at the same instant (both `needs: unit`, no dependency on each
-// other), so whichever setup's verifyOtp lost that race failed with
-// "invalid or has expired" nearly every run — see ci.yml's own comment on
-// admin-write's `needs: [unit, cache-roundtrip]`, which is what actually
-// prevents this now, not anything about the identity itself.
+// Each runs as its own process/port, so sharing an identity would be safe
+// for ordinary reads/writes — but NOT for minting the session itself:
+// generateLink + verifyOtp for the SAME email invalidates whichever magic
+// link was already outstanding for that user, so two suites racing to
+// authenticate as one shared identity made whichever one lost the race fail
+// with "invalid or has expired" nearly every run (this used to be one
+// constant, CACHE_TEST_ADMIN_EMAIL, used by both — ci.yml's admin-write job
+// depended on cache-roundtrip finishing first purely to dodge this, at the
+// cost of forcing them to run sequentially in CI instead of in parallel).
+// Giving each suite its own identity removes the collision at the source,
+// so that `needs:` ordering is no longer required.
 export const CACHE_TEST_ADMIN_EMAIL = 'cache-roundtrip-admin@test.invalid'
+export const ADMIN_WRITE_TEST_ADMIN_EMAIL = 'admin-write-admin@test.invalid'
 
 // The email actually authorized to administer the "default" community on
 // whatever Supabase project these suites are running against.
@@ -38,14 +39,21 @@ export const CACHE_TEST_ADMIN_EMAIL = 'cache-roundtrip-admin@test.invalid'
 //
 // Reading it directly and minting for whichever email is actually
 // authorized fixes this correctly rather than by coincidence: a pristine
-// test project (admin_email still unset) gets CACHE_TEST_ADMIN_EMAIL same
-// as before, and a shared project with a real admin_email configured gets
-// a session for that real address instead — no email is sent either way,
+// test project (admin_email still unset) gets `fallbackEmail` same as
+// before, and a shared project with a real admin_email configured gets a
+// session for that real address instead — no email is sent either way,
 // since generateLink mints the link directly via the service-role key.
-export async function resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey) {
+// `fallbackEmail` defaults to CACHE_TEST_ADMIN_EMAIL for backward
+// compatibility with cache-roundtrip's own callsite; admin-write passes
+// ADMIN_WRITE_TEST_ADMIN_EMAIL explicitly so the two suites never resolve to
+// the same identity on a pristine (CI) test project. Note this doesn't help
+// on a SHARED_DEV_TEST_PROJECT with a real admin_email set — both suites
+// still resolve to that same real address there, same as before this
+// change; that's a local-dev-only scenario, not the CI race this fixes.
+export async function resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey, fallbackEmail = CACHE_TEST_ADMIN_EMAIL) {
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data } = await admin.from('community').select('admin_email, is_default, sort_order').order('sort_order', { ascending: true })
   const rows = data ?? []
   const target = rows.find((r) => r.is_default) ?? rows[0]
-  return target?.admin_email || CACHE_TEST_ADMIN_EMAIL
+  return target?.admin_email || fallbackEmail
 }
