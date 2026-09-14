@@ -9,7 +9,7 @@ import HeaderNav from '@/components/HeaderNav'
 import { StarOfDavid } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { useActiveCommunity } from '@/lib/communityContext'
-import { useHeaderCollapsed, useScreenHeader, useScrollShowHide } from '@/lib/headerVisibility'
+import { useHeaderCollapsed, useHeaderOverlaid, useScreenHeader, useScrollShowHide, useScrolledPastTop } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { routes } from '@/lib/routes'
 import { isModifiedClick } from '@/lib/isModifiedClick'
@@ -45,6 +45,15 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
 
   const collapsed = useHeaderCollapsed()
   const isMobile = useIsMobile()
+
+  // Desktop-only: Landing opts the home screen into a transparent header
+  // over its photo hero (useHeaderOverlay) until the page scrolls past the
+  // hero, at which point the header goes solid the same way it always has
+  // everywhere else. Neither hook does anything on mobile — see the
+  // desktop-only classes below, and headerVisibility.tsx's own docs.
+  const overlaid = useHeaderOverlaid()
+  const scrolledPastTop = useScrolledPastTop()
+  const transparent = overlaid && !scrolledPastTop && !collapsed
 
   // On mobile, a category/hospital/synagogue directory screen (the only
   // things that ever call useSetScreenHeader — see GenericDirectory) swaps
@@ -86,10 +95,20 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   // can opt back in with its own `visible`, which is exactly what the
   // popover does (see its wrapper in LocationControl.tsx), so it can still
   // render while everything else in the collapsed header stays gone.
+  // Mobile classes are byte-for-byte what they were before this — only the
+  // `desktop:` utilities below change behavior, and only while `transparent`
+  // is true (the home screen, unscrolled). Once scrolled, or on any other
+  // screen, desktop gets the same solid white/border treatment it always
+  // has, just spelled out under `desktop:` instead of falling through to
+  // the shared `bg-white/90 backdrop-blur` mobile treatment.
   const className = collapsed
     ? 'invisible h-0 overflow-visible'
-    : `sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)] transition-transform duration-300 ${
+    : `sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200/80 pt-[env(safe-area-inset-top)] transition-transform transition-colors duration-300 ${
         scrollHideVisible ? 'translate-y-0' : '-translate-y-full'
+      } ${
+        transparent
+          ? 'desktop:bg-transparent desktop:border-transparent desktop:backdrop-blur-none'
+          : 'desktop:bg-white desktop:border-b desktop:border-slate-200/80'
       }`
 
   return (
@@ -104,7 +123,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
       // fixed reference point a directional transition depends on.
       style={{ viewTransitionName: 'site-header' }}
     >
-      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-10">
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 desktop:h-[60px] flex items-center gap-10">
         {showScreenHeader && screenHeader ? (
           <button
             onClick={screenHeader.onBack}
@@ -143,14 +162,14 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
             // logo URL containing a ")" broke the rule, and the value was
             // never escaped. Here it's an attribute, handled by React.
             <span
-              className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl"
+              className="block relative h-9 w-9 shrink-0 overflow-hidden rounded-xl desktop:h-11 desktop:w-11"
               aria-hidden="true"
             >
               <Image
                 src={settings.logoUrl}
                 alt=""
                 fill
-                sizes="36px"
+                sizes="(min-width: 640px) 44px, 36px"
                 className="object-cover"
                 // Always unoptimized, unlike the card photos.
                 //
@@ -174,7 +193,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
               />
             </span>
           ) : (
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary text-white desktop:h-11 desktop:w-11">
               <StarOfDavid className="h-5 w-5" />
             </span>
           )
@@ -195,7 +214,7 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           // anywhere on the live site. Worth knowing before spending more
           // time writing good taglines into a field nothing shows.
           const title = (
-            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors">
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-slate-900 group-hover:text-primary transition-colors desktop:font-serif desktop:text-2xl desktop:font-semibold desktop:text-ink">
               {settings.name}
             </span>
           )
@@ -276,6 +295,26 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
           <LocationControl controls={location} />
         </div>
       </div>
+      {/* White diagonal shape behind the logo/nav, overlaid+unscrolled only,
+          desktop only — the mockup's white panel on the left ending in a
+          slanted edge, with the hero photo visible through the rest of the
+          header strip. `aria-hidden`: purely decorative. A sibling of the
+          content row above (both direct children of <header>, which is
+          itself `position: sticky` and so the containing block this
+          `absolute` shape sizes against — full header width, not the row's
+          own max-w-6xl column), not nested inside it: e2e/header.spec.ts's
+          Categories mega-menu test finds the content row by `header > div`,
+          the first direct child of <header>, so this has to come SECOND in
+          source order. `-z-10` (rather than earlier DOM order) is what
+          keeps it painted behind the row's real content despite coming
+          after it. */}
+      {transparent && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 -z-10 hidden w-[58%] desktop:block bg-white/95"
+          style={{ clipPath: 'polygon(0 0, 100% 0, 94% 100%, 0 100%)' }}
+        />
+      )}
     </header>
   )
 }

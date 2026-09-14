@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCommunity } from '@/test/providerFixtures'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
-import { HeaderCollapseProvider, ScreenHeaderProvider, useSetScreenHeader } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider, useHeaderOverlay, useSetScreenHeader } from '@/lib/headerVisibility'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -146,6 +146,67 @@ describe('SiteHeader — several communities', () => {
 
     expect(screen.getByText('Preview Name')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Switch community' })).not.toBeInTheDocument()
+  })
+})
+
+function OverlayOn() {
+  useHeaderOverlay(true)
+  return null
+}
+
+function setScrollY(y: number) {
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+}
+
+describe('SiteHeader — desktop overlay (transparent over the home hero)', () => {
+  afterEach(() => setScrollY(0))
+
+  it('is transparent (desktop) when overlaid and not yet scrolled', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).toHaveClass('desktop:bg-transparent')
+  })
+
+  it('goes solid (desktop) once scrolled past the top, even while still overlaid', () => {
+    setScrollY(40)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).not.toHaveClass('desktop:bg-transparent')
+    expect(screen.getByRole('banner')).toHaveClass('desktop:bg-white')
+  })
+
+  it('stays solid (desktop) on a screen that never opts into the overlay', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).not.toHaveClass('desktop:bg-transparent')
+  })
+
+  it('leaves mobile\'s own classes untouched in every state', () => {
+    setScrollY(0)
+    renderWithProviders(
+      <HeaderCollapseProvider>
+        <OverlayOn />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    expect(screen.getByRole('banner')).toHaveClass('bg-white/90')
   })
 })
 

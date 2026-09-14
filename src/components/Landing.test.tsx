@@ -8,6 +8,7 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory, makeListing } from '@/test/providerFixtures'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { LocationProvider } from '@/lib/locationContext'
+import { HeaderCollapseProvider } from '@/lib/headerVisibility'
 import { ListingsProvider } from '@/lib/listingsContext'
 import type { DirectoryResource } from '@/types'
 import { resetMockIntersectionObserver, setAllIntersecting, triggerAllIntersections } from '@/test/intersectionObserverMock'
@@ -97,11 +98,18 @@ function renderLanding(
   listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
-    <LocationProvider>
-      <ListingsProvider listings={listings}>
-        <Landing {...handlers} {...props} />
-      </ListingsProvider>
-    </LocationProvider>,
+    // HeaderCollapseProvider: Landing now calls useHeaderOverlay (Phase 2 —
+    // transparent desktop header over the hero), which needs the same
+    // provider SiteChrome always wraps it in for real. Not asserted on
+    // directly here — see SiteHeader.test.tsx for the overlay behavior
+    // itself — just required for Landing to render at all.
+    <HeaderCollapseProvider>
+      <LocationProvider>
+        <ListingsProvider listings={listings}>
+          <Landing {...handlers} {...props} />
+        </ListingsProvider>
+      </LocationProvider>
+    </HeaderCollapseProvider>,
     options,
   )
 }

@@ -273,7 +273,7 @@ export default function LocationControl({ controls }: Props) {
         // hidden-label state reachable on every category screen, not only
         // after a visitor had set an address.
         aria-label={label}
-        className="flex max-w-[220px] items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2.5 text-xs sm:pl-2.5 sm:pr-3 sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer"
+        className="flex max-w-[220px] items-center gap-1 sm:gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-2.5 text-xs sm:pl-2.5 sm:pr-3 sm:text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md active:bg-slate-50 cursor-pointer desktop:px-4 desktop:py-2"
       >
         {/* Filled once an address is set — on mobile the label text collapses
             away below (leaving just this icon), so the fill is the only

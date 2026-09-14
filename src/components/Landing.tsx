@@ -22,6 +22,7 @@ import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
 import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
+import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
 import { useCommunitySlug } from '@/lib/communityContext'
 import type { NavigateFn } from '@/types'
@@ -93,6 +94,9 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // lazy-mount on this one becoming visible).
   const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
+  // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
+  // transparent over this screen's photo hero until scrolled past it.
+  useHeaderOverlay(true)
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()

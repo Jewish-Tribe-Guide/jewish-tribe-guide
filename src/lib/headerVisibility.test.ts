@@ -1,5 +1,14 @@
+// @vitest-environment jsdom
+import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { nextHeaderVisible } from './headerVisibility'
+import { HeaderCollapseProvider, nextHeaderVisible, useHeaderOverlay, useHeaderOverlaid, useScrolledPastTop } from './headerVisibility'
+
+function setScrollY(y: number) {
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
+  act(() => {
+    window.dispatchEvent(new Event('scroll'))
+  })
+}
 
 // The scroll-direction decision is the one part of the hide-on-scroll header
 // with room for a real mistake, and simulating a browser scroll to exercise it
@@ -90,5 +99,43 @@ describe('nextHeaderVisible', () => {
     visible = nextHeaderVisible(503, anchor, visible)
     visible = nextHeaderVisible(506, anchor, visible)
     expect(visible).toBe(true)
+  })
+})
+
+describe('useScrolledPastTop', () => {
+  it('is false at the top and true once scrolled past the threshold', () => {
+    setScrollY(0)
+    const { result } = renderHook(() => useScrolledPastTop())
+    expect(result.current).toBe(false)
+
+    setScrollY(20)
+    expect(result.current).toBe(true)
+  })
+})
+
+describe('useHeaderOverlay / useHeaderOverlaid', () => {
+  it('is false with no caller', () => {
+    const { result } = renderHook(() => useHeaderOverlaid(), { wrapper: HeaderCollapseProvider })
+    expect(result.current).toBe(false)
+  })
+
+  it('is true while a component calling useHeaderOverlay(true) is mounted, false once it stops', () => {
+    const { result, rerender } = renderHook(
+      ({ active }: { active: boolean }) => {
+        useHeaderOverlay(active)
+        return useHeaderOverlaid()
+      },
+      { wrapper: HeaderCollapseProvider, initialProps: { active: false } },
+    )
+    expect(result.current).toBe(false)
+
+    rerender({ active: true })
+    expect(result.current).toBe(true)
+
+    // Unmounting (or the caller going inactive, same cleanup path) must
+    // reset the flag — otherwise leaving the home screen by any route would
+    // leave the header stuck transparent.
+    rerender({ active: false })
+    expect(result.current).toBe(false)
   })
 })

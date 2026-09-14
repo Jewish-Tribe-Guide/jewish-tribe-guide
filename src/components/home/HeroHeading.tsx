@@ -131,7 +131,7 @@ export default function HeroHeading({
           the site). Search + the two buttons sit over the photo's left
           side, on a light wash gradient that keeps dark text legible while
           leaving the photo's right side uncovered. */}
-      <section className="hidden desktop:block relative left-1/2 isolate min-h-[520px] w-screen -translate-x-1/2 overflow-hidden">
+      <section className="hidden desktop:block relative left-1/2 isolate min-h-[520px] w-screen -translate-x-1/2 overflow-hidden desktop:-mt-[60px]">
         {heroImage ? (
           // A real photo: it has content to describe, so it's a genuine
           // `alt`, not aria-hidden — the opposite of the placeholder below.
@@ -191,7 +191,7 @@ export default function HeroHeading({
           aria-hidden="true"
           className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,white_0%,white_45%,transparent_68%)]"
         />
-        <div className="mx-auto flex min-h-[520px] max-w-6xl flex-col justify-center px-4 py-14 sm:px-6">
+        <div className="mx-auto flex min-h-[520px] max-w-6xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
           <h1 className="max-w-2xl text-6xl font-bold leading-[1.05] text-slate-900 text-balance">
             {headline}
           </h1>
