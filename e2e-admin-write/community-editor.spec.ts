@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { CACHE_TEST_ADMIN_EMAIL, resolveDefaultCommunityAdminEmail } from '../scripts/cacheE2eAdmin.mjs'
+import {
+  ADMIN_WRITE_TEST_ADMIN_EMAIL,
+  CACHE_TEST_ADMIN_EMAIL,
+  resolveDefaultCommunityAdminEmail,
+} from '../scripts/cacheE2eAdmin.mjs'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drives CommunityManager's real create flow — creating a community through
@@ -90,8 +94,14 @@ test('creating a community through the real UI, starting empty, makes it live wi
   // Playwright test process — so it's recomputed the same way instead.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey)
-  const expectedSuperadmins = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, testAdminEmail]))
+  // resolveDefaultCommunityAdminEmail's fallback matters here: this suite's
+  // own server process (run-test-project-server.mjs) authorizes BOTH
+  // CACHE_TEST_ADMIN_EMAIL and ADMIN_WRITE_TEST_ADMIN_EMAIL (see that
+  // script's own comment on why it lists both regardless of which suite is
+  // actually running), so both are genuine superadmins here, not just the
+  // one this suite happens to authenticate as.
+  const testAdminEmail = await resolveDefaultCommunityAdminEmail(supabaseUrl, serviceRoleKey, ADMIN_WRITE_TEST_ADMIN_EMAIL)
+  const expectedSuperadmins = Array.from(new Set([CACHE_TEST_ADMIN_EMAIL, ADMIN_WRITE_TEST_ADMIN_EMAIL, testAdminEmail]))
   for (const email of expectedSuperadmins) {
     expect(created!.admin_emails).toContain(email)
   }
