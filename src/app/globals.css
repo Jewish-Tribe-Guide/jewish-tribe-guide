@@ -109,13 +109,18 @@ html {
   --color-sage-700: #4f6a34;
   --color-sage-800: #435a2a;
   --color-sage-900: #35481f;
-  /* Plain slate-50. Tried tinting this with a few percent of the community's
-     brand color to make the page feel less neutral; at desktop widths, where
-     a lot of the surface shows at once, it read as the whole site having gone
-     faintly blue rather than as warmth, so it's back to grey. If this gets
-     revisited, the tint needs to be well under 5% — or applied to a band
-     rather than to every screen. */
-  --color-surface: #f8fafc;
+  /* Plain slate-100, not slate-50 (#f8fafc, one step lighter — tried first,
+     see below). Cards sit on this at pure white with only a hairline border/
+     ring for separation, so the tone itself has to do real work: slate-50 is
+     only ~3/255 per channel off white, invisible on its own, and a border-
+     less card (or a washed-out monitor) read as one continuous white surface
+     with no page underneath it. slate-100 is a genuinely different grey, not
+     a brand tint — a separate, earlier attempt tinted this token toward the
+     community's brand color instead and got reverted because at desktop
+     widths, where a lot of surface shows at once, it read as the whole site
+     having gone faintly blue rather than as warmth. If THIS gets revisited,
+     go lighter/darker on the neutral scale, not back toward a brand tint. */
+  --color-surface: #f1f5f9;
   --color-muted: #64748b;
 }
 
