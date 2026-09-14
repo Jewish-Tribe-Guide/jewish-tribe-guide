@@ -2,8 +2,8 @@
 // remove, to free up Function Storage — see the conversation this was
 // written for: Vercel usage emails hit 100% Image Optimization, 75%
 // Function Storage, 75% Fluid Active CPU. This only lists; it never
-// deletes anything. Run it, read the output, and only write the follow-up
-// delete script once the list looks right.
+// deletes anything. Run it, read the output, and only run the follow-up
+// delete script (vercel-deployments-delete.mjs) once the list looks right.
 //
 //   node --env-file=.env.local scripts/vercel-deployments-dry-run.mjs
 //
@@ -15,12 +15,10 @@
 // None of these need to go in .env.local permanently — this is a one-off
 // check, not something the app itself reads.
 //
-// Deliberately conservative about what it calls "safe to delete": ANY
-// deployment with target 'production' is excluded from that list, full
-// stop, not just the current one — a past production deployment is what
-// "instant rollback" in Vercel's dashboard rolls back to, and this script
-// has no way to know if you still want that safety net. Only ever
-// consider deleting what it prints under "preview/branch deployments".
+// What counts as "safe to delete" lives in vercelDeployments.mjs, shared
+// with the delete script so the two can never disagree about it.
+
+import { fetchAllDeployments, splitByProductionSafety } from './vercelDeployments.mjs'
 
 const TOKEN = process.env.VERCEL_TOKEN
 const PROJECT = process.env.VERCEL_PROJECT
@@ -34,38 +32,9 @@ if (!TOKEN || !PROJECT) {
   process.exit(0)
 }
 
-async function fetchAllDeployments() {
-  const deployments = []
-  let until
-
-  for (;;) {
-    const url = new URL('https://api.vercel.com/v6/deployments')
-    url.searchParams.set('projectId', PROJECT)
-    url.searchParams.set('limit', '100')
-    if (TEAM_ID) url.searchParams.set('teamId', TEAM_ID)
-    if (until) url.searchParams.set('until', String(until))
-
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
-    if (!res.ok) {
-      const body = await res.text()
-      throw new Error(`Vercel API request failed (${res.status}): ${body}`)
-    }
-    const body = await res.json()
-    deployments.push(...body.deployments)
-
-    // Vercel's own pagination shape: keep paging while it says there's more.
-    if (!body.pagination?.next) break
-    until = body.pagination.next
-  }
-
-  return deployments
-}
-
 try {
-  const deployments = await fetchAllDeployments()
-
-  const production = deployments.filter((d) => d.target === 'production')
-  const preview = deployments.filter((d) => d.target !== 'production')
+  const deployments = await fetchAllDeployments(TOKEN, PROJECT, TEAM_ID)
+  const { production, preview } = splitByProductionSafety(deployments)
 
   console.log(`\n  ${deployments.length} total deployments found.\n`)
 
@@ -84,7 +53,7 @@ try {
   }
 
   console.log(`\n  Nothing was deleted — this script only lists. If ${preview.length} preview deployments`)
-  console.log('  looks right to remove, say so and the delete script comes next.\n')
+  console.log('  looks right to remove, run vercel-deployments-delete.mjs next.\n')
 } catch (err) {
   console.log(`\n  ✗ ${err.message}\n`)
   process.exit(1)
