@@ -8,9 +8,10 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import type { Subscriber } from '@/lib/subscriberStore'
 import { useCardOptions } from './HomeSectionManager'
 
-// ── The 'subscribers' tab: everyone who's opted in to "Stay in the Loop"
-// (SubscribeSection, desktop-only) — the one piece of this feature that had
-// no admin surface at all until now. View + remove only, deliberately: a
+// ── A "Subscribers" section inside the Desktop settings tab: everyone who's
+// opted in to "Stay in the Loop" (SubscribeSection, desktop-only) — the one
+// piece of this feature that had no admin surface at all until now. View +
+// remove only, deliberately: a
 // subscriber's own categories/notify preferences are already editable from
 // their own "Manage your subscription" link (every notification email
 // carries one) — duplicating that here would be a second place the same
