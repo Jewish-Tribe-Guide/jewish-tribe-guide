@@ -88,13 +88,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // be seen instead of on every home-screen load regardless of scroll
   // position.
   const [mapBandRef, mapInView] = useInView<HTMLDivElement>()
+  // The hero's "Browse Categories" button scrolls here — same plain ref +
+  // scrollIntoView as mapBandRef just above, not useInView (nothing needs to
+  // lazy-mount on this one becoming visible).
+  const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
   const entryCards = useEntryCards(onOpenFlow)
   const isMobile = useIsMobile()
   const navTransition = useNavTransitionProps()
   const { anchor } = useLocation()
-  // The Map pseudo-category still gates whether the map shows at all.
+  // The Map pseudo-category still gates whether the map shows at all — also
+  // doubles as the hero's "View Map" button gate (mapIcon below).
   const hasMap = !!categories?.some((c) => c.kind === 'map')
+  // The Map pseudo-category's own icon — shown on the hero's "View Map"
+  // button the same way HeroHeading/SearchSection already accept it. Null
+  // (not just absent) while categories haven't loaded yet or there's no Map
+  // category configured, which is what keeps the button from rendering at
+  // all (see HeroHeading's own `mapIcon != null` check).
+  const mapIcon = categories?.find((c) => c.kind === 'map')?.icon ?? null
   const zmanimCategory = categories?.find((c) => c.kind === 'zmanim')
   // Same as the real Zmanim & Shabbos category page (FindResources' own
   // locationLabel) — the visitor's typed address, or the community's region,
@@ -390,7 +401,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         className={`max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
-        <HeroHeading settings={settings} query={query} onQueryChange={setQuery} />
+        <HeroHeading
+          settings={settings}
+          query={query}
+          onQueryChange={setQuery}
+          mapIcon={hasMap ? mapIcon : null}
+          onViewMap={() => mapBandRef.current?.scrollIntoView({ block: 'start' })}
+          onBrowseCategories={() => browseCardRef.current?.scrollIntoView({ block: 'start' })}
+        />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
                 Renders nothing outside its own admin-set date range (see the
@@ -487,7 +505,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // own doc for why a small icon-avatar row instead of a full
             // photo tile is the fix for a list this long.
             return (
-              <div className="hidden desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
+              // scroll-mt-24, not the map band's own scroll-mt-20 — same
+              // sticky-header offset requirement, but a distinct value so
+              // e2e/header.spec.ts's `div.scroll-mt-20.desktop:block`
+              // selector (written when that combination was unique to the
+              // map band) still resolves to exactly one element.
+              <div ref={browseCardRef} className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
                     {settings.desktopBrowseEyebrow}
                   </p>
