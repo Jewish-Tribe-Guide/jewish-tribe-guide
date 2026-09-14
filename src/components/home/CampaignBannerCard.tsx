@@ -96,6 +96,16 @@ export default function CampaignBannerCard() {
         ✕
       </button>
 
+      {/* Same eyebrow treatment as the Browse card's `desktopBrowseEyebrow`
+          ("Get started") — text-xs/uppercase/tracking-wide — colored to
+          match this banner's own per-breakpoint accent rather than that
+          card's amber, so it reads as this banner's label, not a borrowed
+          one. Static, not admin-editable: every banner is "happening now"
+          by definition (activeCampaignBanner already filters to live ones),
+          so there's nothing per-campaign for an admin to set here. */}
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700 desktop:text-sage-700">
+        Happening now
+      </p>
       <h3 className="max-w-[28ch] text-lg font-extrabold text-slate-900 desktop:max-w-[32ch] desktop:text-[19px]">
         {banner.title}
       </h3>
