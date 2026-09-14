@@ -72,7 +72,8 @@ async function ensureMinimalListing(supabase) {
   })
   if (categoryError) throw new Error(`Could not seed minimal category: ${categoryError.message}`)
 
-  const { error: resourceError } = await supabase.from('resource').insert({
+  const { error: resourceError } = await supabase.from('resource').upsert({
+    id: CACHE_ROUNDTRIP_RESOURCE_ID,
     category: CATEGORY_ID,
     name: 'Cache Round-trip Seed Listing',
     address: '1 Test St, Philadelphia, PA',
@@ -96,9 +97,22 @@ async function ensureMinimalListing(supabase) {
 // Unlike ensureMinimalListing above (which only fires when the project is
 // otherwise completely empty), this runs every boot regardless of what else
 // is in the project — the whole point is that this category is never
-// missing. Every write here is upsert/existence-checked so repeat runs don't
-// pile up duplicate listings or home-section rows.
+// missing. Every write here is a real upsert keyed on a fixed id, not a
+// select-then-insert — the cache-roundtrip and form-roundtrip suites each
+// boot their own instance of this script against the same shared test
+// project, often as parallel CI jobs, and a select-then-insert has a race
+// window between the two: both processes can see "no resource yet" and both
+// insert, which is exactly how this project ended up with two identical
+// "Cache Round-trip Seed Listing" rows (found 2026-09-14, breaking every
+// getByRole('button', { name: ... }) locator that expects exactly one). A
+// fixed id + upsert is atomic at the database level regardless of how many
+// processes call it at once — concurrent upserts to the same id just
+// converge on one row, never two.
 const CACHE_ROUNDTRIP_CATEGORY_ID = 'cache-roundtrip-seed'
+// A real UUID, not the category's own text id — `resource.id` is a uuid
+// column. Fixed/hardcoded so every boot, from any process, upserts the same
+// row instead of generating a fresh gen_random_uuid() default each time.
+const CACHE_ROUNDTRIP_RESOURCE_ID = '00000000-0000-4000-8000-0000cace0001'
 
 async function ensureCacheRoundtripFixtureCategory(supabase) {
   const { error: categoryError } = await supabase.from('category').upsert({
@@ -117,24 +131,17 @@ async function ensureCacheRoundtripFixtureCategory(supabase) {
   })
   if (categoryError) throw new Error(`Could not seed cache-roundtrip fixture category: ${categoryError.message}`)
 
-  const { data: existingResource } = await supabase
-    .from('resource')
-    .select('id')
-    .eq('category', CACHE_ROUNDTRIP_CATEGORY_ID)
-    .limit(1)
-    .maybeSingle()
-  if (!existingResource) {
-    const { error: resourceError } = await supabase.from('resource').insert({
-      category: CACHE_ROUNDTRIP_CATEGORY_ID,
-      name: 'Cache Round-trip Seed Listing',
-      address: '1 Test St, Philadelphia, PA',
-      phone: null,
-      details: {},
-      status: 'approved',
-      reviewed_at: new Date().toISOString(),
-    })
-    if (resourceError) throw new Error(`Could not seed cache-roundtrip fixture listing: ${resourceError.message}`)
-  }
+  const { error: resourceError } = await supabase.from('resource').upsert({
+    id: CACHE_ROUNDTRIP_RESOURCE_ID,
+    category: CACHE_ROUNDTRIP_CATEGORY_ID,
+    name: 'Cache Round-trip Seed Listing',
+    address: '1 Test St, Philadelphia, PA',
+    phone: null,
+    details: {},
+    status: 'approved',
+    reviewed_at: new Date().toISOString(),
+  })
+  if (resourceError) throw new Error(`Could not seed cache-roundtrip fixture listing: ${resourceError.message}`)
 
   // A listing category only renders on /all if it's grouped into a home
   // section (AllCategories.tsx groups by home_section, with a "More" bucket
