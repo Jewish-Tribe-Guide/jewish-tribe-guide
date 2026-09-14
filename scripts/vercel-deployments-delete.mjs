@@ -42,8 +42,14 @@ async function deleteOne(id) {
   if (TEAM_ID) url.searchParams.set('teamId', TEAM_ID)
   const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${TOKEN}` } })
   if (res.ok) return { ok: true }
-  const body = await res.text().catch(() => '')
-  return { ok: false, status: res.status, body }
+  const bodyText = await res.text().catch(() => '')
+  let parsed
+  try {
+    parsed = JSON.parse(bodyText)
+  } catch {
+    // Not JSON — leave parsed undefined, bodyText still gets logged below.
+  }
+  return { ok: false, status: res.status, bodyText, error: parsed?.error }
 }
 
 try {
@@ -69,20 +75,37 @@ try {
     if (result.ok) {
       deleted++
       console.log(`  ✓ deleted  ${d.uid}  ${d.url}`)
+    } else if (result.error?.code === 'rate_limited') {
+      // Vercel's deployment-removal endpoint (not the general API) caps
+      // this at a fixed count per window — confirmed live: 200 deletes,
+      // then every further one fails identically until the window resets,
+      // regardless of how long a gap sits between requests. Grinding
+      // through the rest of `preview` here would just be that many more
+      // guaranteed-identical failures — stop immediately instead, and say
+      // exactly when it's safe to rerun. Re-running this same script later
+      // picks up cleanly: it re-fetches the live list fresh, so anything
+      // already deleted this run simply won't be in `preview` again.
+      const resetMs = result.error.limit?.reset
+      const waitMin = resetMs ? Math.max(1, Math.ceil((resetMs - Date.now()) / 60000)) : 10
+      console.log(`\n  Rate limited by Vercel's own deployment-removal cap (${result.error.limit?.total ?? 200} per window).`)
+      console.log(`  ${deleted} deleted so far, ${preview.length - deleted} left. Wait ~${waitMin} more minute(s), then rerun this exact script —`)
+      console.log('  it will pick up where this left off automatically.\n')
+      process.exit(0)
     } else {
-      failures.push({ id: d.uid, url: d.url, status: result.status, body: result.body })
+      failures.push({ id: d.uid, url: d.url, status: result.status, bodyText: result.bodyText })
       console.log(`  ✗ failed   ${d.uid}  ${d.url}  (${result.status})`)
     }
-    // A small gap between requests — Vercel's API is rate-limited, and a
-    // few hundred deletes back-to-back with no pause is exactly the shape
-    // that trips one.
+    // A small courtesy gap between requests — not what caused the rate
+    // limit above (that's a fixed count per window, not a request-rate
+    // throttle a delay would help with), just avoids hammering the API
+    // needlessly hard.
     await sleep(150)
   }
 
   console.log(`\n  Done — ${deleted} deleted, ${failures.length} failed, ${production.length} production deployments left untouched.\n`)
   if (failures.length) {
     console.log('  Failures:')
-    for (const f of failures) console.log(`    ${f.id}  ${f.url}  (${f.status}): ${f.body}`)
+    for (const f of failures) console.log(`    ${f.id}  ${f.url}  (${f.status}): ${f.bodyText}`)
     console.log()
   }
 } catch (err) {
