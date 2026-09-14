@@ -11,7 +11,7 @@ import SubscriberManager from './SubscriberManager'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  usePathname: () => '/philly/admin/subscribers',
+  usePathname: () => '/philly/admin/desktop',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/fetchJson', () => ({ fetchJson: vi.fn(), parseOkJson: vi.fn() }))

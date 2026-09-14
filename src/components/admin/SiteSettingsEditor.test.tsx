@@ -47,8 +47,12 @@ function mockLoad(settings: typeof SITE_SETTINGS_DEFAULTS, sections: HomeSection
     // The two calls race via Promise.all — settings first, sections second,
     // in the order load() awaits them — but parseOkJson can't tell which
     // response is which from the stubbed Response alone, so key off call order.
+    // A third call only happens on the Desktop tab, once a test opens the
+    // Subscribers section and mounts SubscriberManager, which does its own
+    // parseOkJson — give it an empty list rather than falling through to
+    // `sections` and crashing on `subscribers.length`.
     const call = vi.mocked(parseOkJson).mock.calls.length
-    return Promise.resolve(call === 1 ? { settings } : { sections })
+    return Promise.resolve(call === 1 ? { settings } : call === 2 ? { sections } : { subscribers: [] })
   })
 }
 

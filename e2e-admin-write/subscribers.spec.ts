@@ -3,15 +3,17 @@ import { expect, test } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Drives the admin Subscribers tab's real list+remove behavior — the one
+// Drives the admin Subscribers section's real list+remove behavior — the one
 // piece of the category-subscriptions feature (SubscribeSection.tsx) that
-// had no admin surface at all before this. There's no admin "create" flow
-// (subscribers only ever come from the public signup form), so the fixture
-// is inserted directly rather than through the UI, same disposable test
-// Supabase project as the rest of this suite (see
-// playwright.admin-write.config.ts). Cleanup mirrors category-editor.spec.ts's
-// own pattern: tracked by email (known up front), not by id, so a test that
-// fails before reaching a DB lookup doesn't leak a real row.
+// had no admin surface at all before this. Lives inside the Desktop settings
+// tab (a collapsed-by-default CollapsibleSection), not its own top-level tab
+// — see SiteSettingsEditor.tsx. There's no admin "create" flow (subscribers
+// only ever come from the public signup form), so the fixture is inserted
+// directly rather than through the UI, same disposable test Supabase project
+// as the rest of this suite (see playwright.admin-write.config.ts). Cleanup
+// mirrors category-editor.spec.ts's own pattern: tracked by email (known up
+// front), not by id, so a test that fails before reaching a DB lookup
+// doesn't leak a real row.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAdminClient() {
@@ -29,7 +31,7 @@ test.afterEach(async () => {
   }
 })
 
-test('the Subscribers tab lists a real subscriber, and Remove deletes it for real', async ({ page }) => {
+test('the Subscribers section lists a real subscriber, and Remove deletes it for real', async ({ page }) => {
   const email = `e2e-admin-write-${randomUUID().slice(0, 8)}@example.com`
   pendingEmails.push(email)
 
@@ -43,7 +45,8 @@ test('the Subscribers tab lists a real subscriber, and Remove deletes it for rea
   })
   expect(insertError).toBeNull()
 
-  await page.goto('/philly/admin/subscribers')
+  await page.goto('/philly/admin/desktop')
+  await page.getByRole('button', { name: /^Show Subscribers$/ }).click()
 
   // A table row now (see SubscriberManager.tsx's own comment — matches
   // CommunityManager's Admins roster shape), not a bare div.
