@@ -400,13 +400,19 @@ export function CompactCardGrid({
   )
 }
 
-/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) — the "What
- *  are you looking for?" card's tile grid: a bigger, friendlier icon per
- *  category (56px, tinted per getCategoryColor, same as CompactCard's own
- *  smaller version) laid out `grid-cols-4 lg:grid-cols-8` instead of
- *  CompactCardGrid's dense many-per-line rows. Expansion is fully
- *  controlled by the caller (`expanded`) rather than owned here, because the
- *  toggle button that drives it ("Browse all categories →") lives in
+/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), later
+ *  revised to a quick-scroll row: the "What are you looking for?" card's
+ *  tile grid, a bigger, friendlier icon per category (56px, tinted per
+ *  getCategoryColor, same as CompactCard's own smaller version).
+ *
+ *  Collapsed (`expanded` false) is a single horizontal-scroll row —
+ *  EVERY card is present in the DOM, not just the first 8; scrolling (not
+ *  slicing) is what keeps the rest reachable without clicking anything, for
+ *  a quick glance. Expanded is the opposite shape: the same cards wrapped
+ *  into a `grid-cols-4 lg:grid-cols-8` grid, no scrolling, everything
+ *  visible at once — a real "full view", not just "the rest of the same
+ *  strip". Both are controlled by the caller (`expanded`) rather than owned
+ *  here, because the toggle button that drives it ("View all →") lives in
  *  Landing's own header row above this grid, not beside it — CompactCardGrid
  *  can own its own "Show more" because that button sits directly under its
  *  grid; this one can't. CompactCardGrid itself is untouched and still
@@ -420,19 +426,28 @@ export function CategoryTileRow({
   cards: CardDef[]
   /** Resolves each card's icon-avatar tint — see getCategoryColor. */
   categories: CategoryConfig[] | null
-  /** false shows the first 8 cards only; true shows all of them. */
+  /** false: a horizontal-scroll row with every card. true: the same cards
+   *  wrapped into a full grid, no scrolling. */
   expanded: boolean
   onCardClick?: (card: CardDef) => void
 }) {
-  const visible = expanded ? cards : cards.slice(0, 8)
-
   return (
-    <div className="grid grid-cols-4 gap-3 lg:grid-cols-8">
-      {visible.map((card) => (
+    <div
+      className={
+        expanded
+          ? 'grid grid-cols-4 gap-3 lg:grid-cols-8'
+          // scrollbar hidden across engines (still fully scrollable by
+          // drag/trackpad/shift-wheel) — a visible scrollbar strip under a
+          // row of round-cornered tiles read as visual noise the "View all"
+          // link already makes unnecessary as a discovery affordance.
+          : 'flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+      }
+    >
+      {cards.map((card) => (
         <Link
           key={card.id ?? card.title}
           href={card.href}
-          className="flex flex-col items-center rounded-xl border border-slate-200/80 bg-white px-2 py-5 text-center transition-colors hover:border-slate-300 hover:shadow-sm"
+          className={`flex flex-col items-center rounded-xl border border-slate-200/80 bg-white px-2 py-5 text-center transition-colors hover:border-slate-300 hover:shadow-sm ${expanded ? '' : 'w-[104px] shrink-0'}`}
           onClick={onCardClick ? () => onCardClick(card) : undefined}
         >
           {card.icon ? (

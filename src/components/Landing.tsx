@@ -80,12 +80,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
-  // "Browse all categories" (desktop "What are you looking for?" card) —
-  // collapsed to the first 8 tiles by default, expanded to every card on
-  // click. Lives here, not inside CategoryTileRow itself: the toggle button
-  // that drives it sits in this card's own header row, beside the search
-  // box, not directly under the grid — so the state has to be shared between
-  // two siblings rather than owned by the grid alone.
+  // "View all" (desktop "What are you looking for?" card) — a horizontal-
+  // scroll quick-view row by default (every card present, reachable by
+  // scrolling), a full wrapped grid with every card once expanded. Lives
+  // here, not inside CategoryTileRow itself: the toggle button that drives
+  // it sits in this card's own header row, beside the search box, not
+  // directly under the grid — so the state has to be shared between two
+  // siblings rather than owned by the grid alone.
   const [browseExpanded, setBrowseExpanded] = useState(false)
   // Deferred, not just observed: the embedded map costs a few hundred KB of
   // Google Maps JS (places/main/util/common/controls/map — see
@@ -527,21 +528,23 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
             // the WHOLE card — left half of the header row, with the search
             // box (compact, not the old full-width-centered treatment) and
-            // the "Browse all categories" toggle sharing the right half.
-            // `SearchSection` renders `bare` here (no card/section shell,
-            // and no heading of its own — `hideHeading`, since this card's
-            // own heading already says the same thing) so it mounts once, as
-            // a stable sibling of the grid below, and never gets swapped out
-            // as a whole subtree when `q` changes — that would unmount the
-            // input mid-keystroke and drop focus. Its own `results` slot is
-            // left unset here on purpose: those results need to span the
-            // FULL card width once there's a query, not the search box's own
-            // ~440px column, so they're rendered as this card's own sibling
-            // block below the header row instead of nested inside it.
+            // the "View all" toggle sharing the right half. `SearchSection`
+            // renders `bare` here (no card/section shell, and no heading of
+            // its own — `hideHeading`, since this card's own heading already
+            // says the same thing) so it mounts once, as a stable sibling of
+            // the grid below, and never gets swapped out as a whole subtree
+            // when `q` changes — that would unmount the input mid-keystroke
+            // and drop focus. Its own `results` slot is left unset here on
+            // purpose: those results need to span the FULL card width once
+            // there's a query, not the search box's own ~440px column, so
+            // they're rendered as this card's own sibling block below the
+            // header row instead of nested inside it.
             //
-            // The grid itself is a flat, always-visible index of every
-            // card, collapsed to CategoryTileRow's first 8 tiles until
-            // "Browse all categories" expands it. CompactCardGrid, kept for
+            // The grid itself is a flat, always-visible index of every card
+            // — a horizontal-scroll "quick view" row by default (every card
+            // is present, scrolling reaches the rest, no clicking required),
+            // and "View all" expands CategoryTileRow into a full wrapped
+            // grid with no scrolling instead. CompactCardGrid, kept for
             // desktop search results (`desktopResultsNode` below) — dense
             // icon/name rows still fit a filtered result list better than
             // this card's bigger tile treatment.
@@ -575,8 +578,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                           onQueryChange={setQuery}
                         />
                       </div>
-                      {/* Hidden once there are 8 or fewer cards — nothing to
-                          expand, so the toggle would do nothing. */}
+                      {/* Hidden once there are 8 or fewer cards — the quick-
+                          scroll row already shows everything without
+                          scrolling at that count, so there's nothing left
+                          for "View all" to reveal. */}
                       {browseCards.length > 8 && (
                         <button
                           type="button"
@@ -584,7 +589,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                           aria-expanded={browseExpanded}
                           className="shrink-0 cursor-pointer text-[13px] font-semibold text-ink transition-colors hover:text-brand-teal"
                         >
-                          {browseExpanded ? 'Show fewer categories' : 'Browse all categories →'}
+                          {browseExpanded ? 'Show fewer categories' : 'View all →'}
                         </button>
                       )}
                     </div>
