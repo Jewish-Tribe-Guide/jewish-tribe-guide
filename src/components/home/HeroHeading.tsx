@@ -154,7 +154,17 @@ export default function HeroHeading({
             // panel's ~40vw — 100vw is the real rendered width at every
             // desktop size, not just >=1024px.
             sizes="100vw"
-            className="absolute inset-0 -z-10 object-cover"
+            // object-top, not object-cover's default (center): this band is
+            // short relative to its width (min-h-[435px] across the full
+            // viewport, easily a 3.5:1 strip), so object-cover crops most
+            // of a normal-aspect photo's height away regardless of anchor —
+            // object-top just decides WHICH slice survives. Anchoring to
+            // the top keeps sky/rooftops in frame (what a street photo's
+            // "whole scene" reads as) instead of a center crop, which on a
+            // tall photo like this one landed mid-building/street level —
+            // the "zoomed in" look the user flagged against the mockup's
+            // own reference photo.
+            className="absolute inset-0 -z-10 object-cover object-top"
             // Above the fold on every desktop load — worth the priority
             // fetch the same way a hero image normally is.
             priority
