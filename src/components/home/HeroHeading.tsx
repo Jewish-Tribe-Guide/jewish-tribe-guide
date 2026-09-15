@@ -200,15 +200,38 @@ export default function HeroHeading({
           where the wash made it look plain; see the photo box's own
           comment below for why confining the box itself is what actually
           fixes that, not just where the fade happens. */}
-      {/* overflow-x-hidden, not overflow-hidden: this section only needs to
-          clip the horizontal edges the w-screen/-translate-x-1/2 full-bleed
-          trick creates (already backstopped globally too — see globals.css's
-          own overflow-x rule), not the vertical ones — the photo box has its
-          own overflow-hidden wrapper below and doesn't need this section's
-          help. Clipping vertically as well cut off HeroSearchDropdown
-          whenever it was taller than the section's own rendered height
-          (a query matching enough categories/listings), confirmed live. */}
-      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-x-hidden bg-cream desktop:-mt-[60px]">
+      {/* No overflow property here at all — not even overflow-x-hidden,
+          which was tried first and turned out to be the same bug this
+          section's own w-screen/-translate-x-1/2 trick has already been
+          burned by once (see globals.css's own overflow-x doc on <html>):
+          per CSS Overflow 3, an axis left `visible` alongside a sibling
+          axis that's anything else computes to `auto`, so `overflow-x:
+          hidden` alone silently turned `overflow-y` into `auto` and clipped
+          (with a visible scrollbar, confirmed live) HeroSearchDropdown
+          whenever it grew taller than the section's own rendered height —
+          exactly the "scroll on the hero" the user reported, not the fix
+          the earlier commit claimed. This section was never the thing
+          keeping the page from scrolling sideways in the first place: the
+          w-screen band is exactly 100vw and centered, so it never actually
+          extends past the viewport edge, and the global `html {
+          overflow-x: hidden }` backstop (already in place for exactly this
+          full-bleed pattern) covers it regardless. Nothing here needed
+          clipping at all — the photo box has its own overflow-hidden
+          wrapper below and was never relying on this section's.
+
+          `z-30`: without an explicit z-index of its own, this section (and
+          everything inside its own `isolate` stacking context, dropdown
+          included) painted at the SAME implicit stacking level as every
+          sibling after it in the DOM — CampaignBannerCard among them —
+          which then won on DOM order alone and painted over the dropdown
+          instead of the dropdown painting over it. `isolate` only walls off
+          z-index COMPARISONS from happening inside vs. outside this
+          section; it does nothing for the section's own position in ITS
+          parent's stacking order, which is what actually decided this.
+          z-30 (not something arbitrarily high) stays under SiteHeader's own
+          sticky z-40, so the dropdown still tucks correctly behind the
+          header on scroll instead of painting over it too. */}
+      <section className="hidden desktop:block relative z-30 left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 bg-cream desktop:-mt-[60px]">
         {/* The photo lives in its OWN right-anchored box — NOT the full
             w-screen band (that was the earlier design: one full-bleed photo
             with a wash faked over the left side to look plain). The user
