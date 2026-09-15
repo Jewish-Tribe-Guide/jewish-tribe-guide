@@ -560,31 +560,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 data-testid="browse-everything-card"
                 className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
               >
-                  <div className="flex flex-wrap items-center justify-between gap-6">
-                    {/* Hardcoded, not settings.desktopBrowseEyebrow/Heading —
-                        the user's own reference image titles this "Explore
-                        by Category" with no small eyebrow label above it,
-                        unlike every other card on this page. The admin
-                        fields still exist (DesktopTopicsManager) but have no
-                        render site left here. */}
-                    <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
-                    {/* No "View all" here any more — the grid's own
-                        trailing "More" tile (CategoryTileRow) does that job
-                        now. This only ever shows the way BACK: once
-                        expanded, "Show fewer categories" is the sole
-                        collapse affordance (there's no "More" tile to click
-                        while expanded — see that component's own doc). */}
-                    {browseExpanded && (
-                      <button
-                        type="button"
-                        onClick={() => setBrowseExpanded(false)}
-                        aria-expanded={browseExpanded}
-                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
-                      >
-                        Show fewer categories
-                      </button>
-                    )}
-                  </div>
+                  {/* Hardcoded, not settings.desktopBrowseEyebrow/Heading —
+                      the user's own reference image titles this "Explore
+                      by Category" with no small eyebrow label above it,
+                      unlike every other card on this page. The admin
+                      fields still exist (DesktopTopicsManager) but have no
+                      render site left here. */}
+                  <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
                   {!isMobile && q && <div className="mt-6">{desktopResultsNode}</div>}
                   {!isMobile && !q && (
                     <div className={ui.search.landing ? 'mt-3' : ''}>
@@ -595,6 +577,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                         onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
                         onExpand={() => setBrowseExpanded(true)}
                       />
+                      {/* The collapse affordance sits where the "More" tile
+                          it replaces did — below the grid, not back up by
+                          the title — so expand and collapse are the same
+                          spot instead of opposite ends of the card.
+                          Centered, matching where a visitor's eye lands
+                          after reading a full-width row of tiles. */}
+                      {browseExpanded && (
+                        <div className="mt-4 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setBrowseExpanded(false)}
+                            aria-expanded={browseExpanded}
+                            className="cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
+                          >
+                            Show fewer categories
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
               </div>
