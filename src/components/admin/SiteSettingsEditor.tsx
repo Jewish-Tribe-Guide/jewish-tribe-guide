@@ -300,7 +300,7 @@ export default function SiteSettingsEditor({
           <ImageUploadField
             value={draft.logoUrl ?? ''}
             onChange={(url) => set('logoUrl', url || null)}
-            uploadUrl="/api/admin/site-settings/logo"
+            uploadUrl={withCommunity('/api/admin/site-settings/logo', community.slug)}
             token={token}
             shape="square"
             originalSource={logoOriginal}
@@ -373,7 +373,7 @@ export default function SiteSettingsEditor({
                 onChange={(url) =>
                   set('desktopHeroImage', url ? { url, alt: draft.desktopHeroImage?.alt ?? '' } : null)
                 }
-                uploadUrl="/api/admin/site-settings/hero-image"
+                uploadUrl={withCommunity('/api/admin/site-settings/hero-image', community.slug)}
                 token={token}
                 shape="square"
                 // Measured live against the real page (HeroHeading.tsx's
