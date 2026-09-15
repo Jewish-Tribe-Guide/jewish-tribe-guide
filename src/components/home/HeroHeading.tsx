@@ -124,100 +124,94 @@ export default function HeroHeading({
         {viewMapButton}
       </section>
 
-      {/* Desktop — a full-bleed photo band, edge to edge under the header
-          rather than a rounded card inside the page's usual max-w-6xl
-          column. `w-screen` + `left-1/2` + `-translate-x-1/2` is the same
-          full-bleed-inside-a-centered-container technique ResourceMapView
+      {/* Desktop — a full-bleed band, edge to edge under the header rather
+          than a rounded card inside the page's usual max-w-6xl column.
+          `w-screen` + `left-1/2` + `-translate-x-1/2` is the same full-
+          bleed-inside-a-centered-container technique ResourceMapView
           already uses for the mobile map band (see that component's own
           doc, and the backstop rule in globals.css that this pattern is
           the one sanctioned exception to) — it breaks the section out of
           `<main>`'s `max-w-6xl mx-auto px-4 sm:px-6`, which nothing else on
           this page needs to do. The inner content wrapper below re-applies
           that same max-w-6xl/px-4 so the headline/search/buttons still line
-          up with the header logo and every section beneath this one — only
-          the photo itself actually reaches the viewport edges.
+          up with the header logo and every section beneath this one.
           desktopHeroHeadline/Subhead are the headline, not the site name —
           see the component doc for why (the header beside it already names
-          the site). Search + the two buttons sit over the photo's left
-          side, on a light wash gradient that keeps dark text legible while
-          leaving the photo's right side uncovered. */}
-      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-hidden desktop:-mt-[60px]">
-        {heroImage ? (
-          // A real photo: it has content to describe, so it's a genuine
-          // `alt`, not aria-hidden — the opposite of the placeholder below.
-          <Image
-            src={heroImage.url}
-            alt={heroImage.alt}
-            fill
-            // The band is genuinely full-viewport-width now (see the
-            // section's own w-screen doc above), not the old two-column
-            // panel's ~40vw — 100vw is the real rendered width at every
-            // desktop size, not just >=1024px.
-            sizes="100vw"
-            // object-top, not object-cover's default (center): this band is
-            // short relative to its width (min-h-[435px] across the full
-            // viewport, easily a 3.5:1 strip), so object-cover crops most
-            // of a normal-aspect photo's height away regardless of anchor —
-            // object-top just decides WHICH slice survives. Anchoring to
-            // the top keeps sky/rooftops in frame (what a street photo's
-            // "whole scene" reads as) instead of a center crop, which on a
-            // tall photo like this one landed mid-building/street level —
-            // the "zoomed in" look the user flagged against the mockup's
-            // own reference photo.
-            className="absolute inset-0 -z-10 object-cover object-top"
-            // Above the fold on every desktop load — worth the priority
-            // fetch the same way a hero image normally is.
-            priority
-            unoptimized={!isOptimizableImage(heroImage.url)}
-          />
-        ) : (
-          // A CSS pattern stand-in, not a real photo. aria-hidden, not
-          // role="img": there's no real image content here to describe —
-          // role="img" with no name is exactly the axe violation
-          // ("role=img elements must have alternative text") that shipped
-          // here once already.
+          the site).
+          The photo itself is NOT full-bleed any more — it's confined to a
+          `w-[58%]` box anchored to the right edge, matching a reference
+          image the user supplied: solid `bg-cream` (the section's own
+          background) on the left where the headline/search/buttons sit,
+          photo only on the right. A full-bleed photo washed to fake a
+          plain left side (the previous design) computed object-cover's
+          crop against the ENTIRE band's width — a very short/wide shape —
+          and cropped away most of a normal photo's height regardless of
+          where the wash made it look plain; see the photo box's own
+          comment below for why confining the box itself is what actually
+          fixes that, not just where the fade happens. */}
+      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-hidden bg-cream desktop:-mt-[60px]">
+        {/* The photo lives in its OWN right-anchored box — NOT the full
+            w-screen band (that was the earlier design: one full-bleed photo
+            with a wash faked over the left side to look plain). The user
+            flagged that version as "zoomed in": object-cover was computing
+            its crop against the full band's width, an extremely short/wide
+            shape (easily 3.5:1), so almost all of a normal-aspect photo's
+            height got cropped away no matter where the wash made it LOOK
+            plain. A photo confined to `w-[58%]` computes its crop against a
+            far less extreme shape (~1.9:1 at typical desktop widths), so
+            object-cover keeps far more of the original scene — the "whole
+            picture" look the reference image has. The left ~42% is now a
+            genuinely flat `bg-cream` (the section's own background, set
+            above) with no photo pixels under it at all, matching that
+            reference exactly instead of approximating it with a gradient. */}
+        <div className="absolute inset-y-0 right-0 -z-10 w-[58%]">
+          {heroImage ? (
+            // A real photo: it has content to describe, so it's a genuine
+            // `alt`, not aria-hidden — the opposite of the placeholder below.
+            <Image
+              src={heroImage.url}
+              alt={heroImage.alt}
+              fill
+              sizes="58vw"
+              // object-top, not object-cover's default (center): even
+              // confined to this narrower box, the shape is still wider
+              // than a typical photo's own aspect ratio, so SOME cropping
+              // still happens — object-top keeps sky/rooftops in frame
+              // (what a street photo's "whole scene" reads as) instead of a
+              // center crop landing mid-building/street level.
+              className="object-cover object-top"
+              // Above the fold on every desktop load — worth the priority
+              // fetch the same way a hero image normally is.
+              priority
+              unoptimized={!isOptimizableImage(heroImage.url)}
+            />
+          ) : (
+            // A CSS pattern stand-in, not a real photo. aria-hidden, not
+            // role="img": there's no real image content here to describe —
+            // role="img" with no name is exactly the axe violation
+            // ("role=img elements must have alternative text") that shipped
+            // here once already.
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-br from-amber-200/60 via-amber-300/40 to-amber-700/40"
+            >
+              <div className="absolute inset-0 flex items-center justify-center opacity-15">
+                <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
+                  <polygon points="50,6 61,35 92,35 67,54 77,84 50,65 23,84 33,54 8,35 39,35" />
+                </svg>
+              </div>
+            </div>
+          )}
+          {/* A short soft fade at the photo box's OWN left edge, not a wash
+              spanning most of the band any more — the flat bg-cream to its
+              left already does the "plain on the left" job, so this only
+              needs to soften the seam between the two rather than fake an
+              entire plain region out of a still-visible photo. */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 -z-10 bg-gradient-to-br from-amber-200/60 via-amber-300/40 to-amber-700/40"
-          >
-            <div className="absolute inset-0 flex items-center justify-center opacity-15">
-              <svg width="130" height="130" viewBox="0 0 100 100" fill="none" stroke="white" strokeWidth="2.5">
-                <polygon points="50,6 61,35 92,35 67,54 77,84 50,65 23,84 33,54 8,35 39,35" />
-              </svg>
-            </div>
-          </div>
-        )}
-        {/* Light wash, not a dark scrim — the headline/search sit in dark
-            text (matching the rest of the page) rather than white-on-photo,
-            so this reads as one more content band instead of a poster.
-            White, not amber — a tinted wash read as a solid block of color
-            with a hard edge into the photo; white lets the photo's own
-            tones show faintly through even under the text, which is what
-            keeps this looking like one photo rather than a color panel
-            butted up against one.
-            Explicit stops, not Tailwind's default 0/50/100 spread — the
-            default put a trace of white wash across the ENTIRE band,
-            fading out only in the last few pixels at the right edge, so the
-            photo never actually reached full, untinted saturation anywhere.
-            Solid through 45% (covering the text column below, which is
-            never wider than that) and fully resolved to transparent by 68%
-            leaves a genuinely clean, fully uncovered right side of the
-            photo, matching the mockup this was built from — a deliberately
-            heavier/wider wash than an earlier pass here, which faded out
-            gradually starting right at the left edge and left even the
-            headline sitting on partially-faded photo instead of a solid
-            band.
-            Fades to `--color-cream`, not pure white: the page ground right
-            below this section (body's own `desktop:bg-cream`) is that same
-            cream, not white, so a pure-white wash left a visible seam where
-            the hero's washed area met the page underneath it — two
-            different "light" colors sitting flush against each other.
-            Fading to the same cream makes the two read as one continuous
-            surface, matching the mockup. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--color-cream)_0%,var(--color-cream)_30%,transparent_58%)]"
-        />
+            className="absolute inset-y-0 left-0 w-1/3 bg-[linear-gradient(to_right,var(--color-cream)_0%,transparent_100%)]"
+          />
+        </div>
         {/* Faint skyline, low and behind the text column — purely
             decorative (aria-hidden), `-z-10` inside this section's own
             `isolate` so it never competes with the wash/photo layers
