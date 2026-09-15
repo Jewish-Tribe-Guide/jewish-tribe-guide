@@ -538,8 +538,23 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                       by Category" with no small eyebrow label above it,
                       unlike every other card on this page. The admin
                       fields still exist (DesktopTopicsManager) but have no
-                      render site left here. */}
-                  <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
+                      render site left here. "Show fewer categories" sits up
+                      here, top-right of the heading, once expanded — the
+                      user's own call, moving it back from below the grid
+                      (where the "More" tile it collapses used to be). */}
+                  <div className="flex items-center justify-between gap-4">
+                    <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
+                    {browseExpanded && (
+                      <button
+                        type="button"
+                        onClick={() => setBrowseExpanded(false)}
+                        aria-expanded={browseExpanded}
+                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
+                      >
+                        Show fewer categories
+                      </button>
+                    )}
+                  </div>
                   {!isMobile && (
                     <div className={ui.search.landing ? 'mt-3' : ''}>
                       <CategoryTileRow
@@ -549,24 +564,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                         onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
                         onExpand={() => setBrowseExpanded(true)}
                       />
-                      {/* The collapse affordance sits where the "More" tile
-                          it replaces did — below the grid, not back up by
-                          the title — so expand and collapse are the same
-                          spot instead of opposite ends of the card.
-                          Centered, matching where a visitor's eye lands
-                          after reading a full-width row of tiles. */}
-                      {browseExpanded && (
-                        <div className="mt-4 flex justify-center">
-                          <button
-                            type="button"
-                            onClick={() => setBrowseExpanded(false)}
-                            aria-expanded={browseExpanded}
-                            className="cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
-                          >
-                            Show fewer categories
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
               </div>
