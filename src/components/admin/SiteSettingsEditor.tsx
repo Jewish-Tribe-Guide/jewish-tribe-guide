@@ -459,7 +459,7 @@ export default function SiteSettingsEditor({
         <div className="mt-6 max-w-2xl">
           <CollapsibleSection
             title="Home screen cards"
-            description="Categories & Search, Davening Times, Update Listings, Map, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
+            description="Categories & Search, Davening Times, Update Listings, Email Signup, and Jewish Times — the desktop home screen’s cards, in order. Rename each one’s eyebrow/heading, reorder, or remove it."
             contentClassName="p-4"
           >
             <DesktopTopicsManager

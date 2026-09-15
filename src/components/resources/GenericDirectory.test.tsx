@@ -26,8 +26,8 @@ vi.mock('@/lib/backForwardNavigation', () => ({
 
 // GenericListingCard is real and separately tested (GenericListingCard.test.tsx)
 // — stubbed here, same "mock the heavy leaf child" pattern as Landing.test.tsx's
-// HomeMap, so what's under test is GenericDirectory's own filtering/search/
-// wiring logic, not the card's own rendering.
+// DaveningTimesCard, so what's under test is GenericDirectory's own
+// filtering/search/wiring logic, not the card's own rendering.
 vi.mock('./GenericListingCard', () => ({
   GenericListingCard: ({
     item,

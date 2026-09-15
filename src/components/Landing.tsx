@@ -4,8 +4,6 @@ import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
-import HomeMap from '@/components/home/HomeMap'
-import type { LocationControls } from '@/components/home/LocationControl'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
@@ -20,7 +18,6 @@ import { useAllListings } from '@/lib/useAllListings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useNavTransitionProps } from '@/lib/navTransitions'
 import { consumeHomeReveal } from '@/lib/homeRevealSignal'
-import { useInView } from '@/lib/useInView'
 import { useLocation } from '@/lib/locationContext'
 import { useHeaderOverlay } from '@/lib/headerVisibility'
 import { community } from '@/community.config'
@@ -35,35 +32,26 @@ export type LandingProps = {
   /** Opens a full-screen guided form (Support / Volunteer). */
   onOpenFlow: (kind: Flow['kind'], preselect?: string[]) => void
   /** The visitor's location (from the header pill) — lets "Places" results show
-   *  distance, exactly like the category directory does. */
+   *  distance, exactly like the category directory does, and feeds the
+   *  Davening Times/Shabbat & Holiday Times cards' own nearest-location calc. */
   coords: { lat: number; lng: number } | null
-  /** The site-wide live GPS watch (see useLiveLocation) — passed through to the
-   *  embedded home-screen map so its tracking controls act on the same shared
-   *  watch as the full map page and the header pill. */
-  liveTracking: { tracking: boolean; error: string | null; start: () => void; stop: () => void }
-  /** Same controls object the header pill uses — passed through to the
-   *  embedded map so it can surface its own copy while fullscreen covers the
-   *  header (see ResourceMapView's `controls` prop). */
-  controls: LocationControls
-  /** 'map' when the visitor arrived by collapsing the fullscreen map — scrolls
-   *  the embedded map band into view so the collapse reads as zooming out of
-   *  the map rather than being dropped at the top of an unrelated page.
-   *  Desktop only in practice; mobile's home screen has no map band. */
-  scrollTo?: 'map' | null
 }
 
 // ── The home screen ───────────────────────────────────────────────────────────
 // Desktop and mobile deliberately differ here (see the desktop-redesign notes):
 //
 //   Desktop — a two-column warm hero (headline + subhead + search beside a
-//   photo, see HeroHeading) → six independent, admin-orderable cards (see
+//   photo, see HeroHeading) → five independent, admin-orderable cards (see
 //   builtInOrder): Categories & Search (a flat "Browse everything" grid,
 //   full weight — every card, always visible, no hover needed), Davening
-//   Times, Update Listings ("kept by the community"), Explore the Map,
-//   Email Signup (Stay in the Loop), and Jewish Times (Shabbat & Holiday
-//   Times) — → footer. HeaderNav's "Categories" mega-menu (in SiteHeader, on
-//   every screen — this page no longer owns any category nav of its own) is
-//   a second way to reach a category, on top of the flat grid.
+//   Times, Update Listings ("kept by the community"), Email Signup (Stay in
+//   the Loop), and Jewish Times (Shabbat & Holiday Times) — → footer. The map
+//   itself lives at its own full-screen route (the hero's "View Map" button,
+//   header nav, or the mobile tab bar), never embedded here — that used to be
+//   a sixth card (BUILT_IN_BLOCKS' `'map'` kind); retired, the user's own
+//   call. HeaderNav's "Categories" mega-menu (in SiteHeader, on every screen
+//   — this page no longer owns any category nav of its own) is a second way
+//   to reach a category, on top of the flat grid.
 //
 //   Mobile — unchanged: hero + search, then the full grouped card grid inline,
 //   no map (it has its own tab for that).
@@ -72,7 +60,7 @@ export type LandingProps = {
 // surfaces Synagogues). On desktop, where the grid isn't on screen, typing
 // reveals it inline as a results list — a search that appeared to do nothing
 // would be worse than a slightly longer page.
-export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, controls, scrollTo }: LandingProps) {
+export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps) {
   const communitySlug = useCommunitySlug()
   const categories = useCategories()
   const homeSections = useHomeSections()
@@ -86,20 +74,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // tile), so the state has to be shared rather than owned by the grid
   // alone.
   const [browseExpanded, setBrowseExpanded] = useState(false)
-  // Deferred, not just observed: the embedded map costs a few hundred KB of
-  // Google Maps JS (places/main/util/common/controls/map — see
-  // loadGoogleMaps.ts), loaded the instant HomeMap mounts. Gating the mount
-  // itself on visibility, not just position, means a mobile visitor — where
-  // this whole band is `hidden` via CSS below (mobile reaches the map
-  // through its own tab instead) — never triggers that download at all: a
-  // `display:none` element never intersects, so mapInView never flips for
-  // it. Desktop still gets the map, just once the band is actually about to
-  // be seen instead of on every home-screen load regardless of scroll
-  // position.
-  const [mapBandRef, mapInView] = useInView<HTMLDivElement>()
-  // The hero's "Browse Categories" button scrolls here — same plain ref +
-  // scrollIntoView as mapBandRef just above, not useInView (nothing needs to
-  // lazy-mount on this one becoming visible).
+  // The hero's "Browse Categories" button scrolls here.
   const browseCardRef = useRef<HTMLDivElement>(null)
   const settings = useSiteSettings()
   // Desktop only (see headerVisibility.tsx/SiteHeader): lets the header sit
@@ -135,16 +110,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
     for (const l of listings) counts[l.category] = (counts[l.category] ?? 0) + 1
     return counts
   }, [listings])
-
-  // The map card's own "N places across M categories" line — a real fact
-  // standing in for a header that otherwise has nothing to say beside the
-  // literal word "Map". Only `kind === 'listing'` categories count toward
-  // either number: Map, Zmanim, and Eruv are pseudo-categories with no
-  // listings of their own to add up.
-  const listingCategories = categories?.filter((c) => c.kind === 'listing') ?? []
-  const totalListings = listingCounts
-    ? listingCategories.reduce((sum, c) => sum + (listingCounts[c.id] ?? 0), 0)
-    : null
 
   const resources = resourceCards(onNavigate, categories, communitySlug, listingCounts)
   // Order is no longer alphabetical — groupCardsIntoSections (below) sorts these
@@ -214,7 +179,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const builtInOrder =
     configuredBuiltIns.length > 0
       ? configuredBuiltIns
-      : (['browse', 'davening', 'listings', 'map', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
+      : (['browse', 'davening', 'listings', 'subscribe', 'jewishTimes'] as const).map((kind) => ({
           kind,
           title: BUILT_IN_BLOCKS[kind].title,
           width: 'full' as const,
@@ -269,19 +234,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
       {placesNode}
     </>
   )
-
-  // Jump to the map band when arriving from a collapsed fullscreen map. Waits
-  // for the band to actually exist — on the first paint after navigating home
-  // it may not be rendered yet (categories still loading, so `hasMap` is false).
-  useEffect(() => {
-    if (scrollTo !== 'map') return
-    const el = mapBandRef.current
-    if (!el) return
-    el.scrollIntoView({ block: 'start' })
-    // mapBandRef comes from useInView, a useRef under the hood — stable
-    // across renders, just not visible as such to eslint across the custom
-    // hook boundary. Listed explicitly rather than suppressed.
-  }, [scrollTo, hasMap, mapBandRef])
 
   // Tapping the tab bar's Home button, or the header logo, while already on
   // home doesn't remount this component — see goHome's own note — so it fires
@@ -386,17 +338,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           query={query}
           onQueryChange={setQuery}
           mapIcon={hasMap ? mapIcon : null}
-          onViewMap={() => {
-            // The map card only renders when the admin's Home screen cards
-            // list still includes it (see the mockup plan — the user removes
-            // it there, in the admin, not here); once it's gone,
-            // mapBandRef.current silently stays null and this fell through
-            // to doing nothing at all. Falling back to the full map page
-            // keeps "View Map" working either way, same call SiteChrome's
-            // own tab bar uses for its Map tab.
-            if (mapBandRef.current) mapBandRef.current.scrollIntoView({ block: 'start' })
-            else onNavigate(null, 'map')
-          }}
+          onViewMap={() => onNavigate(null, 'map')}
           onBrowseCategories={() => {
             // Also expands the row (the same thing the "More" tile's own
             // click does), not just a scroll — "Browse Categories" reads as
@@ -523,11 +465,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
             )
             return (
-              // scroll-mt-24, not the map band's own scroll-mt-20 — same
-              // sticky-header offset requirement, but a distinct value so
-              // e2e/header.spec.ts's `div.scroll-mt-20.desktop:block`
-              // selector (written when that combination was unique to the
-              // map band) still resolves to exactly one element.
+              // scroll-mt-24 clears the sticky site header when this card is
+              // scrolled into view (the "Browse Categories" hero button).
               <div
                 ref={browseCardRef}
                 data-testid="browse-everything-card"
@@ -607,68 +546,14 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               )
             )
           }
-          if (kind === 'map') {
-            // The real full map screen, right on the home screen. Desktop
-            // only: mobile reaches the same map via its own tab bar entry, so
-            // it's dropped from this scroll to avoid showing it twice. Stays
-            // up while searching, unlike Browse everything above it — search
-            // results are now their own thing (see SearchSection's own
-            // `results` slot), not something this needs to make room for by
-            // disappearing; the map is independent content, not an answer to
-            // what was typed. `scroll-mt` clears the sticky site header, so scrolling
-            // this band into view (arriving from a collapsed fullscreen map)
-            // doesn't tuck its heading underneath it.
-            //
-            // The heading sits inside the same rounded-2xl/ring-1 card as the
-            // map now, matching Browse everything's own card — HomeMap passes
-            // `borderless` to ResourceMapView so the map doesn't draw its own
-            // border inside this one (see that prop's own doc for why: this
-            // component is shared with the full map screen, which still owns
-            // its border the old way). overflow-hidden here is what clips the
-            // now-borderless map's square corners to match this card's
-            // rounded ones — ResourceMapView already clips its own contents
-            // the same way internally, so this adds no new clipping behavior,
-            // just extends the same shape one level out. Not a risk to the
-            // fullscreen expand-in-place transition either: fullscreen goes
-            // `fixed inset-0`, which escapes this ancestor's overflow/rounding
-            // entirely regardless of what wraps it.
-            return hasMap && (
-              <div ref={mapBandRef} className="hidden scroll-mt-20 desktop:block overflow-hidden rounded-2xl bg-white ring-1 ring-slate-900/5">
-                  <div className="px-5 pt-5 pb-4">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                      {settings.desktopMapEyebrow}
-                    </p>
-                    {/* Same eyebrow/heading rhythm as every other card —
-                        both admin-editable now (Desktop tab's Home screen
-                        cards), no longer a hardcoded eyebrow next to a
-                        home_section.title-driven heading. The count fades
-                        in once listings have loaded rather than reserving
-                        space for it; a header that's briefly one line
-                        shorter reads fine, a wrong number wouldn't. */}
-                    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-                      <h2 className="text-lg font-semibold text-slate-900">{settings.desktopMapHeading}</h2>
-                      {totalListings != null && (
-                        <p className="text-sm text-slate-500">
-                          <span className="font-semibold text-slate-700">{totalListings.toLocaleString()}</span>{' '}
-                          place{totalListings === 1 ? '' : 's'} across {listingCategories.length}{' '}
-                          categor{listingCategories.length === 1 ? 'y' : 'ies'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {mapInView ? (
-                    <HomeMap onNavigate={onNavigate} coords={coords} liveTracking={liveTracking} controls={controls} />
-                  ) : (
-                    // Same footprint as ResourceMapView's own embedded-mode
-                    // container (desktop:h-[70vh] desktop:min-h-[420px]) so
-                    // swapping in the real map once mapInView flips true
-                    // doesn't shift anything below it. No rounding/ring of
-                    // its own now — the wrapping card above already owns that.
-                    <div className="h-[70vh] min-h-[420px] bg-slate-100" />
-                  )}
-              </div>
-            )
-          }
+          // 'map' — the old embedded map band — is retired (the user's own
+          // call: the map lives at its own full-screen route now, reached via
+          // the hero's "View Map" button/header nav/tab bar, never embedded
+          // on the home screen). Falls through to `return null` below like
+          // any other retired kind (see BUILT_IN_BLOCKS's own doc) — a
+          // community with an old 'map' row in its home_sections just
+          // silently renders nothing for it, same as 'zmanim'/'shabbat'/
+          // 'featured' before it.
           return null
           }
 

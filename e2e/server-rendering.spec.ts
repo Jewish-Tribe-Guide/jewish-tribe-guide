@@ -33,15 +33,19 @@ test.describe('content is server-rendered', () => {
   // so the document shipped a shell (`/philly` had no <main> at all; a
   // category page's <main> was 42 characters of nothing).
   //
-  // Fixed by moving the actual useSearchParams() reads (Landing's `?at=map`,
-  // FindResources' `?item=`/`?q=`/`?hospital=`/`?form=`) out into their own
-  // thin wrapper components (LandingConnected, FindResourcesConnected),
-  // narrowing the Suspense boundary down to just those — everything else
-  // (the category grid, the listing rows) no longer calls a Dynamic API and
-  // prerenders for real. The wrapper's own Suspense fallback is the same
-  // component rendered with no query-string props at all, which is exactly
-  // what a plain URL with no query string looks like — so there's nothing
-  // duplicated between "what ships in the HTML" and "what the fallback is".
+  // Fixed by moving the actual useSearchParams() reads (FindResources'
+  // `?item=`/`?q=`/`?hospital=`/`?form=`) out into their own thin wrapper
+  // component (FindResourcesConnected), narrowing the Suspense boundary down
+  // to just that — everything else (the category grid, the listing rows) no
+  // longer calls a Dynamic API and prerenders for real. The wrapper's own
+  // Suspense fallback is the same component rendered with no query-string
+  // props at all, which is exactly what a plain URL with no query string
+  // looks like — so there's nothing duplicated between "what ships in the
+  // HTML" and "what the fallback is". `[community]/page.tsx` (home) needed
+  // the same fix at the time (Landing's own `?at=map`, via a
+  // LandingConnected wrapper) — that's gone now along with the embedded map
+  // band `?at=map` existed to scroll to (retired feature), so home has no
+  // Suspense boundary at all any more; see HomeScreen.tsx's own doc.
   test('a category directory ships its listings in the HTML', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const { category } = await categoryWithListings(request, community)

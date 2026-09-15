@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 // equivalent for. Mocked to a stub exposing just enough to drive
 // ResourceMapView's own logic (filtering, search, chip selection, point
 // selection) without ever touching window.google. Same approach as
-// Landing.test.tsx's HomeMap/ZmanimStrip mocks.
+// Landing.test.tsx's DaveningTimesCard mock.
 vi.mock('./ResourceMap', () => ({
   default: ({
     points,

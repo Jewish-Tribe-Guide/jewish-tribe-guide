@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ComponentProps } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { track } from '@vercel/analytics'
@@ -27,22 +27,18 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// HomeMap and DaveningTimesCard are mocked out — both pull in real
-// network/SDK dependencies of their own (Google Maps, the community's real
-// listings/categories aggregation) that are their own components'
-// concerns, not Landing's. What's under test here is Landing's own
-// composition/filtering logic: which cards render, whether typing narrows
-// the grid, and whether the map/davening cards appear only when the
-// community actually has the relevant pseudo-category/data.
+// DaveningTimesCard is mocked out — it pulls in its own real
+// listings/categories aggregation, its own component's concern, not
+// Landing's. What's under test here is Landing's own composition/filtering
+// logic: which cards render, whether typing narrows the grid, and whether
+// the davening card appears only when the community actually has it
+// configured.
 //
 // ShabbatTimesCard/SubscribeSection/UpdateListingsCard are NOT mocked —
 // none of them ever were, even before the old zmanim+shabbat pairs split
 // into these independent cards, so this preserves that.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
-vi.mock('@/components/home/HomeMap', () => ({
-  default: () => <div data-testid="home-map-stub" />,
-}))
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
 }))
@@ -56,18 +52,6 @@ const handlers = {
   onNavigate: vi.fn(),
   onOpenFlow: vi.fn(),
   coords: null,
-  liveTracking: { tracking: false, error: null, start: vi.fn(), stop: vi.fn() },
-  controls: {
-    address: '',
-    coords: null,
-    onAddressChange: vi.fn(),
-    onCoords: vi.fn(),
-    tracking: false,
-    geoError: null,
-    geoErrorSilent: false,
-    onStartTracking: vi.fn(),
-    onStopTracking: vi.fn(),
-  },
 }
 
 // Landing now reads useLocation() directly (for the zmanim location label —
@@ -93,8 +77,9 @@ function renderLanding(
   props: Partial<ComponentProps<typeof Landing>> = {},
   options?: Parameters<typeof renderWithProviders>[1],
   // Defaults to null (the same as no provider at all — see useAllListings'
-  // own doc) so every existing call site is unaffected; only the map card's
-  // "N places across M categories" line needs real listings supplied.
+  // own doc) so every existing call site is unaffected; only tests that need
+  // real per-category listing counts (the browse grid's sort order, place
+  // search) supply this.
   listings: DirectoryResource[] | null = null,
 ): RenderResult {
   return renderWithProviders(
@@ -181,112 +166,19 @@ describe('Landing', () => {
     expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
   })
 
-  it('renders the map band only when the community has a Map pseudo-category, deferring HomeMap itself until scrolled near', () => {
+  // The map is retired as a home-screen card (the user's own call — it only
+  // ever lives at its own full-screen route now), so the hero's "View Map"
+  // button has one job unconditionally: navigate there. No more "scroll to
+  // an embedded band, falling back to navigation only once the admin's
+  // removed it" branching.
+  it('the hero\'s "View Map" button navigates to the full map page', async () => {
+    const user = userEvent.setup()
     const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    const { unmount } = renderLanding(undefined, { content: { categories: [withMap] } })
-    // The band exists (a placeholder of the same footprint), but HomeMap
-    // itself — and the Google Maps SDK it pulls in — doesn't mount until
-    // useInView says the band has actually scrolled near. See useInView's
-    // own doc comment for why this matters most on mobile, where the band
-    // is `hidden` outright and never intersects at all.
-    expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
-    act(() => triggerAllIntersections())
-    expect(screen.getByTestId('home-map-stub')).toBeInTheDocument()
-    unmount()
+    renderLanding(undefined, { content: { categories: [withMap] } })
 
-    renderLanding(undefined, { content: { categories: [makeCategory()] } })
-    act(() => triggerAllIntersections())
-    expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
-  })
+    await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
 
-  // Phase 3 of the desktop mockup rework: the hero's "View Map" button used
-  // to unconditionally scroll to the embedded map band — which silently did
-  // nothing once the admin's Home screen cards list stopped including a map
-  // row (the map band and the Map pseudo-category that gates this button's
-  // very existence are two independent settings; see Landing's own doc on
-  // "all-or-nothing" homeSections). Now it falls back to navigating to the
-  // full map page, the same call SiteChrome's own Map tab uses.
-  describe('the hero\'s "View Map" button', () => {
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-
-    beforeEach(() => {
-      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
-      Element.prototype.scrollIntoView = vi.fn()
-      vi.mocked(handlers.onNavigate).mockClear()
-    })
-
-    it('scrolls to the embedded map band when it renders', async () => {
-      const user = userEvent.setup()
-      renderLanding(undefined, {
-        content: {
-          categories: [withMap],
-          homeSections: [{ id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' }],
-        },
-      })
-
-      await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
-
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
-      expect(handlers.onNavigate).not.toHaveBeenCalled()
-    })
-
-    it('falls back to the full map page once the admin has removed the map band from Home', async () => {
-      const user = userEvent.setup()
-      renderLanding(undefined, {
-        content: {
-          categories: [withMap],
-          // All-or-nothing homeSections: a davening-only row means the map
-          // band doesn't render at all, even though the Map pseudo-category
-          // (and therefore the View Map button itself) still exists.
-          homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
-        },
-      })
-
-      await user.click(screen.getAllByRole('button', { name: /View Map/ })[0]!)
-
-      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
-      expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
-    })
-  })
-
-  describe('the map card\'s "N places across M categories" line', () => {
-    const withMap = makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' })
-    const grocery = makeCategory({ id: 'grocery', kind: 'listing', pluralLabel: 'Grocery Stores' })
-    const synagogue = makeCategory({ id: 'synagogue', kind: 'listing', pluralLabel: 'Synagogues' })
-
-    it('counts real listings across listing-kind categories only, once they’ve loaded', () => {
-      const listings = [
-        makeListing({ id: 'l1', category: 'grocery' }),
-        makeListing({ id: 'l2', category: 'grocery' }),
-        makeListing({ id: 'l3', category: 'synagogue' }),
-        // A stray row filed under the Map pseudo-category itself — shouldn't
-        // happen in real data, but proves the count is driven by the
-        // category's own `kind`, not just whatever `listings` happens to hold.
-        makeListing({ id: 'l4', category: 'map' }),
-      ]
-      renderLanding(undefined, { content: { categories: [withMap, grocery, synagogue] } }, listings)
-
-      expect(
-        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '3 places across 2 categories'),
-      ).toBeInTheDocument()
-    })
-
-    it('pluralizes down to one place, one category', () => {
-      renderLanding(
-        undefined,
-        { content: { categories: [withMap, grocery] } },
-        [makeListing({ id: 'l1', category: 'grocery' })],
-      )
-
-      expect(
-        screen.getByText((_, el) => el?.tagName.toLowerCase() === 'p' && el.textContent === '1 place across 1 category'),
-      ).toBeInTheDocument()
-    })
-
-    it('shows nothing yet while listings haven’t loaded, rather than claiming zero', () => {
-      renderLanding(undefined, { content: { categories: [withMap, grocery] } })
-      expect(screen.queryByText(/places across/)).not.toBeInTheDocument()
-    })
+    expect(handlers.onNavigate).toHaveBeenCalledWith(null, 'map')
   })
 
   // Jewish Times (ShabbatTimesCard, not mocked) is the one remaining card
@@ -386,55 +278,31 @@ describe('Landing', () => {
     })
   })
 
-  describe('the gateway block order (Explore the map / Davening Times)', () => {
-    const withMapAndZmanim = [
-      makeCategory({ id: 'map', kind: 'map', pluralLabel: 'Map' }),
-      makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' }),
-    ]
+  describe('the built-in cards\' admin-configured order', () => {
+    const withZmanim = [makeCategory({ id: 'zmanim', kind: 'zmanim', pluralLabel: 'Zmanim' })]
 
-    it('defaults to davening before map when nothing is configured (no built-in rows at all)', () => {
-      const { container } = renderLanding(undefined, {
-        content: { categories: withMapAndZmanim, homeSections: [] },
-      })
-      // HomeMap itself doesn't mount until the band scrolls near (see
-      // useInView) — irrelevant to this test, which only cares about DOM
-      // order, so just force it in so home-map-stub is there to compare.
-      act(() => triggerAllIntersections())
+    it('defaults to davening before jewishTimes when nothing is configured (no built-in rows at all)', () => {
+      renderLanding(undefined, { content: { categories: withZmanim, homeSections: [] } })
 
-      const html = container.innerHTML
-      expect(html.indexOf('data-testid="davening-stub"')).toBeLessThan(html.indexOf('data-testid="home-map-stub"'))
+      const daveningStub = screen.getByTestId('davening-stub')
+      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      expect(daveningStub.compareDocumentPosition(jewishTimesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
-    it('follows the admin-configured order — map before davening', () => {
-      const { container } = renderLanding(undefined, {
-        content: {
-          categories: withMapAndZmanim,
-          homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
-            { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
-          ],
-        },
-      })
-      act(() => triggerAllIntersections())
-
-      const html = container.innerHTML
-      expect(html.indexOf('data-testid="home-map-stub"')).toBeLessThan(html.indexOf('data-testid="davening-stub"'))
-    })
-
-    it('renders the map’s admin-editable heading, not the built-in default', () => {
+    it('follows the admin-configured order — jewishTimes before davening', () => {
       renderLanding(undefined, {
         content: {
-          categories: withMapAndZmanim,
-          settings: { ...SITE_SETTINGS_DEFAULTS, desktopMapHeading: 'See it on the map' },
+          categories: withZmanim,
           homeSections: [
-            { id: 'map', kind: 'map', title: 'Map Card', sortOrder: 100, cardIds: [], width: 'full' },
+            { id: 'jewishTimes', kind: 'jewishTimes', title: 'Jewish Times Card', sortOrder: 100, cardIds: [], width: 'full' },
             { id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 200, cardIds: [], width: 'full' },
           ],
         },
       })
 
-      expect(screen.getByRole('heading', { name: 'See it on the map' })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Explore the Map' })).not.toBeInTheDocument()
+      const daveningStub = screen.getByTestId('davening-stub')
+      const jewishTimesHeading = screen.getByRole('heading', { name: 'Shabbat & Holiday Times' })
+      expect(jewishTimesHeading.compareDocumentPosition(daveningStub) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     // All-or-nothing: the admin's Home screen cards list is authoritative
@@ -446,15 +314,15 @@ describe('Landing', () => {
     it('hides a built-in card that has no row of its own, once a sibling kind is configured', () => {
       renderLanding(undefined, {
         content: {
-          categories: withMapAndZmanim,
+          categories: withZmanim,
           homeSections: [{ id: 'davening', kind: 'davening', title: 'Davening Times Card', sortOrder: 100, cardIds: [], width: 'full' }],
         },
       })
 
       expect(screen.getByTestId('davening-stub')).toBeInTheDocument()
-      // Map has no row of its own here, so it doesn't render at all —
-      // configuring one kind doesn't implicitly configure the rest.
-      expect(screen.queryByTestId('home-map-stub')).not.toBeInTheDocument()
+      // Jewish Times has no row of its own here, so it doesn't render at
+      // all — configuring one kind doesn't implicitly configure the rest.
+      expect(screen.queryByRole('heading', { name: 'Shabbat & Holiday Times' })).not.toBeInTheDocument()
     })
   })
 
@@ -697,8 +565,7 @@ describe('Landing', () => {
     // "show me everything." It now expands the grid too, same as clicking
     // "More" directly.
     it('the hero\'s "Browse Categories" button expands the grid, not just scrolls to it', async () => {
-      // jsdom doesn't implement scrollIntoView at all (not even a no-op) —
-      // see the "View Map" describe block's own identical note.
+      // jsdom doesn't implement scrollIntoView at all (not even a no-op).
       Element.prototype.scrollIntoView = vi.fn()
       const user = userEvent.setup()
       const { categories, listings } = tenCategoriesWithCounts()

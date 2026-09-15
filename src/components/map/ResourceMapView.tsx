@@ -100,16 +100,13 @@ type Props = {
   initialPlaceId?: string
   /** Open a specific listing's detail card in its category directory. */
   onViewListing?: (categoryId: string, listingId: string) => void
-  /** True for the one page-level map screen (mode 'map' in page.tsx) — as
-   *  opposed to the small contained map embedded directly on the home screen
-   *  (see HomeMap), which is a separate mounted instance of this same
-   *  component and never sets this. Desktop only in effect: a standalone map
-   *  always opens (and stays) fullscreen — there's no boxed state for it —
-   *  and its exit control always navigates away via onExitFullscreenToListing
-   *  rather than collapsing in place, however the visitor got here (a
-   *  listing's own "Map" button, the mobile tab bar, browser back/forward).
-   *  The embedded home-screen map keeps its own boxed-by-default, expand-in-
-   *  place behavior untouched. */
+  /** True for the one page-level map screen (mode 'map' in page.tsx) — the
+   *  admin's category-preview map is the only other caller, and never sets
+   *  this (it stays boxed). Desktop only in effect: a standalone map always
+   *  opens (and stays) fullscreen — there's no boxed state for it — and its
+   *  exit control always navigates away via onExitFullscreenToListing rather
+   *  than collapsing in place, however the visitor got here (a listing's own
+   *  "Map" button, the mobile tab bar, browser back/forward). */
   standalone?: boolean
   /** Whether the standalone map screen is the one currently on screen (mode
    *  === 'map') — since it stays mounted across tab switches (see page.tsx),
@@ -118,19 +115,10 @@ type Props = {
    *  Ignored (and unnecessary) when `standalone` isn't set. */
   visible?: boolean
   /** Called whenever the standalone map's fullscreen exits — always
-   *  provided when `standalone` is set (either back to the listing it was
-   *  opened from, or home otherwise), since a standalone map never just
-   *  collapses to a boxed view in place. Unused by the embedded home-screen
-   *  map, whose own toggle collapses in place instead. */
+   *  provided when `standalone` is set, since a standalone map never just
+   *  collapses to a boxed view in place; it navigates away instead (see
+   *  MapScreen's own exitToPreviousScreen). */
   onExitFullscreenToListing?: () => void
-  /** Embedded home-screen map only — called when it's sitting expanded and the
-   *  viewport narrows to phone width. There's no expanded state to narrow INTO
-   *  on mobile (the whole embedded map is `hidden desktop:block` on the home screen,
-   *  and mobile reaches the map through its own tab instead), so without this
-   *  the visitor's fullscreen map would just silently vanish behind the card
-   *  grid. Hands off to the real map screen, which is where a full-viewport map
-   *  lives on mobile. */
-  onPromoteToMapScreen?: () => void
   /** The site-wide live GPS watch (see useLiveLocation), lifted to page.tsx so
    *  starting it here also updates `userLocation` everywhere else the same
    *  live coords are read (search sorting, directory distances) — not just
@@ -155,20 +143,11 @@ type Props = {
    *  address anyway (the admin category-preview map), which just means no
    *  control renders. */
   controls?: LocationControls
-  /** Embedded home-screen map only — drops this component's own boxed
-   *  border (rounded-2xl/ring) in the non-fullscreen state, because the
-   *  caller (Landing.tsx) draws a single outer card around a heading plus
-   *  this map instead, matching Browse everything's own card — see that
-   *  render site's own comment. No effect once fullscreen: that state
-   *  always manages its own chrome (`rounded-none`/`ring-0`, breaking out
-   *  to `fixed inset-0`), same as before this prop existed. Never set by
-   *  `standalone` callers, which have no outer card to defer to. */
-  borderless?: boolean
 }
 
 const NOOP_LIVE_TRACKING = { tracking: false, error: null, start: () => {}, stop: () => {} }
 
-export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, onPromoteToMapScreen, liveTracking, controls, borderless }: Props) {
+export default function ResourceMapView({ userLocation, initialCategory, initialQuery, initialSelectedCategories, initialFilters, initialPlaceId, onViewListing, standalone, visible, onExitFullscreenToListing, liveTracking, controls }: Props) {
   const listings = useAllListings()
   const categories = useCategories()
   // Admin-configured cap on how far a point can be from the anchor and still
@@ -369,17 +348,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFullscreen(true)
   }, [standalone, visible])
-  // The mirror of the above, for the embedded home-screen map: expanded on
-  // desktop, then narrowed to phone width. `desktop:fixed` stops applying and the
-  // whole embedded map is `hidden desktop:block` on the home screen, so the visitor's
-  // full-viewport map would simply disappear behind the card grid. Hand it to
-  // the real map screen instead — the same map, on the screen mobile keeps it.
-  useEffect(() => {
-    if (standalone || !fullscreen || !isMobile || !onPromoteToMapScreen) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFullscreen(false)
-    onPromoteToMapScreen()
-  }, [standalone, fullscreen, isMobile, onPromoteToMapScreen])
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1530,7 +1498,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
           ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
-          // desktop:isolate: boxed mode (e.g. the home-screen map band) has no
+          // desktop:isolate: boxed mode (the admin's category-preview map,
+          // the only caller that still renders non-fullscreen) has no
           // z-index of its own on this wrapper, so without a stacking context
           // here the search box's z-40 below (ResourceMapView's own overlay,
           // meant only to sit above the map/sidebar inside this box) leaked
@@ -1542,9 +1511,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
           // establishes its own stacking context, and covering the header
           // there is a separate, intentional tradeoff — see the `controls`
           // prop's own doc above).
-          : `desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none${
-              borderless ? '' : ' desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
-            }`
+          : 'desktop:relative desktop:isolate desktop:h-[70vh] desktop:min-h-[420px] desktop:flex-none desktop:rounded-2xl desktop:ring-1 desktop:ring-slate-900/5'
       }`}
     >
       {loading ? (

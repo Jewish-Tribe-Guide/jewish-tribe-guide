@@ -17,10 +17,9 @@ vi.mock('next/navigation', () => ({
 
 // AddressInput loads the real Google Maps SDK on mount (see loadGoogleMaps.ts)
 // — no equivalent under jsdom, same reasoning ResourceMap gets stubbed in
-// ResourceMapView.test.tsx/Landing.test.tsx's HomeMap. The stub exposes a
-// plain controlled input plus a button that fires onPlaceSelect/onCoords with
-// a fixed payload, enough to exercise handlePlaceSelect's autofill logic
-// without the real widget.
+// ResourceMapView.test.tsx. The stub exposes a plain controlled input plus a
+// button that fires onPlaceSelect/onCoords with a fixed payload, enough to
+// exercise handlePlaceSelect's autofill logic without the real widget.
 vi.mock('@/components/intake/AddressInput', () => ({
   default: ({
     value,

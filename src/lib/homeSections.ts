@@ -6,9 +6,10 @@
 // `kind` widens this from "just titled category groups" to the desktop home
 // screen's full block order — a plain named section (kind 'section', the
 // original and by far the most common case) sits in the SAME ordered list as
-// six singleton built-in blocks, one per desktop home-screen card. Reordering
-// or removing any of them is just reordering/removing a row in this same
-// list — see HomeSectionManager.tsx and Landing.tsx's ordered block walk.
+// the desktop home screen's singleton built-in blocks, one per card.
+// Reordering or removing any of them is just reordering/removing a row in
+// this same list — see HomeSectionManager.tsx and Landing.tsx's ordered
+// block walk.
 //
 // 'zmanim' (Davening Times + the community card, paired side-by-side),
 // 'shabbat' (Shabbat Times + Stay in the Loop, also paired), and 'featured'
@@ -16,20 +17,24 @@
 // into two fully independent cards ('davening'/'listings',
 // 'subscribe'/'jewishTimes'), and 'featured' was dropped outright (no
 // admin control was ever built for it, and it duplicated what the flat
-// "Browse everything" grid already shows). The DB CHECK constraint keeps
-// allowing the old values too, though (see the migration that added the
-// current set) — DDL here only ever widens, never narrows, so an existing
-// row with one of the old kinds doesn't fail to load; Landing.tsx's ordered
-// walk just no longer has a branch for it, so it silently renders nothing
-// until reseeded (see seed-home-blocks.mjs) or removed by hand.
+// "Browse everything" grid already shows). 'map' (the map embedded directly
+// on the home screen) retired later, the same way — the user's own call:
+// the map only ever lives at its own full-screen route now. The DB CHECK
+// constraint keeps allowing all of these old values too, though (see the
+// migration that added the current set) — DDL here only ever widens, never
+// narrows, so an existing row with one of the old kinds doesn't fail to
+// load; Landing.tsx's ordered walk just no longer has a branch for it, so it
+// silently renders nothing until reseeded (see seed-home-blocks.mjs) or
+// removed by hand.
 export type HomeBlockKind = 'section' | 'browse' | 'davening' | 'listings' | 'map' | 'subscribe' | 'jewishTimes'
 
-/** The six singleton built-ins' fixed identity — id doubles as `kind` (there
- *  can only ever be one of each). `title` is only ever used as this row's
- *  fallback label in the admin's own "+ Add" button and DB default — every
- *  one of these six has its own dedicated eyebrow/heading fields in
- *  SiteSettings now (see DesktopTopicsManager's CARD_META), not a
- *  live-rendered `title` the way the old 'featured'/'map'/'zmanim' did.
+/** The built-ins' fixed identity — id doubles as `kind` (there can only ever
+ *  be one of each). `title` is only ever used as this row's fallback label
+ *  in the admin's own "+ Add" button and DB default — every one of the five
+ *  still offered (see DesktopTopicsManager's CARD_META — 'map' is a member
+ *  of this type/record for legacy-row compatibility only, and isn't one of
+ *  them) has its own dedicated eyebrow/heading fields in SiteSettings now,
+ *  not a live-rendered `title` the way the old 'featured'/'map'/'zmanim' did.
  *  Order here is just documentation; actual display order always comes from
  *  sortOrder. */
 export const BUILT_IN_BLOCKS: Record<Exclude<HomeBlockKind, 'section'>, { id: string; title: string }> = {

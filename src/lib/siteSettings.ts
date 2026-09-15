@@ -65,10 +65,12 @@ export type SiteSettings = {
    *  Add/Edit/Report card, "Kept by the Community" by default). */
   desktopListingsEyebrow: string
   desktopListingsHeading: string
-  /** Desktop only — the Map card's eyebrow/heading. Used to be a hardcoded
-   *  eyebrow string plus the heading read off the 'map' home_section row's
-   *  own `title` — both are dedicated fields now, same pattern as every
-   *  other card, so home_section.title is unused for any built-in block. */
+  /** Desktop only — the Map card's eyebrow/heading, from back when the map
+   *  was embedded directly on the home screen. That card is retired (the
+   *  user's own call: the map only ever lives at its own full-screen route
+   *  now) — these two fields have no render site left, kept only because
+   *  DDL widens the DB's allowed columns, never narrows (same precedent as
+   *  a retired home_section `kind`; see homeSections.ts's own doc). */
   desktopMapEyebrow: string
   desktopMapHeading: string
   /** Desktop only — the Email Signup (SubscribeSection) card's eyebrow/
