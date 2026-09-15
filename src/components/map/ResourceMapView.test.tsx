@@ -952,3 +952,48 @@ describe('ResourceMapView — the map’s own location control', () => {
     expect(screen.queryByRole('button', { name: 'Set location' })).not.toBeInTheDocument()
   })
 })
+
+// A real user reported seeing a brief flash of "some other screen of a small
+// map" on desktop after pressing Escape on the standalone /map route. Root
+// cause: exitFullscreen() called setFullscreen(false) unconditionally before
+// navigating away, which rendered one frame of the embedded/boxed map layout
+// — a state that isn't supposed to exist for this screen at all (see the
+// `standalone` prop's own doc: "a standalone map always opens (and stays)
+// fullscreen — there's no boxed state for it") — before the navigation
+// actually unmounted the component.
+describe('ResourceMapView — standalone map Escape/exit', () => {
+  function renderStandalone(onExitFullscreenToListing: () => void) {
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible onExitFullscreenToListing={onExitFullscreenToListing} />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ category: 'grocery' })],
+    )
+  }
+
+  it('navigates away on Escape without ever dropping out of its fullscreen layout first', () => {
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+    // Still the fullscreen layout, synchronously — nothing ever flipped it to
+    // the boxed one, so there's no frame for that flash to happen in.
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View fullscreen' })).not.toBeInTheDocument()
+  })
+
+  it('clicking the fullscreen-toggle button (its other exit path) behaves the same way', async () => {
+    const user = userEvent.setup()
+    const onExit = vi.fn()
+    renderStandalone(onExit)
+
+    await user.click(screen.getByRole('button', { name: 'Exit fullscreen' }))
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
+  })
+})

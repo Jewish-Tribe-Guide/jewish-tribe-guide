@@ -345,8 +345,15 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // Exiting fullscreen: a standalone map always navigates away (back to the
   // listing it was opened from, or home — see onExitFullscreenToListing);
   // the embedded home-screen map just collapses back to its boxed card.
+  // Standalone skips the setFullscreen(false) entirely — that screen has no
+  // boxed state to collapse into (see the `standalone` prop's own doc), so
+  // flipping it just rendered one frame of the embedded/boxed layout before
+  // the navigation below unmounted this component, a visible flash of a
+  // "small map" on Escape (or the fullscreen-toggle button) that a real user
+  // reported seeing. Leaving `fullscreen` true keeps this screen showing its
+  // real layout right up until it's replaced.
   const exitFullscreen = () => {
-    setFullscreen(false)
+    if (!standalone) setFullscreen(false)
     onExitFullscreenToListing?.()
   }
   // Re-forces fullscreen every time the standalone map screen becomes the
