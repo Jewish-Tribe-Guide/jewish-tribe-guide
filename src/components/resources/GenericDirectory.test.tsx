@@ -37,6 +37,7 @@ vi.mock('./GenericListingCard', () => ({
     onFilterBool,
     onNavigate,
     showDistanceSlot,
+    onExpandedChange,
   }: {
     item: DirectoryResource
     onEdit: () => void
@@ -45,6 +46,7 @@ vi.mock('./GenericListingCard', () => ({
     onFilterBool: (key: string) => void
     onNavigate?: (direction: 1 | -1) => void
     showDistanceSlot?: boolean
+    onExpandedChange?: (expanded: boolean) => void
   }) => (
     <div>
       <span>{item.name}</span>
@@ -54,6 +56,12 @@ vi.mock('./GenericListingCard', () => ({
       <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
       <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
       {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
+      {onExpandedChange && (
+        <>
+          <button onClick={() => onExpandedChange(true)}>Expand {item.name}</button>
+          <button onClick={() => onExpandedChange(false)}>Collapse {item.name}</button>
+        </>
+      )}
     </div>
   ),
 }))
@@ -619,6 +627,41 @@ describe('GenericDirectory — scrolling a reopened listing into view', () => {
       vi.unstubAllGlobals()
       vi.useRealTimers()
     }
+  })
+})
+
+// Same one-way-in problem the Davening modal's own `davening`/`day` sync
+// solves above — GenericListingCard's onExpandedChange (fired on open,
+// close, and toggle) is wired here to keep ?item=<id> in the URL matching
+// whichever card is actually open, so a reload or a shared link lands back
+// on the same expanded listing.
+describe('GenericDirectory — syncing ?item with the expanded listing', () => {
+  it('sets ?item=<id> when a card is expanded', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const category = makeCategory()
+    const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
+    renderWithProviders(
+      <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Expand Kosher Mart' }))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ item: 'a' }, { replace: true })
+  })
+
+  it('clears ?item when the card is collapsed', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const category = makeCategory()
+    const items = [makeListing({ id: 'a', name: 'Kosher Mart' })]
+    renderWithProviders(
+      <GenericDirectory category={category} items={items} {...handlers} onParamsChange={onParamsChange} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Collapse Kosher Mart' }))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ item: null }, { replace: true })
   })
 })
 

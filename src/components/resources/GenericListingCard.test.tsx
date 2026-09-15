@@ -728,6 +728,55 @@ describe('GenericListingCard — expanded', () => {
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
 
+  // onExpandedChange — lets GenericDirectory keep ?item=<id> in sync with
+  // whichever card is open (see that component's own doc on why this is
+  // called directly rather than via a useEffect watching `expanded`).
+  it('calls onExpandedChange(true) then onExpandedChange(false) as the row is clicked open and closed', async () => {
+    const user = userEvent.setup()
+    const onExpandedChange = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} onExpandedChange={onExpandedChange} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /show details for/i }))
+    expect(onExpandedChange).toHaveBeenLastCalledWith(true)
+
+    await user.click(screen.getByRole('button', { name: /hide details for/i }))
+    expect(onExpandedChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('calls onExpandedChange via the imperative open()/close() handle', () => {
+    const ref = createRef<GenericListingCardHandle>()
+    const onExpandedChange = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard ref={ref} item={item} category={category} upvotes={false} count={0} onExpandedChange={onExpandedChange} {...requiredHandlers} />,
+    )
+
+    act(() => ref.current?.open())
+    expect(onExpandedChange).toHaveBeenLastCalledWith(true)
+
+    act(() => ref.current?.close())
+    expect(onExpandedChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('calls onExpandedChange(false) when the desktop dialog is closed via its own Close button', async () => {
+    const user = userEvent.setup()
+    const onExpandedChange = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded onExpandedChange={onExpandedChange} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(onExpandedChange).toHaveBeenCalledWith(false)
+  })
+
   // Desktop's ListingDetailModal — real here, not mocked, since this is
   // exactly the wiring under test: an arrow key while the dialog is open
   // reaches GenericDirectory's onNavigate through it.

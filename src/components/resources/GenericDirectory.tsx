@@ -1303,6 +1303,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               upvotes={upvotes}
               count={liveCount(item)}
               defaultExpanded={item.id === reopenItemId}
+              // Keeps ?item=<id> in the URL in sync with whichever card is
+              // actually open — a reload (or a shared link) lands back on
+              // the same expanded listing, same as `davening`/`day` do for
+              // the Davening Times modal above. `replace`, not `push`: an
+              // expand/collapse is a one-off, not something that should
+              // pile up browser-back history entries the way opening an
+              // Add/Edit/Report form (which does use push, see
+              // FindResources' openAction) reasonably does.
+              onExpandedChange={(expanded) => onParamsChange?.({ item: expanded ? item.id : null }, { replace: true })}
               onVote={(c) => setVoteCounts((prev) => ({ ...prev, [item.id]: c }))}
               onTagClick={setSearch}
               onFilterOpen={() => setOpenNow((v) => !v)}

@@ -126,6 +126,17 @@ type Props = {
   onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
   onReport: () => void
+  /** Fired synchronously alongside every `setExpanded` call (the row's own
+   *  toggle, ListingDetailModal's onClose, and the imperative open()/
+   *  close() below) — lets GenericDirectory keep `?item=<id>` in sync with
+   *  whichever card is actually open. Deliberately NOT a `useEffect`
+   *  watching `expanded`: `navigateFromCard`'s close-then-open pair runs on
+   *  two different card instances in the same commit, and passive effects
+   *  fire in tree order, not call order — a card later in the list would
+   *  have its "closed" effect run AFTER an earlier card's "opened" effect,
+   *  clobbering the URL back to the wrong value. Calling this directly at
+   *  each call site preserves the actual close-then-open sequence instead. */
+  onExpandedChange?: (expanded: boolean) => void
   /** Desktop only (see ListingDetailModal's own doc comment) — arrow-key
    *  next/prev while this card's dialog is open. Wired by GenericDirectory,
    *  which is the only thing that knows the current filtered/sorted order
@@ -157,6 +168,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onNavigate,
   hasPrev,
   hasNext,
+  onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
   // Mobile's inline panel (see the isMobile branch far below) animates open
@@ -218,8 +230,14 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   const upvoteSpacerRef = useRef<HTMLDivElement>(null)
   const badgeSpacerRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(ref, () => ({
-    open: () => setExpanded(true),
-    close: () => setExpanded(false),
+    open: () => {
+      setExpanded(true)
+      onExpandedChange?.(true)
+    },
+    close: () => {
+      setExpanded(false)
+      onExpandedChange?.(false)
+    },
     measureUpvoteRowOffset: () => {
       if (!cardRootRef.current || !upvoteRowRef.current) return null
       return upvoteRowRef.current.getBoundingClientRect().top - cardRootRef.current.getBoundingClientRect().top
@@ -561,8 +579,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
         ref={cardRootRef}
         onClick={() => {
           setExpanded((p) => {
-            if (!p) track('listing_opened', { listing: item.name, category: category.id })
-            return !p
+            const next = !p
+            if (next) track('listing_opened', { listing: item.name, category: category.id })
+            onExpandedChange?.(next)
+            return next
           })
         }}
         // h-full: on desktop this row is the ENTIRE visible card (the outer
@@ -946,7 +966,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
       {!isMobile && (
         <ListingDetailModal
           isOpen={expanded}
-          onClose={() => setExpanded(false)}
+          onClose={() => {
+            setExpanded(false)
+            onExpandedChange?.(false)
+          }}
           item={item}
           category={category}
           color={color}
