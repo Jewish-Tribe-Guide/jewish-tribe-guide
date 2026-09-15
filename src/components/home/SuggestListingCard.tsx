@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { PencilIcon } from '@/components/icons'
 import ContributePicker from './ContributePicker'
 
@@ -18,10 +19,13 @@ import ContributePicker from './ContributePicker'
 // same state pattern (a `null | 'open'`-shaped boolean, not a full
 // ContributeAction union, since this card only ever offers the one action).
 //
-// The right ~42% is a warm brick-toned photo placeholder, masked to fade
-// into the card the same way the Sukkah banner's own placeholder does (see
-// CampaignBannerCard) — the text column is capped at `max-w-[58%]` so real
-// copy at any length never runs under it.
+// The right ~42% is a real photo (a storefront street, standing in for
+// "your local Jewish business" — Unsplash, same sourcing/licensing as the
+// category tile photos elsewhere), masked to fade into the card the same
+// way the Sukkah banner's own photo does (see CampaignBannerCard) — the
+// text column is capped at `max-w-[58%]` so real copy at any length never
+// runs under it. Replaces the plain orange/amber gradient placeholder
+// every other card without a real photo yet still falls back to.
 export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
@@ -29,8 +33,16 @@ export default function SuggestListingCard() {
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 w-[42%] bg-gradient-to-bl from-orange-200 via-orange-300 to-amber-700/60 [mask-image:linear-gradient(to_left,black_60%,transparent)]"
-      />
+        className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
+      >
+        <Image
+          src="https://images.unsplash.com/photo-1610320022580-5295faad847c?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTl8fGxvY2FsJTIwYnVzaW5lc3N8ZW58MHx8MHx8fDA%3D"
+          alt=""
+          fill
+          sizes="(min-width: 640px) 42vw, 0px"
+          className="object-cover"
+        />
+      </div>
       <div className="relative max-w-[58%]">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Get involved</p>
         <h3 className="font-serif text-lg font-semibold text-ink">Suggest a Listing</h3>
