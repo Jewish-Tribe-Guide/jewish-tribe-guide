@@ -29,7 +29,7 @@ export default function SiteFooter({
   const settings = previewSettings ?? live
 
   return (
-    <footer className="mt-16 border-t border-slate-200/80 bg-white/60">
+    <footer className="mt-16 border-t border-slate-200/80 bg-cream">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex max-w-md items-center gap-4">
