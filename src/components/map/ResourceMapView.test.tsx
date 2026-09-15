@@ -157,6 +157,47 @@ describe('ResourceMapView — plotting listings', () => {
   })
 })
 
+describe('ResourceMapView — search autocomplete', () => {
+  // "Open now" is a real, working search (typing it and hitting Enter
+  // filters to only-open places) but was entirely undiscoverable — nothing
+  // on screen ever suggested it. Google Maps surfaces this kind of thing as
+  // its own row in the autocomplete dropdown; this mirrors that.
+  it('offers "Open now" as a suggestion when the search box is focused and empty', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+
+    await user.click(screen.getByPlaceholderText(/Search name, address/))
+
+    expect(screen.getByText('Open now')).toBeInTheDocument()
+    expect(screen.getByText('Show only places open right now')).toBeInTheDocument()
+  })
+
+  it('keeps offering "Open now" while the typed text is still heading toward it, and drops it once the text diverges', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+
+    const input = screen.getByPlaceholderText(/Search name, address/)
+    await user.click(input)
+    await user.type(input, 'ope')
+    expect(screen.getByText('Open now')).toBeInTheDocument()
+
+    await user.type(input, 'n pizza')
+    expect(screen.queryByText('Open now')).not.toBeInTheDocument()
+  })
+
+  it('clicking "Open now" commits it as the search, closing the dropdown', async () => {
+    const user = userEvent.setup()
+    renderMap(<ResourceMapView onUp={vi.fn()} />, [listingWithGeo({ category: 'grocery', name: 'Acme Grocery' })])
+
+    const input = screen.getByPlaceholderText<HTMLInputElement>(/Search name, address/)
+    await user.click(input)
+    await user.click(screen.getByText('Open now'))
+
+    expect(input.value).toBe('open now')
+    expect(screen.queryByText('Show only places open right now')).not.toBeInTheDocument()
+  })
+})
+
 describe('ResourceMapView — desktop search/filter bar position', () => {
   // Neither the search box nor the chips move when the sidebar opens or
   // closes anymore — both used to shift right to dodge the sidebar (first

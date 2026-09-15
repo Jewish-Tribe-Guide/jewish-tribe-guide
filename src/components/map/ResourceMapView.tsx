@@ -665,6 +665,26 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     return [...starts.sort(byRank), ...contains.sort(byRank)].slice(0, 6)
   }, [allPoints, input, activeLocation, effectiveSelected])
 
+  // "Open now" is a real, working search (see OPEN_NOW_WORDS/openNowActive)
+  // but a silent one — nothing on screen ever told a visitor typing into this
+  // box that it's a valid thing to search, the way Google Maps' own
+  // autocomplete surfaces "open now" as a suggestion the moment it could be
+  // what you're typing toward. Shown whenever the box is empty (an upfront
+  // hint, same spot Google puts it) or the typed text is still a prefix of
+  // "open now" — hidden the moment it diverges (e.g. "open pizza"), same as
+  // any other autocomplete match narrowing away.
+  const showOpenNowSuggestion = useMemo(() => {
+    const q = input.trim().toLowerCase()
+    return q.length === 0 || 'open now'.startsWith(q)
+  }, [input])
+  const selectOpenNow = () => {
+    setInput('open now')
+    setCommittedQuery('open now')
+    setSearchFocused(false)
+    mobileSearchInputRef.current?.blur()
+    desktopSearchInputRef.current?.blur()
+  }
+
   // Picking a suggestion jumps straight to that place — map pin + sheet detail
   // — instead of just adding it as a narrowing text filter. Setting
   // committedQuery to the place's own name (below) still broadens the
@@ -1349,8 +1369,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
       {/* ── Autocomplete dropdown — same Google-Maps-style behavior as
               mobile's: matching places while typing, click one to jump
               straight to its card. ─────────────────────────────────────── */}
-      {searchFocused && searchSuggestions.length > 0 && (
+      {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
         <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-lg">
+          {showOpenNowSuggestion && (
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={selectOpenNow}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+            >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                aria-hidden="true"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">Open now</p>
+                <p className="truncate text-xs text-slate-400">Show only places open right now</p>
+              </span>
+            </button>
+          )}
           {searchSuggestions.map((p) => (
             <button
               key={p.id}
@@ -1865,7 +1906,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           (no separate "Filters" button/sheet). Ducks out of the
                           way while the autocomplete dropdown below is showing,
                           same as Google Maps swapping chips for suggestions. ── */}
-                  {options.length > 0 && !(searchFocused && searchSuggestions.length > 0) && (
+                  {options.length > 0 && !(searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0)) && (
                     <div className="mt-2">
                       <CategoryFilter
                         options={optionsWithFilters}
@@ -1891,8 +1932,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   {/* ── Autocomplete dropdown — Google-Maps-style: matching
                           places while typing, tap one to jump straight to its
                           card instead of just narrowing the list. ─────────── */}
-                  {searchFocused && searchSuggestions.length > 0 && (
+                  {searchFocused && (showOpenNowSuggestion || searchSuggestions.length > 0) && (
                     <div className="mt-2 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-slate-900/5">
+                      {showOpenNowSuggestion && (
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={selectOpenNow}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 active:bg-slate-100 cursor-pointer"
+                        >
+                          <span
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                            aria-hidden="true"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <circle cx="12" cy="12" r="9" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                            </svg>
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-900">Open now</p>
+                            <p className="truncate text-xs text-slate-400">Show only places open right now</p>
+                          </span>
+                        </button>
+                      )}
                       {searchSuggestions.map((p) => (
                         <button
                           key={p.id}
