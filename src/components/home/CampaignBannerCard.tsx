@@ -146,13 +146,10 @@ export default function CampaignBannerCard() {
       <div className="relative hidden items-center overflow-hidden rounded-2xl border border-sage-200 bg-sage-50 desktop:flex min-h-[120px]">
         <div
           aria-hidden="true"
-          // `self-stretch` alone (not also `h-full`, which is height:100% —
-          // an explicit height, so it resolves against this row's own
-          // height, which is auto/content-driven, not a definite value, and
-          // computes to a 0px-tall sliver instead of stretching) is what
-          // makes this fill the row's actual height, whatever that ends up
-          // being.
-          className="relative w-[24%] self-stretch overflow-hidden [mask-image:linear-gradient(to_right,black_60%,transparent)]"
+          // `absolute inset-y-0` rather than a flex `self-stretch` child —
+          // pins this to the card's own top and bottom edges exactly, with
+          // no dependency on the row's content height agreeing with it.
+          className="absolute inset-y-0 left-0 w-[24%] overflow-hidden [mask-image:linear-gradient(to_right,black_60%,transparent)]"
         >
           {/* A real photo (an AI-generated sukkah, user-supplied — no
               licensing concern the way a stock-photo pull would carry),
@@ -170,7 +167,7 @@ export default function CampaignBannerCard() {
           />
         </div>
 
-        <div className="flex-1 px-6">
+        <div className="flex-1 py-6 pl-[calc(24%+1.5rem)] pr-6">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sage-700">
             Happening now
           </p>
