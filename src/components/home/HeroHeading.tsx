@@ -1,11 +1,15 @@
 'use client'
 
 import Image from 'next/image'
+import { useEffect, useRef, useState } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
+import type { CategoryConfig } from '@/lib/categories'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { GridIcon, MapFoldIcon, SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
+import HeroSearchDropdown from './HeroSearchDropdown'
+import type { CardDef, ListingHit } from './sections'
 
 type Props = {
   settings: Pick<
@@ -31,6 +35,21 @@ type Props = {
    *  leaves this undefined the same way it leaves onViewMap undefined — the
    *  button still renders, it just doesn't do anything. */
   onBrowseCategories?: () => void
+  /** Desktop only — categories/listings matching `query`, already computed
+   *  by Landing (the same `filtered`/`placeHits` its own full results
+   *  section below reads), so this and that section can never disagree
+   *  about what matched. `null` cards means "still loading"; omitted
+   *  entirely (preview mode) just renders no dropdown, same as an empty
+   *  query would. */
+  searchCards?: CardDef[] | null
+  searchPlaceHits?: ListingHit[]
+  categories?: CategoryConfig[] | null
+  onSearchCardClick?: (card: CardDef) => void
+  onOpenSearchPlace?: (hit: ListingHit) => void
+  /** Scrolls to the full results section below and closes this panel —
+   *  see HeroSearchDropdown's own doc on why "See all" doesn't duplicate
+   *  that section here instead. */
+  onSeeAllResults?: () => void
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -68,6 +87,14 @@ type Props = {
 // `query` state this band does, so typing here still narrows/surfaces its
 // results — it just doesn't have an input of its own any more.
 //
+// Typing also opens HeroSearchDropdown, a capped live-results preview right
+// under the box — the user's own reported pain point: a search box whose
+// answer shows up in a card near the bottom of the page reads as
+// disconnected from the box itself, since nothing changes where you're
+// actually looking. The dropdown's "See all" scrolls to that same
+// lower section rather than duplicating it, so there's still exactly one
+// place the full, uncapped results live.
+//
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render
 // (SSR-safe), so branching here would flash the desktop layout on a phone
@@ -94,8 +121,46 @@ export default function HeroHeading({
   mapIcon,
   onViewMap,
   onBrowseCategories,
+  searchCards,
+  searchPlaceHits = [],
+  categories = null,
+  onSearchCardClick,
+  onOpenSearchPlace,
+  onSeeAllResults,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
+
+  // The dropdown's own open/closed state — derived from `query` (open the
+  // moment there's something to show), except for `dismissed`, which
+  // Escape/an outside click/"See all" set to override that back closed
+  // until the visitor types again. Not just "has focus": clicking a result
+  // blurs the input on the way to navigating, and closing the panel at that
+  // exact moment would race the click.
+  const [dismissed, setDismissed] = useState(false)
+  const trimmedQuery = query.trim()
+  const dropdownOpen = trimmedQuery.length > 0 && !dismissed && searchCards != null
+  const searchShellRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dropdownOpen) return
+    function onPointerDown(e: MouseEvent) {
+      if (searchShellRef.current && !searchShellRef.current.contains(e.target as Node)) setDismissed(true)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDismissed(true)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [dropdownOpen])
+
+  function handleQueryChange(next: string) {
+    setDismissed(false)
+    onQueryChange(next)
+  }
 
   return (
     <>
@@ -217,14 +282,29 @@ export default function HeroHeading({
             </p>
           )}
           {ui.search.landing && (
-            <div className="mt-8 max-w-[585px]">
+            <div ref={searchShellRef} className="relative mt-8 max-w-[585px]">
               <SearchBox
                 query={query}
-                onQueryChange={onQueryChange}
+                onQueryChange={handleQueryChange}
                 interactive={interactive}
                 placeholder={settings.searchPlaceholder}
+                onFocus={() => setDismissed(false)}
                 className="pl-6 pr-2.5 py-3"
               />
+              {dropdownOpen && (
+                <HeroSearchDropdown
+                  query={trimmedQuery}
+                  cards={searchCards ?? []}
+                  placeHits={searchPlaceHits}
+                  categories={categories}
+                  onCardClick={(card) => onSearchCardClick?.(card)}
+                  onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
+                  onSeeAll={() => {
+                    setDismissed(true)
+                    onSeeAllResults?.()
+                  }}
+                />
+              )}
             </div>
           )}
           <div className="mt-6 flex flex-wrap items-center gap-3">

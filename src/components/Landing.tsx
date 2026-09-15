@@ -438,6 +438,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             setBrowseExpanded(true)
             browseCardRef.current?.scrollIntoView({ block: 'start' })
           }}
+          searchCards={filtered}
+          searchPlaceHits={placeHits}
+          categories={categories}
+          onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
+          onOpenSearchPlace={(hit) => openPlace(hit)}
+          // Same destination as the "Explore by Category" card's own header
+          // — desktopResultsNode already renders there once `q` is set, so
+          // this is purely a scroll, not a second results section.
+          onSeeAllResults={() => browseCardRef.current?.scrollIntoView({ block: 'start' })}
         />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────

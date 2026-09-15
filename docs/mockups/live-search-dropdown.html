@@ -1,0 +1,322 @@
+<title>Live Search Preview</title>
+<style>
+  :root {
+    --cream: #f7f5ef;
+    --ink: #16211f;
+    --teal: #1f5b5a;
+    --teal-dark: #184a49;
+    --amber: #b45309;
+    --slate-700: #334155;
+    --slate-500: #64748b;
+    --slate-300: #cbd5e1;
+    --slate-200: #e2e8f0;
+    --border: rgba(15, 23, 42, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--cream); }
+  .wrap {
+    font-family: Figtree, system-ui, sans-serif;
+    color: var(--ink);
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 1.5rem 0 3rem;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 0 0 6px;
+  }
+  .title {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+  .dek {
+    font-size: 14.5px;
+    color: var(--slate-700);
+    max-width: 62ch;
+    line-height: 1.6;
+    margin: 0 0 28px;
+  }
+  .screen {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.07);
+    overflow: hidden;
+  }
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfaf7;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--slate-300); }
+  .chrome-url {
+    margin-left: 10px;
+    font-size: 12px;
+    color: var(--slate-500);
+    font-family: ui-monospace, monospace;
+  }
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--teal);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-family: "Source Serif 4", serif; font-size: 15px; font-weight: 700;
+  }
+  .site-nav { display: flex; gap: 26px; font-size: 14px; color: var(--slate-700); font-weight: 500; }
+  .set-location {
+    font-size: 13px; font-weight: 600; color: var(--teal-dark);
+    border: 1px solid var(--slate-200); border-radius: 999px; padding: 7px 16px;
+  }
+  .hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: 42% 58%;
+    min-height: 660px;
+  }
+  .hero-left {
+    background: var(--cream);
+    padding: 44px 40px 40px;
+    position: relative;
+    z-index: 3;
+  }
+  .headline {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .subhead { font-size: 14.5px; color: var(--slate-500); margin: 0 0 22px; }
+  .search-shell { position: relative; max-width: 420px; }
+  .search-box {
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border: 1px solid var(--slate-300); border-radius: 999px;
+    padding: 12px 18px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    position: relative; z-index: 5;
+  }
+  .search-box svg { flex-shrink: 0; color: var(--slate-500); }
+  .search-text { font-size: 14.5px; color: var(--ink); }
+  .caret {
+    display: inline-block; width: 1px; height: 16px; background: var(--ink);
+    vertical-align: -3px; animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .results-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 16px;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06), 0 20px 40px rgba(15, 23, 42, 0.12);
+    padding: 6px 0;
+    z-index: 4;
+  }
+  .results-section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--slate-500); padding: 12px 18px 6px;
+  }
+  .cat-row, .listing-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 18px;
+  }
+  .row-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .row-icon.food { background: #dcecea; color: var(--teal-dark); }
+  .row-icon.grocery { background: #f8dfe3; color: #a13a4c; }
+  .row-icon.kosher { background: #f4e3cf; color: var(--amber); }
+  .cat-name { font-size: 13.5px; font-weight: 600; }
+  .cat-count { font-size: 12.5px; color: var(--slate-500); margin-left: auto; }
+  .listing-name { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+  .listing-sub { font-size: 12px; color: var(--slate-500); line-height: 1.3; }
+  .panel-divider { height: 1px; background: var(--slate-200); margin: 4px 18px; }
+  .see-all {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px 10px;
+    font-size: 13px; font-weight: 600; color: var(--teal-dark);
+  }
+  .hero-buttons { display: flex; gap: 12px; margin-top: 22px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13.5px; font-weight: 600; border-radius: 999px; padding: 10px 18px;
+  }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-secondary { background: #fff; border: 1px solid var(--slate-300); color: var(--ink); }
+  .hero-photo {
+    position: relative;
+    background:
+      linear-gradient(to right, var(--cream) 0%, transparent 12%),
+      linear-gradient(160deg, #cfd9e0 0%, #aebac4 38%, #8fa0ad 62%, #6d818f 100%);
+  }
+  .skyline { position: absolute; bottom: 0; left: 0; right: 0; height: 52%; opacity: 0.9; }
+  .skyline rect { fill: #445561; }
+  .skyline .tallest { fill: #33424c; }
+  .callouts {
+    margin-top: 26px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .callout {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .callout-label {
+    font-size: 12px; font-weight: 700; color: var(--teal-dark);
+    margin: 0 0 4px;
+  }
+  .callout-body { font-size: 13px; color: var(--slate-700); line-height: 1.5; margin: 0; }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Proposal</p>
+  <h1 class="title">Search results, right where you typed them</h1>
+  <p class="dek">
+    Right now, typing in the hero search box scrolls a visitor down to a card near the bottom of the page —
+    nothing happens where they're actually looking. This mocks up an alternative: a live results panel
+    that opens directly under the search box, the moment there's something to show.
+  </p>
+
+  <div class="screen">
+    <div class="chrome">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <span class="chrome-url">phillyjewishguide.org/philly</span>
+    </div>
+
+    <div class="site-header">
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        Philly Jewish Guide
+      </div>
+      <div class="site-nav">
+        <span>Categories</span><span>Map</span><span>More</span>
+      </div>
+      <div class="set-location">Set location</div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-left">
+        <h2 class="headline">Your Guide to<br>Jewish Philadelphia</h2>
+        <p class="subhead">Kept current by you, and by the community that uses it</p>
+
+        <div class="search-shell">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <span class="search-text">kosher<span class="caret"></span></span>
+          </div>
+
+          <div class="results-panel">
+            <p class="results-section-label">Categories</p>
+            <div class="cat-row">
+              <div class="row-icon food">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v20M6 2a4 4 0 0 0-4 4v3a4 4 0 0 0 4 4M18 2v20M18 2a4 4 0 0 1 4 4v14"/></svg>
+              </div>
+              <span class="cat-name">Food</span>
+              <span class="cat-count">72 places →</span>
+            </div>
+            <div class="cat-row">
+              <div class="row-icon grocery">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+              </div>
+              <span class="cat-name">Grocery</span>
+              <span class="cat-count">22 places →</span>
+            </div>
+
+            <div class="panel-divider"></div>
+
+            <p class="results-section-label">Listings</p>
+            <div class="listing-row">
+              <div class="row-icon kosher">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 12l10 10 10-10z"/></svg>
+              </div>
+              <div>
+                <p class="listing-name">Kosher Mart</p>
+                <p class="listing-sub">Grocery · 1 Main St, Philadelphia</p>
+              </div>
+            </div>
+            <div class="listing-row">
+              <div class="row-icon kosher">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 12l10 10 10-10z"/></svg>
+              </div>
+              <div>
+                <p class="listing-name">Goldie's Kosher Kitchen</p>
+                <p class="listing-sub">Food · 214 South St, Philadelphia</p>
+              </div>
+            </div>
+
+            <div class="panel-divider"></div>
+
+            <div class="see-all">
+              <span>See all 14 results for "kosher"</span>
+              <span>→</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-buttons">
+          <div class="btn btn-primary">Browse Categories</div>
+          <div class="btn btn-secondary">View Map</div>
+        </div>
+      </div>
+
+      <div class="hero-photo">
+        <svg class="skyline" viewBox="0 0 500 120" preserveAspectRatio="none">
+          <rect x="0" y="60" width="30" height="60"/>
+          <rect x="35" y="40" width="24" height="80"/>
+          <rect x="64" y="70" width="34" height="50"/>
+          <rect class="tallest" x="105" y="10" width="26" height="110"/>
+          <rect x="136" y="55" width="30" height="65"/>
+          <rect x="172" y="35" width="22" height="85"/>
+          <rect x="200" y="65" width="40" height="55"/>
+          <rect x="246" y="45" width="26" height="75"/>
+          <rect x="278" y="20" width="24" height="100"/>
+          <rect x="308" y="58" width="32" height="62"/>
+          <rect x="346" y="42" width="22" height="78"/>
+          <rect x="374" y="68" width="36" height="52"/>
+          <rect x="416" y="30" width="24" height="90"/>
+          <rect x="446" y="55" width="30" height="65"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="callouts">
+    <div class="callout">
+      <p class="callout-label">Same box, same spot</p>
+      <p class="callout-body">Nothing about the search box itself changes — it's still the first thing on the page, beside Browse Categories and View Map.</p>
+    </div>
+    <div class="callout">
+      <p class="callout-label">Results open in place</p>
+      <p class="callout-body">Categories and listings appear directly under the box as soon as there's a match — no scrolling required to see that search did something.</p>
+    </div>
+    <div class="callout">
+      <p class="callout-label">Still one click from everything</p>
+      <p class="callout-body">"See all results" at the bottom leads to the full results view below — this replaces the guesswork, not the destination.</p>
+    </div>
+  </div>
+</div>

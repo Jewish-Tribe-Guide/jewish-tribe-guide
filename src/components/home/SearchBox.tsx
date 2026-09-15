@@ -11,6 +11,7 @@ export default function SearchBox({
   onQueryChange,
   interactive = true,
   placeholder,
+  onFocus,
   // Spacing only, not the border/background/shadow — those stay fixed so
   // every caller gets the same pill styling, but the desktop hero (Phase 3
   // of the mockup rework) wants a taller ~48px box than mobile's default,
@@ -27,6 +28,10 @@ export default function SearchBox({
    *  devices rather than split into separate mobile/desktop copies (it's
    *  describing the same search either way). */
   placeholder: string
+  /** Desktop hero only — reopens HeroSearchDropdown when a visitor refocuses
+   *  an already-typed-into box (e.g. after "See all" dismissed it), without
+   *  requiring them to edit the text first. */
+  onFocus?: () => void
   /** Padding only — see the prop's own doc above. */
   className?: string
 }) {
@@ -39,6 +44,11 @@ export default function SearchBox({
         type="text"
         value={query}
         onChange={(e) => interactive && onQueryChange(e.target.value)}
+        onFocus={onFocus}
+        // Also on click, not just focus: Escape can close the dropdown
+        // without blurring the input (focus never actually leaves it), so a
+        // plain focus listener alone never re-fires on the next click.
+        onClick={onFocus}
         readOnly={!interactive}
         // "Search", not "Filter": on desktop the grid isn't on screen
         // when this is empty, so there is nothing visible to be

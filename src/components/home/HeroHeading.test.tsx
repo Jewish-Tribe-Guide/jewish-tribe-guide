@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { CardDef } from './sections'
 import HeroHeading from './HeroHeading'
 
 afterEach(() => cleanup())
@@ -166,5 +169,116 @@ describe('HeroHeading — the photo panel', () => {
     // an <img> with an empty/missing alt (which would be its own violation).
     expect(container.querySelector('img')).toBeNull()
     expect(container.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+  })
+})
+
+// The user's own reported pain point: typing in the hero search box used to
+// scroll a visitor down to a card near the bottom of the page — nothing
+// changed where they were actually looking. HeroSearchDropdown opens right
+// under the box instead; this covers the open/close state machine
+// HeroHeading owns around it (HeroSearchDropdown itself, and its own
+// content/capping/click-handler behavior, are covered in
+// HeroSearchDropdown.test.tsx).
+describe('HeroHeading — the search dropdown', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'Your guide to Jewish Philadelphia',
+    searchPlaceholder: 'Search — kosher food, mikvah, shuls, schools…',
+    desktopHeroHeadline: 'Your guide to Jewish Philadelphia',
+    desktopHeroSubhead: '',
+    desktopHeroImage: null,
+  }
+  const foodCard: CardDef = { title: 'Food', id: 'restaurant', href: '/philly/restaurant', go: () => {} }
+
+  // A real controlled query (useState), same shape as Landing's own — the
+  // dropdown reopening on typing depends on a genuine query→prop round
+  // trip, which a fixed `query=""` prop can't exercise.
+  function Wrapper(props: Partial<React.ComponentProps<typeof HeroHeading>> = {}) {
+    const [query, setQuery] = useState('')
+    return (
+      <HeroHeading
+        settings={settings}
+        query={query}
+        onQueryChange={setQuery}
+        searchCards={[foodCard]}
+        searchPlaceHits={[]}
+        categories={[]}
+        onSeeAllResults={vi.fn()}
+        {...props}
+      />
+    )
+  }
+
+  // Two "Search resources" inputs exist at once (CSS-only mobile/desktop
+  // split — see the component's own doc); scoped to the desktop section
+  // the same way the "Phase 3" tests above scope their own assertions.
+  function desktopSearchInput(container: HTMLElement): HTMLInputElement {
+    const desktopSection = container.querySelector('.desktop\\:block')!
+    return desktopSection.querySelector('input')!
+  }
+
+  it('stays closed with an empty query, and opens once there is one', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+
+    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    await user.type(desktopSearchInput(container), 'food')
+    expect(screen.getByText('Food')).toBeInTheDocument()
+  })
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    await user.type(desktopSearchInput(container), 'food')
+    expect(screen.getByText('Food')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  it('closes on a click outside the search box', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    await user.type(desktopSearchInput(container), 'food')
+    expect(screen.getByText('Food')).toBeInTheDocument()
+
+    await user.click(document.body)
+    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+  })
+
+  // Escape (and "See all") close the dropdown without necessarily blurring
+  // the input — refocusing/clicking it again has to reopen the dropdown on
+  // its own, without requiring the visitor to edit the text first.
+  it('reopens on refocus after being dismissed, without needing to retype', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper />)
+    const input = desktopSearchInput(container)
+    await user.type(input, 'food')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+
+    await user.click(input)
+    expect(screen.getByText('Food')).toBeInTheDocument()
+  })
+
+  it('stays hidden while the search data is still loading (searchCards null), rather than showing a false "nothing matches"', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<Wrapper searchCards={null} />)
+    await user.type(desktopSearchInput(container), 'food')
+
+    expect(screen.queryByText('Food')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
+  })
+
+  it('"See all" dismisses the dropdown and calls onSeeAllResults', async () => {
+    const user = userEvent.setup()
+    const onSeeAllResults = vi.fn()
+    const { container } = render(<Wrapper onSeeAllResults={onSeeAllResults} />)
+    await user.type(desktopSearchInput(container), 'food')
+
+    await user.click(screen.getByText(/See all/))
+    expect(onSeeAllResults).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/See all/)).not.toBeInTheDocument()
   })
 })
