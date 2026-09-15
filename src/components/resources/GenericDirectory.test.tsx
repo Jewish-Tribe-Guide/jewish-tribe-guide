@@ -63,8 +63,26 @@ vi.mock('./GenericListingCard', () => ({
 // initialDayFilter parsing tests below, what it's told to open TO), not what's
 // in it.
 vi.mock('@/components/synagogues/DaveningTimesModal', () => ({
-  default: ({ isOpen, initialDayFilter }: { isOpen: boolean; initialDayFilter?: string[] }) =>
-    isOpen ? <div>davening modal open{initialDayFilter ? `: ${initialDayFilter.join(',')}` : ''}</div> : null,
+  default: ({
+    isOpen,
+    initialDayFilter,
+    onClose,
+  }: {
+    isOpen: boolean
+    initialDayFilter?: string[]
+    onClose: () => void
+  }) =>
+    isOpen ? (
+      // The label stays in its own element (not a sibling text node next to
+      // the close button) so the existing exact-text assertions below —
+      // getByText('davening modal open...') — keep matching a single
+      // element's own text rather than that element's text plus the
+      // button's, now that this mock renders both.
+      <div>
+        <span>davening modal open{initialDayFilter ? `: ${initialDayFilter.join(',')}` : ''}</span>
+        <button onClick={onClose}>Close davening modal</button>
+      </div>
+    ) : null,
 }))
 
 afterEach(() => {
@@ -472,6 +490,53 @@ describe('GenericDirectory', () => {
     )
 
     expect(screen.getByText('davening modal open')).toBeInTheDocument()
+  })
+
+  // Reported live: closing the modal (X, Escape, overlay click — all funnel
+  // into the same onClose) left `?davening=1` sitting in the URL, so
+  // reloading the page after closing reopened a modal the visitor had
+  // already dismissed. `?day=` is meaningless without the modal it was
+  // filtering, so it clears alongside `davening`.
+  it('clears ?davening and ?day from the URL when the modal is closed', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(
+      <GenericDirectory
+        category={category}
+        items={[item]}
+        openDaveningModal
+        initialDaveningDay="tue"
+        {...handlers}
+        onParamsChange={onParamsChange}
+      />,
+    )
+    expect(onParamsChange).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Close davening modal' }))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ davening: null, day: null }, { replace: true })
+  })
+
+  it('adds ?davening=1 to the URL when the modal is opened from the page itself, not just on arrival', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const category = makeCategory({ detailFields: [{ key: 'minyanim', label: 'Minyanim', type: 'minyanim' }] })
+    const item = {
+      ...makeListing(),
+      minyanim: [{ id: 'm1', tefillah: 'shacharis', days: ['sunday'], time: '7:00 AM' }],
+    } as unknown as DirectoryResource
+    renderWithProviders(
+      <GenericDirectory category={category} items={[item]} {...handlers} onParamsChange={onParamsChange} />,
+    )
+
+    await user.click(screen.getAllByRole('button', { name: /All davening times/ })[0])
+
+    expect(onParamsChange).toHaveBeenCalledWith({ davening: '1' }, { replace: true })
   })
 
   it('never shows its own Map link, even when a Map pseudo-category exists', () => {

@@ -316,6 +316,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // of an update to the existing one, and the lazy initializer below runs
   // again with the real value.
   const [daveningModalOpen, setDaveningModalOpen] = useState(!!openDaveningModal)
+  // Same one-way-in problem `search`/`openNow` already solve above: without
+  // this, closing the modal (X, Escape, overlay click — all funnel into
+  // `setDaveningModalOpen(false)`) left `?davening=1` sitting in the URL,
+  // so a reload after closing reopened a modal the visitor had already
+  // dismissed. Clears `day` alongside `davening` on close — a stale
+  // `?day=` with no modal to filter is meaningless on its own. Skips the
+  // first render for the same reason `openNowSyncedOnce` does: the initial
+  // value here is just `openDaveningModal` echoed back, and re-writing it
+  // immediately would be a pointless replace on a URL that's already
+  // correct.
+  const daveningModalSyncedOnce = useRef(false)
+  useEffect(() => {
+    if (!daveningModalSyncedOnce.current) {
+      daveningModalSyncedOnce.current = true
+      return
+    }
+    onParamsChange?.(daveningModalOpen ? { davening: '1' } : { davening: null, day: null }, { replace: true })
+  }, [daveningModalOpen, onParamsChange])
   const isMobile = useIsMobile()
   // For getCategoryColor below — same call CompactCard makes for this same
   // category's home-screen badge, so the morph target's color matches
