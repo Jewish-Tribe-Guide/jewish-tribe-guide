@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
+import { SkylineIcon } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
 import { community } from '@/community.config'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -31,14 +32,21 @@ export default function SiteFooter({
     <footer className="mt-16 border-t border-slate-200/80 bg-white/60">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-md">
-            <p className="text-sm font-semibold text-slate-900">
-              A more connected {community.region}
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              Whether you&rsquo;re a lifelong local, new to the city, or just visiting — the {settings.name} helps
-              you find what you need and feel at home.
-            </p>
+          <div className="flex max-w-md items-center gap-4">
+            {/* The skyline glyph moved here with the "A more connected
+                {region}" copy it was originally paired with — see
+                ClosingStrip's own doc on why the text moved down to the
+                footer. */}
+            <SkylineIcon className="h-10 w-[86px] shrink-0 text-slate-400" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                A more connected {community.region}
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                Whether you&rsquo;re a lifelong local, new to the city, or just visiting — the {settings.name} helps
+                you find what you need and feel at home.
+              </p>
+            </div>
           </div>
 
           <div className="sm:text-right">
