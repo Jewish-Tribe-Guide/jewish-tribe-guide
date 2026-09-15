@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -55,9 +56,9 @@ import { LeafIcon, PinIcon } from '@/components/icons'
 // Desktop mockup match (Phase 4, docs/desktop-mockup-plan.md): a completely
 // separate horizontal layout (`hidden desktop:flex`), not the mobile card's
 // vertical one reused with a few overrides — the two read too differently
-// (a left-edge photo placeholder, buttons pinned to the right, no colour
-// rail) to share markup cleanly. Mobile's own JSX is untouched apart from
-// gaining `desktop:hidden`; both blocks are computed from the same
+// (a left-edge photo, buttons pinned to the right, no colour rail) to
+// share markup cleanly. Mobile's own JSX is untouched apart from gaining
+// `desktop:hidden`; both blocks are computed from the same
 // `banner`/`primary`/`secondary` values above so the actual content/logic
 // only lives in one place.
 export default function CampaignBannerCard() {
@@ -139,9 +140,9 @@ export default function CampaignBannerCard() {
         </div>
       </div>
 
-      {/* Desktop — horizontal: a photo placeholder on the left fading into
-          the banner, text in the middle, buttons pinned to the right. No
-          left colour rail here (that's a mobile-only accent). */}
+      {/* Desktop — horizontal: a photo on the left fading into the banner,
+          text in the middle, buttons pinned to the right. No left colour
+          rail here (that's a mobile-only accent). */}
       <div className="relative hidden items-center overflow-hidden rounded-2xl border border-sage-200 bg-sage-50 desktop:flex min-h-[120px]">
         <div
           aria-hidden="true"
@@ -151,9 +152,22 @@ export default function CampaignBannerCard() {
           // computes to a 0px-tall sliver instead of stretching) is what
           // makes this fill the row's actual height, whatever that ends up
           // being.
-          className="relative w-[24%] self-stretch bg-gradient-to-br from-amber-200 via-sage-200 to-sage-50 [mask-image:linear-gradient(to_right,black_60%,transparent)]"
+          className="relative w-[24%] self-stretch overflow-hidden [mask-image:linear-gradient(to_right,black_60%,transparent)]"
         >
-          <LeafIcon className="absolute inset-0 m-auto h-16 w-16 text-white/70" />
+          {/* A real photo (an AI-generated sukkah, user-supplied — no
+              licensing concern the way a stock-photo pull would carry),
+              replacing the gradient+LeafIcon placeholder every other
+              seasonal banner still falls back to. Served from /public
+              (not hotlinked) since this came in as a local file, not a
+              URL — public/images/sukkah-banner.png, copied in from the
+              user's own docs/ upload. */}
+          <Image
+            src="/images/sukkah-banner.png"
+            alt=""
+            fill
+            sizes="(min-width: 640px) 24vw, 0px"
+            className="object-cover"
+          />
         </div>
 
         <div className="flex-1 px-6">
