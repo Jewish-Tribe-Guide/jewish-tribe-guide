@@ -10,7 +10,7 @@ import { useDismissedCampaignBanners } from '@/lib/dismissedCampaignBanners'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { routes, mapQueryString } from '@/lib/routes'
 import { community } from '@/community.config'
-import { LeafIcon, PinIcon } from '@/components/icons'
+import { LeafIcon } from '@/components/icons'
 
 // ── A seasonal promotion (see CampaignBannerManager's own doc) — renders
 // nothing outside its admin-set date range, so there is no separate on/off
@@ -206,7 +206,6 @@ export default function CampaignBannerCard() {
             href={primary.href}
             className="inline-flex items-center gap-1.5 cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-sage-700"
           >
-            {mapIsPrimary && <PinIcon className="h-4 w-4 shrink-0" />}
             {primary.label}
           </Link>
           <Link
