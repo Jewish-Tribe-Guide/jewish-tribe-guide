@@ -16,7 +16,6 @@ import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 import { community } from '@/community.config'
-import { BookIcon } from '@/components/icons'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
@@ -182,7 +181,6 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
           href={seeAllHref}
           className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
         >
-          <BookIcon className="h-4 w-4 shrink-0" />
           View Times
         </Link>
       </div>

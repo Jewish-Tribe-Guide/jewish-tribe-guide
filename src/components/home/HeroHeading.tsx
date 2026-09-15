@@ -6,7 +6,7 @@ import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
 import type { CategoryConfig } from '@/lib/categories'
 import { isOptimizableImage } from '@/lib/imageHosts'
-import { GridIcon, MapFoldIcon, SkylineIcon } from '@/components/icons'
+import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 import HeroSearchDropdown from './HeroSearchDropdown'
 import type { CardDef, ListingHit } from './sections'
@@ -107,9 +107,9 @@ type Props = {
 // "People · Places · Community" tagline and the short quote over the
 // photo's right side (naming the community by its own `community.config`
 // region) were both cut after review — the user's own call, not a mockup
-// deviation. The Browse Categories button carries a small grid icon and
-// View Map an outline folded-map glyph, replacing the raw admin-set emoji
-// this used to render directly next to the label.
+// deviation. Browse Categories and View Map render as plain text buttons —
+// the user's own call, removing the icons that used to sit next to every
+// label across the desktop home screen.
 export default function HeroHeading({
   settings,
   query,
@@ -335,7 +335,6 @@ export default function HeroHeading({
               onClick={onBrowseCategories}
               className="inline-flex items-center gap-2 rounded-full bg-brand-teal px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-teal-dark cursor-pointer"
             >
-              <GridIcon className="h-[18px] w-[18px]" />
               Browse Categories
             </button>
             {mapIcon != null && (
@@ -343,7 +342,6 @@ export default function HeroHeading({
                 onClick={onViewMap}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-6 py-3 text-[15px] font-medium text-ink shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
               >
-                <MapFoldIcon className="h-[18px] w-[18px]" />
                 View Map
               </button>
             )}

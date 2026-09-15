@@ -45,7 +45,6 @@ export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: stri
         href={routes.about(communitySlug)}
         className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
       >
-        <PeopleIcon className="h-4 w-4 shrink-0" />
         Learn More
       </Link>
     </div>

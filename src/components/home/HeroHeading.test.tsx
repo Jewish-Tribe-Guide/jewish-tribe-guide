@@ -81,8 +81,9 @@ describe('HeroHeading — desktop headline vs. mobile heroTitle', () => {
 // trimmed: the mockup's own "People · Places · Community" tagline and its
 // short quote naming the community's region were both cut after review —
 // the user's own call — so this now asserts they're gone rather than
-// present. View Map still renders a real icon instead of the raw
-// admin-set emoji string it used to show next to the label.
+// present. Every desktop home-screen button (including View Map) later
+// lost its icon too, the user's own call — see the plain-text assertion
+// below.
 describe('HeroHeading — Phase 3 desktop details', () => {
   const settings = {
     name: 'Philly Jewish Guide',
@@ -104,7 +105,7 @@ describe('HeroHeading — Phase 3 desktop details', () => {
     expect(screen.queryByText(/stronger Jewish/)).not.toBeInTheDocument()
   })
 
-  it('the desktop View Map button renders an icon, not the raw admin-set emoji string, next to the label', () => {
+  it('the desktop View Map button renders plain text — no icon, and not the raw admin-set emoji string, next to the label', () => {
     const { container } = render(
       <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />,
     )
@@ -117,7 +118,7 @@ describe('HeroHeading — Phase 3 desktop details', () => {
     const desktopViewMap = Array.from(desktopSection!.querySelectorAll('button')).find((b) => b.textContent?.includes('View Map'))
     expect(desktopViewMap).toBeTruthy()
     expect(desktopViewMap!.textContent).not.toContain('🗺️')
-    expect(desktopViewMap!.querySelector('svg')).toBeTruthy()
+    expect(desktopViewMap!.querySelector('svg')).toBeNull()
   })
 
   // Mobile used to render its own "View Map" button below the search box —

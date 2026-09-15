@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { PencilIcon } from '@/components/icons'
 import ContributePicker from './ContributePicker'
 
 // ── "Suggest a Listing" — desktop mockup match (Phase 6, docs/desktop-
@@ -52,7 +51,6 @@ export default function SuggestListingCard() {
           onClick={() => setOpen(true)}
           className="mt-4 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
         >
-          <PencilIcon className="h-4 w-4 shrink-0" />
           Submit a Listing
         </button>
       </div>
