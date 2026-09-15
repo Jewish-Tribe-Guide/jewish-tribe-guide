@@ -411,7 +411,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
         // element on its own, same mechanism that made the plain fadeIn
         // replay before any of this existed — the className never has to
         // change for that part to keep working.
-        className={`max-w-6xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
+        className={`max-w-6xl desktop:max-w-5xl mx-auto px-4 sm:px-6 pb-24 desktop:pb-0 ${backReveal ? 'reveal-slide-back' : 'animate-[fadeIn_180ms_ease-out]'}`}
       >
         {/* ── Heading + filter ───────────────────────────────────────────────── */}
         <HeroHeading

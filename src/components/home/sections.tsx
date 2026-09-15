@@ -503,7 +503,12 @@ export function CategoryTileRow({
           ) : (
             <span className="h-16 w-16 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
           )}
-          <span className="mt-3 w-full truncate text-base font-semibold text-ink">{card.title}</span>
+          {/* No `truncate` — a category name like "Networking" or
+              "Hospitals" shouldn't ever end in an ellipsis on a tile with
+              room to wrap. Two lines (`leading-tight` keeps them close) is
+              the worst case; the count below stays single-line since a
+              number like "72 places" never needs to wrap. */}
+          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">{card.title}</span>
           {card.count != null && (
             <span className="w-full truncate text-sm text-slate-500">{card.count}</span>
           )}
@@ -514,7 +519,7 @@ export function CategoryTileRow({
           <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">
             <DotsIcon className="h-6 w-6" />
           </span>
-          <span className="mt-3 w-full truncate text-base font-semibold text-ink">More</span>
+          <span className="mt-3 w-full text-balance text-base font-semibold leading-tight text-ink">More</span>
           <span className="w-full truncate text-sm text-slate-500">See all</span>
         </button>
       )}
