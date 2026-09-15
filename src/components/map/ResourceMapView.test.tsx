@@ -66,7 +66,19 @@ vi.mock('./ResourceMap', () => ({
   ),
 }))
 
-afterEach(() => cleanup())
+// localStorage.clear(): PinnedProvider/DroppedPinsProvider persist there (see
+// pinnedContext.tsx's own doc) and jsdom's localStorage is one real store
+// shared by every test in this file, not reset between them on its own. A
+// pin left behind by an earlier test (e.g. "long-pressing a point pins it")
+// silently changes `hasPinnedChip`/`allChipsOn` for every test that runs
+// after it — confirmed live: it turned a later "select just this chip" click
+// into a deselect, because "All" no longer meant the same thing "all
+// categories, no pin filter" once a stray pinned listing survived from
+// another test.
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
 
 // usePinned()/useDroppedPins() throw outside their providers, and
 // useAllListings() silently returns null outside ListingsProvider — which
@@ -1013,14 +1025,22 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
 describe('ResourceMapView — the shareable URL (standalone)', () => {
   afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
 
+  // Two categories, not one — narrowing to "just Grocery" when it's the
+  // ONLY category available is indistinguishable from "All" by set equality
+  // (see allSelected's own comment below), so a single-category fixture
+  // can't tell "wrote the chip" apart from "wrongly treated it as All".
   function renderStandaloneWithListings() {
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     return renderMap(
       <HeaderCollapseProvider>
         <ResourceMapView onUp={vi.fn()} standalone visible />
       </HeaderCollapseProvider>,
-      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
-      [grocery],
+      [
+        listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' }),
+        listingWithGeo({ id: 's1', category: 'synagogue', name: 'Beth Shalom' }),
+      ],
+      [grocery, synagogue],
     )
   }
 
@@ -1031,6 +1051,22 @@ describe('ResourceMapView — the shareable URL (standalone)', () => {
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
     expect(new URLSearchParams(window.location.search).get('cat')).toBe('grocery')
+  })
+
+  // "All" sets `selected` to a Set holding every current option's id, not
+  // back to null (see showAll's own comment) — without allSelected treating
+  // the two the same, this would spell out `cat=grocery,synagogue` instead
+  // of just omitting the param the way the pristine "nothing tapped yet"
+  // state already does.
+  it('omits `cat` entirely once "All" is re-selected, instead of spelling out every category', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+    expect(new URLSearchParams(window.location.search).get('cat')).toBe('grocery')
+
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(new URLSearchParams(window.location.search).has('cat')).toBe(false)
   })
 
   it('writes the selected pin to the URL', async () => {

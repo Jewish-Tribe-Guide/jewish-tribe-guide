@@ -866,10 +866,19 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   //
   // Persists committedQuery, not the live `input`, so this doesn't fire on
   // every keystroke — only once a search is actually committed.
+  //
+  // "All" (showAll) doesn't set `selected` back to null — it sets it to a
+  // Set holding every current option's id (see its own comment on why: a
+  // fresh reference has to flow through effectiveSelected either way to
+  // avoid a stale-Set bug). Left as-is here, that would spell out every
+  // category id in the URL instead of just omitting `cat` the way the
+  // pristine "nothing tapped yet" state already does — allSelected treats
+  // both the same, since they mean the same thing.
+  const allSelected = !selected || (selected.size === options.length && options.every((o) => selected.has(o.id)))
   useEffect(() => {
     if (!standalone) return
     const qs = mapQueryString({
-      categories: selected ? Array.from(selected) : null,
+      categories: allSelected ? null : Array.from(selected ?? []),
       query: openNowActive ? null : committedQuery || null,
       openNow: openNowActive,
       bool: boolFields,
@@ -879,7 +888,7 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     const url = `${window.location.pathname}${qs}`
     if (url === `${window.location.pathname}${window.location.search}`) return
     window.history.replaceState(window.history.state, '', url)
-  }, [standalone, committedQuery, selected, openNowActive, boolFields, selectFilters, selectedPointId])
+  }, [standalone, committedQuery, selected, allSelected, openNowActive, boolFields, selectFilters, selectedPointId])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
