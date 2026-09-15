@@ -9,7 +9,6 @@ import type { LocationControls } from '@/components/home/LocationControl'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
 import UpdateListingsCard from '@/components/home/UpdateListingsCard'
 import SuggestListingCard from '@/components/home/SuggestListingCard'
-import ClosingStrip from '@/components/home/ClosingStrip'
 import ShabbatTimesCard from '@/components/home/ShabbatTimesCard'
 import SubscribeSection from '@/components/home/SubscribeSection'
 import CampaignBannerCard from '@/components/home/CampaignBannerCard'
@@ -805,10 +804,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             </div>
           ))
         })()}
-
-        {/* ── The closing strip — desktop mockup match (Phase 7). Very last
-                thing on the desktop card walk, below every card. ─────────── */}
-        <ClosingStrip settings={settings} />
 
         {/* ── The grid (mobile) — grouped into labeled sections; a search
                 narrows each section's cards and hides any section left

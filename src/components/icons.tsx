@@ -247,7 +247,7 @@ export function DotsIcon({ className }: IconProps) {
 // flanking one taller, stepped tower loosely standing in for Philadelphia
 // City Hall's own silhouette, without depicting the real building closely
 // enough to need a licensed asset. Purely decorative wherever it's used
-// (HeroHeading, ClosingStrip) — callers render it aria-hidden.
+// (HeroHeading, SiteFooter) — callers render it aria-hidden.
 export function SkylineIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 -14 200 104" fill="currentColor" aria-hidden="true" className={className}>

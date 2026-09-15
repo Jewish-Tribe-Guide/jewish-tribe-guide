@@ -33,10 +33,11 @@ export default function SiteFooter({
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex max-w-md items-center gap-4">
-            {/* The skyline glyph moved here with the "A more connected
-                {region}" copy it was originally paired with — see
-                ClosingStrip's own doc on why the text moved down to the
-                footer. */}
+            {/* The skyline glyph and "A more connected {region}" copy both
+                used to live in a dedicated closing strip above this
+                footer, on the desktop home screen only — removed as
+                redundant with this footer, which already runs on every
+                page. Both moved here rather than being dropped. */}
             <SkylineIcon className="h-10 w-[86px] shrink-0 text-slate-400" />
             <div>
               <p className="text-sm font-semibold text-slate-900">
