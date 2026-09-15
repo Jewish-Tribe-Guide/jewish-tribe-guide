@@ -939,7 +939,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               placeholder={searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             {search && (
               <button

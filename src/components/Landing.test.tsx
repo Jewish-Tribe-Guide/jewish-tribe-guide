@@ -674,6 +674,28 @@ describe('Landing', () => {
 
       expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
     })
+
+    // The hero's own "Browse Categories" button used to only scroll to this
+    // card, landing a visitor on the same capped 9+"More" row they'd have
+    // scrolled to on their own — defeating a button whose whole promise is
+    // "show me everything." It now expands the grid too, same as clicking
+    // "More" directly.
+    it('the hero\'s "Browse Categories" button expands the grid, not just scrolls to it', async () => {
+      // jsdom doesn't implement scrollIntoView at all (not even a no-op) —
+      // see the "View Map" describe block's own identical note.
+      Element.prototype.scrollIntoView = vi.fn()
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Browse Categories' }))
+
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
+      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+    })
   })
 
   // Landing never remounts when a category's back arrow returns here — Next

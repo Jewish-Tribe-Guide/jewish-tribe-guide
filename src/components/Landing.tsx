@@ -429,7 +429,15 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             if (mapBandRef.current) mapBandRef.current.scrollIntoView({ block: 'start' })
             else onNavigate(null, 'map')
           }}
-          onBrowseCategories={() => browseCardRef.current?.scrollIntoView({ block: 'start' })}
+          onBrowseCategories={() => {
+            // Also expands the row (the same thing the "More" tile's own
+            // click does), not just a scroll — "Browse Categories" reads as
+            // "show me everything," so landing on the same capped 9+More
+            // row a visitor would've scrolled to on their own defeats the
+            // button's own promise.
+            setBrowseExpanded(true)
+            browseCardRef.current?.scrollIntoView({ block: 'start' })
+          }}
         />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
