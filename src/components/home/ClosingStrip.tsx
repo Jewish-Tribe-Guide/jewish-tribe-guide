@@ -1,4 +1,3 @@
-import { community } from '@/community.config'
 import { SkylineIcon } from '@/components/icons'
 import type { SiteSettings } from '@/lib/siteSettings'
 
@@ -14,19 +13,18 @@ import type { SiteSettings } from '@/lib/siteSettings'
 // glyph difference wasn't worth the duplication; the filled glyph at this
 // size and in a plain slate tone reads close enough to the mockup's intent.
 //
-// Copy is fixed layout, but never a hardcoded city/community name:
-// `community.region` (this app hosts more than one community) and
-// `settings.name` (admin-editable) fill in the two blanks.
-export default function ClosingStrip({ settings }: { settings: Pick<SiteSettings, 'name'> }) {
+// The left block used to be a hardcoded "A more connected {region}" plus a
+// fixed sentence naming the site — replaced with the same {name}/{mission}
+// pair SiteFooter's own left column shows, so an admin editing either in
+// the console (Desktop tab) doesn't have this strip quietly drift out of
+// sync with the footer beneath it.
+export default function ClosingStrip({ settings }: { settings: Pick<SiteSettings, 'name' | 'mission'> }) {
   return (
     <div className="hidden desktop:flex mt-8 mb-4 items-center gap-8">
       <SkylineIcon className="h-14 w-[120px] shrink-0 text-slate-600" />
       <div className="flex-1">
-        <p className="font-serif text-lg text-ink">A more connected {community.region}</p>
-        <p className="mt-1 max-w-[460px] text-[13px] text-slate-500">
-          Whether you&rsquo;re a lifelong local, new to the city, or just visiting — the {settings.name} helps you
-          find what you need and feel at home.
-        </p>
+        <p className="text-lg font-semibold text-ink">{settings.name}</p>
+        <p className="mt-1 max-w-[460px] text-[13px] text-slate-500">{settings.mission}</p>
       </div>
       <div className="self-stretch w-px bg-slate-200" />
       <div className="shrink-0 text-right">
