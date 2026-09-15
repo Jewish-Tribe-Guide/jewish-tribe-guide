@@ -402,8 +402,13 @@ export function CompactCardGrid({
 
 /** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), later
  *  revised to a quick-scroll row: the "What are you looking for?" card's
- *  tile grid, a bigger, friendlier icon per category (56px, tinted per
- *  getCategoryColor, same as CompactCard's own smaller version).
+ *  tile grid, a bigger, friendlier icon per category (64px, tinted per
+ *  getCategoryColor, same as CompactCard's own smaller version). No border/
+ *  background on the tile itself, at rest or on hover — just the icon and
+ *  label sitting directly on the card's own white background, the same
+ *  "navigation, not a boxed object" reasoning CompactCard's own doc gives
+ *  for its rows (a border per tile, repeated 8-20+ times in one row/grid,
+ *  reads as clutter rather than structure).
  *
  *  Collapsed (`expanded` false) is a single horizontal-scroll row —
  *  EVERY card is present in the DOM, not just the first 8; scrolling (not
@@ -416,7 +421,9 @@ export function CompactCardGrid({
  *  Landing's own header row above this grid, not beside it — CompactCardGrid
  *  can own its own "Show more" because that button sits directly under its
  *  grid; this one can't. CompactCardGrid itself is untouched and still
- *  used for desktop search results (SearchSection's own `results` slot). */
+ *  used for desktop search results (Landing's own `desktopResultsNode`,
+ *  rendered below this card's header row once the hero's search box puts
+ *  something in `q`). */
 export function CategoryTileRow({
   cards,
   categories,
@@ -435,19 +442,19 @@ export function CategoryTileRow({
     <div
       className={
         expanded
-          ? 'grid grid-cols-4 gap-3 lg:grid-cols-8'
+          ? 'grid grid-cols-4 gap-6 lg:grid-cols-8'
           // scrollbar hidden across engines (still fully scrollable by
           // drag/trackpad/shift-wheel) — a visible scrollbar strip under a
           // row of round-cornered tiles read as visual noise the "View all"
           // link already makes unnecessary as a discovery affordance.
-          : 'flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+          : 'flex gap-6 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
       }
     >
       {cards.map((card) => (
         <Link
           key={card.id ?? card.title}
           href={card.href}
-          className={`flex flex-col items-center rounded-xl border border-slate-200/80 bg-white px-2 py-5 text-center transition-colors hover:border-slate-300 hover:shadow-sm ${expanded ? '' : 'w-[104px] shrink-0'}`}
+          className={`flex flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-slate-50 ${expanded ? '' : 'w-[112px] shrink-0'}`}
           onClick={onCardClick ? () => onCardClick(card) : undefined}
         >
           {card.icon ? (
@@ -463,8 +470,8 @@ export function CategoryTileRow({
                   icon={card.icon}
                   categoryId={card.id}
                   color={getCategoryColor(categories, card.id)}
-                  className="h-14 w-14 text-2xl"
-                  sizePx={56}
+                  className="h-16 w-16 text-[28px]"
+                  sizePx={64}
                 />
               </ViewTransition>
             ) : (
@@ -472,16 +479,16 @@ export function CategoryTileRow({
                 icon={card.icon}
                 categoryId={card.id}
                 color={getCategoryColor(categories, card.id ?? '')}
-                className="h-14 w-14 text-2xl"
-                sizePx={56}
+                className="h-16 w-16 text-[28px]"
+                sizePx={64}
               />
             )
           ) : (
-            <span className="h-14 w-14 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
+            <span className="h-16 w-16 shrink-0 rounded-full bg-slate-100" aria-hidden="true" />
           )}
-          <span className="mt-3 w-full truncate text-sm font-medium text-ink">{card.title}</span>
+          <span className="mt-3 w-full truncate text-base font-semibold text-ink">{card.title}</span>
           {card.count != null && (
-            <span className="w-full truncate text-[13px] text-slate-500">{card.count}</span>
+            <span className="w-full truncate text-sm text-slate-500">{card.count}</span>
           )}
         </Link>
       ))}

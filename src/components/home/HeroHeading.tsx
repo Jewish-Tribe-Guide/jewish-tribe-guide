@@ -56,14 +56,16 @@ type Props = {
 // same site — `settings.name` still isn't dead, it's the header, the
 // footer, and the browser tab, just never repeated here.
 //
-// Search sits inside the band again, overlaid on the photo alongside Browse
-// Categories/View Map — a deliberate reversal of the previous design, which
-// pulled search out into SearchSection (its own headed card below) on the
-// reasoning that it deserved billing as a peer of the category grid rather
-// than a hero accessory. SearchSection is untouched and still renders
-// further down (Landing's "Browse everything" card, same `query` state) —
-// this band's copy is a second, above-the-fold entry point, not a
-// replacement.
+// Search sits inside the band, overlaid on the photo alongside Browse
+// Categories/View Map — this is now the ONLY search box on desktop.
+// It used to have a second copy in SearchSection, a standalone headed card
+// below the hero, on the reasoning that search deserved billing as a peer
+// of the category grid rather than a hero accessory; SearchSection is gone
+// (the user's own call, reviewing the built page — a second input for the
+// same `query` state read as redundant once both were on screen at once).
+// The "Browse everything" card (Landing.tsx) still reads/writes the same
+// `query` state this band does, so typing here still narrows/surfaces its
+// results — it just doesn't have an input of its own any more.
 //
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render

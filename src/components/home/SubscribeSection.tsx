@@ -30,8 +30,7 @@ export default function SubscribeSection({
 }: {
   /** Skip this section's own outer `<section>`/card shell and render just the
    *  heading + form — Landing renders this inside its own standalone card
-   *  now (own border/padding), the same reason SearchSection takes this
-   *  prop when Landing merges it into another card. */
+   *  now (own border/padding). */
   bare?: boolean
   /** settings.desktopSubscribeEyebrow/Heading — admin-editable (Desktop
    *  tab's Home screen cards). Optional with today's literal defaults

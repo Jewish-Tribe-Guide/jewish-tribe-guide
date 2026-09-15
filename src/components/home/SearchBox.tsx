@@ -1,10 +1,11 @@
 'use client'
 
-// The pill-shaped search input itself — shared by HeroHeading's mobile hero
-// (still owns it directly) and SearchSection (desktop's own headed section,
-// now that search moved out of the hero band there — see that component's
-// doc for why). Pulled out rather than duplicated so the two only ever
-// diverge in placeholder copy, not in the input's actual behavior.
+// The pill-shaped search input itself — shared by HeroHeading's mobile and
+// desktop hero (the only place search lives now; the standalone
+// SearchSection component that used to hold a second copy on desktop has
+// been removed — see HeroHeading's own doc). Pulled out rather than
+// duplicated so both sizes only ever diverge in spacing, not in the input's
+// actual behavior.
 export default function SearchBox({
   query,
   onQueryChange,
@@ -12,8 +13,8 @@ export default function SearchBox({
   placeholder,
   // Spacing only, not the border/background/shadow — those stay fixed so
   // every caller gets the same pill styling, but the desktop hero (Phase 3
-  // of the mockup rework) wants a taller ~48px box than mobile/SearchSection's
-  // default, and forking the whole component for that one difference would
+  // of the mockup rework) wants a taller ~48px box than mobile's default,
+  // and forking the whole component for that one difference would
   // duplicate everything else here.
   className = 'pl-5 pr-2 py-2',
 }: {

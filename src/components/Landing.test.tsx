@@ -533,10 +533,10 @@ describe('Landing', () => {
       const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
       renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-      // The card's heading is `settings.heroTitle` now ("What are you
-      // looking for?" by default), not a hardcoded "Browse Everything" —
-      // see Landing.tsx's own comment on why that string is gone.
-      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      // The card's heading is a hardcoded "Explore by Category" now (the
+      // user's own reference image), not settings.desktopBrowseHeading —
+      // see Landing.tsx's own comment on why.
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       // Both cards render as siblings under the ONE "Browse everything"
       // card — not under their own admin-configured section titles ("Food
       // and Hospitality", etc.), which is what "flat" means here.
@@ -545,33 +545,31 @@ describe('Landing', () => {
       expect(within(card).getByText('Synagogues')).toBeInTheDocument()
     })
 
-    // Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) gave this
-    // card real tiles — a bordered box per category, not CompactCardGrid's
-    // borderless hover-only rows. That's a deliberate reversal of the
-    // earlier design (this test used to assert the opposite); see
-    // CategoryTileRow's own doc for why.
-    it('tiles are real bordered boxes, not borderless hover-only rows', () => {
+    // Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md) briefly
+    // gave this card a bordered box per tile — reversed again after review
+    // against the user's own reference image, which shows plain icon+label
+    // with no box, closer to CompactCard's own borderless-at-rest treatment
+    // than a card grid.
+    it('tiles have no border, at rest or on hover — just the icon and label', () => {
       const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
       renderLanding(undefined, { content: { categories: [grocery] } })
 
       const card = screen.getByTestId('browse-everything-card')
       const tile = within(card).getByText('Grocery Stores').closest('a')!
-      expect(tile.className).toMatch(/\bborder\b/)
-      expect(tile.className).toMatch(/hover:border-slate-300/)
+      expect(tile.className).not.toMatch(/\bborder\b/)
+      expect(tile.className).toMatch(/hover:bg-slate-50/)
     })
 
-    // `settings.heroTitle` now titles the whole merged card — search sits
-    // under it as the first thing in the section, framed as "search within
-    // these categories" — not just this flat grid, so unlike the flat grid
-    // itself (still replaced by the grouped results grid while there's a
-    // query — see "narrows the grid" above), the heading no longer hides.
+    // "Explore by Category" titles the whole merged card — unlike the flat
+    // grid itself (still replaced by the grouped results grid while there's
+    // a query — see "narrows the grid" above), the heading never hides.
     it('keeps its heading as the section title while actively searching', async () => {
       const user = userEvent.setup()
       renderLanding(undefined, { content: { categories: [makeCategory({ pluralLabel: 'Grocery Stores' })] } })
 
-      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
       await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
-      expect(screen.getByRole('heading', { level: 2, name: SITE_SETTINGS_DEFAULTS.heroTitle })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Explore by Category' })).toBeInTheDocument()
     })
 
     it('tracks category_opened with source "grid" on a card click', async () => {

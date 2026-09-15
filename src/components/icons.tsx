@@ -309,3 +309,13 @@ export function LeafIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+// Open book — DaveningTimesCard's "View Times" button.
+export function BookIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 5.5c2-1 5-1 8 .5 3-1.5 6-1.5 8-.5v13c-2-1-5-1-8 .5-3-1.5-6-1.5-8-.5z" />
+      <path d="M12 6v13" />
+    </svg>
+  )
+}

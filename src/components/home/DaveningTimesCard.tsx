@@ -8,14 +8,14 @@ import { useNow } from '@/lib/useNow'
 import { currentSeason } from '@/lib/season'
 import { DAY_KEYS, dayAndMinutesInTimezone } from '@/lib/hours'
 import { isMinyanim, type Minyan } from '@/lib/davening'
-import { nextUpcomingDavening, formatStartsIn, type ShulMinyanim } from '@/lib/upcomingDavening'
+import { nextUpcomingDavening, type ShulMinyanim } from '@/lib/upcomingDavening'
 import { secularHolidayTomorrow } from '@/lib/secularHolidays'
 import { useZmanim } from '@/lib/useZmanim'
 import { useZmanAnchors, geoOrCommunityDefault } from '@/lib/useZmanAnchors'
 import type { LatLng } from '@/lib/geo'
 import { routes } from '@/lib/routes'
 import { community } from '@/community.config'
-import { SunIcon } from '@/components/icons'
+import { BookIcon } from '@/components/icons'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
 
 // ── The home screen's davening-times card — one line, deliberately. ────────
@@ -34,35 +34,21 @@ import type { CategoryConfig, CategoryField } from '@/lib/categories'
 // row.
 //
 // Deliberately NOT the three-lines-per-tefillah design floated earlier —
-// the point of this card is that there is nothing to read, only one fact
-// to glance at, with "All davening times" as the answer to "and the rest?".
-//
-// Desktop mockup match (Phase 6, docs/desktop-mockup-plan.md): the one fact
-// is a single compact amber-tinted row now — a sun icon, the tefillah name
-// and shul (or "at N nearby shuls") on the left, the time and a plain-
-// language countdown (formatStartsIn) on the right — rather than the larger
-// bordered "plaque" this used to be. The card lost its own distance chip
-// ("N mi") in the same pass: it no longer has the header-row space that
-// used to hold it, and the card is now a peer of Update Listings/Suggest a
-// Listing in a 3-up row (see Landing.tsx's own community-row doc) rather
-// than pairing with Update Listings alone. "View all times" replaces the
-// old amber pill button with a plain text link in the header row, matching
-// the mockup's other "See more" links (DaveningTimesCard, UpdateListingsCard
-// used to each have their own distinct CTA treatment; this card's own is
-// now consistent with them). Amber, not a category colour: this card can
-// show a minyan from any category with a minyanim field, so it isn't
-// "Synagogues' own" the way a single-category card's icon tint would be.
-export default function DaveningTimesCard({
-  coords,
-  eyebrow,
-  heading,
-}: {
-  coords: LatLng | null
-  /** settings.desktopDaveningEyebrow/Heading — admin-editable (Desktop
-   *  tab's Home screen cards). Defaults to "Today"/"Upcoming Davening". */
-  eyebrow: string
-  heading: string
-}) {
+// still true, but the "one fact to glance at" itself (the specific next
+// minyan's time/shul/countdown) was cut in a later pass, matching a
+// photo-card reference the user supplied: fixed "Upcoming"/"Davening
+// Times"/"See minyanim near you." copy, a photo placeholder on the right
+// (same warm-gradient-plus-mask treatment as SuggestListingCard/
+// CampaignBannerCard's own placeholders), and "View Times" as a real
+// outline button instead of a text link — matching Suggest a Listing/Kept
+// by the Community's own button treatment now that all three sit together
+// in one row (see Landing.tsx's own community-row doc). The underlying
+// nextUpcomingDavening computation stays (still needed for
+// tomorrowHoliday/seeAllHref's `&day=` param — see below), it just isn't
+// rendered on the card face any more. Not admin-editable any more either
+// (settings.desktopDaveningEyebrow/Heading have no render site left) —
+// same call the user made for the Browse card's "Explore by Category".
+export default function DaveningTimesCard({ coords }: { coords: LatLng | null }) {
   const categories = useCategories()
   const listings = useAllListings()
   const communitySlug = useCommunitySlug()
@@ -152,39 +138,23 @@ export default function DaveningTimesCard({
   const seeAllHref = `${routes.slug(communitySlug, linkCategoryId)}?davening=1${result?.isTomorrow ? `&day=${tomorrowDayParam}` : ''}`
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <div className="mb-4 flex items-end justify-between gap-2">
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{eyebrow}</p>
-          <h3 className="font-serif text-lg font-semibold text-ink">{heading}</h3>
-        </div>
-        <Link href={seeAllHref} className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink transition-colors hover:text-brand-teal">
-          View all times →
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 right-0 w-[42%] bg-gradient-to-bl from-slate-300 via-slate-200 to-slate-100 [mask-image:linear-gradient(to_left,black_60%,transparent)]"
+      />
+      <div className="relative max-w-[58%]">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Upcoming</p>
+        <h3 className="font-serif text-lg font-semibold text-ink">Davening Times</h3>
+        <p className="mt-2 text-sm text-slate-600">See minyanim near you.</p>
+        <Link
+          href={seeAllHref}
+          className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
+        >
+          <BookIcon className="h-4 w-4 shrink-0" />
+          View Times
         </Link>
       </div>
-
-      {result ? (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-4 py-3">
-          <SunIcon className="h-6 w-6 shrink-0 text-amber-500" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-ink">{result.label}</p>
-            <p className="truncate text-xs text-slate-500">
-              {result.shul ? result.shul.name : `at ${result.shulCount} nearby shuls`}
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-semibold tabular-nums text-ink">{result.time}</p>
-            <p className="text-xs text-slate-500">
-              {formatStartsIn(nowMinutes, result.minutes, result.isTomorrow)}
-              {result.isTomorrow && ' tmrw'}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <p className="rounded-lg bg-slate-50 px-3.5 py-3 text-[13px] text-muted">
-          No davening times posted yet.
-        </p>
-      )}
     </div>
   )
 }

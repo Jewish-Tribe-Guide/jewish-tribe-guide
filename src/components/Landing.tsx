@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
 import { CardGrid, CategoryTileRow, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
-import SearchSection from '@/components/home/SearchSection'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
 import DaveningTimesCard from '@/components/home/DaveningTimesCard'
@@ -115,7 +114,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   // doubles as the hero's "View Map" button gate (mapIcon below).
   const hasMap = !!categories?.some((c) => c.kind === 'map')
   // The Map pseudo-category's own icon — shown on the hero's "View Map"
-  // button the same way HeroHeading/SearchSection already accept it. Null
+  // button the same way HeroHeading already accepts it. Null
   // (not just absent) while categories haven't loaded yet or there's no Map
   // category configured, which is what keeps the button from rendering at
   // all (see HeroHeading's own `mapIcon != null` check).
@@ -272,8 +271,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
     </>
   )
 
-  // Desktop's own copy, shown only once there's a query, inside
-  // SearchSection's own white box (see that component's own doc on why — a
+  // Desktop's own copy, shown only once there's a query, below the "Browse
+  // everything" card's own header row (see that card's own comment — a
   // search whose answer shows up somewhere else on the page reads as
   // disconnected). CompactCardGrid, not CardGrid: search results used to
   // fall back to the heavier photo-tile grid mobile uses, which read as a
@@ -449,14 +448,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the
-                grid below — search sits right under that title as the first
-                thing in the section. `SearchSection` renders `bare` here (no
-                card/section shell, and no heading of its own — `hideHeading`,
-                since this card's own heading right above it already says the
-                same thing) so it mounts once, as a stable sibling of the
-                grid below, and never gets swapped out as a whole subtree
-                when `q` changes — that would unmount the input mid-keystroke
-                and drop focus.
+                grid below. No search box of its own any more — the hero's
+                own search box (HeroHeading) drives the same `query`/
+                `setQuery` state this card reads, so typing there still
+                narrows/surfaces `desktopResultsNode` below without this
+                card needing a second input.
 
                 The grid itself is a flat, always-visible index of every
                 card: every real category, Patient & Family Support,
@@ -526,19 +522,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           function cardKindContent(kind: (typeof builtInOrder)[number]['kind']): React.ReactNode {
           if (kind === 'browse') {
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
-            // the WHOLE card — left half of the header row, with the search
-            // box (compact, not the old full-width-centered treatment) and
-            // the "View all" toggle sharing the right half. `SearchSection`
-            // renders `bare` here (no card/section shell, and no heading of
-            // its own — `hideHeading`, since this card's own heading already
-            // says the same thing) so it mounts once, as a stable sibling of
-            // the grid below, and never gets swapped out as a whole subtree
-            // when `q` changes — that would unmount the input mid-keystroke
-            // and drop focus. Its own `results` slot is left unset here on
-            // purpose: those results need to span the FULL card width once
-            // there's a query, not the search box's own ~440px column, so
-            // they're rendered as this card's own sibling block below the
-            // header row instead of nested inside it.
+            // the WHOLE card — left side of the header row, with the "View
+            // all" toggle on the right. No search box of its own (see the
+            // section comment above this card) — `desktopResultsNode` still
+            // renders below the header row, full card width, once the
+            // hero's own search box puts something in `q`.
             //
             // The grid itself is a flat, always-visible index of every card
             // — a horizontal-scroll "quick view" row by default (every card
@@ -558,45 +546,34 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               <div
                 ref={browseCardRef}
                 data-testid="browse-everything-card"
-                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white p-5 ring-1 ring-slate-900/5"
+                className="hidden scroll-mt-24 desktop:block rounded-2xl bg-white px-8 pt-6 pb-3 ring-1 ring-slate-900/5"
               >
-                  <div className="flex flex-wrap items-end justify-between gap-6">
-                    <div>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                        {settings.desktopBrowseEyebrow}
-                      </p>
-                      <h2 className="font-serif text-lg font-semibold text-ink">{settings.desktopBrowseHeading}</h2>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="w-[440px] max-w-full">
-                        <SearchSection
-                          bare
-                          hideHeading
-                          heroTitle={settings.desktopBrowseHeading}
-                          searchPlaceholder={settings.searchPlaceholder}
-                          query={query}
-                          onQueryChange={setQuery}
-                        />
-                      </div>
-                      {/* Hidden once there are 8 or fewer cards — the quick-
-                          scroll row already shows everything without
-                          scrolling at that count, so there's nothing left
-                          for "View all" to reveal. */}
-                      {browseCards.length > 8 && (
-                        <button
-                          type="button"
-                          onClick={() => setBrowseExpanded((e) => !e)}
-                          aria-expanded={browseExpanded}
-                          className="shrink-0 cursor-pointer text-[13px] font-semibold text-ink transition-colors hover:text-brand-teal"
-                        >
-                          {browseExpanded ? 'Show fewer categories' : 'View all →'}
-                        </button>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap items-center justify-between gap-6">
+                    {/* Hardcoded, not settings.desktopBrowseEyebrow/Heading —
+                        the user's own reference image titles this "Explore
+                        by Category" with no small eyebrow label above it,
+                        unlike every other card on this page. The admin
+                        fields still exist (DesktopTopicsManager) but have no
+                        render site left here. */}
+                    <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
+                    {/* Hidden once there are 8 or fewer cards — the quick-
+                        scroll row already shows everything without
+                        scrolling at that count, so there's nothing left
+                        for "View all" to reveal. */}
+                    {browseCards.length > 8 && (
+                      <button
+                        type="button"
+                        onClick={() => setBrowseExpanded((e) => !e)}
+                        aria-expanded={browseExpanded}
+                        className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
+                      >
+                        {browseExpanded ? 'Show fewer categories' : 'View all →'}
+                      </button>
+                    )}
                   </div>
                   {!isMobile && q && <div className="mt-6">{desktopResultsNode}</div>}
                   {!isMobile && !q && (
-                    <div className={ui.search.landing ? 'mt-6' : ''}>
+                    <div className={ui.search.landing ? 'mt-3' : ''}>
                       <CategoryTileRow
                         cards={browseCards}
                         categories={categories}
@@ -740,12 +717,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
               const communityCards: React.ReactElement[] = []
               if (hasDavening && !isMobile) {
                 communityCards.push(
-                  <DaveningTimesCard
-                    key="davening"
-                    coords={coords}
-                    eyebrow={settings.desktopDaveningEyebrow}
-                    heading={settings.desktopDaveningHeading}
-                  />,
+                  <DaveningTimesCard key="davening" coords={coords} />,
                 )
               }
               if (hasListings && !isMobile) {
@@ -834,9 +806,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 narrows each section's cards and hides any section left
                 empty. Desktop's own copy of this same content (styled
                 differently — see desktopResultsNode's own doc) lives inside
-                SearchSection above instead. Plain CSS `desktop:hidden`, not
-                an isMobile branch: mobile needs this correct on the very
-                first paint, with no prior interaction, which only a CSS
+                the "Browse everything" card above instead. Plain CSS
+                `desktop:hidden`, not an isMobile branch: mobile needs this
+                correct on the very first paint, with no prior interaction,
+                which only a CSS
                 media query (not a value React doesn't know for certain
                 until after hydration) can guarantee. ─────────────────────── */}
         <section className="mt-12 sm:mt-14 space-y-10 desktop:hidden">{mobileResultsNode}</section>
