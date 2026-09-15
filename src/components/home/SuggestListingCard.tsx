@@ -18,7 +18,7 @@ import ContributePicker from './ContributePicker'
 // same state pattern (a `null | 'open'`-shaped boolean, not a full
 // ContributeAction union, since this card only ever offers the one action).
 //
-// The right ~42% is a real photo (a "Yes, We're Open" shop-window sign —
+// The right ~42% is a real photo (a blue-fronted local shopfront —
 // Unsplash, same sourcing/licensing as the category tile photos elsewhere),
 // masked to fade into the card the same way the Sukkah banner's own photo
 // does (see CampaignBannerCard) — the text column is capped at
@@ -35,7 +35,7 @@ export default function SuggestListingCard() {
         className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
       >
         <Image
-          src="https://images.unsplash.com/photo-1575663620136-5ebbfcc2c597?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8bG9jYWwlMjBidXNpbmVzc3xlbnwwfHwwfHx8MA%3D%3D"
+          src="https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D"
           alt=""
           fill
           sizes="(min-width: 640px) 42vw, 0px"
