@@ -117,9 +117,13 @@ export default function CampaignBannerCard() {
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
           Happening now
         </p>
-        <h3 className="max-w-[28ch] text-lg font-extrabold text-slate-900">
+        {/* h2, not h3: this is the first real section heading below the
+            page's own h1 (it renders above "Explore by Category"'s own
+            h2), so h3 here skipped a level — axe's heading-order rule,
+            caught by e2e/accessibility.spec.ts. */}
+        <h2 className="max-w-[28ch] text-lg font-extrabold text-slate-900">
           {banner.title}
-        </h3>
+        </h2>
         {banner.subtitle && (
           <p className="mb-4 mt-1 text-sm leading-relaxed text-stone-600">{banner.subtitle}</p>
         )}
@@ -181,9 +185,10 @@ export default function CampaignBannerCard() {
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sage-700">
             Happening now
           </p>
-          <h3 className="max-w-[32ch] font-serif text-[24px] font-semibold text-ink">
+          {/* h2 — same heading-order reasoning as the mobile block above. */}
+          <h2 className="max-w-[32ch] font-serif text-[24px] font-semibold text-ink">
             {banner.title}
-          </h3>
+          </h2>
           {banner.subtitle && (
             <p className="mt-1 max-w-[44ch] text-[15px] text-stone-600">{banner.subtitle}</p>
           )}
