@@ -2,18 +2,19 @@ import { expect, test } from '@playwright/test'
 import { categories, defaultCommunity, dismissLocationPrompt, ready } from './helpers'
 
 // "Browse everything" (CategoryTileRow, desktop only — see the desktop
-// mockup rework, docs/desktop-mockup-plan.md Phase 5, revised after review
-// from an 8-tile collapse to a scroll row) is a horizontal-scroll "quick
-// view" row by default — every tile is in the DOM, scrolling reaches the
-// rest — and "View all" (in the card's own header row, not under the grid)
-// expands it into a full wrapped grid with no scrolling. Deriving the
+// mockup rework, docs/desktop-mockup-plan.md Phase 5, revised twice after
+// user review: first to a horizontal-scroll row, then to this) is a single
+// non-scrolling, non-wrapping row by default — the first 9 cards plus a
+// trailing "More" tile when there are more. The header row's own "View
+// all" link is gone; "More" is the only way to expand, "Show fewer
+// categories" (shown only once expanded) the only way back. Deriving the
 // expected count from the real, admin-configured category list (via
 // `categories()` below) rather than hardcoding a number: this app hosts
 // more than one community's worth of fixture data.
 test.describe('home — Browse everything grid', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop-only feature (hidden below the desktop breakpoint)')
 
-  test('every tile is present in both states; "View all" swaps a scroll row for a wrapped grid', async ({ page, request }) => {
+  test('caps at 9 tiles with a trailing "More" tile; "More" expands to a wrapped grid with no cap', async ({ page, request }) => {
     const community = await defaultCommunity(page)
     const cats = await categories(request, community)
     await page.goto(`/${community}`)
@@ -23,40 +24,36 @@ test.describe('home — Browse everything grid', () => {
     const card = page.getByTestId('browse-everything-card')
     await expect(card).toBeVisible()
     const tiles = card.locator('a')
+    const more = card.getByRole('button', { name: /More/ })
 
-    const toggle = page.getByRole('button', { name: /View all|Show fewer categories/ })
     // This community's own category (+ built-in entry card) count decides
-    // whether there's a toggle to test at all (8 or fewer hides it
+    // whether there's a "More" tile to test at all (9 or fewer hides it
     // entirely — see Landing.tsx's own doc) — skip rather than fail if
     // there isn't, since the point is the mechanism, not this fixture data
     // forcing it.
-    if ((await toggle.count()) === 0) {
-      test.skip(cats.length < 8, "this community doesn't have enough categories for the toggle to show")
+    if ((await more.count()) === 0) {
+      test.skip(cats.length < 9, "this community doesn't have enough categories for the \"More\" tile to show")
     }
 
-    const collapsedCount = await tiles.count()
-    expect(collapsedCount).toBeGreaterThan(8)
-    expect(await toggle.getAttribute('aria-expanded')).toBe('false')
-    // Collapsed: a horizontal-scroll row, not a wrapped grid — real content
-    // overflows its own width rather than every tile fitting on screen.
-    const scrollRow = card.locator('.overflow-x-auto').first()
-    await expect(scrollRow).toBeVisible()
-    const [rowBox, scrollWidth] = await Promise.all([scrollRow.boundingBox(), scrollRow.evaluate((el) => el.scrollWidth)])
-    expect(rowBox && scrollWidth > rowBox.width, 'expected the collapsed row to actually overflow, not just fit').toBeTruthy()
+    expect(await tiles.count()).toBe(9)
+    // A single row: no wrapping, no horizontal overflow to scroll through
+    // either — exactly 9 tiles plus "More" share the row's width.
+    const row = tiles.first().locator('..')
+    const [rowBox, rowScrollWidth] = await Promise.all([row.boundingBox(), row.evaluate((el) => el.scrollWidth)])
+    expect(rowBox && rowScrollWidth <= rowBox.width + 1, 'expected the collapsed row to fit with no overflow').toBeTruthy()
 
-    await toggle.click()
+    await more.click()
     await expect(page.getByRole('button', { name: 'Show fewer categories' })).toBeVisible()
-    expect(await tiles.count()).toBe(collapsedCount)
-    // Expanded: the same tiles, now in a wrapped grid — no horizontal
-    // overflow left to scroll through.
+    await expect(more).not.toBeVisible()
+    const expandedCount = await tiles.count()
+    expect(expandedCount).toBeGreaterThan(9)
+    // Expanded: the same tiles, now in a wrapped grid.
     const grid = card.locator('.grid').first()
     await expect(grid).toBeVisible()
-    const [gridBox, gridScrollWidth] = await Promise.all([grid.boundingBox(), grid.evaluate((el) => el.scrollWidth)])
-    expect(gridBox && gridScrollWidth <= gridBox.width + 1, 'expected the expanded grid to wrap, not overflow').toBeTruthy()
 
-    await toggle.click()
-    expect(await tiles.count()).toBe(collapsedCount)
-    expect(await toggle.getAttribute('aria-expanded')).toBe('false')
+    await page.getByRole('button', { name: 'Show fewer categories' }).click()
+    expect(await tiles.count()).toBe(9)
+    await expect(more).toBeVisible()
   })
 })
 

@@ -584,67 +584,95 @@ describe('Landing', () => {
     })
   })
 
-  // Phase 5 of the desktop mockup rework, revised after review: the flat
-  // grid is a horizontal-scroll "quick view" row by default — EVERY card is
-  // in the DOM, scrolling (not slicing) reaches the rest — and "View all"
-  // (in the card's own header row, beside the search box, not directly
-  // under the grid — see CategoryTileRow's own doc on why the expand state
-  // lives in Landing rather than inside that component) expands it into a
-  // full wrapped grid with no scrolling instead.
-  describe('"View all" (scroll row vs. full grid)', () => {
-    function nineCategories() {
-      return Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+  // Phase 5 of the desktop mockup rework, revised twice after user review:
+  // the flat grid is a single non-scrolling, non-wrapping row by default —
+  // the first COLLAPSED_TILE_COUNT (9) cards, sorted by listing count (most
+  // to least places), plus a trailing "More" tile when there are more than
+  // that. The header row's own "View all" link is gone (the "More" tile
+  // does that job now); "Show fewer categories" there is the only way back
+  // once expanded, since there's no "More" tile to click in that state.
+  describe('the capped row + "More" tile vs. full grid', () => {
+    // Listing counts, not creation order, decide the order — deliberately
+    // NOT already-sorted category ids, so a test that accidentally read
+    // insertion order instead of the real sort would still pass by
+    // accident. cat9 (the 10th, over COLLAPSED_TILE_COUNT) gets the fewest
+    // listings, so it's the one pushed behind "More".
+    function tenCategoriesWithCounts() {
+      const categories = Array.from({ length: 10 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      // Descending counts: cat0 has the most listings, cat9 the fewest.
+      const listings = categories.flatMap((c, i) =>
+        Array.from({ length: 10 - i }, (_, j) => makeListing({ id: `${c.id}-l${j}`, category: c.id! })),
+      )
+      return { categories, listings }
     }
 
-    it('shows every card either way — collapsed is a scroll row, expanded is a wrapped grid', async () => {
-      const user = userEvent.setup()
-      renderLanding(undefined, { content: { categories: nineCategories() } })
+    it('sorts by listing count (most to least), caps at 9, and shows a trailing "More" tile', () => {
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
 
       const card = screen.getByTestId('browse-everything-card')
-      // Collapsed: all 9 are present (scrolling reaches them, not slicing),
-      // in a horizontal-scroll strip.
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
-      const scrollRow = within(card).getByText('Category 0').closest('a')!.parentElement!
-      expect(scrollRow).toHaveClass('overflow-x-auto')
+      const tileLinks = within(card).getAllByRole('link', { name: /Category \d/ })
+      // Exactly the first 9, in descending-count order — cat9 (fewest
+      // listings) is the one left out, behind "More".
+      expect(tileLinks.map((l) => l.textContent)).toEqual(
+        Array.from({ length: 9 }, (_, i) => expect.stringContaining(`Category ${i}`)),
+      )
+      expect(within(card).queryByText('Category 9')).not.toBeInTheDocument()
 
-      await user.click(screen.getByRole('button', { name: 'View all →' }))
-      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
-      expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
-      // Expanded: the same 9, now in a wrapped grid, no horizontal scroll.
-      const grid = within(card).getByText('Category 0').closest('a')!.parentElement!
-      expect(grid).toHaveClass('grid')
-      expect(grid).not.toHaveClass('overflow-x-auto')
+      const moreButton = within(card).getByRole('button', { name: /More/ })
+      expect(moreButton).toBeInTheDocument()
+      // Single row: no scroll container, no wrap — a plain flex row.
+      const row = tileLinks[0]!.parentElement!
+      expect(row).toHaveClass('flex')
+      expect(row).not.toHaveClass('overflow-x-auto')
+      expect(row).not.toHaveClass('flex-wrap')
     })
 
-    it('collapses back to the scroll row on a second click', async () => {
+    it('the trailing "More" tile expands the grid to every card, no cap', async () => {
       const user = userEvent.setup()
-      renderLanding(undefined, { content: { categories: nineCategories() } })
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
 
-      await user.click(screen.getByRole('button', { name: 'View all →' }))
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByRole('button', { name: /More/ }))
+
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(10)
+      expect(within(card).queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show fewer categories' })).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('collapses back to the capped row + "More" tile on "Show fewer categories"', async () => {
+      const user = userEvent.setup()
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
+
+      const card = screen.getByTestId('browse-everything-card')
+      await user.click(within(card).getByRole('button', { name: /More/ }))
       await user.click(screen.getByRole('button', { name: 'Show fewer categories' }))
 
-      const card = screen.getByTestId('browse-everything-card')
-      const scrollRow = within(card).getByText('Category 0').closest('a')!.parentElement!
-      expect(scrollRow).toHaveClass('overflow-x-auto')
-      expect(screen.getByRole('button', { name: 'View all →' })).toHaveAttribute('aria-expanded', 'false')
+      expect(within(card).getAllByRole('link', { name: /Category \d/ }).length).toBe(9)
+      expect(within(card).getByRole('button', { name: /More/ })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
     })
 
-    it('hides the toggle entirely with 8 or fewer cards', () => {
-      const eight = Array.from({ length: 8 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
-      renderLanding(undefined, { content: { categories: eight } })
+    it('shows no "More" tile and no "Show fewer" control with 9 or fewer cards', () => {
+      const nine = Array.from({ length: 9 }, (_, i) => makeCategory({ id: `cat${i}`, pluralLabel: `Category ${i}` }))
+      renderLanding(undefined, { content: { categories: nine } })
 
-      expect(screen.queryByRole('button', { name: /View all|Show fewer categories/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Show fewer categories' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /More/ })).not.toBeInTheDocument()
     })
 
     it('tile clicks still track category_opened with source "grid" once expanded', async () => {
       const user = userEvent.setup()
-      renderLanding(undefined, { content: { categories: nineCategories() } })
+      const { categories, listings } = tenCategoriesWithCounts()
+      renderLanding(undefined, { content: { categories } }, listings)
 
-      await user.click(screen.getByRole('button', { name: 'View all →' }))
       const card = screen.getByTestId('browse-everything-card')
-      await user.click(within(card).getByText('Category 8'))
+      await user.click(within(card).getByRole('button', { name: /More/ }))
+      await user.click(within(card).getByText('Category 9'))
 
-      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat8', source: 'grid' })
+      expect(vi.mocked(track)).toHaveBeenCalledWith('category_opened', { category: 'cat9', source: 'grid' })
     })
   })
 

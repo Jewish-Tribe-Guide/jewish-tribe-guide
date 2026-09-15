@@ -79,13 +79,13 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
   const homeSections = useHomeSections()
   const listings = useAllListings()
   const [query, setQuery] = useState('')
-  // "View all" (desktop "What are you looking for?" card) — a horizontal-
-  // scroll quick-view row by default (every card present, reachable by
-  // scrolling), a full wrapped grid with every card once expanded. Lives
-  // here, not inside CategoryTileRow itself: the toggle button that drives
-  // it sits in this card's own header row, beside the search box, not
-  // directly under the grid — so the state has to be shared between two
-  // siblings rather than owned by the grid alone.
+  // "View all" (desktop "Explore by Category" card) — collapsed shows the
+  // first COLLAPSED_TILE_COUNT cards plus a trailing "More" tile, expanded
+  // shows every card in a full wrapped grid. Lives here, not inside
+  // CategoryTileRow itself: two different things can trigger it (the
+  // header row's own "View all" toggle, and the grid's own trailing "More"
+  // tile), so the state has to be shared rather than owned by the grid
+  // alone.
   const [browseExpanded, setBrowseExpanded] = useState(false)
   // Deferred, not just observed: the embedded map costs a few hundred KB of
   // Google Maps JS (places/main/util/common/controls/map — see
@@ -528,15 +528,20 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // renders below the header row, full card width, once the
             // hero's own search box puts something in `q`.
             //
-            // The grid itself is a flat, always-visible index of every card
-            // — a horizontal-scroll "quick view" row by default (every card
-            // is present, scrolling reaches the rest, no clicking required),
-            // and "View all" expands CategoryTileRow into a full wrapped
-            // grid with no scrolling instead. CompactCardGrid, kept for
-            // desktop search results (`desktopResultsNode` below) — dense
-            // icon/name rows still fit a filtered result list better than
-            // this card's bigger tile treatment.
-            const browseCards = loading ? entryCards : (filtered ?? [])
+            // The grid itself is a flat index of every card, sorted by
+            // listing count (most to least places) rather than the source
+            // order resourceCards/entryCards happens to build — matching
+            // the user's own reference image. Collapsed shows the first
+            // COLLAPSED_TILE_COUNT plus a trailing "More" tile (no
+            // scrolling, no wrap — see CategoryTileRow's own doc); "View
+            // all" (here or the "More" tile itself) expands it into a full
+            // wrapped grid instead. CompactCardGrid, kept for desktop
+            // search results (`desktopResultsNode` below) — dense icon/name
+            // rows still fit a filtered result list better than this
+            // card's bigger tile treatment.
+            const browseCards = [...(loading ? entryCards : (filtered ?? []))].sort(
+              (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
+            )
             return (
               // scroll-mt-24, not the map band's own scroll-mt-20 — same
               // sticky-header offset requirement, but a distinct value so
@@ -556,18 +561,20 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                         fields still exist (DesktopTopicsManager) but have no
                         render site left here. */}
                     <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
-                    {/* Hidden once there are 8 or fewer cards — the quick-
-                        scroll row already shows everything without
-                        scrolling at that count, so there's nothing left
-                        for "View all" to reveal. */}
-                    {browseCards.length > 8 && (
+                    {/* No "View all" here any more — the grid's own
+                        trailing "More" tile (CategoryTileRow) does that job
+                        now. This only ever shows the way BACK: once
+                        expanded, "Show fewer categories" is the sole
+                        collapse affordance (there's no "More" tile to click
+                        while expanded — see that component's own doc). */}
+                    {browseExpanded && (
                       <button
                         type="button"
-                        onClick={() => setBrowseExpanded((e) => !e)}
+                        onClick={() => setBrowseExpanded(false)}
                         aria-expanded={browseExpanded}
                         className="shrink-0 cursor-pointer text-sm font-semibold text-ink transition-colors hover:text-brand-teal"
                       >
-                        {browseExpanded ? 'Show fewer categories' : 'View all →'}
+                        Show fewer categories
                       </button>
                     )}
                   </div>
@@ -579,6 +586,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                         categories={categories}
                         expanded={browseExpanded}
                         onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
+                        onExpand={() => setBrowseExpanded(true)}
                       />
                     </div>
                   )}

@@ -17,6 +17,7 @@ import { useCommunitySlug } from '@/lib/communityContext'
 import { routes } from '@/lib/routes'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import CategoryIcon from '@/components/CategoryIcon'
+import { DotsIcon } from '@/components/icons'
 import { getCategoryColor } from '@/lib/categoryColor'
 import { useIsMobile } from '@/lib/useIsMobile'
 
@@ -400,61 +401,77 @@ export function CompactCardGrid({
   )
 }
 
-/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), later
- *  revised to a quick-scroll row: the "What are you looking for?" card's
- *  tile grid, a bigger, friendlier icon per category (64px, tinted per
- *  getCategoryColor, same as CompactCard's own smaller version). No border/
- *  background on the tile itself, at rest or on hover — just the icon and
- *  label sitting directly on the card's own white background, the same
- *  "navigation, not a boxed object" reasoning CompactCard's own doc gives
- *  for its rows (a border per tile, repeated 8-20+ times in one row/grid,
- *  reads as clutter rather than structure).
+// How many real cards show before the trailing "More" tile, collapsed —
+// matches the count in the user's own reference image (9 categories + one
+// "More" tile = 10 total). A fixed number, not a measured "however many fit"
+// — this app has one desktop breakpoint, not several to size against, and a
+// fixed count is what makes `flex-1` below reliably lay out as one
+// non-wrapping row instead of needing real layout measurement (the
+// CompactCardGrid approach) just to decide whether to show a tile.
+const COLLAPSED_TILE_COUNT = 9
+
+/** Desktop mockup match (Phase 5, docs/desktop-mockup-plan.md), revised
+ *  twice after user review — first to a horizontal-scroll row, then to
+ *  this: the "Explore by Category" card's tile grid, a bigger, friendlier
+ *  icon per category (64px, tinted per getCategoryColor, same as
+ *  CompactCard's own smaller version). No border/background on the tile
+ *  itself, at rest or on hover — just the icon and label sitting directly
+ *  on the card's own white background, the same "navigation, not a boxed
+ *  object" reasoning CompactCard's own doc gives for its rows.
  *
- *  Collapsed (`expanded` false) is a single horizontal-scroll row —
- *  EVERY card is present in the DOM, not just the first 8; scrolling (not
- *  slicing) is what keeps the rest reachable without clicking anything, for
- *  a quick glance. Expanded is the opposite shape: the same cards wrapped
- *  into a `grid-cols-4 lg:grid-cols-8` grid, no scrolling, everything
- *  visible at once — a real "full view", not just "the rest of the same
- *  strip". Both are controlled by the caller (`expanded`) rather than owned
- *  here, because the toggle button that drives it ("View all →") lives in
- *  Landing's own header row above this grid, not beside it — CompactCardGrid
- *  can own its own "Show more" because that button sits directly under its
- *  grid; this one can't. CompactCardGrid itself is untouched and still
- *  used for desktop search results (Landing's own `desktopResultsNode`,
- *  rendered below this card's header row once the hero's search box puts
- *  something in `q`). */
+ *  Collapsed (`expanded` false) is a single row, no scrolling and no wrap —
+ *  the first `COLLAPSED_TILE_COUNT` cards (by whatever order the caller
+ *  already sorted `cards` into — Landing sorts by listing count, most to
+ *  least, matching the reference image) plus a trailing "More" tile when
+ *  there are more. `flex-1` on every tile (not a fixed width) is what
+ *  guarantees the row itself never needs to scroll or wrap: exactly
+ *  `COLLAPSED_TILE_COUNT` (+1 for "More") tiles share the row's width
+ *  evenly, however wide that ends up being, rather than each claiming a
+ *  fixed size and overflowing. Expanded is the opposite shape: EVERY card
+ *  wrapped into a `grid-cols-4 lg:grid-cols-8` grid, no "More" tile, no cap
+ *  — a real "full view". Both states are controlled by the caller
+ *  (`expanded`) rather than owned here, because the toggle that drives it
+ *  ("View all →") lives in Landing's own header row above this grid, not
+ *  beside it — CompactCardGrid can own its own "Show more" because that
+ *  button sits directly under its grid; this one can't. CompactCardGrid
+ *  itself is untouched and still used for desktop search results (Landing's
+ *  own `desktopResultsNode`, rendered below this card's header row once the
+ *  hero's search box puts something in `q`). */
 export function CategoryTileRow({
   cards,
   categories,
   expanded,
   onCardClick,
+  onExpand,
 }: {
+  /** Already in the order this should render — Landing sorts by listing
+   *  count (most to least) before passing this in; this component doesn't
+   *  re-sort. */
   cards: CardDef[]
   /** Resolves each card's icon-avatar tint — see getCategoryColor. */
   categories: CategoryConfig[] | null
-  /** false: a horizontal-scroll row with every card. true: the same cards
-   *  wrapped into a full grid, no scrolling. */
+  /** false: the first COLLAPSED_TILE_COUNT cards plus a trailing "More"
+   *  tile. true: every card, wrapped, no cap. */
   expanded: boolean
   onCardClick?: (card: CardDef) => void
+  /** Fired by the trailing "More" tile — same action as the header row's
+   *  own "View all" toggle (Landing owns the actual `expanded` state). Only
+   *  meaningful (and only rendered) when collapsed and there's a "More"
+   *  tile to click. */
+  onExpand?: () => void
 }) {
+  const visible = expanded ? cards : cards.slice(0, COLLAPSED_TILE_COUNT)
+  const hasMore = !expanded && cards.length > COLLAPSED_TILE_COUNT
+
+  const tileClassName = 'flex flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-slate-50'
+
   return (
-    <div
-      className={
-        expanded
-          ? 'grid grid-cols-4 gap-6 lg:grid-cols-8'
-          // scrollbar hidden across engines (still fully scrollable by
-          // drag/trackpad/shift-wheel) — a visible scrollbar strip under a
-          // row of round-cornered tiles read as visual noise the "View all"
-          // link already makes unnecessary as a discovery affordance.
-          : 'flex gap-6 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
-      }
-    >
-      {cards.map((card) => (
+    <div className={expanded ? 'grid grid-cols-4 gap-6 lg:grid-cols-8' : 'flex gap-6'}>
+      {visible.map((card) => (
         <Link
           key={card.id ?? card.title}
           href={card.href}
-          className={`flex flex-col items-center rounded-xl px-2 py-2 text-center transition-colors hover:bg-slate-50 ${expanded ? '' : 'w-[112px] shrink-0'}`}
+          className={`${tileClassName} ${expanded ? '' : 'min-w-0 flex-1'}`}
           onClick={onCardClick ? () => onCardClick(card) : undefined}
         >
           {card.icon ? (
@@ -492,6 +509,15 @@ export function CategoryTileRow({
           )}
         </Link>
       ))}
+      {hasMore && (
+        <button type="button" onClick={onExpand} className={`${tileClassName} min-w-0 flex-1 cursor-pointer`}>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">
+            <DotsIcon className="h-6 w-6" />
+          </span>
+          <span className="mt-3 w-full truncate text-base font-semibold text-ink">More</span>
+          <span className="w-full truncate text-sm text-slate-500">See all</span>
+        </button>
+      )}
     </div>
   )
 }
