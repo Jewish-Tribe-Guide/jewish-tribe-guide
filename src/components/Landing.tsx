@@ -800,7 +800,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           }
 
           return rows.map((row) => (
-            <div key={row.key} className="my-12">
+            <div key={row.key} className="my-8">
               {row.node}
             </div>
           ))

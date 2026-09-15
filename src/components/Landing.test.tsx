@@ -326,7 +326,7 @@ describe('Landing', () => {
       expect(row).toHaveClass('min-[900px]:grid-cols-3')
 
       // Only one shared row wrapper for all three, not one per card.
-      expect(container.querySelectorAll('.my-12').length).toBe(1)
+      expect(container.querySelectorAll('.my-8').length).toBe(1)
 
       // Document order: Davening, then Update Listings, then Suggest.
       const html = container.innerHTML
@@ -470,14 +470,14 @@ describe('Landing', () => {
       })
 
       // Both cards share the same grid row — a direct parent with grid
-      // classes containing both, not two separate my-12 rows.
+      // classes containing both, not two separate my-8 rows.
       const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
       const jewishTimesHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopJewishTimesHeading })
       const row = subscribeHeading.closest('.grid')
       expect(row).not.toBeNull()
       expect(row).toContainElement(jewishTimesHeading)
       // Only one shared outer spacing wrapper for the pair, not one each.
-      expect(container.querySelectorAll('.my-12').length).toBe(1)
+      expect(container.querySelectorAll('.my-8').length).toBe(1)
     })
 
     it('a half-width card with no half-width neighbor falls back to its own full-width row', () => {
@@ -494,7 +494,7 @@ describe('Landing', () => {
       const subscribeHeading = screen.getByRole('heading', { name: SITE_SETTINGS_DEFAULTS.desktopSubscribeHeading })
       // Not inside a grid — its own row, same as a full-width card.
       expect(subscribeHeading.closest('.grid')).toBeNull()
-      expect(container.querySelectorAll('.my-12').length).toBe(2)
+      expect(container.querySelectorAll('.my-8').length).toBe(2)
     })
 
     it('a half-width card whose neighbor was gated off this render still falls back to full width', () => {
