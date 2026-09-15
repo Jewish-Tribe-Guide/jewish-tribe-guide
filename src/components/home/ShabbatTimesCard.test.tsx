@@ -196,16 +196,22 @@ describe('ShabbatTimesCard — the holiday block', () => {
   })
 })
 
-// A separate box from the holiday block above, not a replacement for it —
-// see the component's own doc. Before this existed, `fastPeriod` was
-// fetched but never rendered here either.
+// The fast block now competes with the holiday-or-Shabbos block for the
+// card's one slot, rather than always sitting alongside it — see
+// resolvePrimaryZmanimBlock in lib/zmanim.ts and the component's own doc.
+// Fixtures here carry `iso` (unlike `readyData` above) specifically so that
+// comparison has real timestamps to work with — offsets from the real
+// clock at test-run time, not a hardcoded date, since useNow reads Date.now().
+const HOUR_MS = 60 * 60 * 1000
+const isoOffset = (ms: number) => new Date(Date.now() + ms).toISOString()
+
 describe('ShabbatTimesCard — the fast block', () => {
   const withFast: ZmanimData = {
     ...readyData,
     fastPeriod: {
       name: 'Tzom Gedaliah',
-      begins: { label: 'Mon, Sep 14', time: '5:19 AM' },
-      ends: { label: 'Mon, Sep 14', time: '7:44 PM' },
+      begins: { label: 'Mon, Sep 14', time: '5:19 AM', iso: isoOffset(-2 * HOUR_MS) },
+      ends: { label: 'Mon, Sep 14', time: '7:44 PM', iso: isoOffset(2 * HOUR_MS) },
     },
   }
 
@@ -220,16 +226,20 @@ describe('ShabbatTimesCard — the fast block', () => {
     expect(screen.getByText('7:44 PM')).toBeInTheDocument()
   })
 
-  it('shows alongside the regular Candles/Havdalah rows, not instead of them', () => {
+  it('replaces the regular Candles/Havdalah rows while the fast is still current, rather than showing both', () => {
     mockUseZmanim.mockReturnValue({ data: withFast, status: 'ready' })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
-    expect(screen.getByText(/^Candles /)).toBeInTheDocument()
+    expect(screen.queryByText(/^Candles /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Havdalah /)).not.toBeInTheDocument()
   })
 
   it('omits the "Fast ends" row when Hebcal has no end time (Ta’anit Bechorot)', () => {
     mockUseZmanim.mockReturnValue({
-      data: { ...readyData, fastPeriod: { name: 'Ta’anit Bechorot', begins: { label: 'Wed, Apr 21', time: '4:47 AM' }, ends: null } },
+      data: {
+        ...readyData,
+        fastPeriod: { name: 'Ta’anit Bechorot', begins: { label: 'Wed, Apr 21', time: '4:47 AM', iso: isoOffset(-HOUR_MS) }, ends: null },
+      },
       status: 'ready',
     })
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
@@ -244,5 +254,48 @@ describe('ShabbatTimesCard — the fast block', () => {
     render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
 
     expect(screen.queryByText(/^Fast begins /)).not.toBeInTheDocument()
+  })
+
+  it('falls back to the regular Candles/Havdalah rows once the fast has ended', () => {
+    mockUseZmanim.mockReturnValue({
+      data: {
+        ...readyData,
+        fastPeriod: {
+          name: 'Tzom Gedaliah',
+          begins: { label: 'Mon, Sep 14', time: '5:19 AM', iso: isoOffset(-30 * HOUR_MS) },
+          ends: { label: 'Mon, Sep 14', time: '7:44 PM', iso: isoOffset(-6 * HOUR_MS) }, // ended
+        },
+      },
+      status: 'ready',
+    })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText(/^Candles /)).toBeInTheDocument()
+    expect(screen.getByText(/^Havdalah /)).toBeInTheDocument()
+    expect(screen.queryByText('Tzom Gedaliah')).not.toBeInTheDocument()
+  })
+
+  it('shows the holiday block instead when a holiday is also upcoming, once the fast has ended', () => {
+    mockUseZmanim.mockReturnValue({
+      data: {
+        ...readyData,
+        holidayPeriod: {
+          name: 'Sukkot',
+          begins: { label: 'Fri, Sep 18', time: '6:40 PM', iso: isoOffset(4 * 24 * HOUR_MS) },
+          candleLightings: [{ label: 'Fri, Sep 18', time: '6:40 PM', iso: isoOffset(4 * 24 * HOUR_MS) }],
+          ends: { label: 'Sat, Sep 19', time: '7:38 PM', iso: isoOffset(5 * 24 * HOUR_MS) },
+        },
+        fastPeriod: {
+          name: 'Tzom Gedaliah',
+          begins: { label: 'Mon, Sep 14', time: '5:19 AM', iso: isoOffset(-30 * HOUR_MS) },
+          ends: { label: 'Mon, Sep 14', time: '7:44 PM', iso: isoOffset(-6 * HOUR_MS) }, // ended
+        },
+      },
+      status: 'ready',
+    })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText('Sukkot')).toBeInTheDocument()
+    expect(screen.queryByText('Tzom Gedaliah')).not.toBeInTheDocument()
   })
 })

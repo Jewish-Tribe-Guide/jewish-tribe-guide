@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyOffsetMinutes, getZmanimData, lookaheadDays, type ZmanimCoords } from './zmanim'
+import { applyOffsetMinutes, getZmanimData, lookaheadDays, resolvePrimaryZmanimBlock, type ZmanimCoords } from './zmanim'
+import type { ZmanimData } from '@/types'
 
 const PHILADELPHIA: ZmanimCoords = {
   latitude: 39.9526,
@@ -547,6 +548,91 @@ describe('getZmanimData', () => {
       const data = await getZmanimData(PHILADELPHIA)
       expect(data.isYomTov).toBe(false)
     })
+  })
+})
+
+describe('resolvePrimaryZmanimBlock', () => {
+  const NOW = new Date('2026-09-14T12:00:00.000Z').getTime()
+  const HOUR = 60 * 60 * 1000
+  const iso = (offsetMs: number) => new Date(NOW + offsetMs).toISOString()
+
+  const base: ZmanimData = {
+    hebrewDate: '3 Tishrei 5787',
+    dayOfWeek: 1,
+    isFriday: false,
+    isShabbos: false,
+    dailyZmanim: [],
+    shabbos: {
+      candleLighting: { label: 'Friday', time: '6:46 PM', iso: iso(4 * 24 * HOUR) },
+      havdalah: { label: 'Saturday', time: '7:43 PM', iso: iso(5 * 24 * HOUR) },
+    },
+    holidayPeriod: null,
+    fastPeriod: null,
+  }
+
+  it('picks Shabbos when there is no fast and no holiday', () => {
+    expect(resolvePrimaryZmanimBlock(base, NOW)).toBe('shabbos')
+  })
+
+  it('picks the fast when it is still current, even though Shabbos is also upcoming — Tzom Gedaliah\'s own case', () => {
+    const data: ZmanimData = {
+      ...base,
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-2 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(2 * HOUR) } },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
+  })
+
+  it('falls back to Shabbos once the fast has ended', () => {
+    const data: ZmanimData = {
+      ...base,
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-1 * HOUR) } },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('shabbos')
+  })
+
+  it('falls back to the holiday, not Shabbos, once the fast has ended and a holiday is upcoming', () => {
+    const data: ZmanimData = {
+      ...base,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Fri', time: '6:40 PM', iso: iso(4 * 24 * HOUR) },
+        candleLightings: [{ label: 'Fri', time: '6:40 PM', iso: iso(4 * 24 * HOUR) }],
+        ends: { label: 'Sat', time: '7:38 PM', iso: iso(5 * 24 * HOUR) },
+      },
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-1 * HOUR) } },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('holiday')
+  })
+
+  it('never treats a fast with no published end (Ta’anit Bechorot) as over', () => {
+    const data: ZmanimData = {
+      ...base,
+      fastPeriod: { name: 'Ta’anit Bechorot', begins: { label: 'Wed', time: '4:47 AM', iso: iso(-30 * HOUR) }, ends: null },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
+  })
+
+  it('picks whichever begins sooner when both a fast and a holiday are still current', () => {
+    const holidaySoonerThanFast: ZmanimData = {
+      ...base,
+      holidayPeriod: {
+        name: 'Sukkot',
+        begins: { label: 'Fri', time: '6:40 PM', iso: iso(1 * HOUR) },
+        candleLightings: [{ label: 'Fri', time: '6:40 PM', iso: iso(1 * HOUR) }],
+        ends: { label: 'Sat', time: '7:38 PM', iso: iso(2 * 24 * HOUR) },
+      },
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(3 * 24 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(4 * 24 * HOUR) } },
+    }
+    expect(resolvePrimaryZmanimBlock(holidaySoonerThanFast, NOW)).toBe('holiday')
+  })
+
+  it('prefers the fast when timing cannot be compared (no iso on either side)', () => {
+    const data: ZmanimData = {
+      ...base,
+      shabbos: { candleLighting: { label: 'Friday', time: '6:46 PM' }, havdalah: { label: 'Saturday', time: '7:43 PM' } },
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM' }, ends: { label: 'Mon', time: '7:44 PM' } },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
   })
 })
 

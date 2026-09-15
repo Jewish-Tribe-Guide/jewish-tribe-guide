@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useZmanim } from '@/lib/useZmanim'
 import { useCommunitySlug } from '@/lib/communityContext'
+import { useNow } from '@/lib/useNow'
+import { resolvePrimaryZmanimBlock } from '@/lib/zmanim'
 import { routes } from '@/lib/routes'
 
 // ── Shabbat & Holiday Times — candle lighting and havdalah, plus the next
@@ -32,6 +34,13 @@ import { routes } from '@/lib/routes'
 // Friday's. Showing both would repeat the identical fact in identical
 // words, one row apart.
 //
+// A fast day (`data.fastPeriod`) competes with that same block rather than
+// sitting alongside it — see resolvePrimaryZmanimBlock in lib/zmanim.ts.
+// Only one of the three (fast/holiday/shabbos) shows at a time, whichever
+// hasn't ended and begins soonest: on Tzom Gedaliah, that's the fast, even
+// though Rosh Hashana's own Shabbos is also live that week; once the fast
+// ends, the card falls back to the holiday-or-Shabbos block on its own.
+//
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening
 // Times and the community card, then paired with SubscribeSection below the
@@ -57,6 +66,8 @@ export default function ShabbatTimesCard({
 }) {
   const { data, status } = useZmanim(coords)
   const communitySlug = useCommunitySlug()
+  const now = useNow()
+  const primaryBlock = data ? resolvePrimaryZmanimBlock(data, now) : 'shabbos'
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -73,7 +84,28 @@ export default function ShabbatTimesCard({
         </div>
       ) : status === 'ready' && data ? (
         <>
-          {data.holidayPeriod ? (
+          {primaryBlock === 'fast' && data.fastPeriod ? (
+            // The fast has priority over the holiday-or-Shabbos block below
+            // while it's still current — see resolvePrimaryZmanimBlock.
+            // `ends` is nullable (see lib/zmanim.ts's findFastPeriod on
+            // Ta'anit Bechorot, ended early by a siyum rather than a
+            // published zman).
+            <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
+                {data.fastPeriod.name}
+              </p>
+              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
+                <span>Fast begins {data.fastPeriod.begins.label}</span>
+                <span className="tabular-nums text-slate-900">{data.fastPeriod.begins.time}</span>
+              </div>
+              {data.fastPeriod.ends && (
+                <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
+                  <span>Fast ends {data.fastPeriod.ends.label}</span>
+                  <span className="tabular-nums text-slate-900">{data.fastPeriod.ends.time}</span>
+                </div>
+              )}
+            </div>
+          ) : data.holidayPeriod ? (
             <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
                 {data.holidayPeriod.name}
@@ -128,30 +160,6 @@ export default function ShabbatTimesCard({
                   <span className={`text-[13px] font-semibold tabular-nums ${data.isShabbos ? 'text-amber-800' : 'text-slate-700'}`}>
                     {data.shabbos.havdalah.time}
                   </span>
-                </div>
-              )}
-            </div>
-          )}
-          {/* Upcoming Fast — a separate box, not a replacement for the block
-              above: unlike a Yom Tov, a fast has no candle lighting and can
-              land on an ordinary weekday, so nothing else on this card would
-              otherwise announce it. Both can and do show at once — e.g. Tzom
-              Gedaliah lands in Rosh Hashana's own week. `ends` is nullable
-              (see lib/zmanim.ts's findFastPeriod on Ta'anit Bechorot, ended
-              early by a siyum rather than a published zman). */}
-          {data.fastPeriod && (
-            <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
-                {data.fastPeriod.name}
-              </p>
-              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                <span>Fast begins {data.fastPeriod.begins.label}</span>
-                <span className="tabular-nums text-slate-900">{data.fastPeriod.begins.time}</span>
-              </div>
-              {data.fastPeriod.ends && (
-                <div className="mt-0.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold text-slate-800">
-                  <span>Fast ends {data.fastPeriod.ends.label}</span>
-                  <span className="tabular-nums text-slate-900">{data.fastPeriod.ends.time}</span>
                 </div>
               )}
             </div>

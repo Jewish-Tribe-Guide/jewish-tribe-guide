@@ -442,3 +442,42 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
   }
 }
+
+function entryMs(entry: ZmanEntry | null | undefined): number | null {
+  return entry?.iso ? new Date(entry.iso).getTime() : null
+}
+
+/** Whether a period counts as already over at `nowMs` — `false` whenever its
+ *  end is unknown (no `iso` at all, or Ta'anit Bechorot's genuinely absent
+ *  `ends`), since "can't tell" should never hide something that might still
+ *  be current. */
+function hasEnded(ends: ZmanEntry | null | undefined, nowMs: number): boolean {
+  const ms = entryMs(ends)
+  return ms !== null && ms <= nowMs
+}
+
+/** ShabbatTimesCard used to show the fast block (Tzom Gedaliah, say)
+ *  alongside the holiday-or-Shabbos block, since the two can genuinely
+ *  coincide — a fast in Rosh Hashana's own week. Now the card shows only
+ *  one at a time: whichever hasn't ended and begins soonest, so a Monday
+ *  fast takes the card until it's over, then Friday's Shabbos (or an
+ *  upcoming holiday) takes it back.
+ *
+ *  Falls back to preferring the fast whenever timing can't be compared
+ *  (either side missing `iso` — real Hebcal-sourced data always has it, see
+ *  `getZmanimData`'s own `toEntry` helpers, but a caller testing this in
+ *  isolation might not bother) rather than picking arbitrarily, since a
+ *  same-day fast is virtually always the sooner of the two in practice. */
+export function resolvePrimaryZmanimBlock(data: ZmanimData, nowMs: number): 'fast' | 'holiday' | 'shabbos' {
+  const primary = data.holidayPeriod
+    ? { kind: 'holiday' as const, begins: data.holidayPeriod.begins }
+    : { kind: 'shabbos' as const, begins: data.shabbos.candleLighting }
+
+  if (!data.fastPeriod || hasEnded(data.fastPeriod.ends, nowMs)) return primary.kind
+
+  const fastBeginsMs = entryMs(data.fastPeriod.begins)
+  const primaryBeginsMs = entryMs(primary.begins)
+  const fastIsSooner = fastBeginsMs === null || primaryBeginsMs === null || fastBeginsMs <= primaryBeginsMs
+
+  return fastIsSooner ? 'fast' : primary.kind
+}
