@@ -157,13 +157,23 @@ export default function CampaignBannerCard() {
               seasonal banner still falls back to. Served from /public
               (not hotlinked) since this came in as a local file, not a
               URL — public/images/sukkah-banner.png, copied in from the
-              user's own docs/ upload. */}
+              user's own docs/ upload.
+
+              `unoptimized`: a local /public asset still goes through
+              Vercel's own Image Optimization pipeline unless told not to
+              — confirmed live on a preview deploy, `402 Payment Required
+              — OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED` (that account's
+              monthly quota, see imageHosts.ts's own doc on the same
+              constraint for remote hosts). This file is already a small,
+              fixed-size PNG with nothing for the optimizer to usefully
+              resize, so skipping it entirely costs nothing. */}
           <Image
             src="/images/sukkah-banner.png"
             alt=""
             fill
             sizes="(min-width: 640px) 24vw, 0px"
             className="object-cover"
+            unoptimized
           />
         </div>
 
