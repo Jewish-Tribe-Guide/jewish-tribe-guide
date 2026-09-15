@@ -37,9 +37,11 @@ import { routes } from '@/lib/routes'
 // A fast day (`data.fastPeriod`) competes with that same block rather than
 // sitting alongside it — see resolvePrimaryZmanimBlock in lib/zmanim.ts.
 // Only one of the three (fast/holiday/shabbos) shows at a time, whichever
-// hasn't ended and begins soonest: on Tzom Gedaliah, that's the fast, even
-// though Rosh Hashana's own Shabbos is also live that week; once the fast
-// ends, the card falls back to the holiday-or-Shabbos block on its own.
+// hasn't ended (plus a 90-minute grace period past the fast's own end, so
+// checking right after havdalah still shows it named) and begins soonest:
+// on Tzom Gedaliah, that's the fast, even though Rosh Hashana's own Shabbos
+// is also live that week; once the grace period passes, the card falls
+// back to the holiday-or-Shabbos block on its own.
 //
 // Lives below the map now, paired with Stay in the loop (see Landing.tsx) —
 // it used to sit above the map, in the HomeBreak grid, alongside Davening

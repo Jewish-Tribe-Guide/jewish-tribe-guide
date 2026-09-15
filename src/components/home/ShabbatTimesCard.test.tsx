@@ -256,6 +256,24 @@ describe('ShabbatTimesCard — the fast block', () => {
     expect(screen.queryByText(/^Fast begins /)).not.toBeInTheDocument()
   })
 
+  it('keeps showing the fast for 90 minutes after it ends', () => {
+    mockUseZmanim.mockReturnValue({
+      data: {
+        ...readyData,
+        fastPeriod: {
+          name: 'Tzom Gedaliah',
+          begins: { label: 'Mon, Sep 14', time: '5:19 AM', iso: isoOffset(-14 * HOUR_MS) },
+          ends: { label: 'Mon, Sep 14', time: '7:44 PM', iso: isoOffset(-1 * HOUR_MS) }, // 60 min ago, within the 90-min grace
+        },
+      },
+      status: 'ready',
+    })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText('Tzom Gedaliah')).toBeInTheDocument()
+    expect(screen.queryByText(/^Candles /)).not.toBeInTheDocument()
+  })
+
   it('falls back to the regular Candles/Havdalah rows once the fast has ended', () => {
     mockUseZmanim.mockReturnValue({
       data: {

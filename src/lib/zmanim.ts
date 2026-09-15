@@ -450,11 +450,21 @@ function entryMs(entry: ZmanEntry | null | undefined): number | null {
 /** Whether a period counts as already over at `nowMs` — `false` whenever its
  *  end is unknown (no `iso` at all, or Ta'anit Bechorot's genuinely absent
  *  `ends`), since "can't tell" should never hide something that might still
- *  be current. */
-function hasEnded(ends: ZmanEntry | null | undefined, nowMs: number): boolean {
+ *  be current. `graceMs` pushes the effective end back, so a caller can keep
+ *  something visible a while after its real end time. */
+function hasEnded(ends: ZmanEntry | null | undefined, nowMs: number, graceMs = 0): boolean {
   const ms = entryMs(ends)
-  return ms !== null && ms <= nowMs
+  return ms !== null && ms + graceMs <= nowMs
 }
+
+/** How long the fast block stays up after `fastPeriod.ends` before the card
+ *  falls back to Shabbos/holiday — long enough that a visitor checking the
+ *  card right after a fast ends (havdalah, a quick bite) still sees it
+ *  named, without lingering into the next morning. Not applied to
+ *  `holidayPeriod`/`shabbos`, which the fast is being compared against:
+ *  those never get their own "already ended" check here, since Hebcal's
+ *  /shabbat response always reports the upcoming cycle, never a past one. */
+const FAST_GRACE_PERIOD_MS = 90 * 60 * 1000
 
 /** ShabbatTimesCard used to show the fast block (Tzom Gedaliah, say)
  *  alongside the holiday-or-Shabbos block, since the two can genuinely
@@ -473,7 +483,7 @@ export function resolvePrimaryZmanimBlock(data: ZmanimData, nowMs: number): 'fas
     ? { kind: 'holiday' as const, begins: data.holidayPeriod.begins }
     : { kind: 'shabbos' as const, begins: data.shabbos.candleLighting }
 
-  if (!data.fastPeriod || hasEnded(data.fastPeriod.ends, nowMs)) return primary.kind
+  if (!data.fastPeriod || hasEnded(data.fastPeriod.ends, nowMs, FAST_GRACE_PERIOD_MS)) return primary.kind
 
   const fastBeginsMs = entryMs(data.fastPeriod.begins)
   const primaryBeginsMs = entryMs(primary.begins)

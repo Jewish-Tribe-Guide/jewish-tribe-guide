@@ -582,15 +582,23 @@ describe('resolvePrimaryZmanimBlock', () => {
     expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
   })
 
-  it('falls back to Shabbos once the fast has ended', () => {
+  it('keeps showing the fast for 90 minutes after it ends — a grace period for a visitor checking right after havdalah', () => {
     const data: ZmanimData = {
       ...base,
-      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-1 * HOUR) } },
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-89 * 60 * 1000) } },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
+  })
+
+  it('falls back to Shabbos once the fast ended more than 90 minutes ago', () => {
+    const data: ZmanimData = {
+      ...base,
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-91 * 60 * 1000) } },
     }
     expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('shabbos')
   })
 
-  it('falls back to the holiday, not Shabbos, once the fast has ended and a holiday is upcoming', () => {
+  it('falls back to the holiday, not Shabbos, once the fast (past its grace period) has ended and a holiday is upcoming', () => {
     const data: ZmanimData = {
       ...base,
       holidayPeriod: {
@@ -599,7 +607,7 @@ describe('resolvePrimaryZmanimBlock', () => {
         candleLightings: [{ label: 'Fri', time: '6:40 PM', iso: iso(4 * 24 * HOUR) }],
         ends: { label: 'Sat', time: '7:38 PM', iso: iso(5 * 24 * HOUR) },
       },
-      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-1 * HOUR) } },
+      fastPeriod: { name: 'Tzom Gedaliah', begins: { label: 'Mon', time: '5:19 AM', iso: iso(-14 * HOUR) }, ends: { label: 'Mon', time: '7:44 PM', iso: iso(-3 * HOUR) } },
     }
     expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('holiday')
   })
