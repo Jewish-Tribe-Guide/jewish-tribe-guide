@@ -13,9 +13,9 @@ type Props = {
   | { onUp: () => void; href?: never }
   /** A real href instead of a handler — for a screen that goes up by
    *  navigating rather than by changing in-app state (About, Privacy: plain
-   *  server-rendered routes with no client-side "up" state to call into).
-   *  Same discriminated-union shape as UpButton's own onClick/href split,
-   *  for the same reason. */
+   *  server-rendered routes, under /[community] but with no client-side "up"
+   *  state to call into). Same discriminated-union shape as UpButton's own
+   *  onClick/href split, for the same reason. */
   | { href: string; onUp?: never }
 )
 

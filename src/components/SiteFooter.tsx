@@ -4,7 +4,9 @@ import Link from 'next/link'
 import FeedbackButton from './FeedbackButton'
 import { SkylineIcon } from '@/components/icons'
 import { useSiteSettings } from '@/lib/useSiteSettings'
+import { useCommunitySlug } from '@/lib/communityContext'
 import { community } from '@/community.config'
+import { routes } from '@/lib/routes'
 import type { SiteSettings } from '@/lib/siteSettings'
 
 export default function SiteFooter({
@@ -27,6 +29,7 @@ export default function SiteFooter({
 }) {
   const live = useSiteSettings()
   const settings = previewSettings ?? live
+  const communitySlug = useCommunitySlug()
 
   return (
     <footer className="mt-16 border-t border-slate-200/80 bg-cream">
@@ -72,9 +75,9 @@ export default function SiteFooter({
           <p className="text-xs text-slate-400">
             Community-maintained — please confirm details directly before relying
             on them. © {year} {settings.name}.{' '}
-            <Link href="/about" className="underline hover:text-slate-600">About</Link>
+            <Link href={routes.about(communitySlug)} className="underline hover:text-slate-600">About</Link>
             {' · '}
-            <Link href="/privacy" className="underline hover:text-slate-600">Privacy</Link>
+            <Link href={routes.privacy(communitySlug)} className="underline hover:text-slate-600">Privacy</Link>
           </p>
           {settings.feedbackEnabled && (
             <FeedbackButton

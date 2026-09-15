@@ -15,6 +15,8 @@ describe('routes', () => {
     expect(routes.feedback('philly')).toBe('/philly/feedback')
     expect(routes.slug('philly', 'grocery')).toBe('/philly/grocery')
     expect(routes.listing('philly', 'grocery', 'abc123')).toBe('/philly/grocery/abc123')
+    expect(routes.about('philly')).toBe('/philly/about')
+    expect(routes.privacy('philly')).toBe('/philly/privacy')
   })
 
   it('keeps communities apart', () => {
@@ -41,6 +43,11 @@ describe('slugRejectionReason', () => {
     expect(slugRejectionReason('admin')).toMatch(/reserved/i)
     expect(slugRejectionReason('api')).toMatch(/reserved/i)
     expect(slugRejectionReason('offline')).toMatch(/reserved/i)
+    // Both live under /[community] now (/[community]/about, /[community]/
+    // privacy) — a category with either name would shadow that screen at
+    // the same URL.
+    expect(slugRejectionReason('about')).toMatch(/reserved/i)
+    expect(slugRejectionReason('privacy')).toMatch(/reserved/i)
   })
 
   // A category named "Eruv" would slugify to exactly the word the Eruv

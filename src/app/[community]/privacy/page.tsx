@@ -2,24 +2,36 @@ import UpButton from '@/components/UpButton'
 import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
 import { community } from '@/community.config'
+import { listCommunities } from '@/lib/communityStore'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
+import { routes } from '@/lib/routes'
 import { getPage } from '@/lib/pagesStore'
 import { pageBodyToHtml } from '@/lib/richText'
 
-export const metadata: Metadata = {
-  title: `Privacy Policy — ${community.name}`,
-  description: `What ${community.name} collects, why, and what we do with it.`,
-  // Self-referencing canonical — same reasoning as every page under
-  // [community] now has (see [community]/page.tsx's comment). Static rather
-  // than a generateMetadata function since this page has nothing dynamic to
-  // read; the path itself is a fixed literal, not a route param.
-  alternates: { canonical: `${siteUrl()}/privacy` },
+// Self-referencing canonical — see [community]/page.tsx's comment on why
+// every screen under [community] needs one.
+export async function generateMetadata(props: PageProps<'/[community]/privacy'>): Promise<Metadata> {
+  const { community: slug } = await props.params
+  const [settings, communities] = await Promise.all([
+    getSiteSettings(slug).catch(() => SITE_SETTINGS_DEFAULTS),
+    listCommunities().catch(() => []),
+  ])
+  const communityRow = communities.find((c) => c.slug === slug)
+  const name = settings.name || communityRow?.name || slug
+  return {
+    title: `Privacy Policy — ${name}`,
+    description: `What ${name} collects, why, and what we do with it.`,
+    alternates: { canonical: `${siteUrl()}${routes.privacy(slug)}` },
+  }
 }
 
-// A plain, top-level page (not under /[community]) — privacy applies to the
-// whole site, not one community, same reasoning as /offline and /admin
-// living outside that segment. Content is admin-editable (see /admin's Pages
-// tab); this component only renders it.
+// Community-scoped route (used to be a plain top-level /privacy, outside
+// [community] entirely) purely for the chrome that comes with living under
+// [community]/layout.tsx — see AboutPage's own doc for the full reasoning,
+// identical here. The CONTENT stays one shared `page` row across every
+// community (getPage takes no community argument).
 //
 // The closing "questions about this policy — email us" paragraph used to be
 // appended here in code, on the grounds that a live mailto: link couldn't be
@@ -32,7 +44,12 @@ export const metadata: Metadata = {
 // "Last updated" reads the row's own updated_at rather than a hardcoded
 // string — a hand-maintained date would need a code change every time the
 // text does, defeating the point of making this admin-editable at all.
-export default async function PrivacyPage() {
+// `community.timezone` here is the static app config (src/community.config.ts),
+// not the per-community DB row — this app's zmanim/hours logic reads the same
+// static value regardless of which community is browsing, so formatting a
+// timestamp with it is consistent with everything else, not a shortcut.
+export default async function PrivacyPage(props: PageProps<'/[community]/privacy'>) {
+  const { community: slug } = await props.params
   const page = await getPage('privacy')
   const title = page?.title ?? 'Privacy Policy'
   const lastUpdated = page
@@ -47,14 +64,11 @@ export default async function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
       {/* The same control every other second-level screen uses, saying the
-          same word. This used to be a bespoke underlined "← Back to
-          {community.name}" link, which named its destination differently from
-          the rest of the app for no reason anyone could point at.
-          UpButton (mobile) and Breadcrumb (desktop) name the same
-          destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. */}
-      <UpButton href="/" label="Home" className="mb-0 desktop:hidden" />
-      <Breadcrumb href="/" upLabel="Home" title={title} className="mb-0" />
+          same word — see AboutPage's own doc. Points at this community's own
+          home (routes.home), not a bare "/", which redirects to whichever
+          community is the site's default. */}
+      <UpButton href={routes.home(slug)} label="Home" className="mb-0 desktop:hidden" />
+      <Breadcrumb href={routes.home(slug)} upLabel="Home" title={title} className="mb-0" />
 
       {/* One card holding the whole document — title included. See the same
           note on /about for why the h1 sits inside rather than above it, and

@@ -64,7 +64,11 @@ export const RESERVED_SLUGS = new Set([
   // The service worker's offline fallback, and the worker itself.
   'offline',
   'sw.js',
-  // The site-wide privacy policy.
+  // The site's About and Privacy pages — community-scoped routes
+  // (/[community]/about, /[community]/privacy) even though their content
+  // is one shared row across every community. A category named either
+  // would otherwise shadow the real screen at that same URL.
+  'about',
   'privacy',
   // Generated app icons.
   'icons',
@@ -119,6 +123,13 @@ export const routes = {
   home: (community: string) => `/${community}`,
   map: (community: string) => `/${community}/map`,
   feedback: (community: string) => `/${community}/feedback`,
+  /** Community-agnostic content (one shared `page` row — see pagesStore.ts),
+   *  but community-scoped chrome: living under `/[community]` is what gives
+   *  these two the visiting community's own header/footer, rather than
+   *  none at all (their old top-level location, outside every layout that
+   *  supplies one). */
+  about: (community: string) => `/${community}/about`,
+  privacy: (community: string) => `/${community}/privacy`,
   /** A category directory or a form wizard — they share this namespace. */
   slug: (community: string, slug: string) => `/${community}/${slug}`,
   /** The third argument is normally a listing's friendly slug (see

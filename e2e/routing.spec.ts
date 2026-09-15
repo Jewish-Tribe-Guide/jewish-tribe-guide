@@ -256,8 +256,9 @@ test.describe('URLs', () => {
     await expect(page).toHaveURL(`/${community}/eruv`)
   })
 
-  test('the privacy policy is a real, server-rendered top-level page', async ({ request }) => {
-    const res = await request.get('/privacy')
+  test('the privacy policy is a real, server-rendered page under its own community', async ({ page, request }) => {
+    const community = await defaultCommunity(page)
+    const res = await request.get(`/${community}/privacy`)
     expect(res.status()).toBe(200)
     // Assert the page rendered its own body, not that it contains a
     // particular phrase: the title and the section headings are admin-edited
@@ -281,7 +282,7 @@ test.describe('URLs', () => {
 
     const link = page.getByRole('link', { name: /privacy policy/i })
     await expect(link).toBeVisible()
-    await expect(link).toHaveAttribute('href', '/privacy')
+    await expect(link).toHaveAttribute('href', `/${community}/privacy`)
   })
 
   test('the privacy policy is linked from the footer', async ({ page, isMobile }) => {
@@ -297,7 +298,7 @@ test.describe('URLs', () => {
     await page.getByRole('link', { name: 'Privacy' }).scrollIntoViewIfNeeded()
     await page.getByRole('link', { name: 'Privacy' }).click()
 
-    await expect(page).toHaveURL('/privacy')
+    await expect(page).toHaveURL(`/${community}/privacy`)
     // By level, not by name. This asserted `name: 'Privacy Policy'` until an
     // admin renamed the page to "Privacy Policy and Terms of Use" and gave
     // its body a "Privacy Policy" section — getByRole matches accessible

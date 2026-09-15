@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { community } from '@/community.config'
 import { PeopleIcon } from '@/components/icons'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 
 // ── The "kept by the community" card ────────────────────────────────────────
 // Desktop mockup match (Phase 6, docs/desktop-mockup-plan.md): this used to
@@ -23,6 +25,7 @@ import { PeopleIcon } from '@/components/icons'
 // doesn't need to duplicate that entry point on top of losing its own
 // actions.
 export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: string; heading: string }) {
+  const communitySlug = useCommunitySlug()
   return (
     <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -39,7 +42,7 @@ export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: stri
         A living guide, built and updated by the people who call {community.region} home.
       </p>
       <Link
-        href="/about"
+        href={routes.about(communitySlug)}
         className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-slate-50"
       >
         <PeopleIcon className="h-4 w-4 shrink-0" />

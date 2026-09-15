@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { useCommunitySlug } from '@/lib/communityContext'
+import { routes } from '@/lib/routes'
 
 /** The one-line "here's what happens to what you just typed" note, shown by
  *  every form that collects a name, phone, or email — the intake wizard, the
@@ -18,6 +22,7 @@ import Link from 'next/link'
  *  most want completed.
  */
 export default function PrivacyNote({ className = '' }: { className?: string }) {
+  const communitySlug = useCommunitySlug()
   return (
     <p className={`text-xs leading-relaxed text-muted ${className}`}>
       We use what you send only to respond to it — never for marketing, and never sold. See our{' '}
@@ -25,7 +30,7 @@ export default function PrivacyNote({ className = '' }: { className?: string }) 
           part-filled form, and navigating away in place would throw the
           answers away. */}
       <Link
-        href="/privacy"
+        href={routes.privacy(communitySlug)}
         target="_blank"
         rel="noopener noreferrer"
         className="underline underline-offset-2 hover:text-slate-600"

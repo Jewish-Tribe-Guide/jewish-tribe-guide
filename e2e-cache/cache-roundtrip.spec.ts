@@ -131,6 +131,14 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   }
   const authHeaders = { Authorization: `Bearer ${accessToken}` }
 
+  // /about moved under /[community] (for the header/footer that comes with
+  // living there — see AboutPage's own doc) — same "/" redirect trick the
+  // site-settings test above uses to find which community this project's
+  // seed data actually uses.
+  const initialPage = await request.get('/')
+  const community = new URL(initialPage.url()).pathname.split('/').filter(Boolean)[0]
+  expect(community, 'the "/" redirect should land on a community').toBeTruthy()
+
   const beforeRes = await request.get('/api/admin/pages', { headers: authHeaders })
   expect(beforeRes.ok(), 'GET /api/admin/pages should succeed with the minted admin token').toBe(true)
   const before = await beforeRes.json()
@@ -140,7 +148,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
   const originalBody: string = aboutPage.body
 
   const newBody = `Cache round-trip check ${Date.now()}`
-  expect(await (await request.get('/about')).text()).not.toContain(newBody)
+  expect(await (await request.get(`/${community}/about`)).text()).not.toContain(newBody)
 
   try {
     const patchRes = await request.patch('/api/admin/pages/about', {
@@ -198,7 +206,7 @@ test('an admin save to a static page reaches the cached /about route', async ({ 
     await expect
       .poll(
         async () => {
-          const res = await request.get('/about')
+          const res = await request.get(`/${community}/about`)
           const body = await res.text()
           const hit = body.includes(newBody)
           seen.push(`${res.headers()['x-nextjs-cache'] ?? 'no-header'}${hit ? '/new' : '/old'}`)

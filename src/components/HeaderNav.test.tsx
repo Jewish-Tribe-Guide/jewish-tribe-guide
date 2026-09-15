@@ -145,8 +145,8 @@ describe('HeaderNav — More', () => {
 
     await user.click(screen.getByRole('button', { name: /More/ }))
 
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about')
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy')
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/test-community/about')
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/test-community/privacy')
 
     // Opens the same in-place FeedbackForm modal the footer's own
     // FeedbackButton does — not a page navigation, so this component (and
@@ -186,7 +186,7 @@ describe('HeaderNav — More', () => {
     expect(screen.getByRole('link', { name: 'Find on map' })).toHaveAttribute('href', '/test-community/map')
 
     await user.click(screen.getByRole('button', { name: /More/ }))
-    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/about')
+    expect(screen.getByRole('link', { name: 'Who we are' })).toHaveAttribute('href', '/test-community/about')
   })
 
   it('hides the feedback item when an admin has turned feedback off', async () => {

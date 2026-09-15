@@ -11,8 +11,9 @@ type Props = {
   | { onClick: () => void; href?: never }
   /** A real href instead of a handler, for a screen that goes up by
    *  navigating rather than by changing in-app state — /about and /privacy,
-   *  which are plain server-rendered routes outside the community segment and
-   *  have no client-side navigation to call. They used to hand-roll their own
+   *  which are plain server-rendered routes (under /[community] for the
+   *  header/footer that lives there, but with no client-side navigation
+   *  state of their own to call into). They used to hand-roll their own
    *  "← Back to {community}" link, which drifted from this control in both
    *  wording and appearance (underlined, an arrow instead of the chevron, and
    *  naming the destination differently from every other screen). Same markup

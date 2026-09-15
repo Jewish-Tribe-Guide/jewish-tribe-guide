@@ -30,11 +30,11 @@ describe('UpdateListingsCard', () => {
     expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
   })
 
-  it('"Learn More" links to /about', () => {
+  it('"Learn More" links to the visiting community\'s own /about', () => {
     renderWithProviders(<UpdateListingsCard eyebrow={eyebrow} heading={heading} />)
 
     const link = screen.getByRole('link', { name: /Learn More/ })
-    expect(link).toHaveAttribute('href', '/about')
+    expect(link).toHaveAttribute('href', '/test-community/about')
   })
 
   it('has no Add/Edit/Report buttons any more', () => {

@@ -1,22 +1,46 @@
 import UpButton from '@/components/UpButton'
 import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
-import { community } from '@/community.config'
+import { listCommunities } from '@/lib/communityStore'
+import { getSiteSettings } from '@/lib/siteSettingsStore'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { siteUrl } from '@/lib/siteUrl'
+import { routes } from '@/lib/routes'
 import { getPage } from '@/lib/pagesStore'
 import { pageBodyToHtml } from '@/lib/richText'
 
-export const metadata: Metadata = {
-  title: `About — ${community.name}`,
-  description: `The story behind the ${community.name} guide.`,
-  alternates: { canonical: `${siteUrl()}/about` },
+// Self-referencing canonical — see [community]/page.tsx's comment on why
+// every screen under [community] needs one.
+export async function generateMetadata(props: PageProps<'/[community]/about'>): Promise<Metadata> {
+  const { community } = await props.params
+  const [settings, communities] = await Promise.all([
+    getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS),
+    listCommunities().catch(() => []),
+  ])
+  // Same admin-edited-wins-over-community-row fallback [community]/layout.tsx's
+  // own generateMetadata uses, so this never disagrees with the rest of the site.
+  const communityRow = communities.find((c) => c.slug === community)
+  const name = settings.name || communityRow?.name || community
+  return {
+    title: `About — ${name}`,
+    description: `The story behind the ${name} guide.`,
+    alternates: { canonical: `${siteUrl()}${routes.about(community)}` },
+  }
 }
 
-// A plain, top-level page (not under /[community]) — same reasoning as
-// /privacy: this is one site's worth of copy, not something that varies by
-// community. Content is admin-editable (see /admin's Pages tab); this
+// Community-scoped route (used to be a plain top-level /about, outside
+// [community] entirely) purely for the chrome that comes with living under
+// [community]/layout.tsx: this page rendered with no SiteHeader and no
+// SiteFooter at all before, since that's the one thing the old location
+// opted out of. The CONTENT stays exactly what it was — one shared `page`
+// row across every community (getPage takes no community argument; see
+// pagesStore.ts) — a visitor reaches this page FROM some specific
+// community's own screens, so it's that community's header/footer they see
+// around the same shared copy, not a second "which community is this"
+// decision. Content is admin-editable (see /admin's Pages tab); this
 // component only renders it.
-export default async function AboutPage() {
+export default async function AboutPage(props: PageProps<'/[community]/about'>) {
+  const { community } = await props.params
   const page = await getPage('about')
   const title = page?.title ?? 'About'
 
@@ -28,9 +52,12 @@ export default async function AboutPage() {
           the rest of the app for no reason anyone could point at.
           UpButton (mobile) and Breadcrumb (desktop) name the same
           destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. */}
-      <UpButton href="/" label="Home" className="mb-0 desktop:hidden" />
-      <Breadcrumb href="/" upLabel="Home" title={title} className="mb-0" />
+          own doc. Points at this community's own home (routes.home), not a
+          bare "/" — "/" redirects to whichever community is the site's
+          default, which isn't necessarily the one this page was reached
+          from. */}
+      <UpButton href={routes.home(community)} label="Home" className="mb-0 desktop:hidden" />
+      <Breadcrumb href={routes.home(community)} upLabel="Home" title={title} className="mb-0" />
 
       {/* One card holding the whole document — title included. The h1 sits
           inside rather than above because these two pages are documents, not

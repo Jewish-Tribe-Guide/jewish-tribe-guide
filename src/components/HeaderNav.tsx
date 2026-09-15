@@ -29,8 +29,8 @@ type OpenPanel = string | null
  *  'map' with no Map category, or a category that's since been deleted). */
 function resolveHref(target: string, hrefById: Map<string, string>, communitySlug: string, hasMap: boolean): string | null {
   if (target === 'map') return hasMap ? routes.map(communitySlug) : null
-  if (target === 'about') return '/about'
-  if (target === 'privacy') return '/privacy'
+  if (target === 'about') return routes.about(communitySlug)
+  if (target === 'privacy') return routes.privacy(communitySlug)
   if (target === 'feedback') return null
   return hrefById.get(target) ?? null
 }

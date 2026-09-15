@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderWithProviders } from '@/test/renderWithProviders'
+import { mockRouter } from '@/test/nextNavigationMock'
 import Wizard, { type Step } from './Wizard'
 
 // The step-branching, validation, and submit-vs-fail paths are the actual
@@ -10,6 +12,14 @@ import Wizard, { type Step } from './Wizard'
 // every form on the site at once.
 
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
+// Needed by PrivacyNote's useCommunitySlug() (communityContext.tsx), the same
+// way every other form embedding it already mocks this — see FeedbackForm.
+// test.tsx/ListingForm.test.tsx's own identical mock.
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => '/test-community',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // history is a real singleton jsdom doesn't reset between tests on its own —
 // and a real submit now writes `submitted: true` to it (see goNext), so
@@ -35,7 +45,7 @@ const contactStep: Step = { id: 'contact', kind: 'contact', question: 'How can w
 function renderWizard(overrides: Partial<React.ComponentProps<typeof Wizard>> = {}) {
   const onSubmit = vi.fn().mockResolvedValue(undefined)
   const onClose = vi.fn()
-  const utils = render(
+  const utils = renderWithProviders(
     <Wizard steps={[textStep, singleStep, contactStep]} onSubmit={onSubmit} onClose={onClose} {...overrides} />,
   )
   return { ...utils, onSubmit, onClose }
@@ -239,7 +249,7 @@ describe('Wizard — branching', () => {
       when: [{ field: 'need', op: 'includes', value: 'meals' }],
     }
     const user = userEvent.setup()
-    render(
+    renderWithProviders(
       <Wizard
         steps={[singleStep, branchStep, contactStep]}
         onSubmit={vi.fn().mockResolvedValue(undefined)}
