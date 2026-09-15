@@ -1,6 +1,6 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import { useLocation } from '@/lib/locationContext'
 import { useSiteNavigation } from '@/lib/useSiteNavigation'
@@ -23,17 +23,35 @@ import { useIsMobile } from '@/lib/useIsMobile'
 // ─────────────────────────────────────────────────────────────────────────────
 export default function MapScreen() {
   const params = useSearchParams()
+  const router = useRouter()
   const { coords, liveTracking, controls } = useLocation()
   const { goHome, viewListing } = useSiteNavigation()
   const isMobile = useIsMobile()
 
   const view = parseMapQuery(params)
 
+  // Exiting fullscreen goes back to whatever screen the visitor was actually
+  // on before the map came up — a category directory's own "Map" button, the
+  // header nav, the hero's "View Map", the mobile tab bar, all lead here, so
+  // there's no one fixed "parent" the way UpButton's hierarchical nav assumes
+  // elsewhere (see that component's own doc on why it deliberately avoids
+  // history.back() everywhere else — the map is the one screen without a
+  // single well-defined parent, which is exactly when real browser history is
+  // the right tool). Falls back to home only when there's nothing to go back
+  // to — a map link opened directly (bookmark, shared link, new tab) is the
+  // first entry in its own history, and a no-op back would leave the visitor
+  // stuck in fullscreen with the header covered and no way out.
+  function exitToPreviousScreen() {
+    if (window.history.length > 1) router.back()
+    else goHome()
+  }
+
   // The mobile map floats its own search bar and controls directly over the
   // map (see ResourceMapView), so the header above it is dead space competing
   // for the same screen — collapse it for as long as this screen is up. Only
-  // on mobile: desktop's map is a contained card, not an immersive fullscreen
-  // view, and the header isn't in its way.
+  // on mobile: desktop's fullscreen map already paints over the header
+  // itself (z-50 fixed layer, see ResourceMapView's own `controls` prop
+  // doc), so there's nothing left for collapsing to do there.
   useCollapseHeader(isMobile)
 
   return (
@@ -52,11 +70,10 @@ export default function MapScreen() {
         onViewListing={viewListing}
         standalone
         visible
-        // Landing on this screen always means fullscreen. Exiting collapses to
-        // the home screen's embedded map band on desktop — `?at=map` tells the
-        // home page to scroll there, so the exit reads as zooming out rather
-        // than being dropped somewhere unrelated.
-        onExitFullscreenToListing={() => goHome({ at: 'map' })}
+        // Landing on this screen always means fullscreen. Exiting (Escape, or
+        // the fullscreen-toggle button) goes back to wherever the visitor was
+        // before — see exitToPreviousScreen's own doc.
+        onExitFullscreenToListing={exitToPreviousScreen}
         liveTracking={liveTracking}
         controls={controls}
       />

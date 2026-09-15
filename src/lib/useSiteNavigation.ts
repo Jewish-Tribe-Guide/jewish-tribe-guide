@@ -61,7 +61,7 @@ export type SiteNavigation = {
   navigate: NavigateFn
   /** Opens a guided form — a category-or-form slug under the community. */
   openFlow: (kind: string, preselect?: string[]) => void
-  goHome: (opts?: { at?: 'map'; transitionTypes?: string[] }) => void
+  goHome: (opts?: { transitionTypes?: string[] }) => void
   viewListing: (categoryId: string, listingId: string) => void
   viewMapForCategory: (categoryId: string, query?: string, filters?: MapFilters) => void
 }
@@ -91,33 +91,23 @@ export function useSiteNavigation(): SiteNavigation {
   )
 
   const goHome = useCallback(
-    (opts?: { at?: 'map'; transitionTypes?: string[] }) => {
-      // `?at=map` lands the visitor on the home screen's embedded map band
-      // rather than at the hero — used when collapsing the fullscreen map, so
-      // the collapse reads as zooming out. Mobile's home screen has no map
-      // band, so the param is simply ignored there.
-      //
+    (opts?: { transitionTypes?: string[] }) => {
       // transitionTypes: only the category directory's own back arrow passes
       // this ('nav-back' — see GenericDirectory's onUp) — not the tab bar's
-      // Home button, the header logo, or the map-exit case above, none of
-      // which have a matching ViewTransition-wrapped exit on their own
-      // screen. Tagging those too would trigger the browser's default
-      // whole-page crossfade with nothing to actually pair it against.
-      router.push(`${routes.home(community)}${opts?.at ? `?at=${opts.at}` : ''}`, {
-        transitionTypes: opts?.transitionTypes,
-      })
+      // Home button or the header logo, neither of which has a matching
+      // ViewTransition-wrapped exit on their own screen. Tagging those too
+      // would trigger the browser's default whole-page crossfade with
+      // nothing to actually pair it against.
+      router.push(routes.home(community), { transitionTypes: opts?.transitionTypes })
       // Tapping the mobile tab bar's Home button, or the header logo, while
       // already on home pushes the exact URL that's already loaded — Next
       // treats that as a no-op, and (as it turns out) so does a REAL
       // cross-page nav back to home: Next keeps the previously-rendered
       // Landing instance alive rather than tearing it down, so nothing
       // here ever remounts on its own. Landing listens for this event to
-      // reset a stale search/scroll position by hand (the tab-bar/logo
-      // "already home" case). Skipped for the `at: 'map'` case: that's
-      // always a real navigation (only ever called from the full-map
-      // screen, a different pathname), so firing here too would race the
-      // scroll-to-map-band effect that same navigation triggers.
-      if (!opts?.at) document.dispatchEvent(new CustomEvent('jpc:go-home'))
+      // reset a stale search/scroll position by hand for every case that
+      // reaches this function, real navigation or not.
+      document.dispatchEvent(new CustomEvent('jpc:go-home'))
       // The mobile back arrow's own directional reveal (see Landing's own
       // `backReveal` doc) can't ride the event above — see
       // homeRevealSignal.ts's own doc for why an event dispatched here
