@@ -64,16 +64,7 @@ export function CategoryBandFrame({ color, imageUrl, children }: FrameProps) {
         style={!bandImage ? { backgroundColor: categoryTint(color) } : undefined}
       >
         {bandImage && (
-          <>
-            <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
-            {/* A photo's own mood varies wildly (dark, busy, unrelated
-                colors) and can bury the category color entirely — this
-                overlay is deliberately much stronger than the plain-wash
-                case (categoryTint's ~18%) so the category's own hue still
-                reads as the dominant color regardless of what's in the
-                photo underneath. */}
-            <div className="absolute inset-0" style={{ backgroundColor: `${color}73` }} />
-          </>
+          <Image src={bandImage} alt="" fill sizes="100vw" className="object-cover" unoptimized={!isOptimizableImage(bandImage)} />
         )}
       </div>
       <div className="mx-auto max-w-6xl px-4">{children}</div>

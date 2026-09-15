@@ -30,7 +30,12 @@ export default function SiteFooter({
 
   return (
     <footer className="mt-16 border-t border-slate-200/80 bg-cream">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+      {/* desktop:max-w-7xl matches the home screen's own content container
+          (Landing.tsx/HeroHeading.tsx) so this footer's edges line up with
+          the cards above it — not the narrower max-w-6xl category/listing
+          pages still use, which the footer no longer lines up with at
+          desktop widths either way. */}
+      <div className="mx-auto max-w-6xl desktop:max-w-7xl px-4 sm:px-6 py-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex max-w-md items-center gap-4">
             {/* The skyline glyph and "A more connected {region}" copy both
