@@ -17,9 +17,10 @@ type Props = {
   /** Admin-preview only: renders the search box inert (nothing to filter in a
    *  preview) instead of driving Landing's card grid. */
   interactive?: boolean
-  /** The Map pseudo-category's icon — shows the "View Map" button below the
-   *  search box (mobile) or beside Browse Categories (desktop) when set.
-   *  Null/undefined (no Map category configured) hides it entirely. */
+  /** The Map pseudo-category's icon — shows the "View Map" button beside
+   *  Browse Categories (desktop only; mobile reaches the map through its
+   *  own tab instead, see MobileTabBar) when set. Null/undefined (no Map
+   *  category configured) hides it entirely. */
   mapIcon?: string | null
   /** Preview mode has nothing to navigate to, so it's left undefined there —
    *  the button still renders (for visual fidelity) but doesn't do anything. */
@@ -96,16 +97,6 @@ export default function HeroHeading({
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
-  const viewMapButton = mapIcon != null && (
-    <button
-      onClick={onViewMap}
-      className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-    >
-      <span aria-hidden="true">{mapIcon}</span>
-      View Map
-    </button>
-  )
-
   return (
     <>
       {/* Mobile — unchanged plain centered block. */}
@@ -121,7 +112,6 @@ export default function HeroHeading({
             <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
           </div>
         )}
-        {viewMapButton}
       </section>
 
       {/* Desktop — a full-bleed band, edge to edge under the header rather

@@ -106,16 +106,25 @@ describe('HeroHeading — Phase 3 desktop details', () => {
       <HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />,
     )
 
-    // Two "View Map" buttons exist in the DOM at once (CSS-only mobile/
-    // desktop split — see the component's own doc); only the desktop one is
-    // in scope for this phase, so this is scoped to the `desktop:block`
-    // section rather than asserting on every button in the document.
+    // Scoped to the `desktop:block` section rather than asserting on every
+    // button in the document — mobile has no "View Map" button of its own
+    // any more (see the next describe block).
     const desktopSection = container.querySelector('.desktop\\:block')
     expect(desktopSection).not.toBeNull()
     const desktopViewMap = Array.from(desktopSection!.querySelectorAll('button')).find((b) => b.textContent?.includes('View Map'))
     expect(desktopViewMap).toBeTruthy()
     expect(desktopViewMap!.textContent).not.toContain('🗺️')
     expect(desktopViewMap!.querySelector('svg')).toBeTruthy()
+  })
+
+  // Mobile used to render its own "View Map" button below the search box —
+  // removed since mobile already reaches the map through its own tab
+  // (MobileTabBar), making the hero's copy redundant.
+  it('renders no "View Map" button on mobile, even when a Map category is configured', () => {
+    render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} mapIcon="🗺️" onViewMap={vi.fn()} />)
+
+    const buttons = screen.getAllByRole('button', { name: /View Map/ })
+    expect(buttons).toHaveLength(1)
   })
 })
 
