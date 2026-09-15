@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, ViewTransition } from 'react'
 import { track } from '@vercel/analytics'
-import { CardGrid, CategoryTileRow, CompactCardGrid, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
+import { CardGrid, CategoryTileRow, PlacesResults, cardMatches, searchListings, groupCardsIntoSections, resourceCards, useEntryCards } from '@/components/home/sections'
 import HeroHeading from '@/components/home/HeroHeading'
 import HomeMap from '@/components/home/HomeMap'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -270,38 +270,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
     </>
   )
 
-  // Desktop's own copy, shown only once there's a query, below the "Browse
-  // everything" card's own header row (see that card's own comment — a
-  // search whose answer shows up somewhere else on the page reads as
-  // disconnected). CompactCardGrid, not CardGrid: search results used to
-  // fall back to the heavier photo-tile grid mobile uses, which read as a
-  // jarring style switch from Browse everything's own small icon-avatar
-  // rows the moment you typed anything — this keeps desktop looking like
-  // desktop whether you're browsing or searching.
-  //
-  // One flat "Categories" heading over every matching card, not `sections`'
-  // own admin-configured group titles ("Food and Hospitality", etc.) — those
-  // exist to organize the tab nav's mega-menus and mobile's permanent grid,
-  // and showing one here reads as a mismatch against "Places" right below
-  // it, which is never split by category either. `filtered`, not `sections`,
-  // is the flat list this needs (the same one `sections` itself groups from).
-  const desktopResultsNode = q ? (
-    <>
-      {noMatchesMessage}
-      {filtered && filtered.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Categories</h2>
-          <CompactCardGrid
-            cards={filtered}
-            categories={categories}
-            onCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'grid' })}
-          />
-        </div>
-      )}
-      {placesNode}
-    </>
-  ) : undefined
-
   // Jump to the map band when arriving from a collapsed fullscreen map. Waits
   // for the band to actually exist — on the first paint after navigating home
   // it may not be rendered yet (categories still loading, so `hasMap` is false).
@@ -443,10 +411,6 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
           categories={categories}
           onSearchCardClick={(card) => track('category_opened', { category: card.id ?? card.title, source: 'hero-search' })}
           onOpenSearchPlace={(hit) => openPlace(hit)}
-          // Same destination as the "Explore by Category" card's own header
-          // — desktopResultsNode already renders there once `q` is set, so
-          // this is purely a scroll, not a second results section.
-          onSeeAllResults={() => browseCardRef.current?.scrollIntoView({ block: 'start' })}
         />
 
         {/* ── Seasonal campaign banner ─────────────────────────────────────────
@@ -464,11 +428,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the
-                grid below. No search box of its own any more — the hero's
-                own search box (HeroHeading) drives the same `query`/
-                `setQuery` state this card reads, so typing there still
-                narrows/surfaces `desktopResultsNode` below without this
-                card needing a second input.
+                grid below. No search box of its own — the hero's own search
+                box (HeroHeading) drives `query`/`setQuery`, but this card
+                doesn't react to it any more: it used to swap its whole grid
+                for a dense CompactCardGrid of search matches the moment `q`
+                was set, back when there was nowhere else on screen for a
+                search's answer to show up. HeroSearchDropdown (opening right
+                under the hero's own search box) replaced that job, so this
+                card stays the plain category index regardless of what's
+                typed — one search, one place its results appear, not two
+                things reacting to the same keystroke.
 
                 The grid itself is a flat, always-visible index of every
                 card: every real category, Patient & Family Support,
@@ -481,20 +450,11 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                 tab row) offers the same destinations grouped by those
                 umbrella labels; this is a second, always-visible flat way to
                 reach them for anyone who doesn't think to open that menu,
-                not a replacement for it. Hidden while actively searching —
-                the grouped grid further down already serves as live search
-                results, and this card shows the search box's own `results`
-                slot instead. `source: 'grid'` on the click lets the admin
-                Metrics tab compare actual usage against HeaderNav's own
-                `source: 'header-nav'`, so keeping both isn't a permanent
-                guess.
-
-                CompactCardGrid, not CardGrid — a list meant to hold every
-                card at once got heavier with every category added and read
-                as a wall of mismatched photo tiles (real photos, flat tints,
-                still-loading placeholders, side by side). See that
-                component's own doc for why a small icon-avatar row instead
-                of a full photo tile is the fix.
+                not a replacement for it. `source: 'grid'` on the click lets
+                the admin Metrics tab compare actual usage against
+                HeaderNav's own `source: 'header-nav'` and HeroSearchDropdown's
+                own `source: 'hero-search'`, so keeping all three isn't a
+                permanent guess.
 
                 The ring-1/rounded-2xl wrapper matches the map's own
                 container below — the two are meant to read as equal "main
@@ -540,9 +500,16 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // `settings.desktopBrowseEyebrow`/`desktopBrowseHeading` title
             // the WHOLE card — left side of the header row, with the "View
             // all" toggle on the right. No search box of its own (see the
-            // section comment above this card) — `desktopResultsNode` still
-            // renders below the header row, full card width, once the
-            // hero's own search box puts something in `q`.
+            // section comment above this card) — and, since
+            // HeroSearchDropdown started giving the hero's own search box a
+            // live results panel of its own, this card no longer reacts to
+            // `query` at all: always the full, unfiltered category index,
+            // never a filtered/search-results view. It used to swap in a
+            // dense CompactCardGrid of search matches the moment `q` was
+            // set — with a real results panel opening right where a visitor
+            // is already looking, having this section ALSO change out from
+            // under them read as two different things happening for one
+            // search, not one.
             //
             // The grid itself is a flat index of every card, sorted by
             // listing count (most to least places) rather than the source
@@ -551,11 +518,8 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
             // COLLAPSED_TILE_COUNT plus a trailing "More" tile (no
             // scrolling, no wrap — see CategoryTileRow's own doc); "View
             // all" (here or the "More" tile itself) expands it into a full
-            // wrapped grid instead. CompactCardGrid, kept for desktop
-            // search results (`desktopResultsNode` below) — dense icon/name
-            // rows still fit a filtered result list better than this
-            // card's bigger tile treatment.
-            const browseCards = [...(loading ? entryCards : (filtered ?? []))].sort(
+            // wrapped grid instead.
+            const browseCards = [...(loading ? entryCards : (allCards ?? []))].sort(
               (a, b) => (listingCounts?.[b.id ?? ''] ?? 0) - (listingCounts?.[a.id ?? ''] ?? 0),
             )
             return (
@@ -576,8 +540,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords, liveTracking, 
                       fields still exist (DesktopTopicsManager) but have no
                       render site left here. */}
                   <h2 className="font-serif text-2xl font-bold text-ink">Explore by Category</h2>
-                  {!isMobile && q && <div className="mt-6">{desktopResultsNode}</div>}
-                  {!isMobile && !q && (
+                  {!isMobile && (
                     <div className={ui.search.landing ? 'mt-3' : ''}>
                       <CategoryTileRow
                         cards={browseCards}

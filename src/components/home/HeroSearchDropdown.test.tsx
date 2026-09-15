@@ -27,7 +27,7 @@ function makeHit(overrides: Partial<ListingHit> = {}): ListingHit {
 const noop = () => {}
 
 describe('HeroSearchDropdown', () => {
-  it('shows matching categories and listings, and the total count in "See all"', () => {
+  it('shows matching categories and listings', () => {
     render(
       <HeroSearchDropdown
         query="food"
@@ -36,7 +36,6 @@ describe('HeroSearchDropdown', () => {
         categories={[]}
         onCardClick={noop}
         onOpenPlace={noop}
-        onSeeAll={noop}
       />,
     )
 
@@ -44,33 +43,57 @@ describe('HeroSearchDropdown', () => {
     expect(screen.getByText('72 places →')).toBeInTheDocument()
     expect(screen.getByText('Grocery')).toBeInTheDocument()
     expect(screen.getByText('Test Grocery')).toBeInTheDocument()
-    expect(screen.getByText(/See all 3 results for/)).toBeInTheDocument()
   })
 
-  it('caps categories and listings independently at 4 each, without undercounting "See all"', () => {
-    const cards = Array.from({ length: 6 }, (_, i) => ({ title: `Cat ${i}`, id: `cat${i}`, href: `/philly/cat${i}`, go: noopGo }))
-    const hits = Array.from({ length: 6 }, (_, i) => makeHit({ item: makeListing({ id: `l${i}`, name: `Listing ${i}` }) }))
+  it('shows no "See all" row when there is nothing more to expand (everything already fits under the caps)', () => {
     render(
       <HeroSearchDropdown
         query="food"
-        cards={cards}
-        placeHits={hits}
+        cards={[foodCard, groceryCard]}
+        placeHits={[makeHit()]}
         categories={[]}
         onCardClick={noop}
         onOpenPlace={noop}
-        onSeeAll={noop}
       />,
+    )
+
+    expect(screen.queryByText(/See all/)).not.toBeInTheDocument()
+  })
+
+  it('caps categories and listings independently at 4 each, and "See all" expands both in place', async () => {
+    const user = userEvent.setup()
+    const cards = Array.from({ length: 6 }, (_, i) => ({ title: `Cat ${i}`, id: `cat${i}`, href: `/philly/cat${i}`, go: noopGo }))
+    const hits = Array.from({ length: 6 }, (_, i) => makeHit({ item: makeListing({ id: `l${i}`, name: `Listing ${i}` }) }))
+    render(
+      <HeroSearchDropdown query="food" cards={cards} placeHits={hits} categories={[]} onCardClick={noop} onOpenPlace={noop} />,
     )
 
     expect(screen.getAllByText(/^Cat \d$/)).toHaveLength(4)
     expect(screen.getAllByText(/^Listing \d$/)).toHaveLength(4)
     expect(screen.getByText(/See all 12 results for/)).toBeInTheDocument()
+
+    await user.click(screen.getByText(/See all 12 results for/))
+
+    expect(screen.getAllByText(/^Cat \d$/)).toHaveLength(6)
+    expect(screen.getAllByText(/^Listing \d$/)).toHaveLength(6)
+    expect(screen.getByText('Show fewer results')).toBeInTheDocument()
+  })
+
+  it('"Show fewer results" collapses back to the capped view', async () => {
+    const user = userEvent.setup()
+    const cards = Array.from({ length: 6 }, (_, i) => ({ title: `Cat ${i}`, id: `cat${i}`, href: `/philly/cat${i}`, go: noopGo }))
+    render(<HeroSearchDropdown query="food" cards={cards} placeHits={[]} categories={[]} onCardClick={noop} onOpenPlace={noop} />)
+
+    await user.click(screen.getByText(/See all 6 results for/))
+    expect(screen.getAllByText(/^Cat \d$/)).toHaveLength(6)
+
+    await user.click(screen.getByText('Show fewer results'))
+    expect(screen.getAllByText(/^Cat \d$/)).toHaveLength(4)
+    expect(screen.getByText(/See all 6 results for/)).toBeInTheDocument()
   })
 
   it('shows a "nothing matches" message instead of empty sections when there are no results at all', () => {
-    render(
-      <HeroSearchDropdown query="asdfasdf" cards={[]} placeHits={[]} categories={[]} onCardClick={noop} onOpenPlace={noop} onSeeAll={noop} />,
-    )
+    render(<HeroSearchDropdown query="asdfasdf" cards={[]} placeHits={[]} categories={[]} onCardClick={noop} onOpenPlace={noop} />)
 
     expect(screen.getByText(/Nothing matches/)).toBeInTheDocument()
     expect(screen.queryByText(/See all/)).not.toBeInTheDocument()
@@ -89,7 +112,6 @@ describe('HeroSearchDropdown', () => {
         categories={[]}
         onCardClick={onCardClick}
         onOpenPlace={onOpenPlace}
-        onSeeAll={noop}
       />,
     )
 
@@ -98,24 +120,5 @@ describe('HeroSearchDropdown', () => {
 
     await user.click(screen.getByText('Test Grocery'))
     expect(onOpenPlace).toHaveBeenCalledWith(hit)
-  })
-
-  it('calls onSeeAll when its own row is clicked', async () => {
-    const user = userEvent.setup()
-    const onSeeAll = vi.fn()
-    render(
-      <HeroSearchDropdown
-        query="food"
-        cards={[foodCard]}
-        placeHits={[]}
-        categories={[]}
-        onCardClick={noop}
-        onOpenPlace={noop}
-        onSeeAll={onSeeAll}
-      />,
-    )
-
-    await user.click(screen.getByText(/See all 1 result for/))
-    expect(onSeeAll).toHaveBeenCalledTimes(1)
   })
 })

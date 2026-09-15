@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import type { CategoryConfig } from '@/lib/categories'
 import { getCategoryColor } from '@/lib/categoryColor'
@@ -9,19 +10,26 @@ import type { CardDef, ListingHit } from './sections'
 // How many of each to show before "See all" — matches the mockup this was
 // built from. Categories and listings are capped independently: a broad
 // query that matches a dozen categories shouldn't crowd out the listings
-// underneath, and vice versa. The real counts (uncapped) still drive the
-// "See all N results" line, so nothing here undercounts what's actually
-// there.
+// underneath, and vice versa.
 const MAX_CATEGORIES = 4
 const MAX_LISTINGS = 4
 
 // ── The hero search box's live results panel ────────────────────────────────
 // Desktop mockup match — replaces "type, then scroll down to see anything
-// happened" with results opening right under the box. Deliberately NOT a
-// replacement for the full results already shown in the "Browse everything"
-// card lower on the page (desktopResultsNode, in Landing.tsx) — this is a
-// capped preview; "See all" scrolls to that existing, uncapped section
-// rather than duplicating it here.
+// happened" with results opening right under the box.
+//
+// "See all" expands this SAME panel to every match, in place — it used to
+// scroll to a full results section elsewhere on the page instead, which the
+// user explicitly didn't want on two counts: that section (the "Browse
+// everything" card) went back to always being the plain category index, not
+// a second view that changes out from under a search; and even if it hadn't,
+// a results panel that answers by jumping the page somewhere else defeats
+// the entire reason this exists — the panel is supposed to grow and spill
+// out over the hero photo/content below it (the hero section itself is only
+// overflow-x-hidden, not overflow-hidden, specifically so this can), not
+// send the visitor's eye somewhere new. `expanded` is local, not lifted: it
+// only ever needs to reset when HeroHeading unmounts this whole panel
+// (closing it), which happens for free on remount.
 export default function HeroSearchDropdown({
   query,
   cards,
@@ -29,24 +37,21 @@ export default function HeroSearchDropdown({
   categories,
   onCardClick,
   onOpenPlace,
-  onSeeAll,
 }: {
   /** The trimmed, non-empty query this panel is showing results for. */
   query: string
-  /** Matching categories — Landing's own `filtered`, already computed for
-   *  the full results section below; this just caps how many render here. */
+  /** Matching categories — Landing's own `filtered`. */
   cards: CardDef[]
   placeHits: ListingHit[]
   categories: CategoryConfig[] | null
   onCardClick: (card: CardDef) => void
   onOpenPlace: (hit: ListingHit) => void
-  /** Scrolls to (and reveals) the full, uncapped results section below —
-   *  this panel's own "See all" row, not a second copy of the results. */
-  onSeeAll: () => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const totalCount = cards.length + placeHits.length
-  const visibleCards = cards.slice(0, MAX_CATEGORIES)
-  const visiblePlaces = placeHits.slice(0, MAX_LISTINGS)
+  const hasMore = cards.length > MAX_CATEGORIES || placeHits.length > MAX_LISTINGS
+  const visibleCards = expanded ? cards : cards.slice(0, MAX_CATEGORIES)
+  const visiblePlaces = expanded ? placeHits : placeHits.slice(0, MAX_LISTINGS)
 
   const panelClassName =
     'absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_4px_10px_rgba(15,23,42,0.06),0_20px_40px_rgba(15,23,42,0.12)]'
@@ -124,17 +129,26 @@ export default function HeroSearchDropdown({
         )}
       </div>
 
-      <div className="mx-4 h-px bg-slate-100" />
-      <button
-        type="button"
-        onClick={onSeeAll}
-        className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
-      >
-        <span>
-          See all {totalCount} result{totalCount === 1 ? '' : 's'} for &ldquo;{query}&rdquo;
-        </span>
-        <span aria-hidden="true">→</span>
-      </button>
+      {hasMore && (
+        <>
+          <div className="mx-4 h-px bg-slate-100" />
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-expanded={expanded}
+            className="flex w-full cursor-pointer items-center justify-between px-4 py-2.5 text-[13px] font-semibold text-brand-teal transition-colors hover:text-brand-teal-dark"
+          >
+            {expanded ? (
+              <span>Show fewer results</span>
+            ) : (
+              <span>
+                See all {totalCount} result{totalCount === 1 ? '' : 's'} for &ldquo;{query}&rdquo;
+              </span>
+            )}
+            <span aria-hidden="true">{expanded ? '▴' : '→'}</span>
+          </button>
+        </>
+      )}
     </div>
   )
 }

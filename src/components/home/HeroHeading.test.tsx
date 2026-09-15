@@ -204,7 +204,6 @@ describe('HeroHeading — the search dropdown', () => {
         searchCards={[foodCard]}
         searchPlaceHits={[]}
         categories={[]}
-        onSeeAllResults={vi.fn()}
         {...props}
       />
     )
@@ -269,16 +268,5 @@ describe('HeroHeading — the search dropdown', () => {
 
     expect(screen.queryByText('Food')).not.toBeInTheDocument()
     expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
-  })
-
-  it('"See all" dismisses the dropdown and calls onSeeAllResults', async () => {
-    const user = userEvent.setup()
-    const onSeeAllResults = vi.fn()
-    const { container } = render(<Wrapper onSeeAllResults={onSeeAllResults} />)
-    await user.type(desktopSearchInput(container), 'food')
-
-    await user.click(screen.getByText(/See all/))
-    expect(onSeeAllResults).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText(/See all/)).not.toBeInTheDocument()
   })
 })

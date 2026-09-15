@@ -46,10 +46,6 @@ type Props = {
   categories?: CategoryConfig[] | null
   onSearchCardClick?: (card: CardDef) => void
   onOpenSearchPlace?: (hit: ListingHit) => void
-  /** Scrolls to the full results section below and closes this panel —
-   *  see HeroSearchDropdown's own doc on why "See all" doesn't duplicate
-   *  that section here instead. */
-  onSeeAllResults?: () => void
 }
 
 // The home screen's heading, mission, and the filter box + "View Map" button
@@ -91,9 +87,10 @@ type Props = {
 // under the box — the user's own reported pain point: a search box whose
 // answer shows up in a card near the bottom of the page reads as
 // disconnected from the box itself, since nothing changes where you're
-// actually looking. The dropdown's "See all" scrolls to that same
-// lower section rather than duplicating it, so there's still exactly one
-// place the full, uncapped results live.
+// actually looking. "See all" expands that same panel in place instead of
+// scrolling anywhere — see that component's own doc for why a scroll-to-a-
+// section answer was explicitly rejected in favor of the panel just
+// growing and spilling out over whatever's beneath it.
 //
 // Expressed as two parallel layouts behind `desktop:`/`hidden` classes
 // rather than an isMobile branch: isMobile starts false on every render
@@ -126,7 +123,6 @@ export default function HeroHeading({
   categories = null,
   onSearchCardClick,
   onOpenSearchPlace,
-  onSeeAllResults,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
 
@@ -307,10 +303,6 @@ export default function HeroHeading({
                   categories={categories}
                   onCardClick={(card) => onSearchCardClick?.(card)}
                   onOpenPlace={(hit) => onOpenSearchPlace?.(hit)}
-                  onSeeAll={() => {
-                    setDismissed(true)
-                    onSeeAllResults?.()
-                  }}
                 />
               )}
             </div>

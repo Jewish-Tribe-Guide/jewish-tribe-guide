@@ -132,28 +132,44 @@ describe('Landing', () => {
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
-  it('narrows the grid to matching cards when typing, and hides the rest', async () => {
+  it('mobile: narrows its own permanent grid to matching cards when typing, and hides the rest', async () => {
+    const user = userEvent.setup()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
+    const { container } = renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
+
+    // Scoped to mobile's own results section specifically (CSS-only toggle
+    // — jsdom applies no CSS, so both mobile and desktop copies are
+    // genuinely in the DOM at once) rather than relying on useIsMobile(),
+    // which starts `false` on every render regardless of a mocked
+    // matchMedia (see HeroHeading's own doc on why) and so can't be used to
+    // isolate a query immediately after render. `.mt-12.desktop\\:hidden`,
+    // not the bare class — HeroHeading's own mobile hero block is also
+    // `desktop:hidden` and renders first in the DOM.
+    const mobileSection = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
+
+    expect(within(mobileSection).getByText('Grocery Stores')).toBeInTheDocument()
+    expect(within(mobileSection).queryByText('Synagogues')).not.toBeInTheDocument()
+  })
+
+  // Desktop used to swap this whole card for a filtered CompactCardGrid the
+  // moment there was a query — HeroSearchDropdown (opening right under the
+  // hero's own search box) replaced that job, and having this section ALSO
+  // change out from under a search read as two different things reacting to
+  // one keystroke — the user's own call, reviewing the built feature. So
+  // this now stays the plain, full category index regardless of `query`.
+  it("desktop: the category index doesn't narrow when typing — only the hero's own search dropdown does", async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
     const synagogue = makeCategory({ id: 'synagogue', pluralLabel: 'Synagogues' })
     renderLanding(undefined, { content: { categories: [grocery, synagogue] } })
 
-    // getAllByLabelText, not getByLabelText: HeroHeading now renders the
-    // search box twice in the DOM (mobile's plain block and desktop's warm
-    // band), toggled with `desktop:hidden`/`hidden desktop:` classes rather
-    // than a JS branch — see that component's own doc on why. jsdom doesn't
-    // apply CSS, so both are genuinely present; either one drives the same
-    // Landing state, so the first is as good as any for a test.
+    const card = screen.getByTestId('browse-everything-card')
     await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
 
-    // getAllByText, not getByText: the same result set now renders twice in
-    // the DOM once there's a query — mobile's own permanent grid section,
-    // and desktop's copy inside SearchSection's white box (see Landing's
-    // resultsNode doc on why: a single mount can't live in two different
-    // places in the tree, so this is genuine, deliberate duplication, not a
-    // bug). jsdom doesn't apply CSS, so both are visible to a query here.
-    expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
-    expect(screen.queryByText('Synagogues')).not.toBeInTheDocument()
+    expect(within(card).getByText('Grocery Stores')).toBeInTheDocument()
+    expect(within(card).getByText('Synagogues')).toBeInTheDocument()
   })
 
   it('shows a "nothing matches" message for a query with no hits', async () => {
