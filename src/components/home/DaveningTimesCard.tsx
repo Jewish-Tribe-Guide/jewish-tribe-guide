@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCategories } from '@/lib/useCategories'
 import { useAllListings } from '@/lib/useAllListings'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -139,10 +140,40 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6">
+      {/* A real photo (tzitzit/siddur), not the gradient placeholder every
+          other card in this row still uses — the user's own choice, a
+          Pexels photo (free to use commercially, no attribution required,
+          unlike an unlicensed/watermarked stock preview tried first). Not
+          admin-editable — hardcoded the same way this card's copy already
+          is. `unoptimized`: pexels.com isn't in next.config.ts's optimizer
+          allowlist (imageHosts.ts) and doesn't need to be for one fixed
+          photo — see that file's own doc on why the allowlist stays narrow
+          rather than growing per image. The mask lives on this wrapper, not
+          the `fill`ed Image itself — `fill` sets its own inset-0/100%
+          sizing via inline style, which would fight a width/position class
+          placed directly on it. No `z-index` (not even a negative one, tried
+          first): this card div never establishes its own stacking context
+          (plain `position: relative`, no z-index of its own), so a negative
+          z-index on this wrapper escaped UP to the nearest ancestor that
+          actually does establish one — landing it behind page-level layers
+          instead of just behind the text column, and the photo vanished
+          entirely. Sibling cards (SuggestListingCard/CampaignBannerCard) get
+          the same "behind the text" result for free from plain DOM order —
+          this wrapper renders first, the text column second, and two
+          z-index:auto positioned/relative siblings paint in that order. */}
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 right-0 w-[42%] bg-gradient-to-bl from-slate-300 via-slate-200 to-slate-100 [mask-image:linear-gradient(to_left,black_60%,transparent)]"
-      />
+        className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
+      >
+        <Image
+          src="https://images.pexels.com/photos/6340893/pexels-photo-6340893.jpeg"
+          alt=""
+          fill
+          sizes="(min-width: 640px) 42vw, 0px"
+          className="object-cover"
+          unoptimized
+        />
+      </div>
       <div className="relative max-w-[58%]">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Upcoming</p>
         <h3 className="font-serif text-lg font-semibold text-ink">Davening Times</h3>
