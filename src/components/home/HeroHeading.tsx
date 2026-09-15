@@ -217,7 +217,7 @@ export default function HeroHeading({
             `isolate` so it never competes with the wash/photo layers
             above. */}
         <SkylineIcon className="pointer-events-none absolute bottom-0 left-0 -z-10 h-auto w-[360px] text-slate-400 opacity-15" />
-        <div className="mx-auto flex min-h-[435px] max-w-6xl desktop:max-w-5xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
+        <div className="mx-auto flex min-h-[435px] max-w-6xl desktop:max-w-7xl flex-col justify-center px-4 pt-[calc(3.5rem+60px)] pb-14 sm:px-6">
           <h1 className="max-w-2xl font-serif text-[64px] font-bold leading-[1.02] tracking-tight text-ink text-balance">
             {headline}
           </h1>
