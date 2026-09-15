@@ -997,3 +997,64 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
   })
 })
+
+// The standalone map's own address bar used to never actually update after
+// the initial load — a chip toggle, a committed search, or picking a pin all
+// left window.location exactly where it started. The mechanism meant to do
+// this (a history.replaceState effect) checked window.history.state.mode
+// === 'map', a leftover from the old hand-rolled navigation state machine
+// (see useSiteNavigation.ts's own doc — "Now the URL is the state") that
+// nothing sets any more, so the effect's body never ran. A category
+// directory's own filters/search already round-trip through its URL the
+// same way (FindResourcesConnected); this closes the same gap here, so a
+// map link is shareable down to the exact chips/search/pin someone had
+// open, the way viewMapForCategory's own initial-navigation link already
+// was — see mapQueryString/parseMapQuery.
+describe('ResourceMapView — the shareable URL (standalone)', () => {
+  afterEach(() => window.history.replaceState(null, '', '/test-community/map'))
+
+  function renderStandaloneWithListings() {
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    return renderMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [grocery],
+    )
+  }
+
+  it('writes the selected category chip to the URL', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+
+    expect(new URLSearchParams(window.location.search).get('cat')).toBe('grocery')
+  })
+
+  it('writes the selected pin to the URL', async () => {
+    const user = userEvent.setup()
+    renderStandaloneWithListings()
+
+    await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
+
+    expect(new URLSearchParams(window.location.search).get('place')).toBe('g1')
+  })
+
+  // openNowActive derives from the committed query text itself (see
+  // OPEN_NOW_WORDS) — the URL should carry that as `open=1`, not also
+  // duplicate it into `q=open+now`.
+  it('writes a committed "open now" search to the URL as open=1, not a redundant q=', async () => {
+    const user = userEvent.setup()
+    const { container } = renderStandaloneWithListings()
+    const input = container.querySelector<HTMLInputElement>('input[placeholder^="Search name, address"]')!
+
+    await user.type(input, 'open now')
+    await user.keyboard('{Enter}')
+
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('open')).toBe('1')
+    expect(params.get('q')).toBeNull()
+  })
+})

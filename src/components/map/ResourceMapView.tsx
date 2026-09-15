@@ -29,6 +29,7 @@ import DroppedPinEditor from './DroppedPinEditor'
 import { useCampaignBanners } from '@/lib/contentContext'
 import { activeCampaignBanner } from '@/lib/campaignBanner'
 import { community } from '@/community.config'
+import { mapQueryString } from '@/lib/routes'
 import type { DirectoryResource, MapFilters } from '@/types'
 
 // Shared by the initial useState below and the resync effect further down
@@ -429,30 +430,6 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     togglePinnedListing({ id: sp.id, categoryId: sp.filterId })
   }
 
-  // Keeps the standalone map screen's own address bar in sync with which pin
-  // is open, so a map link is shareable down to the specific place someone
-  // had selected — not just the pins and filters mapQueryString already
-  // covered. Plain history.replaceState, not next/navigation's router —
-  // same choice the existing mapQuery/mapSelected/mapFilters sync above
-  // already made (see its own comment), and for the same reason: router.replace
-  // re-subscribes every useSearchParams() caller (this component now among
-  // them) to the change, and this screen's marker layer already re-renders
-  // more often than its own state actually changes — feeding that back
-  // through the router turns a harmless extra render into a real navigation
-  // each time.
-  // A plain history write has no such feedback loop: nothing subscribes to
-  // it, so it only ever affects a future cold load (initialPlaceId) or a
-  // copy-pasted address bar.
-  useEffect(() => {
-    if (!standalone) return
-    const next = new URLSearchParams(window.location.search)
-    if (selectedPointId) next.set('place', selectedPointId)
-    else next.delete('place')
-    const qs = next.toString()
-    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-    if (url === `${window.location.pathname}${window.location.search}`) return
-    window.history.replaceState(window.history.state, '', url)
-  }, [selectedPointId, standalone])
   // Restoring the selection from `initialPlaceId` needs allPoints, which
   // isn't computed yet at this point in the component — see below, right
   // after allPoints itself.
@@ -869,31 +846,40 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, boolFields, selectFilters, categories, allPoints, filterChips])
 
-  // Keep the current history entry in sync with the committed query/filters/
-  // selection, so returning via browser Back restores what was actually on
-  // screen — not just the snapshot from when the map was first opened (or
-  // last touched a chip). Persists committedQuery, not the live `input`, so
-  // this doesn't fire on every keystroke.
+  // Keeps the standalone map screen's own address bar in sync with the
+  // category chips, committed search/filters, and selected pin — so a
+  // shared map link (or hitting browser Back) reopens the exact same view,
+  // the same way a category directory's own filters/search already round-
+  // trip through its URL. mapQueryString is the same builder viewMapForCategory
+  // uses for the initial navigation there, so a link built by either one
+  // reads back identically via parseMapQuery.
+  //
+  // Plain history.replaceState, not next/navigation's router: router.replace
+  // re-subscribes every useSearchParams() caller (this component now among
+  // them) to the change, and this screen's marker layer already re-renders
+  // more often than its own state actually changes — feeding that back
+  // through the router turns a harmless extra render into a real navigation
+  // each time. A plain history write has no such feedback loop: nothing
+  // subscribes to it, so it only ever affects a future cold load
+  // (initialCategory/initialQuery/initialFilters/initialPlaceId) or a
+  // copy-pasted/shared address bar.
+  //
+  // Persists committedQuery, not the live `input`, so this doesn't fire on
+  // every keystroke — only once a search is actually committed.
   useEffect(() => {
-    const current = window.history.state as { mode?: string } | null
-    if (current?.mode !== 'map') return
-    const anyFilter = openNowActive || boolFields.length > 0 || Object.keys(selectFilters).length > 0
-    history.replaceState(
-      {
-        ...current,
-        mapQuery: committedQuery || undefined,
-        mapSelected: selected ? Array.from(selected) : undefined,
-        mapFilters: anyFilter
-          ? {
-              openNow: openNowActive || undefined,
-              bool: boolFields.length ? boolFields : undefined,
-              select: Object.keys(selectFilters).length ? selectFilters : undefined,
-            }
-          : undefined,
-      },
-      '',
-    )
-  }, [committedQuery, selected, openNowActive, boolFields, selectFilters])
+    if (!standalone) return
+    const qs = mapQueryString({
+      categories: selected ? Array.from(selected) : null,
+      query: openNowActive ? null : committedQuery || null,
+      openNow: openNowActive,
+      bool: boolFields,
+      select: selectFilters,
+      place: selectedPointId ?? null,
+    })
+    const url = `${window.location.pathname}${qs}`
+    if (url === `${window.location.pathname}${window.location.search}`) return
+    window.history.replaceState(window.history.state, '', url)
+  }, [standalone, committedQuery, selected, openNowActive, boolFields, selectFilters, selectedPointId])
 
   // "Open now" has to re-answer as the clock moves — a pin that closed at 6pm
   // should drop off a filtered map at 6pm, not when the visitor next reloads.
