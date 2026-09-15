@@ -32,7 +32,10 @@ export default function UpdateListingsCard({ eyebrow, heading }: { eyebrow: stri
         </div>
         <PeopleIcon className="h-8 w-8 shrink-0 text-brand-teal" />
       </div>
-      <p className="text-sm text-slate-600">
+      {/* max-w keeps this wrapping onto its own couple of lines — without
+          it, this card's wider desktop width (the 3-up community row) lets
+          the sentence run edge to edge on one line instead. */}
+      <p className="max-w-[34ch] text-sm text-slate-600">
         A living guide, built and updated by the people who call {community.region} home.
       </p>
       <Link
