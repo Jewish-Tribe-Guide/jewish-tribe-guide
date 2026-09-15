@@ -204,7 +204,15 @@ export default function HeroHeading({
           where the wash made it look plain; see the photo box's own
           comment below for why confining the box itself is what actually
           fixes that, not just where the fade happens. */}
-      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-hidden bg-cream desktop:-mt-[60px]">
+      {/* overflow-x-hidden, not overflow-hidden: this section only needs to
+          clip the horizontal edges the w-screen/-translate-x-1/2 full-bleed
+          trick creates (already backstopped globally too — see globals.css's
+          own overflow-x rule), not the vertical ones — the photo box has its
+          own overflow-hidden wrapper below and doesn't need this section's
+          help. Clipping vertically as well cut off HeroSearchDropdown
+          whenever it was taller than the section's own rendered height
+          (a query matching enough categories/listings), confirmed live. */}
+      <section className="hidden desktop:block relative left-1/2 isolate min-h-[435px] w-screen -translate-x-1/2 overflow-x-hidden bg-cream desktop:-mt-[60px]">
         {/* The photo lives in its OWN right-anchored box — NOT the full
             w-screen band (that was the earlier design: one full-bleed photo
             with a wash faked over the left side to look plain). The user
