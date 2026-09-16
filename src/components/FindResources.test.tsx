@@ -146,9 +146,13 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
   })
 
-  // Mobile: unchanged full-screen navigation, same as 'create' above — the
-  // directory (ResourceLoader) is gone, replaced entirely by the form.
-  it('on mobile, resolves a deep-linked edit to a full-screen form, replacing the directory', () => {
+  // Mobile: a bottom sheet layered over the still-mounted directory (see
+  // MobileSheet's own doc) — used to be a flat full-screen overlay, and
+  // before that a route-level replace that took ResourceLoader down with
+  // it, same as 'create' still is above. The form renders `embedded`
+  // (skips its own Breadcrumb/mobile-header hijack) since the sheet
+  // already supplies a title and close control, same as desktop's dialog.
+  it('on mobile, resolves a deep-linked edit to a sheet over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <ForcedViewport isMobile>
@@ -157,11 +161,12 @@ describe('FindResources — a real listing category', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
-    expect(screen.queryByText('ResourceLoader')).not.toBeInTheDocument()
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
   })
 
-  it('on mobile, resolves a deep-linked report to a full-screen form, replacing the directory', () => {
+  it('on mobile, resolves a deep-linked report to a sheet over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <ForcedViewport isMobile>
@@ -170,8 +175,9 @@ describe('FindResources — a real listing category', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ReportListing')).toBeInTheDocument()
-    expect(screen.queryByText('ResourceLoader')).not.toBeInTheDocument()
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
+    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
   })
 
   // Desktop: a dialog layered over the still-mounted directory instead —

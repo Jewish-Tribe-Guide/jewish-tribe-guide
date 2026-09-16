@@ -8,10 +8,10 @@ import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
 import ListingForm from '@/components/resources/ListingForm'
-import ReportSheet from '@/components/resources/ReportSheet'
+import ReportListing from '@/components/resources/ReportListing'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
-import { ChevronLeftIcon } from '@/components/icons'
+import UpButton from '@/components/UpButton'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -48,82 +48,77 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
       : category.iconImageUrl) ?? undefined
-  // Edit swaps this whole detail view for the same form the category
-  // directory uses (ListingForm), same as GenericListingCard's own mobile
-  // accordion — just scoped to this one component instead of the whole
-  // screen, since the map has no separate "form view" of its own to
-  // navigate to. Returns to this same place's detail (not the list) on
-  // cancel or submit, since that's what was on screen before Edit was
-  // tapped.
+  // Edit/Report both swap this whole detail view for the same form the
+  // category directory uses (ListingForm/ReportListing), same as
+  // GenericListingCard's own mobile accordion — just scoped to this one
+  // component instead of the whole screen, since the map has no separate
+  // "form view" of its own to navigate to. Returns to this same place's
+  // detail (not the list) on cancel or submit, since that's what was on
+  // screen before either was tapped.
   //
-  // Gets its own history entry, nested on top of the one MobileNearbySheet's
-  // selectPlace already pushed for this place — so a swipe-back/browser-back
-  // out of the form lands on this place's detail, not the list underneath
-  // it or off the map entirely. Same pattern as that one; see its own
-  // comment for why (and CategoryEditor's openPreview/closePreview, the
-  // precedent both follow).
+  // Report used to open as its own sheet, layered on top (ReportSheet) —
+  // that's still the right call on the category directory, which has no
+  // persistent panel of its own for Report to join. Here there already IS
+  // one (this whole detail view sits inside MobileNearbySheet's own
+  // persistent bottom sheet), so a second sheet stacked on top of it read
+  // as a mismatch once Edit's in-place swap made the alternative visible
+  // side by side — swapping in place, matching Edit, means Report and Edit
+  // both stay inside the one sheet that's already open instead of one of
+  // them popping a second one over it.
   //
-  // Report used to work the identical way (a third `action` value, its own
-  // history entry) — moved to its own sheet instead (see ReportSheet's own
-  // doc on why: its form is short enough not to need a full replace at
-  // all). No history entry for it any more, on purpose: dismissing a sheet
-  // is a local UI change, not a navigation, so it doesn't belong in browser
-  // history alongside the places this map sheet actually visited.
-  const [editOpen, setEditOpen] = useState(false)
-  const [reportSheetOpen, setReportSheetOpen] = useState(false)
+  // Each gets its own history entry, nested on top of the one
+  // MobileNearbySheet's selectPlace already pushed for this place — so a
+  // swipe-back/browser-back out of the form lands on this place's detail,
+  // not the list underneath it or off the map entirely. Same pattern as
+  // that one; see its own comment for why (and CategoryEditor's
+  // openPreview/closePreview, the precedent both follow).
+  const [formOpen, setFormOpen] = useState<'edit' | 'report' | null>(null)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit' } | null
-      setEditOpen(state?.mapSheetForm === 'edit')
+      const state = e.state as { mapSheetForm?: 'edit' | 'report' } | null
+      setFormOpen(state?.mapSheetForm === 'edit' || state?.mapSheetForm === 'report' ? state.mapSheetForm : null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  const openEdit = () => {
-    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
-    setEditOpen(true)
+  const openForm = (mode: 'edit' | 'report') => {
+    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
+    setFormOpen(mode)
   }
-  const closeEdit = () => history.back()
+  const closeForm = () => history.back()
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
 
-  if (editOpen) {
+  if (formOpen) {
     return (
       <>
-        {/* Mobile only — ListingForm's own back affordance (a Breadcrumb)
-            is desktop-only by design (see Breadcrumb's own doc), and its
-            useSetScreenHeader "‹ Suggest an edit" call never actually
+        {/* Mobile only — ListingForm/ReportListing's own back affordance (a
+            Breadcrumb) is desktop-only by design (see Breadcrumb's own
+            doc), and their useSetScreenHeader "‹ ..." call never actually
             becomes visible here: MapScreen deliberately collapses the
             shared header on this screen (useCollapseHeader), so it
             doesn't compete with the map's own floating search bar.
-            Without this, editing from here on mobile opened straight into
-            the form with no way back at all — confirmed live. Reuses
-            "Back to list" below's exact style; "Back" alone rather than
-            naming a destination, since — unlike that button, which really
-            does go to a different screen (the nearby list) — this one
-            just returns to the same place detail you were already on. */}
-        <button
-          onClick={closeEdit}
-          className="desktop:hidden mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-        >
-          <ChevronLeftIcon className="h-4 w-4" />
-          Back
-        </button>
-        <ListingForm category={category} mode="edit" existing={item} onUp={closeEdit} onSubmitted={closeEdit} />
+            Without this, opening either form here on mobile had no way
+            back at all — confirmed live. The same UpButton every other
+            screen's "go up a level" control already is (see its own doc);
+            "Back" alone rather than naming a destination, since — unlike
+            "Back to list" below, which really does go to a different
+            screen (the nearby list) — this one just returns to the same
+            place detail you were already on. */}
+        <UpButton label="Back" onClick={closeForm} className="desktop:hidden mb-3" />
+        {formOpen === 'edit' ? (
+          <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} />
+        ) : (
+          <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeForm} onSubmitted={closeForm} />
+        )}
       </>
     )
   }
 
   return (
     <div className="space-y-4 pb-2">
-      <button
-        onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-        Back to list
-      </button>
+      <UpButton label="Back to list" onClick={onBack} className="" />
 
       {/* ── Header: icon, name, category, pin ────────────────────────────── */}
       <div className="flex items-start gap-3">
@@ -184,16 +179,15 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             GenericListingCard's own mobile kebab passes — see that
             component's doc on why Edit/Report moved into this menu instead
             of sitting alone in the footer below (removed from here now,
-            same reasoning). Report opens ReportSheet locally; Edit still
-            swaps this whole panel via the history-backed editOpen state
-            above, unchanged. */}
+            same reasoning). Both now swap this whole panel via the
+            history-backed formOpen state above — see its own doc. */}
         <ListingActionsMenu
           item={item}
           category={category}
           path={listingPath}
           className="mr-1 self-center"
-          onEdit={openEdit}
-          onReport={() => setReportSheetOpen(true)}
+          onEdit={() => openForm('edit')}
+          onReport={() => openForm('report')}
           canEdit={canEdit}
           canReport={canReport}
         />
@@ -210,13 +204,6 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
         {/* Edit/Report used to sit here too — both now live only in the
             kebab above, same place Pin/Share/Set location do. */}
       </div>
-
-      <ReportSheet
-        isOpen={reportSheetOpen}
-        onClose={() => setReportSheetOpen(false)}
-        listing={item}
-        upLabel={category.pluralLabel}
-      />
     </div>
   )
 }

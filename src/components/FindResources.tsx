@@ -8,6 +8,7 @@ import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
 import ReportListing from '@/components/resources/ReportListing'
 import ActionDialog from '@/components/resources/ActionDialog'
+import MobileSheet from '@/components/resources/MobileSheet'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import UpButton from '@/components/UpButton'
@@ -302,26 +303,16 @@ export default function FindResources({
         </>
       )
     }
-    // Edit/Report on mobile stay a full-screen navigation, same as always —
-    // Edit's form can run long (category-specific detail fields), and a
-    // dialog tall enough to hold it comfortably on a phone wouldn't feel any
-    // lighter than the full screen it already is (see ReportSheet's own doc
-    // for the fuller reasoning, and why Report itself takes a different,
-    // sheet-based path on mobile instead of ever reaching here at all — this
-    // branch is now only what a deep link or search-result Report button
-    // still falls back to there). Desktop instead falls through to the
-    // dialog below, layered over the still-mounted directory.
-    if (action?.mode === 'edit' && isMobile) {
-      return (
-        <>
-          {sharedTurnstileWidget}
-          <ListingForm category={category} mode="edit" existing={action.listing} onUp={goToCategoryList} onSubmitted={goToCategoryList} sharedTurnstile={sharedTurnstile} />
-        </>
-      )
-    }
-    if (action?.mode === 'report' && isMobile) {
-      return <ReportListing listing={action.listing} upLabel={category.pluralLabel} onUp={goToCategoryList} onSubmitted={goToCategoryList} />
-    }
+    // Edit/Report (desktop: a centered dialog; mobile: a bottom sheet — see
+    // ActionDialog's and MobileSheet's own docs) both layer over a
+    // ResourceLoader that stays mounted the whole time, on both platforms.
+    // Mobile used to swap in a flat full-screen form here instead, before
+    // the map's own MapPlaceDetail (whose Edit/Report already live inside
+    // its persistent bottom sheet) made that mismatch obvious. Report itself
+    // mostly never reaches this any more — the collapsed row's own kebab
+    // opens ReportSheet on mobile directly (see GenericListingCard's doc) —
+    // this is what a deep link or search-result Report button still falls
+    // back to.
     return (
       <>
         {sharedTurnstileWidget}
@@ -343,37 +334,65 @@ export default function FindResources({
           onReport={(listing) => openAction({ mode: 'report', listing })}
           onParamsChange={setParams}
         />
-        {/* Desktop's Edit/Report — see ActionDialog's own doc for why this
-            layers over the still-mounted ResourceLoader above instead of
-            replacing it, unlike mobile's branches above. `action` (and
-            therefore which dialog, if either, is actually open) already
-            narrows correctly against `!isMobile` from the checks above —
-            re-checked per-dialog here only because TypeScript can't carry
-            that narrowing through the JSX below on its own. */}
-        <ActionDialog isOpen={!isMobile && action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
-          {!isMobile && action?.mode === 'edit' && (
-            <ListingForm
-              category={category}
-              mode="edit"
-              existing={action.listing}
-              onUp={goToCategoryList}
-              onSubmitted={goToCategoryList}
-              sharedTurnstile={sharedTurnstile}
-              embedded
-            />
-          )}
-        </ActionDialog>
-        <ActionDialog isOpen={!isMobile && action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem">
-          {!isMobile && action?.mode === 'report' && (
-            <ReportListing
-              listing={action.listing}
-              upLabel={category.pluralLabel}
-              onUp={goToCategoryList}
-              onSubmitted={goToCategoryList}
-              embedded
-            />
-          )}
-        </ActionDialog>
+        {/* `action` (and therefore which overlay, if either, is actually
+            open) already narrows correctly against `isMobile` here —
+            re-checked per-branch below only because TypeScript can't carry
+            that narrowing through sibling JSX on its own. */}
+        {isMobile ? (
+          <>
+            <MobileSheet isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
+              {action?.mode === 'edit' && (
+                <ListingForm
+                  category={category}
+                  mode="edit"
+                  existing={action.listing}
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  sharedTurnstile={sharedTurnstile}
+                  embedded
+                />
+              )}
+            </MobileSheet>
+            <MobileSheet isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem">
+              {action?.mode === 'report' && (
+                <ReportListing
+                  listing={action.listing}
+                  upLabel={category.pluralLabel}
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  embedded
+                />
+              )}
+            </MobileSheet>
+          </>
+        ) : (
+          <>
+            <ActionDialog isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
+              {action?.mode === 'edit' && (
+                <ListingForm
+                  category={category}
+                  mode="edit"
+                  existing={action.listing}
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  sharedTurnstile={sharedTurnstile}
+                  embedded
+                />
+              )}
+            </ActionDialog>
+            <ActionDialog isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem">
+              {action?.mode === 'report' && (
+                <ReportListing
+                  listing={action.listing}
+                  upLabel={category.pluralLabel}
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  embedded
+                />
+              )}
+            </ActionDialog>
+          </>
+        )}
       </>
     )
   }
