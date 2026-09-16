@@ -89,7 +89,30 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   const canReport = ui.contributions.report && caps.report
 
   if (editOpen) {
-    return <ListingForm category={category} mode="edit" existing={item} onUp={closeEdit} onSubmitted={closeEdit} />
+    return (
+      <>
+        {/* Mobile only — ListingForm's own back affordance (a Breadcrumb)
+            is desktop-only by design (see Breadcrumb's own doc), and its
+            useSetScreenHeader "‹ Suggest an edit" call never actually
+            becomes visible here: MapScreen deliberately collapses the
+            shared header on this screen (useCollapseHeader), so it
+            doesn't compete with the map's own floating search bar.
+            Without this, editing from here on mobile opened straight into
+            the form with no way back at all — confirmed live. Reuses
+            "Back to list" below's exact style; "Back" alone rather than
+            naming a destination, since — unlike that button, which really
+            does go to a different screen (the nearby list) — this one
+            just returns to the same place detail you were already on. */}
+        <button
+          onClick={closeEdit}
+          className="desktop:hidden mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Back
+        </button>
+        <ListingForm category={category} mode="edit" existing={item} onUp={closeEdit} onSubmitted={closeEdit} />
+      </>
+    )
   }
 
   return (

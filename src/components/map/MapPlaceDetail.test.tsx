@@ -140,6 +140,33 @@ describe('MapPlaceDetail', () => {
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
   })
 
+  // Regression: the edit form used to open with no way back at all on
+  // mobile — ListingForm's own back affordance (a Breadcrumb) is
+  // desktop-only, and its useSetScreenHeader call never becomes visible
+  // here since MapScreen deliberately collapses the shared header on this
+  // screen. Confirmed live before this landed. This button (mobile only —
+  // desktop still has ListingForm's own Breadcrumb) closes it the same way
+  // cancelling the form does: via history.back(), not a direct state reset.
+  it('shows a Back button once the edit form is open, and it closes the form via history.back()', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+
+    await user.click(screen.getByRole('button', { name: /^back$/i }))
+    expect(backSpy).toHaveBeenCalled()
+  })
+
   it('opens Report as a sheet, layered on top — the place detail underneath is untouched', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
     const user = userEvent.setup()
