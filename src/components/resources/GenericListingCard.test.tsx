@@ -383,7 +383,7 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
     // utility on the same element won the cascade over line-clamp's own
     // required `display: -webkit-box`).
     for (const description of screen.getAllByText(/A network of young leaders/)) {
-      expect(description).toHaveStyle({ WebkitLineClamp: '3', display: '-webkit-box' })
+      expect(description).toHaveStyle({ WebkitLineClamp: '2', display: '-webkit-box' })
       expect(description).not.toHaveClass('truncate')
     }
   })

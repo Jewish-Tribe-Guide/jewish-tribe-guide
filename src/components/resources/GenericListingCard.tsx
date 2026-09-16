@@ -391,7 +391,7 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Kept as inline style on an INNER element below instead, one level
   // removed from the classes doing responsive show/hide, so the two
   // display values are never fighting over the same element to begin with.
-  const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' } as const
+  const headerTextClampStyle = { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' } as const
 
   // Collapsed-row signal badges — only the ones tied to a real filter control
   // (boolean/select fields marked `filterable`). Everything else (cert
