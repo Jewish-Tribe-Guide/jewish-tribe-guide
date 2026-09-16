@@ -46,3 +46,34 @@ export function splitByProductionSafety(deployments) {
   const preview = deployments.filter((d) => d.target !== 'production')
   return { production, preview }
 }
+
+/** Splits an already-production-only list (splitByProductionSafety's own
+ *  `production`) into the `keep` most recent (by `created`) and everything
+ *  older — what a production-history pruning pass targets, for a project on
+ *  a Vercel plan with no Deployment Retention setting of its own (Hobby;
+ *  see the delete script's own header for why that setting can't just be
+ *  turned on instead).
+ *
+ *  Date-sorted by count, not alias-aware: this doesn't call Vercel's
+ *  aliases API to confirm which single deployment is the one actually
+ *  serving the production domain right now. It keeps a generous recent
+ *  window instead, on the reasoning that the live deployment is
+ *  overwhelmingly likely to be among the most recent handful (a manual
+ *  "instant rollback" to something older is the one case that could put it
+ *  outside this window) — "keep the last N" is a safety margin simple
+ *  enough to trust at a glance, not a precision guarantee, so `keep`
+ *  should stay generous rather than tuned tight to the storage target.
+ *
+ *  `keepOldest` (default off): also spares the single OLDEST deployment
+ *  overall, on top of the `keep` most recent — the user's own call, purely
+ *  sentimental (the project's very first production deployment), not a
+ *  rollback-safety concern the way the recent window is. A no-op when
+ *  there's nothing left to prune (the oldest is already inside `keep`). */
+export function splitProductionByRetention(production, keep, { keepOldest = false } = {}) {
+  const sorted = [...production].sort((a, b) => b.created - a.created)
+  const keptRecent = sorted.slice(0, keep)
+  const rest = sorted.slice(keep)
+  if (!keepOldest || rest.length === 0) return { keep: keptRecent, prune: rest }
+  const oldest = rest[rest.length - 1]
+  return { keep: [...keptRecent, oldest], prune: rest.slice(0, -1) }
+}
