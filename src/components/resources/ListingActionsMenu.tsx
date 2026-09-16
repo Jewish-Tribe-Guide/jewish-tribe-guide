@@ -62,9 +62,13 @@ import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon, PencilIcon, 
 // property of normal DOM stacking every browser agrees on, not by racing an
 // event through JS-level interception.
 
-// w-40 below, in px — needed as a number to compare against actual measured
-// space at open time.
-const MENU_WIDTH = 160
+// w-48 below, in px — needed as a number to compare against actual measured
+// space at open time. Was 160 (w-40): bumped alongside the menu's own row
+// size (see menuItemClass) to Material's ~44-48px row height / 14px text
+// spec — Gmail's own overflow menu is the same size, on both mobile and
+// desktop; the old text-xs/36px rows undershot the mobile tap-target
+// minimum (Apple HIG and Material both land around 44-48px).
+const MENU_WIDTH = 192
 // A little slack past the bare minimum so the menu never sits flush against
 // the very edge of the screen even when it JUST fits.
 const EDGE_MARGIN = 8
@@ -143,12 +147,12 @@ export default function ListingActionsMenu({
       // A rough estimate of the popup's height — good enough to decide
       // whether it fits below the button without waiting a render to
       // measure the real thing (same reasoning as CheckboxDropdown's own
-      // ESTIMATED_ROW_PX). ~36px per row, +8px for the popup's own vertical
-      // padding/border.
+      // ESTIMATED_ROW_PX). ~44px per row (see menuItemClass), +8px for the
+      // popup's own vertical padding/border.
       const itemCount = hidePrimaryActions
         ? (canEdit ? 1 : 0) + (canReport ? 1 : 0)
         : (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0) + (canReport ? 1 : 0)
-      const estimatedHeight = itemCount * 36 + 8
+      const estimatedHeight = itemCount * 44 + 8
       const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
       // Clamped inward from the kebab's own left edge means the popup is
       // effectively right-aligned against the viewport edge — used below to
@@ -199,8 +203,14 @@ export default function ListingActionsMenu({
   const pinned = isPinned(item.id)
   const active = canSetLocation && location!.anchorListingId === item.id
 
+  // py-3 + text-sm (~44px row height), not the old py-2 + text-xs (~36px) —
+  // Material's and Apple HIG's own tap-target minimum is ~44-48px, and the
+  // old size undershot it. Same size on both platforms rather than a
+  // mobile/desktop split: Gmail's own overflow menu (what prompted this)
+  // doesn't shrink for desktop either, and a mouse being more precise than
+  // a finger isn't a reason to make text harder to read.
   const menuItemClass =
-    'flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer'
+    'flex w-full items-center gap-2.5 whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer'
 
   return (
     <div ref={wrapRef} className={`relative ${className ?? ''}`}>
@@ -284,7 +294,7 @@ export default function ListingActionsMenu({
               left: popupPos.left,
               transformOrigin: `${popupPos.top !== undefined ? 'top' : 'bottom'} ${popupPos.anchorRight ? 'right' : 'left'}`,
             }}
-            className="z-[56] w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
+            className="z-[56] w-48 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
           >
             {!hidePrimaryActions && (
               <>
@@ -305,7 +315,7 @@ export default function ListingActionsMenu({
                     aria-pressed={pinned}
                     className={menuItemClass}
                   >
-                    <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
+                    <PinIcon filled={pinned} className="h-4 w-4 shrink-0" />
                     {pinned ? 'Pinned' : 'Pin'}
                   </button>
                 )}
@@ -315,7 +325,7 @@ export default function ListingActionsMenu({
                   onClick={share}
                   className={menuItemClass}
                 >
-                  <ExternalIcon className="h-3.5 w-3.5 shrink-0" />
+                  <ExternalIcon className="h-4 w-4 shrink-0" />
                   {copied ? 'Copied!' : 'Share'}
                 </button>
                 {canSetLocation && (
@@ -331,7 +341,7 @@ export default function ListingActionsMenu({
                     aria-pressed={active}
                     className={menuItemClass}
                   >
-                    {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
+                    {active ? <CheckIcon className="h-4 w-4 shrink-0" /> : <CrosshairIcon className="h-4 w-4 shrink-0" />}
                     {active ? 'Location set' : 'Set location'}
                   </button>
                 )}
@@ -349,7 +359,7 @@ export default function ListingActionsMenu({
                 }}
                 className={menuItemClass}
               >
-                <PencilIcon className="h-3.5 w-3.5 shrink-0" />
+                <PencilIcon className="h-4 w-4 shrink-0" />
                 Edit
               </button>
             )}
@@ -364,7 +374,7 @@ export default function ListingActionsMenu({
                 }}
                 className={`${menuItemClass} hover:text-red-600`}
               >
-                <FlagIcon className="h-3.5 w-3.5 shrink-0" />
+                <FlagIcon className="h-4 w-4 shrink-0" />
                 Report
               </button>
             )}
