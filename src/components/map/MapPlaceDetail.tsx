@@ -93,24 +93,31 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   if (formOpen) {
     return (
       <>
-        {/* Mobile only — ListingForm/ReportListing's own back affordance (a
-            Breadcrumb) is desktop-only by design (see Breadcrumb's own
-            doc), and their useSetScreenHeader "‹ ..." call never actually
-            becomes visible here: MapScreen deliberately collapses the
-            shared header on this screen (useCollapseHeader), so it
-            doesn't compete with the map's own floating search bar.
-            Without this, opening either form here on mobile had no way
-            back at all — confirmed live. The same UpButton every other
-            screen's "go up a level" control already is (see its own doc);
-            "Back" alone rather than naming a destination, since — unlike
-            "Back to list" below, which really does go to a different
-            screen (the nearby list) — this one just returns to the same
-            place detail you were already on. */}
-        <UpButton label="Back" onClick={closeForm} className="desktop:hidden mb-3" />
+        {/* Own back affordance on BOTH platforms — not just mobile.
+            ListingForm/ReportListing's own back affordance (a Breadcrumb)
+            names the wrong destination here: it reads "‹ {category
+            label} / Suggest an edit", the correct wording for the
+            category directory's own Edit (cancelling really does go up
+            to that category's list there) but not for this panel, where
+            cancelling (closeForm) returns to THIS place's own detail, not
+            to a category list at all — there's no "up to the category"
+            to go to from inside the map. `embedded` suppresses that
+            Breadcrumb (and useSetScreenHeader's identical "‹ ..." call,
+            never visible here anyway: MapScreen collapses the shared
+            header on this screen so it doesn't compete with the map's own
+            floating search bar) on both platforms, replaced by the same
+            UpButton every other screen's "go up a level" control already
+            is (see its own doc) — same as "Back to list" below, which
+            shows on both platforms too, for the same reason. "Back" alone
+            rather than naming a destination, since — unlike "Back to
+            list", which really does go to a different screen (the nearby
+            list) — this one just returns to the same place detail you
+            were already on. */}
+        <UpButton label="Back" onClick={closeForm} className="mb-3" />
         {formOpen === 'edit' ? (
-          <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} />
+          <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
         ) : (
-          <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeForm} onSubmitted={closeForm} />
+          <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeForm} onSubmitted={closeForm} embedded />
         )}
       </>
     )

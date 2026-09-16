@@ -21,15 +21,17 @@ vi.mock('next/navigation', () => ({
 // one with the right listing, not to re-exercise their internals (which
 // pull in the real Google Maps address widget, Turnstile, etc.).
 vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode, existing, onUp }: { mode: string; existing?: DirectoryResource; onUp: () => void }) => (
+  default: ({ mode, existing, onUp, embedded }: { mode: string; existing?: DirectoryResource; onUp: () => void; embedded?: boolean }) => (
     <div>
-      <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
+      <p>ListingForm stub — mode={mode}, existing={existing?.name}{embedded ? ' (embedded)' : ''}</p>
       <button onClick={onUp}>stub cancel</button>
     </div>
   ),
 }))
 vi.mock('@/components/resources/ReportListing', () => ({
-  default: ({ listing }: { listing: DirectoryResource }) => <p>ReportListing stub — {listing.name}</p>,
+  default: ({ listing, embedded }: { listing: DirectoryResource; embedded?: boolean }) => (
+    <p>ReportListing stub — {listing.name}{embedded ? ' (embedded)' : ''}</p>
+  ),
 }))
 
 afterEach(() => {
@@ -135,18 +137,19 @@ describe('MapPlaceDetail', () => {
     await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
     await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
-    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market (embedded)')).toBeInTheDocument()
     // Swapped out entirely, not layered on top.
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
   })
 
   // Regression: the edit form used to open with no way back at all on
-  // mobile — ListingForm's own back affordance (a Breadcrumb) is
-  // desktop-only, and its useSetScreenHeader call never becomes visible
-  // here since MapScreen deliberately collapses the shared header on this
-  // screen. Confirmed live before this landed. This button (mobile only —
-  // desktop still has ListingForm's own Breadcrumb) closes it the same way
-  // cancelling the form does: via history.back(), not a direct state reset.
+  // mobile — ListingForm's own back affordance (a Breadcrumb) never
+  // becomes visible here since MapScreen deliberately collapses the
+  // shared header on this screen. Confirmed live before this landed. This
+  // button now replaces that Breadcrumb on BOTH platforms (see this
+  // component's own doc on why the Breadcrumb's wording was actually
+  // wrong here, not just redundant) — closes the form the same way
+  // cancelling it does: via history.back(), not a direct state reset.
   it('shows a Back button once the edit form is open, and it closes the form via history.back()', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
     const user = userEvent.setup()
@@ -187,7 +190,7 @@ describe('MapPlaceDetail', () => {
     await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
     await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
 
-    expect(screen.getByText('ReportListing stub — Goldi Market')).toBeInTheDocument()
+    expect(screen.getByText('ReportListing stub — Goldi Market (embedded)')).toBeInTheDocument()
     // Swapped out entirely, not layered on top.
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
   })
