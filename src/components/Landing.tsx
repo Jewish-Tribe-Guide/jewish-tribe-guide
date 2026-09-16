@@ -124,15 +124,18 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // with a "cheese" tag for "kosher cheese"). Only computed once the visitor types.
   const placeHits = q && listings ? searchListings(listings, categories ?? [], q, coords) : []
 
-  // Tapping a place opens its category directory, pre-filtered to the matched term
-  // (so it survives that page's own search) with the place itself expanded.
-  // Edit/Report additionally carry `findAction` so the directory opens straight
-  // into that form instead of just the expanded card.
+  // Tapping a place opens its category directory with just that place
+  // expanded — not also pre-filtered to the matched search term. That used
+  // to carry the term along as `?q=`, on the reasoning that it'd survive
+  // closing the modal back to a relevant list — the user's own call,
+  // reviewing it live: picking a listing should show exactly that listing,
+  // not a filtered category page underneath it. Edit/Report additionally
+  // carry `findAction` so the directory opens straight into that form
+  // instead of just the expanded card.
   const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') => {
     if (!action) track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
     onNavigate('patient', 'find', {
       findView: hit.item.category,
-      findQuery: hit.term,
       findItemId: hit.item.id,
       ...(action ? { findAction: action } : {}),
     })

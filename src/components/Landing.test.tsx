@@ -166,6 +166,30 @@ describe('Landing', () => {
     expect(screen.getAllByText(/Nothing matches “xyznotreal”/).length).toBeGreaterThan(0)
   })
 
+  // Reported live: picking a listing from the hero's own search dropdown
+  // used to also carry the typed search term along as `?q=` on the
+  // destination category page, pre-filtering its list underneath the
+  // listing's own modal — the user's own call to drop it: picking a
+  // listing should show exactly that listing, nothing else narrowed.
+  it("opening a listing from the hero's search dropdown carries no leftover search term to the destination category page", async () => {
+    const user = userEvent.setup()
+    vi.mocked(handlers.onNavigate).mockClear()
+    const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })
+    renderLanding(
+      undefined,
+      { content: { categories: [grocery] } },
+      [makeListing({ id: 'l1', category: 'grocery', name: 'Test Grocery' })],
+    )
+
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'Test Grocery')
+    await user.click(screen.getAllByText('Test Grocery')[0]!)
+
+    expect(handlers.onNavigate).toHaveBeenCalledWith('patient', 'find', {
+      findView: 'grocery',
+      findItemId: 'l1',
+    })
+  })
+
   // The map is retired as a home-screen card (the user's own call — it only
   // ever lives at its own full-screen route now), so the hero's "View Map"
   // button has one job unconditionally: navigate there. No more "scroll to
