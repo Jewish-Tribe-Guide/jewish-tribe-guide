@@ -140,6 +140,10 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market (embedded)')).toBeInTheDocument()
     // Swapped out entirely, not layered on top.
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+    // Stands in for ListingForm's own heading, suppressed by `embedded` —
+    // every other Edit/Report surface (ActionDialog, MobileSheet,
+    // ReportSheet) shows this same title in its own header.
+    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
   // Regression: the edit form used to open with no way back at all on
@@ -193,6 +197,7 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByText('ReportListing stub — Goldi Market (embedded)')).toBeInTheDocument()
     // Swapped out entirely, not layered on top.
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Report a problem' })).toBeInTheDocument()
   })
 
   it('shows a Back button once the report form is open, and it closes the form via history.back()', async () => {

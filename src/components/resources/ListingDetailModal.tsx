@@ -234,7 +234,7 @@ export default function ListingDetailModal({
         className={`flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
         role="dialog"
         aria-modal="true"
-        aria-label={name}
+        aria-label={formOpen ? (formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem') : name}
       >
         {/* Badges live inside this same block, under the subtitle — not as
             their own section below a divider. They're facts about this
@@ -250,13 +250,25 @@ export default function ListingDetailModal({
             // that component's doc): this returns to the detail view you
             // were just on, not up to some other screen, so it doesn't
             // name a destination the way "Back to list" elsewhere does.
-            <button
-              onClick={closeForm}
-              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-            >
-              <ChevronLeftIcon className="h-4 w-4" />
-              Back
-            </button>
+            // The title below stands in for ListingForm/ReportListing's
+            // own heading (suppressed by `embedded`, same as the
+            // Breadcrumb it also skips) — every other Edit/Report surface
+            // (ActionDialog, MobileSheet, ReportSheet) shows this same
+            // title in its own header; this and MapPlaceDetail's identical
+            // morph-in-place were the two gaps, confirmed live to read as
+            // unfinished next to the other four once compared side by side.
+            <div className="min-w-0">
+              <button
+                onClick={closeForm}
+                className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+                Back
+              </button>
+              <h2 className="mt-1 font-semibold text-slate-900 text-lg">
+                {formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem'}
+              </h2>
+            </div>
           ) : (
             <div className="flex items-start gap-3 min-w-0">
               <CategoryIcon

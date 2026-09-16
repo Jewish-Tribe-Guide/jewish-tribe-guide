@@ -113,7 +113,20 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             list", which really does go to a different screen (the nearby
             list) — this one just returns to the same place detail you
             were already on. */}
-        <UpButton label="Back" onClick={closeForm} className="mb-3" />
+        <UpButton label="Back" onClick={closeForm} className="mb-1" />
+        {/* embedded suppresses ListingForm/ReportListing's own heading too
+            (bundled with the Breadcrumb it skips — see this component's
+            own doc above), so this stands in for it — every other Edit/
+            Report surface (ActionDialog, MobileSheet, ReportSheet) shows
+            this same title in its own header; this one and
+            ListingDetailModal's identical morph-in-place were the two
+            gaps, missed initially on the reasoning that the form's own
+            intro copy plus already being on this listing's detail gave
+            enough context — confirmed live that it read as unfinished
+            next to the other four surfaces, all of which keep a title. */}
+        <h2 className="mb-3 text-lg font-semibold text-slate-900">
+          {formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem'}
+        </h2>
         {formOpen === 'edit' ? (
           <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
         ) : (

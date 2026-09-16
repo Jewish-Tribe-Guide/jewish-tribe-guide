@@ -774,6 +774,11 @@ describe('GenericListingCard — expanded', () => {
     expect(requiredHandlers.onEdit).not.toHaveBeenCalled()
     // Still the SAME dialog, not a second one stacked or swapped in.
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    // Stands in for ListingForm's own heading, suppressed by `embedded` —
+    // every other Edit/Report surface (ActionDialog, MobileSheet,
+    // ReportSheet) shows this same title in its own header.
+    expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
   it('swaps the dialog\'s own content to the report form — not a separate dialog — when the kebab\'s Report item is clicked', async () => {
@@ -791,6 +796,8 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByText('ReportListing stub — Goldi Market')).toBeInTheDocument()
     expect(requiredHandlers.onReport).not.toHaveBeenCalled()
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'Report a problem' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
   })
 
   // Regression coverage for the actual reason this exists: with no way
