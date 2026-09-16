@@ -37,9 +37,9 @@ vi.mock('@/components/tabs/AboutYourHospital', () => ({
 vi.mock('@/components/resources/EruvInfo', () => ({ default: () => <p>EruvInfo</p> }))
 vi.mock('@/components/ZmanimCard', () => ({ default: () => <p>ZmanimCard</p> }))
 vi.mock('@/components/resources/ResourceLoader', () => ({
-  default: ({ onAdd }: { onAdd: () => void }) => (
+  default: ({ onAdd, reopenItemId }: { onAdd: () => void; reopenItemId?: string | null }) => (
     <div>
-      <p>ResourceLoader</p>
+      <p>ResourceLoader{reopenItemId ? ` (reopenItemId=${reopenItemId})` : ''}</p>
       <button onClick={onAdd}>Add listing</button>
     </div>
   ),
@@ -214,7 +214,15 @@ describe('FindResources — a real listing category', () => {
   // so this only proves the dialog's onUp/onClose reports the right params,
   // not that the dialog visually closes (that's FindResourcesConnected's
   // own round-trip to verify).
-  it("on desktop, the Edit dialog's cancel reports ?form=null via onParamsChange", async () => {
+  // `item` also clears on cancel, not just `form` — leaving it behind used
+  // to silently re-expand the listing's own detail dialog once this one
+  // closed (GenericDirectory's reopenItemId effect can't tell "resolve
+  // which listing to edit" apart from "expand this card", so a lingering
+  // `item` after the reason it was there is gone reads as the latter).
+  // Confirmed live: a collapsed row's Edit, cancelled, silently opened the
+  // full detail dialog anyway — both dialogs open the whole time behind
+  // the one actually visible. See openAction/goToCategoryList's own docs.
+  it("on desktop, the Edit dialog's cancel reports ?form=null AND ?item=null via onParamsChange — not just form, or the listing's detail dialog silently reopens", async () => {
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
@@ -226,6 +234,53 @@ describe('FindResources — a real listing category', () => {
         onUp={vi.fn()}
         onParamsChange={onParamsChange}
         searchForm="edit"
+        searchItem="l1"
+      />,
+      { content: { categories: [grocery] } },
+    )
+
+    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null, item: null })
+  })
+
+  // Root cause of the bug the previous test's own doc describes: while a
+  // deep-linked edit/report is open, `?item=` still names the SAME listing
+  // (see deepLinkListing above) — passed straight through to
+  // ResourceLoader/GenericDirectory's own reopenItemId, its auto-open
+  // effect can't tell that apart from "navigated here to view this
+  // listing" and opens its detail dialog too. Confirmed live as two
+  // overlapping dialogs, the second only becoming visible once the first
+  // (the one actually meant to be on screen) closed.
+  it('on desktop, an Edit dialog for the SAME listing named by ?item= does not also tell ResourceLoader to auto-open its detail dialog', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.queryByText(/reopenItemId=/)).not.toBeInTheDocument()
+  })
+
+  // 'create' never sets `item` itself (see the comment above), so its own
+  // cancel must leave whatever was already there alone — unlike edit/
+  // report's cancel just above, clearing `item` here would be undoing
+  // something 'create' never did. Covers the real case: viewing one
+  // listing's details, clicking "Add" for a different one, cancelling —
+  // the original listing should stay expanded, not lose its `item`.
+  it('the create form\'s cancel reports only ?form=null, leaving an unrelated ?item= alone', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <FindResources
+        view="grocery"
+        listings={[listing({ id: 'l1' })]}
+        anchor={anchor}
+        onUp={vi.fn()}
+        onParamsChange={onParamsChange}
+        searchForm="create"
         searchItem="l1"
       />,
       { content: { categories: [grocery] } },

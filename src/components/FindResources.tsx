@@ -203,6 +203,21 @@ export default function FindResources({
             : null))
       : null
 
+  // What ResourceLoader/GenericDirectory actually get told to auto-open —
+  // `reopenItemId` itself stays the raw `?item=` value above (still needed
+  // to resolve deepLinkListing regardless of whether a form is open), but
+  // GenericDirectory's own reopenItemId effect opens whatever id it's given
+  // unconditionally, with no way to tell "navigated here to view this" apart
+  // from "this happens to be the listing an edit/report action names". Left
+  // as the raw value, editing/reporting a collapsed row silently expanded
+  // its detail dialog behind the one actually visible the whole time —
+  // confirmed live as two overlapping dialogs, revealed once the visible
+  // one closed. Suppressed here specifically (not by leaving `item` out of
+  // openAction's own URL update) so the reload/deep-link resolution above
+  // keeps working unchanged.
+  const cardReopenItemId =
+    (action?.mode === 'edit' || action?.mode === 'report') && action.listing.id === reopenItemId ? null : reopenItemId
+
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {
     setParams({ hospital: id })
@@ -219,16 +234,36 @@ export default function FindResources({
     setActionSubject(act)
     setParams({
       form: act.mode,
-      // Re-expands the relevant card when the form closes.
+      // `item` is how edit/report resolve WHICH listing on a reload or a
+      // shared deep link (see deepLinkListing above) — not a request to
+      // expand its card. GenericDirectory's own reopenItemId effect can't
+      // tell those two reasons apart, though: it opens whatever `?item=`
+      // names unconditionally. Reached only from a COLLAPSED row's kebab or
+      // a deep link now (an already-expanded card's own Edit/Report morphs
+      // its dialog in place instead — see ListingDetailModal's doc — and
+      // never calls this), so the card was never genuinely open before
+      // this ran; goToCategoryList clears `item` back out on close so it
+      // doesn't linger as a false "reopen this" signal once the reason it
+      // was there (this form) is gone. Confirmed live: without that, a
+      // collapsed row's Edit — cancelled — silently expanded into the full
+      // detail dialog anyway, both dialogs open the whole time behind the
+      // one actually visible.
       ...(act.mode === 'edit' || act.mode === 'report' ? { item: act.listing.id } : {}),
     })
   }
 
-  // Up from a listing form / report form → the category list it was opened from
-  // (the path is still the category; `item` re-expands the relevant card).
+  // Up from a listing form / report form → the category list it was opened
+  // from. Also undoes openAction's own `item` (see its comment) for
+  // edit/report specifically — never for 'create', which doesn't set it in
+  // the first place and may be layered over a genuinely-expanded card that
+  // should stay expanded once this closes (e.g. "Add" clicked while
+  // already viewing a different listing's details).
   const goToCategoryList = () => {
     setActionSubject(null)
-    setParams({ form: null })
+    setParams({
+      form: null,
+      ...(action?.mode === 'edit' || action?.mode === 'report' ? { item: null } : {}),
+    })
   }
 
   // ── Special (non-category) detail views ─────────────────────────────────────
@@ -321,7 +356,7 @@ export default function FindResources({
           category={category}
           items={listings}
           anchor={anchor}
-          reopenItemId={reopenItemId}
+          reopenItemId={cardReopenItemId}
           initialSearch={initialSearch ?? undefined}
           initialOpenNow={initialOpenNow}
           initialFilters={searchFilters}
