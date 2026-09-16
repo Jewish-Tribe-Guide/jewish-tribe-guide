@@ -340,7 +340,17 @@ export default function FindResources({
             that narrowing through sibling JSX on its own. */}
         {isMobile ? (
           <>
-            <MobileSheet isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
+            {/* draggable: Edit is category-aware (address/hours/photo
+                fields) and runs longer than a single screen comfortably
+                holds at `half`, so the extra headroom a drag-up to `full`
+                gives is worth having. Report stays non-draggable — same
+                short one-textarea form as the kebab's own ReportSheet
+                (which this is only a deep-link/search-result fallback
+                for; see this return's own top comment), so it keeps the
+                identical fixed-to-content sizing that shell already has,
+                rather than behaving differently depending on which path
+                reached it. */}
+            <MobileSheet isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit" draggable>
               {action?.mode === 'edit' && (
                 <ListingForm
                   category={category}
