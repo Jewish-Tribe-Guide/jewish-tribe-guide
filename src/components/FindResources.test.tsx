@@ -4,6 +4,7 @@ import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCategory } from '@/test/providerFixtures'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import type { DirectoryResource, Hospital } from '@/types'
 import FindResources from './FindResources'
 
@@ -44,9 +45,21 @@ vi.mock('@/components/resources/ResourceLoader', () => ({
   ),
 }))
 vi.mock('@/components/resources/ListingForm', () => ({
-  default: ({ mode }: { mode: string }) => <p>ListingForm: {mode}</p>,
+  default: ({ mode, embedded, onUp }: { mode: string; embedded?: boolean; onUp: () => void }) => (
+    <div>
+      <p>ListingForm: {mode}{embedded ? ' (embedded)' : ''}</p>
+      <button onClick={onUp}>stub cancel</button>
+    </div>
+  ),
 }))
-vi.mock('@/components/resources/ReportListing', () => ({ default: () => <p>ReportListing</p> }))
+vi.mock('@/components/resources/ReportListing', () => ({
+  default: ({ embedded, onUp }: { embedded?: boolean; onUp: () => void }) => (
+    <div>
+      <p>ReportListing{embedded ? ' (embedded)' : ''}</p>
+      <button onClick={onUp}>stub cancel</button>
+    </div>
+  ),
+}))
 vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
 
 afterEach(() => cleanup())
@@ -133,24 +146,88 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
   })
 
-  it('resolves a deep-linked edit (searchForm="edit", searchItem=<id>) to the matching listing, with no explicit openAction call', () => {
+  // Mobile: unchanged full-screen navigation, same as 'create' above — the
+  // directory (ResourceLoader) is gone, replaced entirely by the form.
+  it('on mobile, resolves a deep-linked edit to a full-screen form, replacing the directory', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />
+      </ForcedViewport>,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
+    expect(screen.queryByText('ResourceLoader')).not.toBeInTheDocument()
+  })
+
+  it('on mobile, resolves a deep-linked report to a full-screen form, replacing the directory', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />
+      </ForcedViewport>,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ReportListing')).toBeInTheDocument()
+    expect(screen.queryByText('ResourceLoader')).not.toBeInTheDocument()
+  })
+
+  // Desktop: a dialog layered over the still-mounted directory instead —
+  // see ActionDialog's own doc for why. The directory stays; only a dialog
+  // appears on top of it, and the form inside renders `embedded` (skips its
+  // own Breadcrumb/mobile-header hijack, since the dialog already has a
+  // title and close control).
+  it('on desktop, resolves a deep-linked edit to a dialog over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />,
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: edit')).toBeInTheDocument()
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
   })
 
-  it('shows the report form once searchForm="report"/searchItem=<id> are set', () => {
+  it('on desktop, resolves a deep-linked report to a dialog over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ReportListing')).toBeInTheDocument()
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
+    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
+  })
+
+  // Same round-trip caveat as "opening Add reports ?form=create" above —
+  // a bare onParamsChange spy doesn't feed an updated searchForm back in,
+  // so this only proves the dialog's onUp/onClose reports the right params,
+  // not that the dialog visually closes (that's FindResourcesConnected's
+  // own round-trip to verify).
+  it("on desktop, the Edit dialog's cancel reports ?form=null via onParamsChange", async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(
+      <FindResources
+        view="grocery"
+        listings={[listing({ id: 'l1' })]}
+        anchor={anchor}
+        onUp={vi.fn()}
+        onParamsChange={onParamsChange}
+        searchForm="edit"
+        searchItem="l1"
+      />,
+      { content: { categories: [grocery] } },
+    )
+
+    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null })
   })
 })
 

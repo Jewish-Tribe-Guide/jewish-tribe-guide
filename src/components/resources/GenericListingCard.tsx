@@ -1006,8 +1006,23 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           onFilterOpen={onFilterOpen}
           onFilterBool={onFilterBool}
           onFilterSelect={onFilterSelect}
-          onEdit={onEdit}
-          onReport={onReport}
+          // Closes this dialog before bubbling up — desktop's Edit/Report
+          // now open their own ActionDialog layered over the directory
+          // (see FindResources), and this dialog staying open underneath
+          // it would stack two backdrops. Harmless before that change too
+          // (the page-swap this dialog was mounted under used to unmount
+          // it either way), so this is safe regardless of which path a
+          // given mode actually takes.
+          onEdit={() => {
+            setExpanded(false)
+            onExpandedChange?.(false)
+            onEdit()
+          }}
+          onReport={() => {
+            setExpanded(false)
+            onExpandedChange?.(false)
+            onReport()
+          }}
           canEdit={canEdit}
           canReport={canReport}
           onNavigate={onNavigate}

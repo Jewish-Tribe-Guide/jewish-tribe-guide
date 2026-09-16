@@ -53,12 +53,21 @@ type Props = {
    *  auth. Only meaningful with mode="create"; see CategoryManager's
    *  "+ Add listing" action. */
   adminSubmit?: { token: string }
+  /** Rendered inside a caller-owned overlay (desktop's Edit dialog) instead
+   *  of as this screen's own top-level content — same reasoning, and same
+   *  treatment, as ReportListing's own `embedded` prop: skips the mobile
+   *  header title hijack (useSetScreenHeader) and this component's own
+   *  Breadcrumb/h2, since the dialog already has its own title and close
+   *  control. Desktop only in practice (Edit stays a full screen on
+   *  mobile), but not itself device-gated — the caller decides when to
+   *  pass it. */
+  embedded?: boolean
 }
 
 const inputClass =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
-export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit }: Props) {
+export default function ListingForm({ category, mode, existing, onUp, onSubmitted, onPreviewSubmit, sharedTurnstile, adminSubmit, embedded }: Props) {
   const community = useCommunitySlug()
   const config = category
   const hasAddress = category.hasAddress !== false
@@ -347,12 +356,12 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // title that would just repeat the h2 below and leave nothing for
   // findByText('Thank you!') to disambiguate. Only the back target changes:
   // onSubmitted once done, onUp before that.
-  useSetScreenHeader(true, heading, done ? onSubmitted : onUp)
+  useSetScreenHeader(!embedded, heading, done ? onSubmitted : onUp)
 
   if (done) {
     return (
       <div>
-        <Breadcrumb upLabel={config.pluralLabel} onUp={onSubmitted} title={heading} />
+        {!embedded && <Breadcrumb upLabel={config.pluralLabel} onUp={onSubmitted} title={heading} />}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           {/* Not sr-only, unlike the other screens' bare title repeats: this
@@ -371,12 +380,15 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
 
   return (
     <div>
-      {/* Breadcrumb (desktop only) names the same destination the header's
-          "‹ {heading}" now covers on mobile — see Breadcrumb's own doc for
-          why only one of the two ever shows at a time. */}
-      <Breadcrumb upLabel={config.pluralLabel} onUp={onUp} title={heading} />
-
-      <h2 className="text-xl font-semibold text-slate-800 mb-3 sr-only desktop:not-sr-only">{heading}</h2>
+      {!embedded && (
+        <>
+          {/* Breadcrumb (desktop only) names the same destination the
+              header's "‹ {heading}" now covers on mobile — see Breadcrumb's
+              own doc for why only one of the two ever shows at a time. */}
+          <Breadcrumb upLabel={config.pluralLabel} onUp={onUp} title={heading} />
+          <h2 className="text-xl font-semibold text-slate-800 mb-3 sr-only desktop:not-sr-only">{heading}</h2>
+        </>
+      )}
       {/* Blue, not amber — this used to read as a warning (amber is this
           app's caveat/verify-this color elsewhere, e.g. Chip's amber tone),
           when it's just process information: every submission goes through

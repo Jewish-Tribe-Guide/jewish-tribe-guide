@@ -109,6 +109,52 @@ describe('ListingForm', () => {
     expect(screen.getByDisplayValue('(215) 555-0100')).toBeInTheDocument()
   })
 
+  // `embedded` — rendered inside a caller-owned overlay (desktop's Edit
+  // dialog) instead of as this screen's own top-level content. Same
+  // reasoning, and same treatment, as ReportListing's own `embedded` prop.
+  describe('embedded', () => {
+    it('renders no Breadcrumb/heading of its own', () => {
+      const category = makeCategory()
+      const existing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} embedded />)
+
+      expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+      // The form itself is unaffected.
+      expect(screen.getByRole('button', { name: 'Submit edit for review' })).toBeInTheDocument()
+    })
+
+    it('still submits the same edit the non-embedded form does', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubFetchOk({ ok: true })
+      const category = makeCategory()
+      const existing = makeListing({ id: 'listing-1', name: 'Old Name' })
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} embedded />)
+
+      await user.type(screen.getByDisplayValue('Old Name'), ' & Deli')
+      await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(body.operation).toBe('update')
+      expect(body.targetId).toBe('listing-1')
+    })
+
+    it('renders no Breadcrumb on the done state either', async () => {
+      const user = userEvent.setup()
+      stubFetchOk({ ok: true })
+      const category = makeCategory()
+      const existing = makeListing({ id: 'listing-1', name: 'Old Name' })
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} embedded />)
+
+      await user.type(screen.getByDisplayValue('Old Name'), ' & Deli')
+      await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
+
+      expect(await screen.findByText('Thank you!')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+    })
+  })
+
   it('hides the Address field when the category has no address, and Phone when it has none', () => {
     const category = makeCategory({ hasAddress: false, hasPhone: false })
     renderWithProviders(<ListingForm category={category} mode="create" {...handlers} />)

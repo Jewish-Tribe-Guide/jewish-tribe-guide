@@ -728,6 +728,52 @@ describe('GenericListingCard — expanded', () => {
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
 
+  // Desktop's Edit/Report now open their own ActionDialog layered over the
+  // directory (see FindResources) instead of the old full-page swap that
+  // used to take this dialog down with it either way — so this dialog has
+  // to close itself first, or it'd stay open underneath the new one,
+  // stacking two backdrops. Confirmed here rather than just trusting the
+  // bubbled call: onExpandedChange(false) is the same signal GenericDirectory
+  // uses to drop `?item=` from the URL, so this also keeps that in sync.
+  it('closes this dialog (and reports onExpandedChange(false)) before calling onEdit, on desktop', async () => {
+    const user = userEvent.setup()
+    const onExpandedChange = vi.fn()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard
+        item={item}
+        category={category}
+        upvotes={false}
+        count={0}
+        defaultExpanded
+        onExpandedChange={onExpandedChange}
+        {...requiredHandlers}
+      />,
+    )
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+
+    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+    expect(onExpandedChange).toHaveBeenCalledWith(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes this dialog before calling onReport, on desktop', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing()
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /^report$/i }))
+
+    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   // onExpandedChange — lets GenericDirectory keep ?item=<id> in sync with
   // whichever card is open (see that component's own doc on why this is
   // called directly rather than via a useEffect watching `expanded`).
