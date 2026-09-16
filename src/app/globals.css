@@ -229,6 +229,15 @@ body {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+/* Mobile's Report sheet (see ReportSheet.tsx) easing up from the bottom
+   edge it's anchored to — a plain translateY, not menuIn's scale+opacity
+   move above, since a sheet is read as sliding up from off-screen rather
+   than growing from an anchor point. */
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
 /* Directional slide for mobile's home <-> category navigation (see
    navTransitions.ts / SlugScreen.tsx / Landing.tsx / sections.tsx) — the
    native "one level deeper" / "back" convention: forward slides new content

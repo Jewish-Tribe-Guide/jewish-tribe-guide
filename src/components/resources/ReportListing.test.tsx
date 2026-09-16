@@ -123,4 +123,45 @@ describe('ReportListing', () => {
     expect(onSubmitted).toHaveBeenCalledTimes(1)
     expect(onUp).not.toHaveBeenCalled()
   })
+
+  // `embedded` — rendered inside a caller-owned overlay (mobile's Report
+  // sheet) instead of as this screen's own top-level content. See the
+  // prop's own doc for why: claiming the shared mobile header here would
+  // rename it out from under whatever screen is actually current, since
+  // the sheet is layered on top of it rather than replacing it.
+  describe('embedded', () => {
+    it('renders no Breadcrumb of its own — the sheet has its own title/close, not this form\'s navigation', async () => {
+      const user = userEvent.setup()
+      stubFetch({ ok: true })
+      renderWithProviders(
+        <ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} embedded />,
+      )
+
+      // Breadcrumb renders "{upLabel}" as part of its own button/link — its
+      // absence is what proves this, not the done-state heading below,
+      // which stays either way (it's real content, not navigation).
+      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Submit report' }))
+      expect(await screen.findByText(/review this and update the listing/i)).toBeInTheDocument()
+    })
+
+    it('still submits the same report the non-embedded form does', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubFetch({ ok: true })
+      const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
+      renderWithProviders(
+        <ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} embedded />,
+      )
+
+      await user.type(screen.getByLabelText("What's the issue?"), 'Closed permanently.')
+      await user.click(screen.getByRole('button', { name: 'Submit report' }))
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+      expect(body.targetId).toBe('listing-1')
+      expect(body.note).toBe('Closed permanently.')
+    })
+  })
 })

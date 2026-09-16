@@ -19,6 +19,7 @@ import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ListingActionsMenu from './ListingActionsMenu'
+import ReportSheet from './ReportSheet'
 import Chip from './Chip'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -170,6 +171,12 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
+  // Mobile's Report sheet (see ReportSheet.tsx) — local to this card rather
+  // than bubbled through onReport the way desktop's still does, since it
+  // doesn't need FindResources' page-swap routing at all: dismissing it
+  // just means "close the sheet," not "go back to the list," because the
+  // list was never replaced in the first place.
+  const [reportSheetOpen, setReportSheetOpen] = useState(false)
   // Mobile's inline panel (see the isMobile branch far below) animates open
   // and closed instead of popping in/out silently — replacing the chevron
   // that used to be the only signal this row was expandable at all (see
@@ -827,8 +834,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             // first, same muscle memory as Pin/Share/Set location, rather
             // than down to the bottom of the expanded accordion panel —
             // see the panel's own comment just below, where those two
-            // buttons used to live.
-            {...(isMobile ? { onEdit, onReport, canEdit, canReport } : {})}
+            // buttons used to live. Report opens this card's own sheet
+            // (see reportSheetOpen's doc) rather than the bubbled-up
+            // onReport prop — Edit still uses that prop as-is, since it
+            // stays a full-screen navigation on mobile.
+            {...(isMobile ? { onEdit, onReport: () => setReportSheetOpen(true), canEdit, canReport } : {})}
           />
         </div>
 
@@ -961,6 +971,18 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           </div>
         </div>
         </div>
+      )}
+
+      {/* Reachable from the kebab whether or not this card is expanded —
+          not nested inside the panelMounted block above, which only exists
+          while the accordion itself is open. */}
+      {isMobile && (
+        <ReportSheet
+          isOpen={reportSheetOpen}
+          onClose={() => setReportSheetOpen(false)}
+          listing={item}
+          upLabel={category.pluralLabel}
+        />
       )}
 
       {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}

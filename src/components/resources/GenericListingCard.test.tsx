@@ -994,9 +994,13 @@ describe('GenericListingCard — actions menu corner', () => {
     await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
 
+    // Report opens this card's own sheet instead of calling the bubbled-up
+    // onReport prop (see ReportSheet's own doc) — Edit above still does,
+    // since it stays a full-screen navigation on mobile.
     await user.click(screen.getByRole('button', { name: /more actions for/i }))
     await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
+    expect(requiredHandlers.onReport).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: /report a problem/i })).toBeInTheDocument()
   })
 
   it('on desktop, the collapsed row kebab does not offer Edit or Report', async () => {

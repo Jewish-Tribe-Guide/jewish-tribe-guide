@@ -18,9 +18,18 @@ type Props = {
   /** Admin-preview only: Submit shows the confirmation screen without actually
    *  posting a report. Used by the category editor's Preview. */
   preview?: boolean
+  /** Rendered inside a caller-owned overlay (mobile's Report sheet) instead
+   *  of as this screen's own top-level content: skips the mobile header
+   *  title hijack (useSetScreenHeader) — the sheet is layered on top of
+   *  whatever screen is actually current, so claiming the shared header
+   *  here would rename it out from under that screen — and skips this
+   *  component's own Breadcrumb/h2, since the sheet already has its own
+   *  visible title and close control. The form/fields/submit logic below
+   *  is identical either way. */
+  embedded?: boolean
 }
 
-export default function ReportListing({ listing, upLabel, onUp, onSubmitted, preview }: Props) {
+export default function ReportListing({ listing, upLabel, onUp, onSubmitted, preview, embedded }: Props) {
   const community = useCommunitySlug()
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
@@ -72,13 +81,14 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
 
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call. Swaps to the done-state title once submitted, matching
-  // each branch's own Breadcrumb below.
-  useSetScreenHeader(true, done ? 'Thanks for the heads-up' : 'Report a problem', done ? onSubmitted : onUp)
+  // each branch's own Breadcrumb below. Inactive when embedded — see this
+  // component's own `embedded` doc.
+  useSetScreenHeader(!embedded, done ? 'Thanks for the heads-up' : 'Report a problem', done ? onSubmitted : onUp)
 
   if (done) {
     return (
       <div>
-        <Breadcrumb upLabel={upLabel} onUp={onSubmitted} title="Thanks for the heads-up" />
+        {!embedded && <Breadcrumb upLabel={upLabel} onUp={onSubmitted} title="Thanks for the heads-up" />}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1 sr-only desktop:not-sr-only">Thanks for the heads-up</h2>
@@ -90,12 +100,16 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
 
   return (
     <div>
-      {/* Breadcrumb (desktop only) names the same destination the header's
-          "‹ Report a problem" now covers on mobile — see Breadcrumb's own
-          doc for why only one of the two ever shows at a time. */}
-      <Breadcrumb upLabel={upLabel} onUp={onUp} title="Report a problem" />
-
-      <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">Report a problem</h2>
+      {!embedded && (
+        <>
+          {/* Breadcrumb (desktop only) names the same destination the
+              header's "‹ Report a problem" now covers on mobile — see
+              Breadcrumb's own doc for why only one of the two ever shows
+              at a time. */}
+          <Breadcrumb upLabel={upLabel} onUp={onUp} title="Report a problem" />
+          <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">Report a problem</h2>
+        </>
+      )}
       <p className="text-sm text-muted mb-2">
         Use this to report that <span className="font-medium text-slate-700">{listing.name}</span> has{' '}
         <span className="font-medium text-slate-700">permanently closed</span>. A moderator reviews every
@@ -106,7 +120,7 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
         instead so the listing can be corrected.
       </p>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+      <div className={embedded ? '' : 'bg-white border border-slate-200 rounded-xl shadow-sm p-6'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Honeypot value={honeypot} onChange={setHoneypot} />
         <div>
