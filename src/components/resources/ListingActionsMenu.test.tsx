@@ -382,6 +382,60 @@ describe('ListingActionsMenu', () => {
       expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
       expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
     })
+
+    // hidePrimaryActions — ListingDetailModal only: Pin/Share/Set location
+    // are pre-opening actions, already one click away on the card behind
+    // that dialog, so restating them there was pure duplication. See the
+    // prop's own doc.
+    describe('hidePrimaryActions', () => {
+      it('hides Pin, Share, Set location, and the divider — Edit/Report are the only rows', async () => {
+        vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
+          anchorListingId: null,
+          setListingAnchor: vi.fn(),
+          unsetListingAnchor: vi.fn(),
+        } as unknown as ReturnType<typeof locationContext.useOptionalLocation>)
+        const user = userEvent.setup()
+        renderWithProviders(
+          <ListingActionsMenu
+            item={makeListing({ geo: { lat: 39.95, lng: -75.16 } })}
+            category={makeCategory()}
+            path="/philly/grocery/goldi-a1b2c3"
+            onEdit={vi.fn()}
+            onReport={vi.fn()}
+            canEdit
+            canReport
+            hidePrimaryActions
+          />,
+        )
+
+        await user.click(screen.getByRole('button', { name: /more actions/i }))
+        expect(screen.queryByRole('menuitem', { name: /^pin$/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: /^share$/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
+      })
+
+      it('shows just the one row when only canEdit is true', async () => {
+        vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+        const user = userEvent.setup()
+        renderWithProviders(
+          <ListingActionsMenu
+            item={makeListing()}
+            category={makeCategory()}
+            path="/philly/grocery/goldi-a1b2c3"
+            onEdit={vi.fn()}
+            canEdit
+            hidePrimaryActions
+          />,
+        )
+
+        await user.click(screen.getByRole('button', { name: /more actions/i }))
+        expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+        expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+      })
+    })
   })
 
   it('stops the kebab click and every menu item click from bubbling to a parent handler', async () => {

@@ -11,7 +11,7 @@ import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ListingActionsMenu from './ListingActionsMenu'
-import { PencilIcon, FlagIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
 type Props = {
@@ -230,13 +230,29 @@ export default function ListingDetailModal({
               )}
             </div>
           </div>
-          {/* The card behind this dialog is dimmed under its own backdrop
-              while the dialog is open, so its kebab isn't reachable from in
-              here — this is that same menu (Pin/Share/Set location),
-              restated in the dialog's own header next to Close, same spot
-              MapPlaceDetail gives it next to the name. */}
+          {/* Pin/Share/Set location used to live in a kebab here too, same
+              spot MapPlaceDetail gives it next to the name — removed: those
+              are all pre-opening actions, already one click away on the
+              card behind this dialog (dimmed but a click away once you
+              close this), so having them here too was pure duplication.
+              Edit/Report moved up here instead, still as a kebab (not
+              plain buttons — see hidePrimaryActions' own doc on
+              ListingActionsMenu) — unlike Pin/Share/Set location, they're
+              things you'd genuinely want only once you're actually looking
+              at the full details, not before, so they stay. */}
           <div className="flex shrink-0 items-center gap-1">
-            <ListingActionsMenu item={item} category={category} path={listingPath} />
+            {(canEdit || canReport) && (
+              <ListingActionsMenu
+                item={item}
+                category={category}
+                path={listingPath}
+                onEdit={onEdit}
+                onReport={onReport}
+                canEdit={canEdit}
+                canReport={canReport}
+                hidePrimaryActions
+              />
+            )}
             <button
               onClick={onClose}
               className="shrink-0 text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
@@ -268,16 +284,9 @@ export default function ListingDetailModal({
 
           <div className="pt-3 border-t border-slate-200 space-y-2.5">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* Share used to sit here — now only in the header's own kebab
-                (ListingActionsMenu), next to Close. */}
-            <div className="flex gap-3">
-              {canEdit && (
-                <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
-              )}
-              {canReport && (
-                <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
-              )}
-            </div>
+            {/* Share, and now Edit/Report too, used to sit here — all three
+                now live only in the header's own kebab (ListingActionsMenu),
+                next to Close. */}
           </div>
         </div>
       </div>

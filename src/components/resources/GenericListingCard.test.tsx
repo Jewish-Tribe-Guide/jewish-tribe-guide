@@ -701,7 +701,7 @@ describe('GenericListingCard — count badge', () => {
 })
 
 describe('GenericListingCard — expanded', () => {
-  it('shows the full address and an Edit button once expanded, when the category allows editing', async () => {
+  it('shows the full address, and an Edit item in the dialog\'s own kebab, once expanded', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ address: '1 Main St, Philadelphia, PA 19104' })
@@ -712,10 +712,17 @@ describe('GenericListingCard — expanded', () => {
     await user.click(screen.getByRole('button', { name: /show details for/i }))
 
     expect(screen.getByText('1 Main St, Philadelphia, PA 19104')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument()
+    // Edit/Report live in a second kebab, inside the dialog's own header —
+    // separate from the collapsed row's kebab underneath it (dimmed while
+    // this dialog is open) — see ListingActionsMenu's hidePrimaryActions doc.
+    // Scoped with `within`: the collapsed row's own kebab, still in the DOM
+    // behind the dialog, shares the same accessible name.
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
   })
 
-  it('calls onEdit when the Edit button is clicked', async () => {
+  it('calls onEdit when the dialog kebab\'s Edit item is clicked', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing()
@@ -723,7 +730,9 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { name: /edit/i }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
@@ -752,8 +761,9 @@ describe('GenericListingCard — expanded', () => {
       />,
     )
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /edit/i }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
     expect(onExpandedChange).toHaveBeenCalledWith(false)
@@ -768,10 +778,32 @@ describe('GenericListingCard — expanded', () => {
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
 
-    await user.click(screen.getByRole('button', { name: /^report$/i }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
 
     expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  // Pin/Share/Set location used to be restated in this dialog's own kebab
+  // too — removed as pure duplication of the collapsed row's kebab, which
+  // is still one click away (dimmed, not gone) behind this dialog. Only
+  // Edit/Report — things you'd want once you're actually looking at the
+  // details, not before — stay here.
+  it('does not offer Pin/Share/Set location from the dialog\'s own kebab', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing({ geo: { lat: 39.95, lng: -75.16 } })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    expect(screen.queryByRole('menuitem', { name: /^pin$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^share$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
   })
 
   // onExpandedChange — lets GenericDirectory keep ?item=<id> in sync with

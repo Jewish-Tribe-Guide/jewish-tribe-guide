@@ -78,6 +78,7 @@ export default function ListingActionsMenu({
   onReport,
   canEdit,
   canReport,
+  hidePrimaryActions,
 }: {
   item: DirectoryResource
   category: CategoryConfig
@@ -87,20 +88,28 @@ export default function ListingActionsMenu({
    *  true edge (see MapPlaceDetail, matching Spotify's own overflow-menu
    *  spacing rather than butting right up against the edge). */
   className?: string
-  /** Edit/Report — optional, and only ever passed by GenericListingCard's
-   *  mobile collapsed row. Undefined everywhere else (MapPlaceDetail,
-   *  ListingDetailModal's own header kebab), which just means the divider
-   *  and these two rows don't render at all there — nothing new for those
-   *  callers to opt out of. Added here specifically because a visitor
-   *  reaching for Edit/Report went straight to this kebab first (same
-   *  muscle memory as Pin/Share/Set location) rather than to the
-   *  standalone buttons at the bottom of the expanded card — see this
+  /** Edit/Report — optional. Passed by GenericListingCard's collapsed row
+   *  (both platforms) and, with hidePrimaryActions below, ListingDetailModal's
+   *  own header kebab. Undefined at MapPlaceDetail's own kebab, which just
+   *  means the divider and these two rows don't render there — nothing new
+   *  for that caller to opt out of. Added here specifically because a
+   *  visitor reaching for Edit/Report went straight to this kebab first
+   *  (same muscle memory as Pin/Share/Set location) rather than to the
+   *  standalone buttons the expanded card used to show them in — see this
    *  component's own top-of-file doc for why Share made the identical move
    *  earlier. */
   onEdit?: () => void
   onReport?: () => void
   canEdit?: boolean
   canReport?: boolean
+  /** ListingDetailModal only: Pin/Share/Set location are pre-opening
+   *  actions — already one click away on the card behind this dialog, so
+   *  restating them here (this dialog used to) was pure duplication. Edit/
+   *  Report are different: things you'd genuinely want only once you're
+   *  actually looking at the full details, not before — so this hides
+   *  everything BUT those two (and the divider, which would otherwise
+   *  precede nothing), rather than hiding the whole kebab. */
+  hidePrimaryActions?: boolean
 }) {
   const [open, setOpen] = useState(false)
   // Fixed-position coordinates for the portaled popup — measured fresh every
@@ -136,8 +145,9 @@ export default function ListingActionsMenu({
       // measure the real thing (same reasoning as CheckboxDropdown's own
       // ESTIMATED_ROW_PX). ~36px per row, +8px for the popup's own vertical
       // padding/border.
-      const itemCount =
-        (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0) + (canReport ? 1 : 0)
+      const itemCount = hidePrimaryActions
+        ? (canEdit ? 1 : 0) + (canReport ? 1 : 0)
+        : (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0) + (canReport ? 1 : 0)
       const estimatedHeight = itemCount * 36 + 8
       const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
       // Clamped inward from the kebab's own left edge means the popup is
@@ -276,53 +286,58 @@ export default function ListingActionsMenu({
             }}
             className="z-[56] w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg animate-[menuIn_140ms_ease-out]"
           >
-            {/* ui.map.pins is the same flag the map's own pin filter chip
-                and (formerly) PinButton respected — the original build of
-                this menu missed it and showed Pin unconditionally even with
-                pinning turned off community-wide. */}
-            {ui.map.pins && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggle({ id: item.id, categoryId: category.id })
-                  setOpen(false)
-                }}
-                aria-pressed={pinned}
-                className={menuItemClass}
-              >
-                <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
-                {pinned ? 'Pinned' : 'Pin'}
-              </button>
+            {!hidePrimaryActions && (
+              <>
+                {/* ui.map.pins is the same flag the map's own pin filter
+                    chip and (formerly) PinButton respected — the original
+                    build of this menu missed it and showed Pin
+                    unconditionally even with pinning turned off
+                    community-wide. */}
+                {ui.map.pins && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggle({ id: item.id, categoryId: category.id })
+                      setOpen(false)
+                    }}
+                    aria-pressed={pinned}
+                    className={menuItemClass}
+                  >
+                    <PinIcon filled={pinned} className="h-3.5 w-3.5 shrink-0" />
+                    {pinned ? 'Pinned' : 'Pin'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={share}
+                  className={menuItemClass}
+                >
+                  <ExternalIcon className="h-3.5 w-3.5 shrink-0" />
+                  {copied ? 'Copied!' : 'Share'}
+                </button>
+                {canSetLocation && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (active) location!.unsetListingAnchor()
+                      else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
+                      setOpen(false)
+                    }}
+                    aria-pressed={active}
+                    className={menuItemClass}
+                  >
+                    {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
+                    {active ? 'Location set' : 'Set location'}
+                  </button>
+                )}
+                {(canEdit || canReport) && <div role="separator" className="my-1 h-px bg-slate-100" />}
+              </>
             )}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={share}
-              className={menuItemClass}
-            >
-              <ExternalIcon className="h-3.5 w-3.5 shrink-0" />
-              {copied ? 'Copied!' : 'Share'}
-            </button>
-            {canSetLocation && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (active) location!.unsetListingAnchor()
-                  else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
-                  setOpen(false)
-                }}
-                aria-pressed={active}
-                className={menuItemClass}
-              >
-                {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <CrosshairIcon className="h-3.5 w-3.5 shrink-0" />}
-                {active ? 'Location set' : 'Set location'}
-              </button>
-            )}
-            {(canEdit || canReport) && <div role="separator" className="my-1 h-px bg-slate-100" />}
             {canEdit && (
               <button
                 type="button"
