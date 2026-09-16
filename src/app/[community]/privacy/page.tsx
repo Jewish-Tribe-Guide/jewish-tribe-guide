@@ -68,7 +68,13 @@ export default async function PrivacyPage(props: PageProps<'/[community]/privacy
           home (routes.home), not a bare "/", which redirects to whichever
           community is the site's default. */}
       <UpButton href={routes.home(slug)} label="Home" className="mb-0 desktop:hidden" />
-      <Breadcrumb href={routes.home(slug)} upLabel="Home" title={title} className="mb-0" />
+      {/* A fixed "Privacy" here, not the admin-editable `title` the h1 below
+          uses — that title is free text ("Privacy Policy and Terms of Use"),
+          which reads fine as a heading but made the breadcrumb noticeably
+          longer than every other screen's ("Home / Add a Childcare",
+          "Home / Report an Issue"). This is still where you are, just said
+          the short way — same idea as UpButton's own short labels elsewhere. */}
+      <Breadcrumb href={routes.home(slug)} upLabel="Home" title="Privacy" className="mb-0" />
 
       {/* One card holding the whole document — title included. See the same
           note on /about for why the h1 sits inside rather than above it, and
