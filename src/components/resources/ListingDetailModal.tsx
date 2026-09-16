@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DirectoryResource } from '@/types'
 import type { CategoryConfig, CategoryField } from '@/lib/categories'
@@ -11,6 +11,8 @@ import CategoryIcon from '@/components/CategoryIcon'
 import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ListingActionsMenu from './ListingActionsMenu'
+import ListingForm from './ListingForm'
+import ReportListing from './ReportListing'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
@@ -38,8 +40,6 @@ type Props = {
   onFilterOpen: () => void
   onFilterBool: (key: string) => void
   onFilterSelect: (key: string, value: string) => void
-  onEdit: () => void
-  onReport: () => void
   canEdit: boolean
   canReport: boolean
   /** Left/Right arrow while this dialog is focused moves to the previous/
@@ -67,7 +67,18 @@ type Props = {
  *  GenericListingCard's `isMobile` branch for the split.
  *
  *  Follows DaveningTimesModal's own conventions: backdrop click and Escape
- *  both close it, body scroll locks while open. */
+ *  both close it, body scroll locks while open.
+ *
+ *  Edit/Report swap THIS dialog's own content to the form (ListingForm/
+ *  ReportListing), the same in-place pattern MapPlaceDetail already uses —
+ *  not a hand-off to a separate ActionDialog. That used to close this
+ *  dialog and open a differently-sized one in its place (448px → 576px,
+ *  no shared backdrop), which read as a completely different popup
+ *  appearing rather than a continuation of the one already open —
+ *  confirmed live before this landed. ActionDialog still exists for the
+ *  cases that have no open dialog to morph FROM (a deep link, a search
+ *  result's own Edit/Report button) — this only replaces the one path
+ *  that already had somewhere to morph in place. */
 export default function ListingDetailModal({
   isOpen,
   onClose,
@@ -84,8 +95,6 @@ export default function ListingDetailModal({
   onFilterOpen,
   onFilterBool,
   onFilterSelect,
-  onEdit,
-  onReport,
   canEdit,
   canReport,
   onNavigate,
@@ -94,6 +103,43 @@ export default function ListingDetailModal({
 }: Props) {
   const community = useCommunitySlug()
   const listingPath = routes.listing(community, category.id, listingSlug(item))
+
+  // Own history entry, nested on top of whatever real navigation got this
+  // dialog open in the first place — so browser back closes the form and
+  // returns to the detail view, not out of the dialog (or off the page)
+  // entirely. Same pattern MapPlaceDetail's own formOpen uses; see that
+  // component's doc for why. Doesn't touch the `?item=` query param this
+  // dialog's own open/close already syncs (see GenericDirectory's
+  // onExpandedChange) — that stays exactly as it was the whole time this
+  // is open, same as it does while just viewing details.
+  const [formOpen, setFormOpen] = useState<'edit' | 'report' | null>(null)
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const state = e.state as { detailModalForm?: 'edit' | 'report' } | null
+      setFormOpen(state?.detailModalForm === 'edit' || state?.detailModalForm === 'report' ? state.detailModalForm : null)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+  const openForm = (mode: 'edit' | 'report') => {
+    history.pushState({ ...(window.history.state ?? {}), detailModalForm: mode }, '')
+    setFormOpen(mode)
+  }
+  const closeForm = () => history.back()
+
+  // Resets the next time this dialog opens (a fresh listing, or the same
+  // one reopened later) — adjusted during render, the React-docs-
+  // recommended way to reset state on a prop change, rather than in an
+  // effect: an effect would commit one frame showing the PREVIOUS open's
+  // form before its own setState took hold. Component instance stays
+  // mounted the whole time (this always renders, just returns null below
+  // while closed), so `formOpen` would otherwise carry over from a
+  // previous open on its own.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) setFormOpen(null)
+  }
 
   // Reference-counted, not a plain `document.body.style.overflow = isOpen ?
   // 'hidden' : ''` — GenericDirectory can mount dozens of these (one per
@@ -107,9 +153,17 @@ export default function ListingDetailModal({
     if (!isOpen) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        // Steps back one level at a time, same as a real nested screen
+        // would: out of the form to the detail view first, and only a
+        // SECOND Escape (formOpen now null) closes the dialog entirely.
+        if (formOpen) closeForm()
+        else onClose()
         return
       }
+      // Sibling-listing navigation doesn't mean anything mid-edit — arrow
+      // keys inside a form's own address/hours fields aren't a "browse
+      // elsewhere" gesture, they're just editing.
+      if (formOpen) return
       // Guards against a text input inside the dialog someday capturing the
       // arrow keys for cursor movement instead of navigation — nothing here
       // currently has one, but a global keydown listener shouldn't assume
@@ -121,15 +175,18 @@ export default function ListingDetailModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose, onNavigate])
+  }, [isOpen, onClose, onNavigate, formOpen])
 
   if (!isOpen) return null
 
   // Visible only when there's actually somewhere for them to go — see
   // onNavigate's own comment on why a dimmed, inert arrow beats hiding it
   // outright (a missing button at one end while browsing reads as a glitch;
-  // a visibly-disabled one reads as "you've reached the end").
-  const showNav = !!onNavigate
+  // a visibly-disabled one reads as "you've reached the end"). Hidden while
+  // formOpen for the same reason the keydown handler above stops routing
+  // arrow keys to it then: browsing to a sibling listing mid-edit doesn't
+  // mean anything, and the form's own fields want those keys for editing.
+  const showNav = !!onNavigate && !formOpen
 
   return (
     <div
@@ -166,7 +223,15 @@ export default function ListingDetailModal({
         // listing reads as a normal vertical card shape, and was checked
         // against the busiest real case (4 action buttons + a cert badge)
         // to confirm nothing wraps awkwardly at this width.
-        className="flex flex-col w-full max-w-md max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl"
+        //
+        // Widens to max-w-xl (576px, matching ActionDialog's own width)
+        // while formOpen — a real form (address/hours/photo fields) needs
+        // more room than the detail view — animated via transition-[max-width]
+        // so it reads as this SAME dialog growing, not a different one
+        // replacing it. That's the entire point of keeping this one element
+        // mounted instead of swapping to ActionDialog: a resize is still
+        // continuous, a close-then-reopen never is.
+        className={`flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
         role="dialog"
         aria-modal="true"
         aria-label={name}
@@ -179,57 +244,72 @@ export default function ListingDetailModal({
             badges belonged with the action icons below instead. The divider
             now marks the real boundary: identity above it, actions below. */}
         <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-slate-200 shrink-0">
-          <div className="flex items-start gap-3 min-w-0">
-            <CategoryIcon
-              icon={category.icon}
-              categoryId={category.id}
-              iconImageUrl={iconImageUrl}
-              color={color}
-              className="h-10 w-10 text-xl shrink-0"
-            />
-            <div className="min-w-0">
-              {/* Two columns, not one wrapping flex row — matching the
-                  collapsed card behind this dialog exactly (see that
-                  component's own headerUrlFields comment): the name gets its
-                  own flexible column and wraps onto a second line there if
-                  it needs to, while the pill stays put in a fixed column at
-                  the right, instead of the two crowding onto the same line
-                  and the pill getting pushed wherever there happened to be
-                  room. Was rendered as one of the actions-row icon buttons
-                  below instead (Directions/Call style) via
-                  includeHeaderUrlFields; moved back to sit with the name
-                  specifically because that row was the one place this
-                  dialog didn't otherwise match the card it opened from, and
-                  PlaceDetailBody's own default (excluding a showInHeader
-                  field from that row) already assumes there's a header spot
-                  like this one showing it instead. */}
-              <div className="flex items-start gap-2">
-                <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
-                {headerUrlFields.length > 0 && (
-                  <div className="flex shrink-0 items-center gap-2">
-                    {headerUrlFields.map(({ f, href }) => (
-                      <a
-                        key={f.key}
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
-                      >
-                        {f.linkLabel ?? f.label}
-                      </a>
-                    ))}
+          {formOpen ? (
+            // Replaces the name/icon block while editing — same "Back"
+            // wording and chevron MapPlaceDetail's own formOpen uses (see
+            // that component's doc): this returns to the detail view you
+            // were just on, not up to some other screen, so it doesn't
+            // name a destination the way "Back to list" elsewhere does.
+            <button
+              onClick={closeForm}
+              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+              Back
+            </button>
+          ) : (
+            <div className="flex items-start gap-3 min-w-0">
+              <CategoryIcon
+                icon={category.icon}
+                categoryId={category.id}
+                iconImageUrl={iconImageUrl}
+                color={color}
+                className="h-10 w-10 text-xl shrink-0"
+              />
+              <div className="min-w-0">
+                {/* Two columns, not one wrapping flex row — matching the
+                    collapsed card behind this dialog exactly (see that
+                    component's own headerUrlFields comment): the name gets its
+                    own flexible column and wraps onto a second line there if
+                    it needs to, while the pill stays put in a fixed column at
+                    the right, instead of the two crowding onto the same line
+                    and the pill getting pushed wherever there happened to be
+                    room. Was rendered as one of the actions-row icon buttons
+                    below instead (Directions/Call style) via
+                    includeHeaderUrlFields; moved back to sit with the name
+                    specifically because that row was the one place this
+                    dialog didn't otherwise match the card it opened from, and
+                    PlaceDetailBody's own default (excluding a showInHeader
+                    field from that row) already assumes there's a header spot
+                    like this one showing it instead. */}
+                <div className="flex items-start gap-2">
+                  <h2 className="min-w-0 flex-1 font-semibold text-slate-900 text-lg">{name}</h2>
+                  {headerUrlFields.length > 0 && (
+                    <div className="flex shrink-0 items-center gap-2">
+                      {headerUrlFields.map(({ f, href }) => (
+                        <a
+                          key={f.key}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex shrink-0 items-center rounded-full border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors whitespace-nowrap"
+                        >
+                          {f.linkLabel ?? f.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
+                {badgeRow && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {badgeRow}
                   </div>
                 )}
               </div>
-              {subtitle && <p className="text-sm text-muted truncate">{subtitle}</p>}
-              {badgeRow && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {badgeRow}
-                </div>
-              )}
             </div>
-          </div>
+          )}
           {/* Pin/Share/Set location used to live in a kebab here too, same
               spot MapPlaceDetail gives it next to the name — removed: those
               are all pre-opening actions, already one click away on the
@@ -239,20 +319,26 @@ export default function ListingDetailModal({
               plain buttons — see hidePrimaryActions' own doc on
               ListingActionsMenu) — unlike Pin/Share/Set location, they're
               things you'd genuinely want only once you're actually looking
-              at the full details, not before, so they stay. */}
+              at the full details, not before, so they stay. Hidden while
+              formOpen: opening Edit from Report (or vice versa) isn't a
+              real use case, and the kebab has nothing else left to show
+              once Pin/Share/Set-location already aren't here. */}
           <div className="flex shrink-0 items-center gap-1">
-            {(canEdit || canReport) && (
+            {!formOpen && (canEdit || canReport) && (
               <ListingActionsMenu
                 item={item}
                 category={category}
                 path={listingPath}
-                onEdit={onEdit}
-                onReport={onReport}
+                onEdit={() => openForm('edit')}
+                onReport={() => openForm('report')}
                 canEdit={canEdit}
                 canReport={canReport}
                 hidePrimaryActions
               />
             )}
+            {/* Closes the WHOLE dialog regardless of formOpen — a second,
+                faster way out beyond stepping back with Escape/the Back
+                button above, not a second meaning for this one control. */}
             <button
               onClick={onClose}
               className="shrink-0 text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
@@ -266,28 +352,36 @@ export default function ListingDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <PlaceDetailBody
-            item={item}
-            category={category}
-            onTagClick={onTagClick}
-            onFilterOpen={onFilterOpen}
-            onFilterBool={onFilterBool}
-            onFilterSelect={onFilterSelect}
-            hideOpenStatus
-            hiddenBadgeKeys={headerBadgeKeys}
-            hideCountBadge
-            // Not includeHeaderUrlFields here — that field now has a home in
-            // this dialog's own header, next to the name (see above), the
-            // same reason PlaceDetailBody's default excludes it from this
-            // row for GenericListingCard's mobile accordion too.
-          />
+          {formOpen === 'edit' ? (
+            <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
+          ) : formOpen === 'report' ? (
+            <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeForm} onSubmitted={closeForm} embedded />
+          ) : (
+            <>
+              <PlaceDetailBody
+                item={item}
+                category={category}
+                onTagClick={onTagClick}
+                onFilterOpen={onFilterOpen}
+                onFilterBool={onFilterBool}
+                onFilterSelect={onFilterSelect}
+                hideOpenStatus
+                hiddenBadgeKeys={headerBadgeKeys}
+                hideCountBadge
+                // Not includeHeaderUrlFields here — that field now has a home in
+                // this dialog's own header, next to the name (see above), the
+                // same reason PlaceDetailBody's default excludes it from this
+                // row for GenericListingCard's mobile accordion too.
+              />
 
-          <div className="pt-3 border-t border-slate-200 space-y-2.5">
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* Share, and now Edit/Report too, used to sit here — all three
-                now live only in the header's own kebab (ListingActionsMenu),
-                next to Close. */}
-          </div>
+              <div className="pt-3 border-t border-slate-200 space-y-2.5">
+                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
+                {/* Share, and now Edit/Report too, used to sit here — all three
+                    now live only in the header's own kebab (ListingActionsMenu),
+                    next to Close. */}
+              </div>
+            </>
+          )}
         </div>
       </div>
       {showNav && (

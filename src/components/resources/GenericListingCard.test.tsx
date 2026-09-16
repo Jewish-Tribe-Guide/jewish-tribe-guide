@@ -23,7 +23,33 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-afterEach(() => cleanup())
+// ListingForm/ReportListing are the same forms the category directory's own
+// Edit/Report use — already covered by their own test files, and by
+// MapPlaceDetail.test.tsx's identical stubbing for the same reason (see that
+// file's own comment): rendering them for real pulls in the Google Maps
+// address widget and Turnstile, which this file has no need to exercise —
+// it only needs to prove ListingDetailModal swaps to the right one, in
+// place, without bubbling to onEdit/onReport.
+vi.mock('./ListingForm', () => ({
+  default: ({ mode, existing, onUp }: { mode: string; existing?: { name: string }; onUp: () => void }) => (
+    <div>
+      <p>ListingForm stub — mode={mode}, existing={existing?.name}</p>
+      <button onClick={onUp}>stub cancel</button>
+    </div>
+  ),
+}))
+vi.mock('./ReportListing', () => ({
+  default: ({ listing }: { listing: { name: string } }) => <p>ReportListing stub — {listing.name}</p>,
+}))
+
+afterEach(() => {
+  cleanup()
+  // The Edit-history-push tests below leave real entries behind — jsdom's
+  // History is a live, module-level object, not reset between tests — so
+  // one test's pushState can't leak into the next one's own assertions.
+  // Same reset MapPlaceDetail.test.tsx uses for its identical pattern.
+  window.history.replaceState(null, '')
+})
 
 const requiredHandlers = {
   onVote: vi.fn(),
@@ -722,10 +748,19 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
   })
 
-  it('calls onEdit when the dialog kebab\'s Edit item is clicked', async () => {
+  // Desktop's Edit/Report used to close this dialog and hand off to a
+  // separate ActionDialog (a 448px card replaced by a differently-sized
+  // 576px form dialog, no shared backdrop — confirmed live to read as a
+  // completely different popup appearing, not a continuation of the one
+  // already open). Swaps THIS dialog's own content in place instead, same
+  // pattern MapPlaceDetail's own formOpen already uses — see
+  // ListingDetailModal's own doc. ActionDialog still exists, just not for
+  // this entry point: only for a deep link or a search result's own
+  // Edit/Report button, which have no open dialog to morph from.
+  it('swaps the dialog\'s own content to the edit form — not a separate dialog — when the kebab\'s Edit item is clicked', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
-    const item = makeListing()
+    const item = makeListing({ name: 'Goldi Market' })
     renderWithProviders(
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
@@ -734,46 +769,17 @@ describe('GenericListingCard — expanded', () => {
     await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
     await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
-    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    // Not bubbled — this dialog handled it itself.
+    expect(requiredHandlers.onEdit).not.toHaveBeenCalled()
+    // Still the SAME dialog, not a second one stacked or swapped in.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
   })
 
-  // Desktop's Edit/Report now open their own ActionDialog layered over the
-  // directory (see FindResources) instead of the old full-page swap that
-  // used to take this dialog down with it either way — so this dialog has
-  // to close itself first, or it'd stay open underneath the new one,
-  // stacking two backdrops. Confirmed here rather than just trusting the
-  // bubbled call: onExpandedChange(false) is the same signal GenericDirectory
-  // uses to drop `?item=` from the URL, so this also keeps that in sync.
-  it('closes this dialog (and reports onExpandedChange(false)) before calling onEdit, on desktop', async () => {
-    const user = userEvent.setup()
-    const onExpandedChange = vi.fn()
-    const category = makeCategory()
-    const item = makeListing()
-    renderWithProviders(
-      <GenericListingCard
-        item={item}
-        category={category}
-        upvotes={false}
-        count={0}
-        defaultExpanded
-        onExpandedChange={onExpandedChange}
-        {...requiredHandlers}
-      />,
-    )
-
-    const dialog = screen.getByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
-
-    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
-    expect(onExpandedChange).toHaveBeenCalledWith(false)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('closes this dialog before calling onReport, on desktop', async () => {
+  it('swaps the dialog\'s own content to the report form — not a separate dialog — when the kebab\'s Report item is clicked', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
-    const item = makeListing()
+    const item = makeListing({ name: 'Goldi Market' })
     renderWithProviders(
       <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
@@ -782,8 +788,47 @@ describe('GenericListingCard — expanded', () => {
     await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
     await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
 
-    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('ReportListing stub — Goldi Market')).toBeInTheDocument()
+    expect(requiredHandlers.onReport).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  // Regression coverage for the actual reason this exists: with no way
+  // back, editing from here would have no way out except the Close button
+  // (which the old behavior also had, but at the cost of losing your place
+  // in the directory — this doesn't). See MapPlaceDetail's own identical
+  // Back-button coverage, same reasoning.
+  it('shows a Back button once the edit form is open, and it returns to the detail view via history.back()', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing()
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+
+    await user.click(screen.getByRole('button', { name: /^back$/i }))
+    expect(backSpy).toHaveBeenCalled()
+  })
+
+  it('pushes a history entry when Edit opens, so a swipe-back returns to the detail view instead of closing the dialog entirely', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing()
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+
+    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ detailModalForm: 'edit' }), '')
   })
 
   // Pin/Share/Set location used to be restated in this dialog's own kebab
