@@ -957,9 +957,24 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // scroll on the page, so the bar slid away while a visitor was still
         // scrolling through content well above it — before it had ever
         // become sticky, let alone been scrolled past.
+        //
+        // lg:border-x once docked: the bar's white is only a few shades off
+        // the page's own cream background, and the shadow above only reads
+        // on its bottom edge — with nothing marking the left/right edges,
+        // the two near-whites just ran together there. A thin border gives
+        // it the same framing the full-bleed results panel below already
+        // has (border-slate-200).
+        //
+        // lg:px-4 once docked, too: the search input and filter pills have
+        // no horizontal padding of their own — un-docked, they just line up
+        // flush with the grid below, which is fine there. But the moment
+        // this box gets its own visible edges (the border above), that same
+        // zero-padding reads as the search box and pills touching the frame
+        // directly, with no breathing room. The inset only appears once
+        // docked, same as the border/shadow/background it's paired with.
         className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-transform lg:duration-300 ${
           controlsStuck
-            ? `lg:bg-white lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
+            ? `lg:border-x lg:border-slate-200 lg:bg-white lg:px-4 lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
             : 'lg:translate-y-0'
         }`}
       >
