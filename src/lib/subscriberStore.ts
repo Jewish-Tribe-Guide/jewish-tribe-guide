@@ -49,7 +49,7 @@ function toSubscriber(row: Row): Subscriber {
 export async function createSubscriber(
   community: string,
   input: { email: string; categories: string[] | null; notifyAdd: boolean; notifyClosure: boolean },
-): Promise<void> {
+): Promise<Subscriber> {
   const email = input.email.trim().toLowerCase()
   const newCategories = input.categories && input.categories.length > 0 ? input.categories : null
 
@@ -69,7 +69,7 @@ export async function createSubscriber(
         ? Array.from(new Set([...(existing.categories ?? []), ...(newCategories ?? [])]))
         : newCategories
 
-  const { error } = await getAdminClient()
+  const { data, error } = await getAdminClient()
     .from('subscriber')
     .upsert(
       {
@@ -81,7 +81,10 @@ export async function createSubscriber(
       },
       { onConflict: 'community_id,email' },
     )
+    .select('*')
+    .single()
   if (error) throw new Error(`Failed to save subscriber: ${error.message}`)
+  return toSubscriber(data as Row)
 }
 
 export async function deleteSubscriberByToken(token: string): Promise<boolean> {
