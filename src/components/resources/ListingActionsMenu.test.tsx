@@ -295,6 +295,95 @@ describe('ListingActionsMenu', () => {
   // must stop that from happening, the same concern PinButton/
   // SetLocationButton/the distance slot's own picker button already
   // document.
+  // Edit/Report — optional, only passed by GenericListingCard's mobile
+  // collapsed row (see this component's own doc). Undefined by default in
+  // renderMenu, so every test above already proves they don't leak into
+  // MapPlaceDetail/ListingDetailModal's own kebab instances, which never
+  // pass them.
+  describe('Edit/Report', () => {
+    it('does not render Edit, Report, or the divider when neither is passed', async () => {
+      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+      const user = userEvent.setup()
+      renderMenu()
+
+      await user.click(screen.getByRole('button', { name: /more actions/i }))
+      expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+    })
+
+    it('shows Edit and Report, with a divider above them, when passed', async () => {
+      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+      const onEdit = vi.fn()
+      const onReport = vi.fn()
+      const user = userEvent.setup()
+      const item = makeListing({ id: 'listing-1', name: 'Goldi Market' })
+      const category = makeCategory()
+      renderWithProviders(
+        <ListingActionsMenu
+          item={item}
+          category={category}
+          path="/philly/grocery/goldi-a1b2c3"
+          onEdit={onEdit}
+          onReport={onReport}
+          canEdit
+          canReport
+        />,
+      )
+
+      await user.click(screen.getByRole('button', { name: /more actions/i }))
+      expect(screen.getByRole('separator')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
+    })
+
+    it('calls onEdit and closes the menu, without bubbling to a parent handler', async () => {
+      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+      const onEdit = vi.fn()
+      const onParentClick = vi.fn()
+      const user = userEvent.setup()
+      renderWithProviders(
+        <div onClick={onParentClick}>
+          <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" onEdit={onEdit} canEdit />
+        </div>,
+      )
+
+      await user.click(screen.getByRole('button', { name: /more actions/i }))
+      await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+
+      expect(onEdit).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(onParentClick).not.toHaveBeenCalled()
+    })
+
+    it('calls onReport and closes the menu', async () => {
+      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+      const onReport = vi.fn()
+      const user = userEvent.setup()
+      renderWithProviders(
+        <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" onReport={onReport} canReport />,
+      )
+
+      await user.click(screen.getByRole('button', { name: /more actions/i }))
+      await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
+
+      expect(onReport).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    })
+
+    it('shows only Edit when canReport is false', async () => {
+      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+      const user = userEvent.setup()
+      renderWithProviders(
+        <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" onEdit={vi.fn()} canEdit canReport={false} />,
+      )
+
+      await user.click(screen.getByRole('button', { name: /more actions/i }))
+      expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('stops the kebab click and every menu item click from bubbling to a parent handler', async () => {
     vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
       anchorListingId: null,
@@ -306,7 +395,6 @@ describe('ListingActionsMenu', () => {
     const item = makeListing({ id: 'listing-1', name: 'Goldi Market', geo: { lat: 39.95, lng: -75.16 } })
     const category = makeCategory()
     renderWithProviders(
-      // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
       <div onClick={onParentClick}>
         <ListingActionsMenu item={item} category={category} path="/philly/grocery/goldi-a1b2c3" />
       </div>,

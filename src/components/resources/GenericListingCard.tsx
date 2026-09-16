@@ -20,7 +20,6 @@ import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ListingActionsMenu from './ListingActionsMenu'
 import Chip from './Chip'
-import { PencilIcon, FlagIcon } from '@/components/icons'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -821,6 +820,15 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             item={item}
             category={category}
             path={listingPath}
+            // Mobile only — desktop's Edit/Report stay where they are, in
+            // ListingDetailModal's own footer (opened by expanding this
+            // card into that dialog). Mobile has no such dialog; a visitor
+            // there reaching for Edit/Report went straight to this kebab
+            // first, same muscle memory as Pin/Share/Set location, rather
+            // than down to the bottom of the expanded accordion panel —
+            // see the panel's own comment just below, where those two
+            // buttons used to live.
+            {...(isMobile ? { onEdit, onReport, canEdit, canReport } : {})}
           />
         </div>
 
@@ -946,17 +954,10 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* Share used to sit here too — now only in the collapsed row's
-                own kebab (ListingActionsMenu), same place Pin/Set location
-                live, rather than duplicated in both spots. */}
-            <div className="flex gap-3">
-              {canEdit && (
-                <button onClick={onEdit} className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"><PencilIcon className="h-3.5 w-3.5" /> Edit</button>
-              )}
-              {canReport && (
-                <button onClick={onReport} className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"><FlagIcon className="h-3.5 w-3.5" /> Report</button>
-              )}
-            </div>
+            {/* Share used to sit here too, and Edit/Report followed it —
+                all three now live only in the collapsed row's own kebab
+                (ListingActionsMenu), same place Pin/Set location do,
+                rather than split between here and there. */}
           </div>
         </div>
         </div>

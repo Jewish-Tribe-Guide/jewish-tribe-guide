@@ -976,6 +976,54 @@ describe('GenericListingCard — actions menu corner', () => {
     )
     expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
   })
+
+  // Edit/Report moved into this kebab, mobile only — reachable straight from
+  // the collapsed row, no need to expand the card first. Desktop keeps them
+  // out of this menu; they still live in ListingDetailModal's own footer
+  // (see "GenericListingCard — expanded" above), reached by expanding into
+  // that dialog.
+  it('on mobile, the kebab itself offers Edit and Report, without expanding the card', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
+    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
+  })
+
+  it('on desktop, the collapsed row kebab does not offer Edit or Report', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
+  })
+
+  it('on mobile, expanding the card no longer shows standalone Edit/Report buttons — the kebab is the only way there now', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^report$/i })).not.toBeInTheDocument()
+    // The kebab is still the way there.
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+  })
 })
 
 // The chevron used to be the only visible signal that this row expands at
@@ -1011,15 +1059,19 @@ describe('GenericListingCard — mobile accordion animation', () => {
 
     const toggle = screen.getByRole('button', { name: /show details for/i })
     act(() => fireEvent.click(toggle))
-    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    // FreshnessFooter's own button — unconditional, unlike Edit/Report
+    // (which moved into this row's own kebab, see ListingActionsMenu), so
+    // it's a marker for "is the panel still mounted" that doesn't depend on
+    // what this category/listing happens to allow.
+    expect(screen.getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
 
     const collapseToggle = screen.getByRole('button', { name: /hide details for/i })
     act(() => fireEvent.click(collapseToggle))
     // Still in the DOM immediately after collapsing starts — an instant
     // unmount here is exactly the silent pop this animation replaced.
-    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^mark as current$/i })).toBeInTheDocument()
 
     act(() => void vi.advanceTimersByTime(MOBILE_PANEL_TRANSITION_MS))
-    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^mark as current$/i })).not.toBeInTheDocument()
   })
 })
