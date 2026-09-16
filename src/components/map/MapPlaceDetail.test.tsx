@@ -94,7 +94,7 @@ describe('MapPlaceDetail', () => {
     localStorage.clear()
   })
 
-  it('shows the same FreshnessFooter/Edit/Report bottom section the category directory\'s expanded card shows, plus a Pin/Share/Set location kebab in the header', async () => {
+  it('shows FreshnessFooter, with Edit/Report/Pin/Share/Set location all behind one kebab in the header', async () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
     const user = (await import('@testing-library/user-event')).default.setup()
@@ -106,31 +106,23 @@ describe('MapPlaceDetail', () => {
     )
 
     expect(screen.getByText('Is this info current?')).toBeInTheDocument()
-    const editButton = screen.getByRole('button', { name: /Edit/ })
-    expect(editButton).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Report/ })).toBeInTheDocument()
+    // Edit/Report used to be standalone buttons right under FreshnessFooter
+    // — both now live only in the kebab, same place Pin/Share/Set location
+    // do (see GenericListingCard's own identical move).
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^report$/i })).not.toBeInTheDocument()
 
-    // The bug this used to guard: Share (now in the kebab below, not a
-    // footer sibling any more) used to sit on the same line as "Is this
-    // info current?" instead of its own row below. Edit/Report being direct
-    // siblings under one shared parent — separate from FreshnessFooter's
-    // own — is what still forces that line break, same structure
-    // GenericListingCard uses.
-    const row = editButton.parentElement!
-    expect(row).toContainElement(screen.getByRole('button', { name: /Report/ }))
-    expect(row).not.toContainElement(screen.getByText('Is this info current?'))
-
-    // Pin/Share/"Set location" — same kebab GenericListingCard's own card
-    // shows, restated here since this panel has no separate collapsed card
-    // of its own to put one on.
     const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
     await user.click(kebab)
     expect(screen.getByRole('menuitem', { name: /^pin$/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
   })
 
   it('swaps to the edit form (same one the category directory uses) when Edit is clicked, and back on cancel', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
 
@@ -140,15 +132,17 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
     expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
     // Swapped out entirely, not layered on top.
     expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
   })
 
-  it('swaps to the report form when Report is clicked', async () => {
+  it('opens Report as a sheet, layered on top — the place detail underneath is untouched', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
 
@@ -158,12 +152,17 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Report/ }))
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
 
     expect(screen.getByText('ReportListing stub — Goldi Market')).toBeInTheDocument()
+    // Not a swap — the place detail (and its own "Back to list" button) is
+    // still there underneath the sheet.
+    expect(screen.getByRole('button', { name: 'Back to list' })).toBeInTheDocument()
   })
 
-  it('hides Edit/Report when the category has turned them off', () => {
+  it('hides Edit/Report when the category has turned them off', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
     const category: CategoryConfig = makeCategory({
       capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, edit: false, report: false },
     })
@@ -175,15 +174,18 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Report/ })).not.toBeInTheDocument()
+    const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
     // The kebab (Pin/Share/Set location) stays available regardless — none
     // of those are contribution capabilities.
-    expect(screen.getByRole('button', { name: /more actions for goldi market/i })).toBeInTheDocument()
+    expect(kebab).toBeInTheDocument()
+    await user.click(kebab)
+    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
   })
 
   it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
     const pushSpy = vi.spyOn(window.history, 'pushState')
@@ -194,13 +196,15 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
 
     expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'edit' }), '')
   })
 
   it('returns to the place detail (not the list, not off the map) when a swipe-back fires while the edit form is open', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
 
@@ -210,12 +214,13 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
     expect(screen.getByText(/ListingForm stub/)).toBeInTheDocument()
 
     // Simulates what a real swipe-back/browser-back delivers: a popstate
     // whose state no longer carries mapSheetForm, because history.back()
-    // popped past the entry openAction pushed.
+    // popped past the entry openEdit pushed.
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
     })
@@ -226,6 +231,7 @@ describe('MapPlaceDetail', () => {
 
   it('closes the edit form via history.back(), not a direct state reset, so cancelling and swiping back behave identically', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
@@ -236,8 +242,9 @@ describe('MapPlaceDetail', () => {
       </PinnedProvider>,
     )
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /Edit/ }))
-    await userEvent.setup().click(screen.getByRole('button', { name: 'stub cancel' }))
+    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
     expect(backSpy).toHaveBeenCalled()
     // Mocked no-op above, so no popstate actually fired — the form staying

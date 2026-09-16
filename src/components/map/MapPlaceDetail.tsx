@@ -8,10 +8,10 @@ import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
 import ListingForm from '@/components/resources/ListingForm'
-import ReportListing from '@/components/resources/ReportListing'
+import ReportSheet from '@/components/resources/ReportSheet'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
-import { ChevronLeftIcon, PencilIcon, FlagIcon } from '@/components/icons'
+import { ChevronLeftIcon } from '@/components/icons'
 import { ui } from '@/lib/uiConfig'
 import { routes } from '@/lib/routes'
 import { listingSlug } from '@/lib/listingSlug'
@@ -48,12 +48,13 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
       : category.iconImageUrl) ?? undefined
-  // Edit/Report swap this whole detail view for the same forms the category
-  // directory uses (ListingForm/ReportListing), same as GenericListingCard —
-  // just scoped to this one component instead of the whole screen, since the
-  // map has no separate "form view" of its own to navigate to. Returns to
-  // this same place's detail (not the list) on cancel or submit, since
-  // that's what was on screen before Edit/Report was tapped.
+  // Edit swaps this whole detail view for the same form the category
+  // directory uses (ListingForm), same as GenericListingCard's own mobile
+  // accordion — just scoped to this one component instead of the whole
+  // screen, since the map has no separate "form view" of its own to
+  // navigate to. Returns to this same place's detail (not the list) on
+  // cancel or submit, since that's what was on screen before Edit was
+  // tapped.
   //
   // Gets its own history entry, nested on top of the one MobileNearbySheet's
   // selectPlace already pushed for this place — so a swipe-back/browser-back
@@ -61,31 +62,34 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
   // it or off the map entirely. Same pattern as that one; see its own
   // comment for why (and CategoryEditor's openPreview/closePreview, the
   // precedent both follow).
-  const [action, setAction] = useState<'edit' | 'report' | null>(null)
+  //
+  // Report used to work the identical way (a third `action` value, its own
+  // history entry) — moved to its own sheet instead (see ReportSheet's own
+  // doc on why: its form is short enough not to need a full replace at
+  // all). No history entry for it any more, on purpose: dismissing a sheet
+  // is a local UI change, not a navigation, so it doesn't belong in browser
+  // history alongside the places this map sheet actually visited.
+  const [editOpen, setEditOpen] = useState(false)
+  const [reportSheetOpen, setReportSheetOpen] = useState(false)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit' | 'report' } | null
-      setAction(state?.mapSheetForm ?? null)
+      const state = e.state as { mapSheetForm?: 'edit' } | null
+      setEditOpen(state?.mapSheetForm === 'edit')
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  const openAction = (mode: 'edit' | 'report') => {
-    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
-    setAction(mode)
+  const openEdit = () => {
+    history.pushState({ ...(window.history.state ?? {}), mapSheetForm: 'edit' }, '')
+    setEditOpen(true)
   }
-  const closeAction = () => history.back()
+  const closeEdit = () => history.back()
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
   const canReport = ui.contributions.report && caps.report
 
-  if (action === 'edit') {
-    return <ListingForm category={category} mode="edit" existing={item} onUp={closeAction} onSubmitted={closeAction} />
-  }
-  if (action === 'report') {
-    return (
-      <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeAction} onSubmitted={closeAction} />
-    )
+  if (editOpen) {
+    return <ListingForm category={category} mode="edit" existing={item} onUp={closeEdit} onSubmitted={closeEdit} />
   }
 
   return (
@@ -153,11 +157,22 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             Spotify's own overflow-menu spacing rather than butting right up
             against it. (Which way the dropdown itself opens is measured
             automatically — see ListingActionsMenu's own doc.) */}
+        {/* onEdit/onReport/canEdit/canReport: same optional props
+            GenericListingCard's own mobile kebab passes — see that
+            component's doc on why Edit/Report moved into this menu instead
+            of sitting alone in the footer below (removed from here now,
+            same reasoning). Report opens ReportSheet locally; Edit still
+            swaps this whole panel via the history-backed editOpen state
+            above, unchanged. */}
         <ListingActionsMenu
           item={item}
           category={category}
           path={listingPath}
           className="mr-1 self-center"
+          onEdit={openEdit}
+          onReport={() => setReportSheetOpen(true)}
+          canEdit={canEdit}
+          canReport={canReport}
         />
       </div>
 
@@ -169,25 +184,16 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-        <div className="flex gap-3">
-          {canEdit && (
-            <button
-              onClick={() => openAction('edit')}
-              className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary transition-colors cursor-pointer"
-            >
-              <PencilIcon className="h-3.5 w-3.5" /> Edit
-            </button>
-          )}
-          {canReport && (
-            <button
-              onClick={() => openAction('report')}
-              className="inline-flex items-center gap-1 text-xs text-muted hover:text-red-600 transition-colors cursor-pointer"
-            >
-              <FlagIcon className="h-3.5 w-3.5" /> Report
-            </button>
-          )}
-        </div>
+        {/* Edit/Report used to sit here too — both now live only in the
+            kebab above, same place Pin/Share/Set location do. */}
       </div>
+
+      <ReportSheet
+        isOpen={reportSheetOpen}
+        onClose={() => setReportSheetOpen(false)}
+        listing={item}
+        upLabel={category.pluralLabel}
+      />
     </div>
   )
 }
