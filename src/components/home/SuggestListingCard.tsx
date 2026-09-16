@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import ContributePicker from './ContributePicker'
+import { isOptimizableImage } from '@/lib/imageHosts'
 
 // ── "Suggest a Listing" — desktop mockup match (Phase 6, docs/desktop-
 // mockup-plan.md). New card, always the third in the community row beside
@@ -25,6 +26,17 @@ import ContributePicker from './ContributePicker'
 // `max-w-[58%]` so real copy at any length never runs under it. Replaces
 // the plain orange/amber gradient placeholder every other card without a
 // real photo yet still falls back to.
+//
+// unoptimized={!isOptimizableImage(...)}: this went out with no gate at all
+// for a while, unlike every other hardcoded photo on this screen
+// (CampaignBannerCard, DaveningTimesCard, HeroHeading) — worked fine until
+// the deployed site's Image Optimization quota was actually exhausted, at
+// which point Vercel returned a 402 for this one request and the card just
+// showed nothing. NEXT_PUBLIC_IMAGES_UNOPTIMIZED (see imageHosts.ts) is set
+// for exactly this, but only for images that actually check it.
+const PHOTO_URL =
+  'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D'
+
 export default function SuggestListingCard() {
   const [open, setOpen] = useState(false)
 
@@ -35,11 +47,12 @@ export default function SuggestListingCard() {
         className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
       >
         <Image
-          src="https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D"
+          src={PHOTO_URL}
           alt=""
           fill
           sizes="(min-width: 640px) 42vw, 0px"
           className="object-cover"
+          unoptimized={!isOptimizableImage(PHOTO_URL)}
         />
       </div>
       <div className="relative max-w-[58%]">

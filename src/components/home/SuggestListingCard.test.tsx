@@ -13,7 +13,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.unstubAllEnvs()
+})
 
 // New card (Phase 6d, docs/desktop-mockup-plan.md) — fixed, non-admin-
 // editable copy, and a single action that opens the same ContributePicker
@@ -36,5 +39,27 @@ describe('SuggestListingCard', () => {
     await user.click(screen.getByRole('button', { name: 'Submit a Listing' }))
 
     expect(screen.getByRole('dialog', { name: 'Add a listing' })).toBeInTheDocument()
+  })
+
+  // Regression: this photo went out with no unoptimized gate at all, unlike
+  // every other hardcoded photo on the home screen (CampaignBannerCard,
+  // DaveningTimesCard, HeroHeading) — invisible locally and in a normal
+  // deploy, since next/image's own optimizer just did its job. It broke the
+  // moment the site's real Image Optimization quota was exhausted: Vercel
+  // returned a 402 for this one request (confirmed live) and the card
+  // rendered with no photo, with no way to route around it — the
+  // NEXT_PUBLIC_IMAGES_UNOPTIMIZED kill switch (see imageHosts.ts) existed
+  // for exactly this but this image never checked it.
+  it('routes the photo unoptimized once NEXT_PUBLIC_IMAGES_UNOPTIMIZED is set', () => {
+    vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
+    renderWithProviders(<SuggestListingCard />, { content: { categories: [makeCategory()] } })
+
+    // Unoptimized: the raw Unsplash URL, untouched. Optimized (the default)
+    // would instead be routed through /_next/image?url=... — exactly the
+    // request Vercel's optimizer 402s once the quota runs out.
+    const img = document.querySelector('img')
+    expect(img?.getAttribute('src')).toBe(
+      'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3RvcmV8ZW58MHx8MHx8fDA%3D',
+    )
   })
 })
