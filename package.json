@@ -39,7 +39,7 @@
     "next": "16.3.4",
     "posthog-js": "^1.422.5",
     "react": "19.3.0-canary-6c0e1047-20260908",
-    "react-dom": "19.3.0-canary-6c0e1047-20260908",
+    "react-dom": "19.3.0",
     "resend": "^6.25.0",
     "sharp": "^0.35.4",
     "tz-lookup": "^6.1.25"
