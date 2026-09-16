@@ -108,6 +108,14 @@ export function Card({
       // mobile — desktop's screens are plain fades with no edge the
       // content is conceptually anchored to (see navTransitions.ts).
       transitionTypes={isMobile ? ['nav-forward'] : undefined}
+      // The home screen mounts every card in this grid at once — 10+ tiles,
+      // each one Next.js would otherwise eagerly prefetch the moment it's
+      // in the viewport — and mobile's and desktop's copies of this same
+      // grid both live in the DOM together (CSS toggles which one shows,
+      // not JS), so a single page load was firing every category route's
+      // RSC prefetch twice over. A click still navigates instantly either
+      // way; this only removes the speculative fetch nobody asked for yet.
+      prefetch={false}
     >
       <div
         className={`relative aspect-[4/3] rounded-2xl overflow-hidden ${hasImage ? 'bg-slate-100' : tint} ring-1 ring-slate-900/5 flex flex-col items-center justify-center gap-1 p-4 text-center transition-all duration-200 group-hover:shadow-lg group-hover:shadow-slate-900/10 group-hover:-translate-y-0.5 group-active:scale-[0.97] group-active:shadow-lg group-active:shadow-slate-900/10`}
@@ -244,6 +252,10 @@ function CompactCard({
       // mounts on mobile (see this component's own doc), and desktop never
       // wants the slide (see navTransitions.ts), so there's no case where
       // tagging it would do anything but risk a stray whole-page crossfade.
+      // Same reasoning as Card's own prefetch={false}: a search-results list
+      // here can be a dozen-plus rows, each an eager prefetch nobody asked
+      // for yet.
+      prefetch={false}
     >
       {card.icon ? (
         // Named (desktop only — this component never mounts on mobile, see
@@ -473,6 +485,9 @@ export function CategoryTileRow({
           href={card.href}
           className={`${tileClassName} ${expanded ? '' : 'min-w-0 flex-1'}`}
           onClick={onCardClick ? () => onCardClick(card) : undefined}
+          // Same reasoning as Card's own prefetch={false} in this file —
+          // this row renders every category at once, expanded or not.
+          prefetch={false}
         >
           {card.icon ? (
             // Named the same way CompactCard's own badge is (desktop only,
