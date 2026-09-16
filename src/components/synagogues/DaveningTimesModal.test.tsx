@@ -7,6 +7,7 @@ import type { Minyan } from '@/lib/davening'
 import { formatAnchorRule } from '@/lib/davening'
 import type { ZmanimData } from '@/types'
 import DaveningTimesModal from './DaveningTimesModal'
+import { __resetZmanimCacheForTests } from '@/lib/useZmanim'
 
 afterEach(() => cleanup())
 
@@ -67,6 +68,11 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.setSystemTime(SUNDAY)
   localStorage.clear()
+  // Every test here calls useZmanim with the same community-default
+  // coordinates on the same pinned SUNDAY, so without this its module-level
+  // cache would serve whichever test's stubZmanim() ran first to every test
+  // after it.
+  __resetZmanimCacheForTests()
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({ ok: true, json: async () => ZMANIM_RESPONSE }) as unknown as Response),
