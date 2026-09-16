@@ -972,7 +972,16 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         // zero-padding reads as the search box and pills touching the frame
         // directly, with no breathing room. The inset only appears once
         // docked, same as the border/shadow/background it's paired with.
-        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-transform lg:duration-300 ${
+        //
+        // lg:transition-all, not lg:transition-transform: the hide-on-scroll
+        // slide is the only thing that was ever animated — background,
+        // padding, margin, border and shadow all popped in/out the instant
+        // `controlsStuck` flipped, no transition at all. That's a smooth
+        // slide with several other properties snapping on top of it in the
+        // same frame, which reads as a stutter right at the moment it docks
+        // rather than one clean motion. transition-all covers all of it with
+        // the same duration, so it settles together.
+        className={`mb-4 space-y-2 lg:sticky lg:top-14 lg:z-30 lg:transition-all lg:duration-300 ${
           controlsStuck
             ? `lg:border-x lg:border-slate-200 lg:bg-white lg:px-4 lg:pt-3 lg:pb-3 lg:-mt-3 lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)] ${controlsVisible ? 'lg:translate-y-0' : 'lg:-translate-y-full'}`
             : 'lg:translate-y-0'
