@@ -539,6 +539,19 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   }
 
   useEffect(() => {
+    if (!reopenItemId) return
+    // Actually opens the card too, not just scrolls to it — `defaultExpanded`
+    // (below, on each card) only seeds that card's OWN expand state on ITS
+    // OWN first mount, which does nothing if this directory is already
+    // mounted from an earlier visit: Next's Cache Components keep a recent
+    // route's component tree alive via <Activity> instead of unmounting it,
+    // so navigating back into an already-open category with a NEW `?item=`
+    // (e.g. a different listing picked from the home search dropdown) left
+    // the URL pointing at the right listing but no modal actually open —
+    // confirmed live, and only a full reload (a genuine fresh mount) fixed
+    // it. Calling .open() on the genuine first-mount case (already true via
+    // defaultExpanded) is a harmless no-op.
+    cardRefs.current.get(reopenItemId)?.open()
     // Settle-aware, not a plain one-shot scrollItemIntoView — this list can
     // still reorder right after mount (distance sort landing once
     // geolocation resolves is the common case: a `?item=` deep link into a
@@ -547,9 +560,9 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // pre-reorder position, so the visitor ends up scrolled to wherever
     // that used to be — short of or past where the reopened listing
     // actually settled, off by however far the reorder moved it.
-    if (reopenItemId) return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally empty — only fire on mount
+    return scrollItemIntoViewWhenSettled(reopenItemId, 'instant')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reopenItemId should retrigger this; scrollItemIntoViewWhenSettled is a fresh closure every render
+  }, [reopenItemId])
 
   // Tapping a listing's "I'm here" (see SetLocationButton) re-anchors every
   // distance to it, which — for anyone not already on Distance sort — flips

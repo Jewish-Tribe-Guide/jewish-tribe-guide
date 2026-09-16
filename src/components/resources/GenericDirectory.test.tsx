@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Activity } from 'react'
+import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -29,41 +29,77 @@ vi.mock('@/lib/backForwardNavigation', () => ({
 // DaveningTimesCard, so what's under test is GenericDirectory's own
 // filtering/search/wiring logic, not the card's own rendering.
 vi.mock('./GenericListingCard', () => ({
-  GenericListingCard: ({
-    item,
-    onEdit,
-    onReport,
-    onTagClick,
-    onFilterBool,
-    onNavigate,
-    showDistanceSlot,
-    onExpandedChange,
-  }: {
-    item: DirectoryResource
-    onEdit: () => void
-    onReport: () => void
-    onTagClick: (t: string) => void
-    onFilterBool: (key: string) => void
-    onNavigate?: (direction: 1 | -1) => void
-    showDistanceSlot?: boolean
-    onExpandedChange?: (expanded: boolean) => void
-  }) => (
-    <div>
-      <span>{item.name}</span>
-      {showDistanceSlot && <span>distance-slot {item.name}</span>}
-      <button onClick={onEdit}>Edit {item.name}</button>
-      <button onClick={onReport}>Report {item.name}</button>
-      <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
-      <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
-      {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
-      {onExpandedChange && (
-        <>
-          <button onClick={() => onExpandedChange(true)}>Expand {item.name}</button>
-          <button onClick={() => onExpandedChange(false)}>Collapse {item.name}</button>
-        </>
-      )}
-    </div>
-  ),
+  // A real forwardRef + useImperativeHandle open()/close(), same shape as
+  // the real GenericListingCardHandle — needed so the reopenItemId→open()
+  // wiring (GenericDirectory's own cardRefs.current.get(id)?.open()) is
+  // actually exercisable here, not silently swallowed by a ref-less mock.
+  // measure*/setSpacer* are no-ops: this suite doesn't cover the alignment
+  // logic that calls them.
+  GenericListingCard: forwardRef(function GenericListingCard(
+    {
+      item,
+      defaultExpanded,
+      onEdit,
+      onReport,
+      onTagClick,
+      onFilterBool,
+      onNavigate,
+      showDistanceSlot,
+      onExpandedChange,
+    }: {
+      item: DirectoryResource
+      defaultExpanded?: boolean
+      onEdit: () => void
+      onReport: () => void
+      onTagClick: (t: string) => void
+      onFilterBool: (key: string) => void
+      onNavigate?: (direction: 1 | -1) => void
+      showDistanceSlot?: boolean
+      onExpandedChange?: (expanded: boolean) => void
+    },
+    ref: Ref<{
+      open: () => void
+      close: () => void
+      measureUpvoteRowOffset: () => number | null
+      measureBadgeGap: () => number | null
+      setUpvoteSpacerHeight: (px: number) => void
+      setBadgeSpacerHeight: (px: number) => void
+    }>,
+  ) {
+    const [expanded, setExpanded] = useState(!!defaultExpanded)
+    useImperativeHandle(ref, () => ({
+      open: () => {
+        setExpanded(true)
+        onExpandedChange?.(true)
+      },
+      close: () => {
+        setExpanded(false)
+        onExpandedChange?.(false)
+      },
+      measureUpvoteRowOffset: () => null,
+      measureBadgeGap: () => null,
+      setUpvoteSpacerHeight: () => {},
+      setBadgeSpacerHeight: () => {},
+    }))
+    return (
+      <div>
+        <span>{item.name}</span>
+        {showDistanceSlot && <span>distance-slot {item.name}</span>}
+        {expanded && <span>Expanded {item.name}</span>}
+        <button onClick={onEdit}>Edit {item.name}</button>
+        <button onClick={onReport}>Report {item.name}</button>
+        <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
+        <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
+        {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
+        {onExpandedChange && (
+          <>
+            <button onClick={() => onExpandedChange(true)}>Expand {item.name}</button>
+            <button onClick={() => onExpandedChange(false)}>Collapse {item.name}</button>
+          </>
+        )}
+      </div>
+    )
+  }),
 }))
 
 // DaveningTimesModal pulls in its own heavy davening-time rendering — out of
@@ -627,6 +663,31 @@ describe('GenericDirectory — scrolling a reopened listing into view', () => {
       vi.unstubAllGlobals()
       vi.useRealTimers()
     }
+  })
+
+  // The scroll above already covers the true-first-mount case. This is the
+  // bug a real user reported live: clicking a different listing from the
+  // home hero's search dropdown updated the URL (?item=<id>) but nothing
+  // visibly opened until a full reload. Root cause — `defaultExpanded` (the
+  // prop each card reads its OWN initial `expanded` state from) only ever
+  // applies on that card's own first mount; it has no effect once this
+  // directory is already mounted, which Next's Cache Components makes the
+  // common case (a recent route's component tree is kept alive via
+  // <Activity> rather than unmounted — see the "clears an already-typed
+  // search" test above for the same mechanism). A plain rerender with a new
+  // reopenItemId, no <Activity> needed, already reproduces it: this effect's
+  // dependency array is what actually matters, not the wrapper.
+  it('opens the reopened listing on a later reopenItemId change too, not just at first mount', () => {
+    const category = makeCategory()
+    const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
+    const { rerenderWithProviders } = renderWithProviders(
+      <GenericDirectory category={category} items={items} {...handlers} />,
+    )
+    expect(screen.queryByText('Expanded Trader Joe')).not.toBeInTheDocument()
+
+    rerenderWithProviders(<GenericDirectory category={category} items={items} {...handlers} reopenItemId="b" />)
+
+    expect(screen.getByText('Expanded Trader Joe')).toBeInTheDocument()
   })
 })
 
