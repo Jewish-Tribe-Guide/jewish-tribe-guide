@@ -1049,15 +1049,28 @@ describe('GenericListingCard — actions menu corner', () => {
     expect(screen.getByRole('dialog', { name: /report a problem/i })).toBeInTheDocument()
   })
 
-  it('on desktop, the collapsed row kebab does not offer Edit or Report', async () => {
+  // Used to be mobile-only, back when desktop's Edit/Report only existed
+  // inside ListingDetailModal. Both now open a lightweight overlay instead
+  // of a full-page navigation (ActionDialog on desktop, this card's own
+  // ReportSheet for Report on mobile), so there's no reason left to make a
+  // desktop visitor open that dialog first just to reach them.
+  it('on desktop too, the collapsed row kebab offers Edit and Report — Report calls the bubbled prop (opens FindResources\' ActionDialog), unlike mobile\'s own sheet', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
     await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
+    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
+    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
+    // No local sheet on desktop — that's mobile-only (see the mobile test
+    // above), since desktop's ActionDialog lives up in FindResources,
+    // outside this component entirely.
+    expect(screen.queryByRole('dialog', { name: /report a problem/i })).not.toBeInTheDocument()
   })
 
   it('on mobile, expanding the card no longer shows standalone Edit/Report buttons — the kebab is the only way there now', async () => {

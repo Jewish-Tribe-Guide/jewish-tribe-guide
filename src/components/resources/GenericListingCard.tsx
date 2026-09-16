@@ -827,18 +827,22 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             item={item}
             category={category}
             path={listingPath}
-            // Mobile only — desktop's Edit/Report stay where they are, in
-            // ListingDetailModal's own footer (opened by expanding this
-            // card into that dialog). Mobile has no such dialog; a visitor
-            // there reaching for Edit/Report went straight to this kebab
-            // first, same muscle memory as Pin/Share/Set location, rather
-            // than down to the bottom of the expanded accordion panel —
-            // see the panel's own comment just below, where those two
-            // buttons used to live. Report opens this card's own sheet
-            // (see reportSheetOpen's doc) rather than the bubbled-up
-            // onReport prop — Edit still uses that prop as-is, since it
-            // stays a full-screen navigation on mobile.
-            {...(isMobile ? { onEdit, onReport: () => setReportSheetOpen(true), canEdit, canReport } : {})}
+            // Both platforms now — a visitor reaching for Edit/Report goes
+            // straight to this kebab first, same muscle memory as Pin/
+            // Share/Set location, rather than opening the expanded card
+            // first (desktop's ListingDetailModal, or mobile's accordion
+            // panel — see that panel's own comment just below, where these
+            // two used to live on mobile). Used to be mobile-only, back
+            // when desktop's Edit/Report only existed inside that dialog;
+            // now that both platforms open a lightweight overlay instead
+            // of a full-page navigation (ActionDialog on desktop, this
+            // card's own ReportSheet for Report on mobile — see its own
+            // doc), there's no reason left to make a desktop visitor open
+            // the dialog first just to reach them.
+            onEdit={onEdit}
+            onReport={isMobile ? () => setReportSheetOpen(true) : onReport}
+            canEdit={canEdit}
+            canReport={canReport}
           />
         </div>
 
