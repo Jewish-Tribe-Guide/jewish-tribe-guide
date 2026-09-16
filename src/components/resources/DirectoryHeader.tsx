@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Breadcrumb from '@/components/Breadcrumb'
 import AddressPrompt from './AddressPrompt'
+import { PinIcon } from '@/components/icons'
 
 type Props = {
   /** The category/section title (e.g. "Synagogues", "Which hospital?"). */
@@ -81,7 +82,15 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               h1 at all. */}
           <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
-            <p className="text-sm text-muted mt-0.5">
+            <p className="flex items-center gap-1 text-sm text-muted mt-0.5">
+              {/* Without this, a named-place anchor (a hospital, or an
+                  address typed as a landmark) reads as plain text right
+                  under the heading — easy to mistake for content rather
+                  than "this is where you're anchored." The unset state
+                  right below (AddressPrompt) already pairs its own prompt
+                  with this same pin; this just matches it once a location
+                  actually is set. */}
+              <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {anchorLabel}
               {countText && (
                 <>
