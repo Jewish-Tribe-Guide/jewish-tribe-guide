@@ -1565,7 +1565,29 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
     <div
       className={`flex flex-1 min-h-0 flex-col desktop:flex-row desktop:overflow-hidden ${
         fullscreen
-          ? 'desktop:fixed desktop:inset-0 desktop:z-50 desktop:rounded-none desktop:ring-0'
+          ? // Unprefixed (not desktop:-only) now — mobile gets this too. It
+            // used to be desktop-only on the theory that mobile was already
+            // "effectively full-bleed" via plain flex layout (see the
+            // `fullscreen` state's own doc), but plain flow content doesn't
+            // paint behind env(safe-area-inset-top) the way a fixed layer
+            // does: confirmed live as a gray gap (the page's own background
+            // showing through) above the floating search bar on a real
+            // notched phone. `fullscreen` is only ever true here for the
+            // standalone map screen on mobile — the admin's boxed
+            // category-preview map is the only other caller, and its own
+            // fullscreen TOGGLE BUTTON is `desktop:flex` (hidden on mobile),
+            // so mobile never has a way to set it true there.
+            //
+            // bottom is an explicit reservation instead of inset-0's implied
+            // 0, because unlike desktop (which has no bottom chrome to clear
+            // in fullscreen — it already covers the header entirely, see
+            // below), mobile's fixed tab bar (MobileTabBar.tsx, z-40) still
+            // needs to stay visible under this z-50 layer — reserving the
+            // exact same space `<main>`'s own padding used to reserve for it
+            // (see MapScreen.tsx) means the map's own painted area simply
+            // never reaches those pixels, so there's nothing for the tab
+            // bar's own z-index to have to win against.
+            'fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-50 rounded-none ring-0 desktop:inset-0'
           // desktop:isolate: boxed mode (the admin's category-preview map,
           // the only caller that still renders non-fullscreen) has no
           // z-index of its own on this wrapper, so without a stacking context

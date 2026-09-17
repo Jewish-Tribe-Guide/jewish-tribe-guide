@@ -1136,6 +1136,32 @@ describe('ResourceMapView — standalone map Escape/exit', () => {
     expect(onExit).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument()
   })
+
+  // Regression coverage for a real, live-confirmed bug: the fullscreen
+  // wrapper's `fixed inset-0` positioning — the only thing that paints
+  // behind env(safe-area-inset-top), the iOS status bar/notch area — used
+  // to be `desktop:`-only, on the theory that mobile was already
+  // "effectively full-bleed" via plain flex layout (see the `fullscreen`
+  // state's own doc comment). Plain flow content doesn't extend behind the
+  // notch the way a fixed layer does, though, which showed up live as a
+  // gray gap (the page's own background) above the floating search bar on
+  // a real notched phone. `fixed` (unprefixed, so it applies on mobile too)
+  // needs its own bottom reservation there, unlike desktop — mobile's fixed
+  // tab bar has to stay clear of it, where desktop has no such bottom
+  // chrome to protect.
+  it('on mobile, the standalone map is fixed to the viewport — not just desktop — with its top flush and its bottom clearing the tab bar', () => {
+    const { container } = renderMobileMap(
+      <HeaderCollapseProvider>
+        <ResourceMapView onUp={vi.fn()} standalone visible />
+      </HeaderCollapseProvider>,
+    )
+
+    const wrapper = container.querySelector('[class*="bottom-\\[calc(3\\.75rem"]') as HTMLElement | null
+    expect(wrapper).not.toBeNull()
+    expect(wrapper!.className).toMatch(/\bfixed\b/)
+    expect(wrapper!.className).toMatch(/\btop-0\b/)
+    expect(wrapper!.className).toMatch(/\bz-50\b/)
+  })
 })
 
 // The standalone map's own address bar used to never actually update after
