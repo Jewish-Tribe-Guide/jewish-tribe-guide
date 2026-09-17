@@ -6,6 +6,11 @@ import MobileSheet from './MobileSheet'
 
 afterEach(cleanup)
 
+// Mirrors the component's own SNAP_DURATION_MS — not imported since it isn't
+// exported (an internal implementation detail), but the closing-animation
+// timer test below needs to know it to assert the unmount timing precisely.
+const SNAP_DURATION_MS = 280
+
 describe('MobileSheet', () => {
   it('renders nothing when closed', () => {
     render(
@@ -105,31 +110,38 @@ describe('MobileSheet', () => {
   // unmounts it — see the component's own Phase doc for why a plain
   // isOpen boolean couldn't do this.
   it('slides down over a moment when closed, instead of vanishing the instant isOpen goes false', () => {
+    // try/finally: a failed assertion here must not leave fake timers
+    // active for whichever test runs next in this file — that's exactly
+    // what happened once already (an assertion failure skipped the
+    // useRealTimers() call below, and the next test hung for a full 5s
+    // waiting on a real timer that fake-timer mode was intercepting).
     vi.useFakeTimers()
-    const { container, rerender } = render(
-      <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
-        <p>form contents</p>
-      </MobileSheet>,
-    )
-    const sheet = () => container.querySelector('[role="dialog"]') as HTMLElement | null
-    expect(sheet()?.style.transform).toBe('translateY(0)')
+    try {
+      const { container, rerender } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = () => container.querySelector('[role="dialog"]') as HTMLElement | null
+      expect(sheet()?.style.transform).toBe('translateY(0)')
 
-    rerender(
-      <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit">
-        <p>form contents</p>
-      </MobileSheet>,
-    )
-    // Still on screen right after isOpen flips, now sliding down.
-    expect(sheet()).not.toBeNull()
-    expect(sheet()?.style.transform).toBe('translateY(100%)')
+      rerender(
+        <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit">
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      // Still on screen right after isOpen flips, now sliding down.
+      expect(sheet()).not.toBeNull()
+      expect(sheet()?.style.transform).toBe('translateY(100%)')
 
-    act(() => { vi.advanceTimersByTime(219) })
-    expect(sheet()).not.toBeNull()
+      act(() => { vi.advanceTimersByTime(SNAP_DURATION_MS - 1) })
+      expect(sheet()).not.toBeNull()
 
-    act(() => { vi.advanceTimersByTime(1) })
-    expect(sheet()).toBeNull()
-
-    vi.useRealTimers()
+      act(() => { vi.advanceTimersByTime(1) })
+      expect(sheet()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders no drag handle unless draggable is set', () => {
@@ -331,6 +343,35 @@ describe('MobileSheet', () => {
       fireEvent.pointerUp(handle, { clientY: 700 })
 
       expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    // Regression coverage for the actual complaint: dismissing mid-drag used
+    // to snap the sheet's height back up to `half` (its last real snap
+    // point) and only THEN start a separate transform-based slide away —
+    // a visible double-motion, not the single continuous shrink a drag
+    // release should read as. Height is the only mechanism now (see
+    // currentHeight's own doc), so a dismiss should continue shrinking
+    // from wherever the drag already had it, straight to 0 — never back up
+    // to 384 (half) first.
+    it('dismissing mid-drag shrinks straight from wherever the drag left it, not back up to half height first', () => {
+      const onClose = vi.fn()
+      const { container } = render(
+        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
+
+      // half (384) down to 100px — well past the dismiss threshold (192).
+      fireEvent.pointerDown(handle, { clientY: 500 })
+      fireEvent.pointerMove(handle, { clientY: 784 })
+      fireEvent.pointerUp(handle, { clientY: 784 })
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+      // The CSS transition then carries it the rest of the way down from
+      // whatever height this is — never all the way back up to 384 first.
+      expect(sheet.style.height).toBe('0px')
     })
 
     it('a small drag that stays above the dismiss threshold snaps back instead of closing', () => {

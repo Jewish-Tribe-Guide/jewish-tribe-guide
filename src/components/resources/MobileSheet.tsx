@@ -25,14 +25,14 @@ type Props = {
 
 type Snap = 'half' | 'full'
 // 'open': fully visible, driven by the header/handle/content drags below.
-// 'closing': isOpen just went false — still mounted and rendering, sliding
-// down via the transform transition in the JSX below, until the timeout in
-// the phase effect flips it to 'closed'. 'closed': unmounted (returns null).
-// Three states instead of a plain isOpen boolean because a close needs to
-// stay ON SCREEN long enough to animate off it — see this file's own note
-// on why "poofs away" was the bug: this component used to unmount the
-// instant isOpen went false, well before an exit transition could ever be
-// seen.
+// 'closing': isOpen just went false — still mounted and rendering, height
+// shrinking to 0 via the same transition the open/snap states already use
+// (see currentHeight below), until the timeout in the phase effect flips it
+// to 'closed'. 'closed': unmounted (returns null). Three states instead of a
+// plain isOpen boolean because a close needs to stay ON SCREEN long enough
+// to animate off it — see this file's own note on why "poofs away" was the
+// bug: this component used to unmount the instant isOpen went false, well
+// before an exit transition could ever be seen.
 type Phase = 'open' | 'closing' | 'closed'
 // `history`: recent (y, t) samples, oldest first, pruned to the last
 // VELOCITY_WINDOW_MS — same windowed-velocity approach as MobileNearbySheet's
@@ -66,10 +66,13 @@ const VELOCITY_WINDOW_MS = 80
 // Floor so a fast drag never collapses the sheet to (or past) zero height
 // before onPointerUp gets a chance to resolve the gesture into a dismiss.
 const MIN_DRAG_PX = 80
-// How long the slide-down-and-gone close transition takes — matches the
-// transform transition duration set on the sheet itself below, so the
-// unmount timer and what's actually visible agree.
-const CLOSE_DURATION_MS = 220
+// The one height-transition duration this file uses, for every height
+// change that isn't a raw finger drag: opening, snapping between half/full
+// on release, AND closing (height 0) — a single constant rather than a
+// separate "close" duration, same as MobileNearbySheet uses one duration
+// for all of ITS height snaps. Also doubles as the unmount timer below, so
+// the close transition and the moment this actually leaves the DOM agree.
+const SNAP_DURATION_MS = 280
 // Same decay/threshold constants as MobileNearbySheet's own momentum coast
 // — see startMomentum's doc for what they mean and why a real physics sim
 // isn't needed here either.
@@ -129,7 +132,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
 
   useEffect(() => {
     if (phase !== 'closing') return
-    const timer = setTimeout(() => setPhase('closed'), CLOSE_DURATION_MS)
+    const timer = setTimeout(() => setPhase('closed'), SNAP_DURATION_MS)
     return () => clearTimeout(timer)
   }, [phase])
 
@@ -143,7 +146,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // below still exists for exactly that path) meant the sheet just sat
   // there, fully open, for however long the round trip through
   // FindResources' router.push and its own re-render actually took —
-  // confirmed live as a real, measurable gap (the sheet's own transform was
+  // confirmed live as a real, measurable gap (the sheet's own height was
   // still untouched 150ms after tapping Close), not a rendering illusion.
   // What reads as "it still kind of fades instead of sliding" is that gap:
   // the close animation was starting late, and often lost its own frames to
@@ -173,7 +176,12 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   }, [isOpen, close])
 
   const heights = { half: Math.round(viewportH * HALF_FRACTION), full: Math.round(viewportH * FULL_FRACTION) }
-  const currentHeight = dragHeight ?? heights[snap]
+  // Closing shrinks height to 0 rather than switching to some other
+  // mechanism (a transform-based slide, say) — see close()'s own doc for
+  // why: whatever height a drag-to-dismiss was ALREADY mid-shrinking
+  // through when it crossed the threshold is exactly where this continues
+  // from, with nothing to jump or snap back to first.
+  const currentHeight = phase === 'closing' ? 0 : (dragHeight ?? heights[snap])
 
   function startDrag(clientY: number, timeStamp: number): DragState {
     return { startY: clientY, startHeight: heights[snap], moved: false, lastY: clientY, lastT: timeStamp, velocity: 0, history: [{ y: clientY, t: timeStamp }] }
@@ -395,25 +403,35 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   if (phase === 'closed') return null
 
   const isClosing = phase === 'closing'
-  const transitionParts: string[] = []
-  if (dragHeight === null) {
-    if (draggable) transitionParts.push('height 280ms cubic-bezier(0.32, 0.72, 0, 1)')
-    transitionParts.push(`transform ${CLOSE_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`)
-  }
+  // draggable: height is the one thing this sheet's size/position is ever
+  // expressed through — open, drag, snap-on-release, AND close (see
+  // currentHeight's own doc) — so there's only ever one transition to
+  // reason about, same as MobileNearbySheet never needing a second
+  // mechanism for ITS own close-to-peek. Suppressed only while a finger is
+  // actively driving dragHeight by hand (that path needs 1:1 tracking, not
+  // a lagging transition) — closing always gets one regardless, since a
+  // released drag's dragHeight has already gone back to null by the time
+  // close() runs (see onHandlePointerUp/onContentPointerUp).
+  //
+  // Non-draggable has no height detents to shrink through (ReportSheet's
+  // short form sizes itself to its content, not to half/full), so it keeps
+  // the plain slide-down-by-its-own-height transform this shell always used
+  // for closing — a fallback with no live caller today (everything real
+  // currently opts into draggable), kept only because `draggable: false` is
+  // still this component's own documented, supported shape.
+  const style: React.CSSProperties = draggable
+    ? { height: currentHeight, transition: isClosing || dragHeight === null ? `height ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)` : 'none' }
+    : { transform: isClosing ? 'translateY(100%)' : 'translateY(0)', transition: `transform ${SNAP_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)` }
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
+      className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-[280ms] ${isClosing ? 'opacity-0' : 'opacity-100'}`}
       onClick={(e) => { if (e.target === e.currentTarget) close() }}
       role="presentation"
     >
       <div
         className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
-        style={{
-          ...(draggable ? { height: currentHeight } : {}),
-          transform: isClosing ? 'translateY(100%)' : 'translateY(0)',
-          transition: transitionParts.length ? transitionParts.join(', ') : 'none',
-        }}
+        style={style}
         role="dialog"
         aria-modal="true"
         aria-label={title}
