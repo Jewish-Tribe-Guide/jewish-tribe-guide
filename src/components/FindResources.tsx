@@ -131,10 +131,9 @@ export default function FindResources({
   // browser back closes it. The listing itself can't live in the URL: the form
   // needs the whole record, not an id it would have to re-fetch.
   const [actionSubject, setActionSubject] = useState<ListingAction | null>(null)
-  // Gates Edit/Report's presentation below — full screen (unchanged) on
-  // mobile, a dialog layered over the still-mounted directory on desktop.
-  // Add stays a full screen on both; out of scope for this (see
-  // ActionDialog's own doc on why Edit/Report specifically wanted this).
+  // Gates Add/Edit/Report's presentation below — a bottom sheet layered over
+  // the still-mounted directory on mobile, a centered dialog over it on
+  // desktop (see MobileSheet's and ActionDialog's own docs).
   const isMobile = useIsMobile()
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
@@ -330,33 +329,17 @@ export default function FindResources({
     )
     const sharedTurnstile = { token: turnstileToken, reset: () => { turnstileRef.current?.reset(); setTurnstileToken('') } }
 
-    // Desktop's Add still swaps in a full standalone screen rather than a
-    // dialog — unlike Edit/Report, it has no existing detail view to layer
-    // over, so there's no "morph in place" surface for it to match (see
-    // ListingDetailModal's own doc on why Edit/Report do). Mobile's Add used
-    // to do the same full-screen swap, but that's the same mismatch mobile's
-    // Edit/Report already moved off of: a full navigation away from the list
-    // reads as a different, heavier gesture than the sheet the other two
-    // actions use, for what's otherwise the identical "form over the list"
-    // shape. It falls through below now, alongside Edit/Report.
-    if (action?.mode === 'create' && !isMobile) {
-      return (
-        <>
-          {sharedTurnstileWidget}
-          <ListingForm category={category} mode="create" onUp={goToCategoryList} onSubmitted={goToCategoryList} sharedTurnstile={sharedTurnstile} />
-        </>
-      )
-    }
     // Add/Edit/Report (desktop: a centered dialog; mobile: a bottom sheet —
     // see ActionDialog's and MobileSheet's own docs) all layer over a
     // ResourceLoader that stays mounted the whole time, on both platforms.
-    // Mobile used to swap in a flat full-screen form here instead, before
-    // the map's own MapPlaceDetail (whose Edit/Report already live inside
-    // its persistent bottom sheet) made that mismatch obvious. Report itself
-    // mostly never reaches this any more — the collapsed row's own kebab
-    // opens ReportSheet on mobile directly (see GenericListingCard's doc) —
-    // this is what a deep link or search-result Report button still falls
-    // back to.
+    // Both platforms used to swap in a full-screen form for at least one of
+    // these three instead (mobile for all of them, desktop for Add alone),
+    // before the map's own MapPlaceDetail (whose Edit/Report already live
+    // inside its persistent bottom sheet) made that mismatch obvious. Report
+    // itself mostly never reaches this any more — the collapsed row's own
+    // kebab opens ReportSheet on mobile directly (see GenericListingCard's
+    // doc) — this is what a deep link or search-result Report button still
+    // falls back to.
     return (
       <>
         {sharedTurnstileWidget}
@@ -429,6 +412,18 @@ export default function FindResources({
           </>
         ) : (
           <>
+            <ActionDialog isOpen={action?.mode === 'create'} onClose={goToCategoryList} title={`Add a ${category.label}`}>
+              {action?.mode === 'create' && (
+                <ListingForm
+                  category={category}
+                  mode="create"
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  sharedTurnstile={sharedTurnstile}
+                  embedded
+                />
+              )}
+            </ActionDialog>
             <ActionDialog isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit">
               {action?.mode === 'edit' && (
                 <ListingForm

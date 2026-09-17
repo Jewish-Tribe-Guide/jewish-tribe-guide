@@ -136,6 +136,10 @@ describe('FindResources — a real listing category', () => {
   // Add/Edit/Report picker (ContributePicker) links straight to
   // `?form=create` with no `?item=`, expecting the create form to just be
   // there on arrival, the same way a deep-linked edit/report already is.
+  // Desktop: a dialog over the still-mounted directory, same as Edit/Report
+  // (see ActionDialog's own doc) — desktop's Add used to swap in a full
+  // standalone screen instead; see 'on desktop, resolves a deep-linked
+  // create to a dialog...' below for the current behavior.
   it('resolves a deep-linked create (searchForm="create", no searchItem) straight to the Add form', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
@@ -143,13 +147,11 @@ describe('FindResources — a real listing category', () => {
       { content: { categories: [grocery] } },
     )
 
-    expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
   })
 
-  // Mobile: unlike desktop (which still swaps in a full standalone screen —
-  // see the 'create'/!isMobile branch's own doc), mobile's Add is a bottom
-  // sheet over the still-mounted directory too, matching Edit/Report instead
-  // of navigating away from the list entirely.
+  // Mobile: a bottom sheet over the still-mounted directory, matching
+  // Edit/Report instead of navigating away from the list entirely.
   it('on mobile, resolves a deep-linked create to a sheet over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing', label: 'Grocery Store' })
     renderWithProviders(
@@ -203,6 +205,18 @@ describe('FindResources — a real listing category', () => {
   // appears on top of it, and the form inside renders `embedded` (skips its
   // own Breadcrumb/mobile-header hijack, since the dialog already has a
   // title and close control).
+  it('on desktop, resolves a deep-linked create to a dialog over the still-mounted directory', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing', label: 'Grocery Store' })
+    renderWithProviders(
+      <FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} searchForm="create" />,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+  })
+
   it('on desktop, resolves a deep-linked edit to a dialog over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
