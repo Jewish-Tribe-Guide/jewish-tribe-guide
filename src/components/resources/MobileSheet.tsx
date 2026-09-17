@@ -147,7 +147,18 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     return target
   }
 
+  // The handle bar alone is a real but small target — noticeably smaller
+  // than what dragging the map's own sheet actually feels like, which gets
+  // its "grab anywhere" feel from handing a scrolled-to-top list's own drag
+  // off to the sheet (see MobileNearbySheet's onContentPointerDown), not
+  // from a bigger handle there either. This has no such list to hand off
+  // from, so the same feel comes from making the whole header a drag
+  // surface instead — the same "grab the header/art area" affordance
+  // Spotify's now-playing sheet has. Guarded against the close button
+  // specifically so tapping it still closes the sheet rather than starting
+  // a (zero-movement, harmless, but wasted) drag underneath the tap.
   function onHandlePointerDown(e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest('button')) return
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     dragRef.current = startDrag(e.clientY, performance.now())
   }
@@ -214,13 +225,28 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
             <span className="h-1 w-9 rounded-full bg-slate-300" aria-hidden="true" />
           </div>
         )}
-        {/* A drag handle above (when `draggable`) would otherwise promise a
-            drag gesture the header itself doesn't have — a plain header
-            with a real close button either way, same affordance
-            ListingDetailModal and ActionDialog give desktop, and the one
-            thing here that still works with a keyboard/screen reader
-            regardless of the handle. */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
+        {/* draggable: the whole header is a drag surface too, not just the
+            handle above it — see onHandlePointerDown's own doc for why.
+            touch-none here (not just on the handle) is load-bearing: without
+            it, a touch starting on the title text tries to scroll/select
+            first and the drag reads as sluggish to start, exactly the
+            "not smooth" gap this exists to close. Close still gets its own
+            real click — onHandlePointerDown bails out for it by target,
+            it's never touch-none'd out of working. Non-draggable (a plain
+            header with a real close button, same affordance
+            ListingDetailModal and ActionDialog give desktop) gets none of
+            this — nothing here to grab. */}
+        <div
+          {...(draggable
+            ? {
+                onPointerDown: onHandlePointerDown,
+                onPointerMove: onHandlePointerMove,
+                onPointerUp: onHandlePointerUp,
+                onPointerCancel: onHandlePointerCancel,
+              }
+            : {})}
+          className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
+        >
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button
             type="button"

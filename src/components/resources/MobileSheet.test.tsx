@@ -134,6 +134,47 @@ describe('MobileSheet', () => {
       expect(sheet.style.height).toBe(`${FULL_PX}px`)
     })
 
+    // The actual gap this whole widening closes: a bare handle bar is a
+    // real but small target, noticeably smaller than what the map's own
+    // sheet feels like to grab (it gets "grab anywhere" from a scrolled-to-
+    // top list handing its own drag off to the sheet, not from a bigger
+    // handle there either — see onHandlePointerDown's own doc). Dragging
+    // from the title text itself — not the handle — should work exactly
+    // the same way.
+    it('dragging from the header title (not just the handle) also resizes the sheet', () => {
+      const { container } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const titleText = screen.getByText('Suggest an edit')
+
+      fireEvent.pointerDown(titleText, { clientY: 500 })
+      fireEvent.pointerMove(titleText, { clientY: 300 })
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 200)
+
+      fireEvent.pointerUp(titleText, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+    })
+
+    // Widening the drag surface to the whole header must not swallow the
+    // close button sitting inside it — onHandlePointerDown bails out by
+    // target specifically so a tap there still closes the sheet instead of
+    // starting a (zero-movement) drag underneath it.
+    it('the close button inside the draggable header still closes the sheet, not just resizes it', async () => {
+      const user = userEvent.setup()
+      const onClose = vi.fn()
+      render(
+        <MobileSheet isOpen onClose={onClose} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Close' }))
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
     it('dragging the handle down past the dismiss threshold closes the sheet', () => {
       const onClose = vi.fn()
       render(
