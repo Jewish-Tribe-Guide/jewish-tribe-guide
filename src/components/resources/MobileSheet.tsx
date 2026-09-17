@@ -265,9 +265,10 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // handle there either. This has no such list to hand off from at the
   // header, so the same feel comes from making the whole header a drag
   // surface instead — the same "grab the header/art area" affordance
-  // Spotify's now-playing sheet has. Guarded against the close button
-  // specifically so tapping it still closes the sheet rather than starting
-  // a (zero-movement, harmless, but wasted) drag underneath the tap.
+  // Spotify's now-playing sheet has. The button guard predates the header
+  // losing its own close button (draggable sheets don't render one — see
+  // the header's own doc below) but stays regardless, harmlessly, in case
+  // a future draggable header ever adds one back.
   function onHandlePointerDown(e: React.PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return
     stopMomentum()
@@ -309,21 +310,27 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     setDragHeight(null)
   }
 
-  /** Pulling down on the form itself, once it's already scrolled to the top,
-   *  used to just rubber-band the form's own content in place — visually
-   *  indistinguishable from "the page moving" to a visitor, and exactly the
-   *  gap the map's own sheet closed for its list a while ago (see
-   *  MobileNearbySheet's identically-named handler, which this mirrors).
-   *  Starts passive (assume a normal scroll or an ordinary tap into a field)
-   *  and only takes over once the content is at scrollTop 0 AND the drag
-   *  keeps pulling down past it — never on the way IN to that boundary, so
-   *  an ordinary scroll through a long form, or tapping/selecting text
-   *  inside a field, is untouched. The form's own scrolling is driven by
-   *  hand here too (contentRef.scrollTop), not left to native touch-action:
-   *  pan-y panning, for the same WebKit-rubber-band-races-a-JS-handler
-   *  reason MobileNearbySheet's own onContentPointerDown documents — the
-   *  handoff below has to see every increment as it happens, not after a
-   *  native bounce animation has already started somewhere it can't see. */
+  /** Google Maps' own bottom sheet swallows all vertical drags over its list
+   *  until it's fully expanded — dragging the content just grows the sheet
+   *  instead of scrolling it, and only once full does the list scroll
+   *  normally (see MobileNearbySheet's identically-named handler, which
+   *  this now matches exactly instead of only partially). A form has no
+   *  "browse without committing to full height" case the way a map's
+   *  nearby-list does, so the same rule applies here unchanged: `active`
+   *  starts true whenever snap isn't already 'full', meaning ANY drag over
+   *  the form at `half` resizes the sheet, never scrolls it — the only way
+   *  to actually scroll a form taller than `half` is to drag it open to
+   *  `full` first. At `full`, this starts passive (an ordinary scroll) and
+   *  only hands back to the sheet once the content is at scrollTop 0 AND
+   *  the drag keeps pulling down past it — never on the way IN to that
+   *  boundary, so an ordinary scroll through a long form, or tapping/
+   *  selecting text inside a field, is untouched there. The form's own
+   *  scrolling is driven by hand here too (contentRef.scrollTop), not left
+   *  to native touch-action: pan-y panning, for the same WebKit-rubber-
+   *  band-races-a-JS-handler reason MobileNearbySheet's own
+   *  onContentPointerDown documents — the handoff below has to see every
+   *  increment as it happens, not after a native bounce animation has
+   *  already started somewhere it can't see. */
   function onContentPointerDown(e: React.PointerEvent) {
     stopMomentum()
     // Deliberately NOT capturing here, same reasoning as
@@ -331,7 +338,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     // on every touchdown would win the pointer before a field's own native
     // behavior (tapping to place a caret, long-pressing to select text) gets
     // a chance to happen at all.
-    contentDragRef.current = { ...startDrag(e.clientY, performance.now()), active: false }
+    contentDragRef.current = { ...startDrag(e.clientY, performance.now()), active: snap !== 'full' }
   }
 
   function onContentPointerMove(e: React.PointerEvent) {
@@ -454,12 +461,15 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
             touch-none here (not just on the handle) is load-bearing: without
             it, a touch starting on the title text tries to scroll/select
             first and the drag reads as sluggish to start, exactly the
-            "not smooth" gap this exists to close. Close still gets its own
-            real click — onHandlePointerDown bails out for it by target,
-            it's never touch-none'd out of working. Non-draggable (a plain
-            header with a real close button, same affordance
-            ListingDetailModal and ActionDialog give desktop) gets none of
-            this — nothing here to grab. */}
+            "not smooth" gap this exists to close. No close button of its
+            own — a backdrop tap, Escape, or the drag-to-dismiss this whole
+            surface already offers cover it, and a redundant X read as
+            visual noise once every caller here had the drag (see close()'s
+            own callers for the non-pointer paths). Non-draggable (a plain
+            header WITH a real close button, same affordance
+            ListingDetailModal and ActionDialog give desktop — it has no
+            drag to fall back on) gets none of this — nothing here to
+            grab, and it keeps its own X below. */}
         <div
           {...(draggable
             ? {
@@ -472,16 +482,18 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
           className={`flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0 ${draggable ? 'touch-none select-none cursor-grab active:cursor-grabbing' : ''}`}
         >
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close"
-            className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {!draggable && (
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close"
+              className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
         <div
           ref={contentRef}

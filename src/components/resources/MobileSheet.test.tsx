@@ -234,11 +234,11 @@ describe('MobileSheet', () => {
       expect(sheet.style.height).toBe(`${FULL_PX}px`)
     })
 
-    // Widening the drag surface to the whole header must not swallow the
-    // close button sitting inside it — onHandlePointerDown bails out by
-    // target specifically so a tap there still closes the sheet instead of
-    // starting a (zero-movement) drag underneath it.
-    it('the close button inside the draggable header still closes the sheet, not just resizes it', async () => {
+    // Now that every real caller (Add/Edit/Report) opens a draggable sheet,
+    // an explicit X reads as redundant noise alongside the backdrop tap,
+    // Escape, and drag-to-dismiss the whole header already offers — see the
+    // header's own doc. Dismissing still works without it.
+    it('renders no close button — a backdrop tap still dismisses it', async () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
       render(
@@ -247,8 +247,33 @@ describe('MobileSheet', () => {
         </MobileSheet>,
       )
 
-      await user.click(screen.getByRole('button', { name: 'Close' }))
+      expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('presentation'))
       expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    // Matches Google Maps' own bottom sheet exactly now (see
+    // onContentPointerDown's own doc): at `half`, the content has no
+    // "browse without committing to full height" case — ANY drag over it
+    // resizes the sheet, the same as dragging the handle would, never
+    // scrolls. Opens at `half` by default, so this is the sheet's normal
+    // resting state, not a special setup.
+    it('at half, any drag over the content resizes the sheet instead of scrolling it', () => {
+      const { container } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(content, { clientY: 500 })
+      fireEvent.pointerMove(content, { clientY: 300 }) // finger moves up 200px — same as dragging the handle up
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX + 200)
+
+      fireEvent.pointerUp(content, { clientY: 300 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
     })
 
     // The actual gap request #2 closed: pulling down on the FORM itself,
@@ -256,8 +281,10 @@ describe('MobileSheet', () => {
     // same state as a real form that fits without scrolling, or one already
     // scrolled all the way up), used to just rubber-band the content in
     // place — visually read as "the page" moving. It should hand off to the
-    // sheet instead, the same way the map's own list already does.
-    it('pulling down on the content once at the scroll top drags the sheet down, instead of the content trying to scroll/bounce on its own', () => {
+    // sheet instead, the same way the map's own list already does. Only
+    // reachable at `full` — see the previous test for `half`, where every
+    // drag already resizes the sheet regardless of scroll position.
+    it('at full, pulling down on the content once at the scroll top drags the sheet down, instead of the content trying to scroll/bounce on its own', () => {
       let fakeNow = 0
       const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
 
@@ -267,7 +294,14 @@ describe('MobileSheet', () => {
         </MobileSheet>,
       )
       const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      // Tap the handle (no movement) to reach `full` first — see the handle's
+      // own "tapping toggles between half and full" test.
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
 
       fireEvent.pointerDown(content, { clientY: 300 })
       fakeNow = 50
@@ -278,53 +312,67 @@ describe('MobileSheet', () => {
       // 100px more over 200ms — comfortably under FLING_VELOCITY, so this
       // settles on its own merits rather than getting nudged by a flick.
       fireEvent.pointerMove(content, { clientY: 410 })
-      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX - 100)
+      expect(Number.parseInt(sheet.style.height)).toBe(FULL_PX - 100)
 
       fireEvent.pointerUp(content, { clientY: 410 })
       nowSpy.mockRestore()
-      // Settled well above the dismiss threshold — snaps back to half rather
-      // than closing, same resolution the handle's own drag would reach.
-      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      // Settled well above the half/full midpoint (553 vs 518.5) — snaps
+      // back to full rather than closing OR dropping to half, same
+      // resolution the handle's own drag would reach starting from the
+      // same height.
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
     })
 
     // Scrolling DOWN through the content (finger moving up, away from the
     // top) is an ordinary scroll, not a handoff — only a drag that's already
     // AT the top and continues pulling further down should ever reach the
-    // sheet.
-    it('scrolling the content away from the top does not resize the sheet', () => {
+    // sheet. Only reachable at `full`, same as the previous test.
+    it('at full, scrolling the content away from the top does not resize the sheet', () => {
       const { container } = render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
       const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
 
       fireEvent.pointerDown(content, { clientY: 400 })
       fireEvent.pointerMove(content, { clientY: 300 }) // finger moves up — scrolls the content down, not the sheet
       fireEvent.pointerUp(content, { clientY: 300 })
 
-      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
     })
 
     // Once the content is already scrolled away from the top, pulling down
     // scrolls it back toward the top first — it should NOT jump straight to
-    // resizing the sheet just because the drag direction is downward.
-    it('pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
+    // resizing the sheet just because the drag direction is downward. Only
+    // reachable at `full`, same as the previous two tests.
+    it('at full, pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
       const { container } = render(
         <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
           <p>form contents</p>
         </MobileSheet>,
       )
       const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const handle = screen.getByRole('button', { name: 'Drag to resize' })
       const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(handle, { clientY: 100 })
+      fireEvent.pointerUp(handle, { clientY: 100 })
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
+
       content.scrollTop = 50 // not at the top yet
 
       fireEvent.pointerDown(content, { clientY: 300 })
       fireEvent.pointerMove(content, { clientY: 340 }) // pulls down 40px, well short of the 50px still separating it from the top
       fireEvent.pointerUp(content, { clientY: 340 })
 
-      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      expect(sheet.style.height).toBe(`${FULL_PX}px`)
       expect(content.scrollTop).toBe(10)
     })
 

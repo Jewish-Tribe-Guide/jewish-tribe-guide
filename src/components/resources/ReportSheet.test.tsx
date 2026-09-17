@@ -42,15 +42,15 @@ describe('ReportSheet', () => {
     expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
   })
 
-  it('closes on the header close button', async () => {
-    const user = userEvent.setup()
-    const onClose = vi.fn()
+  // Draggable (this sheet always is, same as Add/Edit — see this
+  // component's own doc), so it has no close button of its own: a backdrop
+  // tap, Escape, or the drag-to-dismiss the whole header offers cover it.
+  it('renders no close button', () => {
     renderWithProviders(
-      <ReportSheet isOpen onClose={onClose} listing={makeListing()} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={vi.fn()} listing={makeListing()} upLabel="Grocery Stores" />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
   })
 
   it('closes on a backdrop click, but not on a click inside the sheet', async () => {
