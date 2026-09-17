@@ -155,10 +155,10 @@ describe('MobileSheet', () => {
 
   describe('draggable', () => {
     // jsdom's window.innerHeight is 768 — heights.half = round(768*0.5) =
-    // 384, heights.full = round(768*0.85) = 653 (see the component's own
-    // HALF_FRACTION/FULL_FRACTION).
+    // 384, heights.full = 768 - TOP_INSET_PX(76) = 692 (see the component's
+    // own HALF_FRACTION/TOP_INSET_PX).
     const HALF_PX = 384
-    const FULL_PX = 653
+    const FULL_PX = 692
 
     it('opens at the half snap point', () => {
       const { container } = render(

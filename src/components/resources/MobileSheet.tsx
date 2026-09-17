@@ -50,12 +50,18 @@ type DragState = {
 }
 type ContentDragState = DragState & { active: boolean }
 
-// Fractions of the viewport, matching the 85vh cap this shell (and
-// ActionDialog/ReportSheet) already use for their own non-draggable "full"
-// sizing — full stays visually consistent with that, half just claims
-// roughly the bottom of the screen.
+// `half` claims roughly the bottom of the screen. `full` used to be a flat
+// 85% of the viewport (matching the 85vh cap ActionDialog/ReportSheet's own
+// non-draggable sizing uses), but that reads as leaving an oddly large gap
+// at the top — ~120px on a typical phone, well past what an actual sheet
+// needs to still read as a sheet rather than a full screen. TOP_INSET_PX
+// below is the same fixed inset MobileNearbySheet's own 'full' already
+// uses (see that file's own constant), for the same reason: a flat
+// percentage grows/shrinks the gap with screen height for no purpose, where
+// a fixed inset stays a consistent-looking sliver of backdrop regardless of
+// device.
 const HALF_FRACTION = 0.5
-const FULL_FRACTION = 0.85
+const TOP_INSET_PX = 76
 // Below this fraction of `half`'s own height, a released drag closes the
 // sheet instead of snapping back to `half` — roughly "dragged down to about
 // a quarter of the screen", the same ballpark iOS's own sheet dismiss
@@ -175,7 +181,12 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, close])
 
-  const heights = { half: Math.round(viewportH * HALF_FRACTION), full: Math.round(viewportH * FULL_FRACTION) }
+  const halfPx = Math.round(viewportH * HALF_FRACTION)
+  // max: on a short viewport, viewportH - TOP_INSET_PX could fall below
+  // half — a fixed viewport-independent inset has no such floor built in
+  // the way a fraction naturally would. Same guard MobileNearbySheet's own
+  // full-height calc has (there against its own peek).
+  const heights = { half: halfPx, full: Math.max(halfPx, viewportH - TOP_INSET_PX) }
   // Closing shrinks height to 0 rather than switching to some other
   // mechanism (a transform-based slide, say) — see close()'s own doc for
   // why: whatever height a drag-to-dismiss was ALREADY mid-shrinking
