@@ -232,14 +232,19 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     )
 
     const search = () => container.querySelector('[class*="w-\\[336px\\]"]')
-    const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]')
-    const classesBefore = [search()?.className, chips()?.className]
+    const chips = () => container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
+    const before = { searchClass: search()?.className, chipsLeft: chips()?.style.left }
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    expect([search()?.className, chips()?.className]).toEqual(classesBefore)
+    // The search box has no position of its own to track (a plain class,
+    // unaffected by the sidebar either way) — only the chips' inline
+    // `left` (now driven by sidebarWidth, not a fixed class — see that
+    // element's own doc) is what actually could have drifted here.
+    expect(search()?.className).toBe(before.searchClass)
+    expect(chips()?.style.left).toBe(before.chipsLeft)
     expect(search()?.className).toMatch(/\bleft-3\b/)
-    expect(chips()?.className).toMatch(/left-\[396px\]/)
+    expect(chips()?.style.left).toBe('396px')
   })
 
   // The invariant that actually prevents both the overlap AND the flush,
@@ -260,14 +265,14 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
 
     await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
 
-    const aside = container.querySelector('aside')
+    const aside = container.querySelector('aside') as HTMLElement | null
     const search = container.querySelector('[class*="w-\\[336px\\]"]')
-    const chips = container.querySelector('[class*="right-16"][class*="z-20"]')
+    const chips = container.querySelector('[class*="right-16"][class*="z-20"]') as HTMLElement | null
 
-    const sidebarWidth = Number(aside?.className.match(/desktop:w-\[(\d+)px\]/)?.[1])
+    const sidebarWidth = Number(aside?.style.width.replace('px', ''))
     const searchLeft = Number(search?.className.match(/\bleft-(\d+)\b/)?.[1]) * 4 // Tailwind spacing unit -> px
     const searchWidth = Number(search?.className.match(/w-\[(\d+)px\]/)?.[1])
-    const chipsLeft = Number(chips?.className.match(/left-\[(\d+)px\]/)?.[1])
+    const chipsLeft = Number(chips?.style.left.replace('px', ''))
     const MIN_GAP_PX = 16
 
     expect(sidebarWidth - (searchLeft + searchWidth)).toBeGreaterThanOrEqual(MIN_GAP_PX)
@@ -295,6 +300,129 @@ describe('ResourceMapView — desktop search/filter bar position', () => {
     const aside = container.querySelector('aside')
     expect(aside?.className).toMatch(/desktop:absolute/)
     expect(aside?.className).not.toMatch(/\bshrink-0\b/)
+  })
+})
+
+describe('ResourceMapView — sidebar resize', () => {
+  async function openSidebar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Grocery Stores/ }))
+  }
+
+  it('renders no resize handle while the sidebar is collapsed', () => {
+    renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar' })).not.toBeInTheDocument()
+  })
+
+  it('dragging the handle resizes the sidebar, clamped to its min/max width', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    expect(aside.style.width).toBe('380px')
+
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 480 }) // +100px
+    expect(aside.style.width).toBe('480px')
+    fireEvent.pointerUp(handle)
+
+    // Dragged well past SIDEBAR_MAX_WIDTH (640) — clamps rather than
+    // growing the sidebar past a usable size.
+    fireEvent.pointerDown(handle, { clientX: 480 })
+    fireEvent.pointerMove(handle, { clientX: 2000 })
+    expect(aside.style.width).toBe('640px')
+    fireEvent.pointerUp(handle)
+
+    // Dragged well below SIDEBAR_MIN_WIDTH (360) — clamps rather than
+    // shrinking past where the floating search box would overhang it (see
+    // SIDEBAR_MIN_WIDTH's own doc).
+    fireEvent.pointerDown(handle, { clientX: 640 })
+    fireEvent.pointerMove(handle, { clientX: 0 })
+    expect(aside.style.width).toBe('360px')
+    fireEvent.pointerUp(handle)
+  })
+
+  it('persists the dragged width, and a later mount restores it', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 460 })
+    fireEvent.pointerUp(handle)
+    unmount()
+
+    const { container: container2 } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await user.click(within(container2).getByRole('button', { name: /Grocery Stores/ }))
+    const aside2 = container2.querySelector('aside') as HTMLElement
+    expect(aside2.style.width).toBe('460px')
+  })
+
+  // Same reasoning as MobileSheet's own pointerCancel coverage: the browser
+  // can take a touch over mid-gesture (most commonly an edge swipe
+  // recognized as its own back-navigation) — that should snap back to
+  // where the drag started, not leave the sidebar wherever the
+  // interrupted gesture happened to reach.
+  it('a pointer cancel snaps the width back to where the drag started, and does not persist it', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+
+    fireEvent.pointerDown(handle, { clientX: 380 })
+    fireEvent.pointerMove(handle, { clientX: 500 })
+    expect(aside.style.width).toBe('500px')
+    fireEvent.pointerCancel(handle)
+
+    expect(aside.style.width).toBe('380px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBeNull()
+  })
+
+  it('ArrowRight/ArrowLeft on the focused handle resize it by a fixed step, and persist immediately', async () => {
+    const user = userEvent.setup()
+    const { container } = renderMap(
+      <ResourceMapView onUp={vi.fn()} />,
+      [listingWithGeo({ id: 'g1', category: 'grocery', name: 'Acme Grocery' })],
+      [makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })],
+    )
+    await openSidebar(user)
+
+    const aside = container.querySelector('aside') as HTMLElement
+    const handle = screen.getByRole('separator', { name: 'Resize sidebar' })
+    handle.focus()
+
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(aside.style.width).toBe('396px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBe('396')
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    expect(aside.style.width).toBe('364px')
+    expect(localStorage.getItem('jpc:map-sidebar-width')).toBe('364')
   })
 })
 
@@ -472,7 +600,7 @@ describe('ResourceMapView — selecting a place', () => {
       [listingWithGeo({ category: 'grocery', name: 'Acme Grocery', address: '1 Main St' })],
       [grocery],
     )
-    const asideWidth = () => container.querySelector('aside')?.className.match(/desktop:w-\[?(\d+)(?:px\])?/)?.[1]
+    const asideWidth = () => (container.querySelector('aside') as HTMLElement | null)?.style.width.replace('px', '')
 
     await user.click(screen.getByRole('button', { name: 'Select Acme Grocery' }))
     expect(await screen.findByText('1 Main St')).toBeInTheDocument()

@@ -58,6 +58,36 @@ const DROPPED_PREFIX = 'dropped:'
 const DROPPED_FILTER_ID = '__dropped__'
 const DROPPED_PIN_COLOR = '#D85A30'
 
+// Desktop sidebar's default/min/max px width — draggable from its own right
+// edge (see the resize handle below), same pattern most split-pane apps use
+// (Claude's own sidebar included). Max leaves the map itself a usable
+// amount of room even on a laptop-width screen rather than letting the
+// sidebar eat the whole view. Min is set by the floating search box's own
+// fixed 336px width (see that element's own doc), not by content
+// wrapping — that box sits flush against the sidebar's left+bottom edge at
+// every width, so the sidebar can never be dragged narrower than what
+// keeps the box's own right edge inside it, or the box would visibly
+// overhang onto the map.
+const SIDEBAR_DEFAULT_WIDTH = 380
+const SIDEBAR_MIN_WIDTH = 360
+const SIDEBAR_MAX_WIDTH = 640
+// Persists the chosen width across visits, the same way Claude's own
+// sidebar remembers a dragged width — otherwise every fresh page load (or
+// every time sidebarVisible cycles false→true, which unmounts this) would
+// silently forget it and snap back to the default.
+const SIDEBAR_WIDTH_STORAGE_KEY = 'jpc:map-sidebar-width'
+
+function clampSidebarWidth(px: number): number {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, px))
+}
+
+function loadStoredSidebarWidth(): number {
+  if (typeof window === 'undefined') return SIDEBAR_DEFAULT_WIDTH
+  const raw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
+  const parsed = raw === null ? NaN : Number(raw)
+  return Number.isFinite(parsed) ? clampSidebarWidth(parsed) : SIDEBAR_DEFAULT_WIDTH
+}
+
 // Typing one of these in the search box searches "open now" instead of
 // matching literal text.
 const OPEN_NOW_WORDS = new Set(['open', 'open now', 'opennow', 'open-now'])
@@ -383,6 +413,49 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
   // narrowing reason to show); see sidebarVisible/toggleSidebar below for
   // how the two combine.
   const [sidebarOpenedManually, setSidebarOpenedManually] = useState(false)
+
+  // Draggable sidebar width — see the resize handle's own doc for the
+  // gesture itself. Lazy-initialized from localStorage (SSR-safe: reads
+  // window only in the initializer, which never runs on the server) so a
+  // returning visitor's chosen width is there on first paint, not snapped
+  // to the default for one frame then corrected.
+  const [sidebarWidth, setSidebarWidth] = useState(loadStoredSidebarWidth)
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false)
+  const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+
+  function onSidebarHandlePointerDown(e: React.PointerEvent) {
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    sidebarDragRef.current = { startX: e.clientX, startWidth: sidebarWidth }
+    setIsDraggingSidebar(true)
+  }
+
+  function onSidebarHandlePointerMove(e: React.PointerEvent) {
+    const drag = sidebarDragRef.current
+    if (!drag) return
+    setSidebarWidth(clampSidebarWidth(drag.startWidth + (e.clientX - drag.startX)))
+  }
+
+  // Persisted on release, not on every pointermove — dragging is the only
+  // time this changes, so writing localStorage a few dozen times over one
+  // drag (instead of once at the end) would be pure waste.
+  function onSidebarHandlePointerUp() {
+    if (!sidebarDragRef.current) return
+    sidebarDragRef.current = null
+    setIsDraggingSidebar(false)
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
+  }
+
+  // Same reasoning as MobileSheet's own onHandlePointerCancel: the browser
+  // took the touch over mid-gesture (most commonly an edge swipe recognized
+  // as back-navigation) — snap back to the width the drag actually started
+  // from rather than leaving it wherever the interrupted gesture reached,
+  // since a cancelled gesture is one that never completed.
+  function onSidebarHandlePointerCancel() {
+    const drag = sidebarDragRef.current
+    sidebarDragRef.current = null
+    setIsDraggingSidebar(false)
+    if (drag) setSidebarWidth(drag.startWidth)
+  }
 
   // follow = map pans with every GPS tick. Turns off the moment the user
   // manually drags the map (see ResourceMap's dragstart listener), and only
@@ -1538,9 +1611,22 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             // its own elevation) means the map's box never changes size, so
             // that ResizeObserver never fires and nothing under it moves.
             <aside
-              className={`hidden flex-col overflow-hidden bg-white transition-[width] duration-200 ease-in-out desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
-                sidebarVisible ? 'desktop:w-[380px] desktop:border-r desktop:border-slate-200' : 'desktop:w-0'
+              className={`hidden flex-col overflow-hidden bg-white desktop:absolute desktop:inset-y-0 desktop:left-0 desktop:z-30 desktop:flex desktop:min-h-0 desktop:shadow-xl ${
+                sidebarVisible ? 'desktop:border-r desktop:border-slate-200' : ''
               }`}
+              // Width lives here, not in a `desktop:w-[...]` class, now that
+              // it's draggable (see sidebarWidth/the resize handle below) —
+              // `hidden`/`desktop:flex` above still fully suppress this on an
+              // actual mobile viewport via CSS regardless, so nothing here
+              // needs its own `desktop:` gate. Transition off entirely while
+              // actively dragging: same reasoning as MobileSheet's own
+              // dragHeight — a CSS transition retargeting on every single
+              // pointermove frame reads as laggy/rubber-banding rather than
+              // tracking the cursor.
+              style={{
+                width: sidebarVisible ? sidebarWidth : 0,
+                transition: isDraggingSidebar ? 'none' : 'width 200ms ease-in-out',
+              }}
             >
               {/* No search/chips header here anymore — the floating bar
                   (rendered once, below, positioned relative to the whole
@@ -1598,6 +1684,55 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             </aside>
           )}
 
+          {/* ── Sidebar resize handle (desktop) — a thin invisible strip
+                  straddling the sidebar's own right edge, the same
+                  split-pane drag affordance most desktop apps with a
+                  resizable panel use (Claude's own sidebar included).
+                  Only rendered while the sidebar actually has a width worth
+                  dragging — collapsed (sidebarVisible false, 0px) there's
+                  nothing to grab, and the collapse toggle below already
+                  covers "bring it back".
+                  w-3 centered on the border (not flush against it, the
+                  collapse toggle's own reasoning above) — a 1px border is
+                  real but not a real target; centering a few px of
+                  cursor:col-resize hit-area on it is what makes the edge
+                  itself grabbable rather than requiring pixel-precision.
+                  bg-primary/0 hover:bg-primary/20: invisible at rest, a
+                  quiet highlight on hover/while dragging is the only
+                  feedback that this edge does something — no visible track
+                  or handle glyph, since the border itself already reads as
+                  the sidebar's edge. */}
+          {!isMobile && sidebarVisible && (
+            <div
+              onPointerDown={onSidebarHandlePointerDown}
+              onPointerMove={onSidebarHandlePointerMove}
+              onPointerUp={onSidebarHandlePointerUp}
+              onPointerCancel={onSidebarHandlePointerCancel}
+              // Same ARROW_STEP both directions — a real keyboard equivalent
+              // for the drag gesture (ARIA's own separator pattern calls
+              // for one), not just a courtesy: dragging with a mouse is the
+              // only way to reach this control otherwise.
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+                e.preventDefault()
+                const next = clampSidebarWidth(sidebarWidth + (e.key === 'ArrowRight' ? 16 : -16))
+                setSidebarWidth(next)
+                window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(next))
+              }}
+              tabIndex={0}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              aria-valuenow={Math.round(sidebarWidth)}
+              aria-valuemin={SIDEBAR_MIN_WIDTH}
+              aria-valuemax={SIDEBAR_MAX_WIDTH}
+              className={`absolute inset-y-0 z-40 hidden w-3 -translate-x-1/2 cursor-col-resize touch-none desktop:block ${
+                isDraggingSidebar ? 'bg-primary/20' : 'bg-primary/0 hover:bg-primary/20'
+              }`}
+              style={{ left: sidebarWidth }}
+            />
+          )}
+
           {/* ── Sidebar collapse toggle (desktop) — sits just outside the
                   sidebar's edge, same idea as Google Maps' own panel-collapse
                   arrow, so the map can take over the full width without
@@ -1608,8 +1743,9 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   this row's own overflow-hidden (unreachable to click), and
                   even expanded it sat exactly where the results list's own
                   scrollbar renders, fighting with it. Its left offset still
-                  tracks the sidebar's width (380px open, 0 collapsed) so it
-                  slides along with the edge instead of jumping.
+                  tracks the sidebar's own current (now draggable) width, 0
+                  when collapsed, so it slides along with the edge instead
+                  of jumping.
                   Always rendered (not just once something's narrowed) — a
                   freshly-loaded map with nothing searched/selected yet
                   otherwise has no visible way to browse the directory at
@@ -1621,8 +1757,8 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
               onClick={toggleSidebar}
               aria-label={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
               aria-pressed={!sidebarVisible}
-              style={{ left: (sidebarVisible ? 380 : 0) + 8 }}
-              className="absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left] duration-200 ease-in-out hover:bg-slate-50 hover:text-slate-700 cursor-pointer desktop:flex"
+              style={{ left: (sidebarVisible ? sidebarWidth : 0) + 8 }}
+              className={`absolute top-1/2 z-20 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md ${isDraggingSidebar ? '' : 'transition-[left] duration-200 ease-in-out'} hover:bg-slate-50 hover:text-slate-700 cursor-pointer desktop:flex`}
             >
               <ChevronLeftIcon className={`h-4 w-4 transition-transform ${sidebarVisible ? '' : 'rotate-180'}`} />
             </button>
@@ -1633,33 +1769,44 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                   sidebar's z-30) so it reads as sitting on top of the
                   sidebar's own top edge, the same way Google Maps' own
                   search box sits over its results panel. Deliberately
-                  narrower than the sidebar (336px, not the full 368px that
-                  would put its right edge flush with the sidebar's own
-                  right edge at 380px) — flush left no visible gap between
-                  the end of the search box and the sidebar's white below
-                  it, unlike Google Maps' own search box, which leaves a
-                  real margin on both sides. left-3 + 336px = 348px, 32px
-                  short of the sidebar's 380px edge. Neither this nor the
-                  chips below ever move now — the sidebar sliding in and
-                  out underneath is what changes, not these. ───────────── */}
+                  narrower than the sidebar's own MINIMUM width (336px vs.
+                  SIDEBAR_MIN_WIDTH's 360px) — flush left, no visible gap
+                  between the end of the search box and the sidebar's white
+                  below it, unlike Google Maps' own search box, which leaves
+                  a real margin on both sides — and still true at the
+                  narrowest the sidebar can be dragged to, which is the
+                  whole reason SIDEBAR_MIN_WIDTH stops where it does rather
+                  than at some smaller, tighter-feeling floor. This box
+                  itself never moves — only the chips below it (and the
+                  sidebar sliding in and out underneath) track the
+                  (now-draggable) width. ────────────────────────────────── */}
           {!isMobile && (
             <div className="absolute left-3 top-3 z-40 hidden w-[336px] desktop:block">{desktopSearchForm}</div>
           )}
 
-          {/* ── Floating category chips (desktop) — fixed just clear of the
-                  sidebar's right edge (380px + a 16px gap = 396px), matching
-                  how tight Google Maps' own chip row sits after its panel
-                  (see the reference screenshot) — closer than the margin
-                  left between the search box and the sidebar's edge above,
-                  which is a separate, deliberately larger gap. Fixed, not
-                  sidebar-tracking: the search box and this gap are already
-                  sized so the sidebar can never reach far enough right to
-                  need this to get out of its way. right-16 (not right-3):
-                  leaves clearance so the chip row's scroll area doesn't run
-                  under the fullscreen button, which shares this same
-                  top-right corner of the map. ───────────────────────────── */}
+          {/* ── Floating category chips (desktop) — sits just clear of the
+                  sidebar's own right edge (its width + a 16px gap),
+                  matching how tight Google Maps' own chip row sits after
+                  its panel (see the reference screenshot) — closer than the
+                  margin left between the search box and the sidebar's edge
+                  above, which is a separate, deliberately larger gap.
+                  Tracks sidebarWidth now that it's draggable — this used to
+                  be a fixed 396px (380 + 16) on the reasoning that the
+                  sidebar could never get wider than that fixed value; now
+                  that it can, clamped with Math.max so a narrow/collapsed
+                  sidebar still leaves its original, already-tuned 396px gap
+                  rather than crowding the chips against a narrower edge.
+                  right-16 (not right-3): leaves clearance so the chip row's
+                  scroll area doesn't run under the fullscreen button, which
+                  shares this same top-right corner of the map. ────────── */}
           {!isMobile && desktopCategoryChips && (
-            <div className="absolute left-[396px] right-16 top-3 z-20 hidden pt-0.5 desktop:block">
+            <div
+              className="absolute right-16 top-3 z-20 hidden pt-0.5 desktop:block"
+              style={{
+                left: Math.max(396, (sidebarVisible ? sidebarWidth : 0) + 16),
+                transition: isDraggingSidebar ? 'none' : 'left 200ms ease-in-out',
+              }}
+            >
               {desktopCategoryChips}
             </div>
           )}
