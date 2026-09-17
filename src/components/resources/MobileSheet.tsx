@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
 type Props = {
@@ -133,6 +133,29 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     return () => clearTimeout(timer)
   }, [phase])
 
+  // Every dismiss gesture in this file (the close button, a backdrop tap,
+  // Escape, dragging past the threshold) goes through this instead of
+  // calling `onClose` directly. `onClose` is FindResources' own
+  // goToCategoryList — it clears local state AND pushes a URL change
+  // (?form=null), and that URL change is what eventually flips the `isOpen`
+  // PROP this component reads. Waiting for that prop to come back around
+  // before starting the exit transition (the `isOpen !== wasOpen` check
+  // below still exists for exactly that path) meant the sheet just sat
+  // there, fully open, for however long the round trip through
+  // FindResources' router.push and its own re-render actually took —
+  // confirmed live as a real, measurable gap (the sheet's own transform was
+  // still untouched 150ms after tapping Close), not a rendering illusion.
+  // What reads as "it still kind of fades instead of sliding" is that gap:
+  // the close animation was starting late, and often lost its own frames to
+  // whatever heavier work (the list re-rendering underneath) landed in the
+  // same tick once the prop finally did flip. Starting the local animation
+  // immediately, in the same event that decided to dismiss, makes the
+  // visible motion depend on nothing but this component's own timer.
+  const close = useCallback(() => {
+    setPhase('closing')
+    onClose()
+  }, [onClose])
+
   useEffect(() => {
     if (!draggable) return
     const onResize = () => setViewportH(window.innerHeight)
@@ -143,11 +166,11 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   useEffect(() => {
     if (!isOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') close()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
+  }, [isOpen, close])
 
   const heights = { half: Math.round(viewportH * HALF_FRACTION), full: Math.round(viewportH * FULL_FRACTION) }
   const currentHeight = dragHeight ?? heights[snap]
@@ -264,7 +287,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     }
     const resolved = resolveSnap(drag, dragHeight ?? heights[snap])
     setDragHeight(null)
-    if (resolved === 'dismiss') onClose()
+    if (resolved === 'dismiss') close()
     else setSnap(resolved)
   }
 
@@ -356,7 +379,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     if (!drag.moved) return
     const resolved = resolveSnap(drag, dragHeight ?? heights[snap])
     setDragHeight(null)
-    if (resolved === 'dismiss') onClose()
+    if (resolved === 'dismiss') close()
     else setSnap(resolved)
   }
 
@@ -381,7 +404,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   return (
     <div
       className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) close() }}
       role="presentation"
     >
       <div
@@ -433,7 +456,7 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close"
             className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-muted hover:text-slate-700"
           >

@@ -68,6 +68,36 @@ describe('MobileSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  // Regression coverage for a real, measured bug (not just "poofs away" — see
+  // the next test for that one): in the real caller (FindResources),
+  // `onClose` doesn't just flip a local boolean — it's goToCategoryList,
+  // which pushes a URL change and only comes back around to actually update
+  // this component's `isOpen` PROP once that navigation's own re-render
+  // lands. Waiting for that round trip before starting the exit transition
+  // meant the sheet visibly sat there, fully open, for however long the
+  // round trip took — confirmed live as the sheet's own transform still
+  // reading unchanged 150ms after tapping Close. A plain `vi.fn()` for
+  // `onClose` reproduces the same shape here: it never touches `isOpen` at
+  // all, so if this component were still waiting on that prop, it would
+  // still show `translateY(0)` after being clicked. It shouldn't — the exit
+  // animation has to start from the click itself, not from a prop the
+  // caller may take a while to come back around on.
+  it('starts sliding closed immediately when dismissed, without waiting for the caller to update the isOpen prop', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn() // deliberately never flips `isOpen` — see doc above
+    const { container } = render(
+      <MobileSheet isOpen onClose={onClose} title="Suggest an edit">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(sheet.style.transform).toBe('translateY(100%)')
+  })
+
   // Regression coverage for "poofs away" instead of sliding down: this used
   // to unmount the instant `isOpen` went false, well before any exit
   // transition could be seen. Now it stays mounted, translated off-screen
