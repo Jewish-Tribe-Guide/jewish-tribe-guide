@@ -146,6 +146,24 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ListingForm: create')).toBeInTheDocument()
   })
 
+  // Mobile: unlike desktop (which still swaps in a full standalone screen —
+  // see the 'create'/!isMobile branch's own doc), mobile's Add is a bottom
+  // sheet over the still-mounted directory too, matching Edit/Report instead
+  // of navigating away from the list entirely.
+  it('on mobile, resolves a deep-linked create to a sheet over the still-mounted directory', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing', label: 'Grocery Store' })
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} searchForm="create" />
+      </ForcedViewport>,
+      { content: { categories: [grocery] } },
+    )
+
+    expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add a Grocery Store' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+  })
+
   // Mobile: a bottom sheet layered over the still-mounted directory (see
   // MobileSheet's own doc) — used to be a flat full-screen overlay, and
   // before that a route-level replace that took ResourceLoader down with

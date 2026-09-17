@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MobileSheet from './MobileSheet'
 
@@ -66,6 +66,40 @@ describe('MobileSheet', () => {
 
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // Regression coverage for "poofs away" instead of sliding down: this used
+  // to unmount the instant `isOpen` went false, well before any exit
+  // transition could be seen. Now it stays mounted, translated off-screen
+  // via a transition, until a timer matching that transition's own duration
+  // unmounts it — see the component's own Phase doc for why a plain
+  // isOpen boolean couldn't do this.
+  it('slides down over a moment when closed, instead of vanishing the instant isOpen goes false', () => {
+    vi.useFakeTimers()
+    const { container, rerender } = render(
+      <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    const sheet = () => container.querySelector('[role="dialog"]') as HTMLElement | null
+    expect(sheet()?.style.transform).toBe('translateY(0)')
+
+    rerender(
+      <MobileSheet isOpen={false} onClose={vi.fn()} title="Suggest an edit">
+        <p>form contents</p>
+      </MobileSheet>,
+    )
+    // Still on screen right after isOpen flips, now sliding down.
+    expect(sheet()).not.toBeNull()
+    expect(sheet()?.style.transform).toBe('translateY(100%)')
+
+    act(() => { vi.advanceTimersByTime(219) })
+    expect(sheet()).not.toBeNull()
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(sheet()).toBeNull()
+
+    vi.useRealTimers()
   })
 
   it('renders no drag handle unless draggable is set', () => {
@@ -173,6 +207,83 @@ describe('MobileSheet', () => {
 
       await user.click(screen.getByRole('button', { name: 'Close' }))
       expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    // The actual gap request #2 closed: pulling down on the FORM itself,
+    // once it's already scrolled to the top (jsdom's scrollTop is always 0,
+    // same state as a real form that fits without scrolling, or one already
+    // scrolled all the way up), used to just rubber-band the content in
+    // place — visually read as "the page" moving. It should hand off to the
+    // sheet instead, the same way the map's own list already does.
+    it('pulling down on the content once at the scroll top drags the sheet down, instead of the content trying to scroll/bounce on its own', () => {
+      let fakeNow = 0
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => fakeNow)
+
+      const { container } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(content, { clientY: 300 })
+      fakeNow = 50
+      // A small initial move down is the handoff itself — the sheet doesn't
+      // move yet on this same event, same as the handle's own drag start.
+      fireEvent.pointerMove(content, { clientY: 310 })
+      fakeNow = 250
+      // 100px more over 200ms — comfortably under FLING_VELOCITY, so this
+      // settles on its own merits rather than getting nudged by a flick.
+      fireEvent.pointerMove(content, { clientY: 410 })
+      expect(Number.parseInt(sheet.style.height)).toBe(HALF_PX - 100)
+
+      fireEvent.pointerUp(content, { clientY: 410 })
+      nowSpy.mockRestore()
+      // Settled well above the dismiss threshold — snaps back to half rather
+      // than closing, same resolution the handle's own drag would reach.
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    // Scrolling DOWN through the content (finger moving up, away from the
+    // top) is an ordinary scroll, not a handoff — only a drag that's already
+    // AT the top and continues pulling further down should ever reach the
+    // sheet.
+    it('scrolling the content away from the top does not resize the sheet', () => {
+      const { container } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+
+      fireEvent.pointerDown(content, { clientY: 400 })
+      fireEvent.pointerMove(content, { clientY: 300 }) // finger moves up — scrolls the content down, not the sheet
+      fireEvent.pointerUp(content, { clientY: 300 })
+
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+    })
+
+    // Once the content is already scrolled away from the top, pulling down
+    // scrolls it back toward the top first — it should NOT jump straight to
+    // resizing the sheet just because the drag direction is downward.
+    it('pulling down while the content is scrolled away from the top scrolls it, rather than resizing the sheet', () => {
+      const { container } = render(
+        <MobileSheet isOpen onClose={vi.fn()} title="Suggest an edit" draggable>
+          <p>form contents</p>
+        </MobileSheet>,
+      )
+      const sheet = container.querySelector('[role="dialog"]') as HTMLElement
+      const content = screen.getByText('form contents').parentElement as HTMLElement
+      content.scrollTop = 50 // not at the top yet
+
+      fireEvent.pointerDown(content, { clientY: 300 })
+      fireEvent.pointerMove(content, { clientY: 340 }) // pulls down 40px, well short of the 50px still separating it from the top
+      fireEvent.pointerUp(content, { clientY: 340 })
+
+      expect(sheet.style.height).toBe(`${HALF_PX}px`)
+      expect(content.scrollTop).toBe(10)
     })
 
     it('dragging the handle down past the dismiss threshold closes the sheet', () => {

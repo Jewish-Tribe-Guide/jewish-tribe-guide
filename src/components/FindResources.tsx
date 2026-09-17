@@ -330,7 +330,16 @@ export default function FindResources({
     )
     const sharedTurnstile = { token: turnstileToken, reset: () => { turnstileRef.current?.reset(); setTurnstileToken('') } }
 
-    if (action?.mode === 'create') {
+    // Desktop's Add still swaps in a full standalone screen rather than a
+    // dialog — unlike Edit/Report, it has no existing detail view to layer
+    // over, so there's no "morph in place" surface for it to match (see
+    // ListingDetailModal's own doc on why Edit/Report do). Mobile's Add used
+    // to do the same full-screen swap, but that's the same mismatch mobile's
+    // Edit/Report already moved off of: a full navigation away from the list
+    // reads as a different, heavier gesture than the sheet the other two
+    // actions use, for what's otherwise the identical "form over the list"
+    // shape. It falls through below now, alongside Edit/Report.
+    if (action?.mode === 'create' && !isMobile) {
       return (
         <>
           {sharedTurnstileWidget}
@@ -338,8 +347,8 @@ export default function FindResources({
         </>
       )
     }
-    // Edit/Report (desktop: a centered dialog; mobile: a bottom sheet — see
-    // ActionDialog's and MobileSheet's own docs) both layer over a
+    // Add/Edit/Report (desktop: a centered dialog; mobile: a bottom sheet —
+    // see ActionDialog's and MobileSheet's own docs) all layer over a
     // ResourceLoader that stays mounted the whole time, on both platforms.
     // Mobile used to swap in a flat full-screen form here instead, before
     // the map's own MapPlaceDetail (whose Edit/Report already live inside
@@ -375,16 +384,24 @@ export default function FindResources({
             that narrowing through sibling JSX on its own. */}
         {isMobile ? (
           <>
-            {/* draggable: Edit is category-aware (address/hours/photo
-                fields) and runs longer than a single screen comfortably
-                holds at `half`, so the extra headroom a drag-up to `full`
-                gives is worth having. Report stays non-draggable — same
-                short one-textarea form as the kebab's own ReportSheet
-                (which this is only a deep-link/search-result fallback
-                for; see this return's own top comment), so it keeps the
-                identical fixed-to-content sizing that shell already has,
-                rather than behaving differently depending on which path
-                reached it. */}
+            {/* draggable on all three: a consistent grab-anywhere,
+                slide-to-dismiss feel across Add/Edit/Report, same reasoning
+                ReportSheet's own doc gives for making its short one-field
+                form draggable too even though it rarely needs `full`'s
+                extra room — matching behavior reads as one shell, not as
+                Edit having gotten a nicer sheet than its siblings. */}
+            <MobileSheet isOpen={action?.mode === 'create'} onClose={goToCategoryList} title={`Add a ${category.label}`} draggable>
+              {action?.mode === 'create' && (
+                <ListingForm
+                  category={category}
+                  mode="create"
+                  onUp={goToCategoryList}
+                  onSubmitted={goToCategoryList}
+                  sharedTurnstile={sharedTurnstile}
+                  embedded
+                />
+              )}
+            </MobileSheet>
             <MobileSheet isOpen={action?.mode === 'edit'} onClose={goToCategoryList} title="Suggest an edit" draggable>
               {action?.mode === 'edit' && (
                 <ListingForm
@@ -398,7 +415,7 @@ export default function FindResources({
                 />
               )}
             </MobileSheet>
-            <MobileSheet isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem">
+            <MobileSheet isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem" draggable>
               {action?.mode === 'report' && (
                 <ReportListing
                   listing={action.listing}

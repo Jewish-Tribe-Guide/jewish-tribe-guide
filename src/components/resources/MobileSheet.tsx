@@ -24,6 +24,16 @@ type Props = {
 }
 
 type Snap = 'half' | 'full'
+// 'open': fully visible, driven by the header/handle/content drags below.
+// 'closing': isOpen just went false — still mounted and rendering, sliding
+// down via the transform transition in the JSX below, until the timeout in
+// the phase effect flips it to 'closed'. 'closed': unmounted (returns null).
+// Three states instead of a plain isOpen boolean because a close needs to
+// stay ON SCREEN long enough to animate off it — see this file's own note
+// on why "poofs away" was the bug: this component used to unmount the
+// instant isOpen went false, well before an exit transition could ever be
+// seen.
+type Phase = 'open' | 'closing' | 'closed'
 // `history`: recent (y, t) samples, oldest first, pruned to the last
 // VELOCITY_WINDOW_MS — same windowed-velocity approach as MobileNearbySheet's
 // own trackDrag, for the same reason (see that file's comment): a flick's
@@ -38,6 +48,7 @@ type DragState = {
   velocity: number
   history: { y: number; t: number }[]
 }
+type ContentDragState = DragState & { active: boolean }
 
 // Fractions of the viewport, matching the 85vh cap this shell (and
 // ActionDialog/ReportSheet) already use for their own non-draggable "full"
@@ -55,29 +66,42 @@ const VELOCITY_WINDOW_MS = 80
 // Floor so a fast drag never collapses the sheet to (or past) zero height
 // before onPointerUp gets a chance to resolve the gesture into a dismiss.
 const MIN_DRAG_PX = 80
+// How long the slide-down-and-gone close transition takes — matches the
+// transform transition duration set on the sheet itself below, so the
+// unmount timer and what's actually visible agree.
+const CLOSE_DURATION_MS = 220
+// Same decay/threshold constants as MobileNearbySheet's own momentum coast
+// — see startMomentum's doc for what they mean and why a real physics sim
+// isn't needed here either.
+const MOMENTUM_FRICTION = 0.996
+const MOMENTUM_MIN_VELOCITY = 0.02
 
 /** Mobile's shared bottom-sheet shell — a fixed-height panel sliding up over
  *  the still-visible (dimmed) screen underneath. Used by ReportSheet (its
  *  original, only caller — always non-draggable, see `draggable`'s own doc)
- *  and by FindResources' own mobile Edit/Report, which used to be a flat
+ *  and by FindResources' own mobile Add/Edit/Report, which used to be a flat
  *  full-screen overlay before the map's own in-sheet Edit made the mismatch
  *  obvious — see FindResources' own doc.
  *
- *  The drag math (`draggable: true`) is its own, deliberately NOT extracted
- *  to share with MobileNearbySheet's: that one also has to arbitrate between
- *  dragging the sheet and scrolling a list inside it (a real map underneath,
- *  worth trading space with, needing its own momentum-scroll physics once
- *  handed off) — this one only ever drags from a dedicated handle, so
- *  there's no handoff to arbitrate and the content underneath just scrolls
- *  natively. Smaller problem, smaller solution; forcing them through one
- *  shared implementation would mean the simple case carrying the complex
- *  one's machinery for no benefit. */
+ *  The drag math (`draggable: true`) used to be its own, deliberately NOT
+ *  shared with MobileNearbySheet's — this only ever dragged from a dedicated
+ *  handle, so there was no handoff to arbitrate and the content underneath
+ *  just scrolled natively. That stopped being true once a real visitor
+ *  compared the two side by side: pulling down from inside the form, once
+ *  already scrolled to its top, tried to rubber-band the form's own content
+ *  instead of resizing/dismissing the sheet the way the map's list already
+ *  does — see onContentPointerDown's own doc for why the fix is the same
+ *  hand-driven-scroll takeover MobileNearbySheet uses, not a smaller one. */
 export default function MobileSheet({ isOpen, onClose, title, children, draggable = false }: Props) {
-  useBodyScrollLock(isOpen)
+  const [phase, setPhase] = useState<Phase>(isOpen ? 'open' : 'closed')
+  useBodyScrollLock(phase !== 'closed')
 
   const [snap, setSnap] = useState<Snap>('half')
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const dragRef = useRef<DragState | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const contentDragRef = useRef<ContentDragState | null>(null)
+  const momentumFrameRef = useRef<number | null>(null)
   const [viewportH, setViewportH] = useState(() => (typeof window === 'undefined' ? 800 : window.innerHeight))
 
   // Resets to `half` every time the sheet opens — same as an iOS sheet
@@ -87,15 +111,27 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // way to reset state on a prop change) rather than in an effect, which
   // would commit one frame at the stale snap/height before its setState
   // took effect — a flash from `full` back down to `half` on every open,
-  // not just a lint preference.
+  // not just a lint preference. The close side can't follow the same
+  // render-time pattern — going straight to 'closed' here would be exactly
+  // the "poofs away" bug this exists to fix — so it goes through the
+  // effect below instead, timed to the exit transition.
   const [wasOpen, setWasOpen] = useState(isOpen)
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen)
     if (isOpen) {
+      setPhase('open')
       setSnap('half')
       setDragHeight(null)
+    } else {
+      setPhase('closing')
     }
   }
+
+  useEffect(() => {
+    if (phase !== 'closing') return
+    const timer = setTimeout(() => setPhase('closed'), CLOSE_DURATION_MS)
+    return () => clearTimeout(timer)
+  }, [phase])
 
   useEffect(() => {
     if (!draggable) return
@@ -147,18 +183,63 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     return target
   }
 
+  function stopMomentum() {
+    if (momentumFrameRef.current !== null) {
+      cancelAnimationFrame(momentumFrameRef.current)
+      momentumFrameRef.current = null
+    }
+  }
+
+  // Coasts the form content the rest of the way on a flick, the way native
+  // momentum scrolling would — needed because onContentPointerMove now
+  // drives scrollTop by hand instead of letting the browser's own
+  // touch-action: pan-y panning do it (see that function's own comment on
+  // why). Not a real physics simulation — exponential decay until it's
+  // imperceptible or the content runs out of room. Copied from
+  // MobileNearbySheet's own startMomentum rather than shared with it for the
+  // same reason the rest of this file's drag math isn't: same shape, no
+  // caller in common to justify the extraction.
+  function startMomentum(initialVelocity: number) {
+    stopMomentum()
+    let velocity = initialVelocity
+    let lastT = performance.now()
+    function step(now: number) {
+      const dt = now - lastT
+      lastT = now
+      velocity *= Math.pow(MOMENTUM_FRICTION, dt)
+      const el = contentRef.current
+      if (!el || Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) {
+        momentumFrameRef.current = null
+        return
+      }
+      const max = el.scrollHeight - el.clientHeight
+      const next = el.scrollTop + velocity * dt
+      if (next <= 0 || next >= max) {
+        el.scrollTop = Math.max(0, Math.min(next, max))
+        momentumFrameRef.current = null
+        return
+      }
+      el.scrollTop = next
+      momentumFrameRef.current = requestAnimationFrame(step)
+    }
+    momentumFrameRef.current = requestAnimationFrame(step)
+  }
+
+  useEffect(() => stopMomentum, [])
+
   // The handle bar alone is a real but small target — noticeably smaller
   // than what dragging the map's own sheet actually feels like, which gets
   // its "grab anywhere" feel from handing a scrolled-to-top list's own drag
-  // off to the sheet (see MobileNearbySheet's onContentPointerDown), not
-  // from a bigger handle there either. This has no such list to hand off
-  // from, so the same feel comes from making the whole header a drag
+  // off to the sheet (see onContentPointerDown below), not from a bigger
+  // handle there either. This has no such list to hand off from at the
+  // header, so the same feel comes from making the whole header a drag
   // surface instead — the same "grab the header/art area" affordance
   // Spotify's now-playing sheet has. Guarded against the close button
   // specifically so tapping it still closes the sheet rather than starting
   // a (zero-movement, harmless, but wasted) drag underneath the tap.
   function onHandlePointerDown(e: React.PointerEvent) {
     if ((e.target as HTMLElement).closest('button')) return
+    stopMomentum()
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
     dragRef.current = startDrag(e.clientY, performance.now())
   }
@@ -197,17 +278,119 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
     setDragHeight(null)
   }
 
-  if (!isOpen) return null
+  /** Pulling down on the form itself, once it's already scrolled to the top,
+   *  used to just rubber-band the form's own content in place — visually
+   *  indistinguishable from "the page moving" to a visitor, and exactly the
+   *  gap the map's own sheet closed for its list a while ago (see
+   *  MobileNearbySheet's identically-named handler, which this mirrors).
+   *  Starts passive (assume a normal scroll or an ordinary tap into a field)
+   *  and only takes over once the content is at scrollTop 0 AND the drag
+   *  keeps pulling down past it — never on the way IN to that boundary, so
+   *  an ordinary scroll through a long form, or tapping/selecting text
+   *  inside a field, is untouched. The form's own scrolling is driven by
+   *  hand here too (contentRef.scrollTop), not left to native touch-action:
+   *  pan-y panning, for the same WebKit-rubber-band-races-a-JS-handler
+   *  reason MobileNearbySheet's own onContentPointerDown documents — the
+   *  handoff below has to see every increment as it happens, not after a
+   *  native bounce animation has already started somewhere it can't see. */
+  function onContentPointerDown(e: React.PointerEvent) {
+    stopMomentum()
+    // Deliberately NOT capturing here, same reasoning as
+    // MobileNearbySheet's own onContentPointerDown: capturing unconditionally
+    // on every touchdown would win the pointer before a field's own native
+    // behavior (tapping to place a caret, long-pressing to select text) gets
+    // a chance to happen at all.
+    contentDragRef.current = { ...startDrag(e.clientY, performance.now()), active: false }
+  }
+
+  function onContentPointerMove(e: React.PointerEvent) {
+    const drag = contentDragRef.current
+    if (!drag) return
+    // Captured before trackDrag overwrites drag.lastY with the new position —
+    // both the handoff check and the manual scroll below need the finger's
+    // most recent increment, not its position relative to wherever this
+    // touch originally landed.
+    const prevY = drag.lastY
+    trackDrag(drag, e.clientY, performance.now())
+    const localDelta = e.clientY - prevY // positive = finger moved down since the last move event
+
+    if (!drag.active) {
+      const content = contentRef.current
+      // Checked against the PREVIOUS move event (localDelta), not
+      // drag.startY — see MobileNearbySheet's identical comment: a real
+      // gesture can scroll down then back up past the top in one continuous
+      // touch, and the boundary should hand off the moment THIS motion is
+      // downward, regardless of which way the finger was moving earlier in
+      // the same touch.
+      const atTop = (content?.scrollTop ?? 0) <= 0
+      if (atTop && localDelta > 1) {
+        drag.active = true
+        drag.startY = e.clientY
+        drag.startHeight = heights[snap]
+        return
+      }
+      // Still scrolling the form, not yet at the boundary — move it
+      // ourselves instead of the browser's native pan (see this function's
+      // own top-level doc). Assigning past either end just clamps, same as
+      // native scrollTop already does, so no manual bounds-checking here.
+      if (content) content.scrollTop -= localDelta
+      return
+    }
+
+    if (contentRef.current) contentRef.current.scrollTop = 0
+    setDragHeight(Math.min(heights.full, Math.max(MIN_DRAG_PX, drag.startHeight + (drag.startY - e.clientY))))
+  }
+
+  function onContentPointerUp() {
+    const drag = contentDragRef.current
+    contentDragRef.current = null
+    if (!drag) return
+    if (!drag.active) {
+      // Ended as a plain content-scroll, never handed off to the sheet —
+      // coast the release velocity the way native panning's own momentum
+      // would have (see onContentPointerDown's doc on why that's now this
+      // component's job instead of the browser's).
+      if (drag.moved && Math.abs(drag.velocity) > MOMENTUM_MIN_VELOCITY) startMomentum(drag.velocity)
+      return
+    }
+    if (!drag.moved) return
+    const resolved = resolveSnap(drag, dragHeight ?? heights[snap])
+    setDragHeight(null)
+    if (resolved === 'dismiss') onClose()
+    else setSnap(resolved)
+  }
+
+  // Same reasoning as onHandlePointerCancel: the browser took the touch over
+  // mid-gesture (an edge swipe recognized as back-navigation is the common
+  // case) — drop the drag without resolving it into a snap change or a
+  // dismiss the visitor never actually completed.
+  function onContentPointerCancel() {
+    contentDragRef.current = null
+    setDragHeight(null)
+  }
+
+  if (phase === 'closed') return null
+
+  const isClosing = phase === 'closing'
+  const transitionParts: string[] = []
+  if (dragHeight === null) {
+    if (draggable) transitionParts.push('height 280ms cubic-bezier(0.32, 0.72, 0, 1)')
+    transitionParts.push(`transform ${CLOSE_DURATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`)
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end bg-slate-900/40"
+      className={`fixed inset-0 z-50 flex items-end bg-slate-900/40 transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
       <div
-        className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl animate-[sheetUp_220ms_ease-out] ${draggable ? '' : 'max-h-[85vh]'}`}
-        style={draggable ? { height: currentHeight, transition: dragHeight === null ? 'height 280ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none' } : undefined}
+        className={`flex w-full flex-col rounded-t-2xl bg-white shadow-xl ${isClosing ? '' : 'animate-[sheetUp_220ms_ease-out]'} ${draggable ? '' : 'max-h-[85vh]'}`}
+        style={{
+          ...(draggable ? { height: currentHeight } : {}),
+          transform: isClosing ? 'translateY(100%)' : 'translateY(0)',
+          transition: transitionParts.length ? transitionParts.join(', ') : 'none',
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -259,7 +442,20 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
             </svg>
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div
+          ref={contentRef}
+          {...(draggable
+            ? {
+                onPointerDown: onContentPointerDown,
+                onPointerMove: onContentPointerMove,
+                onPointerUp: onContentPointerUp,
+                onPointerCancel: onContentPointerCancel,
+              }
+            : {})}
+          className={`overflow-y-auto overscroll-contain px-5 py-4 ${draggable ? 'touch-none' : ''}`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )
