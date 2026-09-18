@@ -1028,6 +1028,26 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           <>
             {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
             <div className="flex items-center gap-1.5 desktop:hidden">
+              {/* Mobile's Add, moved down here from DirectoryHeader's own
+                  row above — see the note on that (now desktop-only)
+                  button for why. Reads as one of a row of view/sort
+                  controls rather than a headline action fighting the
+                  location label for attention, which is the actual goal;
+                  it's a real create action, not a filter, but there's
+                  nowhere else on this row that wouldn't have the same
+                  "different kind of button" mismatch to a lesser degree.
+                  Ordered before Filters: it's the more frequent tap
+                  (Filters is a secondary refinement), and coming first
+                  keeps it from shifting position when Filters gains a
+                  count badge. */}
+              {canAdd && (
+                <button
+                  onClick={onAdd}
+                  className="inline-flex items-center gap-1 text-sm font-medium bg-primary text-white border border-primary rounded-md px-2.5 py-2 hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" /> Add
+                </button>
+              )}
               {hasActualFilters && (
                 <button
                   onClick={() => setFiltersOpen((v) => !v)}
@@ -1047,22 +1067,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                       {activeFilterCount}
                     </span>
                   )}
-                </button>
-              )}
-              {/* Mobile's Add, moved down here from DirectoryHeader's own
-                  row above — see the note on that (now desktop-only)
-                  button for why. Reads as one of a row of view/sort
-                  controls rather than a headline action fighting the
-                  location label for attention, which is the actual goal;
-                  it's a real create action, not a filter, but there's
-                  nowhere else on this row that wouldn't have the same
-                  "different kind of button" mismatch to a lesser degree. */}
-              {canAdd && (
-                <button
-                  onClick={onAdd}
-                  className="inline-flex items-center gap-1 text-sm font-medium bg-primary text-white border border-primary rounded-md px-2.5 py-2 hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  <PlusIcon className="h-4 w-4" /> Add
                 </button>
               )}
               {/* No mobile Map button here (desktop keeps its own, further
