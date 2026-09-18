@@ -59,10 +59,22 @@ type Props = {
 // rules — live in ONE place instead of being copy-pasted (and drifting) across
 // the synagogue, generic, and hospital directories.
 //
-// Mobile density: the listing count is supplementary, so it's hidden on small
-// screens (`hidden desktop:*`) to keep the header from crowding next to the
-// location label or the "Set location" prompt. The count always shows on
-// desktop.
+// Mobile density: the RESOLVED location label and the listing count are
+// desktop-only now (`hidden desktop:*`); the unset "Set location" prompt
+// stays on mobile but goes full-width (see AddressPrompt's own doc). All
+// three used to share mobile density rules with this component's own
+// `actions` (Add) sitting right beside them — a real bordered/colored
+// button next to plain text that wasn't even this page's main content,
+// which read unevenly no matter how the text itself was styled. The
+// resolved address doesn't need repeating here on mobile: it stays
+// reachable exactly the way it always has been, one tap on the header's own
+// location pin (see LocationControl) — same pattern most directory apps
+// use. The UNSET prompt is different: it's a real call to action (nothing
+// works right until someone answers it), not a standing copy of something
+// shown elsewhere, so it keeps its mobile presence and grows to fill the
+// row instead of shrinking away. Desktop is unchanged either way: there's
+// room, and desktop's `actions` sits in this same row rather than moving
+// elsewhere (see GenericDirectory's own doc on where mobile's Add moved to).
 export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, upLabel, onUp, titleInHeader, banner }: Props) {
   const noun = hasAddress === false ? 'listing' : 'place'
   const countText = count != null ? `${count} ${noun}${count !== 1 ? 's' : ''}` : null
@@ -72,7 +84,13 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
       {banner}
       {upLabel && onUp && <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />}
       <div className="flex items-end justify-between gap-2 mb-2">
-        <div>
+        {/* w-full desktop:w-auto: only the unset AddressPrompt below needs
+            this column to actually stretch (it goes full-width on mobile —
+            see that component's own doc); harmless for the other two
+            branches, which size to their own content either way. Reverts
+            on desktop so this stays a normal auto-width flex item there,
+            same as `actions` beside it. */}
+        <div className="w-full desktop:w-auto">
           {/* h1, not h2: this is the page's own main heading (every category
               directory, the synagogue/hospitals directories, all share this
               component) — every other top-level screen in the app (home,
@@ -82,16 +100,15 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               h1 at all. */}
           <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
-            // text-base font-medium text-slate-600, not text-sm text-muted:
-            // on mobile this isn't just supplementary text next to the real
-            // heading — titleInHeader hides the h1 above it (SiteHeader's
-            // own "‹ {title}" replaces it), so this line IS the first real
-            // content on the page, not a caption under one. It needs to
-            // read as such next to a real button (DirectoryHeader's
-            // `actions`, e.g. Add: bordered, colored, padded) — plain small
-            // muted text read as an afterthought there, when it's actually
-            // what every listing's distance is sorted against.
-            <p className="flex items-center gap-1 text-base font-medium text-slate-600 mt-0.5">
+            // desktop:flex, not shown on mobile at all — see this file's
+            // own doc above on why a resolved address no longer repeats
+            // here on mobile (it's a tap away via the header's own location
+            // pin regardless). text-base font-medium text-slate-600, not
+            // text-sm text-muted, is still right for the desktop rendering:
+            // it sits beside a real button there (`actions`, e.g. Add:
+            // bordered, colored, padded), and needs enough presence not to
+            // read as an afterthought next to it.
+            <p className="hidden desktop:flex items-center gap-1 text-base font-medium text-slate-600 mt-0.5">
               {/* Without this, a named-place anchor (a hospital, or an
                   address typed as a landmark) reads as plain text right
                   under the heading — easy to mistake for content rather
@@ -109,7 +126,7 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               )}
             </p>
           ) : addressPrompt ? (
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            <div className="flex w-full desktop:w-auto items-center gap-1.5 mt-1.5 flex-wrap">
               <AddressPrompt />
               {countText && (
                 <span className="hidden desktop:inline text-sm text-muted">
