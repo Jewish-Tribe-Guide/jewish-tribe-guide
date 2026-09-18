@@ -1039,11 +1039,15 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   Ordered before Filters: it's the more frequent tap
                   (Filters is a secondary refinement), and coming first
                   keeps it from shifting position when Filters gains a
-                  count badge. */}
+                  count badge. Styled to match Filters' neutral state
+                  (white/slate) rather than solid primary blue — with
+                  the Distance toggle already blue on this row, a second
+                  solid-blue button read as too much color competing for
+                  attention rather than as a clear call to action. */}
               {canAdd && (
                 <button
                   onClick={onAdd}
-                  className="inline-flex items-center gap-1 text-sm font-medium bg-primary text-white border border-primary rounded-md px-2.5 py-2 hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1 text-sm font-medium bg-white text-slate-600 border border-slate-300 rounded-md px-2.5 py-2 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <PlusIcon className="h-4 w-4" /> Add
                 </button>
