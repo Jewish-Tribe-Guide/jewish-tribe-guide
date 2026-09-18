@@ -911,10 +911,21 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             banner={categoryBadge}
             actions={
               <>
+                {/* Desktop only — mobile's copy moved into the Filters/sort
+                    row below, between Filters and Popularity/Distance. Sat
+                    here on both platforms until then, next to the location
+                    label above (DirectoryHeader's `anchorLabel`), which
+                    read as the wrong two things competing for attention on
+                    mobile: a real bordered/colored button beside plain
+                    text that isn't even this page's main content — the
+                    address is one tap away behind the header's own pin
+                    icon regardless (a normal pattern; see LocationControl),
+                    not something this row needs to repeat. Desktop has the
+                    room for both side by side, so it's unchanged there. */}
                 {canAdd && (
                   <button
                     onClick={onAdd}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                    className="hidden desktop:inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
                   >
                     <PlusIcon className="h-4 w-4" /> Add
                   </button>
@@ -1036,6 +1047,22 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                       {activeFilterCount}
                     </span>
                   )}
+                </button>
+              )}
+              {/* Mobile's Add, moved down here from DirectoryHeader's own
+                  row above — see the note on that (now desktop-only)
+                  button for why. Reads as one of a row of view/sort
+                  controls rather than a headline action fighting the
+                  location label for attention, which is the actual goal;
+                  it's a real create action, not a filter, but there's
+                  nowhere else on this row that wouldn't have the same
+                  "different kind of button" mismatch to a lesser degree. */}
+              {canAdd && (
+                <button
+                  onClick={onAdd}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-2.5 py-2 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" /> Add
                 </button>
               )}
               {/* No mobile Map button here (desktop keeps its own, further

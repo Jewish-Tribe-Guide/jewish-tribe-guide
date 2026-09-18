@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { Activity, forwardRef, useImperativeHandle, useState, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { mockRouter } from '@/test/nextNavigationMock'
@@ -221,6 +221,31 @@ describe('GenericDirectory', () => {
     renderWithProviders(<GenericDirectory category={category} items={[]} {...handlers} onAdd={onAdd} />)
 
     await user.click(screen.getByRole('button', { name: /Add grocery store/ }))
+    expect(onAdd).toHaveBeenCalledTimes(1)
+  })
+
+  // Add sits in the mobile Filters/sort row (between Filters and the
+  // Popularity/Distance toggle) rather than its own row up in
+  // DirectoryHeader — DirectoryHeader's own copy is `desktop:inline-flex`
+  // only now (see that component's own doc). Both are always in the DOM at
+  // once here — the split between them is a CSS media query (`desktop:`),
+  // which jsdom doesn't evaluate, same reason the Distance/davening tests
+  // above use getAllByRole rather than assuming a single match.
+  it('places Add in the mobile Filters/sort row, not the header, so it clicks the same onAdd either way', async () => {
+    const user = userEvent.setup()
+    const onAdd = vi.fn()
+    const category = makeCategory({
+      label: 'Grocery Store',
+      upvotesEnabled: true,
+      detailFields: [{ key: 'isKosher', label: 'Kosher', type: 'boolean', filterable: true }],
+    })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} onAdd={onAdd} />)
+
+    const filtersButton = screen.getByRole('button', { name: 'Filters' })
+    const filtersRow = filtersButton.parentElement!
+    const addInFiltersRow = within(filtersRow).getByRole('button', { name: 'Add' })
+
+    await user.click(addInFiltersRow)
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
