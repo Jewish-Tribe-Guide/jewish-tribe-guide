@@ -121,7 +121,22 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
       // which suppresses any animation on it. Without this, the header
       // would visibly slide/flash along with the content, breaking the one
       // fixed reference point a directional transition depends on.
-      style={{ viewTransitionName: 'site-header' }}
+      //
+      // 'none' while collapsed — a *named* `view-transition-name` forces
+      // Chromium to promote the element to its own top-layer-adjacent paint
+      // layer permanently, not just during an active transition (confirmed
+      // live: removing the name was the only thing that fixed it — z-index
+      // on the header, or on descendants, made no difference at all, not
+      // even z-index: 9999). That silently wins against EVERY normal
+      // z-index in the document, including the mobile map's own fullscreen
+      // `z-50` layer (ResourceMapView.tsx) sitting on top of this collapsed
+      // (invisible, zero-height) header — so LocationControl's popover,
+      // opened by the map's own pin button while collapsed (see that
+      // component's own doc), rendered and even reported itself `open`,
+      // just never actually paintable above the map. Nothing here needs the
+      // name while collapsed anyway: there's no visible header content for
+      // a slide transition to protect.
+      style={{ viewTransitionName: collapsed ? 'none' : 'site-header' }}
     >
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 h-14 desktop:h-[60px] flex items-center gap-10">
         {showScreenHeader && screenHeader ? (

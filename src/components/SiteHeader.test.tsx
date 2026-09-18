@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/renderWithProviders'
 import { makeCommunity } from '@/test/providerFixtures'
 import { mockRouter, resetMockRouter } from '@/test/nextNavigationMock'
-import { HeaderCollapseProvider, ScreenHeaderProvider, useHeaderOverlay, useSetScreenHeader } from '@/lib/headerVisibility'
+import { HeaderCollapseProvider, ScreenHeaderProvider, useCollapseHeader, useHeaderOverlay, useSetScreenHeader } from '@/lib/headerVisibility'
 import { ForcedViewport } from '@/lib/useIsMobile'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import type { LocationControls } from '@/components/home/LocationControl'
@@ -258,5 +258,48 @@ describe('SiteHeader — mobile', () => {
     )
 
     expect(screen.getByText('Set location')).not.toHaveClass('hidden')
+  })
+})
+
+// Regression coverage for: on the mobile map, tapping the map's own pin
+// button — which opens LocationControl's popover while the header is
+// collapsed (see that component's own doc) — visibly did nothing. The
+// popover really was opening; it just could never paint above the map's own
+// fullscreen `z-50` layer (ResourceMapView.tsx), no matter its own z-index
+// (confirmed live: not even z-index: 9999 helped). The cause was this
+// header's `viewTransitionName` — a *named* one forces Chromium to promote
+// the element to its own paint layer that wins against ordinary z-index
+// unconditionally, not just during an active transition — and it was set
+// unconditionally, including while collapsed, when the header has no
+// visible content left for a transition to protect. jsdom can't exercise
+// the paint/stacking bug itself; this asserts the one property the real fix
+// touches — see SiteHeader.tsx's own doc for how this was diagnosed.
+function Collapser() {
+  useCollapseHeader(true)
+  return null
+}
+
+describe('SiteHeader — collapsed (mobile map)', () => {
+  it('carries no view-transition-name while collapsed — a named one would win against the map\'s own z-50 layer no matter its own z-index', () => {
+    const { container } = renderWithProviders(
+      <HeaderCollapseProvider>
+        <Collapser />
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    const header = container.querySelector('header')!
+    expect(header.style.viewTransitionName).toBe('none')
+  })
+
+  it('still carries the view-transition-name when not collapsed, so the slide transition still has a stable layer to anchor to', () => {
+    const { container } = renderWithProviders(
+      <HeaderCollapseProvider>
+        <SiteHeader onGoHome={vi.fn()} location={location()} />
+      </HeaderCollapseProvider>,
+    )
+
+    const header = container.querySelector('header')!
+    expect(header.style.viewTransitionName).toBe('site-header')
   })
 })
