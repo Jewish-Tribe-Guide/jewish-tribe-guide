@@ -82,15 +82,16 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               h1 at all. */}
           <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
-            // font-medium text-slate-600, not text-muted: on mobile this is
-            // the ONLY thing left in this row once titleInHeader hides the
-            // h1 above it (SiteHeader's own "‹ {title}" replaces it) — so
-            // it's the row's real content, sitting beside a real button
-            // (DirectoryHeader's `actions`, e.g. Add: bordered, colored,
-            // padded). Plain muted text read as an afterthought next to
-            // that, when it's actually what every listing's distance is
-            // sorted against — the more important of the two, not the less.
-            <p className="flex items-center gap-1 text-sm font-medium text-slate-600 mt-0.5">
+            // text-base font-medium text-slate-600, not text-sm text-muted:
+            // on mobile this isn't just supplementary text next to the real
+            // heading — titleInHeader hides the h1 above it (SiteHeader's
+            // own "‹ {title}" replaces it), so this line IS the first real
+            // content on the page, not a caption under one. It needs to
+            // read as such next to a real button (DirectoryHeader's
+            // `actions`, e.g. Add: bordered, colored, padded) — plain small
+            // muted text read as an afterthought there, when it's actually
+            // what every listing's distance is sorted against.
+            <p className="flex items-center gap-1 text-base font-medium text-slate-600 mt-0.5">
               {/* Without this, a named-place anchor (a hospital, or an
                   address typed as a landmark) reads as plain text right
                   under the heading — easy to mistake for content rather

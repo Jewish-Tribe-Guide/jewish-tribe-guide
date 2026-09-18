@@ -8,9 +8,10 @@ afterEach(() => cleanup())
 // Regression coverage for: once a location is set, this label is the ONLY
 // content left in the row on mobile (titleInHeader hides the h1 above it —
 // SiteHeader's own "‹ {title}" replaces it), sitting beside a real button
-// (`actions`, e.g. Add: bordered, colored, padded). Rendered as plain muted
-// text, it read as an afterthought next to that button, when it's actually
-// what every listing's distance is sorted against.
+// (`actions`, e.g. Add: bordered, colored, padded). Rendered as plain small
+// muted text, it read as an afterthought next to that button, when it's
+// actually the first real content on the page (the hidden h1's stand-in),
+// not a caption under a visible heading.
 describe('DirectoryHeader — the location label', () => {
   it('renders with real visual weight next to the Add button, not as an afterthought', () => {
     render(
@@ -23,7 +24,9 @@ describe('DirectoryHeader — the location label', () => {
     )
 
     const label = screen.getByText('Say She Ate')
+    expect(label.className).toMatch(/text-base/)
     expect(label.className).toMatch(/font-medium/)
+    expect(label.className).not.toMatch(/text-sm\b/)
     expect(label.className).not.toMatch(/text-muted/)
   })
 })
