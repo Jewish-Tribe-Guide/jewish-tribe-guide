@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import AddressInput from '@/components/intake/AddressInput'
 import { CrosshairIcon, PinIcon } from '@/components/icons'
 import { useHeaderCollapsed } from '@/lib/headerVisibility'
@@ -79,11 +80,18 @@ export default function LocationControl({ controls }: Props) {
   // the click's own 'jpc:toggle-location' handler immediately re-opened it
   // (toggling what it saw as still-open), so a second tap on the button
   // never actually closed anything.
+  //
+  // `popoverRef` counts too, separately from `ref` — collapsed, the popover
+  // is portaled to `document.body` (see the render below), so it's no
+  // longer a DOM descendant of `ref.current` for `.contains()` to find. Not
+  // collapsed, the popover already sits inside `ref` in the DOM, so this is
+  // a harmless no-op there; it's load-bearing only for the portaled case.
   useEffect(() => {
     if (!open) return
     function onDown(e: PointerEvent) {
       const target = e.target as Node
       if (ref.current?.contains(target)) return
+      if (popoverRef.current?.contains(target)) return
       if (mapAnchor?.contains(target)) return
       setOpen(false)
     }
@@ -296,15 +304,6 @@ export default function LocationControl({ controls }: Props) {
       </button>
 
       {open && (
-        // `visible`: on the mobile map screen the header itself is
-        // `invisible` (see SiteHeader) while this popover is still meant to
-        // show, opened by the map's own pin button rather than the header's
-        // own (there, also invisible) trigger pill. `visibility` is
-        // inherited, but a descendant can opt back out of an ancestor's
-        // `hidden` with its own `visible` — this is that opt-out. A no-op
-        // everywhere the header isn't collapsed, since `visible` is already
-        // the default.
-        //
         // Two different anchors, not one shared position tweaked by a class:
         // the normal case is `absolute`, hanging off the trigger pill inside
         // this component's own `relative` wrapper, which is the right anchor
@@ -322,13 +321,30 @@ export default function LocationControl({ controls }: Props) {
         // opens collapsed without an anchor (there's currently no such path,
         // but nothing should render off-screen if one appears later).
         collapsed ? (
-          <div
-            ref={popoverRef}
-            className="visible fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
-            style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8 }}
-          >
-            {popoverBody}
-          </div>
+          // Portal straight to `document.body`, not just a `fixed` div left
+          // in place — the map behind it (ResourceMapView's own fullscreen
+          // wrapper) runs Google's own heavy internal compositing, and
+          // z-index tuning alone proved unreliable against it: raising this
+          // above the map's z-50 (even to literal 9999) sometimes still lost
+          // the paint order, apparently depending on how Chromium happened
+          // to squash layers on a given render — not something a z-index
+          // number can force. A portal sidesteps the question entirely by
+          // making this the LAST element in the DOM, body-level, so it's
+          // guaranteed topmost regardless of any ancestor's stacking
+          // context or the map's own layer promotion. `visible` no longer
+          // needed here — portaled to `document.body`, this isn't a
+          // descendant of the (invisible, while collapsed) header any more
+          // for `visibility` to inherit from in the first place.
+          createPortal(
+            <div
+              ref={popoverRef}
+              className="fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
+              style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8 }}
+            >
+              {popoverBody}
+            </div>,
+            document.body,
+          )
         ) : (
           <div
             ref={popoverRef}
