@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { PinIcon } from '@/components/icons'
 
 // Shown under a category title when no location is set yet. Clicking it
@@ -12,10 +13,39 @@ import { PinIcon } from '@/components/icons'
 // component's own doc), so the unset state deserves the same real estate
 // rather than reading as a small aside. Desktop keeps the original compact
 // pill; it sits beside the count/Add there and has never had this problem.
+//
+// Dismissible on mobile via sessionStorage (not localStorage): someone who
+// declines location shouldn't be nagged again this visit, but distance
+// sorting is core enough here that it should come back next session rather
+// than being silenced forever. Desktop's compact pill has no dismiss — it's
+// a small inline aside there, not a full-width banner competing for space.
+const DISMISS_KEY = 'jpc:address-prompt-dismissed'
+
 export default function AddressPrompt() {
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return sessionStorage.getItem(DISMISS_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
   function handleClick() {
     document.dispatchEvent(new CustomEvent('jpc:open-location'))
   }
+
+  function handleDismiss(e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      sessionStorage.setItem(DISMISS_KEY, '1')
+    } catch {
+      // sessionStorage unavailable (private mode, etc.) — dismissal just won't persist
+    }
+    setDismissed(true)
+  }
+
+  if (dismissed) return null
 
   return (
     <button
@@ -24,6 +54,16 @@ export default function AddressPrompt() {
     >
       <PinIcon className="h-4 w-4 desktop:h-3.5 desktop:w-3.5" />
       Set location to see distances
+      <span
+        onClick={handleDismiss}
+        role="button"
+        aria-label="Dismiss"
+        className="ml-1 -mr-1 rounded-full p-0.5 hover:bg-caution/20 cursor-pointer desktop:hidden"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </span>
     </button>
   )
 }

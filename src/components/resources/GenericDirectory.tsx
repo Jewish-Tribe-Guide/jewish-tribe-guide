@@ -1060,7 +1060,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               {canAdd && (
                 <button
                   onClick={onAdd}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary border border-primary rounded-md px-2.5 py-2 hover:bg-primary hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1 text-sm font-medium bg-primary text-white border border-primary rounded-md px-2.5 py-2 hover:bg-primary/90 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <PlusIcon className="h-4 w-4" /> Add
                 </button>
