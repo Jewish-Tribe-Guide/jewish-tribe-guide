@@ -82,7 +82,15 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
               h1 at all. */}
           <h1 className={`text-xl font-semibold text-slate-800 ${titleInHeader ? 'sr-only desktop:not-sr-only' : ''}`}>{title}</h1>
           {anchorLabel ? (
-            <p className="flex items-center gap-1 text-sm text-muted mt-0.5">
+            // font-medium text-slate-600, not text-muted: on mobile this is
+            // the ONLY thing left in this row once titleInHeader hides the
+            // h1 above it (SiteHeader's own "‹ {title}" replaces it) — so
+            // it's the row's real content, sitting beside a real button
+            // (DirectoryHeader's `actions`, e.g. Add: bordered, colored,
+            // padded). Plain muted text read as an afterthought next to
+            // that, when it's actually what every listing's distance is
+            // sorted against — the more important of the two, not the less.
+            <p className="flex items-center gap-1 text-sm font-medium text-slate-600 mt-0.5">
               {/* Without this, a named-place anchor (a hospital, or an
                   address typed as a landmark) reads as plain text right
                   under the heading — easy to mistake for content rather
@@ -90,7 +98,7 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
                   right below (AddressPrompt) already pairs its own prompt
                   with this same pin; this just matches it once a location
                   actually is set. */}
-              <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <PinIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {anchorLabel}
               {countText && (
                 <>
