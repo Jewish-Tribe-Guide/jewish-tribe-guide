@@ -179,6 +179,42 @@ describe('PlaceDetailBody — "N {countLabel}" count chip', () => {
   })
 })
 
+// A row field's label used to render inline, sharing one text node with its
+// value ("Description: Grocery chain..."), so a tags field's own new caption
+// (see below) couldn't reuse the same styling without either shrinking to
+// match the tags caption or the tags caption growing to match — they were
+// two different visual treatments for the same "what is this field" job.
+// The label now sits on its own line, the same "label above content" shape
+// daveningSection and the tags caption already use, and at the exact same
+// size/color as the tags caption.
+describe('PlaceDetailBody — row field label', () => {
+  it('renders a row field\'s label on its own line, separate from the value', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', renderAs: 'row' }],
+    })
+    const item = makeListing({ d: 'A place with great bagels.' })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    // Not one merged "Description: A place with great bagels." text node —
+    // the label and the value are each their own element.
+    expect(screen.queryByText(/Description:/)).not.toBeInTheDocument()
+    const label = screen.getByText('Description')
+    const value = screen.getByText('A place with great bagels.')
+    expect(label).not.toBe(value)
+  })
+
+  it('omits the label entirely for a field marked hideLabel', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', renderAs: 'row', hideLabel: true }],
+    })
+    const item = makeListing({ d: 'A place with great bagels.' })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.queryByText('Description')).not.toBeInTheDocument()
+    expect(screen.getByText('A place with great bagels.')).toBeInTheDocument()
+  })
+})
+
 // A tags field's chips used to render as a bare row with no caption at all —
 // fine for the collapsed card's "N kosher items" count chip (it names the
 // items right there), but once expanded there was nothing telling a visitor

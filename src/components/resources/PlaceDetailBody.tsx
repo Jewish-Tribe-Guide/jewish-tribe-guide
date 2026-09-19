@@ -448,7 +448,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
     if (fieldTags.length === 0 && fieldTagsSometimes.length === 0) return []
     return [
       <div key={f.key} className="space-y-2">
-        <p className="text-xs text-muted mb-1">{f.label}</p>
+        <p className="text-sm text-muted mb-1">{f.label}</p>
         <ClampedChipRow>
           {[
             ...fieldTags.map((t) => (
@@ -496,25 +496,27 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   )
 
   const rowFieldsSection = visibleRowFields.length > 0 && (
-    <div className="space-y-1">
+    <div className="space-y-3">
       {visibleRowFields.map((f) => (
-        <p key={f.key} className="text-sm text-slate-700">
-          {!f.hideLabel && <span className="text-muted">{f.label}: </span>}
-          {f.type === 'tel' ? (
-            // Same treatment as the main Phone field — a tappable tel: link,
-            // reformatted defensively in case the stored value predates
-            // formatPhone being applied to fields other than the built-in one.
-            <a
-              href={`tel:${display(item[f.key]).replace(/\D/g, '')}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline"
-            >
-              {formatPhone(display(item[f.key]))}
-            </a>
-          ) : (
-            display(item[f.key])
-          )}
-        </p>
+        <div key={f.key}>
+          {!f.hideLabel && <p className="text-sm text-muted mb-1">{f.label}</p>}
+          <p className="text-sm text-slate-700">
+            {f.type === 'tel' ? (
+              // Same treatment as the main Phone field — a tappable tel: link,
+              // reformatted defensively in case the stored value predates
+              // formatPhone being applied to fields other than the built-in one.
+              <a
+                href={`tel:${display(item[f.key]).replace(/\D/g, '')}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline"
+              >
+                {formatPhone(display(item[f.key]))}
+              </a>
+            ) : (
+              display(item[f.key])
+            )}
+          </p>
+        </div>
       ))}
     </div>
   )
