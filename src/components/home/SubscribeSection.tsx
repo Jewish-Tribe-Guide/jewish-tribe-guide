@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CategoryConfig } from '@/lib/categories'
 import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -52,8 +53,61 @@ export default function SubscribeSection({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+  // The category row tooltip (see the grid below) — a timer, not CSS
+  // group-hover, so the tooltip's own text only ever mounts once actually
+  // hovered rather than sitting in the DOM (duplicating the row's own
+  // visible label) the whole time. Position is captured at hover time via
+  // getBoundingClientRect and rendered through a portal at `position: fixed`
+  // — an in-flow `absolute` tooltip got clipped by this grid's own
+  // `overflow-y-auto` for any row near its scrolled edge (confirmed live);
+  // `fixed` escapes that the same way CheckboxDropdown/ListingActionsMenu's
+  // own portaled popups already do elsewhere in this app, for the same
+  // reason. `delayedHoverRef` is the pending "not hovered long enough yet"
+  // timer; cleared on every enter/leave so a quick pass across several rows
+  // doesn't leave a stale one to fire late against whatever row the pointer
+  // is on by then.
+  const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null)
+  const delayedHoverRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleCategoryRowEnter = (label: string, e: React.MouseEvent<HTMLLabelElement>) => {
+    if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+    // Only for a name actually cut off by the truncate — comparing the
+    // rendered text's own scrollWidth (the width it WANTS) against its
+    // clientWidth (the width it HAS) is the standard way to detect that;
+    // a short name that fits has nothing to reveal, so it gets no tooltip
+    // at all, not one that would just repeat what's already fully visible.
+    const textEl = e.currentTarget.querySelector<HTMLElement>('.truncate')
+    if (!textEl || textEl.scrollWidth <= textEl.clientWidth) return
+    const rowEl = e.currentTarget
+    delayedHoverRef.current = setTimeout(() => {
+      const rect = rowEl.getBoundingClientRect()
+      setTooltip({ label, top: rect.top, left: rect.left })
+    }, 150)
+  }
+  const handleCategoryRowLeave = () => {
+    if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+    setTooltip(null)
+  }
 
   const eligible = (categories ?? []).filter((c: CategoryConfig) => c.kind === 'listing')
+
+  // Otherwise a pending 150ms tooltip timer started right before the picker
+  // closed (an outside click, Escape) would still fire afterward — harmless
+  // to this still-mounted component, but it'd leave a stale tooltip ready to
+  // flash immediately the next time the picker reopens, for a row that isn't
+  // actually being hovered. Also closes it on the grid's own scroll — a
+  // `fixed` tooltip has no way to follow its row once that row moves under
+  // it, the same reason CheckboxDropdown's own popup closes on scroll too.
+  useEffect(() => {
+    if (!pickerOpen) {
+      if (delayedHoverRef.current != null) clearTimeout(delayedHoverRef.current)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTooltip(null)
+      return
+    }
+    function onScroll() { setTooltip(null) }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', onScroll, true)
+  }, [pickerOpen])
 
   // Closes on Escape or a click/tap outside the picker — same pattern as
   // HomeBreak's Add/Edit/Report dropdown (see that component's own doc).
@@ -268,18 +322,48 @@ export default function SubscribeSection({
                       </label>
                       <div className="mt-1 grid max-h-48 grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto border-t border-slate-100 pt-2">
                         {eligible.map((c) => (
-                          // title on the label, not just the truncated span:
-                          // the checkbox and its own hit area sit inside
-                          // this same label, so the tooltip should cover
-                          // wherever the row itself is hovered, not just the
-                          // sliver of text that happens to be clipped.
-                          <label key={c.id} title={c.pluralLabel} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50">
+                          // A custom tooltip (rendered once via the portal
+                          // below, not per-row) — not the native `title`
+                          // attribute, which every browser gates behind a
+                          // ~1s hover delay with no CSS/HTML way to shorten
+                          // it. Only actually shows for a name the truncate
+                          // really cut off — handleCategoryRowEnter checks
+                          // scrollWidth vs. clientWidth before ever
+                          // scheduling it, so a name that already fits gets
+                          // no tooltip repeating what's already visible.
+                          <label
+                            key={c.id}
+                            className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50"
+                            onMouseEnter={(e) => handleCategoryRowEnter(c.pluralLabel, e)}
+                            onMouseLeave={handleCategoryRowLeave}
+                          >
                             <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleCategory(c.id)} />
                             <span className="truncate">{c.pluralLabel}</span>
                           </label>
                         ))}
                       </div>
                     </div>
+                  )}
+                  {/* `position: fixed` via a portal, not an in-flow
+                      `absolute` child of the row — see handleCategoryRowEnter's
+                      own doc above for why: this grid scrolls
+                      (`overflow-y-auto`), and a tooltip positioned relative to
+                      its own row got visibly clipped by that for rows near the
+                      scrolled edge. `fixed`, escaping to document.body, paints
+                      in the root stacking context instead, the same fix
+                      CheckboxDropdown/ListingActionsMenu already use for their
+                      own popups. `-4px` above the row's own top, not flush
+                      against it, so the tooltip doesn't touch the text it's
+                      naming. */}
+                  {tooltip && createPortal(
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none fixed z-50 -translate-y-full whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs text-white shadow-lg"
+                      style={{ top: tooltip.top - 4, left: tooltip.left }}
+                    >
+                      {tooltip.label}
+                    </span>,
+                    document.body,
                   )}
                 </div>
 
