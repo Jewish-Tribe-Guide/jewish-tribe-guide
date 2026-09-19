@@ -50,17 +50,17 @@ export default function AddressPrompt() {
   return (
     <button
       onClick={handleClick}
-      className="relative mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-caution/30 bg-caution/10 px-3 py-2.5 pr-9 text-sm font-medium text-caution hover:bg-caution/20 hover:border-caution/45 active:bg-caution/30 transition-colors cursor-pointer desktop:inline-flex desktop:w-auto desktop:justify-start desktop:px-2.5 desktop:py-1.5 desktop:pr-2.5 desktop:text-xs"
+      className="relative mt-1.5 flex w-full items-center justify-center gap-1 rounded-md border border-caution/30 bg-caution/10 px-3 py-1.5 pr-8 text-xs font-medium text-caution hover:bg-caution/20 hover:border-caution/45 active:bg-caution/30 transition-colors cursor-pointer desktop:inline-flex desktop:w-auto desktop:justify-start desktop:gap-1.5 desktop:px-2.5 desktop:py-1.5 desktop:pr-2.5"
     >
-      <PinIcon className="h-4 w-4 desktop:h-3.5 desktop:w-3.5" />
+      <PinIcon className="h-3.5 w-3.5" />
       Set location to see distances
       <span
         onClick={handleDismiss}
         role="button"
         aria-label="Dismiss"
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-caution/20 cursor-pointer desktop:hidden"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-caution/20 cursor-pointer desktop:hidden"
       >
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </span>

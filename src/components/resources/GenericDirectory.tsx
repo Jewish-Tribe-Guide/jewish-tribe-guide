@@ -1031,7 +1031,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
         )}
         {hasFilterRow && (
           <>
-            {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ── */}
+            {/* ── Mobile: Filters + Map buttons, then sort toggle — all one line ──
+                    Sized as a utility toolbar (py-1.5, text-xs, slate-200 borders),
+                    a step down from the py-2/text-sm/slate-300 it used to share with
+                    ordinary buttons — this row's job is filtering/sorting chrome, not
+                    a set of calls to action, and at that weight it was out-competing
+                    the search bar above it for attention. ── */}
             <div className="flex items-center gap-1.5 desktop:hidden">
               {/* Mobile's Add, moved down here from DirectoryHeader's own
                   row above — see the note on that (now desktop-only)
@@ -1052,27 +1057,27 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               {canAdd && (
                 <button
                   onClick={onAdd}
-                  className="inline-flex items-center gap-1 text-sm font-medium bg-white text-slate-600 border border-slate-300 rounded-md px-2.5 py-2 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-white text-slate-600 border border-slate-200 rounded-md px-2.5 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <PlusIcon className="h-4 w-4" /> Add
+                  <PlusIcon className="h-3.5 w-3.5" /> Add
                 </button>
               )}
               {hasActualFilters && (
                 <button
                   onClick={() => setFiltersOpen((v) => !v)}
                   className={[
-                    'inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
+                    'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors cursor-pointer whitespace-nowrap',
                     activeFilterCount > 0
                       ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50',
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50',
                   ].join(' ')}
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path d="M3 4a1 1 0 000 2h14a1 1 0 000-2H3zm3 5a1 1 0 000 2h8a1 1 0 000-2H6zm2 5a1 1 0 000 2h4a1 1 0 000-2H8z" />
                   </svg>
                   Filters
                   {activeFilterCount > 0 && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-xs font-bold">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px] font-bold">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1092,7 +1097,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   href={category.externalLink.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 transition-colors whitespace-nowrap"
                 >
                   {category.externalLink.label} ↗
                 </a>
@@ -1103,11 +1108,11 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                   aria-label="All davening times"
                   title="All davening times"
                   className={[
-                    'inline-flex items-center gap-1 px-2.5 py-2 text-sm font-medium rounded-md border bg-white text-slate-600 border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
+                    'inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap',
                     !upvotes && !category.externalLink ? 'ml-auto' : '',
                   ].join(' ')}
                 >
-                  <ClockIcon className="h-4 w-4" />
+                  <ClockIcon className="h-3.5 w-3.5" />
                   {/* Full label once the row has room — hidden below this so it
                       never crowds Filters/Map on the narrowest phones. */}
                   <span className="hidden min-[390px]:inline">All davening times</span>
@@ -1116,7 +1121,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
               {upvotes && (
                 <div
                   className={[
-                    'flex rounded-md border border-slate-300 overflow-hidden',
+                    'flex rounded-md border border-slate-200 overflow-hidden',
                     !hasMinyanim && !category.externalLink ? 'ml-auto' : '',
                   ].join(' ')}
                 >
@@ -1125,7 +1130,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                       key={opt.label}
                       onClick={() => selectSort(opt.v)}
                       className={[
-                        'px-2.5 py-2 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap',
+                        'px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
                         sortByPopular === opt.v ? 'bg-primary text-white' : 'bg-white text-slate-600 hover:bg-slate-50',
                       ].join(' ')}
                     >
