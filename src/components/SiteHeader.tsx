@@ -58,9 +58,10 @@ export default function SiteHeader({ onGoHome, location, previewSettings, hideNa
   // On mobile, a category/hospital/synagogue directory screen (the only
   // things that ever call useSetScreenHeader — see GenericDirectory) swaps
   // the static site name for its own "‹ {title}", the same pattern the cRc
-  // Kosher app's own drill-down screens use. Desktop keeps the site name and
-  // relies on Breadcrumb ("{upLabel} / {title}") instead — there's already
-  // room there for both, so this only ever applies at mobile widths.
+  // Kosher app's own drill-down screens use. Desktop keeps the site name
+  // instead — its persistent logo/nav is already a permanent way back to
+  // Home, and the screen's own heading already says where you are, so this
+  // only ever applies at mobile widths.
   const screenHeader = useScreenHeader()
   const showScreenHeader = isMobile && !!screenHeader
 

@@ -996,7 +996,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           isOpen={reportSheetOpen}
           onClose={() => setReportSheetOpen(false)}
           listing={item}
-          upLabel={category.pluralLabel}
         />
       )}
 

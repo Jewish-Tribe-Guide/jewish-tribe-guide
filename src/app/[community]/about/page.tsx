@@ -1,5 +1,4 @@
 import UpButton from '@/components/UpButton'
-import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
 import { listCommunities } from '@/lib/communityStore'
 import { getSiteSettings } from '@/lib/siteSettingsStore'
@@ -50,14 +49,16 @@ export default async function AboutPage(props: PageProps<'/[community]/about'>) 
           same word. This used to be a bespoke underlined "← Back to
           {community.name}" link, which named its destination differently from
           the rest of the app for no reason anyone could point at.
-          UpButton (mobile) and Breadcrumb (desktop) name the same
-          destination, so only one ever shows at a time — see Breadcrumb's
-          own doc. Points at this community's own home (routes.home), not a
-          bare "/" — "/" redirects to whichever community is the site's
-          default, which isn't necessarily the one this page was reached
-          from. */}
+          Mobile-only: desktop already has a permanent way back to Home (the
+          site logo in the header, always on screen), so a second link here
+          — and a second, redundant "Home / {title}" naming the exact same
+          destination right above a heading that already says {title} — used
+          to render on desktop for no real benefit; removed rather than kept
+          around just because it was harmless. Points at this community's own
+          home (routes.home), not a bare "/" — "/" redirects to whichever
+          community is the site's default, which isn't necessarily the one
+          this page was reached from. */}
       <UpButton href={routes.home(community)} label="Home" className="mb-0 desktop:hidden" />
-      <Breadcrumb href={routes.home(community)} upLabel="Home" title={title} className="mb-0" />
 
       {/* One card holding the whole document — title included. The h1 sits
           inside rather than above because these two pages are documents, not

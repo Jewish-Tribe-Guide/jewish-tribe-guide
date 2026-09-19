@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import Breadcrumb from '@/components/Breadcrumb'
 import AddressPrompt from './AddressPrompt'
 import { PinIcon } from '@/components/icons'
 
@@ -24,25 +23,17 @@ type Props = {
   addressPrompt?: boolean
   /** Right-aligned action buttons (Map, Add). Wrapped in a shrink-0 flex row. */
   actions?: ReactNode
-  /** Ancestor label for the desktop-only Breadcrumb above the heading —
-   *  mirrors the UpButton every caller already renders beside this component
-   *  ("Home" on mobile, "All resources" on desktop for most callers; see
-   *  GenericDirectory's own upLabel doc). Both this and onUp are required
-   *  together or omitted together; a caller that doesn't pass them just gets
-   *  no breadcrumb line, same as before this existed. */
-  upLabel?: string
-  onUp?: () => void
   /** True for a caller whose title is also shown in SiteHeader on mobile
    *  (GenericDirectory, via useSetScreenHeader) — visually hiding a second,
    *  identical "Food" directly under a mobile header already reading "‹
    *  Food" recovers real space with nothing lost, since the h1 role still
    *  needs to exist for a screen reader (`sr-only`, not removed) even where
-   *  it's redundant to a sighted visitor. Desktop never shows the title in
-   *  its header (Breadcrumb only names the "up" path, not this screen), so
-   *  the h1 there stays visible regardless of this prop. Left `false` for a
-   *  caller like HospitalsDirectory that still has its own mobile UpButton
-   *  instead of a header title — hiding its only visible title would leave
-   *  mobile with none at all. */
+   *  it's redundant to a sighted visitor. Desktop's header never swaps to a
+   *  per-screen title the way mobile's does, so the h1 there stays visible
+   *  regardless of this prop. Left `false` for a caller like
+   *  HospitalsDirectory that still has its own mobile UpButton instead of a
+   *  header title — hiding its only visible title would leave mobile with
+   *  none at all. */
   titleInHeader?: boolean
   /** Desktop-only category icon badge, shown above everything else in this
    *  header — see GenericDirectory's own doc on how this pairs (a matching
@@ -75,14 +66,24 @@ type Props = {
 // row instead of shrinking away. Desktop is unchanged either way: there's
 // room, and desktop's `actions` sits in this same row rather than moving
 // elsewhere (see GenericDirectory's own doc on where mobile's Add moved to).
-export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, upLabel, onUp, titleInHeader, banner }: Props) {
+export default function DirectoryHeader({ title, count, hasAddress, anchorLabel, addressPrompt, actions, titleInHeader, banner }: Props) {
   const noun = hasAddress === false ? 'listing' : 'place'
   const countText = count != null ? `${count} ${noun}${count !== 1 ? 's' : ''}` : null
 
   return (
     <div>
       {banner}
-      {upLabel && onUp && <Breadcrumb upLabel={upLabel} onUp={onUp} title={title} />}
+      {/* Holds open the vertical space the desktop-only Breadcrumb used to
+          take up here (removed — it repeated the title text right below it,
+          e.g. "All resources / Grocery" directly above an h1 that already
+          said "Grocery"). Kept as a bare spacer, not deleted outright: the
+          icon badge above and the heading below read as glued together
+          without it, sized to match Breadcrumb's own box exactly (its
+          text-sm line height plus its default mb-2). mb-[0.5rem], not mb-2 —
+          same 8px margin, but a literal-value class so this element doesn't
+          also match a `.mb-2` selector meant for the row below (see this
+          component's own test). */}
+      <div className="hidden desktop:block h-5 mb-[0.5rem]" aria-hidden="true" />
       <div className="flex items-end justify-between gap-2 mb-2">
         {/* w-full desktop:w-auto: only the unset AddressPrompt below needs
             this column to actually stretch (it goes full-width on mobile —

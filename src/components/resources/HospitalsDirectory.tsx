@@ -16,10 +16,6 @@ type Props = {
   /** Open the About Your Hospital page for the chosen hospital. */
   onSelect: (hospitalId: string) => void
   onUp: () => void
-  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
-   *  index there), "All resources" on desktop (a separate index page). See
-   *  FindResources' upToAllResources, which this mirrors. */
-  upLabel?: string
   /** Open the map view (all resources, no category filter). */
   onViewMap?: () => void
 }
@@ -41,7 +37,7 @@ function features(info?: HospitalInfo | null): string[] {
 // question so it reads as a clear first step, not a database listing.
 const TITLE = 'Which hospital?'
 
-export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = 'All resources', onViewMap }: Props) {
+export default function HospitalsDirectory({ anchor, onSelect, onUp, onViewMap }: Props) {
   // Puts "‹ {TITLE}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -95,8 +91,6 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
         title={TITLE}
         anchorLabel={coords && label ? label : undefined}
         addressPrompt
-        upLabel={upLabel}
-        onUp={onUp}
         titleInHeader
         banner={banner}
       />

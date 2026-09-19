@@ -147,13 +147,13 @@ describe('MapPlaceDetail', () => {
   })
 
   // Regression: the edit form used to open with no way back at all on
-  // mobile — ListingForm's own back affordance (a Breadcrumb) never
-  // becomes visible here since MapScreen deliberately collapses the
-  // shared header on this screen. Confirmed live before this landed. This
-  // button now replaces that Breadcrumb on BOTH platforms (see this
-  // component's own doc on why the Breadcrumb's wording was actually
-  // wrong here, not just redundant) — closes the form the same way
-  // cancelling it does: via history.back(), not a direct state reset.
+  // mobile — ListingForm's own back affordance (formerly a Breadcrumb,
+  // since removed everywhere) never became visible here since MapScreen
+  // deliberately collapses the shared header on this screen. Confirmed
+  // live before this landed. This button replaces it on BOTH platforms
+  // (see this component's own doc on why naming a destination was
+  // actually wrong here, not just redundant) — closes the form the same
+  // way cancelling it does: via history.back(), not a direct state reset.
   it('shows a Back button once the edit form is open, and it closes the form via history.back()', async () => {
     const userEvent = (await import('@testing-library/user-event')).default
     const user = userEvent.setup()

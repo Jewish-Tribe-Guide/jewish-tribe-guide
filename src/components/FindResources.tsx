@@ -294,7 +294,7 @@ export default function FindResources({
 
   // ── Special (non-category) detail views ─────────────────────────────────────
   if (view === 'hospitals' && !hospitalDetailId) {
-    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} upLabel="Home" onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
+    return <HospitalsDirectory anchor={anchor} onSelect={openHospital} onUp={onUp} onViewMap={onViewMap ? () => onViewMap('__hospitals__') : undefined} />
   }
   if (view === 'hospitals' && hospitalDetailId) {
     // The hospital chosen from the list; its name (not the address) is the subtitle.
@@ -317,7 +317,6 @@ export default function FindResources({
       <EruvInfo
         eruvim={eruvim}
         onUp={onUp}
-        upLabel="Home"
         title={eruv?.pluralLabel}
         icon={eruv?.icon}
         color={eruv ? getCategoryColor(categories, eruv.id) : undefined}
@@ -335,7 +334,6 @@ export default function FindResources({
         coords={zmanimCoords}
         locationLabel={locationLabel}
         onUp={onUp}
-        upLabel="Home"
         title={zmanim?.pluralLabel}
         icon={zmanim?.icon}
         color={zmanim ? getCategoryColor(categories, zmanim.id) : undefined}
@@ -429,7 +427,6 @@ export default function FindResources({
               {action?.mode === 'report' && (
                 <ReportListing
                   listing={action.listing}
-                  upLabel={category.pluralLabel}
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   embedded
@@ -468,7 +465,6 @@ export default function FindResources({
               {action?.mode === 'report' && (
                 <ReportListing
                   listing={action.listing}
-                  upLabel={category.pluralLabel}
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   embedded

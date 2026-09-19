@@ -123,7 +123,6 @@ export default function CategoryPreview({
       <EruvInfo
         eruvim={eruvim}
         onUp={onClose}
-        upLabel="Home"
         title={category.pluralLabel}
         icon={category.icon}
         color={getCategoryColor([category], category.id)}
@@ -139,7 +138,6 @@ export default function CategoryPreview({
         coords={coords ?? community.mapCenter}
         locationLabel={(coords && address) || community.region}
         onUp={onClose}
-        upLabel="Home"
         title={category.pluralLabel}
         icon={category.icon}
         color={getCategoryColor([category], category.id)}
@@ -171,7 +169,6 @@ export default function CategoryPreview({
     content = (
       <ReportListing
         listing={action.listing}
-        upLabel={category.pluralLabel}
         onUp={goToDirectory}
         onSubmitted={goToDirectory}
         preview

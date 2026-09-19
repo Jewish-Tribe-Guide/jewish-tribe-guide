@@ -70,12 +70,6 @@ type Props = {
    *  ordinary in-page "All davening times" button. */
   initialDaveningDay?: string
   onUp: () => void
-  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
-   *  index there), "All resources" on desktop (a separate index page). See
-   *  FindResources' upToAllResources, which this mirrors. Defaults to "All
-   *  resources" for callers (the admin's category preview) that always mean
-   *  that literally, regardless of device. */
-  upLabel?: string
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
   onReport: (item: DirectoryResource) => void
@@ -93,7 +87,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, upLabel = 'All resources', onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onReport, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -959,11 +953,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     <div>
       <CategoryBandFrame color={bandColor} imageUrl={bandImage}>
           {/* Mobile used to have its own "‹ {upLabel}" row here (UpButton,
-              desktop:hidden) alongside DirectoryHeader's desktop-only Breadcrumb.
-              It's gone now that useSetScreenHeader (above) puts the same "‹
-              {title}" control directly in SiteHeader on mobile — this component
-              no longer needs to render its own copy of it. Desktop is
-              unaffected: Breadcrumb still renders exactly as before. */}
+              desktop:hidden). It's gone now that useSetScreenHeader (above)
+              puts the same "‹ {title}" control directly in SiteHeader on
+              mobile — this component no longer needs to render its own copy
+              of it. Desktop never had an equivalent row of its own (the
+              since-removed Breadcrumb lived inside DirectoryHeader, not
+              here) and still doesn't. */}
 
           <DirectoryHeader
             title={category.pluralLabel}
@@ -971,8 +966,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             hasAddress={category.hasAddress}
             anchorLabel={anchorLabel}
             addressPrompt={addressPrompt}
-            upLabel={upLabel}
-            onUp={onUp}
             titleInHeader
             banner={categoryBadge}
             actions={

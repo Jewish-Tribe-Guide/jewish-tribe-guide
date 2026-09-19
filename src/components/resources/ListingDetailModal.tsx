@@ -259,8 +259,8 @@ export default function ListingDetailModal({
             // were just on, not up to some other screen, so it doesn't
             // name a destination the way "Back to list" elsewhere does.
             // The title below stands in for ListingForm/ReportListing's
-            // own heading (suppressed by `embedded`, same as the
-            // Breadcrumb it also skips) — every other Edit/Report surface
+            // own heading (suppressed by `embedded`) — every other
+            // Edit/Report surface
             // (ActionDialog, MobileSheet, ReportSheet) shows this same
             // title in its own header; this and MapPlaceDetail's identical
             // morph-in-place were the two gaps, confirmed live to read as
@@ -381,7 +381,7 @@ export default function ListingDetailModal({
           {formOpen === 'edit' ? (
             <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
           ) : formOpen === 'report' ? (
-            <ReportListing listing={item} upLabel={category.pluralLabel} onUp={closeForm} onSubmitted={closeForm} embedded />
+            <ReportListing listing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
           ) : (
             <>
               <PlaceDetailBody

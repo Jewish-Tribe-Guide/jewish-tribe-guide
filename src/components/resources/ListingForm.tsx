@@ -10,7 +10,7 @@ import ImageUploadField from '@/components/ImageUploadField'
 import AddressInput, { type PlaceSelectResult } from '@/components/intake/AddressInput'
 import HoursInput from '@/components/intake/HoursInput'
 import MinyanimInput from '@/components/intake/MinyanimInput'
-import Breadcrumb from '@/components/Breadcrumb'
+import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
@@ -349,19 +349,20 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     mode === 'edit' ? 'Suggest an edit' : `Add a ${config?.label ?? 'listing'}`
 
   // Puts "‹ {heading}" in SiteHeader on mobile — see GenericDirectory's
-  // identical call. Unlike ReportListing, this screen never had a distinct
-  // done-state title — both branches' Breadcrumb already said `heading`
-  // ("Add a Grocery Store" stays the destination name even once submitted),
-  // so the header matches that instead of introducing a new "Thank you!"
-  // title that would just repeat the h2 below and leave nothing for
-  // findByText('Thank you!') to disambiguate. Only the back target changes:
-  // onSubmitted once done, onUp before that.
+  // identical call. Only the back target changes: onSubmitted once done,
+  // onUp before that.
   useSetScreenHeader(!embedded, heading, done ? onSubmitted : onUp)
 
   if (done) {
     return (
       <div>
-        {!embedded && <Breadcrumb upLabel={config.pluralLabel} onUp={onSubmitted} title={heading} />}
+        {/* Non-embedded only (the admin's standalone preview/editor — every
+            real Add/Edit already lives inside a dialog/sheet with its own
+            close chrome, see `embedded`'s own doc): with no destination to
+            name (that's what made the old Breadcrumb here redundant with
+            the heading above it), just a plain way to leave the confirmation
+            rather than a dead end. */}
+        {!embedded && <UpButton label="Back" onClick={onSubmitted} className="mb-2" />}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           {/* Not sr-only, unlike the other screens' bare title repeats: this
@@ -382,10 +383,14 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     <div>
       {!embedded && (
         <>
-          {/* Breadcrumb (desktop only) names the same destination the
-              header's "‹ {heading}" now covers on mobile — see Breadcrumb's
-              own doc for why only one of the two ever shows at a time. */}
-          <Breadcrumb upLabel={config.pluralLabel} onUp={onUp} title={heading} />
+          {/* The old Breadcrumb here did double duty — it also named the
+              destination ("Grocery Stores"), which is what made it
+              redundant with the heading right below. This keeps only the
+              part that isn't: a real cancel action, since nothing else on
+              this screen closes the form without submitting it. Same "Back"
+              wording MapPlaceDetail's own formOpen control uses for the
+              identical job. */}
+          <UpButton label="Back" onClick={onUp} className="mb-2" />
           <h2 className="text-xl font-semibold text-slate-800 mb-3 sr-only desktop:not-sr-only">{heading}</h2>
         </>
       )}

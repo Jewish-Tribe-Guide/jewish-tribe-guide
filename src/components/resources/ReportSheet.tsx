@@ -8,7 +8,6 @@ type Props = {
   isOpen: boolean
   onClose: () => void
   listing: DirectoryResource
-  upLabel: string
 }
 
 /** Mobile's Report action, as a bottom sheet over the still-visible (dimmed)
@@ -19,10 +18,10 @@ type Props = {
  *  fallback below is: not because this form needs it, but so every Report
  *  surface handles the same way as Edit instead of only some of them
  *  resizing/sliding smoothly and others not. */
-export default function ReportSheet({ isOpen, onClose, listing, upLabel }: Props) {
+export default function ReportSheet({ isOpen, onClose, listing }: Props) {
   return (
     <MobileSheet isOpen={isOpen} onClose={onClose} title="Report a problem" draggable>
-      <ReportListing listing={listing} upLabel={upLabel} onUp={onClose} onSubmitted={onClose} embedded />
+      <ReportListing listing={listing} onUp={onClose} onSubmitted={onClose} embedded />
     </MobileSheet>
   )
 }

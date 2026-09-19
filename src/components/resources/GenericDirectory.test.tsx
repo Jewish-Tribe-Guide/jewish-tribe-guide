@@ -147,11 +147,6 @@ describe('GenericDirectory', () => {
     const items = [makeListing({ id: 'a', name: 'Kosher Mart' }), makeListing({ id: 'b', name: 'Trader Joe' })]
     renderWithProviders(<GenericDirectory category={category} items={items} {...handlers} />)
 
-    // By role, not getByText: the desktop breadcrumb (see DirectoryHeader's
-    // upLabel/onUp) repeats the title as plain text above the real h1, so
-    // getByText('Grocery Stores') is ambiguous — jsdom has no viewport to
-    // apply the breadcrumb's desktop-only CSS against, so both are "visible"
-    // to testing-library regardless. The h1 is the one heading role either way.
     expect(screen.getByRole('heading', { name: 'Grocery Stores' })).toBeInTheDocument()
     // "places", not "listings" — this category has an address (the fixture
     // default, same as almost every real category), and DirectoryHeader's

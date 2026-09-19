@@ -10,10 +10,6 @@ import { useIsMobile } from '@/lib/useIsMobile'
 type Props = {
   eruvim: EruvRecord[]
   onUp: () => void
-  /** What `onUp` actually goes to — "Home" on mobile (the home grid IS the
-   *  index there), "All resources" on desktop (a separate index page). See
-   *  FindResources' upToAllResources, which this mirrors. */
-  upLabel?: string
   /** The category's own (admin-editable) name — falls back to the historical
    *  copy while categories are still loading. */
   title?: string
@@ -45,7 +41,7 @@ function EruvCard({ eruv }: { eruv: EruvRecord }) {
   )
 }
 
-export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', title = 'Eruv Information', icon, color = '#64748b', bandImageUrl }: Props) {
+export default function EruvInfo({ eruvim, onUp, title = 'Eruv Information', icon, color = '#64748b', bandImageUrl }: Props) {
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
   // it used to (its own mobile UpButton, no header title).
@@ -63,7 +59,7 @@ export default function EruvInfo({ eruvim, onUp, upLabel = 'All resources', titl
       {/* Mobile used to have its own "‹ {upLabel}" row here — see
           GenericDirectory's identical comment on why it doesn't need one now
           that useSetScreenHeader puts the same "‹ {title}" in SiteHeader. */}
-      <DirectoryHeader title={title} upLabel={upLabel} onUp={onUp} titleInHeader banner={banner} />
+      <DirectoryHeader title={title} titleInHeader banner={banner} />
       <p className="mb-4 text-sm text-muted">
         Check the current status of the {community.region}-area eruvim before Shabbos.
       </p>

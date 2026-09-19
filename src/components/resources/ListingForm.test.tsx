@@ -113,13 +113,13 @@ describe('ListingForm', () => {
   // dialog) instead of as this screen's own top-level content. Same
   // reasoning, and same treatment, as ReportListing's own `embedded` prop.
   describe('embedded', () => {
-    it('renders no Breadcrumb/heading of its own', () => {
+    it('renders no Back button or heading of its own', () => {
       const category = makeCategory()
       const existing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
       renderWithProviders(<ListingForm category={category} mode="edit" existing={existing} {...handlers} embedded />)
 
       expect(screen.queryByRole('heading', { name: 'Suggest an edit' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
       // The form itself is unaffected.
       expect(screen.getByRole('button', { name: 'Submit edit for review' })).toBeInTheDocument()
     })
@@ -140,7 +140,7 @@ describe('ListingForm', () => {
       expect(body.targetId).toBe('listing-1')
     })
 
-    it('renders no Breadcrumb on the done state either', async () => {
+    it('renders no Back button on the done state either', async () => {
       const user = userEvent.setup()
       stubFetchOk({ ok: true })
       const category = makeCategory()
@@ -151,7 +151,44 @@ describe('ListingForm', () => {
       await user.click(screen.getByRole('button', { name: 'Submit edit for review' }))
 
       expect(await screen.findByText('Thank you!')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    })
+  })
+
+  // Non-embedded only — every real Add/Edit already lives inside a
+  // dialog/sheet with its own close chrome. This is the only in-content way
+  // to leave the form without submitting it (or, once done, to leave the
+  // confirmation), now that the old Breadcrumb — which did this AND
+  // redundantly named the destination the heading right below it already
+  // named — is gone.
+  describe('non-embedded Back button', () => {
+    it('calls onUp from the form, not onSubmitted', async () => {
+      const user = userEvent.setup()
+      const onUp = vi.fn()
+      const onSubmitted = vi.fn()
+      const category = makeCategory()
+      renderWithProviders(<ListingForm category={category} mode="create" onUp={onUp} onSubmitted={onSubmitted} />)
+
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      expect(onUp).toHaveBeenCalledTimes(1)
+      expect(onSubmitted).not.toHaveBeenCalled()
+    })
+
+    it('calls onSubmitted from the done state, not onUp', async () => {
+      const user = userEvent.setup()
+      stubFetchOk({ ok: true })
+      const onUp = vi.fn()
+      const onSubmitted = vi.fn()
+      const category = makeCategory()
+      renderWithProviders(<ListingForm category={category} mode="create" onUp={onUp} onSubmitted={onSubmitted} />)
+
+      await user.type(screen.getByLabelText(/Name/), 'Kosher Mart')
+      await user.click(screen.getByRole('button', { name: 'Submit for review' }))
+      await screen.findByText('Thank you!')
+
+      await user.click(screen.getByRole('button', { name: 'Back' }))
+      expect(onSubmitted).toHaveBeenCalledTimes(1)
+      expect(onUp).not.toHaveBeenCalled()
     })
   })
 

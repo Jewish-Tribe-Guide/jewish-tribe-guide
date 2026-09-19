@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { DirectoryResource } from '@/types'
-import Breadcrumb from '@/components/Breadcrumb'
+import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget from '@/components/TurnstileWidget'
 import { useCommunitySlug } from '@/lib/communityContext'
@@ -11,8 +11,6 @@ import { useSetScreenHeader } from '@/lib/headerVisibility'
 
 type Props = {
   listing: DirectoryResource
-  /** The category this listing belongs to — the Up destination, e.g. "Synagogues". */
-  upLabel: string
   onUp: () => void
   onSubmitted: () => void
   /** Admin-preview only: Submit shows the confirmation screen without actually
@@ -23,13 +21,13 @@ type Props = {
    *  title hijack (useSetScreenHeader) — the sheet is layered on top of
    *  whatever screen is actually current, so claiming the shared header
    *  here would rename it out from under that screen — and skips this
-   *  component's own Breadcrumb/h2, since the sheet already has its own
-   *  visible title and close control. The form/fields/submit logic below
-   *  is identical either way. */
+   *  component's own h2, since the sheet already has its own visible title
+   *  and close control. The form/fields/submit logic below is identical
+   *  either way. */
   embedded?: boolean
 }
 
-export default function ReportListing({ listing, upLabel, onUp, onSubmitted, preview, embedded }: Props) {
+export default function ReportListing({ listing, onUp, onSubmitted, preview, embedded }: Props) {
   const community = useCommunitySlug()
   const [note, setNote] = useState('')
   const [submitterName, setSubmitterName] = useState('')
@@ -80,15 +78,18 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
     'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary'
 
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
-  // identical call. Swaps to the done-state title once submitted, matching
-  // each branch's own Breadcrumb below. Inactive when embedded — see this
-  // component's own `embedded` doc.
+  // identical call. Swaps to the done-state title once submitted. Inactive
+  // when embedded — see this component's own `embedded` doc.
   useSetScreenHeader(!embedded, done ? 'Thanks for the heads-up' : 'Report a problem', done ? onSubmitted : onUp)
 
   if (done) {
     return (
       <div>
-        {!embedded && <Breadcrumb upLabel={upLabel} onUp={onSubmitted} title="Thanks for the heads-up" />}
+        {/* Non-embedded only — every real Report already lives inside a
+            sheet/dialog with its own close chrome (see `embedded`'s own
+            doc). See the matching control on the form below for why this
+            replaced the old Breadcrumb rather than just disappearing. */}
+        {!embedded && <UpButton label="Back" onClick={onSubmitted} className="mb-2" />}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
           <p className="text-2xl mb-2">🙏</p>
           <h2 className="text-lg font-semibold text-green-800 mb-1 sr-only desktop:not-sr-only">Thanks for the heads-up</h2>
@@ -102,11 +103,12 @@ export default function ReportListing({ listing, upLabel, onUp, onSubmitted, pre
     <div>
       {!embedded && (
         <>
-          {/* Breadcrumb (desktop only) names the same destination the
-              header's "‹ Report a problem" now covers on mobile — see
-              Breadcrumb's own doc for why only one of the two ever shows
-              at a time. */}
-          <Breadcrumb upLabel={upLabel} onUp={onUp} title="Report a problem" />
+          {/* The old Breadcrumb here did double duty — it also named the
+              destination, which is what made it redundant with the heading
+              right below. This keeps only the part that isn't: a real
+              cancel action, since nothing else on this screen closes the
+              form without submitting it. */}
+          <UpButton label="Back" onClick={onUp} className="mb-2" />
           <h2 className="text-xl font-semibold text-slate-800 mb-1 sr-only desktop:not-sr-only">Report a problem</h2>
         </>
       )}

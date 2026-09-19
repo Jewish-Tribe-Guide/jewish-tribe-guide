@@ -27,19 +27,19 @@ function stubFetch(body: Record<string, unknown>, ok = true) {
 describe('ReportSheet', () => {
   it('renders nothing when closed', () => {
     renderWithProviders(
-      <ReportSheet isOpen={false} onClose={vi.fn()} listing={makeListing()} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen={false} onClose={vi.fn()} listing={makeListing()} />,
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('shows the report form, embedded (no Breadcrumb), when open', () => {
+  it('shows the report form, embedded (no Back button of its own), when open', () => {
     renderWithProviders(
-      <ReportSheet isOpen onClose={vi.fn()} listing={makeListing({ name: 'Kosher Mart' })} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={vi.fn()} listing={makeListing({ name: 'Kosher Mart' })} />,
     )
     expect(screen.getByRole('dialog', { name: /report a problem/i })).toBeInTheDocument()
     expect(screen.getByLabelText("What's the issue?")).toBeInTheDocument()
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 
   // Draggable (this sheet always is, same as Add/Edit — see this
@@ -47,7 +47,7 @@ describe('ReportSheet', () => {
   // tap, Escape, or the drag-to-dismiss the whole header offers cover it.
   it('renders no close button', () => {
     renderWithProviders(
-      <ReportSheet isOpen onClose={vi.fn()} listing={makeListing()} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={vi.fn()} listing={makeListing()} />,
     )
 
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
@@ -57,7 +57,7 @@ describe('ReportSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     renderWithProviders(
-      <ReportSheet isOpen onClose={onClose} listing={makeListing()} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={onClose} listing={makeListing()} />,
     )
 
     await user.click(screen.getByRole('dialog'))
@@ -74,7 +74,7 @@ describe('ReportSheet', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     renderWithProviders(
-      <ReportSheet isOpen onClose={onClose} listing={makeListing()} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={onClose} listing={makeListing()} />,
     )
 
     await user.keyboard('{Escape}')
@@ -86,7 +86,7 @@ describe('ReportSheet', () => {
     const fetchMock = stubFetch({ ok: true })
     const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
     renderWithProviders(
-      <ReportSheet isOpen onClose={vi.fn()} listing={listing} upLabel="Grocery Stores" />,
+      <ReportSheet isOpen onClose={vi.fn()} listing={listing} />,
     )
 
     await user.type(screen.getByLabelText("What's the issue?"), 'Closed permanently.')

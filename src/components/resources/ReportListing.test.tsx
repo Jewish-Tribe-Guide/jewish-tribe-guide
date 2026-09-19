@@ -27,9 +27,24 @@ function stubFetch(body: Record<string, unknown>, ok = true) {
 const handlers = { onUp: vi.fn(), onSubmitted: vi.fn() }
 
 describe('ReportListing', () => {
+  // The only way to leave the form without submitting it, now that the
+  // Breadcrumb that used to do this (and also, redundantly, name the
+  // destination) is gone — see the component's own doc on the Back button
+  // right above the form.
+  it('the form\'s own Back button calls onUp, not onSubmitted', async () => {
+    const user = userEvent.setup()
+    const onUp = vi.fn()
+    const onSubmitted = vi.fn()
+    renderWithProviders(<ReportListing listing={makeListing()} onUp={onUp} onSubmitted={onSubmitted} />)
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(onUp).toHaveBeenCalledTimes(1)
+    expect(onSubmitted).not.toHaveBeenCalled()
+  })
+
   it('names the listing and shows the labeled note/name fields', () => {
     const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
-    renderWithProviders(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={listing} {...handlers} />)
 
     expect(screen.getByText('Kosher Mart')).toBeInTheDocument()
     expect(screen.getByLabelText("What's the issue?")).toBeInTheDocument()
@@ -40,7 +55,7 @@ describe('ReportListing', () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
     const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
-    renderWithProviders(<ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={listing} {...handlers} />)
 
     await user.type(screen.getByLabelText("What's the issue?"), 'Closed permanently.')
     await user.type(screen.getByLabelText('Your name (optional)'), 'A Neighbor')
@@ -62,7 +77,7 @@ describe('ReportListing', () => {
   it('omits note and submittedBy when left blank, rather than sending empty strings', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
-    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -75,7 +90,7 @@ describe('ReportListing', () => {
   it('shows the server errors and stays on the form when the report is rejected', async () => {
     const user = userEvent.setup()
     stubFetch({ ok: false, errors: ['Please slow down and try again.'] })
-    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -86,7 +101,7 @@ describe('ReportListing', () => {
   it('shows a network-error fallback message', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
-    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -96,7 +111,7 @@ describe('ReportListing', () => {
   it('in preview mode, shows the confirmation without ever calling fetch', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch({ ok: true })
-    renderWithProviders(<ReportListing listing={makeListing()} upLabel="Grocery Stores" preview {...handlers} />)
+    renderWithProviders(<ReportListing listing={makeListing()} preview {...handlers} />)
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
 
@@ -104,22 +119,18 @@ describe('ReportListing', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it("the confirmation screen's Up button calls onSubmitted, not onUp", async () => {
+  it("the confirmation screen's Back button calls onSubmitted, not onUp", async () => {
     const user = userEvent.setup()
     const onUp = vi.fn()
     const onSubmitted = vi.fn()
     renderWithProviders(
-      <ReportListing listing={makeListing()} upLabel="Grocery Stores" onUp={onUp} onSubmitted={onSubmitted} preview />,
+      <ReportListing listing={makeListing()} onUp={onUp} onSubmitted={onSubmitted} preview />,
     )
 
     await user.click(screen.getByRole('button', { name: 'Submit report' }))
     await screen.findByRole('heading', { name: 'Thanks for the heads-up' })
 
-    // Two "Grocery Stores" controls now render simultaneously (UpButton for
-    // mobile, Breadcrumb for desktop — jsdom doesn't apply the CSS that keeps
-    // only one visible at a time); either calls the same handler, so clicking
-    // the first is enough to prove it.
-    await user.click(screen.getAllByRole('button', { name: /Grocery Stores/ })[0])
+    await user.click(screen.getByRole('button', { name: 'Back' }))
     expect(onSubmitted).toHaveBeenCalledTimes(1)
     expect(onUp).not.toHaveBeenCalled()
   })
@@ -130,21 +141,19 @@ describe('ReportListing', () => {
   // rename it out from under whatever screen is actually current, since
   // the sheet is layered on top of it rather than replacing it.
   describe('embedded', () => {
-    it('renders no Breadcrumb of its own — the sheet has its own title/close, not this form\'s navigation', async () => {
+    it('renders no Back control or heading of its own — the sheet has its own title/close, not this form\'s navigation', async () => {
       const user = userEvent.setup()
       stubFetch({ ok: true })
       renderWithProviders(
-        <ReportListing listing={makeListing()} upLabel="Grocery Stores" {...handlers} embedded />,
+        <ReportListing listing={makeListing()} {...handlers} embedded />,
       )
 
-      // Breadcrumb renders "{upLabel}" as part of its own button/link — its
-      // absence is what proves this, not the done-state heading below,
-      // which stays either way (it's real content, not navigation).
-      expect(screen.queryByRole('button', { name: /Grocery Stores/ })).not.toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: /Grocery Stores/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Report a problem' })).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: 'Submit report' }))
       expect(await screen.findByText(/review this and update the listing/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
     })
 
     it('still submits the same report the non-embedded form does', async () => {
@@ -152,7 +161,7 @@ describe('ReportListing', () => {
       const fetchMock = stubFetch({ ok: true })
       const listing = makeListing({ id: 'listing-1', name: 'Kosher Mart' })
       renderWithProviders(
-        <ReportListing listing={listing} upLabel="Grocery Stores" {...handlers} embedded />,
+        <ReportListing listing={listing} {...handlers} embedded />,
       )
 
       await user.type(screen.getByLabelText("What's the issue?"), 'Closed permanently.')

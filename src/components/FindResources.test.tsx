@@ -222,8 +222,8 @@ describe('FindResources — a real listing category', () => {
   // MobileSheet's own doc) — used to be a flat full-screen overlay, and
   // before that a route-level replace that took ResourceLoader down with
   // it, same as 'create' still is above. The form renders `embedded`
-  // (skips its own Breadcrumb/mobile-header hijack) since the sheet
-  // already supplies a title and close control, same as desktop's dialog.
+  // (skips its own mobile-header hijack) since the sheet already supplies
+  // a title and close control, same as desktop's dialog.
   it('on mobile, resolves a deep-linked edit to a sheet over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
@@ -255,8 +255,8 @@ describe('FindResources — a real listing category', () => {
   // Desktop: a dialog layered over the still-mounted directory instead —
   // see ActionDialog's own doc for why. The directory stays; only a dialog
   // appears on top of it, and the form inside renders `embedded` (skips its
-  // own Breadcrumb/mobile-header hijack, since the dialog already has a
-  // title and close control).
+  // own mobile-header hijack, since the dialog already has a title and
+  // close control).
   it('on desktop, resolves a deep-linked create to a dialog over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing', label: 'Grocery Store' })
     renderWithProviders(

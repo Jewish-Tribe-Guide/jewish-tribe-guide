@@ -136,20 +136,4 @@ describe('HospitalsDirectory', () => {
     await user.click(screen.getByRole('button', { name: /Map/ }))
     expect(onViewMap).toHaveBeenCalledTimes(1)
   })
-
-  it('calls onUp when the Up button is clicked', async () => {
-    const user = userEvent.setup()
-    const onUp = vi.fn()
-    renderWithProviders(<HospitalsDirectory anchor={noAnchor} {...handlers} onUp={onUp} upLabel="All resources" />, {
-      content: { hospitals: [makeHospital()] },
-    })
-
-    // Two such buttons now exist — the mobile UpButton and DirectoryHeader's
-    // desktop breadcrumb (see that component's upLabel/onUp) — CSS-hidden
-    // from each other depending on viewport, which jsdom doesn't have. Both
-    // call the same onUp, so either serves to prove the wiring; the first is
-    // as good as any.
-    await user.click(screen.getAllByRole('button', { name: 'All resources' })[0])
-    expect(onUp).toHaveBeenCalledTimes(1)
-  })
 })
