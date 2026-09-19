@@ -103,12 +103,14 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
             // desktop:flex, not shown on mobile at all — see this file's
             // own doc above on why a resolved address no longer repeats
             // here on mobile (it's a tap away via the header's own location
-            // pin regardless). text-base font-medium text-slate-600, not
-            // text-sm text-muted, is still right for the desktop rendering:
-            // it sits beside a real button there (`actions`, e.g. Add:
-            // bordered, colored, padded), and needs enough presence not to
-            // read as an afterthought next to it.
-            <p className="hidden desktop:flex items-center gap-1 text-base font-medium text-slate-600 mt-0.5">
+            // pin regardless). Plain text-sm text-muted here — the
+            // text-base/font-medium/slate-600 weight bump this briefly went
+            // through was aimed at mobile, where this line used to be the
+            // only content in the row; that reasoning never applied to
+            // desktop, which still has the visible h1 and a real Add button
+            // doing the heavy lifting, so it's reverted back to how it
+            // looked before that sequence of changes.
+            <p className="hidden desktop:flex items-center gap-1 text-sm text-muted mt-0.5">
               {/* Without this, a named-place anchor (a hospital, or an
                   address typed as a landmark) reads as plain text right
                   under the heading — easy to mistake for content rather
@@ -116,7 +118,7 @@ export default function DirectoryHeader({ title, count, hasAddress, anchorLabel,
                   right below (AddressPrompt) already pairs its own prompt
                   with this same pin; this just matches it once a location
                   actually is set. */}
-              <PinIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <PinIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {anchorLabel}
               {countText && (
                 <>

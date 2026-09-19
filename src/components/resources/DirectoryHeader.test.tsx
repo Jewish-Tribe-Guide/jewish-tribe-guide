@@ -27,7 +27,15 @@ describe('DirectoryHeader — the resolved location label', () => {
     expect(label.className).toMatch(/desktop:flex/)
   })
 
-  it('still carries real visual weight on desktop, next to the Add button', () => {
+  // The label briefly carried a mobile-oriented weight bump (text-base,
+  // font-medium, slate-600 instead of text-muted) from when it was still
+  // rendered on mobile as the row's only content. That reasoning never
+  // applied to desktop — which keeps its visible h1 and doesn't need this
+  // line to carry extra visual weight next to it — so once the mobile
+  // rendering was dropped entirely, the bump should have reverted with it
+  // rather than staying stuck on desktop. It's back to plain text-sm
+  // text-muted, the same as before that sequence of changes.
+  it('stays plain, muted text on desktop — it sits beside a real h1, not as a stand-in for one', () => {
     render(
       <DirectoryHeader
         title="Grocery"
@@ -38,9 +46,10 @@ describe('DirectoryHeader — the resolved location label', () => {
     )
 
     const label = screen.getByText('Say She Ate')
-    expect(label.className).toMatch(/text-base/)
-    expect(label.className).toMatch(/font-medium/)
-    expect(label.className).not.toMatch(/text-muted/)
+    expect(label.className).toMatch(/text-sm/)
+    expect(label.className).toMatch(/text-muted/)
+    expect(label.className).not.toMatch(/text-base/)
+    expect(label.className).not.toMatch(/font-medium/)
   })
 })
 
