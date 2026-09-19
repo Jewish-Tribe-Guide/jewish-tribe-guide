@@ -833,7 +833,12 @@ export default function GenericDirectory({ category, items, anchorLabel, address
   // the "Filters" toggle button itself so it doesn't show (opening onto an
   // empty panel) for a category with upvotes/minyanim but no filterable field.
   const hasActualFilters = filterableBooleans.length > 0 || hasRenderedSelects || hasFilterableHours
-  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim
+  // Must also cover canAdd and externalLink: both render inside this same row
+  // (mobile's Add button and, on desktop, the external-link button live in the
+  // block this flag gates). Missing them here meant a category with neither
+  // filters, upvotes, nor minyanim — e.g. WhatsApp Groups, Networking — lost
+  // its mobile Add button entirely, even though canAdd was true.
+  const hasFilterRow = hasActualFilters || !!upvotes || hasMinyanim || canAdd || !!category.externalLink
 
   const hasActiveFilters =
     search.trim() !== '' ||

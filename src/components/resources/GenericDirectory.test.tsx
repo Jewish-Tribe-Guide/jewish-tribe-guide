@@ -249,6 +249,24 @@ describe('GenericDirectory', () => {
     expect(onAdd).toHaveBeenCalledTimes(1)
   })
 
+  // Regression coverage: the mobile Add/Filters/sort row used to be gated by
+  // `hasFilterRow`, which only checked for filterable fields, upvotes, or
+  // minyanim — not canAdd or externalLink, both of which render inside that
+  // same row. A category with none of the former (WhatsApp Groups,
+  // Networking — no filterable detail fields, upvotes off, no minyanim) lost
+  // its mobile Add button entirely, even with canAdd true.
+  it('shows the mobile Add button for a category with no filterable fields, upvotes, or minyanim', () => {
+    const category = makeCategory({ pluralLabel: 'WhatsApp Groups', hasAddress: false })
+    renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    // Two, not one: DirectoryHeader's desktop-only copy (`hidden
+    // desktop:inline-flex`, always in the DOM since jsdom doesn't apply CSS)
+    // plus the mobile Filters/sort row's copy, which is the one that used to
+    // go missing. Asserting a single `getByRole` match here would pass even
+    // with the mobile copy gone, matching only the desktop one.
+    expect(screen.getAllByRole('button', { name: 'Add' })).toHaveLength(2)
+  })
+
   it('wires a card\'s Edit/Report/tag-click callbacks back to the directory\'s own props/state', async () => {
     const user = userEvent.setup()
     const onEdit = vi.fn()
