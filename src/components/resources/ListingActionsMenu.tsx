@@ -235,7 +235,18 @@ export default function ListingActionsMenu({
         // more than a decoration, and disappearing at a glance next to bold
         // black text undersold that. hover:text-primary matches every other
         // interactive icon-button on this card (UpvoteButton, Edit).
-        className="-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-slate-900 hover:text-primary"
+        //
+        // hover:bg-slate-100/active:bg-slate-200 — Material's "state layer"
+        // convention for an icon-only button: a bare icon with no fill
+        // behind it doesn't read as clickable the way text or a bordered
+        // button does. rounded-full already gave this button a circular
+        // shape to fill; it just had nothing filling it. Kept lit
+        // (`open && 'bg-slate-100 text-primary'`) for as long as the menu
+        // itself is open, not just for the hover/press instant — that's
+        // what actually ties the popup back to the control that opened it,
+        // the way Gmail's own overflow menu keeps its trigger highlighted
+        // the whole time its menu is up.
+        className={`-m-2 flex cursor-pointer items-center justify-center rounded-full p-2 text-slate-900 transition-colors hover:bg-slate-100 hover:text-primary active:bg-slate-200 ${open ? 'bg-slate-100 text-primary' : ''}`}
       >
         <DotsIcon className="h-5 w-5" />
       </button>

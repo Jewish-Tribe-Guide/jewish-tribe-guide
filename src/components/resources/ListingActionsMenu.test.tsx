@@ -81,6 +81,25 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  // Material's "state layer" convention for an icon-only button — see the
+  // kebab button's own doc comment. Kept lit for as long as the menu is
+  // open (not just for the hover/press instant), so there's a visible line
+  // from the button back to the popup it caused.
+  it('keeps the kebab lit (bg-slate-100) while its menu is open, not just on hover', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
+    const user = userEvent.setup()
+    renderMenu()
+    const kebab = screen.getByRole('button', { name: /more actions for goldi market/i })
+
+    expect(kebab).not.toHaveClass('bg-slate-100')
+
+    await user.click(kebab)
+    expect(kebab).toHaveClass('bg-slate-100')
+
+    await user.keyboard('{Escape}')
+    expect(kebab).not.toHaveClass('bg-slate-100')
+  })
+
   // The original build showed Pin unconditionally, missing the same
   // ui.map.pins gate PinButton and the map's own pin filter chip respected —
   // a community with pinning turned off still saw a working Pin action here.
