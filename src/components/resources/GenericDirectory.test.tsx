@@ -675,6 +675,70 @@ describe('GenericDirectory', () => {
     expect(controlsBar).not.toHaveClass('lg:bg-white')
     expect(controlsBar).not.toHaveClass('lg:shadow-[0_6px_12px_-8px_rgba(15,23,42,0.35)]')
   })
+
+  // Regression coverage for the exact mistake described in the test above:
+  // the sentinel's non-zero-height safeguard was only ever applied at the
+  // `lg:` breakpoint (`lg:h-px`), leaving it genuinely zero-height below
+  // that — which is every mobile viewport, where the observer still runs
+  // (it isn't gated by breakpoint) even though `controlsStuck`'s only
+  // visible effects are. A wrongly-stuck reading taken there doesn't stay
+  // invisible forever: it rides along into `lg:`-gated styling the moment
+  // the viewport crosses into `lg:`, whether by rotating a device or
+  // resizing a browser window past it.
+  it("gives the sticky-bar sentinel a real height at every breakpoint, not just where the bar itself can stick", () => {
+    const category = makeCategory({ hasAddress: true })
+    const { container } = renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+
+    const sentinel = container.querySelector('[aria-hidden].h-px')
+    expect(sentinel).not.toBeNull()
+    expect(sentinel).not.toHaveClass('lg:h-px')
+  })
+
+  // Regression coverage for a real, reproduced-by-hand bug: load the page at
+  // a mobile width, let it fully settle, then resize the window to a
+  // desktop width — the bar can latch into "docked" (white background and
+  // all) on a page that was never scrolled. Root cause was the sentinel's
+  // very first observation landing against a not-yet-settled layout and
+  // never self-correcting from a later legitimate shift — the same failure
+  // mode a plain window resize can trigger, since crossing the `lg:`
+  // breakpoint reshuffles everything above the sentinel (mobile's address
+  // banner disappears, desktop's hero/badge appear). Fixed by replacing the
+  // observer outright on a debounced `resize`, rather than trusting the
+  // original instance to recompute on its own.
+  //
+  // The bug itself can't be reproduced here: it's a real-browser timing
+  // quirk in IntersectionObserver's callback delivery (confirmed by hand,
+  // repeatedly, in an actual browser — see the commit this test shipped
+  // with), and MockIntersectionObserver's `setAllIntersecting` fires every
+  // currently-observed callback deterministically on demand, which can't
+  // exhibit "the real callback just doesn't reliably refire." What IS
+  // mechanically verifiable, and what the fix actually changed, is that a
+  // resize constructs a brand new IntersectionObserver rather than reusing
+  // the original instance — so that's what this asserts, via a constructor
+  // spy rather than the mock's intersecting/not-intersecting behavior.
+  it('constructs a fresh IntersectionObserver after a resize, rather than reusing the original instance', () => {
+    vi.useFakeTimers()
+    try {
+      const category = makeCategory({ hasAddress: true })
+      renderWithProviders(<GenericDirectory category={category} items={[makeListing()]} {...handlers} />)
+      // Flush the mount-time resync (a double rAF once the document is
+      // already "complete", which it is by default in this jsdom test
+      // environment) so it isn't mistaken for the resize-triggered one below.
+      act(() => vi.advanceTimersByTime(50))
+
+      const IntersectionObserverSpy = vi.spyOn(window, 'IntersectionObserver')
+      expect(IntersectionObserverSpy).not.toHaveBeenCalled()
+
+      act(() => window.dispatchEvent(new Event('resize')))
+      // Not yet — debounced to the quiet period after the resize burst ends.
+      expect(IntersectionObserverSpy).not.toHaveBeenCalled()
+
+      act(() => vi.advanceTimersByTime(200))
+      expect(IntersectionObserverSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 // A `?item=` deep link (reopenItemId) scrolls that listing's row into view on

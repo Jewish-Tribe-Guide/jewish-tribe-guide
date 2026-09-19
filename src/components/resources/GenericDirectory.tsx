@@ -472,12 +472,73 @@ export default function GenericDirectory({ category, items, anchorLabel, address
     // in normal flow immediately above the controls bar, so it stops
     // "intersecting" at exactly the scroll position where the bar's own
     // sticky offset would engage, not a moment before or after.
-    const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
-      threshold: 0,
-      rootMargin: '-56px 0px 0px 0px',
-    })
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    function makeObserver() {
+      const observer = new IntersectionObserver(([entry]) => setControlsStuck(!entry.isIntersecting), {
+        threshold: 0,
+        rootMargin: '-56px 0px 0px 0px',
+      })
+      observer.observe(sentinel!)
+      return observer
+    }
+    let observer = makeObserver()
+    // Resyncing by replacing the observer alone (disconnect + a fresh
+    // `makeObserver()`) isn't enough: confirmed by hand, in real browser
+    // testing, that even a BRAND NEW IntersectionObserver's very first
+    // callback can misreport — this isn't limited to the original,
+    // mount-time instance. IntersectionObserver's callback is asynchronous
+    // by spec (scheduled some time "after layout and paint"), and nothing
+    // guarantees that delivery race resolves correctly on every instance,
+    // every time. `getBoundingClientRect()` has no such race — it's a
+    // synchronous, always-current measurement — so `resync` sets
+    // `controlsStuck` directly from it. The observer is still replaced
+    // alongside that (cheap, and worth doing so a later plain scroll isn't
+    // still checking a sentinel bound to a stale rootMargin/layout
+    // snapshot), just no longer trusted to deliver the correction itself.
+    function resync() {
+      setControlsStuck(sentinel!.getBoundingClientRect().top < 56)
+      observer.disconnect()
+      observer = makeObserver()
+    }
+    // Two separate races this bar's "docked" look (white background, the
+    // border, the shadow — all `lg:`-gated on `controlsStuck`) can lose,
+    // both confirmed by hand and both invisible on their own since neither
+    // has any effect below the `lg:` breakpoint:
+    //
+    // Mount: this component's very first observation can land against a
+    // not-yet-settled layout — content above the sentinel still streaming
+    // or hydrating in — and, once wrong, does NOT self-correct from a later
+    // legitimate layout shift, even long after that content has finished
+    // loading. `load` (or immediately, via a double rAF, if it already
+    // fired before this effect ran) is the resync point: a real signal that
+    // layout has settled, not a guessed timeout.
+    //
+    // Resize: rotating a device, or crossing the `lg:` breakpoint by
+    // resizing a browser window, reshuffles the whole page above the
+    // sentinel — the mobile address banner disappears, the desktop hero/
+    // badge appear. Debounced to the quiet period after the last event in a
+    // resize burst (same shape as this file's other resize listener, see
+    // alignRows above) so it resyncs against the settled size once, not a
+    // different mid-transition layout on every intermediate event.
+    if (document.readyState === 'complete') {
+      requestAnimationFrame(() => requestAnimationFrame(resync))
+    } else {
+      window.addEventListener('load', resync, { once: true })
+    }
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null
+    function handleResize() {
+      if (resizeTimer != null) clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(() => {
+        resizeTimer = null
+        resync()
+      }, 150)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('load', resync)
+      if (resizeTimer != null) clearTimeout(resizeTimer)
+      observer.disconnect()
+    }
   }, [])
   const scrollItemIntoView = (id: string, behavior: ScrollBehavior) => {
     const el = itemRowRefs.current.get(id)
@@ -955,8 +1016,18 @@ export default function GenericDirectory({ category, items, anchorLabel, address
           — an actual zero-area target can report `isIntersecting` as
           unreliably always-false in some browsers, since there's no overlap
           area to compute a ratio from. See controlsStuck's own doc for what
-          it's for. */}
-      <div ref={controlsSentinelRef} aria-hidden className="lg:h-px" />
+          it's for. Plain `h-px`, not `lg:h-px`: the observer that reads it
+          is created unconditionally regardless of viewport width, so a
+          zero-height sentinel on mobile could already latch in a wrong
+          `isIntersecting` reading there — invisible at the time, since
+          `controlsStuck`'s only visible effects are `lg:`-gated, but the
+          bad reading doesn't self-correct just because the viewport later
+          crosses into `lg:` (by rotating a device, or resizing a browser
+          window past it). The docked white background then shows up on an
+          unscrolled desktop page, sourced from a mobile-era reading that
+          was already wrong before desktop-only styling ever had a chance
+          to reveal it. */}
+      <div ref={controlsSentinelRef} aria-hidden className="h-px" />
       <div
         ref={controlsRef}
         // The "docked" look (white background, the padding it needs, the
