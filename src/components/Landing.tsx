@@ -366,10 +366,24 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
                 banner "near the top" on both. Not part of builtInOrder/
                 cardKindContent: it isn't admin-orderable among those cards,
                 just a plain "is one active" check, same shape as
-                hasMap/zmanimCategory above. ─────────────────────────────── */}
-        <div className="mt-8">
-          <CampaignBannerCard />
-        </div>
+                hasMap/zmanimCategory above.
+
+                Hidden on mobile while actively searching (`isMobile && q`):
+                mobile has no HeroSearchDropdown of its own — typing re-filters
+                the grouped grid further down the page in place, with this
+                banner sitting in normal flow between the box and that grid.
+                Desktop never has this problem (HeroSearchDropdown opens right
+                under its own search box and overlays this banner visually,
+                same as it overlays everything else below it), so it's left
+                showing there regardless of `q`. Reappears the instant the
+                search is cleared — not a "no promotions during search" rule,
+                just removing the one thing putting distance between the box
+                and its own answer. ─────────────────────────────────────── */}
+        {!(isMobile && q) && (
+          <div className="mt-8">
+            <CampaignBannerCard />
+          </div>
+        )}
 
         {/* ── Browse everything (desktop), one card ──────────────────────────
                 `settings.heroTitle` titles the WHOLE card now, not just the

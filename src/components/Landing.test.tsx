@@ -14,6 +14,7 @@ import type { DirectoryResource } from '@/types'
 import { resetMockIntersectionObserver, setAllIntersecting, triggerAllIntersections } from '@/test/intersectionObserverMock'
 import { mockRouter } from '@/test/nextNavigationMock'
 import { markHomeReveal } from '@/lib/homeRevealSignal'
+import { ForcedViewport } from '@/lib/useIsMobile'
 import Landing from './Landing'
 
 // Card tiles now render as real <Link>s (see sections.tsx's CardDef.href),
@@ -41,6 +42,13 @@ vi.mock('next/navigation', () => ({
 vi.mock('@vercel/analytics', () => ({ track: vi.fn() }))
 vi.mock('@/components/home/DaveningTimesCard', () => ({
   default: () => <div data-testid="davening-stub" />,
+}))
+// Stubbed for the same reason as DaveningTimesCard above — its own
+// admin-set-date-range gating (activeCampaignBanner) is that component's own
+// concern, not Landing's. What's under test here is Landing's own decision
+// to hide it on mobile while actively searching — see the tests below.
+vi.mock('@/components/home/CampaignBannerCard', () => ({
+  default: () => <div data-testid="campaign-banner-stub" />,
 }))
 
 afterEach(() => {
@@ -136,6 +144,68 @@ describe('Landing', () => {
 
     expect(within(mobileSection).getByText('Grocery Stores')).toBeInTheDocument()
     expect(within(mobileSection).queryByText('Synagogues')).not.toBeInTheDocument()
+  })
+
+  // Reported live: mobile has no HeroSearchDropdown of its own (see
+  // HeroHeading's own doc) — typing re-filters the grid further down the
+  // page in place instead, with the campaign banner sitting in normal flow
+  // between the search box and that grid, pushing the answer further from
+  // the box the same way desktop's old "answer in a card near the bottom"
+  // problem did. Hidden here specifically while there's an active query, not
+  // as a "no promotions during search" rule — it reappears the instant the
+  // search is cleared. ForcedViewport, not the mobileSection DOM-scoping
+  // trick the test above uses: this is gated on the real `isMobile` value
+  // (Landing.tsx's own `!(isMobile && q)`), which starts false regardless of
+  // matchMedia in jsdom (see that test's own comment) and so needs forcing
+  // to exercise at all.
+  it('mobile: hides the campaign banner while actively searching, and brings it back once the search is cleared', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <HeaderCollapseProvider>
+          <LocationProvider>
+            <ListingsProvider listings={null}>
+              <Landing {...handlers} />
+            </ListingsProvider>
+          </LocationProvider>
+        </HeaderCollapseProvider>
+      </ForcedViewport>,
+      { content: { categories: [makeCategory()] } },
+    )
+    const search = screen.getAllByLabelText('Search resources')[0]!
+
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
+
+    await user.type(search, 'grocery')
+    expect(screen.queryByTestId('campaign-banner-stub')).not.toBeInTheDocument()
+
+    await user.clear(search)
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
+  })
+
+  // Desktop's own HeroSearchDropdown already opens right under the search
+  // box and paints over whatever's below it (including this banner) while
+  // there are results to show — see that component's own doc. No separate
+  // hide-while-searching rule is needed (or wanted) on top of that, so the
+  // banner stays mounted regardless of `q` here.
+  it("desktop: keeps the campaign banner mounted while searching — HeroSearchDropdown's own overlay covers it instead", async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile={false}>
+        <HeaderCollapseProvider>
+          <LocationProvider>
+            <ListingsProvider listings={null}>
+              <Landing {...handlers} />
+            </ListingsProvider>
+          </LocationProvider>
+        </HeaderCollapseProvider>
+      </ForcedViewport>,
+      { content: { categories: [makeCategory()] } },
+    )
+
+    await user.type(screen.getAllByLabelText('Search resources')[0]!, 'grocery')
+
+    expect(screen.getByTestId('campaign-banner-stub')).toBeInTheDocument()
   })
 
   // Desktop used to swap this whole card for a filtered CompactCardGrid the
