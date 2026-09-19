@@ -413,7 +413,10 @@ export function WizardLoading({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+            // active:bg-slate-200 — this wizard close button (both the
+            // loading placeholder and the real Shell below use the exact
+            // same one) had a hover fill with nothing past it for a press.
+            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -506,7 +509,10 @@ function Shell({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+            // active:bg-slate-200 — this wizard close button (both the
+            // loading placeholder and the real Shell below use the exact
+            // same one) had a hover fill with nothing past it for a press.
+            className="grid h-8 w-8 place-items-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

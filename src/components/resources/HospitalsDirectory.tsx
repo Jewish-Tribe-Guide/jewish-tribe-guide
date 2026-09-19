@@ -136,7 +136,11 @@ export default function HospitalsDirectory({ anchor, onSelect, onUp, upLabel = '
               type="button"
               onClick={() => setSearch('')}
               aria-label="Clear search"
-              className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+              // active:text-slate-800 — same treatment as GenericDirectory's
+              // own clear-search button (see its doc): no room for a filled
+              // circle flush against the input's edge, so press feedback is
+              // a further text-color step past hover instead.
+              className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-600 active:text-slate-800 cursor-pointer"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

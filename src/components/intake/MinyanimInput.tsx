@@ -302,7 +302,10 @@ export default function MinyanimInput({ label, value, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => removeRow(row.id)}
-                className="text-red-400 hover:text-red-600 transition-colors cursor-pointer shrink-0 text-sm leading-none ml-auto"
+                // active:text-red-800 — a further step past hover's
+                // red-600, same text-color-escalation treatment as this
+                // app's other unpadded icon-only controls.
+                className="text-red-400 hover:text-red-600 active:text-red-800 transition-colors cursor-pointer shrink-0 text-sm leading-none ml-auto"
                 aria-label="Remove minyan"
               >
                 ✕

@@ -110,7 +110,9 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
                   {label}
                 </button>
               ) : label}
-              <button type="button" onClick={() => removeAlways(label)} aria-label={`Remove ${label}`} className="hover:bg-green-100 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
+              {/* active:bg-green-200 — one step past hover, matching this
+                  app's other rounded-full icon chips. */}
+              <button type="button" onClick={() => removeAlways(label)} aria-label={`Remove ${label}`} className="hover:bg-green-100 active:bg-green-200 transition-colors rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
                 ×
               </button>
             </span>
@@ -125,7 +127,9 @@ export default function TagsInput({ field, value, onChange, sometimes = [], onCh
               >
                 ~{label}
               </button>
-              <button type="button" onClick={() => removeSometimes(label)} aria-label={`Remove ${label}`} className="hover:bg-caution/20 rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
+              {/* See the "always" chip's own remove button above for why
+                  active: was added. */}
+              <button type="button" onClick={() => removeSometimes(label)} aria-label={`Remove ${label}`} className="hover:bg-caution/20 active:bg-caution/30 transition-colors rounded-full w-4 h-4 flex items-center justify-center cursor-pointer">
                 ×
               </button>
             </span>

@@ -466,7 +466,10 @@ export default function DaveningTimesModal({ items, isOpen, onClose, initialDeno
           </div>
           <button
             onClick={onClose}
-            className="text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
+            // hover:bg-slate-100/active:bg-slate-200, rounded-full (was
+            // plain `rounded`) — same state-layer fix as
+            // ListingDetailModal's own close button (see that file's doc).
+            className="text-muted hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 transition-colors cursor-pointer p-1 rounded-full"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
