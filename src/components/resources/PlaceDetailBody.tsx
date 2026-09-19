@@ -198,13 +198,6 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
 
   const { isOpen, closing, closure } = getOpenStatus(item, hoursFields.map((f) => f.key), new Date(useNow()))
 
-  // Every tags field's chosen values, primary and expanded-only alike — they
-  // all render together here, in the one place tags show once a listing is
-  // open. (Only the *filterable* signal badges below get a second, quieter
-  // appearance in the card's collapsed header — tags never do.)
-  const tags = tagFields.flatMap((f) => asTags(item[f.key]))
-  const tagsSometimes = tagFields.flatMap((f) => asTags(item[f.key + '_sometimes']))
-
   const signalBadges = badgeFields.filter((f) =>
     f.type === 'boolean' ? !!item[f.key] : f.type === 'select' ? selectValues(item[f.key]).length > 0 : false,
   )
@@ -441,32 +434,46 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   )
 
   // ── Tags ──────────────────────────────────────────────────────────────
-  const tagsSection = (tags.length > 0 || tagsSometimes.length > 0) && (
-    <div className="space-y-2">
-      <ClampedChipRow>
-        {[
-          ...tags.map((t) => (
-            <Chip key={t} tone="slate" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
-              {t}
-            </Chip>
-          )),
-          ...tagsSometimes.map((t) => (
-            <span key={`sometimes:${t}`} className="relative group/tip">
-              <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
-                ~{t}
+  // One labeled block per tags field, not one merged row — a bare row of
+  // chips gives no clue what they mean (a grocery's "12 kosher items" count
+  // badge names them on the collapsed card, but nothing did once expanded),
+  // and a category with more than one tags field (e.g. Restaurants' Kosher
+  // Items + Dietary) would otherwise merge two different vocabularies into
+  // one indistinguishable list. Captioned with the field's own admin-set
+  // `label`, the same pattern daveningSection already uses. Fields with no
+  // values on this listing are skipped, not shown empty.
+  const tagsSections = tagFields.flatMap((f) => {
+    const fieldTags = asTags(item[f.key])
+    const fieldTagsSometimes = asTags(item[f.key + '_sometimes'])
+    if (fieldTags.length === 0 && fieldTagsSometimes.length === 0) return []
+    return [
+      <div key={f.key} className="space-y-2">
+        <p className="text-xs text-muted mb-1">{f.label}</p>
+        <ClampedChipRow>
+          {[
+            ...fieldTags.map((t) => (
+              <Chip key={t} tone="slate" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })} title={onTagClick ? `Find places with ${t}` : undefined}>
+                {t}
               </Chip>
-              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden desktop:block z-10">
-                not always in stock
+            )),
+            ...fieldTagsSometimes.map((t) => (
+              <span key={`sometimes:${t}`} className="relative group/tip">
+                <Chip tone="amber" size="expanded" onClick={onTagClick && ((e) => { e.stopPropagation(); onTagClick(t) })}>
+                  ~{t}
+                </Chip>
+                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-[11px] leading-none text-white opacity-0 transition-opacity duration-150 group-hover/tip:opacity-100 hidden desktop:block z-10">
+                  not always in stock
+                </span>
               </span>
-            </span>
-          )),
-        ]}
-      </ClampedChipRow>
-      {tagsSometimes.length > 0 && (
-        <p className="text-[11px] text-caution desktop:hidden">~not always in stock — call ahead</p>
-      )}
-    </div>
-  )
+            )),
+          ]}
+        </ClampedChipRow>
+        {fieldTagsSometimes.length > 0 && (
+          <p className="text-[11px] text-caution desktop:hidden">~not always in stock — call ahead</p>
+        )}
+      </div>,
+    ]
+  })
 
   // ── Other detail fields ─────────────────────────────────────────────────
   const detailBadgesSection = detailBadges.some((f) => (f.type === 'boolean' ? item[f.key] : display(item[f.key]))) && (
@@ -541,7 +548,7 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
   // Caught live: Networking's "The Chevra" (no address/phone/hours — an
   // empty addressSection) showed a stray `<hr>` before its Description
   // with nothing above it.
-  const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, tagsSection, caveatSection]
+  const sections = [statusSection, actionsSection, addressSection, daveningSection, detailBadgesSection, rowFieldsSection, ...tagsSections, caveatSection]
     .filter((s): s is Exclude<typeof s, false | null | undefined> => !!s)
 
   return (

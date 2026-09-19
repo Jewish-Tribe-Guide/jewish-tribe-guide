@@ -178,3 +178,51 @@ describe('PlaceDetailBody — "N {countLabel}" count chip', () => {
     }
   })
 })
+
+// A tags field's chips used to render as a bare row with no caption at all —
+// fine for the collapsed card's "N kosher items" count chip (it names the
+// items right there), but once expanded there was nothing telling a visitor
+// what the chips underneath meant. Captioned with the field's own admin-set
+// `label`, the same pattern daveningSection already uses for its own caption.
+describe('PlaceDetailBody — tags field caption', () => {
+  it('labels a tags field\'s chips with the field\'s own label', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags' }],
+    })
+    const item = makeListing({ items: ['Milk', 'Bread'] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText('Kosher Items')).toBeInTheDocument()
+    expect(screen.getByText('Milk')).toBeInTheDocument()
+  })
+
+  // A category can have more than one tags field (e.g. a restaurant's
+  // "Kosher Items" and "Dietary Options"). They used to be flattened into
+  // one merged, unlabeled chip row — indistinguishable from each other, not
+  // just unlabeled. Each field now gets its own captioned block.
+  it('keeps two tags fields as separate, independently-labeled blocks rather than merging them', () => {
+    const category = makeCategory({
+      detailFields: [
+        { key: 'items', label: 'Kosher Items', type: 'tags' },
+        { key: 'diet', label: 'Dietary Options', type: 'tags' },
+      ],
+    })
+    const item = makeListing({ items: ['Milk'], diet: ['Vegan'] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText('Kosher Items')).toBeInTheDocument()
+    expect(screen.getByText('Milk')).toBeInTheDocument()
+    expect(screen.getByText('Dietary Options')).toBeInTheDocument()
+    expect(screen.getByText('Vegan')).toBeInTheDocument()
+  })
+
+  it('skips a tags field entirely when this listing has no values for it', () => {
+    const category = makeCategory({
+      detailFields: [{ key: 'items', label: 'Kosher Items', type: 'tags' }],
+    })
+    const item = makeListing({ items: [] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.queryByText('Kosher Items')).not.toBeInTheDocument()
+  })
+})
