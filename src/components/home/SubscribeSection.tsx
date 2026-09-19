@@ -268,7 +268,12 @@ export default function SubscribeSection({
                       </label>
                       <div className="mt-1 grid max-h-48 grid-cols-2 gap-x-3 gap-y-1 overflow-y-auto border-t border-slate-100 pt-2">
                         {eligible.map((c) => (
-                          <label key={c.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50">
+                          // title on the label, not just the truncated span:
+                          // the checkbox and its own hit area sit inside
+                          // this same label, so the tooltip should cover
+                          // wherever the row itself is hovered, not just the
+                          // sliver of text that happens to be clipped.
+                          <label key={c.id} title={c.pluralLabel} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-slate-700 hover:bg-slate-50">
                             <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleCategory(c.id)} />
                             <span className="truncate">{c.pluralLabel}</span>
                           </label>
