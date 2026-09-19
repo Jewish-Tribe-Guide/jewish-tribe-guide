@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AboutYourHospital from '@/components/tabs/AboutYourHospital'
 import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
@@ -126,11 +126,6 @@ export default function FindResources({
   const zmanimCoords = anchor.coords ?? community.mapCenter
   const locationLabel = anchor.label || community.region
 
-  // The listing being edited or reported. Only the *subject* is state — whether
-  // a form is open at all is `?form=` in the URL (see formOpen below), so
-  // browser back closes it. The listing itself can't live in the URL: the form
-  // needs the whole record, not an id it would have to re-fetch.
-  const [actionSubject, setActionSubject] = useState<ListingAction | null>(null)
   // Gates Add/Edit/Report's presentation below — a bottom sheet layered over
   // the still-mounted directory on mobile, a centered dialog over it on
   // desktop (see MobileSheet's and ActionDialog's own docs).
@@ -167,40 +162,63 @@ export default function FindResources({
 
   const setParams = onParamsChange
 
-  // A form is only open while its param says so, so browser back closes it
-  // without this component listening for anything.
-  //
-  // Derived rather than synced: an effect that cleared the subject whenever the
-  // param went away would be a second source of truth chasing the first, and
-  // would render one frame of a form the URL says is closed. Reading them
-  // together means there is no in-between state to get wrong.
-  //
-  // A deep link (e.g. Edit/Report tapped on a home-screen search result) never
-  // went through openAction, so actionSubject is still null on first render —
-  // but `listings` arrived with this screen as a prop, not fetched after
-  // mount, so the listing named by ?item= is already in hand and edit/report
-  // can be resolved from the URL alone, same as reopenItemId already is for
-  // the expanded card.
+  // `formParam`/`deepLinkListing` resolve what a fresh page load or shared
+  // link's `?form=`/`?item=` names — `listings` arrived with this screen as a
+  // prop, not fetched after mount, so the listing is already in hand and
+  // doesn't need a round trip to look up.
   const formParam = searchForm
   const deepLinkListing =
     (formParam === 'edit' || formParam === 'report') && reopenItemId
       ? (listings?.find((l) => l.id === reopenItemId) ?? null)
       : null
-  const action =
-    formParam !== null
-      ? (actionSubject ??
-        // 'create' deep-links straight in with no listing to resolve first —
-        // unlike edit/report, which need `reopenItemId` to look one up. This
-        // is what lets the home screen's Add/Edit/Report picker (UpdateListingsCard)
-        // land directly on the create form via `?form=create`, the same way
-        // a search result's Edit/Report button already deep-links into
-        // those.
-        (formParam === 'create'
-          ? ({ mode: 'create' } as ListingAction)
-          : deepLinkListing
-            ? ({ mode: formParam, listing: deepLinkListing } as ListingAction)
-            : null))
-      : null
+  // 'create' deep-links straight in with no listing to resolve first —
+  // unlike edit/report, which need `reopenItemId` to look one up. This is
+  // what lets the home screen's Add/Edit/Report picker (UpdateListingsCard)
+  // land directly on the create form via `?form=create`, the same way a
+  // search result's Edit/Report button already deep-links into those.
+  const actionFromUrl: ListingAction | null =
+    formParam === 'create'
+      ? { mode: 'create' }
+      : (formParam === 'edit' || formParam === 'report') && deepLinkListing
+        ? { mode: formParam, listing: deepLinkListing }
+        : null
+
+  // The listing being edited or reported, AND whether the form is open at
+  // all — both live in this one piece of local state now, seeded from the
+  // URL once on mount (the deep-link case above) and otherwise set directly
+  // by openAction/goToCategoryList below. This used to be re-derived from
+  // `?form=`/`?item=` on every render instead (only the listing itself was
+  // state), which is what made "browser back closes the form" work with no
+  // effect of its own — but it also meant OPENING the form had to go through
+  // a real Next.js navigation (router.push) for `?form=` to come back around
+  // into this render, and that navigation re-renders everything on this
+  // route (FindResources → ResourceLoader → GenericDirectory → the whole
+  // listing grid) — confirmed live as the grid visibly reloading behind the
+  // dialog the instant Edit/Report/Add opened, unlike tapping the listing
+  // itself (GenericDirectory's own onExpandedChange), which only ever
+  // touches local state and a `history.replaceState` the URL bar shows but
+  // nothing reads back. openAction/goToCategoryList now use that same
+  // `replace: true` path, so this needs to stop depending on the URL
+  // round-tripping back in to know it's open.
+  const [actionSubject, setActionSubject] = useState<ListingAction | null>(actionFromUrl)
+
+  // The one place this still reads the URL back: closing the form on
+  // browser back. `openAction`/`goToCategoryList`'s own `replace: true`
+  // never changes `formParam` (a raw history.replaceState the router doesn't
+  // see — see their own docs), so this effect never fires in response to
+  // them; it only fires on a REAL navigation, e.g. back landing on a URL
+  // with no `?form=`. A brief extra frame of the form still visible while
+  // that navigation resolves is the tradeoff for not re-deriving `actionSubject`
+  // from the URL on every render any more (see above) — the same one
+  // GenericDirectory's own listing-expand already accepted for "back" on a
+  // card, just spelled out as an effect here because closing has to
+  // positively clear local state rather than just stop rendering it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (formParam === null) setActionSubject(null)
+  }, [formParam])
+
+  const action = actionSubject
 
   // What ResourceLoader/GenericDirectory actually get told to auto-open —
   // `reopenItemId` itself stays the raw `?item=` value above (still needed
@@ -227,28 +245,33 @@ export default function FindResources({
     setParams({ hospital: null })
   }
 
-  // Open a listing action (create/edit/report form). Pushes its own history
-  // entry so browser-back from the form lands on the category list, not home.
+  // Open a listing action (create/edit/report form). `replace: true` — see
+  // actionSubject's own doc above for why: a plain setParams call goes
+  // through router.push, which re-renders this whole route (including the
+  // listing grid) behind the dialog that just opened.
   function openAction(act: ListingAction) {
     setActionSubject(act)
-    setParams({
-      form: act.mode,
-      // `item` is how edit/report resolve WHICH listing on a reload or a
-      // shared deep link (see deepLinkListing above) — not a request to
-      // expand its card. GenericDirectory's own reopenItemId effect can't
-      // tell those two reasons apart, though: it opens whatever `?item=`
-      // names unconditionally. Reached only from a COLLAPSED row's kebab or
-      // a deep link now (an already-expanded card's own Edit/Report morphs
-      // its dialog in place instead — see ListingDetailModal's doc — and
-      // never calls this), so the card was never genuinely open before
-      // this ran; goToCategoryList clears `item` back out on close so it
-      // doesn't linger as a false "reopen this" signal once the reason it
-      // was there (this form) is gone. Confirmed live: without that, a
-      // collapsed row's Edit — cancelled — silently expanded into the full
-      // detail dialog anyway, both dialogs open the whole time behind the
-      // one actually visible.
-      ...(act.mode === 'edit' || act.mode === 'report' ? { item: act.listing.id } : {}),
-    })
+    setParams(
+      {
+        form: act.mode,
+        // `item` is how edit/report resolve WHICH listing on a reload or a
+        // shared deep link (see deepLinkListing above) — not a request to
+        // expand its card. GenericDirectory's own reopenItemId effect can't
+        // tell those two reasons apart, though: it opens whatever `?item=`
+        // names unconditionally. Reached only from a COLLAPSED row's kebab or
+        // a deep link now (an already-expanded card's own Edit/Report morphs
+        // its dialog in place instead — see ListingDetailModal's doc — and
+        // never calls this), so the card was never genuinely open before
+        // this ran; goToCategoryList clears `item` back out on close so it
+        // doesn't linger as a false "reopen this" signal once the reason it
+        // was there (this form) is gone. Confirmed live: without that, a
+        // collapsed row's Edit — cancelled — silently expanded into the full
+        // detail dialog anyway, both dialogs open the whole time behind the
+        // one actually visible.
+        ...(act.mode === 'edit' || act.mode === 'report' ? { item: act.listing.id } : {}),
+      },
+      { replace: true },
+    )
   }
 
   // Up from a listing form / report form → the category list it was opened
@@ -256,13 +279,17 @@ export default function FindResources({
   // edit/report specifically — never for 'create', which doesn't set it in
   // the first place and may be layered over a genuinely-expanded card that
   // should stay expanded once this closes (e.g. "Add" clicked while
-  // already viewing a different listing's details).
+  // already viewing a different listing's details). `replace: true` to
+  // match openAction opening it — see that function's own doc.
   const goToCategoryList = () => {
     setActionSubject(null)
-    setParams({
-      form: null,
-      ...(action?.mode === 'edit' || action?.mode === 'report' ? { item: null } : {}),
-    })
+    setParams(
+      {
+        form: null,
+        ...(action?.mode === 'edit' || action?.mode === 'report' ? { item: null } : {}),
+      },
+      { replace: true },
+    )
   }
 
   // ── Special (non-category) detail views ─────────────────────────────────────

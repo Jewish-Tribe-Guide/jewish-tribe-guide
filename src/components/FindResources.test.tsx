@@ -37,10 +37,21 @@ vi.mock('@/components/tabs/AboutYourHospital', () => ({
 vi.mock('@/components/resources/EruvInfo', () => ({ default: () => <p>EruvInfo</p> }))
 vi.mock('@/components/ZmanimCard', () => ({ default: () => <p>ZmanimCard</p> }))
 vi.mock('@/components/resources/ResourceLoader', () => ({
-  default: ({ onAdd, reopenItemId }: { onAdd: () => void; reopenItemId?: string | null }) => (
+  default: ({
+    onAdd,
+    onEdit,
+    reopenItemId,
+  }: {
+    onAdd: () => void
+    onEdit: (item: DirectoryResource) => void
+    reopenItemId?: string | null
+  }) => (
     <div>
       <p>ResourceLoader{reopenItemId ? ` (reopenItemId=${reopenItemId})` : ''}</p>
       <button onClick={onAdd}>Add listing</button>
+      <button onClick={() => onEdit({ id: 'l1', category: 'grocery', name: 'Acme Grocery', anchorId: 'community', distance: 1, address: '1 Main St' })}>
+        Edit l1
+      </button>
     </div>
   ),
 }))
@@ -111,15 +122,14 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
   })
 
-  it('opening Add reports ?form=create via onParamsChange', async () => {
-    // `action`'s own derivation (below in this file) gates on searchForm !==
-    // null AND actionSubject — so this click alone can't show ListingForm in
-    // isolation, since a bare onParamsChange spy never feeds an updated
-    // searchForm prop back in the way a real caller does. That full
-    // round-trip (click → onParamsChange → router.push → real
-    // useSearchParams update → searchForm prop updates → form opens, all in
-    // one render thanks to React batching) is FindResourcesConnected's own
-    // job — see its test for "opens the form immediately".
+  it('opening Add shows the form immediately (local state) and reports ?form=create via onParamsChange with replace: true', async () => {
+    // Unlike the old formParam-derived `action`, actionSubject is real local
+    // state now — a bare onParamsChange spy is enough for the form to show
+    // up in this same render, with no round trip through a real router
+    // needed (see actionSubject's own doc). `replace: true` is what keeps
+    // that round trip from being a full router.push navigation in the first
+    // place — see FindResourcesConnected's own test for the URL/no-push side
+    // of this.
     const user = userEvent.setup()
     const onParamsChange = vi.fn()
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
@@ -129,7 +139,49 @@ describe('FindResources — a real listing category', () => {
 
     await user.click(screen.getByText('Add listing'))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' })
+    expect(onParamsChange).toHaveBeenCalledWith({ form: 'create' }, { replace: true })
+    expect(screen.getByText('ListingForm: create (embedded)')).toBeInTheDocument()
+  })
+
+  // The bug this session actually fixed: clicking Edit on a collapsed row
+  // used to only work through a real router.push, which re-renders the
+  // whole route (including the listing grid) behind the dialog the instant
+  // it opens (confirmed live: the grid visibly reloading), unlike tapping
+  // the listing itself, which never does. Edit now opens the same way that
+  // does — local state, no router round trip needed for the dialog itself
+  // to appear.
+  it('opening Edit shows the form immediately and reports ?form=edit&item=l1 via onParamsChange with replace: true', async () => {
+    const user = userEvent.setup()
+    const onParamsChange = vi.fn()
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    renderWithProviders(<FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} onParamsChange={onParamsChange} />, {
+      content: { categories: [grocery] },
+    })
+
+    await user.click(screen.getByText('Edit l1'))
+
+    expect(onParamsChange).toHaveBeenCalledWith({ form: 'edit', item: 'l1' }, { replace: true })
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+  })
+
+  // openAction/goToCategoryList's `replace: true` deliberately never updates
+  // `searchForm` (see actionSubject's own doc — it's a raw history API call
+  // the router doesn't see), so a real navigation is the only thing that can
+  // still close the form via the URL — this is what makes browser back do
+  // that. Simulated here as a re-render with searchForm switched back to
+  // null, exactly what FindResourcesConnected passes down once a genuine
+  // back navigation resolves.
+  it('closes an open Edit form when searchForm goes back to null via a real navigation (e.g. browser back)', () => {
+    const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+    const { rerenderWithProviders } = renderWithProviders(
+      <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="edit" searchItem="l1" />,
+      { content: { categories: [grocery] } },
+    )
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+
+    rerenderWithProviders(<FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm={null} searchItem={null} />)
+
+    expect(screen.queryByText('ListingForm: edit (embedded)')).not.toBeInTheDocument()
   })
 
   // Unlike edit/report, 'create' has no listing to resolve — UpdateListingsCard's
@@ -273,7 +325,7 @@ describe('FindResources — a real listing category', () => {
 
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ form: null, item: null })
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null, item: null }, { replace: true })
   })
 
   // Root cause of the bug the previous test's own doc describes: while a
@@ -320,7 +372,7 @@ describe('FindResources — a real listing category', () => {
 
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
-    expect(onParamsChange).toHaveBeenCalledWith({ form: null })
+    expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true })
   })
 })
 
