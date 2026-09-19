@@ -207,7 +207,15 @@ export default function ListingDetailModal({
           onClick={(e) => { e.stopPropagation(); onNavigate!(-1) }}
           disabled={!hasPrev}
           aria-label="Previous listing"
-          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+          // active:bg-slate-100 — one step past hover's slate-50, same
+          // escalation ListingActionsMenu's kebab uses for its own state
+          // layer, so this circular icon button darkens visibly for the
+          // instant it's actually pressed rather than only on hover.
+          // transition-[opacity,background-color], not the original plain
+          // transition-opacity: the disabled fade still needs its own
+          // transition, but background-color now needs one too, or the
+          // hover→active darkening above would snap instead of easing.
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
         >
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
@@ -353,7 +361,13 @@ export default function ListingDetailModal({
                 button above, not a second meaning for this one control. */}
             <button
               onClick={onClose}
-              className="shrink-0 text-muted hover:text-slate-700 transition-colors cursor-pointer p-1 rounded"
+              // hover:bg-slate-100/active:bg-slate-200 — same state-layer
+              // treatment as ListingActionsMenu's kebab: this had a text-color
+              // hover but nothing behind it, so a tap gave no visual
+              // acknowledgment at all before the whole dialog closed.
+              // rounded-full (was plain `rounded`) to match that same
+              // circular treatment now that there's a fill to round.
+              className="shrink-0 text-muted hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 transition-colors cursor-pointer p-1 rounded-full"
               aria-label="Close"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
@@ -402,7 +416,9 @@ export default function ListingDetailModal({
           onClick={(e) => { e.stopPropagation(); onNavigate!(1) }}
           disabled={!hasNext}
           aria-label="Next listing"
-          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-opacity hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
+          // See "Previous listing"'s own doc just above for active:bg-slate-100
+          // and the transition-[opacity,background-color] swap.
+          className="shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-slate-900/10 transition-[opacity,background-color] hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer disabled:cursor-default"
         >
           <ChevronRightIcon className="h-5 w-5" />
         </button>

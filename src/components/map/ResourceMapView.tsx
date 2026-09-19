@@ -2150,8 +2150,16 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                     setFollow(true)
                   }}
                   aria-label={!activeLocation ? 'Set your location' : follow ? 'Following your location' : 'Recenter'}
+                  // active:bg-* — press feedback for a mobile-only FAB that
+                  // otherwise gave zero visual acknowledgment of a tap before
+                  // the map itself started panning a moment later. One step
+                  // darker than each resting background (blue-700 is this
+                  // codebase's own established hover/press step for
+                  // bg-blue-600 — see e.g. ResourceMap.tsx's own recenter
+                  // pill), so which one applies has to follow the same
+                  // `activeLocation && follow` branch the resting color does.
                   className={`absolute bottom-[4.75rem] right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full shadow-md ring-1 ring-slate-900/10 cursor-pointer transition-colors desktop:hidden ${
-                    activeLocation && follow ? 'bg-blue-600 text-white' : 'bg-white text-blue-600'
+                    activeLocation && follow ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-white text-blue-600 active:bg-slate-100'
                   }`}
                 >
                   <svg

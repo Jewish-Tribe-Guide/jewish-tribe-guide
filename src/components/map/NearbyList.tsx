@@ -362,7 +362,16 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           <button
             onClick={share}
             aria-label={`Share ${p.name}`}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
+            // active:brightness-90 — a filter, not an active:bg-* class:
+            // this button's background is a runtime inline style (matching
+            // the exact hex Pin's own two states use below), so it can't
+            // pick up a Tailwind background-color darkening the way a plain
+            // bg-* button can. A brightness filter darkens whatever's
+            // painted underneath regardless of how that color got there,
+            // which is what these swipe-reveal buttons actually needed —
+            // they had zero touch feedback before, on a purely swipe/tap
+            // mobile surface.
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white transition-[filter] active:brightness-90"
             style={{ backgroundColor: '#0f172a' }}
           >
             <ExternalIcon className="h-4 w-4" />
@@ -371,7 +380,9 @@ function NearbyRow({ point: p, canViewListing, canPin, hoverCapable, isOpen, onO
           <button
             onClick={onTogglePin}
             aria-label={p.pinned ? `Unpin ${p.name}` : `Pin ${p.name}`}
-            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
+            // See Share's own doc just above for why this is a filter, not
+            // an active:bg-* class.
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white transition-[filter] active:brightness-90"
             style={{ backgroundColor: p.pinned ? '#64748b' : '#2563eb' }}
           >
             <PinIcon filled={p.pinned} className="h-4 w-4" />
