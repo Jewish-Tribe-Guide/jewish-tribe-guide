@@ -852,8 +852,19 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             row below, matching desktop's own order (its version of this
             text sits inside the name column, above where that row starts) —
             this used to come after on mobile, which read as popularity/
-            distance outranking the description instead of following it. */}
-        {headerTextFields.map(({ f, text }) =>
+            distance outranking the description instead of following it.
+
+            Skipped entirely for a no-address category (WhatsApp Groups,
+            Networking): on mobile the card is already just a name plus a
+            couple badges, and this free-form field is usually the longest
+            thing on it — showing a multi-line preview here made every card
+            in those categories dominate the list instead of letting a
+            visitor scan names quickly, worse than the same field being one
+            of several facts on a card that already has an address. Desktop's
+            twin above is untouched — the grid has room, and a 2-3-column
+            layout doesn't have the same "one tall card buries the rest of
+            the list" problem a single mobile column does. */}
+        {category.hasAddress !== false && headerTextFields.map(({ f, text }) =>
           f.type === 'textarea' ? (
             <p key={f.key} className="desktop:hidden text-sm text-slate-600 mt-2 pl-[52px]">
               <span style={headerTextClampStyle}>{text}</span>

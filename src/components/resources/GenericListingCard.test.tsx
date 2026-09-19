@@ -414,6 +414,28 @@ describe('GenericListingCard — showInHeader text/textarea fields', () => {
     }
   })
 
+  // Regression: a no-address category (WhatsApp Groups, Networking) used to
+  // render this same mobile preview as every other category — but those
+  // listings are just a name plus a website, so the free-form description is
+  // usually the longest thing on the card, and on a single-column mobile
+  // list that meant one listing's card dwarfed its neighbors instead of
+  // letting a visitor scan names quickly. Desktop keeps it (a multi-column
+  // grid doesn't have that problem), so this only asserts mobile's copy is
+  // gone — not the desktop one.
+  it('does not render the mobile description preview for a category with no address', () => {
+    const category = makeCategory({
+      hasAddress: false,
+      detailFields: [{ key: 'd', label: 'Description', type: 'textarea', showInHeader: true }],
+    })
+    const item = makeListing({ d: 'A network of young leaders and philanthropists giving back as they build connections and community.' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} {...requiredHandlers} />,
+    )
+
+    // Exactly one copy now (desktop's), not the usual two.
+    expect(screen.getAllByText(/A network of young leaders/)).toHaveLength(1)
+  })
+
   // Regression: mobile used to render this description AFTER the upvote/
   // distance row instead of before it, unlike desktop (whose own copy of
   // this field sits inside the name column, ahead of that row entirely) —
