@@ -104,7 +104,10 @@ export default function CampaignBannerCard() {
           type="button"
           onClick={() => dismiss(banner.id)}
           aria-label="Dismiss"
-          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900"
+          // active:bg-blue-900/20 — one step past the existing hover fill;
+          // this and its desktop twin below both had a hover state with
+          // nothing past it for a real press.
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-blue-900/10 hover:text-blue-900 active:bg-blue-900/20"
         >
           ✕
         </button>
@@ -220,7 +223,9 @@ export default function CampaignBannerCard() {
           type="button"
           onClick={() => dismiss(banner.id)}
           aria-label="Dismiss"
-          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-sage-900/10 hover:text-sage-900"
+          // See the mobile dismiss button's own doc above — same
+          // active:bg-*-900/20 addition, this block's own sage token.
+          className="absolute right-3 top-3 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-sage-900/10 hover:text-sage-900 active:bg-sage-900/20"
         >
           ✕
         </button>

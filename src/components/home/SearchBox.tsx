@@ -68,7 +68,12 @@ export default function SearchBox({
         <button
           onClick={() => onQueryChange('')}
           aria-label="Clear search"
-          className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+          // active:bg-slate-200 — this button already had a hover fill with
+          // nothing past it for an actual press; one step darker matches the
+          // escalation every other state-layer button in this app uses.
+          // Shared by both the mobile and desktop hero (see this file's own
+          // top doc), so fixing it once covers both.
+          className="shrink-0 rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
         >
           ✕
         </button>

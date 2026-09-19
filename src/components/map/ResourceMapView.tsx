@@ -1400,7 +1400,13 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             type="button"
             onClick={clearSearch}
             aria-label="Clear search"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+            // hover:bg-slate-100/active:bg-slate-200 — already rounded-full
+            // with nothing filling it; same state-layer treatment as every
+            // other icon-only button in this pass. Two independent copies of
+            // this search box exist (mobile/desktop each have their own —
+            // see this file's own doc), both missing this the same way, so
+            // this fix is applied to both rather than just the mobile one.
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1984,7 +1990,10 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
                           type="button"
                           onClick={clearSearch}
                           aria-label="Clear search"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                          // See the desktop copy of this same search box's
+                          // own doc above (hover:bg-slate-100/active:bg-slate-200)
+                          // for why this needed the fill, not just the color.
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 cursor-pointer"
                         >
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -2227,7 +2236,11 @@ export default function ResourceMapView({ userLocation, initialCategory, initial
             <button
               onClick={closeCategoriesPicker}
               aria-label="Back to map"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
+              // active:bg-slate-200 — mobile-only (this full-screen picker
+              // has no desktop equivalent at all — see its own doc above),
+              // and a frequent tap with nothing marking the instant it
+              // registers before.
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>

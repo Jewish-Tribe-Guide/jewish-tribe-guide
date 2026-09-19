@@ -448,8 +448,13 @@ export default function CategoryFilter({
                     onClick={(e) => openEditor(o.id, selectedState, e.currentTarget)}
                     aria-expanded={editorOpen}
                     aria-label={`Edit ${o.label} filters`}
-                    className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer ${
-                      on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                    // active:bg-black/20 / active:bg-slate-100 — one step
+                    // past each branch's own hover, same escalation as every
+                    // other state-layer button in this pass; this segment
+                    // had a hover fill with nothing past it for an actual
+                    // tap.
+                    className={`rounded-r-full border-l pl-1 pr-2.5 py-1 cursor-pointer transition-colors ${
+                      on ? 'border-white/30 text-white/90 hover:bg-black/10 active:bg-black/20' : 'border-slate-300 text-slate-500 hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     {o.filterSuffix}
@@ -464,8 +469,10 @@ export default function CategoryFilter({
                     onClick={(e) => openEditor(o.id, selectedState, e.currentTarget)}
                     aria-expanded={editorOpen}
                     aria-label={`${o.label} filters`}
-                    className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer ${
-                      on ? 'border-white/30 text-white/90 hover:bg-black/10' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                    // Same active: addition as the mobile branch above — see
+                    // its own doc.
+                    className={`flex items-center rounded-r-full border-l pl-1 pr-2 py-1 cursor-pointer transition-colors ${
+                      on ? 'border-white/30 text-white/90 hover:bg-black/10 active:bg-black/20' : 'border-slate-300 text-slate-500 hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <ChevronRightIcon className={`h-3.5 w-3.5 transition-transform ${editorOpen ? '-rotate-90' : 'rotate-90'}`} />

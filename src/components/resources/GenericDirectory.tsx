@@ -1088,7 +1088,13 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 type="button"
                 onClick={() => setSearch('')}
                 aria-label="Clear search"
-                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                // active:text-slate-800 — no background to darken here (this
+                // sits flush inside the input's own right edge, where a
+                // filled circle would look like a second control rather than
+                // part of the field), so press feedback is a further step
+                // past hover's text-slate-600 instead. Single shared button
+                // (no isMobile/desktop split), so this covers both.
+                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 transition-colors hover:text-slate-600 active:text-slate-800 cursor-pointer"
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
