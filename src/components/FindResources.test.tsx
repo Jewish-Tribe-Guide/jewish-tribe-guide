@@ -71,7 +71,7 @@ vi.mock('@/components/resources/ReportListing', () => ({
     </div>
   ),
 }))
-vi.mock('@/components/TurnstileWidget', () => ({ default: () => null }))
+vi.mock('@/components/TurnstileWidget', () => ({ default: () => <div data-testid="turnstile" /> }))
 
 afterEach(() => cleanup())
 
@@ -373,6 +373,73 @@ describe('FindResources — a real listing category', () => {
     await user.click(screen.getByRole('button', { name: 'stub cancel' }))
 
     expect(onParamsChange).toHaveBeenCalledWith({ form: null }, { replace: true })
+  })
+})
+
+// The shared Turnstile widget loads Cloudflare's script and runs a challenge
+// (a third-party script plus two or three iframes). It used to mount on every
+// category page whether or not the visitor ever opened a form — measured on a
+// plain category browse — so it now waits for the first Add/Edit form.
+describe('FindResources — the shared Turnstile widget', () => {
+  const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
+
+  it('is not mounted while only browsing a category', () => {
+    renderWithProviders(<FindResources view="grocery" listings={[listing()]} anchor={anchor} onUp={vi.fn()} />, {
+      content: { categories: [grocery] },
+    })
+    expect(screen.queryByTestId('turnstile')).not.toBeInTheDocument()
+  })
+
+  it('mounts when Add opens', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} />, {
+      content: { categories: [grocery] },
+    })
+
+    await user.click(screen.getByText('Add listing'))
+
+    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
+  })
+
+  it('mounts when Edit opens', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<FindResources view="grocery" listings={[listing()]} anchor={anchor} onUp={vi.fn()} />, {
+      content: { categories: [grocery] },
+    })
+
+    await user.click(screen.getByText('Edit l1'))
+
+    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
+  })
+
+  it('is there from the first render of a deep-linked form', () => {
+    renderWithProviders(
+      <FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} searchForm="create" />,
+      { content: { categories: [grocery] } },
+    )
+    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
+  })
+
+  it('stays mounted after the form closes, so reopening it does not start another challenge', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<FindResources view="grocery" listings={[]} anchor={anchor} onUp={vi.fn()} />, {
+      content: { categories: [grocery] },
+    })
+
+    await user.click(screen.getByText('Add listing'))
+    await user.click(screen.getByRole('button', { name: 'stub cancel' }))
+
+    expect(screen.queryByText('ListingForm: create (embedded)')).not.toBeInTheDocument()
+    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
+  })
+
+  it('is not mounted for Report, which brings its own widget', () => {
+    renderWithProviders(
+      <FindResources view="grocery" listings={[listing()]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
+      { content: { categories: [grocery] } },
+    )
+    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
+    expect(screen.queryByTestId('turnstile')).not.toBeInTheDocument()
   })
 })
 

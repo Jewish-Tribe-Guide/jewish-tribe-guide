@@ -133,13 +133,20 @@ export default function FindResources({
   const categories = useCategories()
   const hospitals = useHospitals() ?? []
 
-  // Started as soon as a category with Add/Edit loads (below), not only once
-  // the visitor opens the form — the Turnstile challenge takes a few seconds
-  // to resolve, so kicking it off while they're still browsing the list means
-  // it's usually already solved by the time they hit Submit, instead of
-  // making Add/Edit open into a multi-second "Verifying…" wait every time.
+  // Started when an Add/Edit form first opens (see `turnstileWanted` below),
+  // not when the category page loads. It used to start on load, on the theory
+  // that the challenge takes a few seconds and would be solved before Submit —
+  // but that meant every visitor to every category page, including the great
+  // majority who only browse, loaded Cloudflare's script and ran a challenge
+  // (a third-party script plus two or three iframes) for a form they never
+  // opened. Submit is disabled until the token arrives anyway (ListingForm),
+  // and the challenge runs while they fill the form in, which takes far longer
+  // than it does.
   const [turnstileToken, setTurnstileToken] = useState('')
   const turnstileRef = useRef<TurnstileHandle>(null)
+  // Sticky: once wanted it stays mounted, so closing and reopening the form
+  // doesn't start a second challenge.
+  const [turnstileWanted, setTurnstileWanted] = useState(false)
   // ── Sub-view state, read from the query string ─────────────────────────────
   // These were four useStates seeded from history.state and reset by the
   // popstate handler above. As query params they survive a reload, make each
@@ -219,6 +226,14 @@ export default function FindResources({
   }, [formParam])
 
   const action = actionSubject
+
+  // Adjusting state during render, not in an effect: React re-renders this
+  // component immediately with the new value, before anything is painted, so
+  // a deep-linked form (?form=create) mounts the widget in its very first
+  // committed render. Report isn't included — it mounts its own widget.
+  if (!turnstileWanted && (action?.mode === 'create' || action?.mode === 'edit')) {
+    setTurnstileWanted(true)
+  }
 
   // What ResourceLoader/GenericDirectory actually get told to auto-open —
   // `reopenItemId` itself stays the raw `?item=` value above (still needed
@@ -346,10 +361,10 @@ export default function FindResources({
   if (category) {
     const caps = resolveCapabilities(category.capabilities)
     // Kept mounted across list ⇄ form transitions within this category (same
-    // JSX slot every render, so React never tears it down between them) —
-    // that's what lets the challenge finish in the background before Add/Edit
-    // is even opened. Skipped entirely when neither action is available.
-    const sharedTurnstileWidget = (caps.add || caps.edit) && (
+    // JSX slot every render, so React never tears it down between them), once
+    // an Add/Edit form has opened. Skipped entirely when neither action is
+    // available, and until one is opened.
+    const sharedTurnstileWidget = (caps.add || caps.edit) && turnstileWanted && (
       <TurnstileWidget ref={turnstileRef} onVerify={setTurnstileToken} />
     )
     const sharedTurnstile = { token: turnstileToken, reset: () => { turnstileRef.current?.reset(); setTurnstileToken('') } }
