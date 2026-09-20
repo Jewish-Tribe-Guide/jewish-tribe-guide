@@ -244,6 +244,12 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
           SUPERADMIN_EMAILS: ${{ secrets.SUPERADMIN_EMAILS }}
           INBOX_EMAILS: ${{ secrets.INBOX_EMAILS }}
+          # Cloudflare's published always-passes Turnstile test key (not a
+          # secret). Without any site key the widget renders nothing, so
+          # e2e/budgets.spec.ts's "browsing loads nothing from Turnstile" check
+          # could never fail in CI — it would skip. NEXT_PUBLIC_, so it has to be
+          # present at build time, which is when this step's webServer builds.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
