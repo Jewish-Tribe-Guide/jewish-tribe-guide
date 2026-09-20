@@ -7,7 +7,6 @@ import { useCategories } from '@/lib/useCategories'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import Honeypot from '@/components/Honeypot'
-import { CheckIcon } from '@/components/icons'
 
 // ── "Stay in the loop" signup — desktop only, right after the map ──────────
 // The home screen ends at the map with nothing after it but the footer; this
