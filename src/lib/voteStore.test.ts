@@ -32,12 +32,6 @@ afterEach(() => {
 })
 
 describe('getVoteCounts', () => {
-  it('returns an empty map without querying at all for an empty input', async () => {
-    const result = await getVoteCounts([])
-    expect(result).toEqual(new Map())
-    expect(mockFrom).not.toHaveBeenCalled()
-  })
-
   it('tallies one count per resource id, for however many vote rows it has', async () => {
     mockFrom.mockReturnValue(
       chainable({
@@ -46,15 +40,27 @@ describe('getVoteCounts', () => {
       }),
     )
 
-    const result = await getVoteCounts(['a', 'b', 'c'])
+    const result = await getVoteCounts('philly')
 
     expect(result).toEqual(new Map([['a', 2], ['b', 1]]))
     expect(result.has('c')).toBe(false)
   })
 
+  it('scopes by the listing\'s community via a join, never by a list of ids', async () => {
+    const builder = chainable({ data: [], error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await getVoteCounts('philly')
+
+    expect(builder.select).toHaveBeenCalledWith('resource_id, resource!inner(community_id)')
+    expect(builder.eq).toHaveBeenCalledWith('resource.community_id', 'philly')
+    // The `in (…ids)` form is what put every listing id in the URL.
+    expect(builder.in).not.toHaveBeenCalled()
+  })
+
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'timeout' } }))
-    await expect(getVoteCounts(['a'])).rejects.toThrow('Failed to load votes: timeout')
+    await expect(getVoteCounts('philly')).rejects.toThrow('Failed to load votes: timeout')
   })
 })
 

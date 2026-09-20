@@ -1,16 +1,22 @@
 import { getAdminClient } from './supabase/admin'
 
-// Upvote counts for a set of listings (id → count). Empty input → empty map.
-export async function getVoteCounts(resourceIds: string[]): Promise<Map<string, number>> {
-  if (resourceIds.length === 0) return new Map()
+// Upvote counts for every listing in a community (id → count).
+//
+// Scoped by a join on the listing's community rather than by an `in (…ids)`
+// list. The id list put every listing's UUID in the request URL — 37 bytes
+// each — and the API starts rejecting the request (a 400) somewhere between
+// 600 and 900 of them, which would have failed the whole listing load, not just
+// the counts. The join keeps the URL a constant size however many listings
+// there are. Rows are one per vote, tallied here; the table is tiny.
+export async function getVoteCounts(community: string): Promise<Map<string, number>> {
   const { data, error } = await getAdminClient()
     .from('vote')
-    .select('resource_id')
-    .in('resource_id', resourceIds)
+    .select('resource_id, resource!inner(community_id)')
+    .eq('resource.community_id', community)
 
   if (error) throw new Error(`Failed to load votes: ${error.message}`)
   const counts = new Map<string, number>()
-  for (const r of data as { resource_id: string }[]) {
+  for (const r of data as unknown as { resource_id: string }[]) {
     counts.set(r.resource_id, (counts.get(r.resource_id) ?? 0) + 1)
   }
   return counts

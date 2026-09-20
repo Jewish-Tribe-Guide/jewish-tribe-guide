@@ -107,6 +107,8 @@ describe('listApprovedResources', () => {
     expect(builder.eq).toHaveBeenCalledWith('status', 'approved')
     expect(result.find((r) => r.id === 'r1')?.upvotes).toBe(5)
     expect(result.find((r) => r.id === 'r2')?.upvotes).toBe(0)
+    // Counted per community, not per listing-id list — see getVoteCounts.
+    expect(mockGetVoteCounts).toHaveBeenCalledWith('philly')
   })
 
   it('further scopes by category when provided', async () => {

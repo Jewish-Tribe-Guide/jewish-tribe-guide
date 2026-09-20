@@ -56,7 +56,7 @@ export async function listApprovedResources(
   if (error) throw new Error(`Failed to load resources: ${error.message}`)
 
   const rows = (data as ResourceRow[]).map(normalizeRow)
-  const counts = await getVoteCounts(rows.map((r) => r.id))
+  const counts = await getVoteCounts(community)
   return rows.map((r) => ({ ...r, upvotes: counts.get(r.id) ?? 0 }))
 }
 
