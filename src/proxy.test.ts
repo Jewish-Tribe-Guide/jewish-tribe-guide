@@ -120,6 +120,23 @@ describe('proxy — hidden-community gating', () => {
     expect(unknown.status).toBe(200)
   })
 
+  it('keeps a hidden community gated when a later refresh fails (no fail-open on a blip)', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      mockListCommunityVisibility.mockResolvedValueOnce({ blatimore: { visible: false, previewToken: 'tok' } })
+      expect((await proxy(req('/blatimore'))).status).toBe(404)
+
+      // Window expires; the database is now failing.
+      vi.advanceTimersByTime(31_000)
+      mockListCommunityVisibility.mockRejectedValue(new Error('supabase blip'))
+
+      expect((await proxy(req('/blatimore'))).status).toBe(404)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('never blocks /admin or /inbox even if the matcher somehow let them through', async () => {
     // config.matcher is what actually keeps these paths from reaching
     // proxy() in production (Next applies it before invoking the function,
