@@ -458,6 +458,7 @@ async function computeGoogleFields(
     if (field === 'name') return payload.name
     if (field === 'phone') return payload.phone
     if (field === 'hours') return hoursKey ? payload.details?.[hoursKey] : undefined
+    if (field === 'description') return payload.details?.googleDescription
     return websiteKey ? payload.details?.[websiteKey] : undefined
   }
   const priorOf = (field: OwnableSyncField): unknown => {
@@ -465,6 +466,7 @@ async function computeGoogleFields(
     if (field === 'name') return existing.name
     if (field === 'phone') return existing.phone
     if (field === 'hours') return hoursKey ? existing.details?.[hoursKey] : undefined
+    if (field === 'description') return existing.details?.googleDescription
     return websiteKey ? existing.details?.[websiteKey] : undefined
   }
   const priorOwned = new Set<OwnableSyncField>(

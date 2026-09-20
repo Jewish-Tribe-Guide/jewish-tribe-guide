@@ -516,6 +516,18 @@ export default function PlaceDetailBody({ item, category, onTagClick, onFilterOp
               display(item[f.key])
             )}
           </p>
+          {/* Only the one field with real Google-vs-curated provenance to
+              report — see OWNABLE_SYNC_FIELDS' own doc on why `description`
+              is tracked now. Gated on `placeId` (not just having a value):
+              with no placeId this listing was never compared against
+              Google at all, so every description on it is trivially
+              community-submitted — a note saying so on every single
+              non-synced listing would be noise, not signal. */}
+          {f.key === 'googleDescription' && item.placeId && display(item[f.key]) && (
+            <p className="mt-1 text-[11px] text-muted">
+              {item.googleFields?.includes('description') ? 'From Google' : 'Community-submitted'}
+            </p>
+          )}
         </div>
       ))}
     </div>

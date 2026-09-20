@@ -94,6 +94,7 @@ export const FIELD_LABELS: Record<OwnableSyncField, string> = {
   phone: 'Phone',
   address: 'Address',
   website: 'Website',
+  description: 'Description',
 }
 
 // Address is excluded: it's always fill-once-when-empty by design (see
@@ -106,11 +107,19 @@ function websiteFieldKey(category: CategoryConfig): string | undefined {
   return category.detailFields.find((f) => f.type === 'url' && f.label.trim().toLowerCase() === 'website')?.key
 }
 
+// Fixed key, unlike `website` — see ListingForm.tsx's `googleDescription`
+// convention doc. Still a lookup (not a bare `true`) because not every
+// category configures a field with that key at all.
+function hasDescriptionField(category: CategoryConfig): boolean {
+  return category.detailFields.some((f) => f.key === 'googleDescription')
+}
+
 function currentValue(field: OwnableSyncField, row: SyncRow, websiteKey: string | undefined): unknown {
   if (field === 'name') return row.name
   if (field === 'phone') return row.phone
   if (field === 'address') return row.address
   if (field === 'hours') return row.details?.hours
+  if (field === 'description') return row.details?.googleDescription
   return websiteKey ? row.details?.[websiteKey] : undefined
 }
 
@@ -125,6 +134,7 @@ function displayValue(field: OwnableSyncField, row: SyncRow, websiteKey: string 
 function categoryHasField(field: OwnableSyncField, category: CategoryConfig, websiteKey: string | undefined): boolean {
   if (field === 'phone') return category.hasPhone !== false
   if (field === 'website') return !!websiteKey
+  if (field === 'description') return hasDescriptionField(category)
   return true
 }
 
@@ -282,6 +292,7 @@ function googleValuesFor(sync: PlaceSync): Record<OwnableSyncField, string> {
     phone: sync.phone?.trim() || '—',
     address: sync.address?.trim() || '—',
     website: sync.website?.trim() || '—',
+    description: sync.description?.trim() || '—',
   }
 }
 

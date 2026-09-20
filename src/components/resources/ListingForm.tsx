@@ -91,7 +91,7 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   // different" without an extra Google API call for the common case where
   // autofill did run. Populated by handlePlaceSelect; a ref because nothing
   // renders from it.
-  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string }>({})
+  const autofilled = useRef<{ name?: string; phone?: string; hours?: string; website?: string; description?: string }>({})
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     (existing?.geo as { lat: number; lng: number } | undefined) ?? null,
   )
@@ -169,23 +169,26 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
     // fields it owns — see googleFieldsForSubmit below. website is only
     // recorded when the category actually has a Website field to compare
     // against (websiteKey there mirrors this same lookup).
+    // Matched by key (the fixed `googleDescription` convention — see
+    // src/lib/categories.ts's showInHeader doc), not label, since a category
+    // names this field's display label whatever it wants ("Description",
+    // "About", …). Unlike name/phone/hours above, only FILLS a gap rather
+    // than always overwriting: re-picking the address on an edit shouldn't
+    // risk clobbering hand-written text. Ownership (below) is still recorded
+    // against what Google actually returned regardless — a description
+    // that's already present and therefore left alone is exactly the case
+    // that should compare as "differs from Google" once submitted.
+    const descriptionField = config.detailFields.find((f) => f.key === 'googleDescription')
+    if (result.description && descriptionField && !details[descriptionField.key]) {
+      setDetail(descriptionField.key, result.description)
+    }
+
     autofilled.current = {
       name: result.name ?? undefined,
       phone: result.phone ? formatPhone(result.phone) : undefined,
       hours: result.hours ? JSON.stringify(result.hours) : undefined,
       website: result.website && websiteField ? result.website : undefined,
-    }
-    // Matched by key (the fixed `googleDescription` convention — see
-    // src/lib/categories.ts's showInHeader doc), not label, since a category
-    // names this field's display label whatever it wants ("Description",
-    // "About", …). Unlike name/phone/hours above, only fills a gap rather
-    // than always overwriting: this field has no googleFields ownership
-    // tracking of its own, so re-picking the address on an edit shouldn't
-    // risk clobbering hand-written text — mirrors the backend sync's own
-    // once-only fill (see scripts/sync-google-hours.mjs).
-    if (result.description) {
-      const descriptionField = config.detailFields.find((f) => f.key === 'googleDescription')
-      if (descriptionField && !details[descriptionField.key]) setDetail(descriptionField.key, result.description)
+      description: result.description && descriptionField ? result.description : undefined,
     }
   }
 

@@ -79,9 +79,9 @@ function serverKey(): string | null {
 //     comparing stored values against Google's: an exact match means it's
 //     Google's. Anything that differed was left as the submitter's.
 
-/** Fields the sync will only write when it owns them. `businessStatus` and
- *  `googleDescription` are deliberately absent — they're Google-only concepts
- *  with no hand-curated counterpart, so they're always refreshed.
+/** Fields the sync will only write when it owns them. `businessStatus` is
+ *  deliberately absent — it's a Google-only concept with no hand-curated
+ *  counterpart, so it's always refreshed.
  *
  *  `name` is tracked per-field like the rest, deliberately: a submitter who
  *  clarifies "Giant" to "Giant (Wynnewood)" is still pointing at the same
@@ -90,8 +90,17 @@ function serverKey(): string | null {
  *
  *  `website` behaves like `phone`/`hours` (submitter-overridable, tracked),
  *  not like `address` (fill-once-when-empty) — a kosher stand's own site can
- *  legitimately differ from the parent business Google links. */
-export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address', 'website'] as const
+ *  legitimately differ from the parent business Google links.
+ *
+ *  `description` (stored as the listing's `googleDescription` detail, only on
+ *  categories that configure a field with that key — see ListingForm.tsx)
+ *  used to be a Google-only concept too, always fill-once-when-empty and
+ *  never tracked. It's tracked now for the same reason `website` is: some
+ *  categories let a submitter write their own, and that shouldn't be
+ *  silently replaced by Google's editorial summary the next time it changes —
+ *  and knowing which one a listing currently has is also what lets the
+ *  public detail page say so (see PlaceDetailBody's own note). */
+export const OWNABLE_SYNC_FIELDS = ['name', 'hours', 'phone', 'address', 'website', 'description'] as const
 export type OwnableSyncField = (typeof OWNABLE_SYNC_FIELDS)[number]
 
 /** Nothing there to protect: unset, blank, or an object with no keys. Note that

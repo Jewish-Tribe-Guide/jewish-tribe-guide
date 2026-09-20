@@ -32,6 +32,57 @@ describe('PlaceDetailBody — "Synced from Google" note', () => {
   })
 })
 
+// `description` (googleDescription) is now a tracked, ownable field like
+// name/hours/phone/website — see OWNABLE_SYNC_FIELDS' own doc — which is
+// what lets this note say which one a listing actually has, rather than
+// guessing from whether it merely has a placeId.
+describe('PlaceDetailBody — description provenance note', () => {
+  const category = makeCategory({
+    detailFields: [{ key: 'googleDescription', label: 'Description', type: 'text' }],
+  })
+
+  it('says "From Google" when the sync owns the description field', () => {
+    const item = makeListing({
+      placeId: 'place-1',
+      googleDescription: "Google's editorial summary.",
+      googleFields: ['description'],
+    })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText('From Google')).toBeInTheDocument()
+  })
+
+  it('says "Community-submitted" when a person wrote it and the sync does not own it', () => {
+    const item = makeListing({
+      placeId: 'place-1',
+      googleDescription: 'Written by the community.',
+      googleFields: ['name', 'hours'], // description deliberately absent
+    })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText('Community-submitted')).toBeInTheDocument()
+  })
+
+  it('shows no provenance note at all for a listing that was never Google-synced', () => {
+    // No placeId — every description here is trivially community-submitted,
+    // so a note saying so on every single non-synced listing would be noise.
+    const item = makeListing({ googleDescription: 'Written by the community.' })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.getByText('Written by the community.')).toBeInTheDocument()
+    expect(screen.queryByText('From Google')).not.toBeInTheDocument()
+    expect(screen.queryByText('Community-submitted')).not.toBeInTheDocument()
+  })
+
+  it('shows no provenance note when the description is empty, even with a placeId', () => {
+    const item = makeListing({ placeId: 'place-1', googleFields: ['description'] })
+    render(<PlaceDetailBody item={item} category={category} />)
+
+    expect(screen.queryByText('From Google')).not.toBeInTheDocument()
+    expect(screen.queryByText('Community-submitted')).not.toBeInTheDocument()
+  })
+})
+
 // A showInHeader url field (e.g. a category's Website link) assumes its
 // caller has a persistent collapsed row showing it elsewhere — true for
 // GenericListingCard's own mobile accordion, false for anything that

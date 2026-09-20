@@ -733,6 +733,60 @@ describe('approveSubmission: Google-sync field ownership', () => {
     expect(mockFetchPlaceSync).not.toHaveBeenCalled()
   })
 
+  // `description` (googleDescription) used to be a Google-only concept with
+  // no ownership tracking at all — these two mirror the `name` tests above,
+  // now that it's an ordinary ownable field. Matched by a fixed key, not
+  // label, unlike `website` — see ListingForm.tsx's own doc on the
+  // convention.
+  it('owns a description field whose submitted value matches its autofill snapshot — no Google call needed', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '',
+        phone: '', // isolates the assertion to the description field alone
+        details: {
+          placeId: 'place-1',
+          googleDescription: "Google's editorial summary.",
+          googleAutofill: { description: "Google's editorial summary." },
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(
+      shulCategory({ detailFields: [{ key: 'googleDescription', label: 'Description', type: 'text' as const }] }),
+    )
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).toContain('description')
+    expect(mockFetchPlaceSync).not.toHaveBeenCalled()
+  })
+
+  it('does not own a description field the submitter wrote themselves', async () => {
+    const sub = baseSubmission({
+      operation: 'create',
+      payload: listingPayload({
+        name: '',
+        phone: '',
+        details: {
+          placeId: 'place-1',
+          googleDescription: 'Written by the community, not autofilled at all.',
+        },
+      }) as unknown as Record<string, unknown>,
+    })
+    const resourceInsertBuilder = mockCreateFlow(sub)
+    mockGetCategoryById.mockResolvedValue(
+      shulCategory({ detailFields: [{ key: 'googleDescription', label: 'Description', type: 'text' as const }] }),
+    )
+    mockFetchPlaceSync.mockResolvedValue(placeSync({ description: "Google's own, different summary." }))
+
+    await approveSubmission('sub-1')
+
+    const written = lastCallArg(resourceInsertBuilder.insert)
+    expect(written.details.googleFields).not.toContain('description')
+  })
+
   it('falls back to a live Google check for a field that was never autofilled', async () => {
     const sub = baseSubmission({
       operation: 'create',

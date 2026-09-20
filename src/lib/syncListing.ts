@@ -109,7 +109,8 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
   delete details.lastSyncError
   delete details.lastSyncFailedAt
 
-  // Google-only concepts with no curated counterpart — always refreshed.
+  // businessStatus is a Google-only concept with no curated counterpart —
+  // always refreshed, unlike everything below.
   //
   // The transition is recorded alongside the value: businessStatus used to be
   // simply overwritten, so there was no way to know a listing had just closed
@@ -131,8 +132,6 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
     }
     details.businessStatus = sync.businessStatus
   }
-  if (sync.description && !details.googleDescription) details.googleDescription = sync.description
-
   // Everything else is written only where Google owns the field: one it
   // filled itself, or one still empty. See syncMayWrite in googlePlaces.ts.
   const wrote: OwnableSyncField[] = []
@@ -165,6 +164,12 @@ export async function syncOneListing(row: SyncedRow): Promise<SyncOneResult> {
   if (sync.website && websiteKey && syncMayWrite(row.details, 'website', row.details?.[websiteKey])) {
     details[websiteKey] = sync.website
     wrote.push('website')
+  }
+  // Fixed key, unlike `website` — see ListingForm.tsx's `googleDescription`
+  // convention doc.
+  if (sync.description && syncMayWrite(row.details, 'description', row.details?.googleDescription)) {
+    details.googleDescription = sync.description
+    wrote.push('description')
   }
 
   details.googleFields = nextGoogleFields(row.details, wrote)
