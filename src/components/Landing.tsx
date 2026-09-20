@@ -227,10 +227,12 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           </div>
         )
       ) : (
-        sections.map((s) => (
+        sections.map((s, i) => (
           <div key={s.title}>
             <h2 className="mb-3 text-lg font-semibold text-slate-900">{s.title}</h2>
-            <CardGrid cards={s.cards} />
+            {/* Only the first section's first row is above the fold: 4 is the
+                widest row the grid renders. */}
+            <CardGrid cards={s.cards} priorityCount={i === 0 ? 4 : 0} />
           </div>
         ))
       )}

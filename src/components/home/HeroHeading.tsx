@@ -1,6 +1,7 @@
 'use client'
 
-import Image from 'next/image'
+import Image, { getImageProps } from 'next/image'
+import { preload } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { ui } from '@/lib/uiConfig'
 import type { SiteSettings } from '@/lib/siteSettings'
@@ -10,6 +11,11 @@ import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
 import HeroSearchDropdown from './HeroSearchDropdown'
 import type { CardDef, ListingHit } from './sections'
+
+/** The `desktop:` variant's own media query (see globals.css) — the hero band is
+ *  `hidden` outside it. Kept in sync by hand; it's a link `media` attribute, so
+ *  it can't reference the Tailwind variant. */
+const DESKTOP_MEDIA = '(min-width: 640px) and (min-height: 640px)'
 
 type Props = {
   settings: Pick<
@@ -125,6 +131,31 @@ export default function HeroHeading({
   onOpenSearchPlace,
 }: Props) {
   const { desktopHeroHeadline: headline, desktopHeroSubhead: subhead, desktopHeroImage: heroImage } = settings
+
+  // Start fetching the hero photo from <head> — but only where it will be
+  // shown. The <img> below is deliberately lazy (a lazy image in a display:none
+  // box is skipped, so phones never download a photo they can't see), and a
+  // lazy image only starts once layout has run. On desktop, where this is the
+  // largest element on the page, that's a late start; this restores the early
+  // one, gated by `media` so it costs a phone nothing. The srcset/sizes come
+  // from getImageProps so the browser picks the same candidate the <img> will
+  // and reuses the preloaded bytes instead of fetching twice.
+  if (heroImage) {
+    const { props } = getImageProps({
+      src: heroImage.url,
+      alt: heroImage.alt,
+      fill: true,
+      sizes: '58vw',
+      unoptimized: !isOptimizableImage(heroImage.url),
+    })
+    preload(props.src, {
+      as: 'image',
+      imageSrcSet: props.srcSet,
+      imageSizes: props.sizes,
+      media: DESKTOP_MEDIA,
+      fetchPriority: 'high',
+    })
+  }
 
   // The dropdown's own open/closed state — derived from `query` (open the
   // moment there's something to show), except for `dismissed`, which
@@ -262,9 +293,15 @@ export default function HeroHeading({
               // (what a street photo's "whole scene" reads as) instead of a
               // center crop landing mid-building/street level.
               className="object-cover object-top"
-              // Above the fold on every desktop load — worth the priority
-              // fetch the same way a hero image normally is.
-              priority
+              // Above the fold on every desktop load, so it should win the
+              // bandwidth race — but NOT `priority`/`preload`. This section is
+              // `hidden` below the desktop breakpoint, and a preload has no
+              // media condition: it made every phone download the desktop hero
+              // and then never show it. Left at the default lazy loading, the
+              // browser skips an image inside a display:none box entirely;
+              // `fetchPriority` alone is what Next's own docs prescribe for an
+              // image that's only visible at some breakpoints.
+              fetchPriority="high"
               unoptimized={!isOptimizableImage(heroImage.url)}
             />
           ) : (

@@ -125,6 +125,41 @@ describe('Landing', () => {
     expect(screen.getAllByText('Grocery Stores').length).toBeGreaterThan(0)
   })
 
+  it('mobile: only the first section\'s first row loads its tile photos eagerly, not every section\'s', () => {
+    // The home screen renders one CardGrid per section. Each used to mark its
+    // own first four tiles as top priority — roughly ten tiles, most of them
+    // below the fold — and a priority image is fetched even when its
+    // container is display:none (this grid is hidden on desktop).
+    const cats = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map((id) =>
+      makeCategory({ id, pluralLabel: `Cat ${id}`, cardImageUrl: `https://images.unsplash.com/photo-${id}` }),
+    )
+    const section = (n: number, ids: string[]) => ({
+      id: `s${n}`,
+      kind: 'section' as const,
+      title: `Section ${n}`,
+      sortOrder: n,
+      cardIds: ids,
+      width: 'full' as const,
+    })
+    const { container } = renderLanding(undefined, {
+      content: {
+        categories: cats,
+        homeSections: [
+          section(1, ['a', 'b', 'c', 'd']),
+          section(2, ['e', 'f', 'g', 'h']),
+          section(3, ['i', 'j', 'k', 'l']),
+        ],
+      },
+    })
+
+    const mobileSection = container.querySelector<HTMLElement>('.mt-12.desktop\\:hidden')!
+    const tiles = [...mobileSection.querySelectorAll('img')]
+    expect(tiles.length).toBe(12)
+    expect(tiles.filter((i) => i.getAttribute('loading') === 'eager')).toHaveLength(4)
+    // ...and they are the first section's, i.e. the ones above the fold.
+    expect(tiles.slice(0, 4).every((i) => i.getAttribute('loading') === 'eager')).toBe(true)
+  })
+
   it('mobile: narrows its own permanent grid to matching cards when typing, and hides the rest', async () => {
     const user = userEvent.setup()
     const grocery = makeCategory({ id: 'grocery', pluralLabel: 'Grocery Stores' })

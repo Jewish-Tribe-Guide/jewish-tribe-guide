@@ -143,7 +143,14 @@ export function Card({
             // Set on the first row of cards only — they're above the fold and
             // usually the largest contentful paint. Lazy-loading those delays
             // the very thing the page is measured on.
-            priority={priority}
+            //
+            // loading/fetchPriority rather than `priority`: that also adds a
+            // <link rel="preload"> to <head> with no media condition, and this
+            // grid is `desktop:hidden` — so desktop preloaded (and downloaded)
+            // tiles it never displays. An eager <img> costs a hidden copy too,
+            // which is why CardGrid keeps the count to one row.
+            loading={priority ? 'eager' : undefined}
+            fetchPriority={priority ? 'high' : undefined}
             // An admin can paste a URL from anywhere. next/image *throws* on a
             // host it wasn't configured for, so without this one pasted link
             // takes down the whole home screen — which is exactly what happened
@@ -184,10 +191,16 @@ export function CardSkeleton() {
 export function CardGrid({
   cards,
   loadingCount = 0,
+  priorityCount = 0,
   onCardClick,
 }: {
   cards: CardDef[]
   loadingCount?: number
+  /** How many leading cards to load eagerly. Per grid, not per page — the home
+   *  screen renders one grid per section, so a hard-coded 4 here meant every
+   *  section marked its first four (about ten tiles, most below the fold) as
+   *  top priority. Only the first grid on the page should pass a count. */
+  priorityCount?: number
   /** See Card's own doc — threaded straight through. */
   onCardClick?: (card: CardDef) => void
 }) {
@@ -198,9 +211,7 @@ export function CardGrid({
           key={card.id ?? card.title}
           card={card}
           tint={TINTS[i % TINTS.length]}
-          // The first row is above the fold at every breakpoint (4 cards is the
-          // widest row the grid ever renders), so those load eagerly.
-          priority={i < 4}
+          priority={i < priorityCount}
           onCardClick={onCardClick}
         />
       ))}
