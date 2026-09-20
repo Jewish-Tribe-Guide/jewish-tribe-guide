@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { statSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -49,6 +51,33 @@ describe('DaveningTimesCard', () => {
     expect(screen.getByText('Upcoming')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Davening Times' })).toBeInTheDocument()
     expect(screen.getByText('See minyanim near you.')).toBeInTheDocument()
+  })
+
+  // The photo used to hotlink a 6000x4000, 1.6 MB JPEG from pexels.com for a
+  // slot under 500px wide — 24 megapixels to decode, and the heaviest asset on
+  // the desktop home screen. It is self-hosted at the size it is shown.
+  it('uses a self-hosted, right-sized photo, not a hotlinked original', () => {
+    const shul = makeListing({
+      id: 'shul-1',
+      category: 'synagogue',
+      name: 'Kahal Kadosh Mikveh Israel',
+      minyanim: [{ id: 'm1', tefillah: 'mincha', days: ['tue'], time: '2:00pm' }],
+    })
+    const { container } = renderWithProviders(
+      <ListingsProvider listings={[shul]}>
+        <DaveningTimesCard coords={null} />
+      </ListingsProvider>,
+      { content: { categories: [synagogue] } },
+    )
+
+    const src = container.querySelector('img')!.getAttribute('src')!
+    expect(src.startsWith('/')).toBe(true)
+
+    // ...and the file it points at exists and stays small, so swapping the
+    // original back in (or a new oversized one) fails here rather than
+    // silently costing every desktop visitor a megabyte and a half.
+    const bytes = statSync(join(process.cwd(), 'public', src)).size
+    expect(bytes).toBeLessThan(120 * 1024)
   })
 
   it('does not render when no category has a minyanim field — a real "not set up", not a loading state', () => {

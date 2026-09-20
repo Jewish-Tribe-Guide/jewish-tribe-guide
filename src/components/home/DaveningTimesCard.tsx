@@ -144,10 +144,16 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
           Pexels photo (free to use commercially, no attribution required,
           unlike an unlicensed/watermarked stock preview tried first). Not
           admin-editable — hardcoded the same way this card's copy already
-          is. `unoptimized`: pexels.com isn't in next.config.ts's optimizer
-          allowlist (imageHosts.ts) and doesn't need to be for one fixed
-          photo — see that file's own doc on why the allowlist stays narrow
-          rather than growing per image. The mask lives on this wrapper, not
+          is.
+
+          Self-hosted (public/images/davening-times.webp), resized to 960px
+          wide. It used to hotlink pexels.com's original: a 6000x4000 JPEG,
+          1.6 MB on the wire and ~24 megapixels for the browser to decode, for
+          a slot under 500px wide — the heaviest single asset on the desktop
+          home screen. `unoptimized` because it is already the right size:
+          there is nothing left for the optimizer to do, and going through it
+          would only spend transformation quota. Source photo:
+          https://www.pexels.com/photo/6340893/ . The mask lives on this wrapper, not
           the `fill`ed Image itself — `fill` sets its own inset-0/100%
           sizing via inline style, which would fight a width/position class
           placed directly on it. No `z-index` (not even a negative one, tried
@@ -165,7 +171,7 @@ export default function DaveningTimesCard({ coords }: { coords: LatLng | null })
         className="absolute inset-y-0 right-0 w-[42%] overflow-hidden [mask-image:linear-gradient(to_left,black_60%,transparent)]"
       >
         <Image
-          src="https://images.pexels.com/photos/6340893/pexels-photo-6340893.jpeg"
+          src="/images/davening-times.webp"
           alt=""
           fill
           sizes="(min-width: 640px) 42vw, 0px"
