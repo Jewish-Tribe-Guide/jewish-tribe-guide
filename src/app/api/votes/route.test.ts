@@ -19,7 +19,7 @@ vi.mock('@/lib/voteStore', () => ({
 const mockRevalidatePublicContent = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/revalidateContent', () => ({ revalidatePublicContent: mockRevalidatePublicContent }))
 
-const { POST } = await import('./route')
+const { POST, GET } = await import('./route')
 
 function postRequest(body: unknown) {
   return new NextRequest('http://localhost/api/votes', {
@@ -48,5 +48,26 @@ describe('POST /api/votes', () => {
     const res = await POST(postRequest({ resourceId: 'r1' }))
     expect(res.status).toBe(400)
     expect(mockToggleVote).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /api/votes', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reads the token from the x-vote-token header', async () => {
+    mockGetVotedResourceIds.mockResolvedValue(['r1'])
+    const res = await GET(new NextRequest('http://localhost/api/votes', { headers: { 'x-vote-token': 't1' } }))
+
+    expect(await res.json()).toEqual({ ok: true, resourceIds: ['r1'] })
+    expect(mockGetVotedResourceIds).toHaveBeenCalledWith('t1')
+  })
+
+  it('ignores a token in the query string (clean cut — it would land in logs)', async () => {
+    const res = await GET(new NextRequest('http://localhost/api/votes?token=t1'))
+
+    expect(res.status).toBe(400)
+    expect(mockGetVotedResourceIds).not.toHaveBeenCalled()
   })
 })

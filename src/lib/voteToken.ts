@@ -36,7 +36,7 @@ export function getMyVotedIds(): Promise<Set<string>> {
       }
       if (!token) return new Set<string>()
       try {
-        const res = await fetch(`/api/votes?token=${encodeURIComponent(token)}`)
+        const res = await fetch('/api/votes', { headers: { 'x-vote-token': token } })
         const body = await res.json()
         return new Set<string>(res.ok && body.ok ? (body.resourceIds as string[]) : [])
       } catch {

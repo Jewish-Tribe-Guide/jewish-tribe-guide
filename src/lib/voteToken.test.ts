@@ -78,7 +78,7 @@ describe('getMyVotedIds', () => {
     expect(await getMyVotedIds()).toEqual(new Set(['r1', 'r2']))
   })
 
-  it('encodes the token in the request URL', async () => {
+  it('sends the token in a header, never in the URL', async () => {
     localStorage.setItem('jpc_voter_token', 'has space/slash')
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, resourceIds: [] }) })
     vi.stubGlobal('fetch', fetchSpy)
@@ -86,7 +86,7 @@ describe('getMyVotedIds', () => {
 
     await getMyVotedIds()
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/votes?token=has%20space%2Fslash')
+    expect(fetchSpy).toHaveBeenCalledWith('/api/votes', { headers: { 'x-vote-token': 'has space/slash' } })
   })
 
   it('returns an empty set when the server responds not-ok', async () => {

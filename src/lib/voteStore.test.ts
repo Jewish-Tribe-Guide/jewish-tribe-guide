@@ -19,14 +19,16 @@ function chainable(result: unknown) {
 }
 
 const mockFrom = vi.hoisted(() => vi.fn())
+const mockRpc = vi.hoisted(() => vi.fn())
 vi.mock('./supabase/admin', () => ({
-  getAdminClient: () => ({ from: mockFrom }),
+  getAdminClient: () => ({ from: mockFrom, rpc: mockRpc }),
 }))
 
 const { getVoteCounts, getVotedResourceIds, toggleVote } = await import('./voteStore')
 
 afterEach(() => {
   mockFrom.mockReset()
+  mockRpc.mockReset()
 })
 
 describe('getVoteCounts', () => {
@@ -74,33 +76,29 @@ describe('getVotedResourceIds', () => {
 })
 
 describe('toggleVote', () => {
-  it('adds a vote (insert) when the token has not voted yet, and returns the new count', async () => {
-    mockFrom
-      .mockReturnValueOnce(chainable({ data: null })) // existing-vote lookup: none
-      .mockReturnValueOnce(chainable({ error: null })) // insert
-      .mockReturnValueOnce(chainable({ count: 3, error: null })) // count
+  it('makes exactly one atomic rpc call and touches no table directly', async () => {
+    mockRpc.mockResolvedValue({ data: [{ voted: true, vote_count: 3 }], error: null })
 
     const result = await toggleVote('resource-1', 'token-1')
 
+    expect(mockRpc).toHaveBeenCalledTimes(1)
+    expect(mockRpc).toHaveBeenCalledWith('toggle_vote', { p_resource_id: 'resource-1', p_token: 'token-1' })
+    expect(mockFrom).not.toHaveBeenCalled()
     expect(result).toEqual({ voted: true, count: 3 })
   })
 
-  it('removes a vote (delete) when the token already voted, and returns the new count', async () => {
-    mockFrom
-      .mockReturnValueOnce(chainable({ data: { resource_id: 'resource-1' } })) // existing-vote lookup: found
-      .mockReturnValueOnce(chainable({ error: null })) // delete
-      .mockReturnValueOnce(chainable({ count: 2, error: null })) // count
-
-    const result = await toggleVote('resource-1', 'token-1')
-
-    expect(result).toEqual({ voted: false, count: 2 })
+  it('reports a removal, and coerces a bigint-as-string count', async () => {
+    mockRpc.mockResolvedValue({ data: [{ voted: false, vote_count: '2' }], error: null })
+    expect(await toggleVote('resource-1', 'token-1')).toEqual({ voted: false, count: 2 })
   })
 
-  it('throws with the Supabase error message when the insert fails', async () => {
-    mockFrom
-      .mockReturnValueOnce(chainable({ data: null }))
-      .mockReturnValueOnce(chainable({ error: { message: 'duplicate' } }))
+  it('throws with the Supabase error message on failure', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'fk violation' } })
+    await expect(toggleVote('resource-1', 'token-1')).rejects.toThrow('Failed to toggle vote: fk violation')
+  })
 
-    await expect(toggleVote('resource-1', 'token-1')).rejects.toThrow('Failed to add vote: duplicate')
+  it('throws on an empty response rather than reporting a made-up state', async () => {
+    mockRpc.mockResolvedValue({ data: [], error: null })
+    await expect(toggleVote('resource-1', 'token-1')).rejects.toThrow('empty response')
   })
 })

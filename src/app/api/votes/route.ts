@@ -1,17 +1,20 @@
 import { toggleVote, getVotedResourceIds } from '@/lib/voteStore'
 import { enforceRateLimit } from '@/lib/rateLimit'
 
-// GET /api/votes?token=…
+// GET /api/votes   header: x-vote-token
 // Every resource this browser token has voted on — lets a page correct its
 // own "voted" display state against the real record instead of trusting a
 // local cache that can outlive, or be outlived by, the token itself. Called
 // once per page load, not per button, so the limit here is about how many
 // PAGE LOADS a visitor can make per minute, not how many things they upvote.
+//
+// The token rides in a header, not the query string: a URL ends up in access
+// logs, error-tracker breadcrumbs and referrers, a header doesn't.
 export async function GET(request: Request) {
   const limited = await enforceRateLimit(request, 'votes-check', { limit: 60, windowSec: 60 })
   if (limited) return limited
 
-  const token = new URL(request.url).searchParams.get('token')
+  const token = request.headers.get('x-vote-token')
   if (!token) {
     return Response.json({ ok: false, error: 'Missing token.' }, { status: 400 })
   }
