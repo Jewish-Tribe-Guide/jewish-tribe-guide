@@ -46,6 +46,16 @@ const nextConfig: NextConfig = {
     //   density (36/40/44/48 all round up to 48; their 2x doubles round up
     //   to 64 or 96) with nothing left over.
     //
+    //   384 was added after the ladder started at 640 and that turned out to
+    //   be too coarse at the small end: a home-screen tile is half a phone's
+    //   width (~187px) or a quarter of a desktop grid (~290px), and with 640
+    //   as the smallest step every one of them downloaded a 640px image for a
+    //   slot a third that wide — measured at 20-58 KB each. 384 covers a phone
+    //   at 2x density and a desktop at 1x. It adds one variant per photo
+    //   rather than replacing one (phones and 1x desktops move from 640 to
+    //   384; the rest still use what they did), so the extra transformations
+    //   are bounded by the number of tile photos.
+    //
     //   deviceSizes — every viewport-relative `sizes` prop (the hero photo,
     //   category tile cards) sits inside a max-w-6xl (1152px) container;
     //   nothing here is a true edge-to-edge layout except the category
@@ -59,7 +69,7 @@ const nextConfig: NextConfig = {
     // requests. Not a monthly lever like imageHosts.ts's kill switches;
     // this is a permanent fix, safe to leave in place regardless of usage.
     imageSizes: [32, 48, 64, 96],
-    deviceSizes: [640, 828, 1080, 1280, 1920],
+    deviceSizes: [384, 640, 828, 1080, 1280, 1920],
   },
   // Cache Components. Two things this buys:
   //
