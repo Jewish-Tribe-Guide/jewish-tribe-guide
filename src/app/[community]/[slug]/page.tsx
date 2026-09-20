@@ -8,6 +8,8 @@ import { getSiteSettings } from '@/lib/siteSettingsStore'
 import { SITE_SETTINGS_DEFAULTS } from '@/lib/siteSettings'
 import { FIXED_VIEW_KINDS, RESERVED_SLUGS, routes } from '@/lib/routes'
 import { siteUrl } from '@/lib/siteUrl'
+import { buildJsonLdScript } from '@/lib/jsonLdScript'
+import { buildCategoryJsonLd } from '@/lib/structuredData'
 import { Suspense } from 'react'
 import SlugScreen from './SlugScreen'
 
@@ -154,6 +156,25 @@ export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) 
         })
       : []
 
+  // A category directory as an ItemList of its listings' own URLs, plus the
+  // breadcrumb — see structuredData.ts. Skipped for a form or fixed view, when
+  // the listings failed to load (null, not "empty"), and for an empty category.
+  let jsonLdScript: string | null = null
+  if (resolved.kind === 'category' && listings && listings.length > 0) {
+    const communities = await listCommunities().catch(() => [])
+    const settings = await getSiteSettings(community).catch(() => SITE_SETTINGS_DEFAULTS)
+    const siteName = settings.name || communities.find((c) => c.slug === community)?.name || community
+    jsonLdScript = buildJsonLdScript(
+      buildCategoryJsonLd({
+        category: { id: slug, pluralLabel: resolved.label },
+        listings,
+        community,
+        siteName,
+        base: siteUrl(),
+      }),
+    )
+  }
+
   return (
     // Only the 'form' kind actually needs this boundary now — SlugScreen's
     // form branch (FormScreen) calls useSearchParams() with no boundary of
@@ -162,8 +183,11 @@ export default async function SlugPage(props: PageProps<'/[community]/[slug]'>) 
     // SlugScreen's own comment), so this never suspends for it — that path
     // prerenders for real, with its own narrower boundary further in, around
     // just the part that does (FindResourcesConnected).
-    <Suspense fallback={<main className="flex flex-1 flex-col" />}>
-      <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
-    </Suspense>
+    <>
+      {jsonLdScript && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />}
+      <Suspense fallback={<main className="flex flex-1 flex-col" />}>
+        <SlugScreen slug={slug} kind={resolved.kind} listings={listings} />
+      </Suspense>
+    </>
   )
 }
