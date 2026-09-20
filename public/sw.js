@@ -34,6 +34,13 @@ const ALL_CACHES = [STATIC_CACHE, CONTENT_CACHE, IMAGE_CACHE]
 // Keeps the image cache from growing without limit on a phone.
 const IMAGE_CACHE_LIMIT = 60
 
+// The same for pages and content APIs. Nothing bounded this: every distinct
+// URL a visitor opened — including each combination of map filters and search
+// text, since those live in the query string — was kept forever. The limit is
+// generous for a real visit (a dozen categories, the map, a few forms, and the
+// content APIs that back them) and small next to what a phone can spare.
+const CONTENT_CACHE_LIMIT = 60
+
 const OFFLINE_URL = '/offline'
 
 self.addEventListener('install', (event) => {
@@ -95,12 +102,14 @@ function isContentApi(pathname) {
   ].some((p) => pathname === p || pathname.startsWith(`${p}?`))
 }
 
-/** Trims a cache to `limit` entries, oldest first. */
-async function trimCache(cacheName, limit) {
+/** Trims a cache to `limit` entries, oldest first. Entries whose path is in
+ *  `keep` are never evicted and don't count against the limit — the offline
+ *  page is the one thing the cache must always be able to answer with. */
+async function trimCache(cacheName, limit, keep = []) {
   const cache = await caches.open(cacheName)
-  const keys = await cache.keys()
-  if (keys.length <= limit) return
-  await Promise.all(keys.slice(0, keys.length - limit).map((k) => cache.delete(k)))
+  const evictable = (await cache.keys()).filter((k) => !keep.includes(new URL(k.url).pathname))
+  if (evictable.length <= limit) return
+  await Promise.all(evictable.slice(0, evictable.length - limit).map((k) => cache.delete(k)))
 }
 
 async function cacheFirst(request, cacheName, limit) {
@@ -122,7 +131,14 @@ async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
   try {
     const response = await fetch(request)
-    if (response.ok) await cache.put(request, response.clone())
+    if (response.ok) {
+      // Delete first so a refreshed URL moves to the back of the queue
+      // (put keeps an existing entry's original position), which is what makes
+      // "oldest first" mean least recently loaded rather than first ever seen.
+      await cache.delete(request)
+      await cache.put(request, response.clone())
+      await trimCache(cacheName, CONTENT_CACHE_LIMIT, [OFFLINE_URL])
+    }
     return response
   } catch (err) {
     const hit = await cache.match(request)
