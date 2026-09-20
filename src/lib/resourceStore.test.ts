@@ -130,12 +130,27 @@ describe('listApprovedResources', () => {
 describe('getResourceById', () => {
   it('returns null when not found', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: null }))
-    expect(await getResourceById('missing')).toBeNull()
+    expect(await getResourceById('missing', 'philly')).toBeNull()
+  })
+
+  it('scopes the lookup to the given community, so another community\'s id cannot be read', async () => {
+    const builder = chainable({ data: null, error: null })
+    mockFrom.mockReturnValue(builder)
+
+    await getResourceById('res-1', 'philly')
+
+    expect(builder.eq).toHaveBeenCalledWith('id', 'res-1')
+    expect(builder.eq).toHaveBeenCalledWith('community_id', 'philly')
+  })
+
+  it('refuses to run without a community rather than falling back to an unscoped read', async () => {
+    await expect(getResourceById('res-1', '')).rejects.toThrow('requires a community')
+    expect(mockFrom).not.toHaveBeenCalled()
   })
 
   it('throws with the Supabase error message on failure', async () => {
     mockFrom.mockReturnValue(chainable({ data: null, error: { message: 'boom' } }))
-    await expect(getResourceById('res-1')).rejects.toThrow('Failed to load resource: boom')
+    await expect(getResourceById('res-1', 'philly')).rejects.toThrow('Failed to load resource: boom')
   })
 })
 
