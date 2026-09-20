@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import posthog from 'posthog-js'
+import { startPostHogWhenIdle } from '@/lib/deferredPostHog'
 
 // Same no-op-until-configured behavior as src/instrumentation.ts. Also gated
 // on actually being the live Vercel production deployment — NEXT_PUBLIC_SENTRY_DSN
@@ -32,12 +32,13 @@ if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
 // project itself has Session Replay enabled in PostHog's settings — the SDK
 // flag alone doesn't turn it on, only whether an already-enabled project
 // records this particular visitor.
-if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
-  const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST
-  if (projectToken && host) {
-    posthog.init(projectToken, { api_host: host, defaults: '2025-05-24' })
-  }
-}
+// Loaded after the page is interactive, not in the initial bundle — see
+// deferredPostHog.ts for the measurement behind that.
+startPostHogWhenIdle({
+  enabled: process.env.NEXT_PUBLIC_VERCEL_ENV === 'production',
+  token: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
+  host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  load: () => import('posthog-js'),
+})
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart

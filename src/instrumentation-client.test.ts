@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sentryInitMock = vi.fn()
@@ -24,17 +25,26 @@ describe('instrumentation-client — only reports from the real Vercel productio
     sentryInitMock.mockClear()
     posthogInitMock.mockClear()
     process.env = { ...ORIGINAL_ENV }
+    // PostHog now starts after load + idle (see deferredPostHog.ts), not at
+    // import. jsdom's document is already 'complete'; make idle fire at once.
+    vi.stubGlobal('requestIdleCallback', (fn: () => void) => setTimeout(fn, 0))
   })
 
   afterEach(() => {
     process.env = ORIGINAL_ENV
+    vi.unstubAllGlobals()
   })
+
+  /** Lets the deferred start (idle callback → dynamic import) play out, so a
+   *  "was never called" assertion is checked AFTER it would have happened. */
+  const settle = () => new Promise((r) => setTimeout(r, 50))
 
   it('initializes neither SDK outside VERCEL_ENV=production (e.g. local dev)', async () => {
     delete process.env.NEXT_PUBLIC_VERCEL_ENV
     process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'phc_test'
     process.env.NEXT_PUBLIC_POSTHOG_HOST = 'https://us.posthog.com'
     await import('./instrumentation-client')
+    await settle()
 
     expect(sentryInitMock).not.toHaveBeenCalled()
     expect(posthogInitMock).not.toHaveBeenCalled()
@@ -45,6 +55,7 @@ describe('instrumentation-client — only reports from the real Vercel productio
     process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'phc_test'
     process.env.NEXT_PUBLIC_POSTHOG_HOST = 'https://us.posthog.com'
     await import('./instrumentation-client')
+    await settle()
 
     expect(sentryInitMock).not.toHaveBeenCalled()
     expect(posthogInitMock).not.toHaveBeenCalled()
@@ -55,6 +66,7 @@ describe('instrumentation-client — only reports from the real Vercel productio
     delete process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST
     await import('./instrumentation-client')
+    await settle()
 
     expect(sentryInitMock).toHaveBeenCalledTimes(1)
     expect(posthogInitMock).not.toHaveBeenCalled()
@@ -65,8 +77,8 @@ describe('instrumentation-client — only reports from the real Vercel productio
     process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = 'phc_test'
     process.env.NEXT_PUBLIC_POSTHOG_HOST = 'https://us.posthog.com'
     await import('./instrumentation-client')
+    await vi.waitFor(() => expect(posthogInitMock).toHaveBeenCalledTimes(1))
 
-    expect(posthogInitMock).toHaveBeenCalledTimes(1)
     expect(posthogInitMock).toHaveBeenCalledWith(
       'phc_test',
       expect.objectContaining({ api_host: 'https://us.posthog.com' }),
