@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseZmanimRequest, roundZmanimCoord, zmanimPath } from './zmanimRequest'
+import { ZMANIM_BATCH_MAX, parseZmanimBatchRequest, parseZmanimRequest, roundZmanimCoord, zmanimBatchPath, zmanimPath } from './zmanimRequest'
 
 const TZ = 'America/New_York'
 const parse = (q: string) => parseZmanimRequest(new URLSearchParams(q), TZ)
@@ -68,5 +68,40 @@ describe('roundZmanimCoord / zmanimPath', () => {
       '/api/zmanim?lat=39.95&lng=-75.16&tzid=America%2FNew_York',
     )
     expect(zmanimPath(1, 2)).toBe('/api/zmanim?lat=1&lng=2')
+  })
+})
+
+describe('zmanim batch request', () => {
+  const qs = (s: string) => new URLSearchParams(s)
+
+  it('builds one URL per set of spots, whatever the order or jitter', () => {
+    const a = zmanimBatchPath([{ lat: 40.001, lng: -75.2 }, { lat: 39.95, lng: -75.16 }])
+    const b = zmanimBatchPath([{ lat: 39.951, lng: -75.161 }, { lat: 40.004, lng: -75.201 }, { lat: 40.0, lng: -75.2 }])
+    expect(a).toBe(b)
+    expect(a).toBe('/api/zmanim/batch?p=39.95,-75.16&p=40,-75.2')
+  })
+
+  it('parses points, rounding and de-duplicating them', () => {
+    const r = parseZmanimBatchRequest(qs('p=39.951,-75.161&p=39.95,-75.16&p=40,-75.2'), 'America/New_York')
+    expect(r).toEqual({
+      ok: true,
+      timezone: 'America/New_York',
+      points: [{ lat: 39.95, lng: -75.16 }, { lat: 40, lng: -75.2 }],
+    })
+  })
+
+  it.each([
+    ['no points', ''],
+    ['a malformed point', 'p=abc,1'],
+    ['a three-part point', 'p=1,2,3'],
+    ['an out-of-range latitude', 'p=91,0'],
+    ['a bad timezone', 'p=1,2&tzid=Not/AZone'],
+  ])('refuses %s', (_name, query) => {
+    expect(parseZmanimBatchRequest(qs(query), 'America/New_York').ok).toBe(false)
+  })
+
+  it('refuses more points than the cap', () => {
+    const many = Array.from({ length: ZMANIM_BATCH_MAX + 1 }, (_, i) => `p=${i},0`).join('&')
+    expect(parseZmanimBatchRequest(qs(many), 'America/New_York').ok).toBe(false)
   })
 })

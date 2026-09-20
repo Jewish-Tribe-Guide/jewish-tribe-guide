@@ -65,3 +65,56 @@ export function parseZmanimRequest(params: URLSearchParams, defaultTimezone: str
     timezone: tz,
   }
 }
+
+// ── Batch: many locations in one round trip ─────────────────────────────────
+//
+// A screen listing many synagogues needs sunset/candle-lighting for each one's
+// own coordinates. One request per location works but is a burst of round
+// trips on first load; this asks for all of them at once. The single-location
+// URL above stays as it is (one URL per spot is what makes it CDN-friendly),
+// and the server side of a batch still reads through the same cached Hebcal
+// fetches.
+
+/** Upper bound on points per batch — each uncached point costs four Hebcal
+ *  requests, so the route must not accept an unbounded list. */
+export const ZMANIM_BATCH_MAX = 25
+
+export type ZmanimPoint = { lat: number; lng: number }
+
+/** Rounded, de-duplicated and sorted, so the same set of spots always yields
+ *  the same URL regardless of the order or jitter they arrived in. */
+export function canonicalZmanimPoints(points: ZmanimPoint[]): ZmanimPoint[] {
+  const seen = new Map<string, ZmanimPoint>()
+  for (const { lat, lng } of points) {
+    const p = { lat: roundZmanimCoord(lat), lng: roundZmanimCoord(lng) }
+    seen.set(`${p.lat},${p.lng}`, p)
+  }
+  return [...seen.values()].sort((a, b) => a.lat - b.lat || a.lng - b.lng)
+}
+
+export function zmanimBatchPath(points: ZmanimPoint[]): string {
+  return `/api/zmanim/batch?${canonicalZmanimPoints(points).map((p) => `p=${p.lat},${p.lng}`).join('&')}`
+}
+
+export type ParsedZmanimBatch =
+  | { ok: true; points: ZmanimPoint[]; timezone: string }
+  | { ok: false; error: string }
+
+export function parseZmanimBatchRequest(params: URLSearchParams, defaultTimezone: string): ParsedZmanimBatch {
+  const raw = params.getAll('p')
+  if (raw.length === 0) return { ok: false, error: 'Missing p.' }
+  if (raw.length > ZMANIM_BATCH_MAX) return { ok: false, error: `At most ${ZMANIM_BATCH_MAX} points.` }
+
+  const points: ZmanimPoint[] = []
+  for (const item of raw) {
+    const [lat, lng, ...extra] = item.split(',')
+    const latitude = extra.length === 0 ? parseCoord(lat ?? null, -90, 90) : null
+    const longitude = extra.length === 0 ? parseCoord(lng ?? null, -180, 180) : null
+    if (latitude === null || longitude === null) return { ok: false, error: 'Invalid p.' }
+    points.push({ lat: latitude, lng: longitude })
+  }
+
+  const tz = params.get('tzid') ?? defaultTimezone
+  if (!isValidTimezone(tz)) return { ok: false, error: 'Invalid tzid.' }
+  return { ok: true, points: canonicalZmanimPoints(points), timezone: tz }
+}

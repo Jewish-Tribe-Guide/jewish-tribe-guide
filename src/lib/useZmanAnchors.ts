@@ -5,7 +5,7 @@ import { useToday } from '@/lib/useNow'
 import { community } from '@/community.config'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
-import { zmanimPath } from '@/lib/zmanimRequest'
+import { roundZmanimCoord, zmanimBatchPath, zmanimPath } from '@/lib/zmanimRequest'
 import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
@@ -39,20 +39,55 @@ function dayScopedKey(day: string, key: string): string {
   return `${day}|${key}`
 }
 
-async function loadOne(cacheKey: string, geo: Geo): Promise<void> {
+function summarize(data: ZmanimData): AnchorTimes {
+  const sunset = data.dailyZmanim.find((z) => z.label === 'Sunset')
+  return {
+    sunsetIso: sunset?.iso,
+    candleLightingIso: data.shabbos.candleLighting?.iso,
+    havdalahIso: data.shabbos.havdalah?.iso,
+  }
+}
+
+type Pending = readonly [cacheKey: string, geo: Geo]
+
+/** Loads every pending location. Several keys can round to the same spot (the
+ *  cache key keeps three decimals, the route two), so they are grouped by the
+ *  spot the route will actually answer for. One spot is one plain request; two
+ *  or more go in a single batch request. Failures leave a key uncached —
+ *  callers just won't get a calculated time for that spot. */
+async function loadPending(pending: Pending[]): Promise<void> {
+  const bySpot = new Map<string, { geo: Geo; cacheKeys: string[] }>()
+  for (const [cacheKey, geo] of pending) {
+    const spot = `${roundZmanimCoord(geo.lat)},${roundZmanimCoord(geo.lng)}`
+    const entry = bySpot.get(spot)
+    if (entry) entry.cacheKeys.push(cacheKey)
+    else bySpot.set(spot, { geo, cacheKeys: [cacheKey] })
+  }
+  const store = (cacheKeys: string[], data: ZmanimData) => {
+    const times = summarize(data)
+    for (const k of cacheKeys) cache.set(k, times)
+  }
+
   try {
-    const res = await fetch(zmanimPath(geo.lat, geo.lng))
-    const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
-    if (json.ok && json.data) {
-      const sunset = json.data.dailyZmanim.find((z) => z.label === 'Sunset')
-      cache.set(cacheKey, {
-        sunsetIso: sunset?.iso,
-        candleLightingIso: json.data.shabbos.candleLighting?.iso,
-        havdalahIso: json.data.shabbos.havdalah?.iso,
-      })
+    const spots = [...bySpot.values()]
+    if (spots.length === 1) {
+      const res = await fetch(zmanimPath(spots[0].geo.lat, spots[0].geo.lng))
+      const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
+      if (json.ok && json.data) store(spots[0].cacheKeys, json.data)
+      return
+    }
+    const res = await fetch(zmanimBatchPath(spots.map((s) => s.geo)))
+    const json = (await res.json()) as {
+      ok: boolean
+      results?: Array<{ lat: number; lng: number; ok: boolean; data?: ZmanimData }>
+    }
+    if (!json.ok || !json.results) return
+    for (const r of json.results) {
+      const entry = bySpot.get(`${r.lat},${r.lng}`)
+      if (entry && r.ok && r.data) store(entry.cacheKeys, r.data)
     }
   } catch {
-    // Leave uncached — callers just won't get a calculated time for this spot.
+    // Leave uncached.
   }
 }
 
@@ -87,11 +122,14 @@ export function useZmanAnchors(coords: Array<Geo | null | undefined>): Record<st
       .filter(([cacheKey]) => !cache.has(cacheKey))
     if (pending.length === 0) return
     let cancelled = false
-    for (const [cacheKey, geo] of pending) {
-      if (!inFlight.has(cacheKey)) {
-        const p = loadOne(cacheKey, geo).finally(() => inFlight.delete(cacheKey))
-        inFlight.set(cacheKey, p)
-      }
+    // Only what nobody else is already fetching goes into our own request;
+    // for the rest we just wait on the promise that's already out there.
+    const mine = pending.filter(([cacheKey]) => !inFlight.has(cacheKey))
+    if (mine.length > 0) {
+      const p = loadPending([...mine]).finally(() => {
+        for (const [cacheKey] of mine) inFlight.delete(cacheKey)
+      })
+      for (const [cacheKey] of mine) inFlight.set(cacheKey, p)
     }
     Promise.all(pending.map(([cacheKey]) => inFlight.get(cacheKey) ?? Promise.resolve())).then(() => {
       if (!cancelled) setVersion((v) => v + 1)

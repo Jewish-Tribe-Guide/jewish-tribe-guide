@@ -53,14 +53,28 @@ const ZMANIM_RESPONSE: { ok: true; data: ZmanimData } = {
 // clock so waitFor and userEvent still resolve.
 const SUNDAY = new Date('2026-08-30T09:00:00')
 
+/** What /api/zmanim answers for a URL: the single-location shape, or — for
+ *  /api/zmanim/batch, which useZmanAnchors uses once two or more shul
+ *  locations are missing — one entry per requested point. */
+function zmanimReply(input: RequestInfo | URL, data: ZmanimData) {
+  const url = String(input)
+  const body = url.includes('/api/zmanim/batch')
+    ? {
+        ok: true,
+        results: new URL(url, 'http://x').searchParams.getAll('p').map((p) => {
+          const [lat, lng] = p.split(',').map(Number)
+          return { lat, lng, ok: true, data }
+        }),
+      }
+    : { ok: true, data }
+  return { ok: true, json: async () => body } as unknown as Response
+}
+
 /** Re-stub /api/zmanim with extra fields on top of ZMANIM_RESPONSE. */
 function stubZmanim(extra: Partial<ZmanimData>) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ok: true, data: { ...ZMANIM_RESPONSE.data, ...extra } }),
-    }) as unknown as Response),
+    vi.fn(async (input: RequestInfo | URL) => zmanimReply(input, { ...ZMANIM_RESPONSE.data, ...extra })),
   )
 }
 
@@ -75,7 +89,7 @@ beforeEach(() => {
   __resetZmanimCacheForTests()
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true, json: async () => ZMANIM_RESPONSE }) as unknown as Response),
+    vi.fn(async (input: RequestInfo | URL) => zmanimReply(input, ZMANIM_RESPONSE.data)),
   )
 })
 
