@@ -314,6 +314,11 @@ export default function ListingActionsMenu({
                     build of this menu missed it and showed Pin
                     unconditionally even with pinning turned off
                     community-wide. */}
+                {/* No aria-pressed on these two items: it isn't a supported
+                    attribute of role="menuitem" (axe: aria-allowed-attr,
+                    critical). Their labels already carry the state —
+                    "Pin"/"Pinned", "Set location"/"Location set" — which is
+                    what a screen reader reads. */}
                 {ui.map.pins && (
                   <button
                     type="button"
@@ -323,7 +328,6 @@ export default function ListingActionsMenu({
                       toggle({ id: item.id, categoryId: category.id })
                       setOpen(false)
                     }}
-                    aria-pressed={pinned}
                     className={menuItemClass}
                   >
                     <PinIcon filled={pinned} className="h-4 w-4 shrink-0" />
@@ -349,7 +353,6 @@ export default function ListingActionsMenu({
                       else location!.setListingAnchor({ id: item.id, name: item.name, coords: item.geo! })
                       setOpen(false)
                     }}
-                    aria-pressed={active}
                     className={menuItemClass}
                   >
                     {active ? <CheckIcon className="h-4 w-4 shrink-0" /> : <CrosshairIcon className="h-4 w-4 shrink-0" />}

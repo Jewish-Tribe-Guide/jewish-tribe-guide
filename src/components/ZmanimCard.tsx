@@ -51,6 +51,11 @@ export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmani
       <DirectoryHeader title={title} anchorLabel={locationLabel} titleInHeader banner={banner} />
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+        {/* ZmanimBody's sub-headings are h3s, written to sit under a caller's own
+            h2. This page's only heading above them is the h1, so without this
+            they skip a level (axe: heading-order). Screen-reader-only: the h1
+            already says the same thing visibly. */}
+        <h2 className="sr-only">Times and Shabbos</h2>
         <ZmanimBody data={data} status={status} now={now} />
       </section>
     </CategoryBandFrame>

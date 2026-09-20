@@ -81,6 +81,26 @@ describe('ListingActionsMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
+  // aria-pressed isn't a supported attribute of role="menuitem" (axe:
+  // aria-allowed-attr, critical). The items' labels already carry the state —
+  // "Pin"/"Pinned", "Set location"/"Location set" — so nothing is lost.
+  it('puts no aria-pressed on any menu item, which the menuitem role does not support', async () => {
+    vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
+      anchorListingId: null,
+      setListingAnchor: vi.fn(),
+      unsetListingAnchor: vi.fn(),
+    } as unknown as ReturnType<typeof locationContext.useOptionalLocation>)
+    const user = userEvent.setup()
+    renderMenu({ geo: { lat: 39.95, lng: -75.16 } })
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+
+    const items = screen.getAllByRole('menuitem')
+    // Pin and Set location are the two that used to carry it.
+    expect(items.length).toBeGreaterThanOrEqual(3)
+    for (const item of items) expect(item, item.textContent ?? '').not.toHaveAttribute('aria-pressed')
+  })
+
   // Material's "state layer" convention for an icon-only button — see the
   // kebab button's own doc comment. Kept lit for as long as the menu is
   // open (not just for the hover/press instant), so there's a visible line

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FeedbackForm from './FeedbackForm'
 import { submitRequest } from '@/lib/submitRequest'
@@ -15,6 +15,47 @@ vi.mock('next/navigation', () => ({
 }))
 
 afterEach(() => cleanup())
+
+describe('FeedbackForm — modal variant semantics', () => {
+  // The desktop /feedback page renders this modal over an empty <main>. It used
+  // to be a bare fixed <div>: no role, no label, no Escape — a screen reader
+  // had no idea it was a dialog and kept reading the page behind it.
+  it('is a labelled, modal dialog', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={vi.fn()} />)
+
+    const dialog = screen.getByRole('dialog', { name: 'Send feedback' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Send feedback' })).toBeInTheDocument()
+  })
+
+  it('closes on Escape, like every other dialog here', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={onClose} />)
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not listen for Escape once it is unmounted', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    const { unmount } = renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" onClose={onClose} />)
+    unmount()
+
+    await user.keyboard('{Escape}')
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('the inline variant is the page itself: an h1, and not a dialog', () => {
+    renderWithProviders(<FeedbackForm heading="Send feedback" successMessage="Thanks!" variant="inline" />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Send feedback' })).toBeInTheDocument()
+  })
+})
 
 describe('FeedbackForm — inline variant (the mobile Feedback tab)', () => {
   it('lets the visitor send a second message after the first succeeds', async () => {

@@ -80,6 +80,20 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
     turnstileRef.current?.reset()
   }
 
+  // Escape closes the modal variant, as it does every other dialog in the app.
+  useEffect(() => {
+    if (variant !== 'modal' || !onClose) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [variant, onClose])
+
+  // The dialog's title is a section under the page; the inline variant IS the
+  // page (FeedbackScreen's mobile branch), so its heading is the page's h1.
+  const Heading = variant === 'modal' ? 'h2' : 'h1'
+
   const wrap = (children: React.ReactNode) => {
     if (variant !== 'modal') {
       return <div className="mx-auto w-full max-w-md px-4 py-8">{children}</div>
@@ -110,8 +124,14 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
       <div
         className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
         onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+        role="presentation"
       >
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">{children}</div>
+        {/* role="dialog" + aria-modal: without them a screen reader has no idea
+            this is a modal, and reads the page behind it as still live. Same
+            shape as ActionDialog's. */}
+        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label={heading}>
+          {children}
+        </div>
       </div>,
       document.body,
     )
@@ -120,7 +140,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   if (status === 'success') {
     return wrap(
       <>
-        <h3 className="text-lg font-semibold text-slate-900">Thanks for your note!</h3>
+        <Heading className="text-lg font-semibold text-slate-900">Thanks for your note!</Heading>
         <p className="mt-2 text-sm text-slate-600">{successMessage}</p>
         {variant === 'modal' ? (
           <button
@@ -144,7 +164,7 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
   return wrap(
     <>
       <div className="flex items-start justify-between">
-        <h3 className="text-lg font-semibold text-slate-900">{heading}</h3>
+        <Heading className="text-lg font-semibold text-slate-900">{heading}</Heading>
         {variant === 'modal' && (
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
             &times;
