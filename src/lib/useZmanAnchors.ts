@@ -5,6 +5,7 @@ import { useToday } from '@/lib/useNow'
 import { community } from '@/community.config'
 import type { ZmanimData } from '@/types'
 import { applyOffsetMinutes } from '@/lib/zmanim'
+import { zmanimPath } from '@/lib/zmanimRequest'
 import { clampTimeText, type MinyanBounds, type ZmanAnchor } from '@/lib/davening'
 
 export type AnchorTimes = {
@@ -40,7 +41,7 @@ function dayScopedKey(day: string, key: string): string {
 
 async function loadOne(cacheKey: string, geo: Geo): Promise<void> {
   try {
-    const res = await fetch(`/api/zmanim?lat=${geo.lat}&lng=${geo.lng}`)
+    const res = await fetch(zmanimPath(geo.lat, geo.lng))
     const json = (await res.json()) as { ok: boolean; data?: ZmanimData }
     if (json.ok && json.data) {
       const sunset = json.data.dailyZmanim.find((z) => z.label === 'Sunset')

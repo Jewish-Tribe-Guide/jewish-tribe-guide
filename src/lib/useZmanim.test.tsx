@@ -102,6 +102,14 @@ afterEach(() => {
 })
 
 describe('useZmanim', () => {
+  it('requests rounded coordinates, so GPS jitter cannot defeat the CDN cache', async () => {
+    render(<Probe testId="a" coords={{ lat: 41.12345, lng: -73.98765 }} />)
+    await flush()
+
+    const url = String(vi.mocked(fetch).mock.calls[0]![0])
+    expect(url).toMatch(/^\/api\/zmanim\?lat=41\.12&lng=-73\.99&tzid=/)
+  })
+
   it('shares one fetch between two simultaneously-mounted callers for the identical coordinates', async () => {
     const coords = freshCoords()
     render(

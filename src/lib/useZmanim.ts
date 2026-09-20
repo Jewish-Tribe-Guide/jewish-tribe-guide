@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { ZmanimData } from '@/types'
 import { community } from '@/community.config'
 import { useToday } from '@/lib/useNow'
+import { zmanimPath } from '@/lib/zmanimRequest'
 
 /** 'no-location' means no coords were passed at all — a distinct state from
  *  'error', since the fix is the visitor entering an address rather than a
@@ -92,7 +93,7 @@ export function useZmanim(coords?: { lat: number; lng: number } | null): {
 
     let promise = inFlight.get(key)
     if (!promise) {
-      const url = `/api/zmanim?lat=${coords.lat}&lng=${coords.lng}&tzid=${encodeURIComponent(community.timezone)}`
+      const url = zmanimPath(coords.lat, coords.lng, community.timezone)
       promise = loadOne(url).finally(() => inFlight.delete(key))
       inFlight.set(key, promise)
     }

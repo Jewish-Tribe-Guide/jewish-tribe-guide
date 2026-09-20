@@ -547,7 +547,7 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
           }
           if (kind === 'jewishTimes') {
             // Still a JS branch on zmanimCategory: useZmanim fetches
-            // /api/zmanim uncached, straight through to Hebcal, and hiding
+            // /api/zmanim (CDN-cached, but still a request), and hiding
             // this with CSS alone would cost every phone visitor a
             // round-trip for a card they never see (mobile has no
             // equivalent of this card at all) — same reasoning as before
