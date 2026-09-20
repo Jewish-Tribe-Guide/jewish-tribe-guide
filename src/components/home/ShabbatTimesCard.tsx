@@ -107,7 +107,7 @@ export default function ShabbatTimesCard({
                 </div>
               )}
             </div>
-          ) : data.holidayPeriod ? (
+          ) : primaryBlock === 'holiday' && data.holidayPeriod ? (
             <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">
                 {data.holidayPeriod.name}

@@ -194,6 +194,35 @@ describe('ShabbatTimesCard — the holiday block', () => {
     expect(screen.getByText(/^Candles /)).toBeInTheDocument()
     expect(screen.getByText(/^Havdalah /)).toBeInTheDocument()
   })
+
+  // A holiday within the lookahead window used to replace the regular
+  // Candles/Havdalah rows unconditionally, even mid-Shabbos before that
+  // week's own Havdalah — reading exactly like Shabbos had already ended.
+  it('keeps showing tonight’s Havdalah instead of jumping to an upcoming holiday while Shabbos is still in progress', () => {
+    const HOUR_MS = 60 * 60 * 1000
+    const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
+    mockUseZmanim.mockReturnValue({
+      data: {
+        ...readyData,
+        isShabbos: true,
+        shabbos: {
+          candleLighting: { label: 'Friday', time: '7:09 PM', iso: at(-20 * HOUR_MS) },
+          havdalah: { label: 'Saturday', time: '8:07 PM', iso: at(HOUR_MS) },
+        },
+        holidayPeriod: {
+          name: 'Rosh Hashana',
+          begins: { label: 'Sun, Sep 13', time: '6:57 PM', iso: at(25 * HOUR_MS) },
+          candleLightings: [{ label: 'Sun, Sep 13', time: '6:57 PM', iso: at(25 * HOUR_MS) }],
+          ends: { label: 'Tue, Sep 15', time: '7:53 PM', iso: at(73 * HOUR_MS) },
+        },
+      },
+      status: 'ready',
+    })
+    render(<ShabbatTimesCard coords={{ lat: 1, lng: 2 }} locationLabel="Philadelphia" />)
+
+    expect(screen.getByText(/^Havdalah /)).toBeInTheDocument()
+    expect(screen.queryByText('Rosh Hashana')).not.toBeInTheDocument()
+  })
 })
 
 // The fast block now competes with the holiday-or-Shabbos block for the

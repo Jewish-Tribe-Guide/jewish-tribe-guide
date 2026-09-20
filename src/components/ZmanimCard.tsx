@@ -7,6 +7,7 @@ import { CategoryGlyph } from '@/lib/categoryIcons'
 import { useZmanim } from '@/lib/useZmanim'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useNow } from '@/lib/useNow'
 
 type Props = {
   /** Coordinates to compute zmanim for — the visitor's typed address, or the
@@ -28,6 +29,7 @@ type Props = {
 
 export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmanim & Shabbos', icon, color = '#64748b', bandImageUrl }: Props) {
   const { data, status } = useZmanim(coords)
+  const now = useNow()
 
   // Puts "‹ {title}" in SiteHeader on mobile — see GenericDirectory's
   // identical call, which this mirrors now that this screen has the same gap
@@ -49,7 +51,7 @@ export default function ZmanimCard({ coords, locationLabel, onUp, title = 'Zmani
       <DirectoryHeader title={title} anchorLabel={locationLabel} titleInHeader banner={banner} />
 
       <section className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-        <ZmanimBody data={data} status={status} />
+        <ZmanimBody data={data} status={status} now={now} />
       </section>
     </CategoryBandFrame>
   )

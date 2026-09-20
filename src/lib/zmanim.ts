@@ -457,6 +457,26 @@ function hasEnded(ends: ZmanEntry | null | undefined, nowMs: number, graceMs = 0
   return ms !== null && ms + graceMs <= nowMs
 }
 
+/** Whether `now` falls inside the current/upcoming Shabbos itself — between
+ *  candle lighting and havdalah, both ends inclusive of "we don't actually
+ *  know" (missing `iso` on either side reads as "not in progress", same as
+ *  `hasEnded`'s own convention).
+ *
+ *  This exists so a holiday landing within the lookahead window (see
+ *  `lookaheadDays`) can't silently replace "Havdalah tonight" with "Begins
+ *  [holiday]" while Havdalah hasn't happened yet: `findHolidayPeriod` only
+ *  guards its far edge (`windowEnd`), not this one, and a query made from
+ *  Saturday afternoon reaches forward far enough that a Yom Tov starting
+ *  Sunday or Monday night already satisfies it — mid-Shabbos, before that
+ *  week's own Havdalah. See `resolvePrimaryZmanimBlock`, which is the one
+ *  place this actually gets consulted. */
+export function isShabbosCurrentlyInProgress(shabbos: ZmanimData['shabbos'], nowMs: number): boolean {
+  const beginMs = entryMs(shabbos.candleLighting)
+  const endMs = entryMs(shabbos.havdalah)
+  if (beginMs === null || endMs === null) return false
+  return beginMs <= nowMs && nowMs < endMs
+}
+
 /** How long the fast block stays up after `fastPeriod.ends` before the card
  *  falls back to Shabbos/holiday — long enough that a visitor checking the
  *  card right after a fast ends (havdalah, a quick bite) still sees it
@@ -479,7 +499,9 @@ const FAST_GRACE_PERIOD_MS = 90 * 60 * 1000
  *  isolation might not bother) rather than picking arbitrarily, since a
  *  same-day fast is virtually always the sooner of the two in practice. */
 export function resolvePrimaryZmanimBlock(data: ZmanimData, nowMs: number): 'fast' | 'holiday' | 'shabbos' {
-  const primary = data.holidayPeriod
+  // A holiday within the lookahead window never preempts a Shabbos that's
+  // still actually in progress — see isShabbosCurrentlyInProgress.
+  const primary = data.holidayPeriod && !isShabbosCurrentlyInProgress(data.shabbos, nowMs)
     ? { kind: 'holiday' as const, begins: data.holidayPeriod.begins }
     : { kind: 'shabbos' as const, begins: data.shabbos.candleLighting }
 

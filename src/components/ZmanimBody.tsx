@@ -2,6 +2,7 @@
 
 import type { ZmanimData, ZmanEntry } from '@/types'
 import type { ZmanimStatus } from '@/lib/useZmanim'
+import { isShabbosCurrentlyInProgress } from '@/lib/zmanim'
 
 // ── The zmanim content itself — Hebrew date, the daily zmanim grid, and
 // upcoming Shabbos — shared by the full Zmanim & Shabbos page (ZmanimCard)
@@ -9,11 +10,11 @@ import type { ZmanimStatus } from '@/lib/useZmanim'
 // wrap this in the same bordered card. Keeping the rendering in one place
 // means the two can never drift on what a "ready" zmanim view actually shows.
 
-export default function ZmanimBody({ data, status }: { data: ZmanimData | null; status: ZmanimStatus }) {
+export default function ZmanimBody({ data, status, now }: { data: ZmanimData | null; status: ZmanimStatus; now: number }) {
   if (status === 'loading') return <LoadingState />
   if (status === 'no-location') return <NoLocationState />
   if (status === 'error') return <ErrorState />
-  if (status === 'ready' && data) return <ReadyState data={data} />
+  if (status === 'ready' && data) return <ReadyState data={data} now={now} />
   return null
 }
 
@@ -52,8 +53,15 @@ function ErrorState() {
   )
 }
 
-function ReadyState({ data }: { data: ZmanimData }) {
+function ReadyState({ data, now }: { data: ZmanimData; now: number }) {
   const { hebrewDate, dailyZmanim, shabbos, isFriday, isShabbos, holidays, holidayPeriod, fastPeriod } = data
+
+  // A holiday within the lookahead window never preempts a Shabbos that's
+  // still actually in progress — see isShabbosCurrentlyInProgress in
+  // lib/zmanim.ts for why this guard exists (candle lighting has fired but
+  // Havdalah hasn't, so this page keeps showing tonight's Havdalah instead
+  // of jumping ahead to the next holiday's own "Begins").
+  const showHolidayPeriod = holidayPeriod !== null && !isShabbosCurrentlyInProgress(shabbos, now)
 
   // Today's own Jewish-calendar events (Rosh Chodesh, or a Yom Tov day
   // itself) — separate from `holidayPeriod` below, which is the NEXT
@@ -95,7 +103,7 @@ function ReadyState({ data }: { data: ZmanimData }) {
             their own h2 section heading — h4 skipped a level. Purely
             semantic; the size/weight come entirely from the className
             below, not the tag, so this has no visual effect. */}
-        {holidayPeriod ? (
+        {showHolidayPeriod && holidayPeriod ? (
           <>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
               {holidayPeriod.name}

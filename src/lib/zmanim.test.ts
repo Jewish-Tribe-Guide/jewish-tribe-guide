@@ -642,6 +642,45 @@ describe('resolvePrimaryZmanimBlock', () => {
     }
     expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('fast')
   })
+
+  // A holiday within the lookahead window used to preempt Shabbos
+  // unconditionally the moment it appeared in the window, even while
+  // Shabbos itself was still in progress and Havdalah hadn't happened yet
+  // — e.g. checked Saturday afternoon with a Yom Tov starting Sunday or
+  // Monday night already inside the 3-day floor lookaheadDays guarantees.
+  it('picks Shabbos over an upcoming holiday while Shabbos is still in progress (before this week\'s own Havdalah)', () => {
+    const data: ZmanimData = {
+      ...base,
+      shabbos: {
+        candleLighting: { label: 'Friday', time: '6:46 PM', iso: iso(-20 * HOUR) },
+        havdalah: { label: 'Saturday', time: '7:43 PM', iso: iso(1 * HOUR) },
+      },
+      holidayPeriod: {
+        name: 'Rosh Hashana',
+        begins: { label: 'Sun', time: '6:57 PM', iso: iso(25 * HOUR) },
+        candleLightings: [{ label: 'Sun', time: '6:57 PM', iso: iso(25 * HOUR) }],
+        ends: { label: 'Tue', time: '7:53 PM', iso: iso(73 * HOUR) },
+      },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('shabbos')
+  })
+
+  it('picks the holiday once this week\'s own Havdalah has passed', () => {
+    const data: ZmanimData = {
+      ...base,
+      shabbos: {
+        candleLighting: { label: 'Friday', time: '6:46 PM', iso: iso(-26 * HOUR) },
+        havdalah: { label: 'Saturday', time: '7:43 PM', iso: iso(-1 * HOUR) },
+      },
+      holidayPeriod: {
+        name: 'Rosh Hashana',
+        begins: { label: 'Sun', time: '6:57 PM', iso: iso(4 * HOUR) },
+        candleLightings: [{ label: 'Sun', time: '6:57 PM', iso: iso(4 * HOUR) }],
+        ends: { label: 'Tue', time: '7:53 PM', iso: iso(52 * HOUR) },
+      },
+    }
+    expect(resolvePrimaryZmanimBlock(data, NOW)).toBe('holiday')
+  })
 })
 
 describe('lookaheadDays', () => {
