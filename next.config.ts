@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { optimizedImagePatterns } from "./src/lib/imageHosts";
+import { buildCsp } from "./src/lib/csp";
 
 // Security headers applied to every response. These are the "safe" set — they
 // harden against clickjacking, MIME-sniffing, and referrer leakage without
@@ -11,6 +12,23 @@ const securityHeaders = [
   // Block the site from being embedded in an <iframe> elsewhere (clickjacking).
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+  // The full policy, in REPORT-ONLY mode: the browser evaluates it and reports
+  // what it would block, but blocks nothing, so a wrong allowlist can't break
+  // the map or the forms. Violations go to Sentry from production. Once the
+  // reports are quiet, enforce it by renaming this header to
+  // 'Content-Security-Policy' (and dropping the frame-ancestors-only one above,
+  // which the full policy already contains). See src/lib/csp.ts for what it
+  // does and deliberately doesn't cover.
+  {
+    key: 'Content-Security-Policy-Report-Only',
+    value: buildCsp({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+      sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      reportViolations: process.env.VERCEL_ENV === 'production',
+      dev: process.env.NODE_ENV !== 'production',
+    }),
+  },
   // Stop browsers from MIME-sniffing responses into a different content type.
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // Don't leak full URLs (which can carry context) to other origins.
