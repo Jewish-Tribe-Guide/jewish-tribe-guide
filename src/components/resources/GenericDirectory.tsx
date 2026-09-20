@@ -1221,7 +1221,7 @@ export default function GenericDirectory({ category, items, anchorLabel, address
             <div
               className={[
                 'gap-2 flex-nowrap overflow-x-auto pb-1',
-                filtersOpen ? 'flex' : 'hidden',
+                filtersOpen ? 'flex animate-[fadeIn_180ms_ease-out] desktop:animate-none' : 'hidden',
                 'desktop:flex',
               ].join(' ')}
               style={{ scrollbarWidth: 'none' }}

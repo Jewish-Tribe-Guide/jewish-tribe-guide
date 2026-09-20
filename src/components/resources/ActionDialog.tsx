@@ -36,12 +36,12 @@ export default function ActionDialog({ isOpen, onClose, title, children }: Props
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
+      className="overlay-in fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
       <div
-        className="flex w-full max-w-xl max-h-[85vh] flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
+        className="dialog-in flex w-full max-w-xl max-h-[85vh] flex-col rounded-xl border border-slate-200 bg-white shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label={title}

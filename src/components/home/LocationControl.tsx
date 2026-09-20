@@ -338,8 +338,8 @@ export default function LocationControl({ controls }: Props) {
           createPortal(
             <div
               ref={popoverRef}
-              className="fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
-              style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8 }}
+              className="animate-[menuIn_140ms_ease-out] fixed inset-x-3 z-50 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
+              style={{ top: (mapAnchor?.getBoundingClientRect().bottom ?? 64) + 8, transformOrigin: 'top center' }}
             >
               {popoverBody}
             </div>,
@@ -348,7 +348,8 @@ export default function LocationControl({ controls }: Props) {
         ) : (
           <div
             ref={popoverRef}
-            className="visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
+            style={{ transformOrigin: 'top right' }}
+            className="animate-[menuIn_140ms_ease-out] visible absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-900/10"
           >
             {popoverBody}
           </div>

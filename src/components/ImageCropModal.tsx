@@ -169,7 +169,7 @@ export default function ImageCropModal({ source, shape, aspect = 1, onCancel, on
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true">
+    <div className="overlay-in fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl">
         <p className="mb-3 text-sm font-semibold text-slate-800">Reposition photo</p>
 

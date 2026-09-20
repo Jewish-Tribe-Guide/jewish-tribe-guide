@@ -83,12 +83,12 @@ export default function LiveLocationPrompt({ enabled, onShare }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="overlay-in fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) dismiss() }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
+        className="dialog-in w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-5 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-label="Share your live location"

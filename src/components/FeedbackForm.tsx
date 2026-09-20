@@ -122,14 +122,14 @@ export default function FeedbackForm({ heading, successMessage, variant = 'modal
     // this element's own box (now correctly sized once portaled) does.
     return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
+        className="overlay-in fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
         onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
         role="presentation"
       >
         {/* role="dialog" + aria-modal: without them a screen reader has no idea
             this is a modal, and reads the page behind it as still live. Same
             shape as ActionDialog's. */}
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label={heading}>
+        <div className="dialog-in w-full max-w-md rounded-xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-label={heading}>
           {children}
         </div>
       </div>,

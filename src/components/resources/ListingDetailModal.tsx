@@ -190,7 +190,7 @@ export default function ListingDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
+      className="overlay-in fixed inset-0 z-50 flex items-center justify-center gap-3 p-4 bg-slate-900/40"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="presentation"
     >
@@ -239,7 +239,7 @@ export default function ListingDetailModal({
         // replacing it. That's the entire point of keeping this one element
         // mounted instead of swapping to ActionDialog: a resize is still
         // continuous, a close-then-reopen never is.
-        className={`flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
+        className={`dialog-in flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
         role="dialog"
         aria-modal="true"
         aria-label={formOpen ? (formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem') : name}
