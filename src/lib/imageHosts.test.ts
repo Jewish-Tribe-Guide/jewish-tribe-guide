@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { isOptimizableImage, optimizedImagePatterns } from './imageHosts'
+import { isOptimizableImage, optimizedImagePatterns, storageThumbnailUrl } from './imageHosts'
 
 const SUPABASE = 'https://abcdefg.supabase.co'
 
@@ -128,5 +128,49 @@ describe('isOptimizableImage', () => {
     vi.stubEnv('NEXT_PUBLIC_IMAGES_UNOPTIMIZED', '1')
     vi.stubEnv('NEXT_PUBLIC_UPLOADED_IMAGES_UNOPTIMIZED', '0')
     expect(isOptimizableImage('https://images.unsplash.com/photo-456?w=400')).toBe(false)
+  })
+})
+
+describe('storageThumbnailUrl', () => {
+  const PHOTO = `${SUPABASE}/storage/v1/object/public/site-assets/listing-photo/1786438175519-2c5byb.jpeg`
+
+  it('rewrites a public Storage object to the transform endpoint, cropped to a square at 2x the shown size', () => {
+    const url = new URL(storageThumbnailUrl(PHOTO, 40)!)
+
+    expect(url.origin).toBe(SUPABASE)
+    expect(url.pathname).toBe('/storage/v1/render/image/public/site-assets/listing-photo/1786438175519-2c5byb.jpeg')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ width: '80', height: '80', resize: 'cover', quality: '70' })
+  })
+
+  it('replaces any query string the original carried, rather than appending to it', () => {
+    const url = new URL(storageThumbnailUrl(`${PHOTO}?t=123&width=9999`, 36)!)
+    expect(url.searchParams.get('t')).toBeNull()
+    expect(url.searchParams.get('width')).toBe('72')
+  })
+
+  it('clamps absurd sizes', () => {
+    expect(new URL(storageThumbnailUrl(PHOTO, 4000)!).searchParams.get('width')).toBe('512')
+    expect(new URL(storageThumbnailUrl(PHOTO, 1)!).searchParams.get('width')).toBe('16')
+  })
+
+  it.each([
+    ['another host (Unsplash)', 'https://images.unsplash.com/photo-1?w=400'],
+    ['a hotlinked thumbnail host', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:abc'],
+    ['a lookalike host', 'https://evilsupabase.co/storage/v1/object/public/a/b.jpg'],
+    ['a non-public Storage path', `${SUPABASE}/storage/v1/object/authenticated/a/b.jpg`],
+    ['a path outside Storage', `${SUPABASE}/rest/v1/resource`],
+    ['plain http', 'http://abcdefg.supabase.co/storage/v1/object/public/a/b.jpg'],
+    ['not a URL', 'not a url'],
+    ['an empty string', ''],
+  ])('leaves %s alone (returns null)', (_name, src) => {
+    expect(storageThumbnailUrl(src, 40)).toBeNull()
+  })
+
+  it('is switched off by NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED=1, and only by that exact value', () => {
+    vi.stubEnv('NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED', '1')
+    expect(storageThumbnailUrl(PHOTO, 40)).toBeNull()
+
+    vi.stubEnv('NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED', '0')
+    expect(storageThumbnailUrl(PHOTO, 40)).not.toBeNull()
   })
 })

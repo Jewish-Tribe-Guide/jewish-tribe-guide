@@ -95,3 +95,44 @@ export function isOptimizableImage(src: string): boolean {
     return false
   }
 }
+
+/** A small, cropped copy of a Supabase Storage photo, made by Storage's own
+ *  image transformation — or null when `src` isn't one (or thumbnails are
+ *  switched off), meaning "use the original".
+ *
+ *  Why this exists: a listing's photo is stored once, at up to 640px, and
+ *  shown as a 40px avatar in every row of every list. With the Vercel
+ *  optimizer turned off for uploads (UPLOADED_IMAGES_UNOPTIMIZED, above) each
+ *  row downloaded the whole original — 14-50 KB for a picture the size of a
+ *  thumbnail, ~2 MB across a long list. Measured on a real one: 13.5 KB
+ *  original, 1.5 KB at 96px. Storage does the resize on its side and caches
+ *  it, so this costs no Vercel optimizer quota at all, and needs no second
+ *  copy at upload time and no backfill of existing photos.
+ *
+ *  `px` is the size the image is DISPLAYED at; it is doubled here so a
+ *  2x-density screen is still sharp. The result is served directly, so render
+ *  it `unoptimized` — and keep the original as a fallback, because Storage
+ *  transformations are a plan feature (a project without them answers 400).
+ *
+ *  NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED=1 turns this off everywhere (e.g.
+ *  if Supabase's image-transformation usage ever needs cutting). */
+export function storageThumbnailUrl(src: string, px: number): string | null {
+  if (process.env.NEXT_PUBLIC_STORAGE_THUMBNAILS_DISABLED === '1') return null
+  try {
+    const url = new URL(src)
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.supabase.co')) return null
+    const from = '/storage/v1/object/public/'
+    if (!url.pathname.startsWith(from)) return null
+
+    const size = Math.min(512, Math.max(16, Math.round(px * 2)))
+    url.pathname = url.pathname.replace(from, '/storage/v1/render/image/public/')
+    url.search = ''
+    url.searchParams.set('width', String(size))
+    url.searchParams.set('height', String(size))
+    url.searchParams.set('resize', 'cover')
+    url.searchParams.set('quality', '70')
+    return url.toString()
+  } catch {
+    return null
+  }
+}

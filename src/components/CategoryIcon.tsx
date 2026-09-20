@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
-import { isOptimizableImage } from '@/lib/imageHosts'
+import { isOptimizableImage, storageThumbnailUrl } from '@/lib/imageHosts'
 import { CategoryGlyph } from '@/lib/categoryIcons'
 import { categoryTint, categoryRing } from '@/lib/categoryColor'
 
@@ -48,6 +49,13 @@ type Props = {
  *  exists exactly once. */
 export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, className = 'h-10 w-10 text-xl', sizePx = 40, ring = true }: Props) {
   const hasImage = !!iconImageUrl?.trim()
+  // A small copy made by Supabase Storage, for an uploaded photo — see
+  // storageThumbnailUrl. Falls back to the original if that request fails
+  // (transformations are a plan feature, so a project without them 400s).
+  // Keyed by the URL so a different picture gets its own second chance.
+  const thumb = hasImage ? storageThumbnailUrl(iconImageUrl!, sizePx) : null
+  const [failedThumb, setFailedThumb] = useState<string | null>(null)
+  const useThumb = thumb !== null && failedThumb !== thumb
   return (
     <span
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${className}`}
@@ -60,12 +68,15 @@ export default function CategoryIcon({ icon, categoryId, iconImageUrl, color, cl
         // otherwise (see isOptimizableImage's own note), and that's a
         // thrown error, not a broken image icon.
         <Image
-          src={iconImageUrl!}
+          src={useThumb ? thumb : iconImageUrl!}
           alt=""
           fill
           sizes={`${sizePx}px`}
           className="object-cover"
-          unoptimized={!isOptimizableImage(iconImageUrl!)}
+          // The thumbnail is already the right size, so it never goes through
+          // Vercel's optimizer (which is the whole point).
+          unoptimized={useThumb || !isOptimizableImage(iconImageUrl!)}
+          onError={useThumb ? () => setFailedThumb(thumb) : undefined}
         />
       ) : (
         // w-[55%]/h-[55%]: a line icon reads as too small relative to its
