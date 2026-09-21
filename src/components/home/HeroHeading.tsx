@@ -9,6 +9,7 @@ import type { CategoryConfig } from '@/lib/categories'
 import { isOptimizableImage } from '@/lib/imageHosts'
 import { SkylineIcon } from '@/components/icons'
 import SearchBox from './SearchBox'
+import CommunityStrip from './CommunityStrip'
 import HeroSearchDropdown from './HeroSearchDropdown'
 import type { CardDef, ListingHit } from './sections'
 
@@ -199,6 +200,7 @@ export default function HeroHeading({
         <p className="mt-3 max-w-2xl mx-auto text-[15px] sm:text-base text-slate-500">
           {settings.mission}
         </p>
+        <CommunityStrip interactive={interactive} className="mx-auto mt-4 max-w-md" />
         {ui.search.landing && (
           <div className="mt-8 max-w-xl mx-auto">
             <SearchBox query={query} onQueryChange={onQueryChange} interactive={interactive} placeholder={settings.searchPlaceholder} />
@@ -383,6 +385,7 @@ export default function HeroHeading({
               </button>
             )}
           </div>
+          <CommunityStrip interactive={interactive} className="mt-5 max-w-[585px]" />
         </div>
       </section>
     </>

@@ -271,3 +271,36 @@ describe('HeroHeading — the search dropdown', () => {
     expect(screen.queryByText(/Nothing matches/)).not.toBeInTheDocument()
   })
 })
+
+// Visitors read the site as a static directory. Both layouts render at once
+// (CSS decides which shows), so the "community-maintained" line has to be in
+// each one — the mobile block used to have no invitation to contribute at all.
+describe('HeroHeading — community-maintained line', () => {
+  const settings = {
+    name: 'Philly Jewish Guide',
+    heroTitle: 'What are you looking for?',
+    mission: 'mission',
+    searchPlaceholder: 'Search',
+    desktopHeroHeadline: 'Headline',
+    desktopHeroSubhead: 'subhead',
+    desktopHeroImage: null,
+  }
+
+  it('is in both the mobile block and the desktop band', () => {
+    const { container } = render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    const mobile = container.querySelector('section.desktop\\:hidden')!
+    const desktop = [...container.querySelectorAll('section')].find((s) => s !== mobile)!
+    expect(mobile.textContent).toContain('Community-maintained.')
+    expect(desktop.textContent).toContain('Community-maintained.')
+  })
+
+  it('sits directly under the mission on mobile, above the search box', () => {
+    const { container } = render(<HeroHeading settings={settings} query="" onQueryChange={vi.fn()} />)
+    const mobile = container.querySelector('section.desktop\\:hidden')!
+    const text = mobile.textContent!
+    expect(text.indexOf('mission')).toBeLessThan(text.indexOf('Community-maintained.'))
+    const strip = [...mobile.querySelectorAll('p')].find((p) => p.textContent?.includes('Community-maintained.'))!
+    const input = mobile.querySelector('input')!
+    expect(strip.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
