@@ -45,10 +45,10 @@ export default defineConfig({
       // will. Raise these numbers as coverage grows — never lower them to
       // make a failing PR pass; fix the coverage instead.
       thresholds: {
-        statements: 58,
-        branches: 56,
-        functions: 59,
-        lines: 59,
+        statements: 62,
+        branches: 59,
+        functions: 61,
+        lines: 63,
       },
     },
   },
