@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { fieldIsVisible, isCategorySyncEligible, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
+import { fieldIsVisible, isCategorySyncEligible, resolveCapabilities, selectValues, type CategoryConfig, type CategoryField } from '@/lib/categories'
 import { formatPhone, normalizeUrl } from '@/lib/validation'
 import { hasListingChanged } from '@/lib/listingDiff'
 import type { DirectoryResource, ResourceSubmission } from '@/types'
@@ -14,6 +14,8 @@ import UpButton from '@/components/UpButton'
 import Honeypot from '@/components/Honeypot'
 import TurnstileWidget, { type TurnstileHandle } from '@/components/TurnstileWidget'
 import PrivacyNote from '@/components/PrivacyNote'
+import RemovalRequest from './RemovalRequest'
+import { ui } from '@/lib/uiConfig'
 import { useCommunitySlug } from '@/lib/communityContext'
 import { withCommunity } from '@/lib/useCommunityData'
 import { useSetScreenHeader } from '@/lib/headerVisibility'
@@ -129,6 +131,9 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [done, setDone] = useState(false)
+  // What was submitted, for the confirmation copy: an edit and a removal
+  // request get different thank-yous.
+  const [doneKind, setDoneKind] = useState<'submission' | 'removal'>('submission')
 
   // Which audience sections (Women's/Men's/Keilim, …) are expanded — purely a
   // display preference layered on top of fieldIsVisible's hard gate (a
@@ -374,8 +379,9 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
               confirmation is actually named, not a duplicate of it. */}
           <h2 className="text-lg font-semibold text-green-800 mb-1">Thank you!</h2>
           <p className="text-sm text-green-700">
-            Your {mode === 'edit' ? 'suggested edit' : 'submission'} was received and will appear once
-            it&apos;s reviewed and approved.
+            {doneKind === 'removal'
+              ? 'Your removal request was received. A moderator will review it before anything changes.'
+              : `Your ${mode === 'edit' ? 'suggested edit' : 'submission'} was received and will appear once it’s reviewed and approved.`}
           </p>
         </div>
       </div>
@@ -601,6 +607,25 @@ export default function ListingForm({ category, mode, existing, onUp, onSubmitte
         </button>
 
         <PrivacyNote />
+
+        {mode === 'edit' && existing && !adminSubmit && !onPreviewSubmit && ui.contributions.report && resolveCapabilities(config.capabilities).report && (
+          <RemovalRequest
+            listing={{ id: existing.id, name: existing.name }}
+            turnstileToken={turnstileToken}
+            canSubmit={!TURNSTILE_ACTIVE || !!turnstileToken}
+            resetTurnstile={resetTurnstile}
+            honeypot={honeypot}
+            submittedBy={
+              submitterName.trim() || submitterEmail.trim()
+                ? { name: submitterName.trim() || undefined, email: submitterEmail.trim() || undefined }
+                : undefined
+            }
+            onDone={() => {
+              setDoneKind('removal')
+              setDone(true)
+            }}
+          />
+        )}
       </form>
       </div>
     </div>

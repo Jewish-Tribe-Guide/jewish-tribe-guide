@@ -8,6 +8,7 @@ import { mockRouter } from '@/test/nextNavigationMock'
 import type { CategoryField } from '@/lib/categories'
 import type { DirectoryResource } from '@/types'
 import ListingForm from './ListingForm'
+import { ui } from '@/lib/uiConfig'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
@@ -107,6 +108,59 @@ describe('ListingForm', () => {
     expect(screen.getByRole('button', { name: 'Submit edit for review' })).toBeInTheDocument()
     expect(screen.getByDisplayValue('Kosher Mart')).toBeInTheDocument()
     expect(screen.getByDisplayValue('(215) 555-0100')).toBeInTheDocument()
+  })
+
+  // Removal used to be a separate Report action in the kebab. It now lives at
+  // the foot of the edit form, since "this listing is wrong" is one thing.
+  describe('removal request', () => {
+    const existing = () => makeListing({ id: 'listing-1', name: 'Kosher Mart' })
+    const removalLine = /closed or shouldn.t be listed/i
+
+    it('is offered at the bottom of an edit', () => {
+      renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
+      expect(screen.getByRole('button', { name: removalLine })).toBeInTheDocument()
+    })
+
+    it('is not offered when adding a new listing', () => {
+      renderWithProviders(<ListingForm category={makeCategory()} mode="create" {...handlers} />)
+      expect(screen.queryByRole('button', { name: removalLine })).not.toBeInTheDocument()
+    })
+
+    it('is not offered when the category has reporting turned off', () => {
+      const category = makeCategory({ capabilities: { add: true, edit: true, report: false, directorySearch: true, map: true } })
+      renderWithProviders(<ListingForm category={category} mode="edit" existing={existing()} {...handlers} />)
+      expect(screen.queryByRole('button', { name: removalLine })).not.toBeInTheDocument()
+    })
+
+    it('is not offered when the community turned reporting off site-wide', () => {
+      ui.contributions.report = false
+      try {
+        renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
+        expect(screen.queryByRole('button', { name: removalLine })).not.toBeInTheDocument()
+      } finally {
+        ui.contributions.report = true
+      }
+    })
+
+    it('is not offered in the admin preview', () => {
+      renderWithProviders(
+        <ListingForm category={makeCategory()} mode="edit" existing={existing()} onPreviewSubmit={vi.fn()} {...handlers} />,
+      )
+      expect(screen.queryByRole('button', { name: removalLine })).not.toBeInTheDocument()
+    })
+
+    it('filing one shows its own thank-you, and never submits the edit', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubFetchOk({ ok: true })
+      renderWithProviders(<ListingForm category={makeCategory()} mode="edit" existing={existing()} {...handlers} />)
+
+      await user.click(screen.getByRole('button', { name: removalLine }))
+      await user.click(screen.getByRole('button', { name: 'Request removal' }))
+
+      expect(await screen.findByText(/removal request was received/i)).toBeInTheDocument()
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body).operation).toBe('delete')
+    })
   })
 
   // `embedded` — rendered inside a caller-owned overlay (desktop's Edit
