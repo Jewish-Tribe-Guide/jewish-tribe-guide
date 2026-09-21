@@ -23,13 +23,13 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-// ListingForm/ReportListing are the same forms the category directory's own
-// Edit/Report use — already covered by their own test files, and by
+// ListingForm is the same form the category directory's own Edit uses —
+// already covered by its own test file, and by
 // MapPlaceDetail.test.tsx's identical stubbing for the same reason (see that
 // file's own comment): rendering them for real pulls in the Google Maps
 // address widget and Turnstile, which this file has no need to exercise —
 // it only needs to prove ListingDetailModal swaps to the right one, in
-// place, without bubbling to onEdit/onReport.
+// place, without bubbling to onEdit.
 vi.mock('./ListingForm', () => ({
   default: ({ mode, existing, onUp }: { mode: string; existing?: { name: string }; onUp: () => void }) => (
     <div>
@@ -37,9 +37,6 @@ vi.mock('./ListingForm', () => ({
       <button onClick={onUp}>stub cancel</button>
     </div>
   ),
-}))
-vi.mock('./ReportListing', () => ({
-  default: ({ listing }: { listing: { name: string } }) => <p>ReportListing stub — {listing.name}</p>,
 }))
 
 afterEach(() => {
@@ -58,7 +55,6 @@ const requiredHandlers = {
   onFilterBool: vi.fn(),
   onFilterSelect: vi.fn(),
   onEdit: vi.fn(),
-  onReport: vi.fn(),
 }
 
 describe('GenericListingCard — collapsed', () => {
@@ -830,23 +826,17 @@ describe('GenericListingCard — expanded', () => {
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
   })
 
-  it('swaps the dialog\'s own content to the report form — not a separate dialog — when the kebab\'s Report item is clicked', async () => {
+  // Removal is requested at the foot of the edit form (RemovalRequest), not
+  // from a Report row, so neither kebab in the expanded dialog offers one.
+  it('the expanded dialog\'s kebab offers Edit and no Report', async () => {
     const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
     renderWithProviders(
-      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+      <GenericListingCard item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
     )
-
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-
-    expect(screen.getByText('ReportListing stub — Goldi Market')).toBeInTheDocument()
-    expect(requiredHandlers.onReport).not.toHaveBeenCalled()
-    expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(screen.getByRole('heading', { name: 'Report a problem' })).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
   })
 
   // Regression coverage for the actual reason this exists: with no way
@@ -1156,12 +1146,10 @@ describe('GenericListingCard — actions menu corner', () => {
     expect(screen.getByRole('button', { name: /more actions for/i })).toBeInTheDocument()
   })
 
-  // Edit/Report moved into this kebab, mobile only — reachable straight from
-  // the collapsed row, no need to expand the card first. Desktop keeps them
-  // out of this menu; they still live in ListingDetailModal's own footer
-  // (see "GenericListingCard — expanded" above), reached by expanding into
-  // that dialog.
-  it('on mobile, the kebab itself offers Edit and Report, without expanding the card', async () => {
+  // Edit is in this kebab on both platforms — reachable straight from the
+  // collapsed row, no need to expand the card first. There is no Report row:
+  // requesting a removal is the last part of the edit form itself.
+  it('on mobile, the kebab itself offers Edit (and no Report), without expanding the card', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <ForcedViewport isMobile>
@@ -1170,40 +1158,21 @@ describe('GenericListingCard — actions menu corner', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
-
-    // Report opens this card's own sheet instead of calling the bubbled-up
-    // onReport prop (see ReportSheet's own doc) — Edit above still does,
-    // since it stays a full-screen navigation on mobile.
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-    expect(requiredHandlers.onReport).not.toHaveBeenCalled()
-    expect(screen.getByRole('dialog', { name: /report a problem/i })).toBeInTheDocument()
   })
 
-  // Used to be mobile-only, back when desktop's Edit/Report only existed
-  // inside ListingDetailModal. Both now open a lightweight overlay instead
-  // of a full-page navigation (ActionDialog on desktop, this card's own
-  // ReportSheet for Report on mobile), so there's no reason left to make a
-  // desktop visitor open that dialog first just to reach them.
-  it('on desktop too, the collapsed row kebab offers Edit and Report — Report calls the bubbled prop (opens FindResources\' ActionDialog), unlike mobile\'s own sheet', async () => {
+  it('on desktop too, the collapsed row kebab offers Edit (and no Report)', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} {...requiredHandlers} />,
     )
 
     await user.click(screen.getByRole('button', { name: /more actions for/i }))
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: /^edit$/i }))
     expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
-
-    await user.click(screen.getByRole('button', { name: /more actions for/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-    expect(requiredHandlers.onReport).toHaveBeenCalledTimes(1)
-    // No local sheet on desktop — that's mobile-only (see the mobile test
-    // above), since desktop's ActionDialog lives up in FindResources,
-    // outside this component entirely.
-    expect(screen.queryByRole('dialog', { name: /report a problem/i })).not.toBeInTheDocument()
   })
 
   it('on mobile, expanding the card no longer shows standalone Edit/Report buttons — the kebab is the only way there now', async () => {

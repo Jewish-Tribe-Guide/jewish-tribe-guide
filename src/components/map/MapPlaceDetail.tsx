@@ -8,7 +8,6 @@ import PlaceDetailBody from '@/components/resources/PlaceDetailBody'
 import FreshnessFooter from '@/components/resources/FreshnessFooter'
 import ListingActionsMenu from '@/components/resources/ListingActionsMenu'
 import ListingForm from '@/components/resources/ListingForm'
-import ReportListing from '@/components/resources/ReportListing'
 import CategoryIcon from '@/components/CategoryIcon'
 import PinnedBadge from '@/components/PinnedBadge'
 import UpButton from '@/components/UpButton'
@@ -48,47 +47,35 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
     (typeof item[PHOTO_FIELD_KEY] === 'string' && (item[PHOTO_FIELD_KEY] as string).trim()
       ? (item[PHOTO_FIELD_KEY] as string)
       : category.iconImageUrl) ?? undefined
-  // Edit/Report both swap this whole detail view for the same form the
-  // category directory uses (ListingForm/ReportListing), same as
-  // GenericListingCard's own mobile accordion — just scoped to this one
-  // component instead of the whole screen, since the map has no separate
+  // Edit swaps this whole detail view for the same form the category
+  // directory uses (ListingForm), same as GenericListingCard's own mobile
+  // accordion — scoped to this one component, since the map has no separate
   // "form view" of its own to navigate to. Returns to this same place's
-  // detail (not the list) on cancel or submit, since that's what was on
-  // screen before either was tapped.
+  // detail (not the list) on cancel or submit. Requesting a removal is part
+  // of that form (see RemovalRequest), so there's no separate Report view.
   //
-  // Report used to open as its own sheet, layered on top (ReportSheet) —
-  // that's still the right call on the category directory, which has no
-  // persistent panel of its own for Report to join. Here there already IS
-  // one (this whole detail view sits inside MobileNearbySheet's own
-  // persistent bottom sheet), so a second sheet stacked on top of it read
-  // as a mismatch once Edit's in-place swap made the alternative visible
-  // side by side — swapping in place, matching Edit, means Report and Edit
-  // both stay inside the one sheet that's already open instead of one of
-  // them popping a second one over it.
-  //
-  // Each gets its own history entry, nested on top of the one
+  // It gets its own history entry, nested on top of the one
   // MobileNearbySheet's selectPlace already pushed for this place — so a
   // swipe-back/browser-back out of the form lands on this place's detail,
   // not the list underneath it or off the map entirely. Same pattern as
   // that one; see its own comment for why (and CategoryEditor's
   // openPreview/closePreview, the precedent both follow).
-  const [formOpen, setFormOpen] = useState<'edit' | 'report' | null>(null)
+  const [formOpen, setFormOpen] = useState<'edit' | null>(null)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { mapSheetForm?: 'edit' | 'report' } | null
-      setFormOpen(state?.mapSheetForm === 'edit' || state?.mapSheetForm === 'report' ? state.mapSheetForm : null)
+      const state = e.state as { mapSheetForm?: 'edit' } | null
+      setFormOpen(state?.mapSheetForm === 'edit' ? 'edit' : null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  const openForm = (mode: 'edit' | 'report') => {
+  const openForm = (mode: 'edit') => {
     history.pushState({ ...(window.history.state ?? {}), mapSheetForm: mode }, '')
     setFormOpen(mode)
   }
   const closeForm = () => history.back()
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
-  const canReport = ui.contributions.report && caps.report
 
   if (formOpen) {
     return (
@@ -106,9 +93,9 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             — this one just returns to the same place detail you were
             already on. */}
         <UpButton label="Back" onClick={closeForm} className="mb-1" />
-        {/* embedded suppresses ListingForm/ReportListing's own heading too,
-            so this stands in for it — every other Edit/Report surface
-            (ActionDialog, MobileSheet, ReportSheet) shows this same title
+        {/* embedded suppresses ListingForm's own heading too,
+            so this stands in for it — every other edit surface
+            (ActionDialog, MobileSheet) shows this same title
             in its own header; this one and ListingDetailModal's identical
             morph-in-place were the two gaps, missed initially on the
             reasoning that the form's own intro copy plus already being on
@@ -116,13 +103,9 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             that it read as unfinished next to the other four surfaces,
             all of which keep a title. */}
         <h2 className="mb-3 text-lg font-semibold text-slate-900">
-          {formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem'}
+          Suggest an edit
         </h2>
-        {formOpen === 'edit' ? (
-          <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
-        ) : (
-          <ReportListing listing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
-        )}
+        <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
       </>
     )
   }
@@ -186,21 +169,16 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
             Spotify's own overflow-menu spacing rather than butting right up
             against it. (Which way the dropdown itself opens is measured
             automatically — see ListingActionsMenu's own doc.) */}
-        {/* onEdit/onReport/canEdit/canReport: same optional props
-            GenericListingCard's own mobile kebab passes — see that
-            component's doc on why Edit/Report moved into this menu instead
-            of sitting alone in the footer below (removed from here now,
-            same reasoning). Both now swap this whole panel via the
-            history-backed formOpen state above — see its own doc. */}
+        {/* onEdit/canEdit: same optional props GenericListingCard's own kebab
+            passes. Edit swaps this whole panel via the history-backed
+            formOpen state above — see its own doc. */}
         <ListingActionsMenu
           item={item}
           category={category}
           path={listingPath}
           className="mr-1 self-center"
           onEdit={() => openForm('edit')}
-          onReport={() => openForm('report')}
           canEdit={canEdit}
-          canReport={canReport}
         />
       </div>
 
@@ -212,9 +190,9 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
         <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
-        {/* Edit/Report used to sit here too and now live in the kebab above,
-            with Pin/Share/Set location — except FreshnessFooter's own quiet
-            "Suggest a correction" link, so it's visible a listing can be fixed. */}
+        {/* Edit lives in the kebab above, with Pin/Share/Set location, plus
+            FreshnessFooter's own quiet "Suggest a correction" link so it's
+            visible a listing can be fixed. */}
       </div>
     </div>
   )

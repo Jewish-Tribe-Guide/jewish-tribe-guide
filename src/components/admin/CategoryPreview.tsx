@@ -12,7 +12,6 @@ import GenericDirectory from '@/components/resources/GenericDirectory'
 import EruvInfo from '@/components/resources/EruvInfo'
 import ZmanimCard from '@/components/ZmanimCard'
 import ListingForm from '@/components/resources/ListingForm'
-import ReportListing from '@/components/resources/ReportListing'
 import ResourceMapView from '@/components/map/ResourceMapView'
 import SiteHeader from '@/components/SiteHeader'
 import SiteFooter from '@/components/SiteFooter'
@@ -24,7 +23,7 @@ import { PreviewCategoryProvider } from '@/lib/contentContext'
 import DevicePreviewFrame from './DevicePreviewFrame'
 
 // A preview of the real directory page for a category — the exact same
-// GenericDirectory/ListingForm/ReportListing components a visitor sees, driven
+// GenericDirectory/ListingForm components a visitor sees, driven
 // by the admin's in-progress (unsaved) draft. Shows the category's real,
 // already-approved listings; Add/Edit build a listing locally and drop it
 // straight into the preview list instead of posting to /api/submissions, so
@@ -40,7 +39,6 @@ import DevicePreviewFrame from './DevicePreviewFrame'
 type Action =
   | { mode: 'create' }
   | { mode: 'edit'; listing: DirectoryResource }
-  | { mode: 'report'; listing: DirectoryResource }
   | { mode: 'map'; query?: string; filters?: MapFilters }
 
 export default function CategoryPreview({
@@ -165,15 +163,6 @@ export default function CategoryPreview({
         onPreviewSubmit={addOrReplaceLocal}
       />
     )
-  } else if (action?.mode === 'report') {
-    content = (
-      <ReportListing
-        listing={action.listing}
-        onUp={goToDirectory}
-        onSubmitted={goToDirectory}
-        preview
-      />
-    )
   } else if (action?.mode === 'map') {
     content = (
       <ListingsProvider listings={mapListings}>
@@ -201,7 +190,6 @@ export default function CategoryPreview({
         onUp={onClose}
         onAdd={() => setAction({ mode: 'create' })}
         onEdit={(listing) => setAction({ mode: 'edit', listing })}
-        onReport={(listing) => setAction({ mode: 'report', listing })}
       />
     )
   }

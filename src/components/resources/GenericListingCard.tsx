@@ -19,7 +19,6 @@ import FreshnessFooter from './FreshnessFooter'
 import PlaceDetailBody from './PlaceDetailBody'
 import ListingDetailModal from './ListingDetailModal'
 import ListingActionsMenu from './ListingActionsMenu'
-import ReportSheet from './ReportSheet'
 import Chip from './Chip'
 import { travelParts } from '@/lib/listingTravel'
 import { ui } from '@/lib/uiConfig'
@@ -125,7 +124,6 @@ type Props = {
    *  chosen at once, regardless of the field's own `multiSelect` setting). */
   onFilterSelect: (key: string, value: string) => void
   onEdit: () => void
-  onReport: () => void
   /** Fired synchronously alongside every `setExpanded` call (the row's own
    *  toggle, ListingDetailModal's onClose, and the imperative open()/
    *  close() below) — lets GenericDirectory keep `?item=<id>` in sync with
@@ -161,7 +159,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onFilterBool,
   onFilterSelect,
   onEdit,
-  onReport,
   showCategoryLabel = true,
   showDistanceSlot = false,
   onNameClick,
@@ -171,12 +168,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   onExpandedChange,
 }, ref) {
   const [expanded, setExpanded] = useState(!!defaultExpanded)
-  // Mobile's Report sheet (see ReportSheet.tsx) — local to this card rather
-  // than bubbled through onReport the way desktop's still does, since it
-  // doesn't need FindResources' page-swap routing at all: dismissing it
-  // just means "close the sheet," not "go back to the list," because the
-  // list was never replaced in the first place.
-  const [reportSheetOpen, setReportSheetOpen] = useState(false)
   // Mobile's inline panel (see the isMobile branch far below) animates open
   // and closed instead of popping in/out silently — replacing the chevron
   // that used to be the only signal this row was expandable at all (see
@@ -285,7 +276,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
   // Per-category capabilities layered under the global `ui.contributions` switches.
   const caps = resolveCapabilities(category.capabilities)
   const canEdit = ui.contributions.edit && caps.edit
-  const canReport = ui.contributions.report && caps.report
   const hoursFields = fields.filter((f) => f.type === 'hours')
   const badgeFields = fields.filter((f) => {
     if (f.type === 'tags' || f.type === 'url' || f.type === 'hours' || f.type === 'minyanim' || f.type === 'image') return false
@@ -827,22 +817,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
             item={item}
             category={category}
             path={listingPath}
-            // Both platforms now — a visitor reaching for Edit/Report goes
-            // straight to this kebab first, same muscle memory as Pin/
-            // Share/Set location, rather than opening the expanded card
-            // first (desktop's ListingDetailModal, or mobile's accordion
-            // panel — see that panel's own comment just below, where these
-            // two used to live on mobile). Used to be mobile-only, back
-            // when desktop's Edit/Report only existed inside that dialog;
-            // now that both platforms open a lightweight overlay instead
-            // of a full-page navigation (ActionDialog on desktop, this
-            // card's own ReportSheet for Report on mobile — see its own
-            // doc), there's no reason left to make a desktop visitor open
-            // the dialog first just to reach them.
+            // Both platforms — a visitor reaching for Edit goes straight to
+            // this kebab first, same muscle memory as Pin/Share/Set
+            // location, rather than opening the expanded card first.
+            // (Requesting a removal is the last part of the edit form itself
+            // — see RemovalRequest — so there's no separate Report action.)
             onEdit={onEdit}
-            onReport={isMobile ? () => setReportSheetOpen(true) : onReport}
             canEdit={canEdit}
-            canReport={canReport}
           />
         </div>
 
@@ -979,24 +960,13 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
             <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? onEdit : undefined} />
-            {/* Share used to sit here too, and Edit/Report followed it — they
-                now live in the collapsed row's own kebab (ListingActionsMenu),
-                with Pin/Set location. FreshnessFooter's own "Suggest a
+            {/* Share used to sit here too, and Edit followed it — Edit lives in
+                the collapsed row's own kebab (ListingActionsMenu), with
+                Pin/Set location. FreshnessFooter's own "Suggest a
                 correction" link is the one visible way to Edit from here. */}
           </div>
         </div>
         </div>
-      )}
-
-      {/* Reachable from the kebab whether or not this card is expanded —
-          not nested inside the panelMounted block above, which only exists
-          while the accordion itself is open. */}
-      {isMobile && (
-        <ReportSheet
-          isOpen={reportSheetOpen}
-          onClose={() => setReportSheetOpen(false)}
-          listing={item}
-        />
       )}
 
       {/* Desktop: same content, centered dialog instead — see ListingDetailModal. */}
@@ -1021,7 +991,6 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           onFilterBool={onFilterBool}
           onFilterSelect={onFilterSelect}
           canEdit={canEdit}
-          canReport={canReport}
           onNavigate={onNavigate}
           hasPrev={hasPrev}
           hasNext={hasNext}

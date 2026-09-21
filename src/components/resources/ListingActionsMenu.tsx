@@ -8,7 +8,7 @@ import { usePinned } from '@/lib/pinnedContext'
 import { useShareLink } from '@/lib/useShareLink'
 import { useOptionalLocation } from '@/lib/locationContext'
 import { ui } from '@/lib/uiConfig'
-import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon, PencilIcon, FlagIcon } from '@/components/icons'
+import { DotsIcon, PinIcon, ExternalIcon, CrosshairIcon, CheckIcon, PencilIcon } from '@/components/icons'
 
 // ── The kebab menu on a listing — Pin, Share, and "Set location" all
 // reachable without expanding the card first. Rendered by GenericListingCard
@@ -79,9 +79,7 @@ export default function ListingActionsMenu({
   path,
   className,
   onEdit,
-  onReport,
   canEdit,
-  canReport,
   hidePrimaryActions,
 }: {
   item: DirectoryResource
@@ -92,7 +90,8 @@ export default function ListingActionsMenu({
    *  true edge (see MapPlaceDetail, matching Spotify's own overflow-menu
    *  spacing rather than butting right up against the edge). */
   className?: string
-  /** Edit/Report — optional. Passed by GenericListingCard's collapsed row
+  /** Edit — optional. (Report used to sit beside it; removal now lives at the
+   *  foot of the edit form, see RemovalRequest.) Passed by GenericListingCard's collapsed row
    *  (both platforms) and, with hidePrimaryActions below, ListingDetailModal's
    *  own header kebab. Undefined at MapPlaceDetail's own kebab, which just
    *  means the divider and these two rows don't render there — nothing new
@@ -103,9 +102,7 @@ export default function ListingActionsMenu({
    *  component's own top-of-file doc for why Share made the identical move
    *  earlier. */
   onEdit?: () => void
-  onReport?: () => void
   canEdit?: boolean
-  canReport?: boolean
   /** ListingDetailModal only: Pin/Share/Set location are pre-opening
    *  actions — already one click away on the card behind this dialog, so
    *  restating them here (this dialog used to) was pure duplication. Edit/
@@ -150,8 +147,8 @@ export default function ListingActionsMenu({
       // ESTIMATED_ROW_PX). ~44px per row (see menuItemClass), +8px for the
       // popup's own vertical padding/border.
       const itemCount = hidePrimaryActions
-        ? (canEdit ? 1 : 0) + (canReport ? 1 : 0)
-        : (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0) + (canReport ? 1 : 0)
+        ? (canEdit ? 1 : 0)
+        : (ui.map.pins ? 1 : 0) + 1 /* Share always renders */ + (canSetLocation ? 1 : 0) + (canEdit ? 1 : 0)
       const estimatedHeight = itemCount * 44 + 8
       const left = Math.min(rect.left, window.innerWidth - MENU_WIDTH - EDGE_MARGIN)
       // Clamped inward from the kebab's own left edge means the popup is
@@ -359,7 +356,7 @@ export default function ListingActionsMenu({
                     {active ? 'Location set' : 'Set location'}
                   </button>
                 )}
-                {(canEdit || canReport) && <div role="separator" className="my-1 h-px bg-slate-100" />}
+                {canEdit && <div role="separator" className="my-1 h-px bg-slate-100" />}
               </>
             )}
             {canEdit && (
@@ -375,21 +372,6 @@ export default function ListingActionsMenu({
               >
                 <PencilIcon className="h-4 w-4 shrink-0" />
                 Edit
-              </button>
-            )}
-            {canReport && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onReport!()
-                  setOpen(false)
-                }}
-                className={`${menuItemClass} hover:text-red-600`}
-              >
-                <FlagIcon className="h-4 w-4 shrink-0" />
-                Report
               </button>
             )}
           </div>

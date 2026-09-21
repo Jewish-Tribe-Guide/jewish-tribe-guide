@@ -6,7 +6,6 @@ import { eruvim } from '@/data/resources'
 import HospitalsDirectory from '@/components/resources/HospitalsDirectory'
 import ResourceLoader from '@/components/resources/ResourceLoader'
 import ListingForm from '@/components/resources/ListingForm'
-import ReportListing from '@/components/resources/ReportListing'
 import ActionDialog from '@/components/resources/ActionDialog'
 import MobileSheet from '@/components/resources/MobileSheet'
 import EruvInfo from '@/components/resources/EruvInfo'
@@ -21,11 +20,10 @@ import { getCategoryColor } from '@/lib/categoryColor'
 import { community } from '@/community.config'
 import { useIsMobile } from '@/lib/useIsMobile'
 
-// A pending add/edit/report action on a listing within the current category.
+// A pending add/edit action on a listing within the current category.
 type ListingAction =
   | { mode: 'create' }
   | { mode: 'edit'; listing: DirectoryResource }
-  | { mode: 'report'; listing: DirectoryResource }
 
 export type FindResourcesProps = {
   /** Which resource view is open — a category id, or one of the curated pages
@@ -44,7 +42,7 @@ export type FindResourcesProps = {
   /** Expand this listing on arrival, same as `?item=` below — set by the
    *  [id] route (a listing's own canonical URL), which has no query param of
    *  its own to carry this. `?item=` still wins if both are somehow present,
-   *  since it reflects an in-page navigation (e.g. Edit/Report closing) that
+   *  since it reflects an in-page navigation (e.g. Edit closing) that
    *  happened after this screen mounted. */
   initialItemId?: string
   /** Up from any resource view — always home. Both mobile and desktop have a
@@ -101,7 +99,7 @@ export type FindResourcesProps = {
 }
 
 // A single resource detail view, opened by tapping a card on the home grid:
-// a category's listings (with add/edit/report), or a curated page (About Your
+// a category's listings (with add/edit), or a curated page (About Your
 // Hospital, Eruv, Zmanim), or the "suggest a category" form.
 export default function FindResources({
   view,
@@ -126,7 +124,7 @@ export default function FindResources({
   const zmanimCoords = anchor.coords ?? community.mapCenter
   const locationLabel = anchor.label || community.region
 
-  // Gates Add/Edit/Report's presentation below — a bottom sheet layered over
+  // Gates Add/Edit's presentation below — a bottom sheet layered over
   // the still-mounted directory on mobile, a centered dialog over it on
   // desktop (see MobileSheet's and ActionDialog's own docs).
   const isMobile = useIsMobile()
@@ -157,7 +155,7 @@ export default function FindResources({
   //   ?item=<id>      expand this listing on arrival
   //   ?q=<text>       pre-fill the category's search box
   //   ?hospital=<id>  show that hospital's About page
-  //   ?form=<mode>    an add/edit/report form is open over the list
+  //   ?form=<mode>    an add/edit form is open over the list
   //   ?davening=1     "All davening times" is open over the list
   //   ?day=<key>      that modal is filtered to one day
   const reopenItemId = searchItem ?? initialItemId ?? null
@@ -178,19 +176,23 @@ export default function FindResources({
     (formParam === 'edit' || formParam === 'report') && reopenItemId
       ? (listings?.find((l) => l.id === reopenItemId) ?? null)
       : null
+  // `?form=report` is what a shared link from before Report was folded into
+  // the edit form still says; it opens the edit form, where "This place is
+  // closed or shouldn't be listed" now lives.
+  //
   // 'create' deep-links straight in with no listing to resolve first —
-  // unlike edit/report, which need `reopenItemId` to look one up. This is
-  // what lets the home screen's Add/Edit/Report picker (UpdateListingsCard)
+  // unlike edit, which needs `reopenItemId` to look one up. This is
+  // what lets the home screen's Add picker (UpdateListingsCard)
   // land directly on the create form via `?form=create`, the same way a
-  // search result's Edit/Report button already deep-links into those.
+  // search result's Edit button already deep-links into those.
   const actionFromUrl: ListingAction | null =
     formParam === 'create'
       ? { mode: 'create' }
       : (formParam === 'edit' || formParam === 'report') && deepLinkListing
-        ? { mode: formParam, listing: deepLinkListing }
+        ? { mode: 'edit', listing: deepLinkListing }
         : null
 
-  // The listing being edited or reported, AND whether the form is open at
+  // The listing being edited, AND whether the form is open at
   // all — both live in this one piece of local state now, seeded from the
   // URL once on mount (the deep-link case above) and otherwise set directly
   // by openAction/goToCategoryList below. This used to be re-derived from
@@ -201,7 +203,7 @@ export default function FindResources({
   // into this render, and that navigation re-renders everything on this
   // route (FindResources → ResourceLoader → GenericDirectory → the whole
   // listing grid) — confirmed live as the grid visibly reloading behind the
-  // dialog the instant Edit/Report/Add opened, unlike tapping the listing
+  // dialog the instant Edit/Add opened, unlike tapping the listing
   // itself (GenericDirectory's own onExpandedChange), which only ever
   // touches local state and a `history.replaceState` the URL bar shows but
   // nothing reads back. openAction/goToCategoryList now use that same
@@ -230,7 +232,7 @@ export default function FindResources({
   // Adjusting state during render, not in an effect: React re-renders this
   // component immediately with the new value, before anything is painted, so
   // a deep-linked form (?form=create) mounts the widget in its very first
-  // committed render. Report isn't included — it mounts its own widget.
+  // committed render.
   if (!turnstileWanted && (action?.mode === 'create' || action?.mode === 'edit')) {
     setTurnstileWanted(true)
   }
@@ -240,15 +242,15 @@ export default function FindResources({
   // to resolve deepLinkListing regardless of whether a form is open), but
   // GenericDirectory's own reopenItemId effect opens whatever id it's given
   // unconditionally, with no way to tell "navigated here to view this" apart
-  // from "this happens to be the listing an edit/report action names". Left
-  // as the raw value, editing/reporting a collapsed row silently expanded
+  // from "this happens to be the listing an edit action names". Left
+  // as the raw value, editing a collapsed row silently expanded
   // its detail dialog behind the one actually visible the whole time —
   // confirmed live as two overlapping dialogs, revealed once the visible
   // one closed. Suppressed here specifically (not by leaving `item` out of
   // openAction's own URL update) so the reload/deep-link resolution above
   // keeps working unchanged.
   const cardReopenItemId =
-    (action?.mode === 'edit' || action?.mode === 'report') && action.listing.id === reopenItemId ? null : reopenItemId
+    action?.mode === 'edit' && action.listing.id === reopenItemId ? null : reopenItemId
 
   // Open one hospital's About page (from the Hospitals list).
   function openHospital(id: string) {
@@ -260,7 +262,7 @@ export default function FindResources({
     setParams({ hospital: null })
   }
 
-  // Open a listing action (create/edit/report form). `replace: true` — see
+  // Open a listing action (create/edit form). `replace: true` — see
   // actionSubject's own doc above for why: a plain setParams call goes
   // through router.push, which re-renders this whole route (including the
   // listing grid) behind the dialog that just opened.
@@ -269,12 +271,12 @@ export default function FindResources({
     setParams(
       {
         form: act.mode,
-        // `item` is how edit/report resolve WHICH listing on a reload or a
+        // `item` is how edit resolves WHICH listing on a reload or a
         // shared deep link (see deepLinkListing above) — not a request to
         // expand its card. GenericDirectory's own reopenItemId effect can't
         // tell those two reasons apart, though: it opens whatever `?item=`
         // names unconditionally. Reached only from a COLLAPSED row's kebab or
-        // a deep link now (an already-expanded card's own Edit/Report morphs
+        // a deep link now (an already-expanded card's own Edit morphs
         // its dialog in place instead — see ListingDetailModal's doc — and
         // never calls this), so the card was never genuinely open before
         // this ran; goToCategoryList clears `item` back out on close so it
@@ -283,15 +285,15 @@ export default function FindResources({
         // collapsed row's Edit — cancelled — silently expanded into the full
         // detail dialog anyway, both dialogs open the whole time behind the
         // one actually visible.
-        ...(act.mode === 'edit' || act.mode === 'report' ? { item: act.listing.id } : {}),
+        ...(act.mode === 'edit' ? { item: act.listing.id } : {}),
       },
       { replace: true },
     )
   }
 
-  // Up from a listing form / report form → the category list it was opened
+  // Up from a listing form → the category list it was opened
   // from. Also undoes openAction's own `item` (see its comment) for
-  // edit/report specifically — never for 'create', which doesn't set it in
+  // edit specifically — never for 'create', which doesn't set it in
   // the first place and may be layered over a genuinely-expanded card that
   // should stay expanded once this closes (e.g. "Add" clicked while
   // already viewing a different listing's details). `replace: true` to
@@ -301,7 +303,7 @@ export default function FindResources({
     setParams(
       {
         form: null,
-        ...(action?.mode === 'edit' || action?.mode === 'report' ? { item: null } : {}),
+        ...(action?.mode === 'edit' ? { item: null } : {}),
       },
       { replace: true },
     )
@@ -356,7 +358,7 @@ export default function FindResources({
       />
     )
   }
-  // ── Database-backed categories (with add / edit / report) ───────────────────
+  // ── Database-backed categories (with add / edit) ───────────────────
   const category = view ? categories?.find((c) => c.id === view && c.kind === 'listing') : undefined
   if (category) {
     const caps = resolveCapabilities(category.capabilities)
@@ -369,17 +371,11 @@ export default function FindResources({
     )
     const sharedTurnstile = { token: turnstileToken, reset: () => { turnstileRef.current?.reset(); setTurnstileToken('') } }
 
-    // Add/Edit/Report (desktop: a centered dialog; mobile: a bottom sheet —
-    // see ActionDialog's and MobileSheet's own docs) all layer over a
-    // ResourceLoader that stays mounted the whole time, on both platforms.
-    // Both platforms used to swap in a full-screen form for at least one of
-    // these three instead (mobile for all of them, desktop for Add alone),
-    // before the map's own MapPlaceDetail (whose Edit/Report already live
-    // inside its persistent bottom sheet) made that mismatch obvious. Report
-    // itself mostly never reaches this any more — the collapsed row's own
-    // kebab opens ReportSheet on mobile directly (see GenericListingCard's
-    // doc) — this is what a deep link or search-result Report button still
-    // falls back to.
+    // Add/Edit (desktop: a centered dialog; mobile: a bottom sheet — see
+    // ActionDialog's and MobileSheet's own docs) layer over a ResourceLoader
+    // that stays mounted the whole time, on both platforms. Requesting a
+    // listing's removal is the last part of the edit form (see
+    // RemovalRequest), so there is no separate Report overlay.
     return (
       <>
         {sharedTurnstileWidget}
@@ -398,7 +394,6 @@ export default function FindResources({
           upLabel="Home"
           onAdd={() => openAction({ mode: 'create' })}
           onEdit={(listing) => openAction({ mode: 'edit', listing })}
-          onReport={(listing) => openAction({ mode: 'report', listing })}
           onParamsChange={setParams}
         />
         {/* `action` (and therefore which overlay, if either, is actually
@@ -407,12 +402,9 @@ export default function FindResources({
             that narrowing through sibling JSX on its own. */}
         {isMobile ? (
           <>
-            {/* draggable on all three: a consistent grab-anywhere,
-                slide-to-dismiss feel across Add/Edit/Report, same reasoning
-                ReportSheet's own doc gives for making its short one-field
-                form draggable too even though it rarely needs `full`'s
-                extra room — matching behavior reads as one shell, not as
-                Edit having gotten a nicer sheet than its siblings. */}
+            {/* draggable on both: a consistent grab-anywhere, slide-to-dismiss
+                feel across Add and Edit, so they read as one shell rather
+                than one having a nicer sheet than the other. */}
             <MobileSheet isOpen={action?.mode === 'create'} onClose={goToCategoryList} title={`Add a ${category.label}`} draggable>
               {action?.mode === 'create' && (
                 <ListingForm
@@ -434,16 +426,6 @@ export default function FindResources({
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
-                  embedded
-                />
-              )}
-            </MobileSheet>
-            <MobileSheet isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem" draggable>
-              {action?.mode === 'report' && (
-                <ReportListing
-                  listing={action.listing}
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
                   embedded
                 />
               )}
@@ -472,16 +454,6 @@ export default function FindResources({
                   onUp={goToCategoryList}
                   onSubmitted={goToCategoryList}
                   sharedTurnstile={sharedTurnstile}
-                  embedded
-                />
-              )}
-            </ActionDialog>
-            <ActionDialog isOpen={action?.mode === 'report'} onClose={goToCategoryList} title="Report a problem">
-              {action?.mode === 'report' && (
-                <ReportListing
-                  listing={action.listing}
-                  onUp={goToCategoryList}
-                  onSubmitted={goToCategoryList}
                   embedded
                 />
               )}

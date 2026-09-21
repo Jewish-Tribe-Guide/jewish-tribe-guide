@@ -12,7 +12,6 @@ import PlaceDetailBody from './PlaceDetailBody'
 import FreshnessFooter from './FreshnessFooter'
 import ListingActionsMenu from './ListingActionsMenu'
 import ListingForm from './ListingForm'
-import ReportListing from './ReportListing'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock'
 
@@ -41,7 +40,6 @@ type Props = {
   onFilterBool: (key: string) => void
   onFilterSelect: (key: string, value: string) => void
   canEdit: boolean
-  canReport: boolean
   /** Left/Right arrow while this dialog is focused moves to the previous/
    *  next card in whatever order is currently on screen — the lightbox
    *  pattern (Google Photos, Gmail's message view). Omitted where there's
@@ -69,15 +67,16 @@ type Props = {
  *  Follows DaveningTimesModal's own conventions: backdrop click and Escape
  *  both close it, body scroll locks while open.
  *
- *  Edit/Report swap THIS dialog's own content to the form (ListingForm/
- *  ReportListing), the same in-place pattern MapPlaceDetail already uses —
+ *  Edit swaps THIS dialog's own content to the form (ListingForm; a removal
+ *  request is the last part of that form, see RemovalRequest), the same
+ *  in-place pattern MapPlaceDetail already uses —
  *  not a hand-off to a separate ActionDialog. That used to close this
  *  dialog and open a differently-sized one in its place (448px → 576px,
  *  no shared backdrop), which read as a completely different popup
  *  appearing rather than a continuation of the one already open —
  *  confirmed live before this landed. ActionDialog still exists for the
  *  cases that have no open dialog to morph FROM (a deep link, a search
- *  result's own Edit/Report button) — this only replaces the one path
+ *  result's own Edit button) — this only replaces the one path
  *  that already had somewhere to morph in place. */
 export default function ListingDetailModal({
   isOpen,
@@ -96,7 +95,6 @@ export default function ListingDetailModal({
   onFilterBool,
   onFilterSelect,
   canEdit,
-  canReport,
   onNavigate,
   hasPrev,
   hasNext,
@@ -112,16 +110,16 @@ export default function ListingDetailModal({
   // dialog's own open/close already syncs (see GenericDirectory's
   // onExpandedChange) — that stays exactly as it was the whole time this
   // is open, same as it does while just viewing details.
-  const [formOpen, setFormOpen] = useState<'edit' | 'report' | null>(null)
+  const [formOpen, setFormOpen] = useState<'edit' | null>(null)
   useEffect(() => {
     function onPopState(e: PopStateEvent) {
-      const state = e.state as { detailModalForm?: 'edit' | 'report' } | null
-      setFormOpen(state?.detailModalForm === 'edit' || state?.detailModalForm === 'report' ? state.detailModalForm : null)
+      const state = e.state as { detailModalForm?: 'edit' } | null
+      setFormOpen(state?.detailModalForm === 'edit' ? 'edit' : null)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  const openForm = (mode: 'edit' | 'report') => {
+  const openForm = (mode: 'edit') => {
     history.pushState({ ...(window.history.state ?? {}), detailModalForm: mode }, '')
     setFormOpen(mode)
   }
@@ -242,7 +240,7 @@ export default function ListingDetailModal({
         className={`dialog-in flex flex-col w-full max-h-[85vh] bg-white border border-slate-200 rounded-xl shadow-xl transition-[max-width] duration-200 ease-in-out ${formOpen ? 'max-w-xl' : 'max-w-md'}`}
         role="dialog"
         aria-modal="true"
-        aria-label={formOpen ? (formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem') : name}
+        aria-label={formOpen ? 'Suggest an edit' : name}
       >
         {/* Badges live inside this same block, under the subtitle — not as
             their own section below a divider. They're facts about this
@@ -258,10 +256,9 @@ export default function ListingDetailModal({
             // that component's doc): this returns to the detail view you
             // were just on, not up to some other screen, so it doesn't
             // name a destination the way "Back to list" elsewhere does.
-            // The title below stands in for ListingForm/ReportListing's
-            // own heading (suppressed by `embedded`) — every other
-            // Edit/Report surface
-            // (ActionDialog, MobileSheet, ReportSheet) shows this same
+            // The title below stands in for ListingForm's own heading
+            // (suppressed by `embedded`) — every other edit surface
+            // (ActionDialog, MobileSheet) shows this same
             // title in its own header; this and MapPlaceDetail's identical
             // morph-in-place were the two gaps, confirmed live to read as
             // unfinished next to the other four once compared side by side.
@@ -274,7 +271,7 @@ export default function ListingDetailModal({
                 Back
               </button>
               <h2 className="mt-1 font-semibold text-slate-900 text-lg">
-                {formOpen === 'edit' ? 'Suggest an edit' : 'Report a problem'}
+                Suggest an edit
               </h2>
             </div>
           ) : (
@@ -335,24 +332,20 @@ export default function ListingDetailModal({
               are all pre-opening actions, already one click away on the
               card behind this dialog (dimmed but a click away once you
               close this), so having them here too was pure duplication.
-              Edit/Report moved up here instead, still as a kebab (not
+              Edit moved up here instead, still as a kebab (not
               plain buttons — see hidePrimaryActions' own doc on
               ListingActionsMenu) — unlike Pin/Share/Set location, they're
               things you'd genuinely want only once you're actually looking
               at the full details, not before, so they stay. Hidden while
-              formOpen: opening Edit from Report (or vice versa) isn't a
-              real use case, and the kebab has nothing else left to show
-              once Pin/Share/Set-location already aren't here. */}
+              formOpen, when the kebab would have nothing left to show. */}
           <div className="flex shrink-0 items-center gap-1">
-            {!formOpen && (canEdit || canReport) && (
+            {!formOpen && canEdit && (
               <ListingActionsMenu
                 item={item}
                 category={category}
                 path={listingPath}
                 onEdit={() => openForm('edit')}
-                onReport={() => openForm('report')}
                 canEdit={canEdit}
-                canReport={canReport}
                 hidePrimaryActions
               />
             )}
@@ -380,8 +373,6 @@ export default function ListingDetailModal({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {formOpen === 'edit' ? (
             <ListingForm category={category} mode="edit" existing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
-          ) : formOpen === 'report' ? (
-            <ReportListing listing={item} onUp={closeForm} onSubmitted={closeForm} embedded />
           ) : (
             <>
               <PlaceDetailBody

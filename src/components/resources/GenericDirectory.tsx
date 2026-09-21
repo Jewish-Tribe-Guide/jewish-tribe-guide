@@ -72,7 +72,6 @@ type Props = {
   onUp: () => void
   onAdd: () => void
   onEdit: (item: DirectoryResource) => void
-  onReport: (item: DirectoryResource) => void
   /** Pushes the search text / "Open now" toggle into the URL (`?q=`,
    *  `?openNow=`) as they change, so a search + filter combination is a
    *  shareable link — e.g. sending someone `?q=bagel&openNow=1` opens the
@@ -87,7 +86,7 @@ type Props = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onReport, onParamsChange }: Props) {
+export default function GenericDirectory({ category, items, anchorLabel, addressPrompt, reopenItemId, initialSearch, initialOpenNow, initialFilters, openDaveningModal, initialDaveningDay, onUp, onAdd, onEdit, onParamsChange }: Props) {
   // Hands the shared header this screen's own title + "up" handler — on
   // mobile, SiteHeader shows "‹ {category.pluralLabel}" in place of the site
   // name while this is mounted, and reverts automatically on unmount (see
@@ -1486,7 +1485,6 @@ export default function GenericDirectory({ category, items, anchorLabel, address
                 })
               }
               onEdit={() => onEdit(item)}
-              onReport={() => onReport(item)}
             />
             </div>
           ))}

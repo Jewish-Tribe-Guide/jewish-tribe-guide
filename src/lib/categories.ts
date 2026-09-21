@@ -212,7 +212,7 @@ export type CategoryCapabilities = {
   add: boolean
   /** Per-listing "Edit" button. */
   edit: boolean
-  /** Per-listing "Report" button. */
+  /** Requesting a listing's removal — offered at the foot of the edit form. */
   report: boolean
   /** The search bar on this category's directory. */
   directorySearch: boolean

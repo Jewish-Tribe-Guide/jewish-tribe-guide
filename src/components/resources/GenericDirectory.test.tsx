@@ -40,7 +40,6 @@ vi.mock('./GenericListingCard', () => ({
       item,
       defaultExpanded,
       onEdit,
-      onReport,
       onTagClick,
       onFilterBool,
       onNavigate,
@@ -50,7 +49,6 @@ vi.mock('./GenericListingCard', () => ({
       item: DirectoryResource
       defaultExpanded?: boolean
       onEdit: () => void
-      onReport: () => void
       onTagClick: (t: string) => void
       onFilterBool: (key: string) => void
       onNavigate?: (direction: 1 | -1) => void
@@ -87,7 +85,6 @@ vi.mock('./GenericListingCard', () => ({
         {showDistanceSlot && <span>distance-slot {item.name}</span>}
         {expanded && <span>Expanded {item.name}</span>}
         <button onClick={onEdit}>Edit {item.name}</button>
-        <button onClick={onReport}>Report {item.name}</button>
         <button onClick={() => onTagClick('cheese')}>tag {item.name}</button>
         <button onClick={() => onFilterBool('isKosher')}>card-filter {item.name}</button>
         {onNavigate && <button onClick={() => onNavigate(1)}>Next listing from {item.name}</button>}
@@ -138,7 +135,6 @@ const handlers = {
   onUp: vi.fn(),
   onAdd: vi.fn(),
   onEdit: vi.fn(),
-  onReport: vi.fn(),
 }
 
 describe('GenericDirectory', () => {
@@ -262,19 +258,15 @@ describe('GenericDirectory', () => {
     expect(screen.getAllByRole('button', { name: 'Add' })).toHaveLength(2)
   })
 
-  it('wires a card\'s Edit/Report/tag-click callbacks back to the directory\'s own props/state', async () => {
+  it('wires a card\'s Edit/tag-click callbacks back to the directory\'s own props/state', async () => {
     const user = userEvent.setup()
     const onEdit = vi.fn()
-    const onReport = vi.fn()
     const category = makeCategory()
     const item = makeListing({ id: 'a', name: 'Kosher Mart' })
-    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} onEdit={onEdit} onReport={onReport} />)
+    renderWithProviders(<GenericDirectory category={category} items={[item]} {...handlers} onEdit={onEdit} />)
 
     await user.click(screen.getByRole('button', { name: 'Edit Kosher Mart' }))
     expect(onEdit).toHaveBeenCalledWith(item)
-
-    await user.click(screen.getByRole('button', { name: 'Report Kosher Mart' }))
-    expect(onReport).toHaveBeenCalledWith(item)
 
     await user.click(screen.getByRole('button', { name: 'tag Kosher Mart' }))
     expect(screen.getByPlaceholderText(/Search/)).toHaveValue('cheese')

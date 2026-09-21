@@ -14,8 +14,8 @@ type Props = {
    *  to (its 'peek' just isn't one of them: that state exists there so a
    *  place stays glanceable while browsing the map, which has no
    *  equivalent for a form you explicitly opened — there's nothing to
-   *  glance at, only "bigger" or "gone"). Off by default: ReportSheet's
-   *  short form has no real use for the extra height `full` would give it,
+   *  glance at, only "bigger" or "gone"). Off by default: a short form
+   *  has no real use for the extra height `full` would give it,
    *  so it keeps the plain fixed-to-content sizing this shell always had.
    *  FindResources turns it on for Edit/Report, where a longer form
    *  benefits from the extra room. See this component's own doc below for
@@ -51,7 +51,7 @@ type DragState = {
 type ContentDragState = DragState & { active: boolean }
 
 // `half` claims roughly the bottom of the screen. `full` used to be a flat
-// 85% of the viewport (matching the 85vh cap ActionDialog/ReportSheet's own
+// 85% of the viewport (matching the 85vh cap ActionDialog's own
 // non-draggable sizing uses), but that reads as leaving an oddly large gap
 // at the top — ~120px on a typical phone, well past what an actual sheet
 // needs to still read as a sheet rather than a full screen. TOP_INSET_PX
@@ -86,9 +86,9 @@ const MOMENTUM_FRICTION = 0.996
 const MOMENTUM_MIN_VELOCITY = 0.02
 
 /** Mobile's shared bottom-sheet shell — a fixed-height panel sliding up over
- *  the still-visible (dimmed) screen underneath. Used by ReportSheet (its
- *  original, only caller — always non-draggable, see `draggable`'s own doc)
- *  and by FindResources' own mobile Add/Edit/Report, which used to be a flat
+ *  the still-visible (dimmed) screen underneath. Used by FindResources' own
+ *  mobile Add/Edit (and originally by a since-removed non-draggable Report
+ *  sheet — see `draggable`'s own doc), which used to be a flat
  *  full-screen overlay before the map's own in-sheet Edit made the mismatch
  *  obvious — see FindResources' own doc.
  *
@@ -431,8 +431,8 @@ export default function MobileSheet({ isOpen, onClose, title, children, draggabl
   // released drag's dragHeight has already gone back to null by the time
   // close() runs (see onHandlePointerUp/onContentPointerUp).
   //
-  // Non-draggable has no height detents to shrink through (ReportSheet's
-  // short form sizes itself to its content, not to half/full), so it keeps
+  // Non-draggable has no height detents to shrink through (a short
+  // form sizes itself to its content, not to half/full), so it keeps
   // the plain slide-down-by-its-own-height transform this shell always used
   // for closing — a fallback with no live caller today (everything real
   // currently opts into draggable), kept only because `draggable: false` is

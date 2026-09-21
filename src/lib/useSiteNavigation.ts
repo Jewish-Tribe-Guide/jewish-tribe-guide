@@ -37,7 +37,7 @@ function pathForMode(community: string, mode: AppMode, extra?: Record<string, un
       // findQuery/findItemId (set when navigating from a search result) become
       // the same ?q=/?item= params FindResources reads on mount, so the target
       // category opens pre-filtered with the tapped listing already expanded.
-      // findAction ('edit'/'report', from a search result's Edit/Report button)
+      // findAction ('edit', from a search result's Edit button)
       // becomes ?form=, which FindResources resolves against the loaded listing
       // to open that form directly rather than just expanding the card.
       const query = typeof extra?.findQuery === 'string' ? extra.findQuery : null

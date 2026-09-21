@@ -10,12 +10,12 @@ type Props = {
   children: ReactNode
 }
 
-/** Desktop's Edit/Report — layered on top of the still-visible (dimmed)
+/** Desktop's Add/Edit — layered on top of the still-visible (dimmed)
  *  directory grid instead of replacing the whole screen with the form, the
  *  same "stay in place" reasoning as ListingDetailModal (viewing a listing)
- *  and mobile's own ReportSheet. Unlike ListingDetailModal's max-w-md — sized
- *  for a listing's own facts — this holds a real form (ListingForm/
- *  ReportListing), which needs more width for address/hours/tag inputs and
+ *  and mobile's own MobileSheet. Unlike ListingDetailModal's max-w-md — sized
+ *  for a listing's own facts — this holds a real form (ListingForm),
+ *  which needs more width for address/hours/tag inputs and
  *  more height before it needs its own internal scroll.
  *
  *  Same conventions as ListingDetailModal otherwise: backdrop click and

@@ -695,7 +695,7 @@ export function PlacesResults({
   showDistanceSlot,
 }: {
   hits: ListingHit[]
-  onOpen: (hit: ListingHit, action?: 'edit' | 'report') => void
+  onOpen: (hit: ListingHit, action?: 'edit') => void
   /** No location set yet — hold each distance-based hit's distance column
    *  open with a tappable placeholder instead of omitting it, same as
    *  GenericDirectory's own `addressPrompt` (see GenericListingCard's
@@ -732,7 +732,6 @@ export function PlacesResults({
               onFilterBool={() => onOpen(hit)}
               onFilterSelect={() => onOpen(hit)}
               onEdit={() => onOpen(hit, 'edit')}
-              onReport={() => onOpen(hit, 'report')}
             />
           </div>
         ))}

@@ -57,7 +57,7 @@ type Props = {
   adminSubmit?: { token: string }
   /** Rendered inside a caller-owned overlay (desktop's Edit dialog) instead
    *  of as this screen's own top-level content — same reasoning, and same
-   *  treatment, as ReportListing's own `embedded` prop: skips the mobile
+   *  treatment as every embedded surface: skips the mobile
    *  header title hijack (useSetScreenHeader) and this component's own
    *  Breadcrumb/h2, since the dialog already has its own title and close
    *  control. Desktop only in practice (Edit stays a full screen on

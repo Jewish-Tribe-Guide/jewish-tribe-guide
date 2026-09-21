@@ -28,12 +28,6 @@ vi.mock('@/components/resources/ListingForm', () => ({
     </div>
   ),
 }))
-vi.mock('@/components/resources/ReportListing', () => ({
-  default: ({ listing, embedded }: { listing: DirectoryResource; embedded?: boolean }) => (
-    <p>ReportListing stub — {listing.name}{embedded ? ' (embedded)' : ''}</p>
-  ),
-}))
-
 afterEach(() => {
   cleanup()
   // The push/pop history tests leave real entries behind (jsdom's History
@@ -96,7 +90,7 @@ describe('MapPlaceDetail', () => {
     localStorage.clear()
   })
 
-  it('shows FreshnessFooter, with Edit/Report/Pin/Share/Set location all behind one kebab in the header', async () => {
+  it('shows FreshnessFooter, with Edit/Pin/Share/Set location behind one kebab in the header and no Report row', async () => {
     const category = makeCategory()
     const item = makeListing({ name: 'Goldi Market' })
     const user = (await import('@testing-library/user-event')).default.setup()
@@ -119,7 +113,8 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByRole('menuitem', { name: /^pin$/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
+    // Removal is requested at the foot of the edit form now, not from here.
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
   })
 
   it('swaps to the edit form (same one the category directory uses) when Edit is clicked, and back on cancel', async () => {
@@ -201,72 +196,7 @@ describe('MapPlaceDetail', () => {
     expect(backSpy).toHaveBeenCalled()
   })
 
-  // Report used to open as its own sheet, layered on top of the place
-  // detail — moved to the same in-place swap Edit already does (see
-  // MapPlaceDetail's own doc): this whole panel already lives inside the
-  // map's one persistent bottom sheet, so Report joining Edit inside it
-  // reads better than a second sheet stacked on top.
-  it('swaps to the report form (same one the category directory uses) when Report is clicked, and back on cancel', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-
-    expect(screen.getByText('ReportListing stub — Goldi Market (embedded)')).toBeInTheDocument()
-    // Swapped out entirely, not layered on top.
-    expect(screen.queryByRole('button', { name: 'Back to list' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Report a problem' })).toBeInTheDocument()
-  })
-
-  it('shows a Back button once the report form is open, and it closes the form via history.back()', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-
-    await user.click(screen.getByRole('button', { name: /^back$/i }))
-    expect(backSpy).toHaveBeenCalled()
-  })
-
-  it('pushes a history entry when Report opens, so a swipe-back returns here instead of leaving the map', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default
-    const user = userEvent.setup()
-    const category = makeCategory()
-    const item = makeListing({ name: 'Goldi Market' })
-    const pushSpy = vi.spyOn(window.history, 'pushState')
-
-    renderWithProviders(
-      <PinnedProvider>
-        <MapPlaceDetail item={item} category={category} color="#000" onBack={() => {}} />
-      </PinnedProvider>,
-    )
-
-    await user.click(screen.getByRole('button', { name: /more actions for goldi market/i }))
-    await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ mapSheetForm: 'report' }), '')
-  })
-
-  it('hides Edit/Report when the category has turned them off', async () => {
+  it('hides Edit when the category has turned it off', async () => {
     const user = (await import('@testing-library/user-event')).default.setup()
     const category: CategoryConfig = makeCategory({
       capabilities: { ...CATEGORY_CAPABILITY_DEFAULTS, edit: false, report: false },
@@ -285,7 +215,7 @@ describe('MapPlaceDetail', () => {
     expect(kebab).toBeInTheDocument()
     await user.click(kebab)
     expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
   })
 
   it('pushes a history entry when Edit opens, so a swipe-back returns here instead of leaving the map', async () => {

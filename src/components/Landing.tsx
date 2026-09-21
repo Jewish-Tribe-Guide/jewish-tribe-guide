@@ -129,10 +129,10 @@ export default function Landing({ onNavigate, onOpenFlow, coords }: LandingProps
   // to carry the term along as `?q=`, on the reasoning that it'd survive
   // closing the modal back to a relevant list — the user's own call,
   // reviewing it live: picking a listing should show exactly that listing,
-  // not a filtered category page underneath it. Edit/Report additionally
+  // not a filtered category page underneath it. Edit additionally
   // carry `findAction` so the directory opens straight into that form
   // instead of just the expanded card.
-  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit' | 'report') => {
+  const openPlace = (hit: (typeof placeHits)[number], action?: 'edit') => {
     if (!action) track('listing_opened', { listing: hit.item.name, category: hit.item.category, source: 'search' })
     onNavigate('patient', 'find', {
       findView: hit.item.category,

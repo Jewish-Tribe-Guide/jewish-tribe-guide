@@ -12,7 +12,7 @@ import FindResources from './FindResources'
 // and how the searchItem/searchQuery/searchHospital/searchForm props drive
 // it — not a renderer of any one of those screens itself. Every real
 // sub-screen (HospitalsDirectory, AboutYourHospital, EruvInfo, ZmanimCard,
-// ResourceLoader, ListingForm, ReportListing) is its own component with its
+// ResourceLoader, ListingForm) is its own component with its
 // own concerns and gets mocked out to a stub that surfaces just enough props
 // to assert the routing decision was right — same approach as Landing.test.tsx.
 //
@@ -59,14 +59,6 @@ vi.mock('@/components/resources/ListingForm', () => ({
   default: ({ mode, embedded, onUp }: { mode: string; embedded?: boolean; onUp: () => void }) => (
     <div>
       <p>ListingForm: {mode}{embedded ? ' (embedded)' : ''}</p>
-      <button onClick={onUp}>stub cancel</button>
-    </div>
-  ),
-}))
-vi.mock('@/components/resources/ReportListing', () => ({
-  default: ({ embedded, onUp }: { embedded?: boolean; onUp: () => void }) => (
-    <div>
-      <p>ReportListing{embedded ? ' (embedded)' : ''}</p>
       <button onClick={onUp}>stub cancel</button>
     </div>
   ),
@@ -238,7 +230,9 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
   })
 
-  it('on mobile, resolves a deep-linked report to a sheet over the still-mounted directory', () => {
+  // Report was folded into the edit form (RemovalRequest). A link shared before
+  // that still says ?form=report, and should land on the edit form.
+  it('on mobile, a legacy ?form=report link opens the edit sheet over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <ForcedViewport isMobile>
@@ -248,8 +242,9 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
-    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 
   // Desktop: a dialog layered over the still-mounted directory instead —
@@ -281,7 +276,7 @@ describe('FindResources — a real listing category', () => {
     expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
   })
 
-  it('on desktop, resolves a deep-linked report to a dialog over the still-mounted directory', () => {
+  it('on desktop, a legacy ?form=report link opens the edit dialog over the still-mounted directory', () => {
     const grocery = makeCategory({ id: 'grocery', kind: 'listing' })
     renderWithProviders(
       <FindResources view="grocery" listings={[listing({ id: 'l1' })]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
@@ -289,8 +284,9 @@ describe('FindResources — a real listing category', () => {
     )
 
     expect(screen.getByText('ResourceLoader')).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Report a problem' })).toBeInTheDocument()
-    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Report a problem' })).not.toBeInTheDocument()
   })
 
   // Same round-trip caveat as "opening Add reports ?form=create" above —
@@ -433,13 +429,13 @@ describe('FindResources — the shared Turnstile widget', () => {
     expect(screen.getByTestId('turnstile')).toBeInTheDocument()
   })
 
-  it('is not mounted for Report, which brings its own widget', () => {
+  it('is mounted for a legacy ?form=report link, since it now opens the edit form (which files removals too)', () => {
     renderWithProviders(
       <FindResources view="grocery" listings={[listing()]} anchor={anchor} onUp={vi.fn()} searchForm="report" searchItem="l1" />,
       { content: { categories: [grocery] } },
     )
-    expect(screen.getByText('ReportListing (embedded)')).toBeInTheDocument()
-    expect(screen.queryByTestId('turnstile')).not.toBeInTheDocument()
+    expect(screen.getByText('ListingForm: edit (embedded)')).toBeInTheDocument()
+    expect(screen.getByTestId('turnstile')).toBeInTheDocument()
   })
 })
 

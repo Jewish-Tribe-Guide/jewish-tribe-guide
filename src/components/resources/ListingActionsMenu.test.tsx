@@ -339,8 +339,8 @@ describe('ListingActionsMenu', () => {
   // renderMenu, so every test above already proves they don't leak into
   // MapPlaceDetail/ListingDetailModal's own kebab instances, which never
   // pass them.
-  describe('Edit/Report', () => {
-    it('does not render Edit, Report, or the divider when neither is passed', async () => {
+  describe('Edit', () => {
+    it('does not render Edit or the divider when it is not passed', async () => {
       vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
       const user = userEvent.setup()
       renderMenu()
@@ -351,10 +351,11 @@ describe('ListingActionsMenu', () => {
       expect(screen.queryByRole('separator')).not.toBeInTheDocument()
     })
 
-    it('shows Edit and Report, with a divider above them, when passed', async () => {
+    // Removal used to be a "Report" row here. It now lives at the foot of the
+    // edit form (RemovalRequest), so the menu must never offer it again.
+    it('shows Edit, with a divider above it, and no Report row', async () => {
       vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
       const onEdit = vi.fn()
-      const onReport = vi.fn()
       const user = userEvent.setup()
       const item = makeListing({ id: 'listing-1', name: 'Goldi Market' })
       const category = makeCategory()
@@ -364,16 +365,14 @@ describe('ListingActionsMenu', () => {
           category={category}
           path="/philly/grocery/goldi-a1b2c3"
           onEdit={onEdit}
-          onReport={onReport}
           canEdit
-          canReport
         />,
       )
 
       await user.click(screen.getByRole('button', { name: /more actions/i }))
       expect(screen.getByRole('separator')).toBeInTheDocument()
       expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
-      expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
     })
 
     it('calls onEdit and closes the menu, without bubbling to a parent handler', async () => {
@@ -395,39 +394,12 @@ describe('ListingActionsMenu', () => {
       expect(onParentClick).not.toHaveBeenCalled()
     })
 
-    it('calls onReport and closes the menu', async () => {
-      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
-      const onReport = vi.fn()
-      const user = userEvent.setup()
-      renderWithProviders(
-        <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" onReport={onReport} canReport />,
-      )
-
-      await user.click(screen.getByRole('button', { name: /more actions/i }))
-      await user.click(screen.getByRole('menuitem', { name: /^report$/i }))
-
-      expect(onReport).toHaveBeenCalledTimes(1)
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    })
-
-    it('shows only Edit when canReport is false', async () => {
-      vi.mocked(locationContext.useOptionalLocation).mockReturnValue(null)
-      const user = userEvent.setup()
-      renderWithProviders(
-        <ListingActionsMenu item={makeListing()} category={makeCategory()} path="/philly/grocery/goldi-a1b2c3" onEdit={vi.fn()} canEdit canReport={false} />,
-      )
-
-      await user.click(screen.getByRole('button', { name: /more actions/i }))
-      expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
-      expect(screen.queryByRole('menuitem', { name: /^report$/i })).not.toBeInTheDocument()
-    })
-
     // hidePrimaryActions — ListingDetailModal only: Pin/Share/Set location
     // are pre-opening actions, already one click away on the card behind
     // that dialog, so restating them there was pure duplication. See the
     // prop's own doc.
     describe('hidePrimaryActions', () => {
-      it('hides Pin, Share, Set location, and the divider — Edit/Report are the only rows', async () => {
+      it('hides Pin, Share, Set location, and the divider — Edit is the only row', async () => {
         vi.mocked(locationContext.useOptionalLocation).mockReturnValue({
           anchorListingId: null,
           setListingAnchor: vi.fn(),
@@ -440,9 +412,7 @@ describe('ListingActionsMenu', () => {
             category={makeCategory()}
             path="/philly/grocery/goldi-a1b2c3"
             onEdit={vi.fn()}
-            onReport={vi.fn()}
             canEdit
-            canReport
             hidePrimaryActions
           />,
         )
@@ -453,7 +423,7 @@ describe('ListingActionsMenu', () => {
         expect(screen.queryByRole('menuitem', { name: /set location/i })).not.toBeInTheDocument()
         expect(screen.queryByRole('separator')).not.toBeInTheDocument()
         expect(screen.getByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument()
-        expect(screen.getByRole('menuitem', { name: /^report$/i })).toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: /report/i })).not.toBeInTheDocument()
       })
 
       it('shows just the one row when only canEdit is true', async () => {
