@@ -163,7 +163,7 @@ describe('MapPlaceDetail', () => {
       <PinnedProvider>
         <MapPlaceDetail
           item={makeListing({ name: 'Goldi Market' })}
-          category={makeCategory({ capabilities: { edit: false } })}
+          category={makeCategory({ capabilities: { add: true, edit: false, report: true, directorySearch: true, map: true } })}
           color="#000"
           onBack={() => {}}
         />
