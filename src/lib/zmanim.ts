@@ -227,13 +227,27 @@ function isYomTovEvent(event: string): boolean {
  *  a holiday-less period is worth surfacing here at all, since the regular
  *  `shabbos.candleLighting`/`havdalah` fields already cover that case on
  *  their own. */
-function findHolidayPeriod(items: HebcalShabbatItem[], timezone: string, windowEnd: string): ZmanimData['holidayPeriod'] {
-  const startIdx = items.findIndex((i) => i.category === 'candles')
-  if (startIdx === -1) return null
+function findHolidayPeriod(
+  items: HebcalShabbatItem[],
+  timezone: string,
+  windowEnd: string,
+  nowMs: number,
+): ZmanimData['holidayPeriod'] {
+  // The first period that hasn't already ended. The response now begins a day
+  // before today (see the holidayUrl comment in getZmanimData), so it can open
+  // with a period that finished hours ago — last Shabbos, or a Yom Tov whose
+  // havdalah has passed — and that must not be what gets reported.
+  let startIdx = -1
+  let endIdx = -1
+  for (let from = 0; ; ) {
+    startIdx = items.findIndex((i, idx) => idx >= from && i.category === 'candles')
+    if (startIdx === -1) return null
+    endIdx = items.findIndex((i, idx) => idx >= startIdx && i.category === 'havdalah')
+    if (endIdx === -1) return null
+    if (new Date(items[endIdx].date).getTime() > nowMs) break
+    from = endIdx + 1
+  }
   if (items[startIdx].date.slice(0, 10) > windowEnd) return null
-
-  const endIdx = items.findIndex((i, idx) => idx >= startIdx && i.category === 'havdalah')
-  if (endIdx === -1) return null
 
   const span = items.slice(startIdx, endIdx + 1)
   const holidayItems = span.filter((i) => i.category === 'holiday')
@@ -289,25 +303,45 @@ function findHolidayPeriod(items: HebcalShabbatItem[], timezone: string, windowE
  *  "Fast ends" pair — it's a `maj` holiday with its own candle-lighting/
  *  havdalah, already covered by `holidayPeriod`, so nothing here would ever
  *  double-report it. */
-function findFastPeriod(items: HebcalShabbatItem[], timezone: string, windowEnd: string): ZmanimData['fastPeriod'] {
+function findFastPeriod(
+  items: HebcalShabbatItem[],
+  timezone: string,
+  windowEnd: string,
+  nowMs: number,
+  today: string,
+): ZmanimData['fastPeriod'] {
   const isFastZman = (i: HebcalShabbatItem) => i.category === 'zmanim' && i.subcat === 'fast'
 
-  const startIdx = items.findIndex((i) => isFastZman(i) && i.title === 'Fast begins')
-  if (startIdx === -1) return null
-  if (items[startIdx].date.slice(0, 10) > windowEnd) return null
-
-  // The next fast-related zmanim item is this fast's own end — unless it's
-  // actually a LATER fast's "Fast begins" (Ta'anit Bechorot's case), which
-  // means this one simply has no end time to find.
-  let endItem: HebcalShabbatItem | null = null
-  for (let i = startIdx + 1; i < items.length; i++) {
-    if (!isFastZman(items[i])) continue
-    if (items[i].title === 'Fast begins') break
-    if (items[i].title === 'Fast ends') {
-      endItem = items[i]
-      break
+  // The end of the fast that begins at `beginIdx`, if Hebcal publishes one:
+  // the next fast-related zmanim item — unless that's actually a LATER fast's
+  // "Fast begins" (Ta'anit Bechorot's case), which means this one has none.
+  const findEnd = (beginIdx: number): HebcalShabbatItem | null => {
+    for (let i = beginIdx + 1; i < items.length; i++) {
+      if (!isFastZman(items[i])) continue
+      if (items[i].title === 'Fast begins') return null
+      if (items[i].title === 'Fast ends') return items[i]
     }
+    return null
   }
+
+  // The first fast that hasn't already finished. The response starts a day
+  // before today (see getZmanimData), so a fast that began last evening
+  // (Tisha B'Av) is found while it's still on, and one that ended yesterday is
+  // skipped. Same grace the card applies afterwards, so a fast that ended
+  // moments ago stays up as long as it always has. A fast with no published
+  // end (Ta'anit Bechorot) counts as over once its own day has passed.
+  let startIdx = -1
+  let endItem: HebcalShabbatItem | null = null
+  for (let from = 0; ; from = startIdx + 1) {
+    startIdx = items.findIndex((i, idx) => idx >= from && isFastZman(i) && i.title === 'Fast begins')
+    if (startIdx === -1) return null
+    endItem = findEnd(startIdx)
+    const over = endItem
+      ? new Date(endItem.date).getTime() + FAST_GRACE_PERIOD_MS <= nowMs
+      : items[startIdx].date.slice(0, 10) < today
+    if (!over) break
+  }
+  if (items[startIdx].date.slice(0, 10) > windowEnd) return null
 
   const toEntry = (item: HebcalShabbatItem): ZmanEntry => ({
     label: weekdayAndDate(item.date, timezone),
@@ -381,8 +415,17 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
   // that starts past the real window; `findFastPeriod` needs no equivalent
   // guard since a fast is always a single day, never a multi-day span that
   // could straddle the window's edge the way a Yom Tov period can.
+  //
+  // The query STARTS a day before today: a period that began last night — Yom
+  // Kippur day, the second day of Rosh Hashana, Shabbos itself — has its
+  // candle-lighting yesterday, and a query starting today never sees it. The
+  // card then skipped straight to the NEXT period (Sukkot, on Yom Kippur)
+  // while today's was still going. The finders below drop whatever has
+  // already ended, so the extra day only ever contributes something that is
+  // genuinely still in progress.
+  const nowMs = Date.now()
   const windowEnd = addDays(dateStr, lookaheadDays(dayOfWeek))
-  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${dateStr}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=on&d=off&o=off&F=off&D=off`
+  const holidayUrl = `${HEBCAL_BASE}/hebcal?cfg=json&v=1&start=${addDays(dateStr, -1)}&end=${addDays(windowEnd, HOLIDAY_QUERY_PAD_DAYS)}&${geo}&c=on&maj=on&min=off&mod=off&s=off&mf=on&d=off&o=off&F=off&D=off`
 
   const [zmanim, shabbat, converter, holidayCalendar] = await Promise.all([
     fetchJson<HebcalZmanim>(zmanimUrl),
@@ -438,8 +481,8 @@ export async function getZmanimData(coords: ZmanimCoords): Promise<ZmanimData> {
     // fallback in useCalendarDays has already been resolved.
     isRoshChodesh: (converter.events ?? []).some((e) => e.startsWith('Rosh Chodesh')),
     isYomTov: (converter.events ?? []).some(isYomTovEvent),
-    holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
-    fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd),
+    holidayPeriod: findHolidayPeriod(holidayCalendar.items ?? [], timezone, windowEnd, nowMs),
+    fastPeriod: findFastPeriod(holidayCalendar.items ?? [], timezone, windowEnd, nowMs, dateStr),
   }
 }
 

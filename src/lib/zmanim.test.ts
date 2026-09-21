@@ -219,6 +219,8 @@ describe('getZmanimData', () => {
 
   describe('holidayPeriod', () => {
     it('asks /hebcal for an explicit date range, padded past the real lookahead window, not the /shabbat "next cycle" the regular candle/havdalah fields use', async () => {
+      // Starts a day BEFORE today, so a period that began last night (Yom
+      // Kippur, the second day of a Yom Tov) is still in the response.
       // Wednesday 2026-06-24, dayOfWeek 3 → lookaheadDays = max(6-3, 3) = 3,
       // so the real window ends 2026-06-27 — but the query itself reaches 3
       // days further (HOLIDAY_QUERY_PAD_DAYS), to 2026-06-30, so a period
@@ -228,7 +230,7 @@ describe('getZmanimData', () => {
       await getZmanimData(PHILADELPHIA)
 
       const holidayUrl = calls.find((c) => c.includes('/hebcal'))!
-      expect(holidayUrl).toContain('start=2026-06-24')
+      expect(holidayUrl).toContain('start=2026-06-23')
       expect(holidayUrl).toContain('end=2026-06-30')
     })
 
@@ -396,6 +398,120 @@ describe('getZmanimData', () => {
       })
       const data = await getZmanimData(PHILADELPHIA)
       expect(data.holidayPeriod).toBeNull()
+    })
+  })
+
+  // A period that began last night is still happening today — Yom Kippur day,
+  // the second day of Rosh Hashana, Shabbos itself. The calendar query used to
+  // start at today, so last night's candle-lighting fell outside it and the
+  // card skipped straight to the NEXT period (Sukkot) on Yom Kippur.
+  describe('a period already in progress', () => {
+    const YOM_KIPPUR_TO_SUKKOT = [
+      { category: 'holiday', title: 'Erev Yom Kippur', date: '2026-09-20' },
+      { category: 'candles', title: 'Candle lighting: 6:43pm', date: '2026-09-20T18:43:00-04:00' },
+      { category: 'holiday', title: 'Yom Kippur', date: '2026-09-21' },
+      { category: 'havdalah', title: 'Havdalah: 7:39pm', date: '2026-09-21T19:39:00-04:00' },
+      { category: 'holiday', title: 'Erev Sukkot', date: '2026-09-25' },
+      { category: 'candles', title: 'Candle lighting: 6:34pm', date: '2026-09-25T18:34:00-04:00' },
+      { category: 'holiday', title: 'Sukkot I', date: '2026-09-26' },
+      { category: 'candles', title: 'Candle lighting: 7:31pm', date: '2026-09-26T19:31:00-04:00' },
+      { category: 'holiday', title: 'Sukkot II', date: '2026-09-27' },
+      { category: 'havdalah', title: 'Havdalah: 7:29pm', date: '2026-09-27T19:29:00-04:00' },
+    ]
+
+    it('reports Yom Kippur, not the Sukkot after it, while Yom Kippur is still going', async () => {
+      vi.setSystemTime(new Date('2026-09-21T20:43:00Z')) // Mon 4:43pm EDT
+      mockHebcal({ holidayCalendar: { items: YOM_KIPPUR_TO_SUKKOT } })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod?.name).toBe('Yom Kippur')
+      expect(data.holidayPeriod?.begins.iso).toBe('2026-09-20T18:43:00-04:00')
+      expect(data.holidayPeriod?.ends.time).toBe('7:39 PM')
+    })
+
+    it('moves on to the next period once the current one has ended', async () => {
+      vi.setSystemTime(new Date('2026-09-21T23:45:00Z')) // Mon 7:45pm EDT, after havdalah
+      mockHebcal({ holidayCalendar: { items: YOM_KIPPUR_TO_SUKKOT } })
+      const data = await getZmanimData(PHILADELPHIA)
+
+      expect(data.holidayPeriod?.name).toBe('Sukkot')
+    })
+
+    it('does not resurface a plain Shabbos that already ended, ahead of the Yom Tov after it', async () => {
+      vi.setSystemTime(new Date('2026-09-06T16:00:00Z')) // Sun 12pm EDT
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'candles', title: 'Candle lighting: 7:12pm', date: '2026-09-04T19:12:00-04:00' },
+            { category: 'havdalah', title: 'Havdalah: 8:08pm', date: '2026-09-05T20:08:00-04:00' },
+            { category: 'holiday', title: 'Erev Rosh Hashana', date: '2026-09-11' },
+            { category: 'candles', title: 'Candle lighting: 6:57pm', date: '2026-09-11T18:57:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana 5787', date: '2026-09-12' },
+            { category: 'candles', title: 'Candle lighting: 7:55pm', date: '2026-09-12T19:55:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana II', date: '2026-09-13' },
+            { category: 'havdalah', title: 'Havdalah: 7:53pm', date: '2026-09-13T19:53:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod?.name).toBe('Rosh Hashana')
+    })
+
+    it('reports the second day of a two-day Yom Tov as still going, from the first night’s candles', async () => {
+      vi.setSystemTime(new Date('2026-09-13T15:00:00Z')) // Sun 11am EDT — Rosh Hashana II
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'candles', title: 'Candle lighting: 6:57pm', date: '2026-09-11T18:57:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana 5787', date: '2026-09-12' },
+            { category: 'candles', title: 'Candle lighting: 7:55pm', date: '2026-09-12T19:55:00-04:00' },
+            { category: 'holiday', title: 'Rosh Hashana II', date: '2026-09-13' },
+            { category: 'havdalah', title: 'Havdalah: 7:53pm', date: '2026-09-13T19:53:00-04:00' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.holidayPeriod?.name).toBe('Rosh Hashana')
+      expect(data.holidayPeriod?.ends.time).toBe('7:53 PM')
+    })
+
+    it('keeps a fast that began last evening (Tisha B’Av) until it ends', async () => {
+      vi.setSystemTime(new Date('2027-08-12T15:00:00Z')) // Thu 11am EDT, the fast day
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2027-08-11T20:03:00-04:00', memo: 'Erev Tish’a B’Av' },
+            { category: 'zmanim', subcat: 'fast', title: 'Fast ends', date: '2027-08-12T20:33:00-04:00', memo: 'Tish’a B’Av' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod?.name).toBe('Tish’a B’Av')
+    })
+
+    it('does not resurface a fast that ended yesterday', async () => {
+      vi.setSystemTime(new Date('2026-09-15T12:00:00Z')) // Tue, the day after Tzom Gedaliah
+      mockHebcal({
+        holidayCalendar: {
+          items: [
+            { category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2026-09-14T05:19:00-04:00', memo: 'Tzom Gedaliah' },
+            { category: 'zmanim', subcat: 'fast', title: 'Fast ends', date: '2026-09-14T19:44:00-04:00', memo: 'Tzom Gedaliah' },
+          ],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod).toBeNull()
+    })
+
+    it('does not resurface a fast with no published end (Ta’anit Bechorot) the day after it', async () => {
+      vi.setSystemTime(new Date('2027-04-21T12:00:00Z'))
+      mockHebcal({
+        holidayCalendar: {
+          items: [{ category: 'zmanim', subcat: 'fast', title: 'Fast begins', date: '2027-04-20T05:00:00-04:00', memo: 'Ta’anit Bechorot' }],
+        },
+      })
+      const data = await getZmanimData(PHILADELPHIA)
+      expect(data.fastPeriod).toBeNull()
     })
   })
 
