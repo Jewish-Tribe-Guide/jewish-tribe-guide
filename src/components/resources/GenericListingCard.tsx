@@ -978,11 +978,11 @@ export const GenericListingCard = forwardRef<GenericListingCardHandle, Props>(fu
           />
 
           <div className="pt-2 border-t border-slate-200 space-y-2">
-            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-            {/* Share used to sit here too, and Edit/Report followed it —
-                all three now live only in the collapsed row's own kebab
-                (ListingActionsMenu), same place Pin/Set location do,
-                rather than split between here and there. */}
+            <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? onEdit : undefined} />
+            {/* Share used to sit here too, and Edit/Report followed it — they
+                now live in the collapsed row's own kebab (ListingActionsMenu),
+                with Pin/Set location. FreshnessFooter's own "Suggest a
+                correction" link is the one visible way to Edit from here. */}
           </div>
         </div>
         </div>

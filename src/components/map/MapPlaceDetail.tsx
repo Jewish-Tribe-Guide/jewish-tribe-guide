@@ -211,9 +211,10 @@ export default function MapPlaceDetail({ item, category, color, onBack }: Props)
       <PlaceDetailBody item={item} category={category} includeHeaderUrlFields />
 
       <div className="pt-2 border-t border-slate-200 space-y-2">
-        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-        {/* Edit/Report used to sit here too — both now live only in the
-            kebab above, same place Pin/Share/Set location do. */}
+        <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
+        {/* Edit/Report used to sit here too and now live in the kebab above,
+            with Pin/Share/Set location — except FreshnessFooter's own quiet
+            "Suggest a correction" link, so it's visible a listing can be fixed. */}
       </div>
     </div>
   )

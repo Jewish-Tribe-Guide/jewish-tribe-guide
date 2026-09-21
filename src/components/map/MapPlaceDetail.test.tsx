@@ -146,6 +146,33 @@ describe('MapPlaceDetail', () => {
     expect(screen.getByRole('heading', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
+  it('has a visible "Suggest a correction" link that opens the same edit form as the kebab', async () => {
+    const userEvent = (await import('@testing-library/user-event')).default
+    const user = userEvent.setup()
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail item={makeListing({ name: 'Goldi Market' })} category={makeCategory()} color="#000" onBack={() => {}} />
+      </PinnedProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Suggest a correction' }))
+    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market (embedded)')).toBeInTheDocument()
+  })
+
+  it('shows no "Suggest a correction" link when the category has editing turned off', () => {
+    renderWithProviders(
+      <PinnedProvider>
+        <MapPlaceDetail
+          item={makeListing({ name: 'Goldi Market' })}
+          category={makeCategory({ capabilities: { edit: false } })}
+          color="#000"
+          onBack={() => {}}
+        />
+      </PinnedProvider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Suggest a correction' })).not.toBeInTheDocument()
+    expect(screen.getByText('Is this info current?')).toBeInTheDocument()
+  })
+
   // Regression: the edit form used to open with no way back at all on
   // mobile — ListingForm's own back affordance (formerly a Breadcrumb,
   // since removed everywhere) never became visible here since MapScreen

@@ -401,10 +401,12 @@ export default function ListingDetailModal({
               />
 
               <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} />
-                {/* Share, and now Edit/Report too, used to sit here — all three
-                    now live only in the header's own kebab (ListingActionsMenu),
-                    next to Close. */}
+                <FreshnessFooter resourceId={item.id} confirmedAt={item.confirmedAt} onSuggestCorrection={canEdit ? () => openForm('edit') : undefined} />
+                {/* Share, Edit and Report used to sit here as a row of links, which
+                    cluttered the details; they live in the header's kebab
+                    (ListingActionsMenu). The one exception is FreshnessFooter's own
+                    "Suggest a correction" link above, so it's visible that a
+                    listing can be fixed. */}
               </div>
             </>
           )}

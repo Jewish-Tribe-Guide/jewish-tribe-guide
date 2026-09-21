@@ -803,6 +803,33 @@ describe('GenericListingCard — expanded', () => {
     expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
   })
 
+  // The visible way in to Edit: a plain "Suggest a correction" link under the
+  // details, opposite the freshness line — the kebab alone doesn't tell a
+  // visitor that a wrong phone number is theirs to fix.
+  it('offers "Suggest a correction" in the expanded dialog, which swaps to the same edit form as the kebab', async () => {
+    const user = userEvent.setup()
+    const category = makeCategory()
+    const item = makeListing({ name: 'Goldi Market' })
+    renderWithProviders(
+      <GenericListingCard item={item} category={category} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />,
+    )
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suggest a correction' }))
+    expect(screen.getByText('ListingForm stub — mode=edit, existing=Goldi Market')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Suggest an edit' })).toBeInTheDocument()
+  })
+
+  it('offers "Suggest a correction" in the expanded mobile card, calling the same onEdit the kebab does', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ForcedViewport isMobile>
+        <GenericListingCard item={makeListing()} category={makeCategory()} upvotes={false} count={0} defaultExpanded {...requiredHandlers} />
+      </ForcedViewport>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Suggest a correction' }))
+    expect(requiredHandlers.onEdit).toHaveBeenCalledTimes(1)
+  })
+
   it('swaps the dialog\'s own content to the report form — not a separate dialog — when the kebab\'s Report item is clicked', async () => {
     const user = userEvent.setup()
     const category = makeCategory()
