@@ -91,6 +91,17 @@ describe('DELETE /api/resource/:id/confirm', () => {
     expect(written.phone).toBe('555')
   })
 
+  it.each([
+    ['not a date', 'lol'],
+    ['markup', '<img src=x onerror=alert(1)>'],
+    ['not a string', 12345],
+    ['an empty string that is not a real date', 'nope-nope'],
+  ])('400s a previousConfirmedAt that is %s, without writing', async (_n, value) => {
+    const res = await DELETE(req('DELETE', { previousConfirmedAt: value }), ctx)
+    expect(res.status).toBe(400)
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
   it('treats a missing or unparseable body as "no previous confirmation"', async () => {
     const res = await DELETE(new Request('http://x', { method: 'DELETE', body: '{oops' }), ctx)
     expect((await res.json()).confirmedAt).toBeNull()

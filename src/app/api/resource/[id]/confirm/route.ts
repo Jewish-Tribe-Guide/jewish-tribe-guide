@@ -47,7 +47,18 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
   if (limited) return limited
 
   const { id } = await ctx.params
-  const body = (await request.json().catch(() => ({}))) as { previousConfirmedAt?: string }
+  const body = (await request.json().catch(() => ({}))) as { previousConfirmedAt?: unknown }
+
+  // Public and unauthenticated, so this value is untrusted: it is written
+  // straight into the listing's details and shown to every visitor. The
+  // client only ever sends back a timestamp this route issued, so anything
+  // that isn't a real ISO date is refused rather than stored.
+  const previous = body.previousConfirmedAt
+  if (previous !== undefined && previous !== null) {
+    if (typeof previous !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(previous) || Number.isNaN(Date.parse(previous))) {
+      return Response.json({ ok: false, error: 'Invalid previous confirmation.' }, { status: 400 })
+    }
+  }
 
   const db = getAdminClient()
   const { data: row, error: fetchErr } = await db
@@ -61,8 +72,8 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
   }
 
   const newDetails = { ...(row.details as Record<string, unknown>) }
-  if (body.previousConfirmedAt) {
-    newDetails.confirmedAt = body.previousConfirmedAt
+  if (previous) {
+    newDetails.confirmedAt = previous
   } else {
     delete newDetails.confirmedAt
   }
@@ -74,5 +85,5 @@ export async function DELETE(request: Request, ctx: RouteContext<'/api/resource/
   }
 
   await revalidatePublicContent()
-  return Response.json({ ok: true, confirmedAt: body.previousConfirmedAt ?? null })
+  return Response.json({ ok: true, confirmedAt: previous ?? null })
 }
