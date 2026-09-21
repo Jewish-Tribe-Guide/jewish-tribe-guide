@@ -622,6 +622,19 @@ function withResolvedGoogleFields(
 /** Returns the id of the listing the approval affected, so the caller can act
  *  on it — a `create` submission has no target_id until now, which left the
  *  newly published listing unreachable to anything downstream. */
+/**
+ * Approval is a moderator vouching for a listing, so it counts as a
+ * confirmation — the same `confirmedAt` a visitor's "Mark as current" sets,
+ * which is what the "Confirmed 3 days ago" line under a listing reads.
+ * Without this an approved edit left the old stamp in place (or none), so a
+ * listing someone had just reviewed still said "Confirmed 8 months ago".
+ * Applied to a create and an edit only: an approved removal archives the
+ * listing and says nothing about its details being current.
+ */
+function withConfirmedNow(details: Record<string, unknown>, now: string): Record<string, unknown> {
+  return { ...details, confirmedAt: now }
+}
+
 async function applyListing(submission: SubmissionRow): Promise<string | null> {
   const supabase = getAdminClient()
   const now = new Date().toISOString()
@@ -631,6 +644,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     payload.details = withResolvedPlaceId(payload.details, payload)
     const googleFields = await resolveGoogleFields(submission.community_id, payload, null)
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
+    payload.details = withConfirmedNow(payload.details, now)
     const { data: created, error } = await supabase
       .from('resource')
       .insert({
@@ -665,6 +679,7 @@ async function applyListing(submission: SubmissionRow): Promise<string | null> {
     payload.details = withResolvedGoogleFields(payload.details, googleFields)
     payload.details = withPreservedInternals(payload.details, existingData as ResourceRow | null)
     payload.details = withClearedSyncOnNewPlaceId(payload.details, existingData as ResourceRow | null)
+    payload.details = withConfirmedNow(payload.details, now)
     const { error } = await supabase
       .from('resource')
       .update({ ...(await listingColumnsWithGeo(payload)), reviewed_at: now })

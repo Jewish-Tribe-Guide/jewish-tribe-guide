@@ -26,6 +26,7 @@ const { getAdminClient } = await import('./supabase/admin')
 const {
   submitListingCreate,
   submitListingDelete,
+  submitListingUpdate,
   approveSubmission,
   rejectSubmission,
   listPendingSubmissions,
@@ -90,6 +91,65 @@ describe('submissionStore (integration)', () => {
 
     const pendingAfter = await listPendingSubmissions('philly')
     expect(pendingAfter.some((s) => s.id === submission.id)).toBe(false)
+  })
+
+  // Approval is a moderator vouching for the listing, so it stamps confirmedAt
+  // — the same field a visitor's "Mark as current" sets. Without it a listing
+  // whose edit was just approved kept saying "Confirmed 8 months ago".
+  it('approving a create stamps the new listing as confirmed just now', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const submission = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(submission.id)
+    const before = Date.now()
+
+    await approveSubmission(submission.id)
+
+    const { data: resource } = await getAdminClient().from('resource').select('details').eq('name', name).single()
+    const stamp = Date.parse(resource!.details.confirmedAt)
+    expect(stamp).toBeGreaterThanOrEqual(before - 1000)
+    expect(stamp).toBeLessThanOrEqual(Date.now() + 1000)
+  })
+
+  it('approving an edit replaces an old confirmedAt with now, and keeps the listing’s other details', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+
+    const longAgo = '2020-01-01T00:00:00.000Z'
+    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo, kept: 'yes' } }).eq('id', created!.id)
+
+    const edit = { ...listingPayload(category.id, name), phone: '555-0100', details: { kept: 'yes' } }
+    const updateSub = await submitListingUpdate('philly', created!.id, edit, null, null)
+    pendingSubmissionIds.push(updateSub.id)
+    const before = Date.now()
+    await approveSubmission(updateSub.id)
+
+    const { data: after } = await getAdminClient().from('resource').select('details, phone').eq('id', created!.id).single()
+    expect(after!.phone).toBe('555-0100')
+    expect(after!.details.kept).toBe('yes')
+    expect(Date.parse(after!.details.confirmedAt)).toBeGreaterThanOrEqual(before - 1000)
+  })
+
+  it('archiving a listing (approved removal) does not stamp it confirmed', async () => {
+    const category = await makeTestCategory()
+    const name = `Integration Listing ${randomUUID()}`
+    const createSub = await submitListingCreate('philly', listingPayload(category.id, name))
+    pendingSubmissionIds.push(createSub.id)
+    await approveSubmission(createSub.id)
+    const { data: created } = await getAdminClient().from('resource').select('id').eq('name', name).single()
+    const longAgo = '2020-01-01T00:00:00.000Z'
+    await getAdminClient().from('resource').update({ details: { confirmedAt: longAgo } }).eq('id', created!.id)
+
+    const deleteSub = await submitListingDelete('philly', created!.id, 'closed', null)
+    pendingSubmissionIds.push(deleteSub.id)
+    await approveSubmission(deleteSub.id)
+
+    const { data: after } = await getAdminClient().from('resource').select('details').eq('id', created!.id).single()
+    expect(after!.details.confirmedAt).toBe(longAgo)
   })
 
   it('rejecting a create submission never creates a live resource', async () => {
