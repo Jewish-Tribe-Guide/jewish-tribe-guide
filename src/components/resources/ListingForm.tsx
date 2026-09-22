@@ -881,16 +881,28 @@ function DetailFieldInput({
   if (field.type === 'boolean') {
     return (
       <div>
-        <label className="flex items-center gap-2 cursor-pointer">
+        {/* Same border/rounded/px-3 py-2 footprint as a text input or select
+            (see inputClass) — a bare checkbox+label with no box at all read
+            as a much lighter, stray element next to a stack of full-width
+            bordered fields, especially wedged between two of them. Still a
+            checkbox, not a Yes/No dropdown: this is the direct, established
+            control for a boolean everywhere else in the app, and a dropdown
+            would trade one inconsistency (visual weight) for a worse one
+            (an extra click, and a state that starts on neither answer). */}
+        <label className="flex items-center gap-2 cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 hover:bg-slate-50">
           <input
             type="checkbox"
             checked={!!value}
             onChange={(e) => onChange(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
           />
-          <span className="text-sm font-medium text-slate-700">{labelOverride ?? field.label}</span>
+          <span className="text-sm text-slate-700">{labelOverride ?? field.label}</span>
         </label>
-        {field.help && <p className="text-xs text-muted mt-1 ml-6">{field.help}</p>}
+        {/* Flush left, matching every other field's help text (no more
+            ml-6 offset to align under the label past the checkbox — the
+            whole control is boxed now, so this reads as "about the box
+            above", same as a select or text field's help line). */}
+        {field.help && <p className="text-xs text-muted mt-1">{field.help}</p>}
       </div>
     )
   }
